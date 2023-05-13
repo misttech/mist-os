@@ -27,6 +27,11 @@ class RadarProviderProxy
   void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                    const std::string& filename) override;
 
+  void BindInjector(
+      fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) override {
+    server_end.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
   void on_fidl_error(fidl::UnbindInfo info) override;
 
  private:

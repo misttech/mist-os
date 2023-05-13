@@ -17,6 +17,7 @@ _common_deps = [
   "//sdk/lib/syslog/cpp",
   "//src/devices/radar/lib/vmo-manager",
   "//src/lib/fsl",
+  "//zircon/system/ulib/async:async-cpp",
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
@@ -28,6 +29,7 @@ _common_deps = [
 executable("radar-proxy-bin") {
   output_name = "radar_proxy"
   sources = [
+    "burst-injector.cc",
     "main.cc",
     "radar-provider-proxy.cc",
     "radar-reader-proxy.cc",
@@ -75,6 +77,7 @@ core_shard("radar-proxy-shard") {
 
 test("radar-proxy-test-bin") {
   sources = [
+    "burst-injector.cc",
     "radar-provider-proxy.cc",
     "radar-proxy-test.cc",
     "radar-reader-proxy.cc",
@@ -83,7 +86,6 @@ test("radar-proxy-test-bin") {
   deps = [
            "//sdk/lib/driver/runtime/testing/runtime",
            "//src/devices/bin/driver_runtime",
-           "//zircon/system/ulib/async:async-cpp",
            "//zircon/system/ulib/sync",
            "//zircon/system/ulib/zxtest",
          ] + _common_deps

@@ -55,6 +55,7 @@ class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstRe
       for (auto& vmo : registered_vmos_) {
         if (!vmo.locked) {
           vmo.locked = true;
+          vmo.vmo.write(&kRealRadarBurstMarker, 0, sizeof(kRealRadarBurstMarker));
           const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::WithBurst(
               {{vmo.vmo_id, zx::clock::get_monotonic().get()}});
           EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst2(burst).is_ok());
@@ -81,14 +82,18 @@ class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstRe
   }
 
   void set_burst_size(uint32_t burst_size) {
-    EXPECT_TRUE(fdf::RunOnDispatcherSync(dispatcher_, [&, size = burst_size]() {
-                  burst_size_ = size;
-                }).is_ok());
+    async::PostTask(dispatcher_, [&, size = burst_size]() { burst_size_ = size; });
   }
 
  private:
+  // We write this marker to the first byte of each burst we send, while injection tests write any
+  // other value. This way clients can determine whether received bursts came from the driver or
+  // were injected.
+  static constexpr uint8_t kRealRadarBurstMarker = 0xff;
+
   struct RegisteredVmo {
     uint32_t vmo_id;
+    zx::vmo vmo;
     bool locked = false;
   };
 
@@ -98,7 +103,7 @@ class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstRe
   }
 
   void GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) override {
-    completer.Reply({burst_size_, 0});
+    completer.Reply({burst_size_, zx::usec(1).to_nsecs()});
   }
 
   void RegisterVmos(RegisterVmosRequest& request, RegisterVmosCompleter::Sync& completer) override {
@@ -112,9 +117,9 @@ class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstRe
       return;
     }
 
-    for (const uint32_t vmo_id : request.vmo_ids()) {
+    for (size_t i = 0; i < request.vmos().size(); i++) {
       // Ignore normal registration errors, such as duplicate IDs.
-      registered_vmos_.push_back(RegisteredVmo{vmo_id});
+      registered_vmos_.push_back(RegisteredVmo{request.vmo_ids()[i], std::move(request.vmos()[i])});
     }
     completer.Reply(fit::success());
   }
@@ -242,6 +247,10 @@ class RadarProxyTest : public zxtest::Test, public RadarDeviceConnector {
                   provider_connect_fail_ = false;
                   dut_.DeviceAdded(kInvalidDir, "000");
                 }).is_ok());
+  }
+
+  void BindInjector(fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
+    dut_.BindInjector(std::move(server_end));
   }
 
   // Visible for testing.
@@ -562,6 +571,36 @@ TEST_F(RadarReaderProxyTest, DeviceWithInvalidBurstSizeIsRejected) {
   loop.Run();
 }
 
+// A client wrapper that supports receiving OnBurst() events. If no burst callback is specified then
+// VMOs will not be unlocked.
+struct BurstReaderClient : fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstReader> {
+ public:
+  BurstReaderClient(fidl::ClientEnd<fuchsia_hardware_radar::RadarBurstReader> client_end,
+                    async_dispatcher_t* dispatcher, std::function<void(uint32_t)> callback)
+      : client(std::move(client_end), dispatcher, this), burst_callback(std::move(callback)) {}
+
+  void OnBurst(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) override {
+    if (event.result().response()) {
+      burst_count++;
+      if (burst_callback) {
+        burst_callback(event.result().response()->burst().vmo_id());
+        EXPECT_TRUE(client->UnlockVmo(event.result().response()->burst().vmo_id()).is_ok());
+      }
+    } else {
+      error_status = event.result().err().value();
+    }
+  }
+
+  fidl::Client<fuchsia_hardware_radar::RadarBurstReader>& operator->() { return client; }
+
+  fidl::Client<fuchsia_hardware_radar::RadarBurstReader> client;
+  uint32_t burst_count = 0;
+  fuchsia_hardware_radar::StatusCode error_status = fuchsia_hardware_radar::StatusCode::kSuccess;
+
+ private:
+  const std::function<void(uint32_t)> burst_callback;
+};
+
 class RadarReaderProxyOnBurstTest : public RadarReaderProxyTest {
  public:
   RadarReaderProxyOnBurstTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
@@ -571,7 +610,7 @@ class RadarReaderProxyOnBurstTest : public RadarReaderProxyTest {
 
     AddRadarDevice();
 
-    const std::function burst_callback([&](uint32_t burst_count) { BurstCallback(burst_count); });
+    const std::function burst_callback([&](uint32_t) { BurstCallback(); });
 
     radar_clients_.reserve(4);
     for (uint32_t i = 0; i < 4; i++) {
@@ -597,36 +636,6 @@ class RadarReaderProxyOnBurstTest : public RadarReaderProxyTest {
   }
 
  protected:
-  // A client wrapper that supports receiving OnBurst() events. If no burst callback is specified
-  // then VMOs will not be unlocked.
-  struct BurstReaderClient : fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstReader> {
-   public:
-    BurstReaderClient(fidl::ClientEnd<fuchsia_hardware_radar::RadarBurstReader> client_end,
-                      async_dispatcher_t* dispatcher, std::function<void(uint32_t)> callback)
-        : client(std::move(client_end), dispatcher, this), burst_callback(std::move(callback)) {}
-
-    void OnBurst(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) override {
-      if (event.result().response()) {
-        burst_count++;
-        if (burst_callback) {
-          EXPECT_TRUE(client->UnlockVmo(event.result().response()->burst().vmo_id()).is_ok());
-          burst_callback(burst_count);
-        }
-      } else {
-        error_status = event.result().err().value();
-      }
-    }
-
-    fidl::Client<fuchsia_hardware_radar::RadarBurstReader>& operator->() { return client; }
-
-    fidl::Client<fuchsia_hardware_radar::RadarBurstReader> client;
-    uint32_t burst_count = 0;
-    fuchsia_hardware_radar::StatusCode error_status = fuchsia_hardware_radar::StatusCode::kSuccess;
-
-   private:
-    const std::function<void(uint32_t)> burst_callback;
-  };
-
   std::vector<BurstReaderClient> radar_clients_;
   async::Loop loop_;
 
@@ -638,13 +647,15 @@ class RadarReaderProxyOnBurstTest : public RadarReaderProxyTest {
   // Keep running until all clients receive this many bursts, then quit the loop.
   static constexpr uint32_t kReceiveBurstCount = 10;
 
-  void BurstCallback(uint32_t burst_count) {
+  void BurstCallback() {
     static uint32_t client_lockstep_counter = 0;
+    static uint32_t burst_count = 0;
     // Increment the counter until all clients have received this burst. At that point we can either
     // send another burst, or stop the loop.
     if (++client_lockstep_counter == kClientsWithBurstsStarted) {
       client_lockstep_counter = 0;
-      if (burst_count == kReceiveBurstCount) {
+      if (++burst_count == kReceiveBurstCount) {
+        burst_count = 0;
         loop_.Quit();
       } else {
         fake_driver_.SendBurst();
@@ -777,6 +788,349 @@ TEST_F(RadarReaderProxyOnBurstTest, StoppedClientStopsReceivingBursts) {
   EXPECT_EQ(radar_clients_[0].burst_count, 10);
   EXPECT_EQ(radar_clients_[1].burst_count, 0);
   EXPECT_EQ(radar_clients_[2].burst_count, 10);
+}
+
+class RadarReaderProxyInjectionTest : public RadarReaderProxyTest {
+ public:
+  RadarReaderProxyInjectionTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+
+  void SetUp() override {
+    fake_driver_.set_burst_size(16);
+
+    RadarReaderProxyTest::SetUp();
+
+    AddRadarDevice();
+
+    {
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+      ASSERT_TRUE(endpoints.is_ok());
+      reader_client_.emplace(std::move(endpoints->client), loop_.dispatcher(),
+                             fit::bind_member<&RadarReaderProxyInjectionTest::OnBurst>(this));
+      EXPECT_TRUE(dut_client_->Connect(std::move(endpoints->server)).is_ok());
+    }
+
+    {
+      std::vector<uint32_t> vmo_ids;
+      std::vector<zx::vmo> vmos;
+      for (uint32_t i = 0; i < 15; i++) {
+        EXPECT_OK(zx::vmo::create(16, 0, &vmos.emplace_back()));
+        EXPECT_OK(vmos.back().duplicate(ZX_RIGHT_SAME_RIGHTS, &registered_vmos_.emplace_back()));
+        vmo_ids.emplace_back(i + 1);
+      }
+
+      reader_client_.value()
+          ->RegisterVmos({std::move(vmo_ids), std::move(vmos)})
+          .Then([](auto& result) { EXPECT_TRUE(result.is_ok()); });
+    }
+
+    {
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstInjector>();
+      ASSERT_TRUE(endpoints.is_ok());
+      injector_client_.emplace(std::move(endpoints->client), loop_.dispatcher(),
+                               [&](uint32_t bursts_id) {
+                                 received_vmo_ids_.push_back(bursts_id);
+                                 if (on_bursts_delivered_) {
+                                   on_bursts_delivered_();
+                                 }
+                               });
+      BindInjector(std::move(endpoints->server));
+    }
+  }
+
+ protected:
+  struct BurstInjectorClient : fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstInjector> {
+   public:
+    BurstInjectorClient(fidl::ClientEnd<fuchsia_hardware_radar::RadarBurstInjector> client_end,
+                        async_dispatcher_t* dispatcher, std::function<void(uint32_t)> callback)
+        : client(std::move(client_end), dispatcher, this),
+          bursts_delivered_callback(std::move(callback)) {}
+
+    void OnBurstsDelivered(
+        fidl::Event<fuchsia_hardware_radar::RadarBurstInjector::OnBurstsDelivered>& event)
+        override {
+      bursts_delivered_callback(event.bursts_id());
+    }
+
+    fidl::Client<fuchsia_hardware_radar::RadarBurstInjector>& operator->() { return client; }
+
+    fidl::Client<fuchsia_hardware_radar::RadarBurstInjector> client;
+    fuchsia_hardware_radar::StatusCode error_status = fuchsia_hardware_radar::StatusCode::kSuccess;
+
+   private:
+    const std::function<void(uint32_t)> bursts_delivered_callback;
+  };
+
+  fidl::Request<fuchsia_hardware_radar::RadarBurstInjector::EnqueueBursts> CreateInjectionVmo(
+      uint8_t count, uint8_t offset = 0) {
+    zx::vmo vmo;
+    EXPECT_OK(zx::vmo::create(count * 16, 0, &vmo));
+
+    for (uint8_t i = 0; i < count; i++) {
+      uint8_t byte = i + offset;
+      EXPECT_OK(vmo.write(&byte, i * 16, sizeof(byte)));
+    }
+
+    return {{std::move(vmo), count}};
+  }
+
+  async::Loop loop_;
+  std::optional<BurstReaderClient> reader_client_;
+  std::optional<BurstInjectorClient> injector_client_;
+  std::vector<uint8_t> received_burst_headers_;
+  std::vector<zx::vmo> registered_vmos_;
+  std::vector<uint32_t> received_vmo_ids_;
+  fit::function<void(size_t)> on_burst_;
+  fit::function<void(void)> on_bursts_delivered_;
+
+ private:
+  void OnBurst(uint32_t vmo_id) {
+    ASSERT_GE(vmo_id, 1);
+    ASSERT_LE(vmo_id, 15);
+
+    uint8_t byte = 0;
+    EXPECT_OK(registered_vmos_[vmo_id - 1].read(&byte, 0, sizeof(byte)));
+    received_burst_headers_.push_back(byte);
+
+    if (on_burst_) {
+      on_burst_(received_burst_headers_.size());
+    }
+  }
+};
+
+TEST_F(RadarReaderProxyInjectionTest, InjectBursts) {
+  on_burst_ = [&](size_t burst_count) {
+    if (burst_count == 2) {
+      // Start burst injection after two real bursts.
+      injector_client_.value()->StartBurstInjection().Then(
+          [&](auto& result) { EXPECT_TRUE(result.is_ok()); });
+
+      // Immediately send a request to stop injection, which will get completed after all three
+      // burst buffers (containing a total of eight bursts) have been sent.
+      injector_client_.value()->StopBurstInjection().Then([&](auto& result) {
+        EXPECT_TRUE(result.is_ok());
+        // Send a burst from the driver to continue the test from the burst callback.
+        fake_driver_.SendBurst();
+      });
+    } else if (burst_count == 12) {
+      // Stop the loop after 12 total bursts.
+      loop_.Quit();
+    } else if (burst_count < 2 || burst_count > 10) {
+      fake_driver_.SendBurst();
+    }
+  };
+
+  EXPECT_TRUE(reader_client_.value()->StartBursts().is_ok());
+  injector_client_.value()->EnqueueBursts(CreateInjectionVmo(3, 0)).Then([&](auto& result) {
+    EXPECT_TRUE(result.is_ok());
+  });
+  injector_client_.value()->EnqueueBursts(CreateInjectionVmo(2, 3)).Then([&](auto& result) {
+    EXPECT_TRUE(result.is_ok());
+  });
+  injector_client_.value()->EnqueueBursts(CreateInjectionVmo(3, 5)).Then([&](auto& result) {
+    EXPECT_TRUE(result.is_ok());
+
+    // Send a burst to the client to trigger the the test.
+    reader_client_.value()->GetBurstProperties().Then(
+        [&](auto& result) { fake_driver_.SendBurst(); });
+  });
+
+  loop_.Run();
+
+  const std::vector<uint8_t> kExpectedBurstHeaders = {0xff, 0xff, 0x00, 0x01, 0x02, 0x03,
+                                                      0x04, 0x05, 0x06, 0x07, 0xff, 0xff};
+  ASSERT_EQ(received_burst_headers_.size(), kExpectedBurstHeaders.size());
+  EXPECT_EQ(received_burst_headers_, kExpectedBurstHeaders);
+
+  const std::vector<uint32_t> kExpectedVmoIds = {1, 2, 3};
+  ASSERT_EQ(received_vmo_ids_.size(), kExpectedVmoIds.size());
+  EXPECT_EQ(received_vmo_ids_, kExpectedVmoIds);
+}
+
+TEST_F(RadarReaderProxyInjectionTest, InjectionPausedWithNoEnqueuedVmos) {
+  on_bursts_delivered_ = [&]() {
+    if (received_vmo_ids_.size() == 1) {
+      // The last burst from the original VMO has been received, now enqueue a new one. We should
+      // still not miss any injected bursts.
+      injector_client_.value()->EnqueueBursts(CreateInjectionVmo(2, 3)).Then([&](auto& result) {
+        EXPECT_TRUE(result.is_ok());
+      });
+    } else if (received_vmo_ids_.size() == 2) {
+      injector_client_.value()->StopBurstInjection().Then([&](auto& result) {
+        EXPECT_TRUE(result.is_ok());
+        // We know that the last bursts will have been sent on the reader client channel by the time
+        // StopBurstInjection() replies. We can ensure that all bursts have been handled by sending
+        // another request with the reader client then stopping the loop when the response is
+        // received.
+        reader_client_.value()->GetBurstProperties().Then([&](auto& result) { loop_.Quit(); });
+      });
+    }
+  };
+
+  // Start burst injection, then enqueue a burst VMO. Clients should not miss any injected bursts.
+  injector_client_.value()->StartBurstInjection().Then([&](auto& result) {
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_TRUE(reader_client_.value()->StartBursts().is_ok());
+    reader_client_.value()->GetBurstProperties().Then([&](auto& result) {
+      injector_client_.value()->EnqueueBursts(CreateInjectionVmo(3, 0)).Then([&](auto& result) {
+        EXPECT_TRUE(result.is_ok());
+      });
+    });
+  });
+
+  loop_.Run();
+
+  const std::vector<uint8_t> kExpectedBurstHeaders = {0, 1, 2, 3, 4};
+  ASSERT_EQ(received_burst_headers_.size(), kExpectedBurstHeaders.size());
+  EXPECT_EQ(received_burst_headers_, kExpectedBurstHeaders);
+
+  // The buffer ID counter should be reset after the first one is returned to us.
+  const std::vector<uint32_t> kExpectedVmoIds = {1, 1};
+  ASSERT_EQ(received_vmo_ids_.size(), kExpectedVmoIds.size());
+  EXPECT_EQ(received_vmo_ids_, kExpectedVmoIds);
+}
+
+TEST_F(RadarReaderProxyInjectionTest, BurstsNotDeliveredToStopppedClients) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+  ASSERT_TRUE(endpoints.is_ok());
+
+  EXPECT_TRUE(dut_client_->Connect(std::move(endpoints->server)).is_ok());
+
+  BurstReaderClient started_client(std::move(endpoints->client), loop_.dispatcher(), [&](uint32_t) {
+    if (started_client.burst_count == 3) {
+      loop_.Quit();
+    }
+  });
+
+  for (uint32_t i = 0; i < 3; i++) {
+    std::vector<zx::vmo> vmos;
+    EXPECT_OK(zx::vmo::create(16, 0, &vmos.emplace_back()));
+    started_client->RegisterVmos({std::vector<uint32_t>{i}, std::move(vmos)})
+        .Then([&](auto& result) { EXPECT_TRUE(result.is_ok()); });
+  }
+
+  EXPECT_TRUE(started_client->StartBursts().is_ok());
+  started_client->GetBurstProperties().Then([&](auto& result) {
+    injector_client_.value()->EnqueueBursts(CreateInjectionVmo(3, 0)).Then([&](auto& result) {
+      EXPECT_TRUE(result.is_ok());
+    });
+    injector_client_.value()->StartBurstInjection().Then(
+        [&](auto& result) { EXPECT_TRUE(result.is_ok()); });
+  });
+
+  loop_.Run();
+
+  // The original (stopped) client should receive zero bursts, while the started client should
+  // receive three.
+  EXPECT_EQ(reader_client_->burst_count, 0);
+  EXPECT_EQ(started_client.burst_count, 3);
+}
+
+TEST_F(RadarReaderProxyInjectionTest, BurstsReceivedDuringInjectionAreIgnored) {
+  on_burst_ = [&](size_t) {
+    if (received_burst_headers_.size() == 5 && received_vmo_ids_.size() == 1) {
+      loop_.Quit();
+    }
+  };
+  on_bursts_delivered_ = [&]() {
+    if (received_burst_headers_.size() == 5 && received_vmo_ids_.size() == 1) {
+      loop_.Quit();
+    }
+  };
+
+  injector_client_.value()->EnqueueBursts(CreateInjectionVmo(5)).Then([&](auto& result) {
+    EXPECT_TRUE(result.is_ok());
+  });
+
+  EXPECT_TRUE(reader_client_.value()->StartBursts().is_ok());
+  reader_client_.value()->GetBurstProperties().Then([&](auto& result) {
+    injector_client_.value()->StartBurstInjection().Then([&](auto& result) {
+      EXPECT_TRUE(result.is_ok());
+      // Send three bursts from the driver after injection has been enabled and the client has been
+      // started. All three should be ignored in favor of the injected bursts.
+      fake_driver_.SendBurst();
+      fake_driver_.SendBurst();
+      fake_driver_.SendBurst();
+    });
+  });
+
+  loop_.Run();
+
+  const std::vector<uint8_t> kExpectedBursts = {0, 1, 2, 3, 4};
+  ASSERT_EQ(received_burst_headers_.size(), kExpectedBursts.size());
+  EXPECT_EQ(received_burst_headers_, kExpectedBursts);
+
+  const std::vector<uint32_t> kExpectedVmoIds = {1};
+  ASSERT_EQ(received_vmo_ids_.size(), kExpectedVmoIds.size());
+  EXPECT_EQ(received_vmo_ids_, kExpectedVmoIds);
+}
+
+TEST_F(RadarReaderProxyInjectionTest, CallsFailsWithBadState) {
+  injector_client_.value()->StartBurstInjection().Then(
+      [&](auto& result) { EXPECT_TRUE(result.is_ok()); });
+
+  injector_client_.value()->StartBurstInjection().Then([&](auto& result) {
+    ASSERT_FALSE(result.is_ok());
+    ASSERT_TRUE(result.error_value().is_domain_error());
+    EXPECT_EQ(result.error_value().domain_error(), fuchsia_hardware_radar::StatusCode::kBadState);
+  });
+
+  injector_client_.value()->StopBurstInjection().Then(
+      [&](auto& result) { EXPECT_TRUE(result.is_ok()); });
+
+  injector_client_.value()->StopBurstInjection().Then([&](auto& result) {
+    ASSERT_FALSE(result.is_ok());
+    ASSERT_TRUE(result.error_value().is_domain_error());
+    EXPECT_EQ(result.error_value().domain_error(), fuchsia_hardware_radar::StatusCode::kBadState);
+
+    loop_.Quit();
+  });
+
+  loop_.Run();
+}
+
+TEST_F(RadarReaderProxyInjectionTest, OnlyOneInjectorCanConnect) {
+  struct : public fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstInjector> {
+    void on_fidl_error(fidl::UnbindInfo info) override {
+      EXPECT_EQ(info.status(), ZX_ERR_ALREADY_BOUND);
+      fidl_error_callback();
+    }
+    fit::callback<void(void)> fidl_error_callback;
+  } client_disconnect_waiter;
+  client_disconnect_waiter.fidl_error_callback = [&]() { loop_.Quit(); };
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstInjector>();
+  ASSERT_TRUE(endpoints.is_ok());
+
+  BindInjector(std::move(endpoints->server));
+
+  fidl::Client<fuchsia_hardware_radar::RadarBurstInjector> client(
+      std::move(endpoints->client), loop_.dispatcher(), &client_disconnect_waiter);
+
+  loop_.Run();
+}
+
+TEST_F(RadarReaderProxyTest, ConnectInjectorBeforeRadarDevice) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstInjector>();
+  ASSERT_TRUE(endpoints.is_ok());
+
+  BindInjector(std::move(endpoints->server));
+
+  fidl::Client<fuchsia_hardware_radar::RadarBurstInjector> client(std::move(endpoints->client),
+                                                                  loop.dispatcher());
+
+  // Issue two requests before adding the radar device. They should be fulfilled after the proxy
+  // connects.
+  client->StartBurstInjection().Then([&](auto& result) { EXPECT_TRUE(result.is_ok()); });
+  client->StopBurstInjection().Then([&](auto& result) {
+    EXPECT_TRUE(result.is_ok());
+    loop.Quit();
+  });
+
+  AddRadarDevice();
+
+  loop.Run();
 }
 
 }  // namespace

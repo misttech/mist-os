@@ -6,6 +6,7 @@
 #define SRC_DEVICES_RADAR_BIN_RADAR_PROXY_RADAR_READER_PROXY_H_
 
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 
 #include <memory>
@@ -13,6 +14,7 @@
 #include <tuple>
 #include <vector>
 
+#include "burst-injector.h"
 #include "radar-proxy.h"
 #include "reader-instance.h"
 
@@ -20,6 +22,7 @@ namespace radar {
 
 class RadarReaderProxy : public RadarProxy,
                          public ReaderInstanceManager,
+                         public BurstInjectorManager,
                          public fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstReader> {
  public:
   RadarReaderProxy(async_dispatcher_t* dispatcher, RadarDeviceConnector* connector)
@@ -30,6 +33,8 @@ class RadarReaderProxy : public RadarProxy,
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
   void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                    const std::string& filename) override;
+  void BindInjector(
+      fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) override;
 
   // ReaderInstanceManager
   void ResizeVmoPool(size_t vmo_count) override;
@@ -37,8 +42,15 @@ class RadarReaderProxy : public RadarProxy,
   void RequestStopBursts() override;
   void OnInstanceUnbound(ReaderInstance* instance) override;
 
+  // ReaderInstanceManager/BurstInjectorManager
   fuchsia_hardware_radar::RadarBurstReaderGetBurstPropertiesResponse burst_properties()
       const override;
+
+  // BurstInjectorManager
+  zx::time StartBurstInjection() override;
+  void StopBurstInjection() override;
+  void SendBurst(cpp20::span<const uint8_t> burst, zx::time timestamp) override;
+  void OnInjectorUnbound(BurstInjector* injector) override;
 
   // fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstReader>
   void on_fidl_error(fidl::UnbindInfo info) override;
@@ -66,6 +78,9 @@ class RadarReaderProxy : public RadarProxy,
   // any other drivers that may be present.
   void HandleFatalError(zx_status_t status);
 
+  void RequestStartBursts();
+  void StopBursts();
+
   async_dispatcher_t* const dispatcher_;
   RadarDeviceConnector* const connector_;
   fidl::Client<fuchsia_hardware_radar::RadarBurstReader> radar_client_;
@@ -76,6 +91,10 @@ class RadarReaderProxy : public RadarProxy,
   std::vector<std::tuple<fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReader>,
                          ConnectCompleter::Async>>
       connect_requests_;
+  zx::time last_burst_timestamp_{};
+  bool inject_bursts_ = false;
+  std::optional<BurstInjector> injector_;
+  fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> pending_injector_client_;
 };
 
 }  // namespace radar

@@ -93,5 +93,17 @@ int main(int argc, const char** argv) {
     return -1;
   }
 
+  if (config.proxy_radar_burst_reader()) {
+    result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstInjector>(
+        [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
+          proxy->BindInjector(std::move(server_end));
+        });
+
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Failed to add RadarBurstInjector protocol: " << result.status_string();
+      return -1;
+    }
+  }
+
   return loop.Run();
 }

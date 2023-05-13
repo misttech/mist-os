@@ -4,6 +4,9 @@
 
 #include "radar-reader-proxy.h"
 
+#include <lib/fit/defer.h>
+#include <lib/zx/clock.h>
+
 namespace radar {
 
 RadarReaderProxy::~RadarReaderProxy() {
@@ -88,7 +91,7 @@ void RadarReaderProxy::ResizeVmoPool(const size_t count) {
 }
 
 void RadarReaderProxy::StartBursts() {
-  if (radar_client_) {
+  if (radar_client_ && !inject_bursts_) {
     if (auto result = radar_client_->StartBursts(); result.is_error()) {
       FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send start bursts request";
       HandleFatalError(result.error_value().status());
@@ -97,10 +100,6 @@ void RadarReaderProxy::StartBursts() {
 }
 
 void RadarReaderProxy::RequestStopBursts() {
-  if (!radar_client_) {
-    return;
-  }
-
   for (const auto& instance : instances_) {
     // Don't stop bursts if any client still wants to receive them.
     if (instance->bursts_started()) {
@@ -108,12 +107,7 @@ void RadarReaderProxy::RequestStopBursts() {
     }
   }
 
-  radar_client_->StopBursts().Then([&](const auto& result) {
-    if (result.is_error()) {
-      FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send stop bursts request";
-      HandleFatalError(result.error_value().status());
-    }
-  });
+  StopBursts();
 }
 
 void RadarReaderProxy::OnInstanceUnbound(ReaderInstance* const instance) {
@@ -133,6 +127,41 @@ RadarReaderProxy::burst_properties() const {
   return *burst_properties_;
 }
 
+zx::time RadarReaderProxy::StartBurstInjection() {
+  inject_bursts_ = true;
+  StopBursts();
+  return last_burst_timestamp_;
+}
+
+void RadarReaderProxy::StopBurstInjection() {
+  inject_bursts_ = false;
+  RequestStartBursts();
+}
+
+void RadarReaderProxy::SendBurst(cpp20::span<const uint8_t> burst, zx::time timestamp) {
+  for (auto& instance : instances_) {
+    instance->SendBurst(burst, timestamp);
+  }
+}
+
+void RadarReaderProxy::OnInjectorUnbound(BurstInjector* const injector) {
+  injector_.reset();
+  StopBurstInjection();
+}
+
+void RadarReaderProxy::BindInjector(
+    fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
+  if (injector_ || pending_injector_client_) {
+    server_end.Close(ZX_ERR_ALREADY_BOUND);
+  } else if (burst_properties_) {
+    injector_.emplace(dispatcher_, std::move(server_end), this);
+  } else {
+    // We haven't connected to the driver to read out the burst properties yet, so stash this
+    // request until we're ready.
+    pending_injector_client_ = std::move(server_end);
+  }
+}
+
 void RadarReaderProxy::on_fidl_error(const fidl::UnbindInfo info) {
   FX_PLOGS(ERROR, info.status()) << "Connection to radar device closed, attempting to reconnect";
   HandleFatalError(info.status());
@@ -144,6 +173,20 @@ void RadarReaderProxy::OnBurst(
   ZX_DEBUG_ASSERT(burst_properties_);
 
   const auto& response = event.result().response();
+
+  // Make sure to unlock the VMO even if we are injecting bursts and don't need the data.
+  const auto unlock_vmo = fit::defer([&]() {
+    if (response && response->burst().vmo_id() < vmo_pool_.size() && radar_client_) {
+      if (auto result = radar_client_->UnlockVmo(response->burst().vmo_id()); result.is_error()) {
+        HandleFatalError(result.error_value().status());
+      }
+    }
+  });
+
+  if (inject_bursts_) {
+    return;
+  }
+
   if (!response || response->burst().vmo_id() >= vmo_pool_.size()) {
     for (auto& instance : instances_) {
       instance->SendError(
@@ -152,22 +195,29 @@ void RadarReaderProxy::OnBurst(
     return;
   }
 
+  last_burst_timestamp_ = zx::time(response->burst().timestamp());
+
   const uint32_t vmo_id = response->burst().vmo_id();
   const cpp20::span<const uint8_t> burst_data{vmo_pool_[vmo_id].start(), burst_properties_->size()};
-  for (auto& instance : instances_) {
-    instance->SendBurst(burst_data, zx::time(response->burst().timestamp()));
-  }
-
-  if (radar_client_) {
-    if (auto result = radar_client_->UnlockVmo(vmo_id); result.is_error()) {
-      HandleFatalError(result.error_value().status());
-    }
-  }
+  SendBurst(burst_data, last_burst_timestamp_);
 }
 
 void RadarReaderProxy::OnBurst2(
     fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) {
   ZX_DEBUG_ASSERT(burst_properties_);
+
+  // Make sure to unlock the VMO even if we are injecting bursts and don't need the data.
+  const auto unlock_vmo = fit::defer([&]() {
+    if (event.burst() && event.burst()->vmo_id() < vmo_pool_.size() && radar_client_) {
+      if (auto result = radar_client_->UnlockVmo(event.burst()->vmo_id()); result.is_error()) {
+        HandleFatalError(result.error_value().status());
+      }
+    }
+  });
+
+  if (inject_bursts_) {
+    return;
+  }
 
   if (event.IsUnknown()) {
     HandleFatalError(ZX_ERR_BAD_STATE);
@@ -182,17 +232,11 @@ void RadarReaderProxy::OnBurst2(
     return;
   }
 
+  last_burst_timestamp_ = zx::time(event.burst()->timestamp());
+
   const uint32_t vmo_id = event.burst()->vmo_id();
   const cpp20::span<const uint8_t> burst_data{vmo_pool_[vmo_id].start(), burst_properties_->size()};
-  for (auto& instance : instances_) {
-    instance->SendBurst(burst_data, zx::time(event.burst()->timestamp()));
-  }
-
-  if (radar_client_) {
-    if (auto result = radar_client_->UnlockVmo(vmo_id); result.is_error()) {
-      HandleFatalError(result.error_value().status());
-    }
-  }
+  SendBurst(burst_data, last_burst_timestamp_);
 }
 
 bool RadarReaderProxy::ValidateDevice(
@@ -256,6 +300,11 @@ bool RadarReaderProxy::ValidateDevice(
   }
   connect_requests_.clear();
 
+  if (pending_injector_client_) {
+    ZX_DEBUG_ASSERT(!injector_);
+    injector_.emplace(dispatcher_, std::move(pending_injector_client_), this);
+  }
+
   return true;
 }
 
@@ -273,6 +322,26 @@ void RadarReaderProxy::HandleFatalError(const zx_status_t status) {
   // not, the DeviceWatcher will signal to connect when a new device becomes available.
   connector_->ConnectToFirstRadarDevice(
       [&](auto client_end) { return ValidateDevice(std::move(client_end)); });
+}
+
+void RadarReaderProxy::RequestStartBursts() {
+  for (const auto& instance : instances_) {
+    if (instance->bursts_started()) {
+      StartBursts();
+      return;
+    }
+  }
+}
+
+void RadarReaderProxy::StopBursts() {
+  if (radar_client_) {
+    radar_client_->StopBursts().Then([&](const auto& result) {
+      if (result.is_error()) {
+        FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send stop bursts request";
+        HandleFatalError(result.error_value().status());
+      }
+    });
+  }
 }
 
 }  // namespace radar

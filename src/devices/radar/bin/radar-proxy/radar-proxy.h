@@ -49,6 +49,9 @@ class RadarProxy : public fidl::Server<fuchsia_hardware_radar::RadarBurstReaderP
   virtual void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                            const std::string& filename) = 0;
 
+  virtual void BindInjector(
+      fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) = 0;
+
  private:
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
 };
