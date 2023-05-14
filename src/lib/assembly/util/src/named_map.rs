@@ -57,11 +57,35 @@ impl<T> std::ops::DerefMut for NamedMap<T> {
 }
 
 impl<T> IntoIterator for NamedMap<T> {
-    type Item = T;
-
-    type IntoIter = std::collections::btree_map::IntoValues<String, Self::Item>;
-
+    type Item = (String, T);
+    type IntoIter = std::collections::btree_map::IntoIter<String, T>;
     fn into_iter(self) -> Self::IntoIter {
-        self.entries.into_values()
+        self.entries.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a NamedMap<T> {
+    type Item = (&'a String, &'a T);
+    type IntoIter = std::collections::btree_map::Iter<'a, String, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.entries).into_iter()
+    }
+}
+
+impl<T> FromIterator<(String, T)> for NamedMap<T> {
+    fn from_iter<I: IntoIterator<Item = (String, T)>>(iter: I) -> Self {
+        Self { name: "from iterator".into(), entries: BTreeMap::from_iter(iter) }
+    }
+}
+
+impl<T, const N: usize> From<[(String, T); N]> for NamedMap<T> {
+    fn from(arr: [(String, T); N]) -> Self {
+        Self { name: "from".into(), entries: BTreeMap::from(arr) }
+    }
+}
+
+impl<T> From<NamedMap<T>> for BTreeMap<String, T> {
+    fn from(map: NamedMap<T>) -> Self {
+        map.entries
     }
 }

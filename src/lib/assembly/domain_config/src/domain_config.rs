@@ -59,7 +59,7 @@ impl DomainConfigPackage {
                 .with_context(|| format!("adding empty file {empty_file_path}"))?;
 
             // Add the necessary config files to the directory.
-            for FileEntry { source, destination } in directory_config.entries.into_iter() {
+            for (_, FileEntry { source, destination }) in directory_config.entries {
                 let destination = Utf8PathBuf::from(&directory).join(destination);
                 builder
                     .add_file_as_blob(destination, &source)
@@ -103,7 +103,6 @@ mod tests {
     use fuchsia_hash::Hash;
     use fuchsia_pkg::PackageName;
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
     use std::fs::File;
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -191,7 +190,8 @@ mod tests {
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
 
         // Prepare the domain config input.
-        let config = DomainConfig { name: "my-package".into(), directories: BTreeMap::default() };
+        let config =
+            DomainConfig { name: "my-package".into(), directories: NamedMap::new("directories") };
         let package = DomainConfigPackage::new(config);
         let (path, manifest) = package.build(&outdir).unwrap();
 

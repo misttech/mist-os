@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeSet};
 
 use assembly_config_schema::{BoardInformation, BuildType, FileEntry};
 use assembly_util::NamedMap;
@@ -197,7 +197,6 @@ impl ComponentConfigBuilderExt for &mut dyn ComponentConfigBuilder {
 }
 
 /// The in-progress builder, which hides its state.
-#[derive(Default)]
 pub(crate) struct ConfigurationBuilderImpl {
     /// The Assembly Input Bundles to add.
     bundles: BTreeSet<String>,
@@ -210,6 +209,17 @@ pub(crate) struct ConfigurationBuilderImpl {
 
     /// The domain config packages to add.
     domain_configs: DomainConfigs,
+}
+
+impl Default for ConfigurationBuilderImpl {
+    fn default() -> Self {
+        Self {
+            bundles: BTreeSet::default(),
+            bootfs: BootfsConfig::default(),
+            package_configs: PackageConfigs::new("package configs"),
+            domain_configs: DomainConfigs::new("domain configs"),
+        }
+    }
 }
 
 impl ConfigurationBuilderImpl {
@@ -243,13 +253,13 @@ pub struct CompletedConfiguration {
 }
 
 /// A map from package names to the configuration to apply to them.
-pub type PackageConfigs = BTreeMap<String, PackageConfiguration>;
+pub type PackageConfigs = NamedMap<PackageConfiguration>;
 
 /// A map from component manifest path with a namespace to the values for for the component.
-pub type ComponentConfigs = BTreeMap<String, ComponentConfiguration>;
+pub type ComponentConfigs = NamedMap<ComponentConfiguration>;
 
 /// A map from package name to domain config.
-pub type DomainConfigs = BTreeMap<String, DomainConfig>;
+pub type DomainConfigs = NamedMap<DomainConfig>;
 
 /// All of the configuration that applies to a single package.
 ///
@@ -274,7 +284,7 @@ impl PackageConfiguration {
     /// Construt a new PackageConfiguration.
     pub fn new(name: impl AsRef<str>) -> Self {
         PackageConfiguration {
-            components: ComponentConfigs::default(),
+            components: ComponentConfigs::new("component configs"),
             config_data: NamedMap::new("config data"),
             name: name.as_ref().into(),
         }
@@ -285,18 +295,24 @@ impl PackageConfiguration {
 ///
 /// This holds:
 /// - Structured Config values for this component.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ComponentConfiguration {
     /// Structured Config key-value pairs.
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: NamedMap<serde_json::Value>,
 
     /// The component's manifest path in its package or in bootfs
     manifest_path: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+impl Default for ComponentConfiguration {
+    fn default() -> Self {
+        Self { fields: NamedMap::new("structured config fields"), manifest_path: String::default() }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DomainConfig {
-    pub directories: BTreeMap<String, DomainConfigDirectory>,
+    pub directories: NamedMap<DomainConfigDirectory>,
     pub name: String,
 }
 
@@ -317,7 +333,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
     fn package(&mut self, name: &str) -> &mut dyn PackageConfigBuilder {
         self.package_configs.entry(name.to_string()).or_insert_with_key(|name| {
             PackageConfiguration {
-                components: ComponentConfigs::default(),
+                components: ComponentConfigs::new("component configs"),
                 config_data: NamedMap::new("config data"),
                 name: name.to_owned(),
             }
@@ -326,7 +342,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
 
     fn add_domain_config(&mut self, name: &str) -> &mut dyn DomainConfigBuilder {
         self.domain_configs.entry(name.to_string()).or_insert_with_key(|name| DomainConfig {
-            directories: BTreeMap::new(),
+            directories: NamedMap::new("directories"),
             name: name.to_owned(),
         })
     }
@@ -354,7 +370,7 @@ impl PackageConfigBuilder for PackageConfiguration {
         match self.components.entry(pkg_path.to_owned()) {
             entry @ Entry::Vacant(_) => {
                 Ok(entry.or_insert_with_key(|path_in_package| ComponentConfiguration {
-                    fields: BTreeMap::default(),
+                    fields: NamedMap::new("structured config fields"),
                     manifest_path: path_in_package.to_owned(),
                 }))
             }
@@ -381,15 +397,10 @@ impl ComponentConfigBuilder for ComponentConfiguration {
         key: &str,
         value: serde_json::Value,
     ) -> Result<&mut dyn ComponentConfigBuilder> {
-        if self.fields.insert(key.to_owned(), value).is_some() {
-            Err(anyhow!("Each Structured Config field can only be set once for a component"))
-                .with_context(|| format!("Setting field: {}", &key))
-                .with_context(|| {
-                    format!("Setting configuration for component: {}", self.manifest_path)
-                })
-        } else {
-            Ok(self)
-        }
+        self.fields
+            .try_insert_unique(key.to_owned(), value)
+            .context("Each Structured Config field can only be set once for a component")?;
+        Ok(self)
     }
 }
 
@@ -397,11 +408,17 @@ impl ComponentConfigBuilder for ComponentConfiguration {
 ///
 /// This is separate from PackageConfig because it may have to place bare files
 /// in bootfs.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BootfsConfig {
     /// A map from manifest paths within bootfs to the configuration values for
     /// the component.
     pub components: ComponentConfigs,
+}
+
+impl Default for BootfsConfig {
+    fn default() -> Self {
+        Self { components: ComponentConfigs::new("component configs") }
+    }
 }
 
 impl BootfsConfigBuilder for BootfsConfig {
@@ -413,7 +430,7 @@ impl BootfsConfigBuilder for BootfsConfig {
         match self.components.entry(component_manifest_path.to_owned()) {
             entry @ Entry::Vacant(_) => {
                 Ok(entry.or_insert_with_key(|component_manifest_path| ComponentConfiguration {
-                    fields: BTreeMap::default(),
+                    fields: NamedMap::new("structured config fields"),
                     manifest_path: component_manifest_path.to_owned(),
                 }))
             }
@@ -552,30 +569,42 @@ mod tests {
 
         assert_eq!(
             config.bootfs.components.get("some/bootfs_component").unwrap().fields,
-            [("key".into(), "value".into())].into()
+            NamedMap {
+                name: "structured config fields".into(),
+                entries: [("key".into(), "value".into())].into(),
+            },
         );
         assert_eq!(config.package_configs.len(), 2);
         assert_eq!(
             config.package_configs.get("package_a").unwrap(),
             &PackageConfiguration {
                 name: "package_a".into(),
-                components: [
-                    (
-                        "meta/component_a1".into(),
-                        ComponentConfiguration {
-                            manifest_path: "meta/component_a1".into(),
-                            fields: [("key_a1".into(), "value_a1".into())].into()
-                        }
-                    ),
-                    (
-                        "meta/component_a2".into(),
-                        ComponentConfiguration {
-                            manifest_path: "meta/component_a2".into(),
-                            fields: [("key_a2".into(), "value_a2".into())].into()
-                        }
-                    ),
-                ]
-                .into(),
+                components: NamedMap {
+                    name: "component configs".into(),
+                    entries: [
+                        (
+                            "meta/component_a1".into(),
+                            ComponentConfiguration {
+                                manifest_path: "meta/component_a1".into(),
+                                fields: NamedMap {
+                                    name: "structured config fields".into(),
+                                    entries: [("key_a1".into(), "value_a1".into())].into()
+                                },
+                            }
+                        ),
+                        (
+                            "meta/component_a2".into(),
+                            ComponentConfiguration {
+                                manifest_path: "meta/component_a2".into(),
+                                fields: NamedMap {
+                                    name: "structured config fields".into(),
+                                    entries: [("key_a2".into(), "value_a2".into())].into(),
+                                },
+                            }
+                        ),
+                    ]
+                    .into(),
+                },
                 config_data: NamedMap {
                     name: "config data".into(),
                     entries: [
@@ -602,18 +631,24 @@ mod tests {
             config.package_configs.get("package_b").unwrap(),
             &PackageConfiguration {
                 name: "package_b".into(),
-                components: [(
-                    "meta/component_b".into(),
-                    ComponentConfiguration {
-                        manifest_path: "meta/component_b".into(),
-                        fields: [
-                            ("key_b1".into(), "value_b1".into()),
-                            ("key_b2".into(), "value_b2".into())
-                        ]
-                        .into()
-                    }
-                )]
-                .into(),
+                components: NamedMap {
+                    name: "component configs".into(),
+                    entries: [(
+                        "meta/component_b".into(),
+                        ComponentConfiguration {
+                            manifest_path: "meta/component_b".into(),
+                            fields: NamedMap {
+                                name: "structured config fields".into(),
+                                entries: [
+                                    ("key_b1".into(), "value_b1".into()),
+                                    ("key_b2".into(), "value_b2".into())
+                                ]
+                                .into(),
+                            },
+                        }
+                    )]
+                    .into(),
+                },
                 config_data: NamedMap {
                     name: "config data".into(),
                     entries: [(
@@ -622,7 +657,7 @@ mod tests {
                             destination: "config/one".into(),
                             source: "config_data1".into(),
                         }
-                    ),]
+                    )]
                     .into(),
                 },
             }
@@ -712,10 +747,12 @@ mod tests {
 
         assert_eq!(
             format_result(result),
-            r"Configuring Subsystem Failed
-    1.  Setting configuration for component: bar
-    2.  Setting field: key
-    3.  Each Structured Config field can only be set once for a component"
+            r#"Configuring Subsystem Failed
+    1.  Each Structured Config field can only be set once for a component
+    2.  duplicate entry in structured config fields:
+  key: 'key'
+  existing value: String("value")
+  new value: String("value2")"#
         );
     }
 

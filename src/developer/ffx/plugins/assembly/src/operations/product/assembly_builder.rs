@@ -108,9 +108,9 @@ impl ImageAssemblyConfigBuilder {
             boot_args: BTreeSet::default(),
             shell_commands: ShellCommands::default(),
             bootfs_files: FileEntryMap::new("bootfs files"),
-            bootfs_structured_config: ComponentConfigs::default(),
-            package_configs: PackageConfigs::default(),
-            domain_configs: DomainConfigs::default(),
+            bootfs_structured_config: ComponentConfigs::new("component configs"),
+            package_configs: PackageConfigs::new("package configs"),
+            domain_configs: DomainConfigs::new("domain configs"),
             kernel_path: None,
             kernel_args: BTreeSet::default(),
             kernel_clock_backstop: None,
@@ -516,7 +516,7 @@ impl ImageAssemblyConfigBuilder {
             // check if we should try to configure the component before attempting so we can still
             // return errors for other conditions like a missing config field or a wrong type
             if bootfs_repackager.has_component(&component) {
-                bootfs_repackager.set_component_config(&component, values.fields)?;
+                bootfs_repackager.set_component_config(&component, values.fields.into())?;
             } else {
                 // TODO(https://fxbug.dev/101556) return an error here
             }
@@ -540,7 +540,7 @@ impl ImageAssemblyConfigBuilder {
                     // Iterate over the components to get their structured config values
                     for (component, values) in &config.components {
                         repackager
-                            .set_component_config(component, values.fields.clone())
+                            .set_component_config(component, values.fields.clone().into())
                             .with_context(|| format!("setting new config for {component}"))?;
                     }
                     let new_path = repackager
@@ -991,7 +991,7 @@ mod tests {
             .set_package_config(
                 vars.config_data_target_package_name.clone(),
                 PackageConfiguration {
-                    components: ComponentConfigs::default(),
+                    components: ComponentConfigs::new("component configs"),
                     name: vars.config_data_target_package_name.clone(),
                     config_data: NamedMap {
                         name: "config data".into(),
