@@ -96,7 +96,10 @@ extern "C" void riscv64_boot_cpu_init(uint32_t hart_id) {
   riscv64_mp_early_init_percpu(hart_id, 0);
 }
 
-void arch_early_init() { riscv64_mmu_early_init(); }
+void arch_early_init() {
+  riscv64_sbi_early_init();
+  riscv64_mmu_early_init();
+}
 
 void arch_prevm_init() {}
 
@@ -104,19 +107,8 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   // print some arch info
   dprintf(INFO, "RISCV: Boot HART ID %u\n", riscv64_boot_hart);
   dprintf(INFO, "RISCV: Supervisor mode\n");
-  dprintf(INFO, "RISCV: mvendorid %#lx marchid %#lx mimpid %#lx\n",
-          sbi_call(SBI_GET_MVENDORID).value, sbi_call(SBI_GET_MARCHID).value,
-          sbi_call(SBI_GET_MIMPID).value);
-  dprintf(INFO, "RISCV: SBI impl id %#lx version %#lx\n", sbi_call(SBI_GET_SBI_IMPL_ID).value,
-          sbi_call(SBI_GET_SBI_IMPL_VERSION).value);
 
-  // probe some SBI extensions
-  dprintf(INFO, "RISCV: SBI extension TIMER %ld\n",
-          sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_TIMER).value);
-  dprintf(INFO, "RISCV: SBI extension IPI %ld\n", sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_IPI).value);
-  dprintf(INFO, "RISCV: SBI extension RFENCE %ld\n",
-          sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_RFENCE).value);
-  dprintf(INFO, "RISCV: SBI extension HSM %ld\n", sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_HSM).value);
+  riscv64_sbi_init();
 
   riscv64_mmu_init();
 

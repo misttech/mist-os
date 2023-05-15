@@ -448,21 +448,21 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
 // terminal is set when flushing at the final level of the page table.
 void Riscv64ArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
   LTRACEF("vaddr %#lx asid %#hx terminal %u\n", vaddr, asid_, terminal);
-  unsigned long hart_mask = mask_all_but_one(riscv64_curr_hart_id());
+  cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
   if (terminal) {
     __asm__ __volatile__("sfence.vma  %0, %1" ::"r"(vaddr), "r"(asid_) : "memory");
-    sbi_remote_sfence_vma_asid(&hart_mask, 0, vaddr, PAGE_SIZE, asid_);
+    sbi_remote_sfence_vma_asid(cpu_mask, vaddr, PAGE_SIZE, asid_);
   } else {
     __asm("sfence.vma  zero, %0" ::"r"(asid_) : "memory");
-    sbi_remote_sfence_vma_asid(&hart_mask, 0, 0, -1, asid_);
+    sbi_remote_sfence_vma_asid(cpu_mask, 0, -1, asid_);
   }
 }
 
 void Riscv64ArchVmAspace::FlushAsid() const {
   LTRACEF("asid %#hx\n", asid_);
   __asm("sfence.vma  zero, %0" ::"r"(asid_) : "memory");
-  unsigned long hart_mask = mask_all_but_one(riscv64_curr_hart_id());
-  sbi_remote_sfence_vma_asid(&hart_mask, 0, 0, -1, asid_);
+  cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
+  sbi_remote_sfence_vma_asid(cpu_mask, 0, -1, asid_);
 }
 
 ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size,

@@ -48,7 +48,7 @@ void riscv64_timer_exception() {
   timer_tick(current_time());
 }
 
-zx_ticks_t platform_current_ticks() { return riscv64_get_time(); }
+zx_ticks_t platform_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME); }
 
 zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
   // TODO(fxb/91701): consider the memory order semantics of this load when the

@@ -79,6 +79,7 @@ if (toolchain_base_environment == "kernel") {
       "mmu.cc",
       "mp.cc",
       "restricted.cc",
+      "sbi.cc",
       "spinlock.cc",
       "start.S",
       "thread.cc",

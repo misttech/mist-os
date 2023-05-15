@@ -39,7 +39,8 @@ ktl::atomic<uint32_t> ipi_data[SMP_MAX_CPUS];
 void riscv64_software_exception() {
   uint current_hart = riscv64_curr_hart_id();
 
-  sbi_clear_ipi();
+  // Clear the IPI by clearing the pending software IPI bit.
+  riscv64_csr_clear(RISCV64_CSR_SIP, RISCV64_CSR_SIP_SIP);
 
   rmb();
   uint32_t reason = ipi_data[current_hart].exchange(0);
@@ -79,15 +80,16 @@ void arch_mp_reschedule(cpu_mask_t mask) {
 void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi) {
   LTRACEF("target %d mask %#x, ipi %d\n", target, mask, ipi);
 
-  ulong hart_mask = 0;
+  arch::HartMask hart_mask = 0;
+  arch::HartMaskBase hart_mask_base = 0;
 
   // translate the high level target + mask mechanism into just a mask
   switch (target) {
     case MP_IPI_TARGET_ALL:
-      hart_mask = (1ul << SMP_MAX_CPUS) - 1;
+      hart_mask = -1;
       break;
     case MP_IPI_TARGET_ALL_BUT_LOCAL:
-      hart_mask = mask_all_but_one(riscv64_curr_hart_id());
+      hart_mask = ~(1UL << riscv64_curr_hart_id());
       break;
     case MP_IPI_TARGET_MASK:
       for (uint cpu = 0; cpu < SMP_MAX_CPUS && mask; cpu++, mask >>= 1) {
@@ -107,7 +109,8 @@ void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi) {
 
   mb();
   LTRACEF("sending to hart_mask %#lx\n", hart_mask);
-  sbi_send_ipis(&hart_mask);
+  arch::RiscvSbiRet ret = sbi_send_ipi(hart_mask, hart_mask_base);
+  DEBUG_ASSERT(ret.error == arch::RiscvSbiError::kSuccess);
 }
 
 // Called once per cpu, sets up the percpu structure and tracks cpu number to hart id.

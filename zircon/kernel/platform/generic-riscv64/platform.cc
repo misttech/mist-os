@@ -532,7 +532,7 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
     power_shutdown();
 
     // TODO-rvbringup: remove this call here and have SBI register via the power pdev
-    sbi_call(SBI_SHUTDOWN);
+    sbi_shutdown();
   }
 
   if (reason == ZirconCrashReason::Panic) {
