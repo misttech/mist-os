@@ -178,6 +178,17 @@ cat > "${BT_TEMP_DIR}/out/default/tool_paths.json" <<EOF
 ]
 EOF
 
+cat > "${BT_TEMP_DIR}/out/default/product_bundles.json" <<EOF
+[
+  {
+    "label": "//vendor/google/products/bar:bar_eng.x64_bazel_action(//build/toolchain/fuchsia:${HOST_CPU})",
+    "path": "gen/vendor/google/products/bar/bar_eng.x64/product_bundle",
+    "transfer_manifest_path": "gen/vendor/google/products/bar/bar_eng.x64/transfer_manifest/transfer.json",
+    "transfer_manifest_url": "file://gen/vendor/google/products/bar/bar_eng.x64/transfer_manifest/transfer.json"
+  }
+]
+EOF
+
 cat > "${BT_TEMP_DIR}/out/default/generated_sources.json" <<EOF
 [
   "fidling/gen/sdk/fidl/fuchsia.time/fuchsia/time/cpp/fidl.cc",
@@ -273,6 +284,10 @@ TEST_fx-list-build-artifacts-generated-sources() {
 
 TEST_fx-list-build-artifacts-mkzedboot() {
   BT_EXPECT_EQ "$(${fx} list-build-artifacts mkzedboot)" "zedboot.esp.blk"
+}
+
+TEST_fx-list-build-artifacts-mkzedboot() {
+  BT_EXPECT_EQ "$(${fx} list-build-artifacts product-bundle)" "gen/vendor/google/products/bar/bar_eng.x64/product_bundle"
 }
 
 BT_RUN_TESTS "$@"

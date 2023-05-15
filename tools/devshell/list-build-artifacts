@@ -37,6 +37,7 @@
 ##                `boot-tests`-- returns the list of boot tests
 ##                `generated-sources`-- returns the list of generated sources
 ##                 (e.g., FIDL and Banjo bindings).
+##                `product-bundle` -- returns the root of the product bundle
 ##
 
 set -o errexit
@@ -48,6 +49,7 @@ readonly IMAGES_JSON="images.json"
 readonly TOOL_PATHS_JSON="tool_paths.json"
 readonly BOOT_TESTS_JSON="boot_tests.json"
 readonly GENERATED_SOURCES_JSON="generated_sources.json"
+readonly PRODUCT_BUNDLE_JSON="product_bundles.json"
 
 build=false
 allow_empty=false
@@ -153,6 +155,9 @@ elif [[ "${mode}" == boot-tests ]]; then
 elif [[ "${mode}" == generated-sources ]]; then
   manifest="${GENERATED_SOURCES_JSON}"
   is_list_like=true
+elif [[ "${mode}" == product-bundle ]]; then
+  manifest="${PRODUCT_BUNDLE_JSON}"
+  jq_filter+=" |  select(.path != null)"
 else
   fx-error "unknown MODE: ${mode}"
   fx-command-help
