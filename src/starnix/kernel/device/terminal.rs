@@ -421,7 +421,7 @@ impl TerminalMutableState<Base = Terminal> {
 
     /// `query_events` implementation of the main side of the terminal.
     fn main_query_events(&self) -> FdEvents {
-        if self.is_replica_closed() {
+        if self.is_replica_closed() && self.output_queue().readable_size() == 0 {
             return FdEvents::POLLOUT | FdEvents::POLLHUP;
         }
         self.output_queue().read_readyness() | self.input_queue().write_readyness()
@@ -433,7 +433,7 @@ impl TerminalMutableState<Base = Terminal> {
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
-        if self.is_replica_closed() {
+        if self.is_replica_closed() && self.output_queue().readable_size() == 0 {
             return error!(EIO);
         }
         let result = with_queue!(self.output_queue.read(self.as_mut(), current_task, data))?;
