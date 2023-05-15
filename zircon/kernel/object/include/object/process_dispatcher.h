@@ -172,7 +172,9 @@ class ProcessDispatcher final
 
   State state() const;
 
-  fbl::RefPtr<AttributionObject> attribution_obj() { return attribution_obj_; }
+  // Attribution object tracking the process that this dispatcher instance
+  // represents.
+  const fbl::RefPtr<AttributionObject>& attribution_object() const;
 
   fbl::RefPtr<JobDispatcher> job();
 
@@ -346,9 +348,9 @@ class ProcessDispatcher final
   // the enclosing job
   const fbl::RefPtr<JobDispatcher> job_;
 
-  // Attribution object tracking the process that this dispatcher
-  // instance represents.
-  fbl::RefPtr<AttributionObject> attribution_obj_;
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  fbl::RefPtr<AttributionObject> attribution_object_;
+#endif
 
   // Job that this process is critical to.
   //

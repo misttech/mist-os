@@ -18,6 +18,7 @@
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/inline_array.h>
+#include <kernel/attribution.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
 #include <object/process_dispatcher.h>
@@ -181,9 +182,28 @@ JobDispatcher::JobDispatcher(uint32_t /*flags*/, fbl::RefPtr<JobDispatcher> pare
       policy_(policy),
       exceptionate_(ZX_EXCEPTION_CHANNEL_TYPE_JOB) {
   kcounter_add(dispatcher_job_create_count, 1);
+
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  // Insert the sentinel nodes in the global list of attribution objects.
+  {
+    Guard<CriticalMutex> guard{AttributionObjectNode::AllAttributionObjectsLock::Get()};
+    AttributionObjectNode* where = parent_ ? parent_->attribution_objects_end() : nullptr;
+    AttributionObjectNode::AddToGlobalListLocked(where, &attribution_objects_begin_);
+    AttributionObjectNode::AddToGlobalListLocked(where, &attribution_objects_end_);
+  }
+#endif
 }
 
 JobDispatcher::~JobDispatcher() {
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  // Remove the sentinel nodes from the global list of attribution objects.
+  {
+    Guard<CriticalMutex> guard{AttributionObjectNode::AllAttributionObjectsLock::Get()};
+    AttributionObjectNode::RemoveFromGlobalListLocked(&attribution_objects_begin_);
+    AttributionObjectNode::RemoveFromGlobalListLocked(&attribution_objects_end_);
+  }
+#endif
+
   kcounter_add(dispatcher_job_destroy_count, 1);
   bool parent_should_die = RemoveFromJobTreesUnlocked();
   if (parent_should_die) {
@@ -192,6 +212,17 @@ JobDispatcher::~JobDispatcher() {
 }
 
 zx_koid_t JobDispatcher::get_related_koid() const { return parent_ ? parent_->get_koid() : 0u; }
+
+// TODO(fxbug.dev/117196): Make these methods inline if KBMA is accepted.
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+AttributionObjectNode* JobDispatcher::attribution_objects_begin() {
+  return &attribution_objects_begin_;
+}
+
+AttributionObjectNode* JobDispatcher::attribution_objects_end() {
+  return &attribution_objects_end_;
+}
+#endif
 
 bool JobDispatcher::AddChildProcess(const fbl::RefPtr<ProcessDispatcher>& process) {
   canary_.Assert();

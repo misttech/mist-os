@@ -5,28 +5,44 @@
 // https://opensource.org/licenses/MIT
 #include "kernel/attribution.h"
 
-fbl::DoublyLinkedList<AttributionObject*> AttributionObject::all_attribution_objects_;
+fbl::DoublyLinkedList<AttributionObjectNode*> AttributionObjectNode::all_nodes_;
 
+// Save some memory if kernel-based memory attribution is disabled.
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
 AttributionObject AttributionObject::kernel_attribution_;
+#endif
+
+void AttributionObjectNode::AddToGlobalListLocked(AttributionObjectNode* where,
+                                                  AttributionObjectNode* node) {
+  if (likely(where != nullptr)) {
+    all_nodes_.insert(*where, node);
+  } else {
+    all_nodes_.push_back(node);
+  }
+}
+
+void AttributionObjectNode::RemoveFromGlobalListLocked(AttributionObjectNode* node) {
+  DEBUG_ASSERT(node->InContainer());
+  all_nodes_.erase(*node);
+}
 
 void AttributionObject::KernelAttributionInit() TA_NO_THREAD_SAFETY_ANALYSIS {
   AttributionObject::kernel_attribution_.Adopt();
-  AttributionObject::kernel_attribution_.SetOwningKoid(0);
-  all_attribution_objects_.push_back(&AttributionObject::kernel_attribution_);
 }
 
 AttributionObject::~AttributionObject() {
-  AttributionObject::RemoveAttributionFromGlobalList(this);
+  if (!InContainer()) {
+    return;
+  }
+
+  Guard<CriticalMutex> guard{AllAttributionObjectsLock::Get()};
+  RemoveFromGlobalListLocked(this);
 }
 
-void AttributionObject::AddAttributionToGlobalList(AttributionObject* obj) {
-  ZX_DEBUG_ASSERT(obj != nullptr);
-  Guard<Mutex> guard{AllAttributionObjectsLock::Get()};
-  all_attribution_objects_.push_back(obj);
-}
+void AttributionObject::AddToGlobalListWithKoid(AttributionObjectNode* where,
+                                                zx_koid_t owning_koid) {
+  owning_koid_ = owning_koid;
 
-void AttributionObject::RemoveAttributionFromGlobalList(AttributionObject* obj) {
-  ZX_DEBUG_ASSERT(obj != nullptr);
-  Guard<Mutex> guard{AllAttributionObjectsLock::Get()};
-  all_attribution_objects_.erase(*obj);
+  Guard<CriticalMutex> guard{AllAttributionObjectsLock::Get()};
+  AddToGlobalListLocked(where, this);
 }

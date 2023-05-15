@@ -14,6 +14,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/name.h>
 #include <fbl/ref_counted.h>
+#include <kernel/attribution.h>
 #include <kernel/lockdep.h>
 #include <ktl/array.h>
 #include <object/dispatcher.h>
@@ -95,6 +96,11 @@ class JobDispatcher final
   void get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final;
   zx_status_t set_name(const char* name, size_t len) final;
   uint32_t max_height() const { return max_height_; }
+
+  // The sentinel nodes marking the beginning and the end of this job's contents
+  // in the linked list of all the attribution objects in the system.
+  AttributionObjectNode* attribution_objects_begin();
+  AttributionObjectNode* attribution_objects_end();
 
   bool AddChildProcess(const fbl::RefPtr<ProcessDispatcher>& process);
   void RemoveChildProcess(ProcessDispatcher* process);
@@ -297,6 +303,10 @@ class JobDispatcher final
 
   // Aggregated runtime stats for processes that have exited.
   TaskRuntimeStats aggregated_runtime_stats_ TA_GUARDED(get_lock());
+
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  AttributionObjectNode attribution_objects_begin_, attribution_objects_end_;
+#endif
 };
 
 // Returns the job that is the ancestor of all other tasks.

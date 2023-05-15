@@ -198,17 +198,18 @@ ProcessDispatcher::ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shareabl
                                      fbl::RefPtr<AttributionObject> attribution_object)
     : shareable_state_(ktl::move(shareable_state)),
       job_(ktl::move(job)),
-      attribution_obj_(ktl::move(attribution_object)),
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+      attribution_object_(ktl::move(attribution_object)),
+#endif
       policy_(job_->GetPolicy()),
       exceptionate_(ZX_EXCEPTION_CHANNEL_TYPE_PROCESS),
       debug_exceptionate_(ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER),
       name_(name.data(), name.length()) {
   LTRACE_ENTRY_OBJ;
 
-  if (attribution_obj_) {
-    attribution_obj_->SetOwningKoid(get_koid());
-    AttributionObject::AddAttributionToGlobalList(attribution_obj_.get());
-  }
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  attribution_object_->AddToGlobalListWithKoid(job_->attribution_objects_end(), get_koid());
+#endif
 
   kcounter_add(dispatcher_process_create_count, 1);
 }
@@ -509,6 +510,13 @@ ProcessDispatcher::State ProcessDispatcher::state() const {
   Guard<CriticalMutex> guard{get_lock()};
   return state_;
 }
+
+// TODO(fxbug.dev/117196): Make this method inline if KBMA is accepted.
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+const fbl::RefPtr<AttributionObject>& ProcessDispatcher::attribution_object() const {
+  return attribution_object_;
+}
+#endif
 
 fbl::RefPtr<JobDispatcher> ProcessDispatcher::job() { return job_; }
 

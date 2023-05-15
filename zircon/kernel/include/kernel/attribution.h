@@ -13,25 +13,63 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 
+// There is one attribution object per process, and an extra one for the
+// kernel's own memory (AttributionObject::kernel_attribution_). Each
+// ProcessDispatcher contains a pointer to the corresponding AttributionObject.
+//
+// In addition to those references, we also keep a linked lists of all the
+// attribution objects, which is used to answer queries more quickly. In detail,
+// two types of queries are possible:
+//
+// - Queries directed to a specific process: those are answered by simply
+//   following the ProcessDispatcher's pointer to the AttributionObject.
+//
+// - Queries directed to a specific job, which return the list of all the
+//   attribution objects belonging to descendant processes. In order to quickly
+//   locate the entries belonging to a given job, we add two sentinel nodes in
+//   the linked list for each job, with the property that all the nodes
+//   corresponding to descendant jobs/processes must be stored between them.
+//   Retrieving all the attribution objects under a given job becomes then a
+//   matter of simply scanning the list, starting from the job's first sentinel
+//   node and stopping at the second one.
+//
+// Nodes are inserted in this list when the corresponding ProcessDispatcher or
+// JobDispatcher is created and removed when the corresponding dispatcher is
+// destroyed, with an exception: attribution object nodes may outlive the
+// corresponding ProcessDispatcher if, after the process exits, a non-zero
+// number of VmCowPages are still attributed to that process. This can happen
+// if VMOs that are kept alive by references in other processes were attributed
+// to the exited process. This exception is not written explicitly: it results
+// from our usage of RefPtrs. Such attribution objects are only reachable by
+// scanning the list, e.g. by querying one of their ancestor jobs.
+
+class AttributionObjectNode : public fbl::DoublyLinkedListable<AttributionObjectNode*> {
+ public:
+  // Protects the global list of the attribution objects.
+  DECLARE_SINGLETON_CRITICAL_MUTEX(AllAttributionObjectsLock);
+
+  // Inserts a new node in the list before the given existing node (or at the
+  // end if |where| is nullptr).
+  static void AddToGlobalListLocked(AttributionObjectNode* where, AttributionObjectNode* node)
+      TA_REQ(AllAttributionObjectsLock::Get());
+
+  // Removes a node from the list.
+  static void RemoveFromGlobalListLocked(AttributionObjectNode* node)
+      TA_REQ(AllAttributionObjectsLock::Get());
+
+ private:
+  // All the nodes in the system.
+  static fbl::DoublyLinkedList<AttributionObjectNode*> all_nodes_
+      TA_GUARDED(AllAttributionObjectsLock::Get());
+};
+
 /// AttributionObject is a collection of counters that track page
 /// allocations and deallocations of VmObjectPageds owned by the
 /// process identified by `owning_koid_`.
-class AttributionObject : public fbl::RefCounted<AttributionObject>,
-                          public fbl::DoublyLinkedListable<AttributionObject*> {
+class AttributionObject : public fbl::RefCounted<AttributionObject>, private AttributionObjectNode {
  public:
-  AttributionObject() : owning_koid_(ZX_KOID_INVALID) {}
   ~AttributionObject();
 
-  // No copy, move, or assignment.
-  AttributionObject(const AttributionObject&) = delete;
-  AttributionObject(AttributionObject&&) = delete;
-  AttributionObject& operator=(const AttributionObject&) = delete;
-  AttributionObject& operator=(AttributionObject&&) = delete;
-
-  static void AddAttributionToGlobalList(AttributionObject* obj)
-      TA_EXCL(AllAttributionObjectsLock::Get());
-  static void RemoveAttributionFromGlobalList(AttributionObject* obj)
-      TA_EXCL(AllAttributionObjectsLock::Get());
   static void KernelAttributionInit();
 
   // Provides a statically defined AttributionObject that tracks
@@ -42,6 +80,11 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>,
   static fbl::RefPtr<AttributionObject> GetKernelAttribution() {
     return fbl::RefPtr<AttributionObject>(&kernel_attribution_);
   }
+
+  // Sets the owning koid and inserts this attribution object in the list before
+  // the given existing node.
+  void AddToGlobalListWithKoid(AttributionObjectNode* where, zx_koid_t owning_koid)
+      TA_EXCL(AllAttributionObjectsLock::Get());
 
   // Increment allocation counters by `page_count`.
   // total_resident_pages_allocated_ is unconditionally incremented.
@@ -67,7 +110,6 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>,
     }
   }
 
-  void SetOwningKoid(zx_koid_t owning_koid) { owning_koid_ = owning_koid; }
   zx_koid_t GetOwningKoid() const { return owning_koid_; }
 
  private:
@@ -85,10 +127,6 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>,
   RelaxedAtomic<uint64_t> total_resident_pages_deallocated_{0};
   // The koid of the process that this attribution object is tracking.
   zx_koid_t owning_koid_;
-
-  DECLARE_SINGLETON_MUTEX(AllAttributionObjectsLock);
-  static fbl::DoublyLinkedList<AttributionObject*> all_attribution_objects_
-      TA_GUARDED(AllAttributionObjectsLock::Get());
 
   // The attribution object used to track resident memory
   // for VMOs attributed to the kernel.

@@ -4,11 +4,17 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <kernel/attribution.h>
 #include <object/executor.h>
 
 void Executor::Init() {
   // Create root job.
   root_job_ = JobDispatcher::CreateRootJob();
+  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
+    // Insert the kernel's attribution object as a child of the root job.
+    fbl::RefPtr<AttributionObject> kernel = AttributionObject::GetKernelAttribution();
+    kernel->AddToGlobalListWithKoid(root_job_->attribution_objects_end(), ZX_KOID_INVALID);
+  }
 
   // Create handle.
   root_job_handle_ =
