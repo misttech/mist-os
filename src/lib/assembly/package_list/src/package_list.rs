@@ -8,7 +8,13 @@ use {
     fuchsia_pkg::{PackageManifest, PackagePath},
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
     serde_json::json,
-    std::{collections::BTreeMap, fs::File, io::Write, path::Path, str::FromStr},
+    std::{
+        collections::{BTreeMap, BTreeSet},
+        fs::File,
+        io::Write,
+        path::Path,
+        str::FromStr,
+    },
 };
 
 /// `WritablePackageList` represents a collection of packages that can be populated and
@@ -125,14 +131,16 @@ impl WritablePackageList for PackageList {
 /// A list of package URLs pinned to a hash, which can be written to a file.
 #[derive(Default, Debug)]
 pub struct PackageUrlList {
-    packages: Vec<PinnedAbsolutePackageUrl>,
+    /// Using a BTreeSet to ensure output consistency, i.e. order of output package list is not
+    /// subject to insertion order.
+    packages: BTreeSet<PinnedAbsolutePackageUrl>,
 }
 
 impl PackageUrlList {
     /// Returns a reference to the list absolute package urls
     /// that this instance contains.
-    pub fn get_packages(&self) -> &Vec<PinnedAbsolutePackageUrl> {
-        return &self.packages;
+    pub fn get_packages(&self) -> Vec<&PinnedAbsolutePackageUrl> {
+        return self.packages.iter().collect();
     }
 }
 
@@ -155,7 +163,7 @@ impl WritablePackageList for PackageUrlList {
             merkle,
         )
         .map_err(|e| anyhow!("Failed to create package url: {}", e))?;
-        self.packages.push(url);
+        self.packages.insert(url);
         Ok(())
     }
 
@@ -208,12 +216,14 @@ mod tests {
     fn package_list() {
         let mut out: Vec<u8> = Vec::new();
         let mut packages = PackageList::default();
+        packages.insert(Some("testrepository.com"), "package2", Hash::from([34u8; 32])).unwrap();
         packages.insert(Some("testrepository.com"), "package0", Hash::from([0u8; 32])).unwrap();
         packages.insert(Some("testrepository.com"), "package1", Hash::from([17u8; 32])).unwrap();
         packages.write(&mut out).unwrap();
         assert_eq!(
             b"package0=0000000000000000000000000000000000000000000000000000000000000000\n\
-                    package1=1111111111111111111111111111111111111111111111111111111111111111\n",
+                    package1=1111111111111111111111111111111111111111111111111111111111111111\n\
+                    package2=2222222222222222222222222222222222222222222222222222222222222222\n",
             &*out
         );
     }
@@ -222,11 +232,12 @@ mod tests {
     fn package_url_list() {
         let mut out: Vec<u8> = Vec::new();
         let mut packages = PackageUrlList::default();
+        packages.insert(Some("testrepository.com"), "package2/0", Hash::from([34u8; 32])).unwrap();
         packages.insert(Some("testrepository.com"), "package0/0", Hash::from([0u8; 32])).unwrap();
         packages.insert(Some("testrepository.com"), "package1/0", Hash::from([17u8; 32])).unwrap();
         packages.write(&mut out).unwrap();
         assert_eq!(
-            br#"{"content":["fuchsia-pkg://testrepository.com/package0/0?hash=0000000000000000000000000000000000000000000000000000000000000000","fuchsia-pkg://testrepository.com/package1/0?hash=1111111111111111111111111111111111111111111111111111111111111111"],"version":"1"}"#,
+            br#"{"content":["fuchsia-pkg://testrepository.com/package0/0?hash=0000000000000000000000000000000000000000000000000000000000000000","fuchsia-pkg://testrepository.com/package1/0?hash=1111111111111111111111111111111111111111111111111111111111111111","fuchsia-pkg://testrepository.com/package2/0?hash=2222222222222222222222222222222222222222222222222222222222222222"],"version":"1"}"#,
             &*out
         );
     }

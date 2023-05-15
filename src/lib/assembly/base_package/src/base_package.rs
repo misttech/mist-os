@@ -173,7 +173,7 @@ mod tests {
              ?hash=0000000000000000000000000000000000000000000000000000000000000000"
             .parse()
             .unwrap();
-        assert_eq!(&vec![url], build_results.cache_packages.get_packages());
+        assert_eq!(vec![&url], build_results.cache_packages.get_packages());
 
         // Inspect the generated files to verify their contents.
         let gen_static_index = build_results.generated_files.get("data/static_packages").unwrap();
