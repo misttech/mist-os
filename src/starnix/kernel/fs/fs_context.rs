@@ -96,6 +96,10 @@ impl FsContext {
         Ok(())
     }
 
+    pub fn umask(&self) -> FileMode {
+        self.state.read().umask
+    }
+
     pub fn apply_umask(&self, mode: FileMode) -> FileMode {
         let umask = self.state.read().umask;
         mode & !umask

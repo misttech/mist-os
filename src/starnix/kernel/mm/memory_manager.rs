@@ -1937,8 +1937,14 @@ impl DynamicFileSource for ProcStatFile {
         }
         let stat_str = stats.map(|n| n.to_string()).join(" ");
 
-        // TODO: report correct state.
-        writeln!(sink, "{} ({}) R {}", self.0.get_pid(), command, stat_str)?;
+        writeln!(
+            sink,
+            "{} ({}) {} {}",
+            self.0.get_pid(),
+            command,
+            self.0.state_code().code_char(),
+            stat_str
+        )?;
 
         Ok(())
     }
@@ -1985,8 +1991,10 @@ impl DynamicFileSource for ProcStatusFile {
         sink.write(task.command().as_bytes());
         writeln!(sink)?;
 
-        // TODO: report task state.
-        writeln!(sink, "State:\tR (running)")?;
+        writeln!(sink, "Umask:\t0{:03o}", self.0.fs().umask().bits())?;
+
+        let state_code = self.0.state_code();
+        writeln!(sink, "State:\t{} ({})", state_code.code_char(), state_code.name())?;
 
         writeln!(sink, "Tgid:\t{}", task.get_pid())?;
         writeln!(sink, "Pid:\t{}", task.id)?;

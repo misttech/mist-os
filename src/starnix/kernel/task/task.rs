@@ -275,6 +275,35 @@ pub enum ExceptionResult {
     Unhandled,
 }
 
+pub enum TaskStateCode {
+    // Task is being executed.
+    Running,
+
+    // Task is waiting for an event.
+    Sleeping,
+
+    // Task has exited.
+    Zombie,
+}
+
+impl TaskStateCode {
+    pub fn code_char(&self) -> char {
+        match self {
+            TaskStateCode::Running => 'R',
+            TaskStateCode::Sleeping => 'S',
+            TaskStateCode::Zombie => 'Z',
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            TaskStateCode::Running => "running",
+            TaskStateCode::Sleeping => "sleeping",
+            TaskStateCode::Zombie => "zombie",
+        }
+    }
+}
+
 pub struct Task {
     pub id: pid_t,
 
@@ -985,6 +1014,17 @@ impl Task {
 
     pub fn logging_span(&self) -> logging::Span {
         self.logging_span.clone()
+    }
+
+    pub fn state_code(&self) -> TaskStateCode {
+        let status = self.read();
+        if status.exit_status.is_some() {
+            TaskStateCode::Zombie
+        } else if status.signals.waiter.is_valid() {
+            TaskStateCode::Sleeping
+        } else {
+            TaskStateCode::Running
+        }
     }
 }
 
