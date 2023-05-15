@@ -37,8 +37,7 @@ pub struct DownloadCommand {
     #[argh(positional)]
     pub manifest_url: String,
 
-    /// local directory to download the product bundle into (default:
-    /// "local_pb").
-    #[argh(positional, default = "PathBuf::from(\"local_pb\")")]
-    pub out_dir: PathBuf,
+    /// local name of the product bundle directory.
+    #[argh(positional)]
+    pub product_dir: PathBuf,
 }

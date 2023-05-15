@@ -28,14 +28,14 @@ pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
     let mut output = stdout();
     let mut err_out = stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.out_dir, &client, &ui).await
+    pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui).await
 }
 
 pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     auth: &AuthFlowChoice,
     force: bool,
     manifest_url: &str,
-    out_dir: &Path,
+    product_dir: &Path,
     client: &Client,
     ui: &I,
 ) -> Result<()> {
@@ -46,10 +46,10 @@ pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
         Ok(p) => p,
         _ => ffx_bail!("The source location must be a URL, failed to parse {:?}", manifest_url),
     };
-    tracing::debug!("make_way_for_output {:?}", out_dir);
-    make_way_for_output(&out_dir, force).await?;
+    tracing::debug!("make_way_for_output {:?}", product_dir);
+    make_way_for_output(&product_dir, force).await?;
 
-    let parent_dir = out_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
+    let parent_dir = product_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
     let temp_dir = tempfile::TempDir::new_in(&parent_dir)?;
     tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
@@ -74,10 +74,10 @@ pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
 
     // Workaround for having the product bundle nested in a sub-dir.
     let extra_dir = temp_dir.path().join("product_bundle");
-    let pb_dir = if extra_dir.exists() { extra_dir } else { temp_dir.path().to_path_buf() };
-    rename(&pb_dir, &out_dir)
+    let from_dir = if extra_dir.exists() { extra_dir } else { temp_dir.path().to_path_buf() };
+    rename(&from_dir, &product_dir)
         .await
-        .with_context(|| format!("moving dir {:?} to {:?}", pb_dir, out_dir))?;
+        .with_context(|| format!("moving dir {:?} to {:?}", from_dir, product_dir))?;
 
     let layers = vec![ProgressState { name: "complete", at: 2, of: 2, units: "steps" }];
     let mut progress = structured_ui::Progress::builder();
@@ -131,14 +131,14 @@ mod test {
         let auth = pbms::AuthFlowChoice::Default;
         let force = false;
         let manifest_url = "gs://example/fake/transfer.json".to_string();
-        let out_dir = test_dir.path().join("download");
+        let product_dir = test_dir.path().join("download");
         let client = Client::initial_with_urls(
             &server.local_url_for_path("api"),
             &server.local_url_for_path("storage"),
         )
         .expect("creating client");
         let ui = structured_ui::MockUi::new();
-        pb_download_impl(&auth, force, &manifest_url, &out_dir, &client, &ui)
+        pb_download_impl(&auth, force, &manifest_url, &product_dir, &client, &ui)
             .await
             .expect("testing download");
     }
