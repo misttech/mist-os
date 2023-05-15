@@ -1578,8 +1578,29 @@ pub struct Ipv4DeviceConfigurationUpdate {
     pub ip_config: Option<IpDeviceConfigurationUpdate>,
 }
 
-fn get_prev_and_update<T>(field: &mut T, new: Option<T>) -> Option<T> {
-    new.map(|v| core::mem::replace(field, v))
+struct Delta<T> {
+    prev: T,
+    next: T,
+}
+
+fn get_prev_next_and_update<T: Copy>(field: &mut T, next: Option<T>) -> Option<Delta<T>> {
+    next.map(|next| Delta { prev: core::mem::replace(field, next), next })
+}
+
+fn handle_change_and_get_prev<T: PartialEq>(
+    delta: Option<Delta<T>>,
+    f: impl FnOnce(T),
+) -> Option<T> {
+    delta.map(|Delta { prev, next }| {
+        if prev != next {
+            f(next)
+        }
+        prev
+    })
+}
+
+fn dont_handle_change_and_get_prev<T: PartialEq>(delta: Option<Delta<T>>) -> Option<T> {
+    handle_change_and_get_prev(delta, |_: T| {})
 }
 
 /// Updates the IPv4 configuration for the device.
@@ -1605,27 +1626,63 @@ pub(crate) fn update_ipv4_configuration<
     device_id: &SC::DeviceId,
     Ipv4DeviceConfigurationUpdate { ip_config }: Ipv4DeviceConfigurationUpdate,
 ) -> Result<Ipv4DeviceConfigurationUpdate, NotSupportedError> {
-    update_ipv4_configuration_inner(sync_ctx, ctx, device_id, |config| {
-        Ipv4DeviceConfigurationUpdate {
-            ip_config: ip_config.map(
-                |IpDeviceConfigurationUpdate { ip_enabled, forwarding_enabled, gmp_enabled }| {
+    let not_supported = ip_config.map_or(
+        false,
+        |IpDeviceConfigurationUpdate { ip_enabled: _, gmp_enabled: _, forwarding_enabled }| {
+            device_id.is_loopback() && forwarding_enabled.unwrap_or(false)
+        },
+    );
+    if not_supported {
+        return Err(NotSupportedError);
+    }
+
+    sync_ctx.with_ip_device_configuration_mut(device_id, |mut inner| {
+        let config = inner.configuration_mut();
+        let ip_config_updates = ip_config.map(
+            |IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled }| {
+                (
+                    get_prev_next_and_update(&mut config.ip_config.ip_enabled, ip_enabled),
+                    get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
+                    get_prev_next_and_update(
+                        &mut config.ip_config.forwarding_enabled,
+                        forwarding_enabled,
+                    ),
+                )
+            },
+        );
+
+        let (config, mut sync_ctx) = inner.ip_device_configuration_and_ctx();
+        let sync_ctx = &mut sync_ctx;
+        Ok(Ipv4DeviceConfigurationUpdate {
+            ip_config: ip_config_updates.map(
+                |(ip_enabled_updates, gmp_enabled_updates, forwarding_enabled_updates)| {
                     IpDeviceConfigurationUpdate {
-                        ip_enabled: get_prev_and_update(
-                            &mut config.ip_config.ip_enabled,
-                            ip_enabled,
-                        ),
-                        gmp_enabled: get_prev_and_update(
-                            &mut config.ip_config.gmp_enabled,
-                            gmp_enabled,
-                        ),
-                        forwarding_enabled: get_prev_and_update(
-                            &mut config.ip_config.forwarding_enabled,
-                            forwarding_enabled,
+                        ip_enabled: handle_change_and_get_prev(ip_enabled_updates, |next| {
+                            if next {
+                                enable_ipv4_device_with_config(sync_ctx, ctx, device_id, config)
+                            } else {
+                                disable_ipv4_device_with_config(sync_ctx, ctx, device_id, config)
+                            }
+
+                            ctx.on_event(IpDeviceEvent::EnabledChanged {
+                                device: device_id.clone(),
+                                ip_enabled: next,
+                            })
+                        }),
+                        gmp_enabled: handle_change_and_get_prev(gmp_enabled_updates, |next| {
+                            if next {
+                                GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id)
+                            } else {
+                                GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id)
+                            }
+                        }),
+                        forwarding_enabled: dont_handle_change_and_get_prev(
+                            forwarding_enabled_updates,
                         ),
                     }
                 },
             ),
-        }
+        })
     })
 }
 
@@ -1670,113 +1727,96 @@ pub(crate) fn update_ipv6_configuration<
         ip_config,
     }: Ipv6DeviceConfigurationUpdate,
 ) -> Result<Ipv6DeviceConfigurationUpdate, NotSupportedError> {
-    update_ipv6_configuration_inner(sync_ctx, ctx, device_id, |config| {
-        Ipv6DeviceConfigurationUpdate {
-            dad_transmits: get_prev_and_update(&mut config.dad_transmits, dad_transmits),
-            max_router_solicitations: get_prev_and_update(
-                &mut config.max_router_solicitations,
-                max_router_solicitations,
+    let not_supported = ip_config
+        .map(|IpDeviceConfigurationUpdate { ip_enabled: _, gmp_enabled: _, forwarding_enabled }| {
+            device_id.is_loopback() && forwarding_enabled.unwrap_or(false)
+        })
+        .unwrap_or(false);
+    if not_supported {
+        return Err(NotSupportedError);
+    }
+
+    sync_ctx.with_ipv6_device_configuration_mut(device_id, |mut inner| {
+        let config = inner.configuration_mut();
+        let dad_transmits_updates =
+            get_prev_next_and_update(&mut config.dad_transmits, dad_transmits);
+        let max_router_solicitations_updates = get_prev_next_and_update(
+            &mut config.max_router_solicitations,
+            max_router_solicitations,
+        );
+        let slaac_config_updates = get_prev_next_and_update(&mut config.slaac_config, slaac_config);
+        let ip_config_updates = ip_config.map(
+            |IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled }| {
+                let config = inner.configuration_mut();
+                (
+                    get_prev_next_and_update(&mut config.ip_config.ip_enabled, ip_enabled),
+                    get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
+                    get_prev_next_and_update(
+                        &mut config.ip_config.forwarding_enabled,
+                        forwarding_enabled,
+                    ),
+                )
+            },
+        );
+
+        let (config, mut sync_ctx) = inner.ipv6_device_configuration_and_ctx();
+        let sync_ctx = &mut sync_ctx;
+        Ok(Ipv6DeviceConfigurationUpdate {
+            dad_transmits: dont_handle_change_and_get_prev(dad_transmits_updates),
+            max_router_solicitations: dont_handle_change_and_get_prev(
+                max_router_solicitations_updates,
             ),
-            slaac_config: get_prev_and_update(&mut config.slaac_config, slaac_config),
-            ip_config: ip_config.map(
-                |IpDeviceConfigurationUpdate { ip_enabled, forwarding_enabled, gmp_enabled }| {
+            slaac_config: dont_handle_change_and_get_prev(slaac_config_updates),
+            ip_config: ip_config_updates.map(
+                |(ip_enabled_updates, gmp_enabled_updates, forwarding_enabled_updates)| {
                     IpDeviceConfigurationUpdate {
-                        ip_enabled: get_prev_and_update(
-                            &mut config.ip_config.ip_enabled,
-                            ip_enabled,
-                        ),
-                        gmp_enabled: get_prev_and_update(
-                            &mut config.ip_config.gmp_enabled,
-                            gmp_enabled,
-                        ),
-                        forwarding_enabled: get_prev_and_update(
-                            &mut config.ip_config.forwarding_enabled,
-                            forwarding_enabled,
+                        ip_enabled: handle_change_and_get_prev(ip_enabled_updates, |next| {
+                            if next {
+                                enable_ipv6_device_with_config(sync_ctx, ctx, device_id, config)
+                            } else {
+                                disable_ipv6_device_with_config(sync_ctx, ctx, device_id, config)
+                            }
+
+                            ctx.on_event(IpDeviceEvent::EnabledChanged {
+                                device: device_id.clone(),
+                                ip_enabled: next,
+                            })
+                        }),
+                        gmp_enabled: handle_change_and_get_prev(gmp_enabled_updates, |next| {
+                            if next {
+                                GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id)
+                            } else {
+                                GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id)
+                            }
+                        }),
+                        forwarding_enabled: handle_change_and_get_prev(
+                            forwarding_enabled_updates,
+                            |next| {
+                                if next {
+                                    RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
+                                    join_ip_multicast_with_config(
+                                        sync_ctx,
+                                        ctx,
+                                        device_id,
+                                        Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+                                        config,
+                                    );
+                                } else {
+                                    leave_ip_multicast_with_config(
+                                        sync_ctx,
+                                        ctx,
+                                        device_id,
+                                        Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+                                        config,
+                                    );
+                                    RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
+                                }
+                            },
                         ),
                     }
                 },
             ),
-        }
-    })
-}
-
-/// Updates the IPv4 Configuration for the device.
-///
-/// The device's configuration will be left unchanged when `Err(_)` is returned.
-fn update_ipv4_configuration_inner<
-    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceConfigurationContext<Ipv4, C>,
-    O,
-    F: FnOnce(&mut Ipv4DeviceConfiguration) -> O,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    device_id: &SC::DeviceId,
-    update_cb: F,
-) -> Result<O, NotSupportedError> {
-    sync_ctx.with_ip_device_configuration_mut(device_id, |mut inner| {
-        let (ret, prev_config) = {
-            let config = inner.configuration_mut();
-            let prev_config = *config;
-
-            let ret = update_cb(config);
-
-            if device_id.is_loopback() {
-                let Ipv4DeviceConfiguration {
-                    ip_config:
-                        IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, forwarding_enabled },
-                } = config;
-
-                if *forwarding_enabled {
-                    *config = prev_config;
-                    return Err(NotSupportedError);
-                }
-            }
-
-            (ret, prev_config)
-        };
-
-        let Ipv4DeviceConfiguration {
-            ip_config:
-                IpDeviceConfiguration {
-                    ip_enabled: prev_ip_enabled,
-                    gmp_enabled: prev_gmp_enabled,
-                    forwarding_enabled: _,
-                },
-        } = prev_config;
-        let (config, mut sync_ctx) = inner.ip_device_configuration_and_ctx();
-        let Ipv4DeviceConfiguration {
-            ip_config:
-                IpDeviceConfiguration {
-                    ip_enabled: next_ip_enabled,
-                    gmp_enabled: next_gmp_enabled,
-                    forwarding_enabled: _,
-                },
-        } = *config;
-        let sync_ctx = &mut sync_ctx;
-
-        if prev_ip_enabled != next_ip_enabled {
-            if next_ip_enabled {
-                enable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
-            } else {
-                disable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
-            }
-
-            ctx.on_event(IpDeviceEvent::EnabledChanged {
-                device: device_id.clone(),
-                ip_enabled: next_ip_enabled,
-            });
-        }
-
-        if prev_gmp_enabled != next_gmp_enabled {
-            if next_gmp_enabled {
-                GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-            } else {
-                GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
-            }
-        }
-
-        Ok(ret)
+        })
     })
 }
 
@@ -1790,116 +1830,6 @@ pub(super) fn is_ip_device_enabled<
 ) -> bool {
     sync_ctx.with_ip_device_configuration(device_id, |state, _ctx| {
         AsRef::<IpDeviceConfiguration>::as_ref(state).ip_enabled
-    })
-}
-
-/// Updates the IPv6 Configuration for the device.
-///
-/// The device's configuration will be left unchanged when `Err(_)` is returned.
-fn update_ipv6_configuration_inner<
-    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: Ipv6DeviceConfigurationContext<C>,
-    O,
-    F: FnOnce(&mut Ipv6DeviceConfiguration) -> O,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    device_id: &SC::DeviceId,
-    update_cb: F,
-) -> Result<O, NotSupportedError> {
-    sync_ctx.with_ipv6_device_configuration_mut(device_id, |mut inner| {
-        let (ret, prev_config) = {
-            let config = inner.configuration_mut();
-            let prev_config = *config;
-            let ret = update_cb(config);
-
-            if device_id.is_loopback() {
-                let Ipv6DeviceConfiguration {
-                    dad_transmits: _,
-                    max_router_solicitations: _,
-                    slaac_config: _,
-                    ip_config:
-                        IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, forwarding_enabled },
-                } = config;
-
-                if *forwarding_enabled {
-                    *config = prev_config;
-                    return Err(NotSupportedError);
-                }
-            }
-
-            (ret, prev_config)
-        };
-
-        let Ipv6DeviceConfiguration {
-            dad_transmits: _,
-            max_router_solicitations: _,
-            slaac_config: _,
-            ip_config:
-                IpDeviceConfiguration {
-                    ip_enabled: prev_ip_enabled,
-                    gmp_enabled: prev_gmp_enabled,
-                    forwarding_enabled: prev_forwarding_enabled,
-                },
-        } = prev_config;
-        let (config, mut sync_ctx) = inner.ipv6_device_configuration_and_ctx();
-        let Ipv6DeviceConfiguration {
-            dad_transmits: _,
-            max_router_solicitations: _,
-            slaac_config: _,
-            ip_config:
-                IpDeviceConfiguration {
-                    ip_enabled: next_ip_enabled,
-                    gmp_enabled: next_gmp_enabled,
-                    forwarding_enabled: next_forwarding_enabled,
-                },
-        } = *config;
-        let sync_ctx = &mut sync_ctx;
-
-        if prev_ip_enabled != next_ip_enabled {
-            if next_ip_enabled {
-                enable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
-            } else {
-                disable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
-            }
-
-            ctx.on_event(IpDeviceEvent::EnabledChanged {
-                device: device_id.clone(),
-                ip_enabled: next_ip_enabled,
-            });
-        }
-
-        if prev_gmp_enabled != next_gmp_enabled {
-            if next_gmp_enabled {
-                GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-            } else {
-                GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
-            }
-        }
-
-        if prev_forwarding_enabled != next_forwarding_enabled {
-            if next_forwarding_enabled {
-                RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
-                join_ip_multicast_with_config(
-                    sync_ctx,
-                    ctx,
-                    device_id,
-                    Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
-                    config,
-                );
-            } else {
-                leave_ip_multicast_with_config(
-                    sync_ctx,
-                    ctx,
-                    device_id,
-                    Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
-                    config,
-                );
-                RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
-            }
-        }
-
-        Ok(ret)
     })
 }
 
