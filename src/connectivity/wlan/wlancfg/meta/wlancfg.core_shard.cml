@@ -55,12 +55,6 @@
             to: "#wlancfg",
         },
         {
-            directory: "config-data",
-            from: "parent",
-            to: "#wlancfg",
-            subdir: "wlancfg",
-        },
-        {
             storage: "data",
             from: "self",
             to: "#wlancfg",

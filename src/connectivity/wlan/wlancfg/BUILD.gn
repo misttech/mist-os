@@ -190,17 +190,6 @@ core_shard("wlancfg-core-shard") {
   shard_file = "meta/wlancfg.core_shard.cml"
 }
 
-config_data("config") {
-  for_pkg = "wlancfg"
-  if (wlancfg_config_type == "ap") {
-    sources = [ rebase_path("config/ap.json") ]
-    outputs = [ "default.json" ]
-  } else if (wlancfg_config_type == "client") {
-    sources = [ rebase_path("config/client.json") ]
-    outputs = [ "default.json" ]
-  }
-}
-
 fuchsia_component("wlancfg_lib_test") {
   testonly = true
   manifest = "meta/wlancfg_lib_test.cml"
