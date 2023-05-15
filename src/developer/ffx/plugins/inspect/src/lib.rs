@@ -28,7 +28,7 @@ fho::embedded_plugin!(InspectTool);
 pub struct InspectTool {
     #[command]
     cmd: InspectCommand,
-    #[with(deferred(moniker("bootstrap/archivist")))]
+    #[with(deferred(moniker("/bootstrap/archivist")))]
     archive_accessor: Deferred<ArchiveAccessorProxy>,
     rcs: Deferred<RemoteControlProxy>,
 }
