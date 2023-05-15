@@ -8,8 +8,11 @@
 #include <debug.h>
 #include <lib/arch/riscv64/sbi-call.h>
 #include <lib/arch/riscv64/sbi.h>
+#include <trace.h>
 
-#include <ktl/forward.h>
+#include <arch/riscv64/mp.h>
+
+#define LOCAL_TRACE 0
 
 // Basic SBI wrapper routines and extension detection.
 //
@@ -110,26 +113,33 @@ void riscv64_sbi_init() {
 }
 
 arch::RiscvSbiRet sbi_send_ipi(arch::HartMask mask, arch::HartMaskBase mask_base) {
+  LTRACEF("hart_mask %#lx, mask_base %lu\n", mask, mask_base);
+
   return arch::RiscvSbi::SendIpi(mask, mask_base);
 }
 
 arch::RiscvSbiRet sbi_hart_start(arch::HartId hart_id, paddr_t start_addr, uint64_t priv) {
+  LTRACEF("hart_id %lu, start_addr %#lx, priv %#lx\n", hart_id, start_addr, priv);
   return arch::RiscvSbi::HartStart(hart_id, start_addr, priv);
 }
 
 arch::RiscvSbiRet sbi_remote_sfence_vma(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size) {
-  // TODO: translate cpu mask to hart mask using routine from later commit
-  arch::HartMask hart_mask = cpu_mask;
+  arch::HartMask hart_mask = riscv64_cpu_mask_to_hart_mask(cpu_mask);
   arch::HartMaskBase hart_mask_base = 0;
+
+  LTRACEF("start %#lx, size %#lx, cpu_mask %#x, hart_mask %#lx\n", start, size, cpu_mask,
+          hart_mask);
 
   return arch::RiscvSbi::RemoteSfenceVma(hart_mask, hart_mask_base, start, size);
 }
 
 arch::RiscvSbiRet sbi_remote_sfence_vma_asid(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size,
                                              uint64_t asid) {
-  // TODO: translate cpu mask to hart mask using routine from later commit
-  arch::HartMask hart_mask = cpu_mask;
+  arch::HartMask hart_mask = riscv64_cpu_mask_to_hart_mask(cpu_mask);
   arch::HartMaskBase hart_mask_base = 0;
+
+  LTRACEF("start %#lx, size %#lx, asid %lu, cpu_mask %#x, hart_mask %#lx\n", start, size, asid,
+          cpu_mask, hart_mask);
 
   return arch::RiscvSbi::RemoteSfenceVmaAsid(hart_mask, hart_mask_base, start, size, asid);
 }

@@ -11,12 +11,14 @@
 
 #ifndef __ASSEMBLER__
 
+#include <lib/arch/riscv64/sbi.h>
 #include <zircon/compiler.h>
 
 #include <arch/defines.h>
 #include <arch/riscv64.h>
 #include <kernel/align.h>
 #include <kernel/cpu.h>
+#include <ktl/atomic.h>
 
 struct percpu;
 
@@ -42,6 +44,11 @@ struct alignas(MAX_CACHE_LINE) riscv64_percpu {
 
   // Flag to track that we're in restricted mode.
   uint32_t in_restricted_mode;
+
+  // A bitmask of queued ipis for this cpu on its own cache line to avoid
+  // aliasing with the rest of the percpu data since this is frequently accessed
+  // from external cpus.
+  __CPU_ALIGN ktl::atomic<uint32_t> ipi_data;
 };
 static_assert(offsetof(struct riscv64_percpu, in_restricted_mode) == PERCPU_IN_RESTRICTED_MODE,
               "in_restricted mode is at the wrong offset");
@@ -115,7 +122,10 @@ inline uint arch_max_num_cpus() { return riscv64_num_cpus; }
 void riscv64_mp_early_init_percpu(uint32_t hart_id, uint cpu_num);
 
 inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD32(cpu_num); }
-inline cpu_num_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }
+inline uint32_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }
+
+// Translate a bitmap of cpu ids to a bitmap of harts, which may not be 1:1
+arch::HartMask riscv64_cpu_mask_to_hart_mask(cpu_mask_t cmask);
 
 inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD32(in_restricted_mode); }
 inline void arch_set_restricted_flag(bool restricted) {
