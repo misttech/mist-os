@@ -40,13 +40,36 @@ fn static_directory_builder_with_common_task_entries<'a>(
 ) -> StaticDirectoryBuilder<'a> {
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.entry_creds(task.as_fscred());
-    dir.entry(b"exe", ExeSymlink::new(task), mode!(IFLNK, 0o777));
+    let local_task = task.clone();
+    dir.entry(
+        b"cwd",
+        CallbackSymlinkNode::new(move || Ok(SymlinkTarget::Node(local_task.fs().cwd()))),
+        mode!(IFLNK, 0o777),
+    );
+    let local_task = task.clone();
+    dir.entry(
+        b"exe",
+        CallbackSymlinkNode::new(move || {
+            if let Some(node) = local_task.mm.executable_node() {
+                Ok(SymlinkTarget::Node(node))
+            } else {
+                error!(ENOENT)
+            }
+        }),
+        mode!(IFLNK, 0o777),
+    );
     dir.entry(b"fd", FdDirectory::new(task), mode!(IFDIR, 0o777));
     dir.entry(b"fdinfo", FdInfoDirectory::new(task), mode!(IFDIR, 0o777));
     dir.entry(b"io", IoFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"limits", LimitsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"mem", MemFile::new_node(task), mode!(IFREG, 0o600));
+    let local_task = task.clone();
+    dir.entry(
+        b"root",
+        CallbackSymlinkNode::new(move || Ok(SymlinkTarget::Node(local_task.fs().root()))),
+        mode!(IFLNK, 0o777),
+    );
     dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"statm", ProcStatmFile::new_node(task), mode!(IFREG, 0o444));
@@ -101,9 +124,13 @@ impl FsNodeOps for FdDirectory {
         let fd = FdNumber::from_fs_str(name).map_err(|_| errno!(ENOENT))?;
         // Make sure that the file descriptor exists before creating the node.
         let _ = self.task.files.get(fd).map_err(|_| errno!(ENOENT))?;
+        let local_task = self.task.clone();
         Ok(node.fs().create_node(
-            FdSymlink::new(self.task.clone(), fd),
-            FdSymlink::file_mode(),
+            CallbackSymlinkNode::new(move || {
+                let file = local_task.files.get(fd).map_err(|_| errno!(ENOENT))?;
+                Ok(SymlinkTarget::Node(file.name.clone()))
+            }),
+            mode!(IFLNK, 0o777),
             self.task.as_fscred(),
         ))
     }
@@ -184,28 +211,14 @@ impl FsNodeOps for NsDirectory {
         } else {
             // The name is {namespace}, link to the correct one of the current task.
             Ok(node.fs().create_node(
-                NsDirectoryEntry { name },
+                CallbackSymlinkNode::new(move || {
+                    // For now, all namespace have the identifier 1.
+                    Ok(SymlinkTarget::Path(format!("{}:[1]", name).as_bytes().to_vec()))
+                }),
                 mode!(IFLNK, 0o7777),
                 self.task.as_fscred(),
             ))
         }
-    }
-}
-
-/// An entry in the ns pseudo directory. For now, all namespace have the identifier 1.
-struct NsDirectoryEntry {
-    name: String,
-}
-
-impl FsNodeOps for NsDirectoryEntry {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path(format!("{}:[1]", self.name).as_bytes().to_vec()))
     }
 }
 
@@ -304,66 +317,6 @@ impl FsNodeOps for TaskListDirectory {
         let task =
             self.thread_group.kernel.pids.read().get_task(tid).ok_or_else(|| errno!(ENOENT))?;
         Ok(tid_directory(&node.fs(), &task))
-    }
-}
-
-/// An `ExeSymlink` points to the `executable_node` (the node that contains the task's binary) of
-/// the task that reads it.
-pub struct ExeSymlink {
-    task: Arc<Task>,
-}
-
-impl ExeSymlink {
-    fn new(task: &Arc<Task>) -> Self {
-        Self { task: Arc::clone(task) }
-    }
-}
-
-impl FsNodeOps for ExeSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        if let Some(node) = self.task.mm.executable_node() {
-            Ok(SymlinkTarget::Node(node))
-        } else {
-            error!(ENOENT)
-        }
-    }
-}
-
-/// `FdSymlink` is a symlink that points to a specific file descriptor in a task.
-pub struct FdSymlink {
-    /// The file descriptor that this symlink targets.
-    fd: FdNumber,
-
-    /// The task that `fd` is to be read from.
-    task: Arc<Task>,
-}
-
-impl FdSymlink {
-    fn new(task: Arc<Task>, fd: FdNumber) -> Self {
-        FdSymlink { fd, task }
-    }
-
-    fn file_mode() -> FileMode {
-        mode!(IFLNK, 0o777)
-    }
-}
-
-impl FsNodeOps for FdSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        let file = self.task.files.get(self.fd).map_err(|_| errno!(ENOENT))?;
-        Ok(SymlinkTarget::Node(file.name.clone()))
     }
 }
 

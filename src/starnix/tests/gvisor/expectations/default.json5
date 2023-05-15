@@ -511,8 +511,6 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcSelfCwd.Absolute",
-                "ProcSelfRoot.IsRoot",
                 "ProcCpuinfo.RequiredFieldsArePresent",
                 "ProcCpuinfo.Stable",
                 "ProcMeminfo.ContainsBasicFields",
