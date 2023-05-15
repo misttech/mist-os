@@ -4,6 +4,7 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::ffi::CString;
 use std::sync::Arc;
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
@@ -77,7 +78,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"environ", EnvironFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"auxv", AuxvFile::new_node(task), mode!(IFREG, 0o444));
-    dir.entry(b"comm", CommFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"comm", CommFile::new_node(task), mode!(IFREG, 0o644));
     dir.subdir(b"attr", 0o555, |dir| {
         dir.entry_creds(task.as_fscred());
         dir.dir_creds(task.as_fscred());
@@ -389,14 +390,50 @@ impl DynamicFileSource for AuxvFile {
 }
 
 /// `CommFile` implements `proc/<pid>/comm` file.
-#[derive(Clone)]
-pub struct CommFile(Arc<Task>);
+pub struct CommFile {
+    task: Arc<Task>,
+    dynamic_file: DynamicFile<CommFileSource>,
+}
 impl CommFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
+        let task = task.clone();
+        SimpleFileNode::new(move || {
+            Ok(CommFile {
+                task: task.clone(),
+                dynamic_file: DynamicFile::new(CommFileSource(task.clone())),
+            })
+        })
     }
 }
-impl DynamicFileSource for CommFile {
+
+impl FileOps for CommFile {
+    fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
+    fileops_impl_seekable_write!();
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        _offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        if !Arc::ptr_eq(&self.task.thread_group, &current_task.thread_group) {
+            return error!(EINVAL);
+        }
+        // What happens if userspace writes to this file in multiple syscalls? We need more
+        // detailed tests to see when the data is actually committed back to the task.
+        let bytes = data.read_all()?;
+        let command =
+            CString::new(bytes.iter().copied().take_while(|c| *c != b'\0').collect::<Vec<_>>())
+                .unwrap();
+        self.task.set_command_name(command);
+        Ok(bytes.len())
+    }
+}
+
+#[derive(Clone)]
+pub struct CommFileSource(Arc<Task>);
+impl DynamicFileSource for CommFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         sink.write(self.0.command().as_bytes());
         sink.write(b"\n");
