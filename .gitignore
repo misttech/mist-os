@@ -131,6 +131,7 @@ tables_generator_tests_*.txt
 /third_party/tpm2-tss/src
 !/third_party/pigweed
 /third_party/pigweed/src
+/third_party/pigweed/nanopb
 !/third_party/gvisor_syscall_tests
 !/third_party/fmtlib
 /third_party/fmtlib/src
