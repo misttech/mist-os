@@ -159,9 +159,7 @@ if possible, but this is not required.
 
 ### OWNERS files
 When you add a new tool, please be sure to edit the OWNERS file and add
-`per-file` lines for the owners and `per-file-COMPONENT` lines for
-bugs.fuchsia.dev components. These indicate the correct contact information for
-your command and are used by `fx report-bug` users to file issues.
+`per-file` lines for the owners.
 
 ### Command metadata
 It is required that all subcommands implement help documentation lines, which

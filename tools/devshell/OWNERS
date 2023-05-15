@@ -1,53 +1,33 @@
 olivernewman@google.com
 
 per-file             add-update-source,build-push,lib/updates.sh = file: /src/sys/pkg/OWNERS
-# per-file-COMPONENT add-update-source,build-push,lib/updates.sh = Packages
 per-file             push-package,ota,serve,serve-remote,serve-updates,update = file: /src/sys/pkg/OWNERS
-# per-file-COMPONENT tests/subcommands/fx_ota_test = Packages
 per-file             tests/subcommands/fx_ota_test = file: /src/sys/pkg/OWNERS
-# per-file-COMPONENT tests/subcommands/fx_remote_test = Packages
 per-file             tests/subcommands/fx_remote_test = file: /src/sys/pkg/OWNERS
-# per-file-COMPONENT tests/subcommands/fx_serve_update_test = Packages
 per-file             tests/subcommands/fx_serve_update_test = file: /src/sys/pkg/OWNERS
 
 per-file             flash,flash-migration,flash-remote                = file: /src/firmware/OWNERS
-# per-file-COMPONENT flash,flash-migration,flash-remote                = Firmware
 per-file             pave,pave-remote,pave-zedboot,pave-zedboot-remote = joshuaseaton@google.com,surajmalhotra@google.com
-# per-file-COMPONENT pave,pave-remote,pave-zedboot,pave-zedboot-remote = Zircon>FW-Services
 
 per-file             args,build,clean,clean-build,gen,get-build-artifacts = file: /build/OWNERS
-# per-file-COMPONENT args,build,clean,clean-build,gen,get-build-artifacts = Build>Workflow
 per-file             get-build-dir,list-boards,list-build-artifacts       = file: /build/OWNERS
-# per-file-COMPONENT get-build-dir,list-boards,list-build-artifacts       = Build>Workflow
 per-file             list-products,ninjatrace2json,set-build-dir,use      = file: /build/OWNERS
-# per-file-COMPONENT list-products,ninjatrace2json,set-build-dir,use      = Build>Workflow
 per-file             list-packages,get-src-dir                            = file: /build/OWNERS
-# per-file-COMPONENT list-packages,get-src-dir                            = Build>Workflow
 per-file             get-flash-source                                     = file: /build/OWNERS
-# per-file-COMPONENT get-flash-source                                     = Build>Workdlow
 
 per-file             repro = olivernewman@google.com
-# per-file-COMPONENT repro = Build>Workflow
 
 per-file             sync-to = olivernewman@google.com
-# per-file-COMPONENT sync-to = Infra>Platform
 
 per-file             set = olivernewman@google.com
-# per-file-COMPONENT set = Tools>Fx
 
 per-file             test = anmittal@google.com,crjohns@google.com,dworsham@google.com
-# per-file-COMPONENT test = Tools>Fx
 
 per-file go = olivernewman@google.com
-# per-file-COMPONENT go = Infra>Platform
 
 per-file symbolize = dangyi@google.com,frousseau@google.com
-# per-file-COMPONENT symbolize = Tools>symbolize
-
-# per-file-COMPONENT report-bug=Tools>fx
 
 per-file cmc.fx = file: /tools/cmc/OWNERS
-# per-file-COMPONENT cmc.fx = ComponentFramework>Tools
 
 per-file create.fx = file: /tools/create/OWNERS
 
@@ -55,4 +35,4 @@ per-file tests/subcommands/fx_format_code_test = jeremymanson@google.com
 per-file tests/subcommands/fx_setup_go_test =  olivernewman@google.com
 
 per-file doc-checker.fx,mdlint.fx       = file: /tools/doc_checker/OWNERS
-# per-file-COMPONENT  doc-checker.fx,mdlint.fx       = DeveloperExperience>DocTools
+
