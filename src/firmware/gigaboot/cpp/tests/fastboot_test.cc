@@ -840,6 +840,33 @@ TEST_F(FastbootFlashTest, FlashSparseImage) {
   ASSERT_EQ(actual, expected);
 }
 
+TEST_F(FastbootFlashTest, FlashSparseImageOldName) {
+  constexpr size_t partition_size = 0x100;
+  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
+  AddPartition(GenerateBasicGptEntry(GUID_FVM_NAME, partition_size));
+  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
+
+  std::vector<uint8_t> sparse_image = SetupSparseImage(partition_size, 1);
+
+  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, sparse_image));
+
+  fastboot::TestTransport transport;
+
+  transport.AddInPacket(std::string("flash:") + GPT_FVM_NAME);
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), {"OKAY"}));
+
+  std::vector<uint8_t> actual(partition_size);
+  auto gpt_device = FindEfiGptDevice();
+  ASSERT_TRUE(gpt_device.is_ok());
+  ASSERT_TRUE(gpt_device->ReadPartition(GUID_FVM_NAME, 0, actual.size(), actual.data()).is_ok());
+
+  std::vector<uint8_t> expected(partition_size, 0xFA);
+  ASSERT_EQ(actual, expected);
+}
+
 TEST_F(FastbootFlashTest, FlashSparseImageNoSuchPartition) {
   constexpr size_t partition_size = 0x100;
   auto cleanup = SetupEfiGlobalState(stub_service(), image_device());

@@ -424,15 +424,16 @@ zx::result<> Fastboot::Flash(std::string_view cmd, fastboot::Transport *transpor
     return SendResponse(ResponseType::kFail, "Not enough argument", transport);
   }
 
-  ZX_ASSERT(args.args[1].size() < fastboot::kMaxCommandPacketSize);
-  char part_name[fastboot::kMaxCommandPacketSize] = {0};
-  memcpy(part_name, args.args[1].data(), args.args[1].size());
-
   auto device = FindEfiGptDevice();
   if (device.is_error() || device->Load().is_error()) {
     return SendResponse(ResponseType::kFail, "Failed to get block device", transport,
                         zx::error(ZX_ERR_INTERNAL));
   }
+
+  ZX_ASSERT(args.args[1].size() < fastboot::kMaxCommandPacketSize);
+  char part_name_data[fastboot::kMaxCommandPacketSize] = {};
+  memcpy(part_name_data, args.args[1].data(), args.args[1].size());
+  std::string_view part_name = MaybeMapPartitionName(*device, part_name_data);
 
   FuchsiaFirmwareStorage ops = device->GenerateStorageOps();
   GptDataHolder gpt_data(ops);
@@ -443,10 +444,10 @@ zx::result<> Fastboot::Flash(std::string_view cmd, fastboot::Transport *transpor
 
   bool res;
   if (FuchsiaIsSparseImage(download_buffer_.data(), total_download_size())) {
-    res = FuchsiaWriteSparseImage(&ops, &gpt_data.Data(), part_name, download_buffer_.data(),
+    res = FuchsiaWriteSparseImage(&ops, &gpt_data.Data(), part_name.data(), download_buffer_.data(),
                                   total_download_size());
   } else {
-    res = FuchsiaFirmwareStorageGptWrite(&ops, &gpt_data.Data(), part_name, 0,
+    res = FuchsiaFirmwareStorageGptWrite(&ops, &gpt_data.Data(), part_name.data(), 0,
                                          total_download_size(), download_buffer_.data());
   }
 
