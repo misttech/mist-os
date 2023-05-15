@@ -126,16 +126,17 @@ async fn install_blobs(
     let fs_block_size = filesystem.block_size() as usize;
     // We don't need any backpressure as the channel guarantees at least one slot per sender.
     let (tx, rx) = futures::channel::mpsc::channel::<BlobToInstall>(0);
+    // Generate each blob in parallel using a thread pool.
+    let num_threads: usize = std::thread::available_parallelism().unwrap().into();
+    let thread_pool = ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap();
     let generate = fasync::unblock(move || {
-        // Generate each blob in parallel using a thread pool.
-        let num_threads: usize = std::thread::available_parallelism().unwrap().into();
-        let pool = ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap();
-        pool.install(|| {
-            blobs.par_iter().for_each(|(hash, path)| {
-                let blob = generate_blob(hash.clone(), path.clone(), fs_block_size);
-                futures::executor::block_on(tx.clone().send(blob)).unwrap();
+        thread_pool.install(|| {
+            blobs.par_iter().try_for_each(|(hash, path)| {
+                let blob = generate_blob(hash.clone(), path.clone(), fs_block_size)?;
+                futures::executor::block_on(tx.clone().send(blob))
+                    .context("send blob to install task")
             })
-        });
+        })?;
         Ok(())
     });
     // We can buffer up to this many blobs after processing.
@@ -158,25 +159,35 @@ async fn install_blob(
 
     let handle;
     let keys = [LockKey::object(directory.store().store_object_id(), directory.object_id())];
-    let mut transaction = filesystem.clone().new_transaction(&keys, Default::default()).await?;
-    handle = directory.create_child_file(&mut transaction, merkle.as_str()).await?;
-    transaction.commit().await?;
+    let mut transaction = filesystem
+        .clone()
+        .new_transaction(&keys, Default::default())
+        .await
+        .context("new transaction")?;
+    handle = directory
+        .create_child_file(&mut transaction, merkle.as_str())
+        .await
+        .context("create child file")?;
+    transaction.commit().await.context("transaction commit")?;
 
     // TODO(fxbug.dev/122125): Should we inline the data payload too?
     {
         let mut writer = DirectWriter::new(&handle, Default::default());
         for bytes in blob.contents {
-            writer.write_bytes(&bytes).await?;
+            writer.write_bytes(&bytes).await.context("write blob contents")?;
         }
-        writer.complete().await?;
+        writer.complete().await.context("flush blob contents")?;
     }
 
     if !blob.serialized_metadata.is_empty() {
-        handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &blob.serialized_metadata).await?;
+        handle
+            .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &blob.serialized_metadata)
+            .await
+            .context("write blob metadata")?;
     }
-    let properties = handle.get_properties().await?;
+    let properties = handle.get_properties().await.context("get properties")?;
     Ok(BlobsJsonOutputEntry {
-        source_path: blob.path.to_str().unwrap().to_string(),
+        source_path: blob.path.to_str().context("blob path to utf8")?.to_string(),
         merkle,
         bytes: blob.uncompressed_size,
         size: properties.allocated_size,
@@ -187,13 +198,12 @@ async fn install_blob(
     })
 }
 
-fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> BlobToInstall {
+fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> Result<BlobToInstall, Error> {
     let mut contents = Vec::new();
     std::fs::File::open(&path)
-        .context(format!("Unable to open `{:?}'", &path))
-        .unwrap()
+        .context(format!("Unable to open `{:?}'", &path))?
         .read_to_end(&mut contents)
-        .unwrap();
+        .context(format!("Unable to read contents of `{:?}'", &path))?;
     let hashes = {
         // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs.
         let mut builder = MerkleTreeBuilder::new();
@@ -224,12 +234,12 @@ fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> BlobToInsta
             compressed_offsets,
             uncompressed_size: uncompressed_size as u64,
         };
-        bincode::serialize(&metadata).unwrap()
+        bincode::serialize(&metadata).context("serialize blob metadata")?
     } else {
         vec![]
     };
 
-    BlobToInstall { hash, path, contents, uncompressed_size, serialized_metadata }
+    Ok(BlobToInstall { hash, path, contents, uncompressed_size, serialized_metadata })
 }
 
 // TODO(fxbug.dev/124377): Support the blob delivery format.
