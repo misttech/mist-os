@@ -68,6 +68,7 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 	addAllExpectations("ipv6", platform.NS3, ipv6ExpectationsNS3)
 	addAllExpectations("ipv6-mld", platform.NS3, ipv6MldExpectationsNS3)
 	addAllExpectations("ipv6-mldv2", platform.NS3, ipv6Mldv2ExpectationsNS3)
+	addAllExpectations("ipv6-ndp", platform.NS3, ipv6ndpExpectationsNS3)
 	addAllExpectations("ipv6-pmtu", platform.NS3, ipv6PmtuExpectationsNS3)
 	addAllExpectations("ipv6-router", platform.NS3, ipv6RouterExpectationsNS3)
 	addAllExpectations("tcp-advanced", platform.NS3, tcpAdvancedExpectationsNS3)
