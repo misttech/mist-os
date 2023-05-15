@@ -46,3 +46,5 @@ fuchsia_structured_config_policy =
 bazel_product_bundle_prefix = "//build/bazel/assembly:minimal"
 extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]
+
+assembly_fshost = true

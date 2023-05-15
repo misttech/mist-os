@@ -365,6 +365,7 @@ template("assembled_system") {
     images_config_matches = "${namespace}.images_config_matches"
     product_assembler = "${namespace}.product_assembler"
     image_assembler = "${namespace}.image_assembler"
+    fshost_validator = "${namespace}.fshost_validator"
     copy_vbmeta = "${namespace}.copy_vbmeta"
     copy_zbi = "${namespace}.copy_zbi"
     copy_zbi_signed = "${namespace}.copy_zbi_signed"
@@ -982,6 +983,49 @@ template("assembled_system") {
     output = files.image_assembly_inputs
   }
 
+  if (use_assembly_fshost) {
+    python_action("${labels.fshost_validator}") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      deps = [
+        ":${labels.fshost}",
+        ":${labels.product_assembler}",
+        "//tools/configc($host_toolchain)",
+      ]
+      outputs = [ "$target_out_dir/${labels.fshost_validator}.txt" ]
+      depfile = "$target_out_dir/$target_name.d"
+      binary_label = "//build/assembly/scripts:fshost_validator"
+      args = [
+        "--output",
+        rebase_path(outputs[0], root_build_dir),
+        "--configc-bin",
+        "host-tools/configc",
+        "--gn-fshost-component",
+        rebase_path("${target_out_dir}/cml/${labels.fshost}.manifest/fshost.cm",
+                    root_build_dir),
+        "--assembly-fshost-component",
+        rebase_path("${files.outdir}/fshost/fshost/fshost.cm", root_build_dir),
+        "--gn-fshost-cml",
+        rebase_path("${target_out_dir}/${files.fshost_merged_cml}",
+                    root_build_dir),
+        "--assembly-fshost-cml",
+        rebase_path("${files.outdir}/fshost/fshost/fshost.cml", root_build_dir),
+        "--gn-fshost-cvf",
+        rebase_path("${target_out_dir}/${labels.fshost}.config_cvf.cvf",
+                    root_build_dir),
+        "--assembly-fshost-cvf",
+        rebase_path(
+            "${files.outdir}/bootfs/repackaging/components/meta/fshost.cvf",
+            root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
+    }
+  }
+
   ffx_action(labels.image_assembler) {
     no_output_dir_leaks = false
 
@@ -1044,6 +1088,12 @@ template("assembled_system") {
     # Set the deps needed in order to run the zbi_signing_script
     if (defined(invoker.zbi_signing_script_deps)) {
       deps += invoker.zbi_signing_script_deps
+    }
+
+    # Validate that the Assembly-built fshost is identical to the GN-built
+    # fshost until the latter is removed.
+    if (use_assembly_fshost) {
+      deps += [ ":${labels.fshost_validator}" ]
     }
 
     inputs = [

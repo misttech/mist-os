@@ -40,6 +40,10 @@ fuchsia_product_configuration(
                     INPUT_DEVICE_TYPE.TOUCHSCREEN,
                 ],
             },
+            "storage": {
+                "configure_fshost": True,
+                "live_usb_enabled": False,
+            },
         },
     },
 )

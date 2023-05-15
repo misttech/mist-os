@@ -17,6 +17,10 @@ product_assembly_configuration("minimal") {
         "touchscreen",
       ]
     }
+    storage = {
+      configure_fshost = true
+      live_usb_enabled = false
+    }
   }
   product = {
   }
