@@ -515,7 +515,6 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcSelfMaps.SharedAnon",
                 "ProcSelfFdInfo.Flags",
                 "ProcSelfCwd.Absolute",
                 "ProcSelfRoot.IsRoot",

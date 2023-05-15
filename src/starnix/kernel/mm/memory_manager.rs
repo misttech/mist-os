@@ -1815,7 +1815,15 @@ fn write_map(
         }
     };
     match &map.name {
-        MappingName::None => (),
+        MappingName::None => {
+            if map.options.contains(MappingOptions::SHARED)
+                && map.options.contains(MappingOptions::ANONYMOUS)
+            {
+                // See proc(5), "/proc/[pid]/map_files/"
+                fill_to_name(sink);
+                sink.write(b"/dev/zero (deleted)");
+            }
+        }
         MappingName::Stack => {
             fill_to_name(sink);
             sink.write(b"[stack]");
@@ -1839,6 +1847,11 @@ fn write_map(
                     .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
                     .copied(),
             );
+            // TODO: See https://man7.org/linux/man-pages/man5/proc.5.html
+            //
+            //   If the mapping is file-backed and the file has been
+            //   deleted, the string " (deleted)" is appended to the
+            //   pathname.
         }
         MappingName::Vma(name) => {
             fill_to_name(sink);
