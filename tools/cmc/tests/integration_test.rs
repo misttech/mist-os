@@ -160,6 +160,7 @@ fn example_cml_integration_test() {
             source_name: Some("fuchsia.logger.Log".to_string()),
             target_name: Some("fuchsia.logger.Log".to_string()),
             target: Some(Ref::Parent(ParentRef {})),
+            availability: Some(Availability::Required),
             ..Default::default()
         }),
         Expose::Protocol(ExposeProtocol {
@@ -167,6 +168,7 @@ fn example_cml_integration_test() {
             source_name: Some("fuchsia.logger.LegacyLog".to_string()),
             target_name: Some("fuchsia.logger.OldLog".to_string()),
             target: Some(Ref::Parent(ParentRef {})),
+            availability: Some(Availability::Required),
             ..Default::default()
         }),
         Expose::Directory(ExposeDirectory {
@@ -176,6 +178,7 @@ fn example_cml_integration_test() {
             target: Some(Ref::Parent(ParentRef {})),
             rights: None,
             subdir: Some("blob".to_string()),
+            availability: Some(Availability::Required),
             ..Default::default()
         }),
         Expose::EventStream(ExposeEventStream {
@@ -198,6 +201,40 @@ fn example_cml_integration_test() {
                 collection: None,
             })]),
             target_name: Some("stopped".to_string()),
+            ..Default::default()
+        }),
+        Expose::Directory(ExposeDirectory {
+            source: Some(Ref::Self_(SelfRef)),
+            source_name: Some("blobfs".to_string()),
+            target: Some(Ref::Parent(ParentRef)),
+            target_name: Some("optional_dir".to_string()),
+            rights: None,
+            subdir: Some("blob".to_string()),
+            availability: Some(Availability::Optional),
+            ..Default::default()
+        }),
+        Expose::Protocol(ExposeProtocol {
+            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
+            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
+            target: Some(Ref::Parent(ParentRef)),
+            target_name: Some("fuchsia.logger.OldLog_same_as_target".to_string()),
+            availability: Some(Availability::SameAsTarget),
+            ..Default::default()
+        }),
+        Expose::Protocol(ExposeProtocol {
+            source: Some(Ref::VoidType(VoidRef)),
+            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
+            target: Some(Ref::Parent(ParentRef)),
+            target_name: Some("fuchsia.logger.OldLog_void".to_string()),
+            availability: Some(Availability::Optional),
+            ..Default::default()
+        }),
+        Expose::Protocol(ExposeProtocol {
+            source: Some(Ref::VoidType(VoidRef)),
+            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
+            target: Some(Ref::Parent(ParentRef)),
+            target_name: Some("fuchsia.logger.OldLog_absent_child".to_string()),
+            availability: Some(Availability::Optional),
             ..Default::default()
         }),
     ];

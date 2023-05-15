@@ -808,7 +808,12 @@ impl<'a> ValidationContext<'a> {
 
         // Validate `from` (done last because this validation depends on the capability type, which
         // must be validated first)
-        self.validate_from_clause("expose", expose, &None, &None)?;
+        self.validate_from_clause(
+            "expose",
+            expose,
+            &expose.source_availability,
+            &expose.availability,
+        )?;
 
         Ok(())
     }
@@ -6034,6 +6039,92 @@ mod tests {
                         "protocol": "fuchsia.examples.Echo",
                         "from": "#bar",
                         "to": "#foo",
+                        "availability": "same_as_target",
+                        "source_availability": "unknown",
+                    },
+                ],
+            }),
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+        ),
+        test_expose_source_availability_unknown(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "#bar",
+                        "availability": "optional",
+                        "source_availability": "unknown",
+                    },
+                ],
+            }),
+            Ok(())
+        ),
+        test_expose_source_availability_required(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "#bar",
+                        "source_availability": "required",
+                    },
+                ],
+            }),
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
+        ),
+        test_expose_source_availability_omitted(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "#bar",
+                    },
+                ],
+            }),
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
+        ),
+        test_expose_source_void_availability_required(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "void",
+                        "availability": "required",
+                    },
+                ],
+            }),
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+        ),
+        test_expose_source_void_availability_same_as_target(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "void",
+                        "availability": "same_as_target",
+                    },
+                ],
+            }),
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+        ),
+        test_expose_source_missing_availability_required(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "#bar",
+                        "availability": "required",
+                        "source_availability": "unknown",
+                    },
+                ],
+            }),
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+        ),
+        test_expose_source_missing_availability_same_as_target(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.examples.Echo",
+                        "from": "#bar",
                         "availability": "same_as_target",
                         "source_availability": "unknown",
                     },

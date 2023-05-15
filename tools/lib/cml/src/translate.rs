@@ -336,17 +336,30 @@ fn translate_expose(
     for expose in expose_in.iter() {
         let target = extract_expose_target(expose)?;
         if let Some(source_names) = expose.service() {
+            // When there are many `sources` exposed under the same `target_name`, aggregation
+            // will happen during routing.
             let sources = extract_all_expose_sources(expose, Some(all_collections))?;
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
                 for source in &sources {
+                    // TODO(fxbug.dev/127214): All sources that feed into an aggregation operation
+                    // should have the same `availability`.
+                    let (source, availability) = derive_source_and_availability(
+                        expose.availability.as_ref(),
+                        clone_ref(source)?,
+                        expose.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                     out_exposes.push(fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(clone_ref(source)?),
+                        source: Some(source),
                         source_name: Some(source_name.clone().into()),
                         target_name: Some(target_name.clone().into()),
                         target: Some(clone_ref(&target)?),
+                        availability: Some(availability),
                         ..Default::default()
                     }))
                 }
@@ -358,11 +371,20 @@ fn translate_expose(
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
+                let (source, availability) = derive_source_and_availability(
+                    expose.availability.as_ref(),
+                    source.clone(),
+                    expose.source_availability.as_ref(),
+                    all_capability_names,
+                    all_children,
+                    all_collections,
+                );
                 out_exposes.push(fdecl::Expose::Protocol(fdecl::ExposeProtocol {
-                    source: Some(clone_ref(&source)?),
+                    source: Some(source),
                     source_name: Some(source_name.clone().into()),
                     target_name: Some(target_name.into()),
                     target: Some(clone_ref(&target)?),
+                    availability: Some(availability),
                     ..Default::default()
                 }))
             }
@@ -375,13 +397,22 @@ fn translate_expose(
             let subdir = extract_expose_subdir(expose);
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
+                let (source, availability) = derive_source_and_availability(
+                    expose.availability.as_ref(),
+                    source.clone(),
+                    expose.source_availability.as_ref(),
+                    all_capability_names,
+                    all_children,
+                    all_collections,
+                );
                 out_exposes.push(fdecl::Expose::Directory(fdecl::ExposeDirectory {
-                    source: Some(clone_ref(&source)?),
+                    source: Some(source),
                     source_name: Some(source_name.clone().into()),
                     target_name: Some(target_name.into()),
                     target: Some(clone_ref(&target)?),
                     rights,
                     subdir: subdir.as_ref().map(|s| s.clone().into()),
+                    availability: Some(availability),
                     ..Default::default()
                 }))
             }
@@ -464,11 +495,13 @@ impl<T> Into<Vec<T>> for OneOrMany<T> {
     }
 }
 
-// Allows the above Into to work by annotating the type.
+/// Allows the above Into to work by annotating the type.
 fn annotate_type<T>(val: T) -> T {
     val
 }
 
+/// If the `source` is not found and `source_availability` is `Unknown`, returns a `Void` source.
+/// Otherwise, returns the source unchanged.
 fn derive_source_and_availability(
     availability: Option<&Availability>,
     source: fdecl::Ref,
@@ -1169,6 +1202,7 @@ fn expose_source_from_ref(
         }
         ExposeFromRef::Framework => Ok(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
         ExposeFromRef::Self_ => Ok(fdecl::Ref::Self_(fdecl::SelfRef {})),
+        ExposeFromRef::Void => Ok(fdecl::Ref::VoidType(fdecl::VoidRef {})),
     }
 }
 
@@ -2683,6 +2717,7 @@ mod tests {
                             source_name: Some("fuchsia.logger.Log".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("fuchsia.logger.LegacyLog".to_string()),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2692,6 +2727,7 @@ mod tests {
                             source_name: Some("A".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("A".to_string()),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2701,6 +2737,7 @@ mod tests {
                             source_name: Some("B".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("B".to_string()),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2712,6 +2749,7 @@ mod tests {
                             source_name: Some("C".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("C".to_string()),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2727,6 +2765,7 @@ mod tests {
                                 fio::Operations::GET_ATTRIBUTES
                             ),
                             subdir: None,
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2741,6 +2780,7 @@ mod tests {
                             target_name: Some("blob2".to_string()),
                             rights: None,
                             subdir: None,
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2755,6 +2795,7 @@ mod tests {
                             target_name: Some("blob3".to_string()),
                             rights: None,
                             subdir: None,
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2766,6 +2807,7 @@ mod tests {
                             target_name: Some("hub".to_string()),
                             rights: None,
                             subdir: None,
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -2921,6 +2963,204 @@ mod tests {
                         ..Default::default()
                     }),
                 ]),
+                children: Some(vec![
+                    fdecl::Child {
+                        name: Some("logger".to_string()),
+                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        environment: None,
+                        on_terminate: None,
+                        ..Default::default()
+                    }
+                ]),
+                ..default_component_decl()
+            },
+        },
+
+        test_compile_expose_other_availability => {
+            input = json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_default",
+                        "to": "parent"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_required",
+                        "to": "parent",
+                        "availability": "required"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_optional",
+                        "to": "parent",
+                        "availability": "optional"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_same_as_target",
+                        "to": "parent",
+                        "availability": "same_as_target"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_transitional",
+                        "to": "parent",
+                        "availability": "transitional"
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "logger",
+                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                    },
+                ],
+            }),
+            output = fdecl::Component {
+                exposes: Some(vec![
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_default".to_string()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_required".to_string()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_optional".to_string()),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_same_as_target".to_string()),
+                            availability: Some(fdecl::Availability::SameAsTarget),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_transitional".to_string()),
+                            availability: Some(fdecl::Availability::Transitional),
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                offers: None,
+                capabilities: None,
+                children: Some(vec![
+                    fdecl::Child {
+                        name: Some("logger".to_string()),
+                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        environment: None,
+                        on_terminate: None,
+                        ..Default::default()
+                    }
+                ]),
+                ..default_component_decl()
+            },
+        },
+
+        test_compile_expose_source_availability_unknown => {
+            input = json!({
+                "expose": [
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#non-existent",
+                        "as": "fuchsia.logger.LegacyLog_non_existent",
+                        "to": "parent",
+                        "availability": "optional",
+                        "source_availability": "unknown"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_child_exist",
+                        "to": "parent",
+                        "availability": "optional",
+                        "source_availability": "unknown"
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "logger",
+                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                    },
+                ],
+            }),
+            output = fdecl::Component {
+                exposes: Some(vec![
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::VoidType(fdecl::VoidRef { })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_non_existent".to_string()),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_child_exist".to_string()),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                offers: None,
+                capabilities: None,
                 children: Some(vec![
                     fdecl::Child {
                         name: Some("logger".to_string()),
@@ -4119,6 +4359,7 @@ mod tests {
                                 fio::Operations::GET_ATTRIBUTES
                             ),
                             subdir: None,
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),

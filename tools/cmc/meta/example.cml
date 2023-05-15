@@ -172,6 +172,35 @@
             to: "parent",
             scope: [ "#logger" ],
         },
+        {
+            directory: "blobfs",
+            from: "self",
+            as: "optional_dir",
+            to: "parent",
+            subdir: "blob",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.logger.LegacyLog",
+            from: "#logger",
+            as: "fuchsia.logger.OldLog_same_as_target",
+            to: "parent",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.logger.LegacyLog",
+            from: "void",
+            as: "fuchsia.logger.OldLog_void",
+            to: "parent",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.logger.LegacyLog",
+            from: "#this-child-does-not-exist",
+            as: "fuchsia.logger.OldLog_absent_child",
+            to: "parent",
+            source_availability: "unknown",
+        },
     ],
     environments: [
         {

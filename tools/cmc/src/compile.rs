@@ -605,6 +605,7 @@ mod tests {
                             source_name: Some("fuchsia.logger.Log".to_string()),
                             target_name: Some("fuchsia.logger.Log2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -617,6 +618,7 @@ mod tests {
                             source_name: Some("my.service.Service".to_string()),
                             target_name: Some("my.service.Service".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -626,6 +628,7 @@ mod tests {
                             source_name: Some("my.service.Service".to_string()),
                             target_name: Some("my.service.Service".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -638,6 +641,7 @@ mod tests {
                             source_name: Some("my.service.Service2".to_string()),
                             target_name: Some("my.service.Service2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -647,6 +651,7 @@ mod tests {
                             source_name: Some("my.service.Service2".to_string()),
                             target_name: Some("my.service.Service2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -656,6 +661,7 @@ mod tests {
                             source_name: Some("my.service.CollectionService".to_string()),
                             target_name: Some("my.service.CollectionService".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -699,6 +705,202 @@ mod tests {
                 ..Default::default()
             },
         },
+
+        test_compile_expose_service_other_availability => {
+            input = json!({
+                "expose": [
+                    {
+                        "service": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.Log_default",
+                    },
+                    {
+                        "service": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.Log_required",
+                        "availability": "required",
+                    },
+                    {
+                        "service": [
+                            "my.service.Service",
+                            "my.service.Service2",
+                        ],
+                        "from": ["#logger", "self"],
+                        "availability": "optional",
+                    },
+                    {
+                        "service": "my.service.CollectionService",
+                        "from": ["#coll"],
+                        "availability": "same_as_target",
+                    },
+                    {
+                        "service": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.Log_transitional",
+                        "availability": "transitional",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "service": [
+                            "my.service.Service",
+                            "my.service.Service2",
+                        ],
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "logger",
+                        "url": "fuchsia-pkg://logger.cm"
+                    },
+                ],
+                "collections": [
+                    {
+                        "name": "coll",
+                        "durability": "transient",
+                    },
+                ],
+            }),
+            output = fdecl::Component {
+                exposes: Some(vec![
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target_name: Some("fuchsia.logger.Log_default".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target_name: Some("fuchsia.logger.Log_required".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("my.service.Service".to_string()),
+                            target_name: Some("my.service.Service".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            source_name: Some("my.service.Service".to_string()),
+                            target_name: Some("my.service.Service".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("my.service.Service2".to_string()),
+                            target_name: Some("my.service.Service2".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            source_name: Some("my.service.Service2".to_string()),
+                            target_name: Some("my.service.Service2".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "coll".to_string() })),
+                            source_name: Some("my.service.CollectionService".to_string()),
+                            target_name: Some("my.service.CollectionService".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::SameAsTarget),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target_name: Some("fuchsia.logger.Log_transitional".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Transitional),
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                capabilities: Some(vec![
+                    fdecl::Capability::Service (
+                        fdecl::Service {
+                            name: Some("my.service.Service".to_string()),
+                            source_path: Some("/svc/my.service.Service".to_string()),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Capability::Service (
+                        fdecl::Service {
+                            name: Some("my.service.Service2".to_string()),
+                            source_path: Some("/svc/my.service.Service2".to_string()),
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                children: Some(vec![
+                    fdecl::Child {
+                        name: Some("logger".to_string()),
+                        url: Some("fuchsia-pkg://logger.cm".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        environment: None,
+                        on_terminate: None,
+                        ..Default::default()
+                    }
+                ]),
+                collections: Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        environment: None,
+                        allowed_offers: None,
+                        allow_long_names: None,
+                        ..Default::default()
+                    }
+                ]),
+                ..Default::default()
+            },
+        },
+
+        // TODO(fxbug.dev/127214): Add a test where different availabilities aggregated by
+        // several service expose declarations is an error.
     }}
 
     test_compile_with_features! { FeatureSet::from(vec![Feature::AllowLongNames]), {

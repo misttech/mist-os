@@ -582,7 +582,7 @@ pub enum EventScope {
 
 /// A reference in an `expose from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"framework\", \"self\", or \"#<child-name>\"")]
+#[reference(expected = "\"framework\", \"self\", \"void\", or \"#<child-name>\"")]
 pub enum ExposeFromRef {
     /// A reference to a child or collection.
     Named(Name),
@@ -590,6 +590,8 @@ pub enum ExposeFromRef {
     Framework,
     /// A reference to this component.
     Self_,
+    /// An intentionally omitted source.
+    Void,
 }
 
 /// A reference in an `expose to`.
@@ -2333,6 +2335,29 @@ pub struct Expose {
     /// the components defined in the scope.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
+
+    /// `availability` _(optional)_: The expectations around this capability's availability. Affects
+    /// build-time and runtime route validation. One of:
+    /// - `required` (default): a required dependency, the source must exist and provide it. Use
+    ///     this when the target of this expose requires this capability to function properly.
+    /// - `optional`: an optional dependency. Use this when the target of the expose can function
+    ///     with or without this capability. The target must not have a `required` dependency on the
+    ///     capability. The ultimate source of this expose must be `void` or an actual component.
+    /// - `same_as_target`: the availability expectations of this capability will match the
+    ///     target's. If the target requires the capability, then this field is set to `required`.
+    ///     If the target has an optional dependency on the capability, then the field is set to
+    ///     `optional`.
+    /// - `transitional`: like `optional`, but will tolerate a missing source. Use this
+    ///     only to avoid validation errors during transitional periods of multi-step code changes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub availability: Option<Availability>,
+
+    /// Whether or not the source of this offer must exist. One of:
+    /// - `required` (default): the source (`from`) must be defined in this manifest.
+    /// - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)
+    ///     is not defined in this manifest after includes are processed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_availability: Option<SourceAvailability>,
 }
 
 impl Expose {
@@ -2350,6 +2375,8 @@ impl Expose {
             subdir: None,
             event_stream: None,
             scope: None,
+            availability: None,
+            source_availability: None,
         }
     }
 }
@@ -2496,13 +2523,12 @@ pub struct Offer {
     pub scope: Option<OneOrMany<EventScope>>,
 
     /// `availability` _(optional)_: The expectations around this capability's availability. Affects
-    /// build-time CML validation and runtime error reporting. One of:
+    /// build-time and runtime route validation. One of:
     /// - `required` (default): a required dependency, the source must exist and provide it. Use
     ///     this when the target of this offer requires this capability to function properly.
     /// - `optional`: an optional dependency. Use this when the target of the offer can function
-    ///     with or without this capability. The target must `use` the capability with
-    ///     `availability` set to `optional`. The source of this offer must _terminate_ with either
-    ///     `void` or an actual component.
+    ///     with or without this capability. The target must not have a `required` dependency on the
+    ///     capability. The ultimate source of this offer must be `void` or an actual component.
     /// - `same_as_target`: the availability expectations of this capability will match the
     ///     target's. If the target requires the capability, then this field is set to `required`.
     ///     If the target has an optional dependency on the capability, then the field is set to
