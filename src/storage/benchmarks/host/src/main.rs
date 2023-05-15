@@ -4,7 +4,7 @@
 
 use {
     regex::{Regex, RegexSetBuilder},
-    std::{fs::OpenOptions, path::PathBuf, sync::Arc, vec::Vec},
+    std::{fs::File, path::PathBuf, sync::Arc, vec::Vec},
     storage_benchmarks::{
         block_device::PanickingBlockDeviceFactory,
         directory_benchmarks::{
@@ -98,7 +98,7 @@ async fn main() {
         results.write_csv(std::io::stdout())
     }
     if let Some(path) = args.output_fuchsiaperf {
-        let file = OpenOptions::new().write(true).create(true).open(path).unwrap();
+        let file = File::create(path).unwrap();
         results.write_fuchsia_perf_json(file);
     }
 }

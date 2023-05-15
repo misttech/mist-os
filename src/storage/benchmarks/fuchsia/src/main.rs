@@ -12,7 +12,7 @@ use {
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs},
     },
     regex::{Regex, RegexSetBuilder},
-    std::{fs::OpenOptions, path::PathBuf, sync::Arc, vec::Vec},
+    std::{fs::File, path::PathBuf, sync::Arc, vec::Vec},
     storage_benchmarks::{
         directory_benchmarks::{
             DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
@@ -163,7 +163,7 @@ async fn main() {
         results.write_csv(std::io::stdout())
     }
     if let Some(path) = args.output_fuchsiaperf {
-        let file = OpenOptions::new().write(true).create(true).open(path).unwrap();
+        let file = File::create(path).unwrap();
         results.write_fuchsia_perf_json(file);
     }
 }
