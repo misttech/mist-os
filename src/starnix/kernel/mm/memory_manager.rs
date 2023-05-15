@@ -2119,7 +2119,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::syscalls::sys_mmap;
+    use crate::mm::syscalls::do_mmap;
     use crate::task::syscalls::sys_prctl;
     use crate::testing::*;
     use assert_matches::assert_matches;
@@ -2681,7 +2681,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
-        let addr = sys_mmap(
+        let addr = do_mmap(
             &current_task,
             UserAddress::default(),
             *PAGE_SIZE as usize,
@@ -2701,7 +2701,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
-        let addr = sys_mmap(
+        let addr = do_mmap(
             &current_task,
             UserAddress::default(),
             *PAGE_SIZE as usize,

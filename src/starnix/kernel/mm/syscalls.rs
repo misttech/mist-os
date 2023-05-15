@@ -6,6 +6,7 @@ use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 
+use crate::execution::notify_debugger_of_module_list;
 use crate::fs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::fs::*;
 use crate::logging::*;
@@ -23,7 +24,27 @@ fn get_valid_platform_mmap_flags() -> u32 {
     0
 }
 
+/// sys_mmap takes a mutable reference to current_task because it may modify the IP register.
 pub fn sys_mmap(
+    current_task: &mut CurrentTask,
+    addr: UserAddress,
+    length: usize,
+    prot: u32,
+    flags: u32,
+    fd: FdNumber,
+    offset: u64,
+) -> Result<UserAddress, Errno> {
+    let user_address = do_mmap(current_task, addr, length, prot, flags, fd, offset)?;
+    if prot & PROT_EXEC != 0 {
+        // Possibly loads a new module. Notify debugger for the change.
+        // We only care about dynamic linker loading modules for now, which uses mmap. In the future
+        // we might want to support unloading modules in munmap or JIT compilation in mprotect.
+        notify_debugger_of_module_list(current_task)?;
+    }
+    Ok(user_address)
+}
+
+pub fn do_mmap(
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -132,6 +153,7 @@ pub fn sys_mmap(
         let _result = vmo.op_range(zx::VmoOp::COMMIT, vmo_offset, length as u64);
         // "The mmap() call doesn't fail if the mapping cannot be populated."
     }
+
     Ok(user_address)
 }
 
@@ -336,7 +358,7 @@ mod tests {
         let page_size = *PAGE_SIZE;
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), page_size);
-        match sys_mmap(
+        match do_mmap(
             &current_task,
             mapped_address,
             page_size as usize,
@@ -360,7 +382,7 @@ mod tests {
         let page_size = *PAGE_SIZE;
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), page_size);
-        match sys_mmap(
+        match do_mmap(
             &current_task,
             mapped_address,
             page_size as usize,
@@ -384,7 +406,7 @@ mod tests {
         let page_size = *PAGE_SIZE;
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), page_size);
-        match sys_mmap(
+        match do_mmap(
             &current_task,
             mapped_address,
             page_size as usize,
@@ -790,7 +812,7 @@ mod tests {
         let page_size = *PAGE_SIZE;
 
         for _i in 0..256 {
-            match sys_mmap(
+            match do_mmap(
                 &current_task,
                 UserAddress::from(0),
                 page_size as usize,

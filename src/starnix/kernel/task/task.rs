@@ -45,20 +45,6 @@ pub struct CurrentTask {
     /// `self.handle.write_state_general_regs(self.registers.into())`.
     pub registers: RegisterState,
 
-    /// The address of the DT_DEBUG entry in the process' ELF file.
-    ///
-    /// The value of the DT_DEBUG entry is a pointer to the `r_debug` symbol in the dynamic linker.
-    /// This struct contains a link map, which the debug agent can use to determine which shared
-    /// objects have been loaded.
-    ///
-    /// The lifecycle of this value is as follows (assuming the tag is present):
-    ///   1. Starnix finds the address of the DT_DEBUG entry and sets `debug_address`.
-    ///   2. The dynamic linker sets the value of the DT_DEBUG entry to the address of its `r_debug`
-    ///      symbol.
-    ///   3. Starnix reads the address from the DT_DEBUG entry, writes the address to the process'
-    ///      debug address property, and sets `debug_address` to `None`.
-    pub dt_debug_address: Option<UserAddress>,
-
     /// A custom function to resume a syscall that has been interrupted by SIGSTOP.
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
@@ -756,7 +742,6 @@ impl Task {
             child_state.signals.alt_stack = state.signals.alt_stack;
             child_state.signals.set_mask(state.signals.mask());
             self.mm.snapshot_to(&child.mm)?;
-            copy_process_debug_addr(&self.thread_group.process, &child.thread_group.process)?;
         }
 
         if flags & (CLONE_PARENT_SETTID as u64) != 0 {
@@ -1033,7 +1018,6 @@ impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
         CurrentTask {
             task: Arc::new(task),
-            dt_debug_address: None,
             registers: RegisterState::default(),
             syscall_restart_func: None,
         }
@@ -1401,7 +1385,6 @@ impl CurrentTask {
             .exec(resolved_elf.file.name.clone())
             .map_err(|status| from_status_like_fdio!(status))?;
         let start_info = load_executable(self, resolved_elf, &path)?;
-        self.dt_debug_address = start_info.dt_debug_address;
         let regs: zx_thread_state_general_regs_t = start_info.into();
         self.registers = regs.into();
 

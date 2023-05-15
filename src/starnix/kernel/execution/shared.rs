@@ -9,7 +9,6 @@ use fidl_fuchsia_process as fprocess;
 use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use process_builder::elf_parse;
 use std::convert::TryFrom;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -19,7 +18,7 @@ use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, Syslog
 use crate::fs::*;
 use crate::logging::log_trace;
 use crate::mm::{DesiredAddress, MappingOptions, PAGE_SIZE};
-use crate::mm::{MappingName, MemoryAccessorExt, MemoryManager, ProtectionFlags};
+use crate::mm::{MappingName, MemoryManager, ProtectionFlags};
 use crate::signals::dequeue_signal;
 use crate::syscalls::{
     decls::{Syscall, SyscallDecl},
@@ -129,26 +128,10 @@ pub fn process_completed_syscall(
     // cause it to stop.
     block_while_stopped(current_task);
 
-    // Handle the debug address after the thread is set up to continue, because
-    // `notify_debugger_of_module_list` expects the register state to be in a post-syscall state
-    // (most importantly the instruction pointer needs to be "correct").
-    notify_debugger_of_module_list(current_task)?;
-
     Ok(None)
 }
 
-/// Notifies the debugger, if one is attached, that the initial module list has been loaded.
-///
-/// Sets the process property if a valid address is found in the `DT_DEBUG` entry. If the existing
-/// value of ZX_PROP_BREAK_ON_LOAD is non-zero, the task will be set up to trigger a software
-/// interrupt (for the debugger to catch) before resuming execution at the current instruction
-/// pointer.
-///
-/// If the property is set on the process (i.e., nothing fails and the values are valid),
-/// `current_task.debug_address` will be cleared.
-///
-/// TODO(fxbug.dev/117484): Starnix should issue a debug breakpoint on each dlopen/dlclose that
-/// causes the module list to change.
+/// Notifies the debugger, if one is attached, that the module list might have been changed.
 ///
 /// For more information about the debugger protocol, see:
 /// https://cs.opensource.google/fuchsia/fuchsia/+/master:src/developer/debug/debug_agent/process_handle.h;l=31
@@ -158,20 +141,6 @@ pub fn process_completed_syscall(
 ///                   pointer specifically, needs to be set to the value with which the task is
 ///                   expected to resume.
 pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<(), Errno> {
-    let dt_debug_address = match current_task.dt_debug_address {
-        Some(dt_debug_address) => dt_debug_address,
-        // The DT_DEBUG entry does not exist, or has already been read and set on the process.
-        None => return Ok(()),
-    };
-
-    // The debug_addres is the pointer located at DT_DEBUG.
-    let debug_address: elf_parse::Elf64Dyn =
-        current_task.mm.read_object(UserRef::new(dt_debug_address))?;
-    if debug_address.value == 0 {
-        // The DT_DEBUG entry is present, but has not yet been set by the linker, check next time.
-        return Ok(());
-    }
-
     let break_on_load = current_task
         .thread_group
         .process
@@ -181,13 +150,6 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
     // If break on load is 0, there is no debugger attached, so return before issuing the software
     // breakpoint.
     if break_on_load == 0 {
-        // Still set the debug address, and clear the debug address from `current_task` to avoid
-        // entering this function again.
-        match current_task.thread_group.process.set_debug_addr(&debug_address.value) {
-            Err(zx::Status::ACCESS_DENIED) => {}
-            status => status.map_err(|err| from_status_like_fdio!(err))?,
-        };
-        current_task.dt_debug_address = None;
         return Ok(());
     }
 
@@ -224,27 +186,7 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
         .map_err(|err| from_status_like_fdio!(err))?;
 
     current_task.registers.set_instruction_pointer_register(instruction_pointer.ptr() as u64);
-    current_task
-        .thread_group
-        .process
-        .set_debug_addr(&debug_address.value)
-        .map_err(|err| from_status_like_fdio!(err))?;
-    current_task.dt_debug_address = None;
 
-    Ok(())
-}
-
-pub fn copy_process_debug_addr(
-    source_process: &zx::Process,
-    target_process: &zx::Process,
-) -> Result<(), Errno> {
-    let source_debug_addr =
-        source_process.get_debug_addr().map_err(|err| from_status_like_fdio!(err))?;
-
-    match target_process.set_debug_addr(&source_debug_addr) {
-        Err(zx::Status::ACCESS_DENIED) => {}
-        status => status.map_err(|err| from_status_like_fdio!(err))?,
-    };
     Ok(())
 }
 

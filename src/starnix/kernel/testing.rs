@@ -13,7 +13,7 @@ use crate::fs::fuchsia::RemoteFs;
 use crate::fs::tmpfs::TmpFs;
 use crate::fs::*;
 use crate::mm::{
-    syscalls::{sys_mmap, sys_mremap},
+    syscalls::{do_mmap, sys_mremap},
     MemoryAccessor, MemoryManager, PAGE_SIZE,
 };
 use crate::syscalls::SyscallResult;
@@ -103,7 +103,7 @@ pub fn map_memory_with_flags(
     length: u64,
     flags: u32,
 ) -> UserAddress {
-    sys_mmap(
+    do_mmap(
         current_task,
         address,
         length as usize,
