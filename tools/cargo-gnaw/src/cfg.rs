@@ -32,6 +32,9 @@ pub fn target_to_gn_conditional(target: &str) -> Result<String> {
         // depend on, so we use a simple exact match list that can be updated as needed.
         let (target_arch, target_os) = match target {
             "aarch64-apple-darwin" => ("aarch64", "macos"),
+            "riscv32i-unknown-none-elf" => ("riscv32i", "unknown"),
+            "riscv32imc-unknown-none-elf" => ("riscv32imc", "unknown"),
+            "thumbv6m-none-eabi" => ("thumbv6m", "unknown"),
             // Return an error for unknown targets, to notify the dev that they should
             // update this list.
             _ => {
@@ -132,6 +135,12 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
         Ok(String::from("current_cpu == \"x64\""))
     } else if cfg == "target_arch = \"wasm32\"" {
         Ok(String::from("current_cpu == \"wasm32\""))
+    } else if cfg == "target_arch = \"riscv32i\"" {
+        Ok(String::from("current_cpu == \"riscv32\""))
+    } else if cfg == "target_arch = \"riscv32imc\"" {
+        Ok(String::from("current_cpu == \"riscv32\""))
+    } else if cfg == "target_arch = \"thumbv6m\"" {
+        Ok(String::from("current_cpu == \"arm\""))
     } else if cfg == "windows" || cfg == "target_family = \"windows\"" {
         // don't support host builds on windows right now
         Ok(String::from("false"))
