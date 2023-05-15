@@ -335,6 +335,31 @@ macro_rules! fileops_impl_seekable_write {
     };
 }
 
+pub fn default_seek(
+    file: &FileObject,
+    _current_task: &CurrentTask,
+    offset: off_t,
+    whence: SeekOrigin,
+) -> Result<off_t, Errno> {
+    let mut current_offset = file.offset.lock();
+    let new_offset = match whence {
+        SeekOrigin::Set => Some(offset),
+        SeekOrigin::Cur => (*current_offset).checked_add(offset),
+        SeekOrigin::End => {
+            let stat = file.node().stat()?;
+            offset.checked_add(stat.st_size as off_t)
+        }
+    }
+    .ok_or_else(|| errno!(EINVAL))?;
+
+    if new_offset < 0 {
+        return error!(EINVAL);
+    }
+
+    *current_offset = new_offset;
+    Ok(*current_offset)
+}
+
 /// Implements [`FileOps`] methods in a way that makes sense for seekable files.
 /// You must implement [`FileOps::read_at`] and [`FileOps::write_at`].
 macro_rules! fileops_impl_seekable {
@@ -345,28 +370,11 @@ macro_rules! fileops_impl_seekable {
         fn seek(
             &self,
             file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            current_task: &crate::task::CurrentTask,
             offset: crate::types::off_t,
             whence: crate::fs::SeekOrigin,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
-            use crate::types::errno::*;
-            let mut current_offset = file.offset.lock();
-            let new_offset = match whence {
-                crate::fs::SeekOrigin::Set => Some(offset),
-                crate::fs::SeekOrigin::Cur => (*current_offset).checked_add(offset),
-                crate::fs::SeekOrigin::End => {
-                    let stat = file.node().stat()?;
-                    offset.checked_add(stat.st_size as crate::types::off_t)
-                }
-            }
-            .ok_or_else(|| errno!(EINVAL))?;
-
-            if new_offset < 0 {
-                return error!(EINVAL);
-            }
-
-            *current_offset = new_offset;
-            Ok(*current_offset)
+            crate::fs::default_seek(file, current_task, offset, whence)
         }
     };
 }

@@ -523,7 +523,21 @@ impl MemFile {
 }
 
 impl FileOps for MemFile {
-    fileops_impl_seekable!();
+    fileops_impl_seekable_read!();
+    fileops_impl_seekable_write!();
+
+    fn seek(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: off_t,
+        whence: SeekOrigin,
+    ) -> Result<off_t, Errno> {
+        match whence {
+            SeekOrigin::End => error!(EINVAL),
+            _ => default_seek(file, current_task, offset, whence),
+        }
+    }
 
     fn read_at(
         &self,

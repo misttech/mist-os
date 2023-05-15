@@ -516,7 +516,6 @@
 
                 // proc_test
                 "ProcPidMem.Unmapped",
-                "ProcPidMem.RepeatedSeek",
                 "ProcPidMem.AfterExit",
                 "ProcSelfMaps.Basic",
                 "ProcSelfMaps.SharedAnon",
