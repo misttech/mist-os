@@ -223,3 +223,7 @@ group("nelson_config") {
 group("sherlock_config") {
   deps = [ "node_config:sherlock" ]
 }
+
+group("vim3_config") {
+  deps = [ "node_config:vim3" ]
+}

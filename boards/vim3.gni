@@ -47,11 +47,15 @@ _common_bootfs_deps = [
   "//src/graphics/display/drivers/amlogic-display",
   "//src/graphics/display/drivers/dsi-dw",
   "//src/graphics/drivers/aml-gpu",
+  "//src/power/power-manager/thermal_config:vim3",
   "//src/ui/backlight/drivers/vim3-pwm-backlight",
   "//src/ui/input/drivers/focaltech",
 ]
 
 board_bootfs_labels += _common_bootfs_deps
+
+board_bootfs_labels -= [ "//src/power/power-manager:base_config" ]
+board_bootfs_labels += [ "//src/power/power-manager:vim3_config" ]
 
 board_zedboot_bootfs_labels += _common_bootfs_deps
 

@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/power/power-manager/thermal_config/thermal_config.gni")
+
 group("tests") {
   testonly = true
   deps = [
@@ -9,4 +11,8 @@ group("tests") {
     "template_tests:tests",
     "validator:tests",
   ]
+}
+
+thermal_config("vim3") {
+  config_file = "vim3.json5"
 }

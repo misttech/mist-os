@@ -48,6 +48,10 @@ node_config("sherlock") {
   source = "sherlock_node_config.json5"
 }
 
+node_config("vim3") {
+  source = "vim3_node_config.json5"
+}
+
 # Make the node config files available for the power-manager-tests test package
 # to allow for some more advanced validation beyond what we can accomplish with
 # JSON schema validation alone.
