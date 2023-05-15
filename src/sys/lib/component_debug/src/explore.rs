@@ -4,7 +4,6 @@
 
 use {
     anyhow::{bail, format_err, Result},
-    atty::Stream,
     fidl_fuchsia_dash as fdash, fidl_fuchsia_io as fio,
     futures::prelude::*,
     moniker::RelativeMoniker,
@@ -35,7 +34,9 @@ impl std::io::Write for Stdout<'_> {
 
 impl Stdout<'_> {
     pub fn raw() -> Result<Self> {
-        if !atty::is(Stream::Stdout) {
+        let stdout = std::io::stdout();
+
+        if !termion::is_tty(&stdout) {
             bail!("interactive mode does not support piping");
         }
 
