@@ -89,7 +89,7 @@ void SummarizeProcessSymbolStatus(ConsoleContext* context, Process* process, Out
     out->Append(fxl::StringPrintf("    Base: 0x%" PRIx64 "\n", module.base));
     out->Append("    Build ID: " + module.build_id);
 
-    if (context->session()->system().HasDownload(module.build_id)) {
+    if (context->session()->system().GetDownloadManager()->HasDownload(module.build_id)) {
       out->Append(Syntax::kWarning, " (Downloading...)");
     }
 

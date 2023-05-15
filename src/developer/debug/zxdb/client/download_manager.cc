@@ -1,0 +1,274 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "src/developer/debug/zxdb/client/download_manager.h"
+
+#include <lib/syslog/cpp/macros.h>
+
+#include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/zxdb/client/download_observer.h"
+#include "src/developer/debug/zxdb/client/process.h"
+#include "src/developer/debug/zxdb/client/session.h"
+#include "src/developer/debug/zxdb/client/symbol_server.h"
+#include "src/developer/debug/zxdb/client/system.h"
+#include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/symbols/debug_symbol_file_type.h"
+#include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
+#include "src/developer/debug/zxdb/symbols/process_symbols.h"
+
+namespace zxdb {
+
+// When we want to download symbols for a build ID, we create a Download object. We then fire off
+// requests to all symbol servers we know about asking whether they have the symbols we need. These
+// requests are async, and the callbacks each own a shared_ptr to the Download object. If all the
+// callbacks run and none of them are informed the request was successful, all of the shared_ptrs
+// are dropped and the Download object is freed. The destructor of the Download object calls a
+// callback that handles notifying the rest of the system of those results.
+//
+// If one of the callbacks does report that the symbols were found, a transaction to actually start
+// the download is initiated, and its reply callback is again given a shared_ptr to the download. If
+// we receive more notifications that other servers also have the symbol in the meantime, they are
+// queued and will be tried as a fallback if the download fails. Again, once the download callback
+// runs the shared_ptr is dropped, and when the Download object dies the destructor handles
+// notifying the system.
+class Download {
+ public:
+  Download(const std::string& build_id, DebugSymbolFileType file_type,
+           SymbolServer::FetchCallback result_cb)
+      : build_id_(build_id), file_type_(file_type), result_cb_(std::move(result_cb)) {}
+
+  ~Download() { Finish(); }
+
+  bool active() { return !!result_cb_; }
+
+  // Add a symbol server to this download.
+  void AddServer(std::shared_ptr<Download> self, SymbolServer* server);
+
+ private:
+  // FetchFunction is a function that downloads the symbol file from one server.
+  // Multiple fetches are queued in server_fetches_ and tried in sequence.
+  using FetchFunction = fit::callback<void(SymbolServer::FetchCallback)>;
+
+  // Notify this download object that we have gotten the symbols if we're going to get them.
+  void Finish();
+
+  // Notify this Download object that one of the servers has the symbols available.
+  void Found(std::shared_ptr<Download> self, FetchFunction fetch);
+
+  // Notify this Download object that a transaction failed.
+  void Error(std::shared_ptr<Download> self, const Err& err);
+
+  void RunFetch(std::shared_ptr<Download> self, FetchFunction& fetch);
+
+  size_t failed_server_count_ = 0;
+  std::string build_id_;
+  DebugSymbolFileType file_type_;
+  Err err_;
+  std::string path_;
+  SymbolServer::FetchCallback result_cb_;
+  std::vector<FetchFunction> server_fetches_;
+  bool trying_ = false;
+};
+
+void Download::Finish() {
+  if (!result_cb_)
+    return;
+
+  if (debug::MessageLoop::Current()) {
+    debug::MessageLoop::Current()->PostTask(
+        FROM_HERE, [result_cb = std::move(result_cb_), err = std::move(err_),
+                    path = std::move(path_)]() mutable { result_cb(err, path); });
+  }
+
+  result_cb_ = nullptr;
+}
+
+void Download::AddServer(std::shared_ptr<Download> self, SymbolServer* server) {
+  FX_DCHECK(self.get() == this);
+
+  if (!result_cb_)
+    return;
+
+  server->CheckFetch(build_id_, file_type_, [self](const Err& err, FetchFunction fetch) {
+    if (!fetch) {
+      self->Error(self, err);
+    } else {
+      self->Found(self, std::move(fetch));
+    }
+  });
+}
+
+void Download::Found(std::shared_ptr<Download> self, FetchFunction fetch) {
+  FX_DCHECK(self.get() == this);
+
+  if (!result_cb_)
+    return;
+
+  if (trying_) {
+    server_fetches_.push_back(std::move(fetch));
+    return;
+  }
+
+  RunFetch(self, fetch);
+}
+
+void Download::Error(std::shared_ptr<Download> self, const Err& err) {
+  FX_DCHECK(self.get() == this);
+
+  if (!result_cb_)
+    return;
+
+  self->failed_server_count_++;
+
+  if (!err_.has_error()) {
+    err_ = err;
+  } else if (err.has_error()) {
+    err_ = Err("Failed downloading build_id %s from %zu servers.\n", self->build_id_.c_str(),
+               self->failed_server_count_);
+  }
+
+  if (!trying_ && !server_fetches_.empty()) {
+    RunFetch(self, server_fetches_.back());
+    server_fetches_.pop_back();
+  }
+}
+
+void Download::RunFetch(std::shared_ptr<Download> self, FetchFunction& fetch) {
+  FX_DCHECK(!trying_);
+  trying_ = true;
+
+  fetch([self](const Err& err, const std::string& path) {
+    self->trying_ = false;
+
+    if (path.empty()) {
+      self->Error(self, err);
+    } else {
+      self->err_ = err;
+      self->path_ = path;
+      self->Finish();
+    }
+  });
+}
+
+// ============================ DownloadManager ===============================
+
+DownloadManager::DownloadManager(System* system) : system_(system), weak_factory_(this) {}
+
+DownloadManager::~DownloadManager() = default;
+
+void DownloadManager::RequestDownload(const std::string& build_id, DebugSymbolFileType file_type) {
+  auto download = GetDownload(build_id, file_type);
+
+  for (auto& server : system_->GetSymbolServers()) {
+    if (server->state() == SymbolServer::State::kReady)
+      download->AddServer(download, server);
+  }
+}
+
+void DownloadManager::OnSymbolServerBecomesReady(SymbolServer* server) {
+  for (const auto& target : system_->GetTargets()) {
+    auto process = target->GetProcess();
+    if (!process)
+      continue;
+
+    for (const auto& mod : process->GetSymbols()->GetStatus()) {
+      if (!mod.symbols || !mod.symbols->module_symbols()) {
+        auto download = GetDownload(mod.build_id, DebugSymbolFileType::kDebugInfo);
+        download->AddServer(download, server);
+      } else if (!mod.symbols->module_symbols()->HasBinary()) {
+        auto download = GetDownload(mod.build_id, DebugSymbolFileType::kBinary);
+        download->AddServer(download, server);
+      }
+    }
+  }
+}
+
+std::shared_ptr<Download> DownloadManager::InjectDownloadForTesting(const std::string& build_id) {
+  return GetDownload(build_id, DebugSymbolFileType::kDebugInfo);
+}
+
+std::shared_ptr<Download> DownloadManager::GetDownload(std::string build_id,
+                                                       DebugSymbolFileType file_type) {
+  if (auto existing = downloads_[{build_id, file_type}].lock()) {
+    return existing;
+  }
+
+  DownloadStarted();
+
+  auto download = std::make_shared<Download>(
+      build_id, file_type,
+      [build_id, file_type, weak_this = weak_factory_.GetWeakPtr()](const Err& err,
+                                                                    const std::string& path) {
+        if (!weak_this) {
+          return;
+        }
+
+        if (!path.empty()) {
+          weak_this->download_success_count_++;
+
+          // Adds the file manually since the build_id could already be marked as missing in the
+          // build_id_index.
+          weak_this->system_->GetSymbols()->build_id_index().AddOneFile(path);
+
+          for (const auto target : weak_this->system_->GetTargets()) {
+            if (auto process = target->GetProcess()) {
+              // Don't need local symbol lookup when retrying a download, so can pass an empty
+              // module name.
+              process->GetSymbols()->RetryLoadBuildID(std::string(), build_id, file_type);
+            }
+          }
+        } else {
+          weak_this->download_fail_count_++;
+
+          weak_this->system_->NotifyFailedToFindDebugSymbols(err, build_id, file_type);
+        }
+
+        weak_this->DownloadFinished();
+      });
+
+  downloads_[{build_id, file_type}] = download;
+
+  return download;
+}
+
+void DownloadManager::DownloadStarted() {
+  FX_DCHECK(system_);
+
+  if (download_count_ == 0) {
+    for (auto& observer : system_->session()->download_observers()) {
+      observer.OnDownloadsStarted();
+    }
+  }
+
+  download_count_++;
+}
+
+void DownloadManager::DownloadFinished() {
+  download_count_--;
+
+  FX_DCHECK(system_);
+  if (download_count_ == 0) {
+    for (auto& observer : system_->session()->download_observers()) {
+      observer.OnDownloadsStopped(download_success_count_, download_fail_count_);
+    }
+
+    download_success_count_ = download_fail_count_ = 0;
+  }
+}
+
+bool DownloadManager::HasDownload(const std::string& build_id) const {
+  auto download = downloads_.find({build_id, DebugSymbolFileType::kDebugInfo});
+
+  if (download == downloads_.end()) {
+    download = downloads_.find({build_id, DebugSymbolFileType::kBinary});
+  }
+
+  if (download == downloads_.end()) {
+    return false;
+  }
+
+  auto ptr = download->second.lock();
+  return ptr && ptr->active();
+}
+}  // namespace zxdb

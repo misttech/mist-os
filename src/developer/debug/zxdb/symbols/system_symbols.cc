@@ -42,8 +42,8 @@ BuildIDIndex::Entry LoadLocalModuleSymbols(const std::string& name, const std::s
 
 }  // namespace
 
-SystemSymbols::SystemSymbols(DownloadHandler* download_handler)
-    : download_handler_(download_handler), weak_factory_(this) {}
+SystemSymbols::SystemSymbols(RequestDownloadFunction f)
+    : request_download_(std::move(f)), weak_factory_(this) {}
 
 SystemSymbols::~SystemSymbols() = default;
 
@@ -78,15 +78,15 @@ Err SystemSymbols::GetModule(const std::string& name, const std::string& build_i
   }
 
   if (entry.debug_info.empty() && download_type == SystemSymbols::DownloadType::kSymbols &&
-      download_handler_) {
-    download_handler_->RequestDownload(build_id, DebugSymbolFileType::kDebugInfo, false);
+      request_download_) {
+    request_download_(build_id, DebugSymbolFileType::kDebugInfo);
   }
 
   if (auto debug = elflib::ElfLib::Create(entry.debug_info)) {
     if (!debug->ProbeHasProgramBits() && entry.binary.empty() &&
-        download_type == SystemSymbols::DownloadType::kBinary && download_handler_) {
+        download_type == SystemSymbols::DownloadType::kBinary && request_download_) {
       // File doesn't exist or has no symbols, schedule a download.
-      download_handler_->RequestDownload(build_id, DebugSymbolFileType::kBinary, false);
+      request_download_(build_id, DebugSymbolFileType::kBinary);
     }
   }
 

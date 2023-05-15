@@ -85,6 +85,8 @@ static_library("client") {
     "client_eval_context_impl.cc",
     "client_object.cc",
     "disassembler.cc",
+    "download_manager.cc",
+    "download_manager.h",
     "exception_settings.cc",
     "exception_settings.h",
     "execution_scope.cc",

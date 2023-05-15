@@ -11,9 +11,11 @@
 #include "lib/fit/function.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/client_object.h"
+#include "src/developer/debug/zxdb/client/download_manager.h"
 #include "src/developer/debug/zxdb/client/map_setting_store.h"
 #include "src/developer/debug/zxdb/client/setting_store_observer.h"
 #include "src/developer/debug/zxdb/client/target.h"
+#include "src/developer/debug/zxdb/symbols/debug_symbol_file_type.h"
 #include "src/developer/debug/zxdb/symbols/system_symbols.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
@@ -23,7 +25,6 @@ namespace zxdb {
 
 class Breakpoint;
 class BreakpointImpl;
-class Download;
 class Err;
 class Filter;
 class ProcessImpl;
@@ -33,9 +34,7 @@ class TargetImpl;
 
 // Represents the client's view of the system-wide state on the debugged
 // computer.
-class System : public ClientObject,
-               public SettingStoreObserver,
-               public SystemSymbols::DownloadHandler {
+class System : public ClientObject, public SettingStoreObserver {
  public:
   // Callback for requesting the process tree.
   using ProcessTreeCallback = fit::callback<void(const Err&, debug_ipc::ProcessTreeReply)>;
@@ -60,7 +59,9 @@ class System : public ClientObject,
   // Like CreateNewTarget but returns the implementation.
   TargetImpl* CreateNewTargetImpl(TargetImpl* clone);
 
-  SystemSymbols* GetSymbols();
+  SystemSymbols* GetSymbols() { return &symbols_; }
+
+  DownloadManager* GetDownloadManager() { return &download_manager_; }
 
   // Returns all targets currently in this System instance. The returned pointers are managed by the
   // System object and should not be cached once you return to the message loop.  There is a single
@@ -132,13 +133,6 @@ class System : public ClientObject,
   // Whether there's a download pending for the given build ID.
   bool HasDownload(const std::string& build_id);
 
-  // Get a test download object.
-  std::shared_ptr<Download> InjectDownloadForTesting(const std::string& build_id);
-
-  // DownloadHandler implementation:
-  void RequestDownload(const std::string& build_id, DebugSymbolFileType file_type,
-                       bool quiet) override;
-
   // Notification that a connection has been made/terminated to a target system.
   //
   // The is_local flag will be set when the connection is just a loopback to the local computer.
@@ -152,6 +146,10 @@ class System : public ClientObject,
 
   // SettingStoreObserver implementation.
   void OnSettingChanged(const SettingStore&, const std::string& setting_name) override;
+
+  // Called when all downloads for |build_id| fail for all active symbol servers.
+  void NotifyFailedToFindDebugSymbols(const Err& err, const std::string& build_id,
+                                      DebugSymbolFileType file_type);
 
   // Add a symbol server for testing purposes.
   void InjectSymbolServerForTesting(std::unique_ptr<SymbolServer> server);
@@ -170,51 +168,8 @@ class System : public ClientObject,
   void AddNewTarget(std::unique_ptr<TargetImpl> target);
   void AddSymbolServer(std::unique_ptr<SymbolServer> server);
 
-  // Called when we have attempted to download debug symbols and failed. If err is set then
-  // something went wrong during the attempt, otherwise the symbols simply weren't available from
-  // any of the servers.
-  void NotifyFailedToFindDebugSymbols(const Err& err, const std::string& build_id,
-                                      DebugSymbolFileType file_type);
-
-  // Called when a symbol server under our control enters the Ready state.
-  void OnSymbolServerBecomesReady(SymbolServer* server);
-
-  // Called every time a new download starts.
-  void DownloadStarted();
-
-  // Called every time a download ends.
-  void DownloadFinished();
-
-  // Create a new download obect for downloading a given build ID. If quiet is set, don't report the
-  // status of this download.
-  //
-  // If multiple callers request a download of the same build ID, this will return the same object
-  // to each. The first caller's preference is taken for the quiet parameter.
-  std::shared_ptr<Download> GetDownload(std::string build_id, DebugSymbolFileType file_type,
-                                        bool quiet);
-
-  // Number of symbol servers currently initializing.
-  size_t servers_initializing_ = 0;
-
-  // The number of downloads currently active.
-  size_t download_count_ = 0;
-
-  // The number of downloads that have succeeded. Every time download_count_ reaches 0, this number
-  // is reported via an event, and then cleared to zero.
-  size_t download_success_count_ = 0;
-
-  // The number of downloads that have failed. Semantics are the same as download_success_count_
-  size_t download_fail_count_ = 0;
-
-  // We hold pointers to downloads while we have servers initializing so that those servers have
-  // time to join the download.
-  std::vector<std::shared_ptr<Download>> suspended_downloads_;
-
   std::vector<std::unique_ptr<SymbolServer>> symbol_servers_;
   std::vector<std::unique_ptr<TargetImpl>> targets_;
-
-  // Downloads currently in progress.
-  std::map<std::pair<std::string, DebugSymbolFileType>, std::weak_ptr<Download>> downloads_;
 
   // The breakpoints are indexed by their unique backend ID. This is separate from the index
   // generated by the console frontend to describe the breakpoint noun.
@@ -223,6 +178,7 @@ class System : public ClientObject,
   std::vector<std::unique_ptr<Filter>> filters_;
   bool filter_sync_pending_ = false;  // Used to throttle consecutive OnFilterChanges.
 
+  DownloadManager download_manager_;
   SystemSymbols symbols_;
 
   MapSettingStore settings_;

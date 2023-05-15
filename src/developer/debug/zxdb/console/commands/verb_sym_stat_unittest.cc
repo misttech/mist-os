@@ -39,7 +39,7 @@ TEST_F(VerbSymStat, SymStat) {
   loop().RunUntilNoTasks();
   console().FlushOutputEvents();
 
-  auto download = session().system().InjectDownloadForTesting("abc123");
+  auto download = session().system().GetDownloadManager()->InjectDownloadForTesting("abc123");
   event = console().GetOutputEvent();
   EXPECT_EQ("Downloading symbols...", event.output.AsString());
 
@@ -55,6 +55,10 @@ TEST_F(VerbSymStat, SymStat) {
   // Releasing the download will cause it to register a failure.
   download = nullptr;
 
+  event = console().GetOutputEvent();
+  EXPECT_EQ(
+      "Could not load symbols for \"fakelib\" because there was no mapping for build ID \"abc123\".",
+      event.output.AsString());
   event = console().GetOutputEvent();
   EXPECT_EQ("Symbol downloading complete. 0 succeeded, 1 failed.", event.output.AsString());
 }

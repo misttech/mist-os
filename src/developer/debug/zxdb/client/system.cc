@@ -12,6 +12,7 @@
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/client/breakpoint_impl.h"
+#include "src/developer/debug/zxdb/client/download_manager.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
 #include "src/developer/debug/zxdb/client/exception_settings.h"
 #include "src/developer/debug/zxdb/client/filter.h"
@@ -219,139 +220,14 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
 
 }  // namespace
 
-// Download ----------------------------------------------------------------------------------------
-
-// When we want to download symbols for a build ID, we create a Download object. We then fire off
-// requests to all symbol servers we know about asking whether they have the symbols we need. These
-// requests are async, and the callbacks each own a shared_ptr to the Download object. If all the
-// callbacks run and none of them are informed the request was successful, all of the shared_ptrs
-// are dropped and the Download object is freed. The destructor of the Download object calls a
-// callback that handles notifying the rest of the system of those results.
-//
-// If one of the callbacks does report that the symbols were found, a transaction to actually start
-// the download is initiated, and its reply callback is again given a shared_ptr to the download. If
-// we receive more notifications that other servers also have the symbol in the meantime, they are
-// queued and will be tried as a fallback if the download fails. Again, once the download callback
-// runs the shared_ptr is dropped, and when the Download object dies the destructor handles
-// notifying the system.
-class Download {
- public:
-  Download(const std::string& build_id, DebugSymbolFileType file_type,
-           SymbolServer::FetchCallback result_cb)
-      : build_id_(build_id), file_type_(file_type), result_cb_(std::move(result_cb)) {}
-
-  ~Download() { Finish(); }
-
-  bool active() { return !!result_cb_; }
-
-  // Add a symbol server to this download.
-  void AddServer(std::shared_ptr<Download> self, SymbolServer* server);
-
- private:
-  // FetchFunction is a function that downloads the symbol file from one server.
-  // Multiple fetches are queued in server_fetches_ and tried in sequence.
-  using FetchFunction = fit::callback<void(SymbolServer::FetchCallback)>;
-
-  // Notify this download object that we have gotten the symbols if we're going to get them.
-  void Finish();
-
-  // Notify this Download object that one of the servers has the symbols available.
-  void Found(std::shared_ptr<Download> self, FetchFunction fetch);
-
-  // Notify this Download object that a transaction failed.
-  void Error(std::shared_ptr<Download> self, const Err& err);
-
-  void RunFetch(std::shared_ptr<Download> self, FetchFunction& fetch);
-
-  std::string build_id_;
-  DebugSymbolFileType file_type_;
-  Err err_;
-  std::string path_;
-  SymbolServer::FetchCallback result_cb_;
-  std::vector<FetchFunction> server_fetches_;
-  bool trying_ = false;
-};
-
-void Download::Finish() {
-  if (!result_cb_)
-    return;
-
-  if (debug::MessageLoop::Current()) {
-    debug::MessageLoop::Current()->PostTask(
-        FROM_HERE, [result_cb = std::move(result_cb_), err = std::move(err_),
-                    path = std::move(path_)]() mutable { result_cb(err, path); });
-  }
-
-  result_cb_ = nullptr;
-}
-
-void Download::AddServer(std::shared_ptr<Download> self, SymbolServer* server) {
-  FX_DCHECK(self.get() == this);
-
-  if (!result_cb_)
-    return;
-
-  server->CheckFetch(build_id_, file_type_, [self](const Err& err, FetchFunction fetch) {
-    if (!fetch)
-      self->Error(self, err);
-    else
-      self->Found(self, std::move(fetch));
-  });
-}
-
-void Download::Found(std::shared_ptr<Download> self, FetchFunction fetch) {
-  FX_DCHECK(self.get() == this);
-
-  if (!result_cb_)
-    return;
-
-  if (trying_) {
-    server_fetches_.push_back(std::move(fetch));
-    return;
-  }
-
-  RunFetch(self, fetch);
-}
-
-void Download::Error(std::shared_ptr<Download> self, const Err& err) {
-  FX_DCHECK(self.get() == this);
-
-  if (!result_cb_)
-    return;
-
-  if (!err_.has_error()) {
-    err_ = err;
-  } else if (err.has_error()) {
-    err_ = Err("Multiple servers could not be reached.");
-  }
-
-  if (!trying_ && !server_fetches_.empty()) {
-    RunFetch(self, server_fetches_.back());
-    server_fetches_.pop_back();
-  }
-}
-
-void Download::RunFetch(std::shared_ptr<Download> self, FetchFunction& fetch) {
-  FX_DCHECK(!trying_);
-  trying_ = true;
-
-  fetch([self](const Err& err, const std::string& path) {
-    self->trying_ = false;
-
-    if (path.empty()) {
-      self->Error(self, err);
-    } else {
-      self->err_ = err;
-      self->path_ = path;
-      self->Finish();
-    }
-  });
-}
-
 // System Implementation ---------------------------------------------------------------------------
 
 System::System(Session* session)
-    : ClientObject(session), symbols_(this), settings_(GetSchema(), nullptr), weak_factory_(this) {
+    : ClientObject(session),
+      download_manager_(this),
+      symbols_(cpp20::bind_front(&DownloadManager::RequestDownload, &download_manager_)),
+      settings_(GetSchema(), nullptr),
+      weak_factory_(this) {
   // Create the default target.
   AddNewTarget(std::make_unique<TargetImpl>(this));
 
@@ -414,8 +290,6 @@ TargetImpl* System::CreateNewTargetImpl(TargetImpl* clone) {
   return to_return;
 }
 
-SystemSymbols* System::GetSymbols() { return &symbols_; }
-
 std::vector<Target*> System::GetTargets() const {
   std::vector<Target*> result;
   result.reserve(targets_.size());
@@ -452,90 +326,6 @@ std::vector<SymbolServer*> System::GetSymbolServers() const {
   return result;
 }
 
-std::shared_ptr<Download> System::GetDownload(std::string build_id, DebugSymbolFileType file_type,
-                                              bool quiet) {
-  if (auto existing = downloads_[{build_id, file_type}].lock()) {
-    return existing;
-  }
-
-  DownloadStarted();
-
-  auto download = std::make_shared<Download>(
-      build_id, file_type,
-      [build_id, file_type, weak_this = weak_factory_.GetWeakPtr(), quiet](
-          const Err& err, const std::string& path) {
-        if (!weak_this) {
-          return;
-        }
-
-        if (!path.empty()) {
-          weak_this->download_success_count_++;
-          // Adds the file manually since the build_id could already be marked as missing in the
-          // build_id_index.
-          weak_this->symbols_.build_id_index().AddOneFile(path);
-
-          for (const auto& target : weak_this->targets_) {
-            if (auto process = target->process()) {
-              // Don't need local symbol lookup when retrying a download, so can pass an empty
-              // module name.
-              process->GetSymbols()->RetryLoadBuildID(std::string(), build_id, file_type);
-            }
-          }
-        } else {
-          weak_this->download_fail_count_++;
-
-          if (!quiet) {
-            weak_this->NotifyFailedToFindDebugSymbols(err, build_id, file_type);
-          }
-        }
-
-        weak_this->DownloadFinished();
-      });
-
-  downloads_[{build_id, file_type}] = download;
-
-  if (servers_initializing_) {
-    suspended_downloads_.push_back(download);
-  }
-
-  return download;
-}
-
-void System::DownloadStarted() {
-  if (download_count_ == 0) {
-    for (auto& observer : session()->download_observers()) {
-      observer.OnDownloadsStarted();
-    }
-  }
-
-  download_count_++;
-}
-
-void System::DownloadFinished() {
-  download_count_--;
-
-  if (download_count_ == 0) {
-    for (auto& observer : session()->download_observers()) {
-      observer.OnDownloadsStopped(download_success_count_, download_fail_count_);
-    }
-
-    download_success_count_ = download_fail_count_ = 0;
-  }
-}
-
-void System::RequestDownload(const std::string& build_id, DebugSymbolFileType file_type,
-                             bool quiet) {
-  auto download = GetDownload(build_id, file_type, quiet);
-
-  for (auto& server : symbol_servers_) {
-    if (server->state() != SymbolServer::State::kReady) {
-      continue;
-    }
-
-    download->AddServer(download, server.get());
-  }
-}
-
 void System::NotifyFailedToFindDebugSymbols(const Err& err, const std::string& build_id,
                                             DebugSymbolFileType file_type) {
   for (const auto& target : targets_) {
@@ -564,24 +354,6 @@ void System::NotifyFailedToFindDebugSymbols(const Err& err, const std::string& b
         }
       } else {
         process->OnSymbolLoadFailure(err);
-      }
-    }
-  }
-}
-
-void System::OnSymbolServerBecomesReady(SymbolServer* server) {
-  for (const auto& target : targets_) {
-    auto process = target->process();
-    if (!process)
-      continue;
-
-    for (const auto& mod : process->GetSymbols()->GetStatus()) {
-      if (!mod.symbols || !mod.symbols->module_symbols()) {
-        auto download = GetDownload(mod.build_id, DebugSymbolFileType::kDebugInfo, true);
-        download->AddServer(download, server);
-      } else if (!mod.symbols->module_symbols()->HasBinary()) {
-        auto download = GetDownload(mod.build_id, DebugSymbolFileType::kBinary, true);
-        download->AddServer(download, server);
       }
     }
   }
@@ -747,25 +519,6 @@ void System::CancelAllThreadControllers() {
     if (Process* process = target->GetProcess())
       process->CancelAllThreadControllers();
   }
-}
-
-bool System::HasDownload(const std::string& build_id) {
-  auto download = downloads_.find({build_id, DebugSymbolFileType::kDebugInfo});
-
-  if (download == downloads_.end()) {
-    download = downloads_.find({build_id, DebugSymbolFileType::kBinary});
-  }
-
-  if (download == downloads_.end()) {
-    return false;
-  }
-
-  auto ptr = download->second.lock();
-  return ptr && ptr->active();
-}
-
-std::shared_ptr<Download> System::InjectDownloadForTesting(const std::string& build_id) {
-  return GetDownload(build_id, DebugSymbolFileType::kDebugInfo, true);
 }
 
 void System::DidConnect(bool is_local) {
@@ -974,7 +727,6 @@ void System::AddSymbolServer(std::unique_ptr<SymbolServer> unique_server) {
   if (server->state() == SymbolServer::State::kInitializing ||
       server->state() == SymbolServer::State::kBusy) {
     initializing = true;
-    servers_initializing_++;
   }
 
   server->set_state_change_callback([weak_this = weak_factory_.GetWeakPtr(), initializing](
@@ -987,20 +739,16 @@ void System::AddSymbolServer(std::unique_ptr<SymbolServer> unique_server) {
       observer.OnSymbolServerStatusChanged(server);
 
     if (state == SymbolServer::State::kReady)
-      weak_this->OnSymbolServerBecomesReady(server);
+      weak_this->download_manager_.OnSymbolServerBecomesReady(server);
 
     if (initializing && state != SymbolServer::State::kBusy &&
         state != SymbolServer::State::kInitializing) {
       initializing = false;
-      weak_this->servers_initializing_--;
-      if (!weak_this->servers_initializing_) {
-        weak_this->suspended_downloads_.clear();
-      }
     }
   });
 
   if (server->state() == SymbolServer::State::kReady) {
-    OnSymbolServerBecomesReady(server);
+    download_manager_.OnSymbolServerBecomesReady(server);
   }
 }
 

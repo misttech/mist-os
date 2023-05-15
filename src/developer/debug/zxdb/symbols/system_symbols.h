@@ -33,13 +33,10 @@ class SystemSymbols {
     kBinary,
   };
 
-  class DownloadHandler {
-   public:
-    virtual void RequestDownload(const std::string& build_id, DebugSymbolFileType file_type,
-                                 bool quiet) = 0;
-  };
+  using RequestDownloadFunction =
+      std::function<void(const std::string& build_id, DebugSymbolFileType file_type)>;
 
-  explicit SystemSymbols(DownloadHandler* download_handler);
+  explicit SystemSymbols(RequestDownloadFunction f);
   ~SystemSymbols();
 
   BuildIDIndex& build_id_index() { return build_id_index_; }
@@ -77,7 +74,7 @@ class SystemSymbols {
   // Saves the given module in the modules_ map and registers for its deletion.
   void SaveModule(const std::string& build_id, ModuleSymbols* module);
 
-  DownloadHandler* download_handler_;
+  RequestDownloadFunction request_download_;
 
   BuildIDIndex build_id_index_;
 
