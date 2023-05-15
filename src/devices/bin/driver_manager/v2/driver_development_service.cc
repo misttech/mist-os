@@ -249,7 +249,7 @@ void DriverDevelopmentService::BindAllUnboundNodes(BindAllUnboundNodesCompleter:
           fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> result) mutable {
         completer.ReplySuccess(result);
       };
-  driver_runner_.TryBindAllOrphans(std::move(callback));
+  driver_runner_.TryBindAllAvailable(std::move(callback));
 }
 
 void DriverDevelopmentService::IsDfv2(IsDfv2Completer::Sync& completer) { completer.Reply(true); }
