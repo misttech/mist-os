@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::Arc;
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::mm::{
     MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatmFile, ProcStatusFile,
@@ -45,6 +46,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"io", IoFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"limits", LimitsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"mem", MemFile::new_node(task), mode!(IFREG, 0o600));
     dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"statm", ProcStatmFile::new_node(task), mode!(IFREG, 0o444));
@@ -507,5 +509,51 @@ impl DynamicFileSource for LimitsFile {
             sink.write(b"\n");
         }
         Ok(())
+    }
+}
+
+/// `MemFile` implements `proc/<pid>/mem` file.
+#[derive(Clone)]
+pub struct MemFile(Arc<Task>);
+impl MemFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        let task = task.clone();
+        SimpleFileNode::new(move || Ok(Self(task.clone())))
+    }
+}
+
+impl FileOps for MemFile {
+    fileops_impl_seekable!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let task = &self.0;
+        let mut addr = UserAddress::default() + offset;
+        data.write_each(&mut |bytes| {
+            let actual = task.mm.read_memory_partial(addr, bytes)?;
+            addr += actual;
+            Ok(actual)
+        })
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        let task = &self.0;
+        let mut addr = UserAddress::default() + offset;
+        data.read_each(&mut |bytes| {
+            let actual = task.mm.write_memory_partial(addr, bytes)?;
+            addr += actual;
+            Ok(actual)
+        })
     }
 }

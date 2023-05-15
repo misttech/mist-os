@@ -515,13 +515,9 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcPidMem.Read",
                 "ProcPidMem.Unmapped",
-                "ProcPidMem.RepeatedRead",
                 "ProcPidMem.RepeatedSeek",
-                "ProcPidMem.PartialRead",
                 "ProcPidMem.AfterExit",
-                "ProcPidMem.SameUser",
                 "ProcSelfMaps.Basic",
                 "ProcSelfMaps.SharedAnon",
                 "ProcSelfFdInfo.Flags",

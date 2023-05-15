@@ -2377,6 +2377,10 @@ impl MemoryAccessor for RemoteResourceAccessor {
             .map_err(Self::map_fidl_posix_errno)?;
         Ok(bytes.len())
     }
+
+    fn write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
+        error!(ENOTSUP)
+    }
 }
 
 impl ResourceAccessor for RemoteResourceAccessor {
@@ -2465,6 +2469,10 @@ impl MemoryAccessor for CurrentTask {
         log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
     }
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        log_trace!("Writing up to {} bytes to {:?}", bytes.len(), addr);
+        self.mm.write_memory_partial(addr, bytes)
+    }
 }
 
 /// Implementation of `ResourceAccessor` for a local client represented as a `Task`.
@@ -2499,6 +2507,10 @@ impl MemoryAccessor for Task {
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
+    }
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        log_trace!("Writing up to {} bytes to {:?}", bytes.len(), addr);
+        self.mm.write_memory_partial(addr, bytes)
     }
 }
 

@@ -907,7 +907,6 @@ impl MemoryManagerState {
             {
                 break;
             }
-
             bytes_read = next_offset;
         }
 
@@ -935,6 +934,32 @@ impl MemoryManagerState {
         }
 
         if bytes_written != bytes.len() {
+            error!(EFAULT)
+        } else {
+            Ok(bytes.len())
+        }
+    }
+
+    /// Writes bytes starting at `addr`, continuing until either `bytes.len()` bytes have been
+    /// written or no more bytes can be written.
+    ///
+    /// # Parameters
+    /// - `addr`: The address to read data from.
+    /// - `bytes`: The byte array to write from.
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        let mut bytes_written = 0;
+        for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
+            let next_offset = bytes_written + len;
+            if mapping
+                .write_memory(addr + bytes_written, &bytes[bytes_written..next_offset])
+                .is_err()
+            {
+                break;
+            }
+            bytes_written = next_offset;
+        }
+
+        if !bytes.is_empty() && bytes_written == 0 {
             error!(EFAULT)
         } else {
             Ok(bytes.len())
@@ -981,8 +1006,16 @@ pub trait MemoryAccessor {
     ///
     /// # Parameters
     /// - `addr`: The address to write to.
-    /// - `bytes`: The bytes to write to the VMO.
+    /// - `bytes`: The bytes to write from.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
+
+    /// Writes bytes starting at `addr`, continuing until either `bytes.len()` bytes have been
+    /// written or no more bytes can be written.
+    ///
+    /// # Parameters
+    /// - `addr`: The address to write to.
+    /// - `bytes`: The bytes to write from.
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
 }
 
 pub trait MemoryAccessorExt: MemoryAccessor {
@@ -1083,17 +1116,19 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
 impl MemoryAccessor for MemoryManager {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        let state = self.state.read();
-        state.read_memory(addr, bytes)
+        self.state.read().read_memory(addr, bytes)
     }
 
     fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
-        let state = self.state.read();
-        state.read_memory_partial(addr, bytes)
+        self.state.read().read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.state.read().write_memory(addr, bytes)
+    }
+
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.state.read().write_memory_partial(addr, bytes)
     }
 }
 
