@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Before adding new declarations to this file, please confirm that they are unique to
-// the component scene_manager.cml. If they're shared with input-pipeline.cml, they should
-// be placed into //src/ui/lib/input_pipeline/meta/client.shard.cml or similar.
+// Before adding new declarations to this file, please confirm that they are
+// relevant to the component scene_manager.cml. If they're unique to input
+// pipeline, they should be placed into
+// //src/ui/lib/input_pipeline/meta/client.shard.cml or similar.
 {
     include: [ "//src/ui/lib/input_pipeline/meta/client.shard.cml" ],
     program: {

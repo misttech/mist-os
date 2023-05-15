@@ -7,7 +7,6 @@ group("bin") {
   deps = [
     "brightness_manager",
     "clipboard",
-    "input-pipeline",
     "root_presenter",
     "root_presenter:virtual_keyboard_manager",
     "scene_manager",
@@ -22,7 +21,6 @@ group("tests") {
     "brightness_manager:tests",
     "clipboard:tests",
     "hardware_display_controller_provider:tests",
-    "input-pipeline:tests",
     "root_presenter:tests",
     "scene_manager:scene_manager_tests",
     "terminal:tests",

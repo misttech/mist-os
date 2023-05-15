@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Declarations shared between input-pipeline and scene_manager, which both use
-// the input_pipeline library.
+// Declarations specific to input pipeline library, for integrating with
+// components such as scene_manager.
 {
     include: [
         "//sdk/lib/inspect/client.shard.cml",

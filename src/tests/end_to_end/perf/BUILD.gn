@@ -281,9 +281,6 @@ group("package_deps") {
     # These are used by flatland_benchmarks.
     "//src/ui/examples:flatland-examples",
 
-    # These are used by input_latency_benchmarks.
-    "//src/ui/bin/input-pipeline:component-for-test",
-
     # These are used by storage_benchmarks_test
     "//src/storage/benchmarks",
   ]
