@@ -181,7 +181,7 @@ impl Union {
         }
     }
 }
-impl fidl::encoding::Persistable for Union {}
+impl fidl::Persistable for Union {}
 
 fidl_union! {
     name: Union,
@@ -201,7 +201,7 @@ fidl_union! {
 pub struct Struct {
     pub x: u32,
 }
-impl fidl::encoding::Persistable for Struct {}
+impl fidl::Persistable for Struct {}
 
 fidl_struct! {
     copy: true,
@@ -232,7 +232,7 @@ pub struct Table {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for Table {}
+impl fidl::Persistable for Table {}
 
 fidl_table! {
     name: Table,

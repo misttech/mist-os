@@ -92,7 +92,7 @@ mod tests {
         ) {
             let actual = item.measure();
             let (bytes, _) =
-                ::fidl::encoding::standalone_encode_value(&item).unwrap();
+                ::fidl::standalone_encode_value(&item).unwrap();
             let expected = bytes.len();
             prop_assert_eq!(expected, actual);
         }

@@ -11,7 +11,7 @@ use {
 
 // [START diff_1]
 use {
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_examples_keyvaluestore_supportexports::{Exportable, Item, StoreMarker},
     fuchsia_zircon::Vmo,
 };

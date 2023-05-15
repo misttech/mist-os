@@ -35,7 +35,7 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 pub struct ExampleFooRequest {
     pub s: String,
 }
-impl fidl::encoding::Persistable for ExampleFooRequest {}
+impl fidl::Persistable for ExampleFooRequest {}
 
 fidl_struct! {
     name: ExampleFooRequest,
@@ -65,7 +65,7 @@ fidl_struct! {
 pub struct ExampleFooResponse {
     pub y: i64,
 }
-impl fidl::encoding::Persistable for ExampleFooResponse {}
+impl fidl::Persistable for ExampleFooResponse {}
 
 fidl_struct! {
     copy: true,

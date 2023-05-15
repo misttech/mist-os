@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use assembly_config_schema::FileEntry;
 use assembly_platform_configuration::DomainConfig;
 use camino::{Utf8Path, Utf8PathBuf};
-use fidl::encoding::persist;
+use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::io::Write;
 
@@ -97,7 +97,7 @@ mod tests {
     use cm_rust::{
         CapabilityName, ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget,
     };
-    use fidl::encoding::unpersist;
+    use fidl::unpersist;
     use fidl_fuchsia_component_decl::Component;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_hash::Hash;

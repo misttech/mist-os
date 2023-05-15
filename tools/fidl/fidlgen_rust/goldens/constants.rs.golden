@@ -199,7 +199,7 @@ pub struct Struct {
     pub enum_with_default: Enum,
     pub bits_with_default: Bits,
 }
-impl fidl::encoding::Persistable for Struct {}
+impl fidl::Persistable for Struct {}
 
 fidl_struct! {
     name: Struct,

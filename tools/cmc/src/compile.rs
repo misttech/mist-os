@@ -8,7 +8,7 @@ use crate::features::FeatureSet;
 use crate::include;
 use crate::util;
 use crate::validate;
-use fidl::encoding::persist;
+use fidl::persist;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -106,7 +106,7 @@ mod tests {
     use crate::features::Feature;
     use assert_matches::assert_matches;
     use difference::Changeset;
-    use fidl::encoding::unpersist;
+    use fidl::unpersist;
     use fidl_fuchsia_component_decl as fdecl;
     use fidl_fuchsia_data as fdata;
     use serde_json::json;

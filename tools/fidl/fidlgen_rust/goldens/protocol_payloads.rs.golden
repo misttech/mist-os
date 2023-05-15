@@ -39,7 +39,7 @@ pub struct LocalStructPayload {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for LocalStructPayload {}
+impl fidl::Persistable for LocalStructPayload {}
 
 fidl_struct! {
     copy: true,
@@ -78,7 +78,7 @@ pub struct MainProtocolOnAnonRequest {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolOnAnonRequest {}
+impl fidl::Persistable for MainProtocolOnAnonRequest {}
 
 fidl_struct! {
     copy: true,
@@ -117,7 +117,7 @@ pub struct MainProtocolOneWayAnonRequest {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
+impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
 
 fidl_struct! {
     copy: true,
@@ -156,7 +156,7 @@ pub struct MainProtocolTwoWayAnonRequest {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonRequest {}
+impl fidl::Persistable for MainProtocolTwoWayAnonRequest {}
 
 fidl_struct! {
     copy: true,
@@ -195,7 +195,7 @@ pub struct MainProtocolTwoWayAnonResponse {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
+impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
 
 fidl_struct! {
     copy: true,
@@ -234,7 +234,7 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 fidl_struct! {
     copy: true,
@@ -273,7 +273,7 @@ pub struct MainProtocolOnAnonWithErrorResponse {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
+impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
 fidl_struct! {
     copy: true,
@@ -312,7 +312,7 @@ pub struct MainProtocolTwoWayAnonWithErrorResponse {
     pub a: u32,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
 fidl_struct! {
     copy: true,

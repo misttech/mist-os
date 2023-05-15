@@ -37,7 +37,7 @@ pub const ALL_BINDINGS: u32 = 0;
 pub struct DenyEachBindingOnlyDenyCppRequest {
     pub a: bool,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyCppRequest {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyCppRequest {}
 
 fidl_struct! {
     name: DenyEachBindingOnlyDenyCppRequest,
@@ -64,7 +64,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyDartRequest {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyDartRequest {}
 
 fidl_struct! {
     name: DenyEachBindingOnlyDenyDartRequest,
@@ -91,7 +91,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyGoRequest {
     pub a: bool,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyGoRequest {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyGoRequest {}
 
 fidl_struct! {
     name: DenyEachBindingOnlyDenyGoRequest,
@@ -118,7 +118,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyLibfuzzerRequest {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerRequest {}
 
 fidl_struct! {
     name: DenyEachBindingOnlyDenyLibfuzzerRequest,
@@ -145,7 +145,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenySyzkallerRequest {}
+impl fidl::Persistable for DenyEachBindingOnlyDenySyzkallerRequest {}
 
 fidl_struct! {
     name: DenyEachBindingOnlyDenySyzkallerRequest,
@@ -175,7 +175,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyCppResponse {
     pub b: i32,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyCppResponse {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyCppResponse {}
 
 fidl_struct! {
     copy: true,
@@ -206,7 +206,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyDartResponse {
     pub b: i32,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyDartResponse {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyDartResponse {}
 
 fidl_struct! {
     copy: true,
@@ -237,7 +237,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyGoResponse {
     pub b: i32,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyGoResponse {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyGoResponse {}
 
 fidl_struct! {
     copy: true,
@@ -268,7 +268,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
     pub b: i32,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenyLibfuzzerResponse {}
+impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerResponse {}
 
 fidl_struct! {
     copy: true,
@@ -299,7 +299,7 @@ fidl_struct! {
 pub struct DenyEachBindingOnlyDenySyzkallerResponse {
     pub b: i32,
 }
-impl fidl::encoding::Persistable for DenyEachBindingOnlyDenySyzkallerResponse {}
+impl fidl::Persistable for DenyEachBindingOnlyDenySyzkallerResponse {}
 
 fidl_struct! {
     copy: true,
@@ -327,7 +327,7 @@ fidl_struct! {
 pub struct MemberOnlyAppearsInImportingLibrary {
     pub a: bool,
 }
-impl fidl::encoding::Persistable for MemberOnlyAppearsInImportingLibrary {}
+impl fidl::Persistable for MemberOnlyAppearsInImportingLibrary {}
 
 fidl_struct! {
     name: MemberOnlyAppearsInImportingLibrary,
@@ -354,7 +354,7 @@ fidl_struct! {
 pub struct OnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: MemberOnlyAppearsInImportingLibrary,
 }
-impl fidl::encoding::Persistable for OnlyAppearsInImportingLibrary {}
+impl fidl::Persistable for OnlyAppearsInImportingLibrary {}
 
 fidl_struct! {
     name: OnlyAppearsInImportingLibrary,
@@ -383,7 +383,7 @@ pub struct OnlyRust {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for OnlyRust {}
+impl fidl::Persistable for OnlyRust {}
 
 fidl_table! {
     name: OnlyRust,

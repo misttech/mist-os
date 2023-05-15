@@ -502,8 +502,7 @@ mod tests {
         let struct_start = 2 + checksum_len as usize;
         assert_eq!(&encoded[2..struct_start], [0; 32]);
 
-        let decoded: BasicSuccessSchema =
-            fidl::encoding::unpersist(&encoded[struct_start..]).unwrap();
+        let decoded: BasicSuccessSchema = fidl::unpersist(&encoded[struct_start..]).unwrap();
         assert_eq!(
             decoded,
             BasicSuccessSchema {

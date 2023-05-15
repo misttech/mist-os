@@ -59,7 +59,7 @@ pub fn create_rust_wrapper(
 
     let stream = quote! {
         use #fidl_library_name::Config as FidlConfig;
-        use fidl::encoding::unpersist;
+        use fidl::unpersist;
         use fuchsia_inspect::{#(#inspect_uses),*};
         use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
         use fuchsia_zircon as zx;

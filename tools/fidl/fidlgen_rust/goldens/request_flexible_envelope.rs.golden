@@ -86,7 +86,7 @@ impl FlexibleFoo {
         }
     }
 }
-impl fidl::encoding::Persistable for FlexibleFoo {}
+impl fidl::Persistable for FlexibleFoo {}
 
 fidl_union! {
     name: FlexibleFoo,
@@ -123,7 +123,7 @@ impl StrictFoo {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictFoo {}
+impl fidl::Persistable for StrictFoo {}
 
 fidl_union! {
     name: StrictFoo,
@@ -143,7 +143,7 @@ fidl_union! {
 pub struct ProtocolRequestFlexibleResponseStrictRequest {
     pub s: FlexibleFoo,
 }
-impl fidl::encoding::Persistable for ProtocolRequestFlexibleResponseStrictRequest {}
+impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictRequest {}
 
 fidl_struct! {
     name: ProtocolRequestFlexibleResponseStrictRequest,
@@ -170,7 +170,7 @@ fidl_struct! {
 pub struct ProtocolRequestFlexibleResponseStrictResponse {
     pub f: StrictFoo,
 }
-impl fidl::encoding::Persistable for ProtocolRequestFlexibleResponseStrictResponse {}
+impl fidl::Persistable for ProtocolRequestFlexibleResponseStrictResponse {}
 
 fidl_struct! {
     name: ProtocolRequestFlexibleResponseStrictResponse,
@@ -197,7 +197,7 @@ fidl_struct! {
 pub struct ProtocolRequestStrictResponseFlexibleRequest {
     pub s: StrictFoo,
 }
-impl fidl::encoding::Persistable for ProtocolRequestStrictResponseFlexibleRequest {}
+impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleRequest {}
 
 fidl_struct! {
     name: ProtocolRequestStrictResponseFlexibleRequest,
@@ -224,7 +224,7 @@ fidl_struct! {
 pub struct ProtocolRequestStrictResponseFlexibleResponse {
     pub f: FlexibleFoo,
 }
-impl fidl::encoding::Persistable for ProtocolRequestStrictResponseFlexibleResponse {}
+impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleResponse {}
 
 fidl_struct! {
     name: ProtocolRequestStrictResponseFlexibleResponse,

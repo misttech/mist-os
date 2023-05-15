@@ -385,7 +385,7 @@ pub async fn get_manifest(
         bytes.append(&mut batch);
     }
 
-    let manifest = fidl::encoding::unpersist::<fcdecl::Component>(&bytes)?;
+    let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
     let manifest = manifest.fidl_into_native();
     Ok(manifest)
 }

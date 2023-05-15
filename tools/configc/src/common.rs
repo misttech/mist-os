@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use cm_rust::{ComponentDecl, FidlIntoNative};
-use fidl::encoding::unpersist;
+use fidl::unpersist;
 use fidl_fuchsia_component_decl as fdecl;
 use std::{fs, path::Path};
 

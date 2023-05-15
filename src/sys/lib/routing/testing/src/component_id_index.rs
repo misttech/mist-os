@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    ::component_id_index::Index, anyhow::Result, fidl::encoding::persist,
+    ::component_id_index::Index, anyhow::Result, fidl::persist,
     fidl_fuchsia_component_internal as fcomponent_internal, std::convert::TryFrom, std::io::Write,
     tempfile::NamedTempFile,
 };

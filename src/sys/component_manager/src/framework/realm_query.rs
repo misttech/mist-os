@@ -323,7 +323,7 @@ pub async fn get_manifest(
         _ => return Err(fsys::GetManifestError::InstanceNotResolved),
     };
 
-    let bytes = fidl::encoding::persist(&decl).map_err(|error| {
+    let bytes = fidl::persist(&decl).map_err(|error| {
         warn!(%moniker, %error, "RealmQuery failed to encode manifest");
         fsys::GetManifestError::EncodeFailed
     })?;
@@ -797,7 +797,7 @@ mod tests {
             bytes.append(&mut batch);
         }
 
-        let manifest = fidl::encoding::unpersist::<fcdecl::Component>(&bytes).unwrap();
+        let manifest = fidl::unpersist::<fcdecl::Component>(&bytes).unwrap();
 
         // Component should have 10000 use and expose decls
         let uses = manifest.uses.unwrap();

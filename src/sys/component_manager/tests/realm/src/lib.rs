@@ -23,7 +23,7 @@ async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::C
         bytes.append(&mut batch);
     }
 
-    fidl::encoding::unpersist::<fcdecl::Component>(&bytes).unwrap()
+    fidl::unpersist::<fcdecl::Component>(&bytes).unwrap()
 }
 
 #[fuchsia::test]

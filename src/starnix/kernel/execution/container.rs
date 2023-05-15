@@ -68,8 +68,8 @@ impl std::ops::Deref for ConfigWrapper {
 /// Returns the configuration object for the container being run by this `starnix_kernel`.
 fn get_config() -> ConfigWrapper {
     if let Ok(config_bytes) = std::fs::read("/container_config/config") {
-        let program_dict: fdata::Dictionary = fidl::encoding::unpersist(&config_bytes)
-            .expect("Failed to unpersist the program dictionary.");
+        let program_dict: fdata::Dictionary =
+            fidl::unpersist(&config_bytes).expect("Failed to unpersist the program dictionary.");
 
         let apex_hack = get_config_strvec(&program_dict, "apex_hack").unwrap_or_default();
         let features = get_config_strvec(&program_dict, "features").unwrap_or_default();

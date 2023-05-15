@@ -263,7 +263,7 @@ impl MockRealmQuery {
                     let query_moniker = &moniker[2..];
                     let res = self.mapping.get(query_moniker).unwrap();
                     let manifest = res.to_manifest();
-                    let manifest = fidl::encoding::persist(&manifest).unwrap();
+                    let manifest = fidl::persist(&manifest).unwrap();
                     let (client_end, server_end) =
                         create_endpoints::<fsys2::ManifestBytesIteratorMarker>();
 

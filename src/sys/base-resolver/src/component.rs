@@ -130,7 +130,7 @@ async fn resolve_from_package(
     let data = mem_util::open_file_data(&package, &url.resource())
         .await
         .map_err(crate::ResolverError::ComponentNotFound)?;
-    let decl: fcomponent_decl::Component = fidl::encoding::unpersist(
+    let decl: fcomponent_decl::Component = fidl::unpersist(
         mem_util::bytes_from_data(&data).map_err(crate::ResolverError::ReadManifest)?.as_ref(),
     )
     .map_err(crate::ResolverError::ParsingManifest)?;

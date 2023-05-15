@@ -33,7 +33,7 @@ use {
 pub struct Foo {
     pub field: fidl_test_dependent::MyEnum,
 }
-impl fidl::encoding::Persistable for Foo {}
+impl fidl::Persistable for Foo {}
 
 fidl_struct! {
     name: Foo,

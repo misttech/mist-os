@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fidl::encoding::unpersist;
+use fidl::unpersist;
 use fidl_fuchsia_component_decl::*;
 use std::fs::File;
 use std::io::Read;

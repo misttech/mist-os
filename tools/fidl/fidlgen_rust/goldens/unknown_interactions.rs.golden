@@ -84,7 +84,7 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {}
 
 fidl_union! {
     name: UnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
@@ -149,7 +149,7 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionRequest {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionRequest {}
 
 fidl_union! {
     name: UnknownInteractionsAjarProtocolStrictEventUnionRequest,
@@ -214,7 +214,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {}
 
 fidl_union! {
     name: UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
@@ -279,7 +279,7 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse,
@@ -344,7 +344,7 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsAjarProtocolStrictEventUnionErrResponse,
@@ -409,7 +409,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
@@ -474,7 +474,7 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionRequest {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionRequest {}
 
 fidl_union! {
     name: UnknownInteractionsClosedProtocolStrictEventUnionRequest,
@@ -539,7 +539,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {}
 
 fidl_union! {
     name: UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
@@ -604,7 +604,7 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsClosedProtocolStrictEventUnionErrResponse,
@@ -669,7 +669,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
@@ -734,7 +734,7 @@ impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventUnionRequest {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventUnionRequest {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolFlexibleEventUnionRequest,
@@ -799,7 +799,7 @@ impl UnknownInteractionsProtocolStrictEventUnionRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventUnionRequest {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventUnionRequest {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolStrictEventUnionRequest,
@@ -864,7 +864,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionResponse {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolStrictTwoWayUnionResponse,
@@ -929,7 +929,7 @@ impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolFlexibleEventUnionErrResponse,
@@ -994,7 +994,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
@@ -1059,7 +1059,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
@@ -1124,7 +1124,7 @@ impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolStrictEventUnionErrResponse,
@@ -1189,7 +1189,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {}
 
 fidl_union! {
     name: UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
@@ -1209,7 +1209,7 @@ fidl_union! {
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {}
 
 fidl_struct! {
     copy: true,
@@ -1240,7 +1240,7 @@ fidl_struct! {
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {}
 
 fidl_struct! {
     copy: true,
@@ -1271,7 +1271,7 @@ fidl_struct! {
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1302,7 +1302,7 @@ fidl_struct! {
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1333,7 +1333,7 @@ fidl_struct! {
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1364,7 +1364,7 @@ fidl_struct! {
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1395,7 +1395,7 @@ fidl_struct! {
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {}
 
 fidl_struct! {
     copy: true,
@@ -1426,7 +1426,7 @@ fidl_struct! {
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1457,7 +1457,7 @@ fidl_struct! {
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1488,10 +1488,7 @@ fidl_struct! {
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable
-    for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
-{
-}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1522,7 +1519,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsRequest {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsRequest {}
 
 fidl_struct! {
     copy: true,
@@ -1553,7 +1550,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolStrictEventFieldsRequest {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventFieldsRequest {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventFieldsRequest {}
 
 fidl_struct! {
     copy: true,
@@ -1584,7 +1581,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1615,7 +1612,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1646,7 +1643,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1677,7 +1674,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1708,7 +1705,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1739,7 +1736,7 @@ fidl_struct! {
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1770,7 +1767,7 @@ pub struct UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
 
 fidl_table! {
     name: UnknownInteractionsAjarProtocolFlexibleEventTableRequest,
@@ -1789,7 +1786,7 @@ pub struct UnknownInteractionsAjarProtocolStrictEventTableRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
 
 fidl_table! {
     name: UnknownInteractionsAjarProtocolStrictEventTableRequest,
@@ -1808,7 +1805,7 @@ pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
 
 fidl_table! {
     name: UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
@@ -1827,7 +1824,7 @@ pub struct UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse,
@@ -1846,7 +1843,7 @@ pub struct UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsAjarProtocolStrictEventTableErrResponse,
@@ -1865,7 +1862,7 @@ pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
@@ -1884,7 +1881,7 @@ pub struct UnknownInteractionsClosedProtocolStrictEventTableRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
 
 fidl_table! {
     name: UnknownInteractionsClosedProtocolStrictEventTableRequest,
@@ -1903,7 +1900,7 @@ pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
 
 fidl_table! {
     name: UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
@@ -1922,7 +1919,7 @@ pub struct UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsClosedProtocolStrictEventTableErrResponse,
@@ -1941,7 +1938,7 @@ pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
@@ -1960,7 +1957,7 @@ pub struct UnknownInteractionsProtocolFlexibleEventTableRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolFlexibleEventTableRequest,
@@ -1979,7 +1976,7 @@ pub struct UnknownInteractionsProtocolStrictEventTableRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolStrictEventTableRequest,
@@ -1998,7 +1995,7 @@ pub struct UnknownInteractionsProtocolStrictTwoWayTableResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolStrictTwoWayTableResponse,
@@ -2017,7 +2014,7 @@ pub struct UnknownInteractionsProtocolFlexibleEventTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolFlexibleEventTableErrResponse,
@@ -2036,7 +2033,7 @@ pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
@@ -2055,7 +2052,7 @@ pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
@@ -2074,7 +2071,7 @@ pub struct UnknownInteractionsProtocolStrictEventTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolStrictEventTableErrResponse,
@@ -2093,7 +2090,7 @@ pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
+impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
 
 fidl_table! {
     name: UnknownInteractionsProtocolStrictTwoWayTableErrResponse,

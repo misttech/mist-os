@@ -50,7 +50,7 @@ pub const SMILE_UPPER: &str = "😀";
 /// "pleaseescapethisdocommentproperly"
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DocCommentWithQuotes;
-impl fidl::encoding::Persistable for DocCommentWithQuotes {}
+impl fidl::Persistable for DocCommentWithQuotes {}
 
 fidl_struct! {
     empty: true,

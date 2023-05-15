@@ -36,7 +36,7 @@ use {
 pub struct ByteAndBytes {
     pub single_byte: u8,
 }
-impl fidl::encoding::Persistable for ByteAndBytes {}
+impl fidl::Persistable for ByteAndBytes {}
 
 fidl_struct! {
     copy: true,

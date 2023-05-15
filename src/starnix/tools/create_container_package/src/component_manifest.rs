@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use cml::{compile, Document};
-use fidl::encoding::persist;
+use fidl::persist;
 use serde_json::json;
 
 fn compile_from_json(contents: serde_json::Value) -> Vec<u8> {

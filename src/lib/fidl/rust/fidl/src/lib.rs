@@ -23,6 +23,11 @@ pub use self::error::{Error, Result};
 pub use handle::*;
 pub use server::ServeInner;
 
+pub use encoding::{
+    persist, standalone_decode_resource, standalone_decode_value, standalone_encode_resource,
+    standalone_encode_value, unpersist, Persistable, Standalone,
+};
+
 #[cfg(feature = "fidl_trace")]
 pub use {
     fuchsia_trace::blob as trace_blob, fuchsia_trace::duration_begin, fuchsia_trace::duration_end,

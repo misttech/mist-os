@@ -193,7 +193,7 @@ type Config = struct {
 
         let expected_rust_src = quote! {
             use fidl_cf_sc_internal::Config as FidlConfig;
-            use fidl::encoding::unpersist;
+            use fidl::unpersist;
             use fuchsia_inspect::{Node};
             use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
             use fuchsia_zircon as zx;

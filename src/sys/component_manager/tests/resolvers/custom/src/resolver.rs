@@ -106,7 +106,7 @@ fn build_decl() -> fmem::Data {
         target_name: Some("fidl.test.components.Trigger".to_string()),
         ..Default::default()
     })]);
-    fmem::Data::Bytes(fidl::encoding::persist(&component_decl).expect("encoded"))
+    fmem::Data::Bytes(fidl::persist(&component_decl).expect("encoded"))
 }
 
 #[fuchsia::main]

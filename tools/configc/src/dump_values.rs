@@ -5,7 +5,7 @@
 use anyhow::{Context, Error};
 use argh::FromArgs;
 use cm_rust::FidlIntoNative;
-use fidl::encoding::unpersist;
+use fidl::unpersist;
 use fidl_fuchsia_component_decl as fdecl;
 use std::{collections::BTreeMap, path::PathBuf};
 

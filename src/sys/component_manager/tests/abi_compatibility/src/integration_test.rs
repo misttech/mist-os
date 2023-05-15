@@ -64,7 +64,7 @@ impl ComponentResolver {
         fresolution::Component {
             url: Some("test".to_string()),
             decl: Some(fmem::Data::Bytes(
-                fidl::encoding::persist(&fdecl::Component::default().clone()).unwrap(),
+                fidl::persist(&fdecl::Component::default().clone()).unwrap(),
             )),
             abi_revision: self.abi_revision(),
             ..Default::default()

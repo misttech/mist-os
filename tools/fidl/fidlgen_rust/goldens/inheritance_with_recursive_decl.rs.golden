@@ -35,7 +35,7 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 pub struct ChildSecondRequest {
     pub request: fidl::endpoints::ServerEnd<ParentMarker>,
 }
-impl fidl::encoding::Standalone for ChildSecondRequest {}
+impl fidl::Standalone for ChildSecondRequest {}
 
 fidl_struct! {
     name: ChildSecondRequest,
@@ -64,7 +64,7 @@ fidl_struct! {
 pub struct ParentFirstRequest {
     pub request: fidl::endpoints::ServerEnd<ParentMarker>,
 }
-impl fidl::encoding::Standalone for ParentFirstRequest {}
+impl fidl::Standalone for ParentFirstRequest {}
 
 fidl_struct! {
     name: ParentFirstRequest,

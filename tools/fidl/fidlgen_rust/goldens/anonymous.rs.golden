@@ -291,7 +291,7 @@ impl Expression {
         }
     }
 }
-impl fidl::encoding::Persistable for Expression {}
+impl fidl::Persistable for Expression {}
 
 fidl_union! {
     name: Expression,
@@ -364,7 +364,7 @@ impl UnionMember {
         }
     }
 }
-impl fidl::encoding::Persistable for UnionMember {}
+impl fidl::Persistable for UnionMember {}
 
 fidl_union! {
     name: UnionMember,
@@ -383,7 +383,7 @@ pub struct OverrideTest {
     pub left: Option<Box<Expression>>,
     pub right: Option<Box<Expression>>,
 }
-impl fidl::encoding::Persistable for OverrideTest {}
+impl fidl::Persistable for OverrideTest {}
 
 fidl_struct! {
     name: OverrideTest,
@@ -435,7 +435,7 @@ pub struct SomeProtocolSomeMethodRequest {
     pub union_member: UnionMember,
     pub table_member: TableMember,
 }
-impl fidl::encoding::Persistable for SomeProtocolSomeMethodRequest {}
+impl fidl::Persistable for SomeProtocolSomeMethodRequest {}
 
 fidl_struct! {
     name: SomeProtocolSomeMethodRequest,
@@ -469,7 +469,7 @@ fidl_struct! {
 pub struct SomeProtocolSomeMethodResponse {
     pub bits_member: BitsMember,
 }
-impl fidl::encoding::Persistable for SomeProtocolSomeMethodResponse {}
+impl fidl::Persistable for SomeProtocolSomeMethodResponse {}
 
 fidl_struct! {
     name: SomeProtocolSomeMethodResponse,
@@ -499,7 +499,7 @@ fidl_struct! {
 pub struct TableData {
     pub data: u8,
 }
-impl fidl::encoding::Persistable for TableData {}
+impl fidl::Persistable for TableData {}
 
 fidl_struct! {
     copy: true,
@@ -532,7 +532,7 @@ pub struct FunctionApplication {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for FunctionApplication {}
+impl fidl::Persistable for FunctionApplication {}
 
 fidl_table! {
     name: FunctionApplication,
@@ -559,7 +559,7 @@ pub struct TableMember {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for TableMember {}
+impl fidl::Persistable for TableMember {}
 
 fidl_table! {
     name: TableMember,

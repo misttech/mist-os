@@ -111,7 +111,7 @@ impl ExampleUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for ExampleUnion {}
+impl fidl::Persistable for ExampleUnion {}
 
 fidl_union! {
     name: ExampleUnion,
@@ -127,7 +127,7 @@ fidl_union! {
 pub struct ExampleProtocolMethodRequest {
     pub arg: fidl_test_exampleusing::Empty,
 }
-impl fidl::encoding::Persistable for ExampleProtocolMethodRequest {}
+impl fidl::Persistable for ExampleProtocolMethodRequest {}
 
 fidl_struct! {
     name: ExampleProtocolMethodRequest,
@@ -157,7 +157,7 @@ fidl_struct! {
 pub struct ExampleStruct {
     pub member: u32,
 }
-impl fidl::encoding::Persistable for ExampleStruct {}
+impl fidl::Persistable for ExampleStruct {}
 
 fidl_struct! {
     copy: true,
@@ -188,7 +188,7 @@ pub struct ExampleTable {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for ExampleTable {}
+impl fidl::Persistable for ExampleTable {}
 
 fidl_table! {
     name: ExampleTable,

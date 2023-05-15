@@ -5,7 +5,7 @@
 use anyhow::Error;
 use difference::Changeset;
 use fdata::{Dictionary, DictionaryEntry, DictionaryValue};
-use fidl::encoding::unpersist;
+use fidl::unpersist;
 use fidl_fuchsia_component_decl::*;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;

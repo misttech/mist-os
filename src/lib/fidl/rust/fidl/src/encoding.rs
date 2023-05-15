@@ -165,10 +165,6 @@ pub trait Decode<T: TypeMarker>: 'static + Sized {
     ) -> Result<()>;
 }
 
-// TODO(fxbug.dev/118783): Preserving the old name of the trait that provides
-// new_empty(). Remove once migrated off and no one imports it anymore.
-pub use Decode as Decodable;
-
 ////////////////////////////////////////////////////////////////////////////////
 // Constants
 ////////////////////////////////////////////////////////////////////////////////

@@ -34,7 +34,7 @@ pub struct BasicStruct {
     pub x: u32,
     pub y: String,
 }
-impl fidl::encoding::Persistable for BasicStruct {}
+impl fidl::Persistable for BasicStruct {}
 
 fidl_struct! {
     name: BasicStruct,
@@ -79,7 +79,7 @@ pub struct Simple {
     pub f1: u8,
     pub f2: bool,
 }
-impl fidl::encoding::Persistable for Simple {}
+impl fidl::Persistable for Simple {}
 
 fidl_struct! {
     name: Simple,

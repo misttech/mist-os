@@ -39,7 +39,7 @@ pub const ENUM_MEMBER_PRIMITIVE: u8 = fidl_test_dependent::MyEnum::Member.into_p
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MyStruct;
-impl fidl::encoding::Persistable for MyStruct {}
+impl fidl::Persistable for MyStruct {}
 
 fidl_struct! {
     empty: true,

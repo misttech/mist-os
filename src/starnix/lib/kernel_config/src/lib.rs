@@ -145,7 +145,7 @@ fn generate_kernel_config_directory(
         .ok_or(anyhow!("Missing program block in container."))?;
 
     // Add the container configuration file to the directory that is provided to the starnix_kernel.
-    let kernel_config_file = vfs::file::vmo::read_only(fidl::encoding::persist(&program_block)?);
+    let kernel_config_file = vfs::file::vmo::read_only(fidl::persist(&program_block)?);
 
     let kernel_config_dir = vfs::directory::immutable::simple();
     kernel_config_dir.add_entry(CONFIG_FILE, kernel_config_file)?;

@@ -6,7 +6,7 @@ use {
     argh::FromArgs,
     cm_types::{symmetrical_enums, Url},
     cml::error::{Error, Location},
-    fidl::encoding::persist,
+    fidl::persist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     serde::Deserialize,
     serde_json5,
@@ -491,9 +491,8 @@ fn compile(args: Args) -> Result<(), Error> {
 mod tests {
     use super::*;
     use {
-        assert_matches::assert_matches, fidl::encoding::unpersist,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, std::io::Read,
-        tempfile::TempDir,
+        assert_matches::assert_matches, fidl::unpersist, fidl_fuchsia_component_decl as fdecl,
+        fidl_fuchsia_io as fio, std::io::Read, tempfile::TempDir,
     };
 
     fn compile_str(input: &str) -> Result<component_internal::Config, Error> {

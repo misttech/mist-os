@@ -8,7 +8,7 @@ use {
         error::{Error, Location},
     },
     cm_rust::ComponentDecl,
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_fuchsia_component_decl::Component,
     serde_json::Value,
     serde_json5,

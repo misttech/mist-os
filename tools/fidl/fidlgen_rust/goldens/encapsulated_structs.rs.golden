@@ -34,7 +34,7 @@ use {
 pub struct ArrayInt16Int8 {
     pub arr: [Int16Int8; 3],
 }
-impl fidl::encoding::Persistable for ArrayInt16Int8 {}
+impl fidl::Persistable for ArrayInt16Int8 {}
 
 fidl_struct! {
     copy: true,
@@ -94,7 +94,7 @@ pub struct Int16Int8 {
     pub a: i16,
     pub b: i8,
 }
-impl fidl::encoding::Persistable for Int16Int8 {}
+impl fidl::Persistable for Int16Int8 {}
 
 fidl_struct! {
     copy: true,
@@ -141,7 +141,7 @@ pub struct Int8Int32 {
     pub a: i8,
     pub b: i32,
 }
-impl fidl::encoding::Persistable for Int8Int32 {}
+impl fidl::Persistable for Int8Int32 {}
 
 fidl_struct! {
     copy: true,
@@ -187,7 +187,7 @@ pub struct NonInlineStructTestStruct {
     pub element: Option<Box<Int16Int8>>,
     pub h: fidl::Handle,
 }
-impl fidl::encoding::Standalone for NonInlineStructTestStruct {}
+impl fidl::Standalone for NonInlineStructTestStruct {}
 
 fidl_struct! {
     name: NonInlineStructTestStruct,
@@ -236,7 +236,7 @@ pub struct StructPaddingTestStruct {
     pub inner: Int8Int32,
     pub array: ArrayInt16Int8,
 }
-impl fidl::encoding::Persistable for StructPaddingTestStruct {}
+impl fidl::Persistable for StructPaddingTestStruct {}
 
 fidl_struct! {
     copy: true,
@@ -329,7 +329,7 @@ pub struct TopLevelStruct {
     pub a: StructPaddingTestStruct,
     pub b: NonInlineStructTestStruct,
 }
-impl fidl::encoding::Standalone for TopLevelStruct {}
+impl fidl::Standalone for TopLevelStruct {}
 
 fidl_struct! {
     name: TopLevelStruct,

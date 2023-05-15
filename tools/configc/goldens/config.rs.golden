@@ -1,4 +1,4 @@
-use fidl::encoding::unpersist;
+use fidl::unpersist;
 use fidl_my_config_lib::Config as FidlConfig;
 use fuchsia_inspect::{ArithmeticArrayProperty, ArrayProperty, Node};
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};

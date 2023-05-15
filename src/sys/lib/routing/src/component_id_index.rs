@@ -6,7 +6,7 @@ use {
     anyhow,
     clonable_error::ClonableError,
     component_id_index, fidl,
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_fuchsia_component_internal as fcomponent_internal,
     moniker::{AbsoluteMoniker, MonikerError},
     std::{

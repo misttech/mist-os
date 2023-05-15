@@ -62,7 +62,7 @@ pub struct Testing {
     pub aa2: Vec<[u64; 2]>,
     pub aa3: [[u64; 2]; 3],
 }
-impl fidl::encoding::Standalone for Testing {}
+impl fidl::Standalone for Testing {}
 
 fidl_struct! {
     name: Testing,

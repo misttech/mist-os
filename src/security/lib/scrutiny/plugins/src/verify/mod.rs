@@ -157,7 +157,7 @@ mod tests {
             OfferDirectoryDecl, OfferProtocolDecl, OfferSource, OfferTarget, ProgramDecl, UseDecl,
             UseDirectoryDecl, UseProtocolDecl, UseSource,
         },
-        fidl::encoding::persist,
+        fidl::persist,
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal, fidl_fuchsia_io as fio,
         maplit::hashset,
@@ -512,7 +512,7 @@ mod tests {
             if split_index_path.as_slice()[..2] == ["/", "boot/"] {
                 bootfs.insert(
                     split_index_path[2..].join(""),
-                    fidl::encoding::persist(
+                    fidl::persist(
                         &mut component_internal::ComponentIdIndex::try_from(component_id_index)
                             .expect("failed to convert component id index to fidl"),
                     )
@@ -521,10 +521,7 @@ mod tests {
             }
         }
 
-        bootfs.insert(
-            DEFAULT_CONFIG_PATH.to_string(),
-            fidl::encoding::persist(&runtime_config).unwrap(),
-        );
+        bootfs.insert(DEFAULT_CONFIG_PATH.to_string(), fidl::persist(&runtime_config).unwrap());
         return Zbi { sections: Vec::default(), bootfs, cmdline: "".to_string() };
     }
 

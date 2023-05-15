@@ -76,7 +76,7 @@ impl<B: PkgNamespaceBuilder> Repackager<B> {
             let config_values =
                 config_value_file::populate_value_file(&config_decl, values)?.native_into_fidl();
             let config_bytes =
-                fidl::encoding::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
+                fidl::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
 
             // write it to the meta.far at the path expected by the resolver
             let cm_rust::ConfigValueSource::PackagePath(path) = &config_decl.value_source;

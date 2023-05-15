@@ -7,7 +7,7 @@
 use {
     anyhow::{format_err, Error},
     camino::{Utf8Path, Utf8PathBuf},
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_fuchsia_component_decl::Component,
     fidl_fuchsia_data as fdata, fuchsia_archive, fuchsia_pkg,
     fuchsia_url::AbsoluteComponentUrl,

@@ -7,7 +7,7 @@ use {
     anyhow::{format_err, Context, Error},
     cm_rust::{CapabilityName, CapabilityTypeName, FidlIntoNative},
     cm_types::{symmetrical_enums, Name, ParseError, Url},
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_internal::{
         self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
@@ -1204,7 +1204,7 @@ mod tests {
         config: component_internal::Config,
     ) -> Result<PathBuf, Error> {
         let path = tmp_dir.path().join("test_config.fidl");
-        let content = fidl::encoding::persist(&config)?;
+        let content = fidl::persist(&config)?;
         std::fs::write(&path, &content)?;
         Ok(path)
     }

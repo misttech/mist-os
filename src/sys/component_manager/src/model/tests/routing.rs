@@ -2216,10 +2216,8 @@ async fn use_resolver_from_parent_environment() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes(
-                                    fidl::encoding::persist(
-                                        &default_component_decl().native_into_fidl(),
-                                    )
-                                    .unwrap(),
+                                    fidl::persist(&default_component_decl().native_into_fidl())
+                                        .unwrap(),
                                 )),
                                 package: None,
                                 // this test only resolves one component_url
@@ -2323,10 +2321,8 @@ async fn use_resolver_from_grandparent_environment() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://c".into()),
                                 decl: Some(fmem::Data::Bytes(
-                                    fidl::encoding::persist(
-                                        &default_component_decl().native_into_fidl(),
-                                    )
-                                    .unwrap(),
+                                    fidl::persist(&default_component_decl().native_into_fidl())
+                                        .unwrap(),
                                 )),
                                 package: None,
                                 // this test only resolves one component_url
@@ -2429,10 +2425,8 @@ async fn resolver_is_not_available() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes(
-                                    fidl::encoding::persist(
-                                        &default_component_decl().native_into_fidl(),
-                                    )
-                                    .unwrap(),
+                                    fidl::persist(&default_component_decl().native_into_fidl())
+                                        .unwrap(),
                                 )),
                                 package: None,
                                 // this test only resolves one component_url
@@ -2542,7 +2536,7 @@ async fn resolver_component_decl_is_validated() {
                                         )]),
                                         ..Default::default()
                                     };
-                                    fidl::encoding::persist(&fidl).unwrap()
+                                    fidl::persist(&fidl).unwrap()
                                 })),
                                 package: None,
                                 // this test only resolves one component_url

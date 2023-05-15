@@ -35,7 +35,7 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 pub struct ParentGetChildRequestResponse {
     pub r: fidl::endpoints::ServerEnd<ChildMarker>,
 }
-impl fidl::encoding::Standalone for ParentGetChildRequestResponse {}
+impl fidl::Standalone for ParentGetChildRequestResponse {}
 
 fidl_struct! {
     name: ParentGetChildRequestResponse,
@@ -64,7 +64,7 @@ fidl_struct! {
 pub struct ParentGetChildResponse {
     pub c: fidl::endpoints::ClientEnd<ChildMarker>,
 }
-impl fidl::encoding::Standalone for ParentGetChildResponse {}
+impl fidl::Standalone for ParentGetChildResponse {}
 
 fidl_struct! {
     name: ParentGetChildResponse,
@@ -93,7 +93,7 @@ fidl_struct! {
 pub struct ParentTakeChildRequest {
     pub c: fidl::endpoints::ClientEnd<ChildMarker>,
 }
-impl fidl::encoding::Standalone for ParentTakeChildRequest {}
+impl fidl::Standalone for ParentTakeChildRequest {}
 
 fidl_struct! {
     name: ParentTakeChildRequest,
@@ -122,7 +122,7 @@ fidl_struct! {
 pub struct ParentTakeChildRequestRequest {
     pub r: fidl::endpoints::ServerEnd<ChildMarker>,
 }
-impl fidl::encoding::Standalone for ParentTakeChildRequestRequest {}
+impl fidl::Standalone for ParentTakeChildRequestRequest {}
 
 fidl_struct! {
     name: ParentTakeChildRequestRequest,

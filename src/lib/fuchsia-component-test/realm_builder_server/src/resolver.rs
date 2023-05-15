@@ -148,7 +148,7 @@ impl Registry {
     ) -> Result<fmem::Data, Error> {
         let mut values_data: fconfig::ValuesData = if let Some(v) = values_data {
             let bytes = mem_util::bytes_from_data(&v)?;
-            let values_data = fidl::encoding::unpersist(&bytes)?;
+            let values_data = fidl::unpersist(&bytes)?;
             cm_fidl_validator::validate_values_data_todo_fxb_126609(&values_data)?;
             values_data
         } else {
@@ -178,7 +178,7 @@ impl Registry {
         cm_fidl_validator::validate_values_data_todo_fxb_126609(&values_data)
             .context("ensuring all values are populated")?;
 
-        let data = fidl::encoding::persist(&values_data)?;
+        let data = fidl::persist(&values_data)?;
         let data = fmem::Data::Bytes(data);
         return Ok(data);
     }
@@ -360,8 +360,7 @@ impl Registry {
 }
 
 fn encode(component_decl: fcdecl::Component) -> Result<fmem::Data, Error> {
-    let encoded =
-        fidl::encoding::persist(&component_decl).context("failed to encode ComponentDecl")?;
+    let encoded = fidl::persist(&component_decl).context("failed to encode ComponentDecl")?;
     let encoded_size = encoded.len() as u64;
     let vmo = Vmo::create(encoded_size)?;
     vmo.write(&encoded, 0)?;

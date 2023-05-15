@@ -153,7 +153,7 @@ impl FuchsiaBootResolver {
         let decl_bytes =
             mem_util::bytes_from_data(&data).map_err(|_| fresolution::ResolverError::Io)?;
 
-        let decl: fdecl::Component = fidl::encoding::unpersist(&decl_bytes[..])
+        let decl: fdecl::Component = fidl::unpersist(&decl_bytes[..])
             .map_err(|_| fresolution::ResolverError::InvalidManifest)?;
 
         let config_values = if let Some(config_decl) = decl.config.as_ref() {
@@ -401,8 +401,8 @@ mod tests {
         ::routing::resolving::ResolvedPackage,
         assert_matches::assert_matches,
         cm_rust::{FidlIntoNative, NativeIntoFidl},
-        fidl::encoding::persist,
         fidl::endpoints::{create_proxy, ServerEnd},
+        fidl::persist,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fuchsia_async::Task,
         fuchsia_fs::directory::open_in_namespace,

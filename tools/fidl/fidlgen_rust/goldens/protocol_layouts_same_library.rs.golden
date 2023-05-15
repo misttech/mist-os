@@ -49,7 +49,7 @@ impl ComposedProtocolOnAnonComposedRequest {
         false
     }
 }
-impl fidl::encoding::Persistable for ComposedProtocolOnAnonComposedRequest {}
+impl fidl::Persistable for ComposedProtocolOnAnonComposedRequest {}
 
 fidl_union! {
     name: ComposedProtocolOnAnonComposedRequest,
@@ -79,7 +79,7 @@ impl ComposedProtocolTwoWayAnonComposedRequest {
         false
     }
 }
-impl fidl::encoding::Persistable for ComposedProtocolTwoWayAnonComposedRequest {}
+impl fidl::Persistable for ComposedProtocolTwoWayAnonComposedRequest {}
 
 fidl_union! {
     name: ComposedProtocolTwoWayAnonComposedRequest,
@@ -109,7 +109,7 @@ impl ComposedProtocolTwoWayAnonComposedWithErrorResponse {
         false
     }
 }
-impl fidl::encoding::Persistable for ComposedProtocolTwoWayAnonComposedWithErrorResponse {}
+impl fidl::Persistable for ComposedProtocolTwoWayAnonComposedWithErrorResponse {}
 
 fidl_union! {
     name: ComposedProtocolTwoWayAnonComposedWithErrorResponse,
@@ -173,7 +173,7 @@ impl MainProtocolOnAnonRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for MainProtocolOnAnonRequest {}
+impl fidl::Persistable for MainProtocolOnAnonRequest {}
 
 fidl_union! {
     name: MainProtocolOnAnonRequest,
@@ -238,7 +238,7 @@ impl MainProtocolTwoWayAnonRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonRequest {}
+impl fidl::Persistable for MainProtocolTwoWayAnonRequest {}
 
 fidl_union! {
     name: MainProtocolTwoWayAnonRequest,
@@ -303,7 +303,7 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
 fidl_union! {
     name: MainProtocolTwoWayAnonWithErrorResponse,
@@ -334,7 +334,7 @@ impl UnionPayload {
         false
     }
 }
-impl fidl::encoding::Persistable for UnionPayload {}
+impl fidl::Persistable for UnionPayload {}
 
 fidl_union! {
     name: UnionPayload,
@@ -353,7 +353,7 @@ pub struct ComposedProtocolOneWayAnonComposedRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for ComposedProtocolOneWayAnonComposedRequest {}
+impl fidl::Persistable for ComposedProtocolOneWayAnonComposedRequest {}
 
 fidl_table! {
     name: ComposedProtocolOneWayAnonComposedRequest,
@@ -372,7 +372,7 @@ pub struct ComposedProtocolTwoWayAnonComposedResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for ComposedProtocolTwoWayAnonComposedResponse {}
+impl fidl::Persistable for ComposedProtocolTwoWayAnonComposedResponse {}
 
 fidl_table! {
     name: ComposedProtocolTwoWayAnonComposedResponse,
@@ -391,7 +391,7 @@ pub struct ComposedProtocolTwoWayAnonComposedWithErrorRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for ComposedProtocolTwoWayAnonComposedWithErrorRequest {}
+impl fidl::Persistable for ComposedProtocolTwoWayAnonComposedWithErrorRequest {}
 
 fidl_table! {
     name: ComposedProtocolTwoWayAnonComposedWithErrorRequest,
@@ -410,7 +410,7 @@ pub struct ComposedProtocolOnAnonComposedWithErrorResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for ComposedProtocolOnAnonComposedWithErrorResponse {}
+impl fidl::Persistable for ComposedProtocolOnAnonComposedWithErrorResponse {}
 
 fidl_table! {
     name: ComposedProtocolOnAnonComposedWithErrorResponse,
@@ -429,7 +429,7 @@ pub struct MainProtocolOneWayAnonRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
+impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
 
 fidl_table! {
     name: MainProtocolOneWayAnonRequest,
@@ -448,7 +448,7 @@ pub struct MainProtocolTwoWayAnonResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
+impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
 
 fidl_table! {
     name: MainProtocolTwoWayAnonResponse,
@@ -467,7 +467,7 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 fidl_table! {
     name: MainProtocolTwoWayAnonWithErrorRequest,
@@ -486,7 +486,7 @@ pub struct MainProtocolOnAnonWithErrorResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
+impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
 fidl_table! {
     name: MainProtocolOnAnonWithErrorResponse,
@@ -505,7 +505,7 @@ pub struct TablePayload {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for TablePayload {}
+impl fidl::Persistable for TablePayload {}
 
 fidl_table! {
     name: TablePayload,

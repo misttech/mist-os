@@ -35,7 +35,7 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 pub struct ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     pub s: String,
 }
-impl fidl::encoding::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {}
+impl fidl::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {}
 
 fidl_struct! {
     name: ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
@@ -65,7 +65,7 @@ fidl_struct! {
 pub struct ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
     pub value: i64,
 }
-impl fidl::encoding::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {}
+impl fidl::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {}
 
 fidl_struct! {
     copy: true,

@@ -77,7 +77,7 @@ impl EmptyFlexibleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for EmptyFlexibleUnion {}
+impl fidl::Persistable for EmptyFlexibleUnion {}
 
 fidl_union! {
     name: EmptyFlexibleUnion,
@@ -141,7 +141,7 @@ impl ExplicitFlexibleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for ExplicitFlexibleUnion {}
+impl fidl::Persistable for ExplicitFlexibleUnion {}
 
 fidl_union! {
     name: ExplicitFlexibleUnion,
@@ -213,7 +213,7 @@ impl ExplicitFoo {
         }
     }
 }
-impl fidl::encoding::Persistable for ExplicitFoo {}
+impl fidl::Persistable for ExplicitFoo {}
 
 fidl_union! {
     name: ExplicitFoo,
@@ -250,7 +250,7 @@ impl ExplicitPizzaOrPasta {
         false
     }
 }
-impl fidl::encoding::Persistable for ExplicitPizzaOrPasta {}
+impl fidl::Persistable for ExplicitPizzaOrPasta {}
 
 fidl_union! {
     name: ExplicitPizzaOrPasta,
@@ -286,7 +286,7 @@ impl ExplicitStrictFoo {
         false
     }
 }
-impl fidl::encoding::Persistable for ExplicitStrictFoo {}
+impl fidl::Persistable for ExplicitStrictFoo {}
 
 fidl_union! {
     name: ExplicitStrictFoo,
@@ -322,7 +322,7 @@ impl ExplicitUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for ExplicitUnion {}
+impl fidl::Persistable for ExplicitUnion {}
 
 fidl_union! {
     name: ExplicitUnion,
@@ -356,7 +356,7 @@ impl FieldCollision {
         false
     }
 }
-impl fidl::encoding::Persistable for FieldCollision {}
+impl fidl::Persistable for FieldCollision {}
 
 fidl_union! {
     name: FieldCollision,
@@ -423,7 +423,7 @@ impl FlexibleFoo {
         }
     }
 }
-impl fidl::encoding::Persistable for FlexibleFoo {}
+impl fidl::Persistable for FlexibleFoo {}
 
 fidl_union! {
     name: FlexibleFoo,
@@ -495,7 +495,7 @@ impl FlexiblePizzaOrPasta {
         }
     }
 }
-impl fidl::encoding::Persistable for FlexiblePizzaOrPasta {}
+impl fidl::Persistable for FlexiblePizzaOrPasta {}
 
 fidl_union! {
     name: FlexiblePizzaOrPasta,
@@ -573,7 +573,7 @@ impl FlexibleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for FlexibleUnion {}
+impl fidl::Persistable for FlexibleUnion {}
 
 fidl_union! {
     name: FlexibleUnion,
@@ -652,7 +652,7 @@ impl NewerSimpleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for NewerSimpleUnion {}
+impl fidl::Persistable for NewerSimpleUnion {}
 
 fidl_union! {
     name: NewerSimpleUnion,
@@ -728,7 +728,7 @@ impl OlderSimpleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for OlderSimpleUnion {}
+impl fidl::Persistable for OlderSimpleUnion {}
 
 fidl_union! {
     name: OlderSimpleUnion,
@@ -791,7 +791,7 @@ impl OnlyReservedFlexibleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for OnlyReservedFlexibleUnion {}
+impl fidl::Persistable for OnlyReservedFlexibleUnion {}
 
 fidl_union! {
     name: OnlyReservedFlexibleUnion,
@@ -820,7 +820,7 @@ impl PizzaOrPasta {
         false
     }
 }
-impl fidl::encoding::Persistable for PizzaOrPasta {}
+impl fidl::Persistable for PizzaOrPasta {}
 
 fidl_union! {
     name: PizzaOrPasta,
@@ -856,7 +856,7 @@ impl ReverseOrdinalUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for ReverseOrdinalUnion {}
+impl fidl::Persistable for ReverseOrdinalUnion {}
 
 fidl_union! {
     name: ReverseOrdinalUnion,
@@ -890,7 +890,7 @@ impl StrictBoundedUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictBoundedUnion {}
+impl fidl::Persistable for StrictBoundedUnion {}
 
 fidl_union! {
     name: StrictBoundedUnion,
@@ -922,7 +922,7 @@ impl StrictFoo {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictFoo {}
+impl fidl::Persistable for StrictFoo {}
 
 fidl_union! {
     name: StrictFoo,
@@ -958,7 +958,7 @@ impl StrictPizzaOrPasta {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictPizzaOrPasta {}
+impl fidl::Persistable for StrictPizzaOrPasta {}
 
 fidl_union! {
     name: StrictPizzaOrPasta,
@@ -996,7 +996,7 @@ impl StrictSimpleUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictSimpleUnion {}
+impl fidl::Persistable for StrictSimpleUnion {}
 
 fidl_union! {
     name: StrictSimpleUnion,
@@ -1038,7 +1038,7 @@ impl StrictUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictUnion {}
+impl fidl::Persistable for StrictUnion {}
 
 fidl_union! {
     name: StrictUnion,
@@ -1080,7 +1080,7 @@ impl Union {
         false
     }
 }
-impl fidl::encoding::Persistable for Union {}
+impl fidl::Persistable for Union {}
 
 fidl_union! {
     name: Union,
@@ -1152,7 +1152,7 @@ impl UnionContainingEmptyStruct {
         }
     }
 }
-impl fidl::encoding::Persistable for UnionContainingEmptyStruct {}
+impl fidl::Persistable for UnionContainingEmptyStruct {}
 
 fidl_union! {
     name: UnionContainingEmptyStruct,
@@ -1217,7 +1217,7 @@ impl UnionWithAttributes {
         }
     }
 }
-impl fidl::encoding::Persistable for UnionWithAttributes {}
+impl fidl::Persistable for UnionWithAttributes {}
 
 fidl_union! {
     name: UnionWithAttributes,
@@ -1232,7 +1232,7 @@ fidl_union! {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Empty;
-impl fidl::encoding::Persistable for Empty {}
+impl fidl::Persistable for Empty {}
 
 fidl_struct! {
     empty: true,
@@ -1243,7 +1243,7 @@ fidl_struct! {
 pub struct NullableUnionStruct {
     pub the_union: Option<Box<Union>>,
 }
-impl fidl::encoding::Persistable for NullableUnionStruct {}
+impl fidl::Persistable for NullableUnionStruct {}
 
 fidl_struct! {
     name: NullableUnionStruct,
@@ -1270,7 +1270,7 @@ fidl_struct! {
 pub struct Pasta {
     pub sauce: String,
 }
-impl fidl::encoding::Persistable for Pasta {}
+impl fidl::Persistable for Pasta {}
 
 fidl_struct! {
     name: Pasta,
@@ -1297,7 +1297,7 @@ fidl_struct! {
 pub struct Pizza {
     pub toppings: Vec<String>,
 }
-impl fidl::encoding::Persistable for Pizza {}
+impl fidl::Persistable for Pizza {}
 
 fidl_struct! {
     name: Pizza,
@@ -1324,7 +1324,7 @@ fidl_struct! {
 pub struct StructWithNullableUnion {
     pub x1: Option<Box<OlderSimpleUnion>>,
 }
-impl fidl::encoding::Persistable for StructWithNullableUnion {}
+impl fidl::Persistable for StructWithNullableUnion {}
 
 fidl_struct! {
     name: StructWithNullableUnion,
@@ -1351,10 +1351,7 @@ fidl_struct! {
 pub struct TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
     pub xu: OlderSimpleUnion,
 }
-impl fidl::encoding::Persistable
-    for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
-{
-}
+impl fidl::Persistable for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {}
 
 fidl_struct! {
     name: TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
@@ -1381,10 +1378,7 @@ fidl_struct! {
 pub struct TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
     pub xu: StrictBoundedUnion,
 }
-impl fidl::encoding::Persistable
-    for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
-{
-}
+impl fidl::Persistable for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {}
 
 fidl_struct! {
     name: TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
@@ -1413,7 +1407,7 @@ pub struct UnionSandwich {
     pub u: ExplicitFlexibleUnion,
     pub b: u32,
 }
-impl fidl::encoding::Persistable for UnionSandwich {}
+impl fidl::Persistable for UnionSandwich {}
 
 fidl_struct! {
     name: UnionSandwich,

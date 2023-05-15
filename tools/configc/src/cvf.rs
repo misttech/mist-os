@@ -6,7 +6,7 @@ use crate::common::load_manifest;
 use anyhow::{Context as _, Error};
 use argh::FromArgs;
 use cm_rust::NativeIntoFidl;
-use fidl::encoding::persist;
+use fidl::persist;
 use std::{collections::BTreeMap, fs, io::Write, path::PathBuf};
 
 #[derive(FromArgs, PartialEq, Debug)]

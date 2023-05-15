@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 
 use component_id_index::*;
-use fidl::encoding::persist;
+use fidl::persist;
 use fidl_fuchsia_component_internal as fcomponent_internal;
 use serde_json;
 use serde_json5;

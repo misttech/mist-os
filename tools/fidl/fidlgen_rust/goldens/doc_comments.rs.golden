@@ -291,7 +291,7 @@ impl FlexibleUnion {
         }
     }
 }
-impl fidl::encoding::Persistable for FlexibleUnion {}
+impl fidl::Persistable for FlexibleUnion {}
 
 fidl_union! {
     name: FlexibleUnion,
@@ -328,7 +328,7 @@ impl StrictUnion {
         false
     }
 }
-impl fidl::encoding::Persistable for StrictUnion {}
+impl fidl::Persistable for StrictUnion {}
 
 fidl_union! {
     name: StrictUnion,
@@ -353,7 +353,7 @@ pub struct Struct {
     /// struct member comment #3
     pub field: i32,
 }
-impl fidl::encoding::Persistable for Struct {}
+impl fidl::Persistable for Struct {}
 
 fidl_struct! {
     copy: true,
@@ -390,7 +390,7 @@ pub struct Table {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for Table {}
+impl fidl::Persistable for Table {}
 
 fidl_table! {
     name: Table,

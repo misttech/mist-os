@@ -83,7 +83,7 @@ impl LocalUnionPayload {
         }
     }
 }
-impl fidl::encoding::Persistable for LocalUnionPayload {}
+impl fidl::Persistable for LocalUnionPayload {}
 
 fidl_union! {
     name: LocalUnionPayload,
@@ -148,7 +148,7 @@ impl MainProtocolOnAnonRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for MainProtocolOnAnonRequest {}
+impl fidl::Persistable for MainProtocolOnAnonRequest {}
 
 fidl_union! {
     name: MainProtocolOnAnonRequest,
@@ -213,7 +213,7 @@ impl MainProtocolTwoWayAnonRequest {
         }
     }
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonRequest {}
+impl fidl::Persistable for MainProtocolTwoWayAnonRequest {}
 
 fidl_union! {
     name: MainProtocolTwoWayAnonRequest,
@@ -278,7 +278,7 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
         }
     }
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
 fidl_union! {
     name: MainProtocolTwoWayAnonWithErrorResponse,
@@ -298,7 +298,7 @@ pub struct LocalTablePayload {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for LocalTablePayload {}
+impl fidl::Persistable for LocalTablePayload {}
 
 fidl_table! {
     name: LocalTablePayload,
@@ -317,7 +317,7 @@ pub struct MainProtocolOneWayAnonRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
+impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
 
 fidl_table! {
     name: MainProtocolOneWayAnonRequest,
@@ -336,7 +336,7 @@ pub struct MainProtocolTwoWayAnonResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
+impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
 
 fidl_table! {
     name: MainProtocolTwoWayAnonResponse,
@@ -355,7 +355,7 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
+impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 fidl_table! {
     name: MainProtocolTwoWayAnonWithErrorRequest,
@@ -374,7 +374,7 @@ pub struct MainProtocolOnAnonWithErrorResponse {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
+impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
 fidl_table! {
     name: MainProtocolOnAnonWithErrorResponse,

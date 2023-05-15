@@ -22,9 +22,9 @@ pub struct {{ .Name }} {
 }
 
 {{- if .IsResourceType }}
-impl fidl::encoding::Standalone for {{ .Name }} {}
+impl fidl::Standalone for {{ .Name }} {}
 {{- else }}
-impl fidl::encoding::Persistable for {{ .Name }} {}
+impl fidl::Persistable for {{ .Name }} {}
 {{- end }}
 
 fidl_table! {

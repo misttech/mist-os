@@ -47,7 +47,7 @@ impl UnionLargeArray {
         false
     }
 }
-impl fidl::encoding::Persistable for UnionLargeArray {}
+impl fidl::Persistable for UnionLargeArray {}
 
 fidl_union! {
     name: UnionLargeArray,
@@ -77,7 +77,7 @@ impl UnionSmallArray {
         false
     }
 }
-impl fidl::encoding::Persistable for UnionSmallArray {}
+impl fidl::Persistable for UnionSmallArray {}
 
 fidl_union! {
     name: UnionSmallArray,
@@ -96,7 +96,7 @@ fidl_union! {
 pub struct StructLargeArray {
     pub a: [u32; 100],
 }
-impl fidl::encoding::Persistable for StructLargeArray {}
+impl fidl::Persistable for StructLargeArray {}
 
 fidl_struct! {
     copy: true,
@@ -127,7 +127,7 @@ fidl_struct! {
 pub struct StructSmallArray {
     pub a: [u32; 2],
 }
-impl fidl::encoding::Persistable for StructSmallArray {}
+impl fidl::Persistable for StructSmallArray {}
 
 fidl_struct! {
     copy: true,
@@ -158,7 +158,7 @@ pub struct TableLargeArray {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for TableLargeArray {}
+impl fidl::Persistable for TableLargeArray {}
 
 fidl_table! {
     name: TableLargeArray,
@@ -177,7 +177,7 @@ pub struct TableSmallArray {
     #[doc(hidden)]
     pub __non_exhaustive: (),
 }
-impl fidl::encoding::Persistable for TableSmallArray {}
+impl fidl::Persistable for TableSmallArray {}
 
 fidl_table! {
     name: TableSmallArray,

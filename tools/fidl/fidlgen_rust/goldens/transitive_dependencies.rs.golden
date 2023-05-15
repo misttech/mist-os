@@ -33,7 +33,7 @@ use {
 pub struct Baz {
     pub g: fidl_test_middle::Bar,
 }
-impl fidl::encoding::Persistable for Baz {}
+impl fidl::Persistable for Baz {}
 
 fidl_struct! {
     name: Baz,

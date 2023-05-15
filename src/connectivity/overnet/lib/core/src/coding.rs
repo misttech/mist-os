@@ -16,12 +16,12 @@ pub struct Context {
 pub const DEFAULT_CONTEXT: Context = Context { use_persistent_header: false };
 
 /// Decode some bytes into a FIDL type
-pub fn decode_fidl_with_context<T: fidl::encoding::Persistable>(
+pub fn decode_fidl_with_context<T: fidl::Persistable>(
     ctx: Context,
     bytes: &mut [u8],
 ) -> Result<T, Error> {
     if ctx.use_persistent_header {
-        fidl::encoding::unpersist(bytes).map_err(Into::into)
+        fidl::unpersist(bytes).map_err(Into::into)
     } else {
         let mut value = T::new_empty();
         // WARNING: Since we are decoding without a transaction header, we have to
@@ -35,7 +35,7 @@ pub fn decode_fidl_with_context<T: fidl::encoding::Persistable>(
 }
 
 /// Encode a FIDL type into some bytes
-pub fn encode_fidl_with_context<'a, T: fidl::encoding::Persistable>(
+pub fn encode_fidl_with_context<'a, T: fidl::Persistable>(
     ctx: Context,
     value: &'a mut T,
 ) -> Result<Vec<u8>, Error>
@@ -43,7 +43,7 @@ where
     &'a T: fidl::encoding::Encode<T>,
 {
     if ctx.use_persistent_header {
-        fidl::encoding::persist(value).map_err(Into::into)
+        fidl::persist(value).map_err(Into::into)
     } else {
         let (mut bytes, mut handles) = (Vec::new(), Vec::new());
         fidl::encoding::Encoder::encode_with_context::<T>(

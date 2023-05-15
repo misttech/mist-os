@@ -11,8 +11,8 @@ use {
     cobalt_client::traits::AsEventCodes,
     diagnostics_hierarchy::{testing::TreeAssertion, DiagnosticsHierarchy},
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl::encoding::persist,
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _},
+    fidl::persist,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload},
     fidl_fuchsia_pkg::{

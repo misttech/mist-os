@@ -100,7 +100,7 @@ impl SemiBoundedBelievedToBeSmall {
         }
     }
 }
-impl fidl::encoding::Persistable for SemiBoundedBelievedToBeSmall {}
+impl fidl::Persistable for SemiBoundedBelievedToBeSmall {}
 
 fidl_union! {
     name: SemiBoundedBelievedToBeSmall,
@@ -165,7 +165,7 @@ impl SemiBoundedMaybeLarge {
         }
     }
 }
-impl fidl::encoding::Persistable for SemiBoundedMaybeLarge {}
+impl fidl::Persistable for SemiBoundedMaybeLarge {}
 
 fidl_union! {
     name: SemiBoundedMaybeLarge,
@@ -182,7 +182,7 @@ fidl_union! {
 pub struct BoundedKnownToBeSmall {
     pub bytes: Vec<u8>,
 }
-impl fidl::encoding::Persistable for BoundedKnownToBeSmall {}
+impl fidl::Persistable for BoundedKnownToBeSmall {}
 
 fidl_struct! {
     name: BoundedKnownToBeSmall,
@@ -209,7 +209,7 @@ fidl_struct! {
 pub struct BoundedMaybeLarge {
     pub bytes: Vec<u8>,
 }
-impl fidl::encoding::Persistable for BoundedMaybeLarge {}
+impl fidl::Persistable for BoundedMaybeLarge {}
 
 fidl_struct! {
     name: BoundedMaybeLarge,
@@ -237,7 +237,7 @@ pub struct Elements {
     pub handle: Option<fidl::Handle>,
     pub bytes: Vec<u8>,
 }
-impl fidl::encoding::Standalone for Elements {}
+impl fidl::Standalone for Elements {}
 
 fidl_struct! {
     name: Elements,
@@ -283,7 +283,7 @@ fidl_struct! {
 pub struct UnboundedMaybeLargeResource {
     pub elements: [Elements; 64],
 }
-impl fidl::encoding::Standalone for UnboundedMaybeLargeResource {}
+impl fidl::Standalone for UnboundedMaybeLargeResource {}
 
 fidl_struct! {
     name: UnboundedMaybeLargeResource,
@@ -312,7 +312,7 @@ fidl_struct! {
 pub struct UnboundedMaybeLargeValue {
     pub bytes: Vec<u8>,
 }
-impl fidl::encoding::Persistable for UnboundedMaybeLargeValue {}
+impl fidl::Persistable for UnboundedMaybeLargeValue {}
 
 fidl_struct! {
     name: UnboundedMaybeLargeValue,

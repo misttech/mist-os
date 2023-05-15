@@ -68,7 +68,7 @@ pub struct Handles {
     pub some_protocol: fidl::endpoints::ClientEnd<SomeProtocolMarker>,
     pub request_some_protocol: fidl::endpoints::ServerEnd<SomeProtocolMarker>,
 }
-impl fidl::encoding::Standalone for Handles {}
+impl fidl::Standalone for Handles {}
 
 fidl_struct! {
     name: Handles,

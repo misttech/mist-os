@@ -33,7 +33,7 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Empty;
-impl fidl::encoding::Persistable for Empty {}
+impl fidl::Persistable for Empty {}
 
 fidl_struct! {
     empty: true,
@@ -44,7 +44,7 @@ fidl_struct! {
 pub struct EmptyProtocolReceiveRequest {
     pub e: Empty,
 }
-impl fidl::encoding::Persistable for EmptyProtocolReceiveRequest {}
+impl fidl::Persistable for EmptyProtocolReceiveRequest {}
 
 fidl_struct! {
     name: EmptyProtocolReceiveRequest,
@@ -71,7 +71,7 @@ fidl_struct! {
 pub struct EmptyProtocolSendAndReceiveRequest {
     pub e: Empty,
 }
-impl fidl::encoding::Persistable for EmptyProtocolSendAndReceiveRequest {}
+impl fidl::Persistable for EmptyProtocolSendAndReceiveRequest {}
 
 fidl_struct! {
     name: EmptyProtocolSendAndReceiveRequest,
@@ -98,7 +98,7 @@ fidl_struct! {
 pub struct EmptyProtocolSendAndReceiveResponse {
     pub e: Empty,
 }
-impl fidl::encoding::Persistable for EmptyProtocolSendAndReceiveResponse {}
+impl fidl::Persistable for EmptyProtocolSendAndReceiveResponse {}
 
 fidl_struct! {
     name: EmptyProtocolSendAndReceiveResponse,
@@ -125,7 +125,7 @@ fidl_struct! {
 pub struct EmptyProtocolSendRequest {
     pub e: Empty,
 }
-impl fidl::encoding::Persistable for EmptyProtocolSendRequest {}
+impl fidl::Persistable for EmptyProtocolSendRequest {}
 
 fidl_struct! {
     name: EmptyProtocolSendRequest,

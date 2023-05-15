@@ -14,7 +14,7 @@ use {
     cm_fidl_analyzer::{component_model::ModelBuilderForAnalyzer, node_path::NodePath},
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
     config_encoder::ConfigFields,
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fuchsia_url::{boot_url::BootUrl, AbsoluteComponentUrl},
     once_cell::sync::Lazy,

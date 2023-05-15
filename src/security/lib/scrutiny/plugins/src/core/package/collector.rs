@@ -26,7 +26,7 @@ use {
     anyhow::{anyhow, bail, Context, Result},
     cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
     cm_fidl_validator,
-    fidl::encoding::unpersist,
+    fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl,
     fuchsia_merkle::Hash,
     fuchsia_url::{

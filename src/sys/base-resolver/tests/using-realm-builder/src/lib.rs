@@ -333,7 +333,7 @@ async fn manipulated_context_rejected() {
 
 #[fuchsia::test]
 async fn resolve_component() {
-    let manifest = fidl::encoding::persist(&fcomponent_decl::Component {
+    let manifest = fidl::persist(&fcomponent_decl::Component {
         config: Some(fcomponent_decl::ConfigSchema {
             value_source: Some(fcomponent_decl::ConfigValueSource::PackagePath(
                 "meta/config-data.cvf".to_string(),
@@ -343,8 +343,7 @@ async fn resolve_component() {
         ..Default::default()
     })
     .unwrap();
-    let config_data =
-        fidl::encoding::persist(&fcomponent_decl::ConfigValuesData::default()).unwrap();
+    let config_data = fidl::persist(&fcomponent_decl::ConfigValuesData::default()).unwrap();
     let base_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-base-package")
         .abi_revision(version_history::AbiRevision::new(0x601665c5b1a89c7f))
         .add_resource_at("meta/manifest.cm", &*manifest)
@@ -379,7 +378,7 @@ async fn resolve_component() {
 
 #[fuchsia::test]
 async fn resolve_with_context_component() {
-    let manifest = fidl::encoding::persist(&fcomponent_decl::Component::default().clone()).unwrap();
+    let manifest = fidl::persist(&fcomponent_decl::Component::default().clone()).unwrap();
     let sub_sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-sub-sub-package")
         .add_resource_at("meta/manifest.cm", &*manifest)
         .build()

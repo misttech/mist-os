@@ -5,8 +5,8 @@
 use crate::light::types::LightInfo;
 use crate::migration::{FileGenerator, Migration, MigrationError};
 use anyhow::{anyhow, Context};
-use fidl::encoding::persist;
 use fidl::endpoints::create_proxy;
+use fidl::persist;
 use fidl_fuchsia_io::FileProxy;
 use fidl_fuchsia_settings::LightGroup as LightGroupFidl;
 use fidl_fuchsia_settings_storage::LightGroups;
