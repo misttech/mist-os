@@ -172,7 +172,6 @@ group("cmx_allowlist") {
     "//src/tests/end_to_end/package_manager/components:package-manager-sample2_manifest_compile",
     "//src/tests/end_to_end/package_manager/components:package-manager-sample_manifest_compile",
     "//src/ui/a11y/bin/a11y_manager:component_v1_manifest_compile",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv1-component_manifest_compile",
     "//src/ui/bin/root_presenter:component_v1_for_test_manifest_compile",
     "//src/ui/bin/root_presenter:component_v1_manifest_compile",
     "//src/ui/bin/text:text_manager_comp_manifest_compile",
