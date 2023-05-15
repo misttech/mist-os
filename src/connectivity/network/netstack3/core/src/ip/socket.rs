@@ -19,7 +19,7 @@ use thiserror::Error;
 use crate::{
     context::{CounterContext, InstantContext, NonTestCtxMarker},
     ip::{
-        device::state::{IpDeviceStateIpExt, Ipv6AddressEntry},
+        device::state::IpDeviceStateIpExt,
         types::{NextHop, ResolvedRoute},
         AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceContext, IpExt, IpLayerIpExt,
         ResolveRouteError, SendIpPacketMeta,
@@ -560,9 +560,17 @@ impl<
 
 /// IPv6 source address selection as defined in [RFC 6724 Section 5].
 pub(crate) mod ipv6_source_address_selection {
-    use net_types::ip::IpAddress as _;
+    use net_types::ip::{AddrSubnet, IpAddress as _};
 
     use super::*;
+
+    use crate::ip::device::state::Ipv6AddressFlags;
+
+    pub(crate) struct SasCandidate<D> {
+        pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        pub(crate) flags: Ipv6AddressFlags,
+        pub(crate) device: D,
+    }
 
     /// Selects the source address for an IPv6 socket using the algorithm
     /// defined in [RFC 6724 Section 5].
@@ -579,8 +587,7 @@ pub(crate) mod ipv6_source_address_selection {
     pub(crate) fn select_ipv6_source_address<
         'a,
         D: PartialEq,
-        Instant: 'a,
-        I: Iterator<Item = (&'a Ipv6AddressEntry<Instant>, D)>,
+        I: Iterator<Item = SasCandidate<D>>,
     >(
         remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         outbound_device: &D,
@@ -600,26 +607,22 @@ pub(crate) mod ipv6_source_address_selection {
         addresses
             // Tentative addresses are not considered available to the source
             // selection algorithm.
-            .filter(|(a, _)| a.flags.assigned)
-            .max_by(|(a, a_device), (b, b_device)| {
-                select_ipv6_source_address_cmp(remote_ip, outbound_device, a, a_device, b, b_device)
-            })
-            .map(|(addr, _device)| addr.addr_sub().addr())
+            .filter(|SasCandidate { addr_sub: _, flags, device: _ }| flags.assigned)
+            .max_by(|a, b| select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b))
+            .map(|SasCandidate { addr_sub, flags: _, device: _ }| addr_sub.addr())
     }
 
     /// Comparison operator used by `select_ipv6_source_address`.
-    fn select_ipv6_source_address_cmp<Instant, D: PartialEq>(
+    fn select_ipv6_source_address_cmp<D: PartialEq>(
         remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         outbound_device: &D,
-        a: &Ipv6AddressEntry<Instant>,
-        a_device: &D,
-        b: &Ipv6AddressEntry<Instant>,
-        b_device: &D,
+        a: &SasCandidate<D>,
+        b: &SasCandidate<D>,
     ) -> Ordering {
         // TODO(fxbug.dev/46822): Implement rules 2, 4, 5.5, 6, and 7.
 
-        let a_addr = a.addr_sub().addr().into_specified();
-        let b_addr = b.addr_sub().addr().into_specified();
+        let a_addr = a.addr_sub.addr().into_specified();
+        let b_addr = b.addr_sub.addr().into_specified();
 
         // Assertions required in order for this implementation to be valid.
 
@@ -635,8 +638,8 @@ pub(crate) mod ipv6_source_address_selection {
 
         rule_1(remote_ip, a_addr, b_addr)
             .then_with(|| rule_3(a.flags.deprecated, b.flags.deprecated))
-            .then_with(|| rule_5(outbound_device, a_device, b_device))
-            .then_with(|| rule_8(remote_ip, a, b))
+            .then_with(|| rule_5(outbound_device, &a.device, &b.device))
+            .then_with(|| rule_8(remote_ip, a.addr_sub, b.addr_sub))
     }
 
     // Assumes that `a` and `b` are not both equal to `remote_ip`.
@@ -692,10 +695,10 @@ pub(crate) mod ipv6_source_address_selection {
         }
     }
 
-    fn rule_8<Instant>(
+    fn rule_8(
         remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
-        a: &Ipv6AddressEntry<Instant>,
-        b: &Ipv6AddressEntry<Instant>,
+        a: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        b: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
     ) -> Ordering {
         let remote_ip = match remote_ip {
             Some(remote_ip) => remote_ip,
@@ -710,14 +713,11 @@ pub(crate) mod ipv6_source_address_selection {
         //   prefix (i.e., the portion of the address not including the
         //   interface ID).  For example, CommonPrefixLen(fe80::1, fe80::2) is
         //   64.
-        fn common_prefix_len<Instant>(
-            src: &Ipv6AddressEntry<Instant>,
+        fn common_prefix_len(
+            src: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
             dst: SpecifiedAddr<Ipv6Addr>,
         ) -> u8 {
-            core::cmp::min(
-                src.addr_sub().addr().common_prefix_len(&dst),
-                src.addr_sub().subnet().prefix(),
-            )
+            core::cmp::min(src.addr().common_prefix_len(&dst), src.subnet().prefix())
         }
 
         // Rule 8: Use longest matching prefix.
@@ -740,7 +740,6 @@ pub(crate) mod ipv6_source_address_selection {
         use net_types::ip::AddrSubnet;
 
         use super::*;
-        use crate::ip::device::state::{AddrConfig, Ipv6DadState};
 
         #[test]
         fn test_select_ipv6_source_address() {
@@ -774,13 +773,7 @@ pub(crate) mod ipv6_source_address_selection {
 
             // Rule 8: Use longest matching prefix.
             {
-                let new_addr_entry = |addr, prefix_len| {
-                    Ipv6AddressEntry::<()>::new(
-                        AddrSubnet::new(addr, prefix_len).unwrap(),
-                        Ipv6DadState::Assigned,
-                        AddrConfig::Manual,
-                    )
-                };
+                let new_addr_entry = |addr, prefix_len| AddrSubnet::new(addr, prefix_len).unwrap();
 
                 // First, test that the longest prefix match is preferred when
                 // using addresses whose common prefix length is shorter than
@@ -793,11 +786,11 @@ pub(crate) mod ipv6_source_address_selection {
                 // 2 leading 0x01 bytes.
                 let local1 = new_addr_entry(net_ip_v6!("1100::"), 64);
 
-                assert_eq!(rule_8(Some(remote), &local0, &local1), Ordering::Greater);
-                assert_eq!(rule_8(Some(remote), &local1, &local0), Ordering::Less);
-                assert_eq!(rule_8(Some(remote), &local0, &local0), Ordering::Equal);
-                assert_eq!(rule_8(Some(remote), &local1, &local1), Ordering::Equal);
-                assert_eq!(rule_8(None, &local0, &local1), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), local0, local1), Ordering::Greater);
+                assert_eq!(rule_8(Some(remote), local1, local0), Ordering::Less);
+                assert_eq!(rule_8(Some(remote), local0, local0), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), local1, local1), Ordering::Equal);
+                assert_eq!(rule_8(None, local0, local1), Ordering::Equal);
 
                 // Second, test that the common prefix length is capped at the
                 // subnet prefix length.
@@ -807,20 +800,18 @@ pub(crate) mod ipv6_source_address_selection {
                 // 2 leading 0x01 bytes, but a subnet prefix length of 8 (1 byte).
                 let local1 = new_addr_entry(net_ip_v6!("1100::"), 8);
 
-                assert_eq!(rule_8(Some(remote), &local0, &local1), Ordering::Equal);
-                assert_eq!(rule_8(Some(remote), &local1, &local0), Ordering::Equal);
-                assert_eq!(rule_8(Some(remote), &local0, &local0), Ordering::Equal);
-                assert_eq!(rule_8(Some(remote), &local1, &local1), Ordering::Equal);
-                assert_eq!(rule_8(None, &local0, &local1), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), local0, local1), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), local1, local0), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), local0, local0), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), local1, local1), Ordering::Equal);
+                assert_eq!(rule_8(None, local0, local1), Ordering::Equal);
             }
 
             {
-                let new_addr_entry = |addr| {
-                    Ipv6AddressEntry::<()>::new(
-                        AddrSubnet::new(addr, 128).unwrap(),
-                        Ipv6DadState::Assigned,
-                        AddrConfig::Manual,
-                    )
+                let new_addr_entry = |addr, device| SasCandidate {
+                    addr_sub: AddrSubnet::new(addr, 128).unwrap(),
+                    flags: Ipv6AddressFlags { deprecated: false, assigned: true },
+                    device,
                 };
 
                 // If no rules apply, then the two address entries are equal.
@@ -828,10 +819,8 @@ pub(crate) mod ipv6_source_address_selection {
                     select_ipv6_source_address_cmp(
                         Some(remote),
                         dev0,
-                        &new_addr_entry(*local0),
-                        dev1,
-                        &new_addr_entry(*local1),
-                        dev2
+                        &new_addr_entry(*local0, *dev1),
+                        &new_addr_entry(*local1, *dev2),
                     ),
                     Ordering::Equal
                 );
@@ -849,14 +838,10 @@ pub(crate) mod ipv6_source_address_selection {
             let local0 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:2::")).unwrap();
             let local1 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:3::")).unwrap();
 
-            let new_addr_entry = |addr, deprecated| {
-                let mut entry = Ipv6AddressEntry::<()>::new(
-                    AddrSubnet::new(addr, 128).unwrap(),
-                    Ipv6DadState::Assigned,
-                    AddrConfig::Manual,
-                );
-                entry.flags.deprecated = deprecated;
-                entry
+            let new_addr_entry = |addr, deprecated, device| SasCandidate {
+                addr_sub: AddrSubnet::new(addr, 128).unwrap(),
+                flags: Ipv6AddressFlags { deprecated, assigned: true },
+                device,
             };
 
             // Verify that Rule 3 still applies (avoid deprecated states).
@@ -864,10 +849,8 @@ pub(crate) mod ipv6_source_address_selection {
                 select_ipv6_source_address_cmp(
                     None,
                     dev0,
-                    &new_addr_entry(*local0, false),
-                    dev1,
-                    &new_addr_entry(*local1, true),
-                    dev2,
+                    &new_addr_entry(*local0, false, *dev1),
+                    &new_addr_entry(*local1, true, *dev2),
                 ),
                 Ordering::Greater
             );
@@ -877,10 +860,8 @@ pub(crate) mod ipv6_source_address_selection {
                 select_ipv6_source_address_cmp(
                     None,
                     dev0,
-                    &new_addr_entry(*local0, false),
-                    dev0,
-                    &new_addr_entry(*local1, false),
-                    dev1
+                    &new_addr_entry(*local0, false, *dev0),
+                    &new_addr_entry(*local1, false, *dev1),
                 ),
                 Ordering::Greater
             );
@@ -908,7 +889,9 @@ pub(crate) mod testutil {
         },
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
-            device::state::{AddrConfig, AssignedAddress as _, IpDeviceState, Ipv6DadState},
+            device::state::{
+                AddrConfig, AssignedAddress as _, IpDeviceState, Ipv6AddressEntry, Ipv6DadState,
+            },
             forwarding::ForwardingTable,
             testutil::FakeIpDeviceIdCtx,
             types::{Destination, Metric, RawMetric},
@@ -1325,7 +1308,9 @@ mod tests {
     use ip_test_macro::ip_test;
     use lock_order::Locked;
     use net_types::{
-        ip::{AddrSubnet, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Mtu},
+        ip::{
+            AddrSubnet, GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Mtu,
+        },
         Witness,
     };
     use nonzero_ext::nonzero;
@@ -1428,10 +1413,23 @@ mod tests {
             |devices, _ctx| devices.collect::<Vec<_>>(),
         );
         for device in devices {
-            let subnets = crate::ip::device::with_assigned_addr_subnets::<I, FakeNonSyncCtx, _, _, _>(
-                &mut Locked::new(sync_ctx),
-                &device,
-                |addrs| addrs.collect::<Vec<_>>(),
+            #[derive(GenericOverIp)]
+            struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
+
+            let WrapVecAddrSubnet(subnets) = I::map_ip(
+                IpInvariant((&mut Locked::new(sync_ctx), &device)),
+                |IpInvariant((sync_ctx, device))| {
+                    crate::ip::device::with_assigned_ipv4_addr_subnets(sync_ctx, device, |addrs| {
+                        WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
+                    })
+                },
+                |IpInvariant((sync_ctx, device))| {
+                    crate::ip::device::testutil::with_assigned_ipv6_addr_subnets(
+                        sync_ctx,
+                        device,
+                        |addrs| WrapVecAddrSubnet(addrs.collect::<Vec<_>>()),
+                    )
+                },
             );
 
             for subnet in subnets {

@@ -43,7 +43,7 @@ pub(crate) enum DelIpv6AddrReason {
 /// An `Ip` extension trait adding IP device state properties.
 pub(crate) trait IpDeviceStateIpExt: Ip {
     /// The information stored about an IP address assigned to an interface.
-    type AssignedAddress<I: Instant>: AssignedAddress<Self::Addr> + Clone + Debug;
+    type AssignedAddress<I: Instant>: AssignedAddress<Self::Addr> + Debug;
 
     /// The state kept by the Group Messaging Protocol (GMP) used to announce
     /// membership in an IP multicast group for this version of IP.
@@ -83,7 +83,7 @@ impl IpDeviceStateIpExt for Ipv6 {
         // device) and deprecated IP addresses (addresses which have been
         // assigned but should no longer be used for new connections) will not
         // be returned.
-        addr.flags.assigned.then_some((*addr.addr_sub()).to_witness())
+        addr.state.flags.assigned.then_some((*addr.addr_sub()).to_witness())
     }
 }
 
@@ -260,6 +260,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
     }
 
     /// Finds the entry for `addr` if any.
+    #[cfg(test)]
     pub(crate) fn find(&self, addr: &I::Addr) -> Option<&I::AssignedAddress<Instant>> {
         self.addrs.iter().find(|entry| &entry.addr().get() == addr)
     }
@@ -628,29 +629,41 @@ pub(crate) struct Ipv6AddressFlags {
     pub(crate) assigned: bool,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Ipv6AddressState<Instant> {
+    pub(crate) flags: Ipv6AddressFlags,
+    pub(crate) config: AddrConfig<Instant>,
+}
+
 /// Data associated with an IPv6 address on an interface.
 // TODO(https://fxbug.dev/91753): Should this be generalized for loopback?
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct Ipv6AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-    pub(crate) state: Ipv6DadState,
-    pub(crate) config: AddrConfig<Instant>,
-    pub(crate) flags: Ipv6AddressFlags,
+    pub(crate) dad_state: Ipv6DadState,
+    pub(crate) state: Ipv6AddressState<Instant>,
 }
 
 impl<Instant> Ipv6AddressEntry<Instant> {
     pub(crate) fn new(
         addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-        state: Ipv6DadState,
+        dad_state: Ipv6DadState,
         config: AddrConfig<Instant>,
     ) -> Self {
-        let assigned = match state {
+        let assigned = match dad_state {
             Ipv6DadState::Assigned => true,
             Ipv6DadState::Tentative { dad_transmits_remaining: _ }
             | Ipv6DadState::Uninitialized => false,
         };
 
-        Self { addr_sub, state, config, flags: Ipv6AddressFlags { deprecated: false, assigned } }
+        Self {
+            addr_sub,
+            dad_state,
+            state: Ipv6AddressState {
+                config,
+                flags: Ipv6AddressFlags { deprecated: false, assigned },
+            },
+        }
     }
 
     pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {

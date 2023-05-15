@@ -13,7 +13,7 @@ pub mod queue;
 pub mod socket;
 mod state;
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     fmt::{self, Debug, Display, Formatter},
     hash::Hash,
@@ -63,11 +63,12 @@ use crate::{
             integration::SyncCtxWithIpDeviceConfiguration,
             nud::{BufferNudHandler, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
             state::{
-                AddrConfig, DualStackIpDeviceState, IpDeviceAddresses, Ipv4DeviceConfiguration,
-                Ipv6DeviceConfiguration,
+                AddrConfig, AssignedAddress as _, DualStackIpDeviceState, Ipv4DeviceConfiguration,
+                Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration,
             },
             BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
-            IpDeviceConfigurationContext, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
+            IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+            IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6AddressRefs,
             Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DeviceContext,
         },
         forwarding::IpForwardingDeviceContext,
@@ -515,34 +516,69 @@ impl<
     }
 }
 
+impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressIdContext<Ipv4>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    type AddressId = AddrSubnet<Ipv4Addr>;
+}
+
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
     IpDeviceStateContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_device_addresses<
-        O,
-        F: FnOnce(&IpDeviceAddresses<NonSyncCtx::Instant, Ipv4>) -> O,
-    >(
+    fn add_ip_address(
         &mut self,
-        device: &DeviceId<NonSyncCtx>,
-        cb: F,
-    ) -> O {
-        with_ip_device_state(self, device, |mut state| {
-            let state = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
-            cb(&state)
+        device_id: &Self::DeviceId,
+        addr: AddrSubnet<Ipv4Addr>,
+        (): <Ipv4 as IpDeviceIpExt>::AddressConfig<NonSyncCtx::Instant>,
+    ) -> Result<Self::AddressId, ExistsError> {
+        with_ip_device_state(self, device_id, |mut state| {
+            state
+                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+                .add(addr)
+                .map(|()| addr)
         })
     }
 
-    fn with_ip_device_addresses_mut<
-        O,
-        F: FnOnce(&mut IpDeviceAddresses<NonSyncCtx::Instant, Ipv4>) -> O,
-    >(
+    fn remove_ip_address(
         &mut self,
-        device: &DeviceId<NonSyncCtx>,
+        device_id: &Self::DeviceId,
+        addr: Self::AddressId,
+    ) -> (AddrSubnet<Ipv4Addr>, <Ipv4 as IpDeviceIpExt>::AddressConfig<NonSyncCtx::Instant>) {
+        (
+            with_ip_device_state(self, device_id, |mut state| {
+                state
+                    .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+                    .remove(&addr.addr())
+            })
+            .unwrap(),
+            (),
+        )
+    }
+
+    fn get_address_id(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr: SpecifiedAddr<Ipv4Addr>,
+    ) -> Result<Self::AddressId, NotFoundError> {
+        with_ip_device_state(self, device_id, |mut state| {
+            state
+                .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+                .iter()
+                .find(|a| a.addr() == addr)
+                .copied()
+                .ok_or(NotFoundError)
+        })
+    }
+
+    fn with_address_ids<O, F: FnOnce(Box<dyn Iterator<Item = Self::AddressId> + '_>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device, |mut state| {
-            let mut state = state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
-            cb(&mut state)
+        with_ip_device_state(self, device_id, |mut state| {
+            cb(Box::new(
+                state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>().iter().copied(),
+            ))
         })
     }
 
@@ -826,34 +862,74 @@ impl<
     }
 }
 
+impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressIdContext<Ipv6>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    type AddressId = AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>;
+}
+
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
     IpDeviceStateContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_device_addresses<
-        O,
-        F: FnOnce(&IpDeviceAddresses<NonSyncCtx::Instant, Ipv6>) -> O,
-    >(
+    fn add_ip_address(
         &mut self,
-        device: &DeviceId<NonSyncCtx>,
-        cb: F,
-    ) -> O {
-        with_ip_device_state(self, device, |mut state| {
-            let state = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
-            cb(&state)
+        device_id: &Self::DeviceId,
+        addr: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        config: <Ipv6 as IpDeviceIpExt>::AddressConfig<NonSyncCtx::Instant>,
+    ) -> Result<Self::AddressId, ExistsError> {
+        with_ip_device_state(self, device_id, |mut state| {
+            state
+                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+                .add(Ipv6AddressEntry::new(addr, Ipv6DadState::Uninitialized, config))
+                .map(|()| addr)
         })
     }
 
-    fn with_ip_device_addresses_mut<
-        O,
-        F: FnOnce(&mut IpDeviceAddresses<NonSyncCtx::Instant, Ipv6>) -> O,
-    >(
+    fn remove_ip_address(
         &mut self,
-        device: &DeviceId<NonSyncCtx>,
+        device_id: &Self::DeviceId,
+        addr: Self::AddressId,
+    ) -> (
+        AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        <Ipv6 as IpDeviceIpExt>::AddressConfig<NonSyncCtx::Instant>,
+    ) {
+        let Ipv6AddressEntry {
+            addr_sub,
+            dad_state: _,
+            state: Ipv6AddressState { flags: _, config },
+        } = with_ip_device_state(self, device_id, |mut state| {
+            state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>().remove(&addr.addr())
+        })
+        .unwrap();
+        (addr_sub, config)
+    }
+
+    fn get_address_id(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr: SpecifiedAddr<Ipv6Addr>,
+    ) -> Result<Self::AddressId, NotFoundError> {
+        with_ip_device_state(self, device_id, |mut state| {
+            state
+                .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+                .iter()
+                .find_map(|a| (a.addr() == addr).then_some(a.addr_sub))
+                .ok_or(NotFoundError)
+        })
+    }
+
+    fn with_address_ids<O, F: FnOnce(Box<dyn Iterator<Item = Self::AddressId> + '_>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device, |mut state| {
-            let mut state = state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
-            cb(&mut state)
+        with_ip_device_state(self, device_id, |mut state| {
+            cb(Box::new(
+                state
+                    .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+                    .iter()
+                    .map(|a| a.addr_sub),
+            ))
         })
     }
 
@@ -913,7 +989,7 @@ impl AsRef<[u8]> for Ipv6DeviceLinkLayerAddr {
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
     Ipv6DeviceContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type LinkLayerAddr = Ipv6DeviceLinkLayerAddr;
@@ -969,6 +1045,24 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         with_ip_device_state(self, device_id, |mut state| {
             let mut state = state.write_lock::<crate::lock_ordering::Ipv6DeviceRetransTimeout>();
             cb(&mut state)
+        })
+    }
+
+    fn with_ipv6_addresses_and_states<
+        O,
+        F: FnOnce(
+            Box<dyn Iterator<Item = Ipv6AddressRefs<'_, Self::AddressId, NonSyncCtx::Instant>> + '_>,
+        ) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        with_ip_device_state(self, device_id, |mut state| {
+            let state = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
+            cb(Box::new(state.iter().map(|Ipv6AddressEntry { addr_sub, dad_state: _, state }| {
+                Ipv6AddressRefs { addr_id: *addr_sub, state }
+            })))
         })
     }
 }

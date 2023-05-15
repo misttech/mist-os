@@ -1229,9 +1229,8 @@ mod tests {
         },
         error::{ExistsError, NotFoundError},
         ip::{
-            device::{nud::DynamicNeighborUpdateSource, state::AssignedAddress},
-            dispatch_receive_ip_packet_name, receive_ip_packet,
-            testutil::is_in_ip_multicast,
+            device::nud::DynamicNeighborUpdateSource, dispatch_receive_ip_packet_name,
+            receive_ip_packet, testutil::is_in_ip_multicast,
         },
         testutil::{
             add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng, Ctx,
@@ -1487,17 +1486,17 @@ mod tests {
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
-                crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_ip_device_addresses(
+                crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |addrs| addrs.iter().any(|a| a.addr() == addr),
+                    |mut addrs| addrs.any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
-                crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
+                crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |addrs| addrs.iter().any(|a| a.addr() == addr),
+                    |mut addrs| addrs.any(|a| a.addr().into_specified() == addr),
                 )
             }
         }

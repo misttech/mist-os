@@ -622,7 +622,7 @@ mod tests {
     use crate::{
         device::{DeviceId, Mtu},
         error::NotFoundError,
-        ip::device::{state::AssignedAddress, IpDeviceIpExt, IpDeviceStateContext},
+        ip::device::{IpAddressId as _, IpDeviceIpExt, IpDeviceStateContext},
         testutil::{
             Ctx, FakeEventDispatcherConfig, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
@@ -666,10 +666,10 @@ mod tests {
         crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
 
         let get_addrs = || {
-            crate::ip::device::IpDeviceStateContext::<I, _>::with_ip_device_addresses(
+            crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
                 &mut Locked::new(sync_ctx),
                 &device,
-                |addrs| addrs.iter().map(AssignedAddress::addr).collect::<Vec<_>>(),
+                |addrs| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
             )
         };
 

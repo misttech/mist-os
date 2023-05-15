@@ -48,7 +48,7 @@ use crate::{
     device::FrameDestination,
     ip::{
         device::{
-            nud::NudIpHandler, route_discovery::Ipv6DiscoveredRoute, state::Ipv6DadState,
+            nud::NudIpHandler, route_discovery::Ipv6DiscoveredRoute, IpAddressState,
             IpDeviceHandler, Ipv6DeviceHandler,
         },
         path_mtu::PmtuHandler,
@@ -1279,7 +1279,7 @@ fn receive_ndp_packet<
                         &device_id,
                         target_address,
                     ) {
-                        Some(Ipv6DadState::Assigned) => {
+                        IpAddressState::Assigned => {
                             // Address is assigned to us to we let the
                             // remote node performing DAD that we own the
                             // address.
@@ -1292,14 +1292,11 @@ fn receive_ndp_packet<
                                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified(),
                             );
                         }
-                        Some(
-                            Ipv6DadState::Uninitialized
-                            | Ipv6DadState::Tentative { dad_transmits_remaining: _ },
-                        ) => {
+                        IpAddressState::Tentative => {
                             // Nothing further to do in response to DAD
                             // messages.
                         }
-                        None => {
+                        IpAddressState::Unavailable => {
                             // Nothing further to do for unassigned target
                             // addresses.
                         }
@@ -1390,40 +1387,35 @@ fn receive_ndp_packet<
                 &device_id,
                 target_address,
             ) {
-                Some(status) => {
-                    match status {
-                        Ipv6DadState::Assigned => {
-                            // A neighbor is advertising that it owns an address
-                            // that we also have assigned. This is out of scope
-                            // for DAD.
-                            //
-                            // As per RFC 4862 section 5.4.4,
-                            //
-                            //   2.  If the target address matches a unicast address
-                            //       assigned to the receiving interface, it would
-                            //       possibly indicate that the address is a
-                            //       duplicate but it has not been detected by the
-                            //       Duplicate Address Detection procedure (recall
-                            //       that Duplicate Address Detection is not
-                            //       completely reliable). How to handle such a case
-                            //       is beyond the scope of this document.
-                            //
-                            // TODO(https://fxbug.dev/36238): Signal to bindings
-                            // that a duplicate address is detected.
-                            error!(
-                                "NA from {} with target address {} that is also assigned on device {}",
-                                src_ip, target_address, device_id
-                            );
-                        }
-                        Ipv6DadState::Uninitialized
-                        | Ipv6DadState::Tentative { dad_transmits_remaining: _ } => (),
-                    }
-
+                IpAddressState::Assigned => {
+                    // A neighbor is advertising that it owns an address
+                    // that we also have assigned. This is out of scope
+                    // for DAD.
+                    //
+                    // As per RFC 4862 section 5.4.4,
+                    //
+                    //   2.  If the target address matches a unicast address
+                    //       assigned to the receiving interface, it would
+                    //       possibly indicate that the address is a
+                    //       duplicate but it has not been detected by the
+                    //       Duplicate Address Detection procedure (recall
+                    //       that Duplicate Address Detection is not
+                    //       completely reliable). How to handle such a case
+                    //       is beyond the scope of this document.
+                    //
+                    // TODO(https://fxbug.dev/36238): Signal to bindings
+                    // that a duplicate address is detected.
+                    error!(
+                        "NA from {} with target address {} that is also assigned on device {}",
+                        src_ip, target_address, device_id
+                    );
+                }
+                IpAddressState::Tentative => {
                     // Nothing further to do for an NA from a neighbor that
                     // targets an address we also have assigned.
                     return;
                 }
-                None => {
+                IpAddressState::Unavailable => {
                     // Address not targeting us so we know its for a neighbor.
                     //
                     // TODO(https://fxbug.dev/99830): Move NUD to IP.
@@ -4225,7 +4217,7 @@ mod tests {
             _ctx: &mut Fakev6NonSyncCtx,
             _device_id: &Self::DeviceId,
             _addr: UnicastAddr<Ipv6Addr>,
-        ) -> Option<Ipv6DadState> {
+        ) -> IpAddressState {
             unimplemented!()
         }
 
