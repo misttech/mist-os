@@ -355,7 +355,7 @@ impl Flash for FlashManifestVersion {
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
             writer,
-            "{}Total Time{} [{}{:.2}s{}]",
+            "{}Done. Total Time{} [{}{:.2}s{}]",
             color::Fg(color::Green),
             style::Reset,
             color::Fg(color::Blue),
@@ -389,7 +389,7 @@ impl Unlock for FlashManifestVersion {
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
             writer,
-            "{}Total Time{} [{}{:.2}s{}]",
+            "{}Done. Total Time{} [{}{:.2}s{}]",
             color::Fg(color::Green),
             style::Reset,
             color::Fg(color::Blue),
@@ -425,7 +425,7 @@ impl Boot for FlashManifestVersion {
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
             writer,
-            "{}Total Time{} [{}{:.2}s{}]",
+            "{}Done. Total Time{} [{}{:.2}s{}]",
             color::Fg(color::Green),
             style::Reset,
             color::Fg(color::Blue),
