@@ -13,19 +13,8 @@ namespace audio {
 
 SimpleCodecClient::~SimpleCodecClient() { Unbind(); }
 
-SimpleCodecClient::SimpleCodecClient(SimpleCodecClient&& other) noexcept
-    : loop_(&kAsyncLoopConfigNeverAttachToThread),
-      created_with_dispatcher_(other.created_with_dispatcher_),
-      dispatcher_(created_with_dispatcher_ ? other.dispatcher_ : loop_.dispatcher()) {
-  other.Unbind();
-  if (other.proto_client_.is_valid()) {
-    SetProtocol(other.proto_client_);
-  }
-}
-
 zx_status_t SimpleCodecClient::SetProtocol(ddk::CodecProtocolClient proto_client) {
   Unbind();
-
   proto_client_ = proto_client;
   if (!proto_client_.is_valid()) {
     return ZX_ERR_NO_RESOURCES;
@@ -41,6 +30,12 @@ zx_status_t SimpleCodecClient::SetProtocol(ddk::CodecProtocolClient proto_client
     return status;
   }
 
+  return SetCodec(std::move(channel_local));
+}
+
+zx_status_t SimpleCodecClient::SetCodec(
+    fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local) {
+  Unbind();
   std::promise<void> codec_torn_down_promise;
   codec_torn_down_ = codec_torn_down_promise.get_future();
   codec_ = fidl::WireSharedClient(
@@ -49,7 +44,7 @@ zx_status_t SimpleCodecClient::SetProtocol(ddk::CodecProtocolClient proto_client
           [teardown = std::move(codec_torn_down_promise)]() mutable { teardown.set_value(); }));
 
   if (!created_with_dispatcher_ && !thread_started_) {
-    status = loop_.StartThread("SimpleCodecClient thread");
+    zx_status_t status = loop_.StartThread("SimpleCodecClient thread");
     if (status != ZX_OK) {
       return status;
     }

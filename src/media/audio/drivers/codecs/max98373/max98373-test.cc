@@ -21,7 +21,19 @@ struct Max98373Codec : public Max98373 {
   explicit Max98373Codec(ddk::I2cChannel i2c, ddk::GpioProtocolClient codec_reset,
                          zx_device_t* parent)
       : Max98373(parent, std::move(i2c), std::move(codec_reset)) {}
-  codec_protocol_t GetProto() { return {&this->codec_protocol_ops_, this}; }
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> GetClient() {
+    zx::channel channel_remote;
+    fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local;
+    zx_status_t status = zx::channel::create(0, &channel_local.channel(), &channel_remote);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    status = CodecConnect(std::move(channel_remote));
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::success(std::move(channel_local));
+  }
 };
 
 class Max98373Test : public zxtest::Test {
@@ -49,8 +61,9 @@ class Max98373Test : public zxtest::Test {
                                                                   fake_root_.get()));
     auto* child_dev = fake_root_->GetLatestChild();
     auto codec = child_dev->GetDeviceContext<Max98373Codec>();
-    auto codec_proto = codec->GetProto();
-    client_.SetProtocol(&codec_proto);
+    zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
+    ASSERT_OK(codec_client.status_value());
+    client_.SetCodec(std::move(*codec_client));
   }
 
   void TearDown() override {

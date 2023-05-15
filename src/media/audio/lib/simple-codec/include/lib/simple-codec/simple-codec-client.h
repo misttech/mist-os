@@ -41,12 +41,11 @@ class SimpleCodecClient {
         dispatcher_(created_with_dispatcher_ ? dispatcher : loop_.dispatcher()) {}
   ~SimpleCodecClient();
 
-  SimpleCodecClient(SimpleCodecClient&& other) noexcept;
-
   // Convenience methods not part of the audio codec protocol.
   // Initialize the client using the DDK codec protocol object. Other methods must not be called
   // until after SetProtocol() has been called and returned ZX_OK.
   zx_status_t SetProtocol(ddk::CodecProtocolClient proto_client);
+  zx_status_t SetCodec(fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local);
 
   // Sync C++ methods to communicate with codecs, for descriptions see
   // //docs/concepts/drivers/driver_interfaces/audio_codec.md.

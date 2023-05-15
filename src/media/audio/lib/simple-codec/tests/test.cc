@@ -28,7 +28,19 @@ class SimpleCodecTest : public inspect::InspectTestHelper, public zxtest::Test {
 class TestCodec : public SimpleCodecServer {
  public:
   explicit TestCodec(zx_device_t* parent) : SimpleCodecServer(parent) {}
-  codec_protocol_t GetProto() { return {&this->codec_protocol_ops_, this}; }
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> GetClient() {
+    zx::channel channel_remote;
+    fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local;
+    zx_status_t status = zx::channel::create(0, &channel_local.channel(), &channel_remote);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    status = CodecConnect(std::move(channel_remote));
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::success(std::move(channel_local));
+  }
   zx_status_t Shutdown() override { return ZX_OK; }
   zx::result<DriverIds> Initialize() override {
     return zx::ok(DriverIds{.vendor_id = 0, .device_id = 0, .instance_count = kTestInstanceCount});
@@ -67,7 +79,6 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
                                       public signal_fidl::SignalProcessing {
  public:
   explicit TestCodecWithSignalProcessing(zx_device_t* parent) : SimpleCodecServer(parent) {}
-  codec_protocol_t GetProto() { return {&this->codec_protocol_ops_, this}; }
 
   zx_status_t Shutdown() override { return ZX_OK; }
   zx::result<DriverIds> Initialize() override {
@@ -162,9 +173,10 @@ TEST_F(SimpleCodecTest, ChannelConnection) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
+  ASSERT_OK(codec_client_end.status_value());
   SimpleCodecClient client;
-  ASSERT_OK(client.SetProtocol(&codec_proto));
+  ASSERT_OK(client.SetCodec(std::move(*codec_client_end)));
 
   auto info = client.GetInfo();
   ASSERT_TRUE(info.is_ok());
@@ -180,9 +192,10 @@ TEST_F(SimpleCodecTest, GainState) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
+  ASSERT_OK(codec_client_end.status_value());
   SimpleCodecClient client;
-  ASSERT_OK(client.SetProtocol(&codec_proto));
+  ASSERT_OK(client.SetCodec(std::move(*codec_client_end)));
 
   // Defaults to false/0db.
   {
@@ -242,13 +255,10 @@ TEST_F(SimpleCodecTest, DefaultTopology) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   zx::channel channel_remote, channel_local;
   ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-  ddk::CodecProtocolClient proto_client;
-  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
   audio_fidl::CodecSyncPtr codec_client;
   codec_client.Bind(std::move(channel_local));
 
@@ -322,9 +332,10 @@ TEST_F(SimpleCodecTest, SetDaiFormat) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
+  ASSERT_OK(codec_client_end.status_value());
   SimpleCodecClient client;
-  client.SetProtocol(&codec_proto);
+  client.SetCodec(std::move(*codec_client_end));
 
   DaiFormat format = {.sample_format = audio_fidl::DaiSampleFormat::PCM_SIGNED,
                       .frame_format = FrameFormat::I2S};
@@ -339,15 +350,12 @@ TEST_F(SimpleCodecTest, PlugStateHardwired) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   // First client.
   {
     zx::channel channel_remote, channel_local;
     ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-    ddk::CodecProtocolClient proto_client;
-    ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+    ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
     audio_fidl::CodecSyncPtr codec_client;
     codec_client.Bind(std::move(channel_local));
 
@@ -360,8 +368,7 @@ TEST_F(SimpleCodecTest, PlugStateHardwired) {
   {
     zx::channel channel_remote, channel_local;
     ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-    ddk::CodecProtocolClient proto_client;
-    ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+    ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
     audio_fidl::CodecSyncPtr codec_client;
     codec_client.Bind(std::move(channel_local));
 
@@ -379,13 +386,10 @@ TEST_F(SimpleCodecTest, GainWithClientViaSignalProcessingApi) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   zx::channel channel_remote, channel_local;
   ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-  ddk::CodecProtocolClient proto_client;
-  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
   audio_fidl::CodecSyncPtr codec_client;
   codec_client.Bind(std::move(channel_local));
 
@@ -448,13 +452,10 @@ TEST_F(SimpleCodecTest, AglStateServerWithClientViaSignalProcessingApi) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodecWithSignalProcessing>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   zx::channel channel_remote, channel_local;
   ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-  ddk::CodecProtocolClient proto_client;
-  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
   audio_fidl::CodecSyncPtr codec_client;
   codec_client.Bind(std::move(channel_local));
 
@@ -490,13 +491,10 @@ TEST_F(SimpleCodecTest, InspectDefaultState) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   zx::channel channel_remote, channel_local;
   ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-  ddk::CodecProtocolClient proto_client;
-  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
   audio_fidl::CodecSyncPtr codec_client;
   codec_client.Bind(std::move(channel_local));
 
@@ -527,13 +525,10 @@ TEST_F(SimpleCodecTest, InspectNoUniqueId) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   zx::channel channel_remote, channel_local;
   ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-  ddk::CodecProtocolClient proto_client;
-  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
   audio_fidl::CodecSyncPtr codec_client;
   codec_client.Bind(std::move(channel_local));
 
@@ -557,12 +552,13 @@ TEST_F(SimpleCodecTest, MultipleClients) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   SimpleCodecClient codec_clients[3];
   for (auto& codec_client : codec_clients) {
-    ASSERT_OK(codec_client.SetProtocol(codec_proto2));
+    zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end =
+        codec->GetClient();
+    ASSERT_OK(codec_client_end.status_value());
+    ASSERT_OK(codec_client.SetCodec(std::move(*codec_client_end)));
   }
 
   {
@@ -611,34 +607,6 @@ TEST_F(SimpleCodecTest, MultipleClients) {
   }
 }
 
-TEST_F(SimpleCodecTest, MoveClient) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<TestCodec>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
-  auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
-
-  SimpleCodecClient codec_client1;
-  ASSERT_OK(codec_client1.SetProtocol(codec_proto2));
-
-  codec_client1.SetGainState({.gain = 1.23f, .muted = true, .agc_enabled = false});
-  EXPECT_OK(codec_client1.Start());
-
-  SimpleCodecClient codec_client2(std::move(codec_client1));
-
-  EXPECT_NOT_OK(codec_client1.Start());  // The client was unbound, this should return an error.
-
-  {
-    auto state = codec_client2.GetGainState();
-    ASSERT_TRUE(state.is_ok());
-    EXPECT_EQ(state->muted, true);
-    EXPECT_EQ(state->agc_enabled, false);
-    EXPECT_EQ(state->gain, 1.23f);
-  }
-}
 
 TEST_F(SimpleCodecTest, CloseChannel) {
   auto fake_parent = MockDevice::FakeRootParent();
@@ -647,11 +615,11 @@ TEST_F(SimpleCodecTest, CloseChannel) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
+  ASSERT_OK(codec_client_end.status_value());
 
   SimpleCodecClient codec_client;
-  ASSERT_OK(codec_client.SetProtocol(codec_proto2));
+  ASSERT_OK(codec_client.SetCodec(std::move(*codec_client_end)));
 
   codec_client.SetGainState({.gain = 1.23f, .muted = true, .agc_enabled = false});
 
@@ -680,11 +648,11 @@ TEST_F(SimpleCodecTest, RebindClient) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end = codec->GetClient();
+  ASSERT_OK(codec_client_end.status_value());
 
   SimpleCodecClient codec_client;
-  ASSERT_OK(codec_client.SetProtocol(codec_proto2));
+  ASSERT_OK(codec_client.SetCodec(std::move(*codec_client_end)));
 
   codec_client.SetGainState({.gain = 1.23f, .muted = true, .agc_enabled = false});
 
@@ -701,44 +669,13 @@ TEST_F(SimpleCodecTest, RebindClient) {
   // gain state.
   EXPECT_OK(codec_client.Start());
 
-  ASSERT_OK(codec_client.SetProtocol(codec_proto2));
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end2 = codec->GetClient();
+  ASSERT_OK(codec_client_end2.status_value());
+  ASSERT_OK(codec_client.SetCodec(std::move(*codec_client_end2)));
 
   // Values updated eventually.
   for (;;) {
     auto state = codec_client.GetGainState();
-    ASSERT_TRUE(state.is_ok());
-    if (state->muted && !state->agc_enabled && state->gain == 1.23f) {
-      break;
-    }
-  }
-}
-
-TEST_F(SimpleCodecTest, MoveClientWithDispatcherProvided) {
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  ASSERT_OK(loop.StartThread("SimpleCodecClient test thread"));
-
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<TestCodec>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
-  auto codec = child_dev->GetDeviceContext<TestCodec>();
-  auto codec_proto = codec->GetProto();
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
-
-  SimpleCodecClient codec_client1(loop.dispatcher());
-  ASSERT_OK(codec_client1.SetProtocol(codec_proto2));
-
-  codec_client1.SetGainState({.gain = 1.23f, .muted = true, .agc_enabled = false});
-  EXPECT_OK(codec_client1.Start());
-
-  SimpleCodecClient codec_client2(std::move(codec_client1));
-
-  EXPECT_NOT_OK(codec_client1.Start());  // The client was unbound, this should return an error.
-
-  // Values updated eventually.
-  for (;;) {
-    auto state = codec_client2.GetGainState();
     ASSERT_TRUE(state.is_ok());
     if (state->muted && !state->agc_enabled && state->gain == 1.23f) {
       break;

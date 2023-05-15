@@ -179,10 +179,10 @@ zx_status_t AmlG12TdmDspStream::InitPDev() {
   ZX_ASSERT(metadata_.codecs.number_of_codecs <= 8);
   codecs_.reserve(metadata_.codecs.number_of_codecs);
   for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
-    codecs_.push_back(SimpleCodecClient());
+    codecs_.push_back(std::make_unique<SimpleCodecClient>());
     char fragment_name[32] = {};
     snprintf(fragment_name, 32, "codec-%02lu", i + 1);
-    status = codecs_[i].SetProtocol(ddk::CodecProtocolClient(parent(), fragment_name));
+    status = codecs_[i]->SetProtocol(ddk::CodecProtocolClient(parent(), fragment_name));
     if (status != ZX_OK) {
       zxlogf(ERROR, "could set protocol - %s - %d", fragment_name, status);
       return status;
@@ -238,20 +238,20 @@ zx_status_t AmlG12TdmDspStream::InitPDev() {
   }
 
   for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
-    auto info = codecs_[i].GetInfo();
+    auto info = codecs_[i]->GetInfo();
     if (info.is_error()) {
       zxlogf(ERROR, "could get codec info %d", status);
       return info.error_value();
     }
 
     // Reset and initialize codec after we have configured I2S.
-    status = codecs_[i].Reset();
+    status = codecs_[i]->Reset();
     if (status != ZX_OK) {
       zxlogf(ERROR, "could not reset codec %d", status);
       return status;
     }
 
-    auto supported_formats = codecs_[i].GetDaiFormats();
+    auto supported_formats = codecs_[i]->GetDaiFormats();
     if (supported_formats.is_error()) {
       zxlogf(ERROR, "supported formats error %d", status);
       return supported_formats.error_value();
@@ -262,7 +262,7 @@ zx_status_t AmlG12TdmDspStream::InitPDev() {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
-    zx::result<CodecFormatInfo> format_info = codecs_[i].SetDaiFormat(dai_formats_[i]);
+    zx::result<CodecFormatInfo> format_info = codecs_[i]->SetDaiFormat(dai_formats_[i]);
     if (!format_info.is_ok()) {
       zxlogf(ERROR, "could not set DAI format %s", format_info.status_string());
       return format_info.status_value();
@@ -299,7 +299,7 @@ void AmlG12TdmDspStream::UpdateCodecsGainState(GainState state) {
     if (override_mute_) {
       state2.muted = true;
     }
-    codecs_[i].SetGainState(state2);
+    codecs_[i]->SetGainState(state2);
   }
 }
 
@@ -312,7 +312,7 @@ zx_status_t AmlG12TdmDspStream::InitCodecsGain() {
     bool can_all_mute = true;
     bool can_all_agc = true;
     for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
-      auto format = codecs_[i].GetGainFormat();
+      auto format = codecs_[i]->GetGainFormat();
       if (format.is_error()) {
         zxlogf(ERROR, "Could not get gain format %d", format.error_value());
         return format.error_value();
@@ -325,7 +325,7 @@ zx_status_t AmlG12TdmDspStream::InitCodecsGain() {
     }
 
     // Use first codec as reference initial gain.
-    auto state = codecs_[0].GetGainState();
+    auto state = codecs_[0]->GetGainState();
     if (state.is_error()) {
       zxlogf(ERROR, "Could not get gain state %d", state.error_value());
       return state.error_value();
@@ -439,7 +439,7 @@ zx_status_t AmlG12TdmDspStream::UpdateHardwareSettings() {
   }
 
   for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
-    zx::result<CodecFormatInfo> format_info = codecs_[i].SetDaiFormat(dai_formats_[i]);
+    zx::result<CodecFormatInfo> format_info = codecs_[i]->SetDaiFormat(dai_formats_[i]);
     if (!format_info.is_ok()) {
       zxlogf(ERROR, "failed to set the DAI format");
       return format_info.status_value();
@@ -479,7 +479,7 @@ zx_status_t AmlG12TdmDspStream::ChangeActiveChannels(uint64_t mask) {
           return status;
         }
       } else {
-        zx_status_t status = codecs_[i].Stop();
+        zx_status_t status = codecs_[i]->Stop();
         if (status != ZX_OK) {
           zxlogf(ERROR, "Failed to stop the codec");
           return status;
@@ -692,7 +692,7 @@ zx_status_t AmlG12TdmDspStream::StartCodecIfEnabled(size_t index) {
   // buffer a codec is associated with. If the codecs ring_buffer_channels_to_use_bitmask intersects
   // with active_channels_ then start the codec.
   if (active_channels_ & metadata_.codecs.ring_buffer_channels_to_use_bitmask[index]) {
-    zx_status_t status = codecs_[index].Start();
+    zx_status_t status = codecs_[index]->Start();
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to start the codec");
       return status;
@@ -732,7 +732,7 @@ zx_status_t AmlG12TdmDspStream::Stop() {
 
 zx_status_t AmlG12TdmDspStream::StopAllCodecs() {
   for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
-    auto status = codecs_[i].Stop();
+    auto status = codecs_[i]->Stop();
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to stop the codec");
       return status;

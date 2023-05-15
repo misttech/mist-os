@@ -55,7 +55,8 @@ class AmlG12TdmDspStream : public SimpleAudioStream {
   void InitDaiFormats();
   zx_status_t InitCodecsGain() __TA_REQUIRES(domain_token());
 
-  std::vector<SimpleCodecClient> codecs_;
+  // SimpleCodecClients stored as unique pointers because they are not movable.
+  std::vector<std::unique_ptr<SimpleCodecClient>> codecs_;
   std::unique_ptr<AmlTdmConfigDevice> aml_audio_;
   std::unique_ptr<AmlMailboxDevice> audio_mailbox_;
   std::unique_ptr<AmlDspDevice> audio_dsp_;

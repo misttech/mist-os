@@ -36,7 +36,19 @@ struct Tas58xxCodec : public Tas58xx {
   explicit Tas58xxCodec(zx_device_t* parent, ddk::I2cChannel i2c,
                         ddk::GpioProtocolClient gpio_fault)
       : Tas58xx(parent, std::move(i2c), std::move(gpio_fault)) {}
-  codec_protocol_t GetProto() { return {&this->codec_protocol_ops_, this}; }
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> GetClient() {
+    zx::channel channel_remote;
+    fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local;
+    zx_status_t status = zx::channel::create(0, &channel_local.channel(), &channel_remote);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    status = CodecConnect(std::move(channel_remote));
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::success(std::move(channel_local));
+  }
   inspect::Inspector& inspect() { return Tas58xx::inspect(); }
   uint64_t GetTopologyId() { return Tas58xx::GetTopologyId(); }
   uint64_t GetAglPeId() { return Tas58xx::GetAglPeId(); }
@@ -72,8 +84,9 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
     auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
     codec_ = child_dev->GetDeviceContext<Tas58xxCodec>();
-    codec_proto_ = codec_->GetProto();
-    client_.SetProtocol(&codec_proto_);
+    zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec_->GetClient();
+    ASSERT_OK(codec_client.status_value());
+    client_.SetCodec(std::move(*codec_client));
   }
   void TearDown() override { mock_i2c_.VerifyAndClear(); }
 
@@ -86,7 +99,6 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
  private:
   std::shared_ptr<zx_device> fake_parent_;
   async::Loop loop_;
-  codec_protocol_t codec_proto_;
 };
 
 TEST_F(Tas58xxTest, GoodSetDai) {
@@ -340,12 +352,10 @@ class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zx
     auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
     codec_ = child_dev->GetDeviceContext<Tas58xxCodec>();
-    codec_proto_ = codec_->GetProto();
-    ddk::CodecProtocolClient proto_client(&codec_proto_);
 
     fidl::InterfaceHandle<audio_fidl::Codec> codec_handle;
     fidl::InterfaceRequest<audio_fidl::Codec> codec_request = codec_handle.NewRequest();
-    ASSERT_OK(proto_client.Connect(codec_request.TakeChannel()));
+    ASSERT_OK(codec_->CodecConnect(codec_request.TakeChannel()));
 
     codec_client_ = codec_handle.BindSync();
 
@@ -365,7 +375,6 @@ class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zx
 
  private:
   async::Loop loop_;
-  codec_protocol_t codec_proto_;
   std::shared_ptr<zx_device> fake_parent_;
 };
 
@@ -432,14 +441,10 @@ TEST(Tas58xxSignalProcessingTest, SignalProcessingConnectTooManyConnections) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
-  auto codec_proto = codec->GetProto();
-
-  ddk::CodecProtocolClient codec_proto2(&codec_proto);
 
   zx::channel channel_remote, channel_local;
   ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
-  ddk::CodecProtocolClient proto_client;
-  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  ASSERT_OK(codec->CodecConnect(std::move(channel_remote)));
   audio_fidl::CodecSyncPtr codec_client;
   codec_client.Bind(std::move(channel_local));
 
@@ -1417,9 +1422,10 @@ TEST(Tas58xxTest, Reset) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
-  auto codec_proto = codec->GetProto();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
+  ASSERT_OK(codec_client.status_value());
   SimpleCodecClient client;
-  client.SetProtocol(&codec_proto);
+  client.SetCodec(std::move(*codec_client));
 
   {
     mock_i2c
@@ -1469,8 +1475,9 @@ TEST(Tas58xxTest, BadFaultGpio) {
 
   // Make a 2-way call to make sure we run the loop in the driver.
   SimpleCodecClient client;
-  auto codec_proto = codec->GetProto();
-  client.SetProtocol(&codec_proto);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
+  ASSERT_OK(codec_client.status_value());
+  client.SetCodec(std::move(*codec_client));
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
   [[maybe_unused]] auto info = client.GetInfo();
 }
@@ -1499,9 +1506,10 @@ TEST(Tas58xxTest, Bridged) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
-  auto codec_proto = codec->GetProto();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
+  ASSERT_OK(codec_client.status_value());
   SimpleCodecClient client;
-  client.SetProtocol(&codec_proto);
+  client.SetCodec(std::move(*codec_client));
 
   {
     // Reset with PBTL mode on.
@@ -1611,9 +1619,10 @@ TEST(Tas58xxTest, ExternalConfig) {
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
-  auto codec_proto = codec->GetProto();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
+  ASSERT_OK(codec_client.status_value());
   SimpleCodecClient client;
-  client.SetProtocol(&codec_proto);
+  client.SetCodec(std::move(*codec_client));
 
   {
     // Reset with PBTL mode on.
