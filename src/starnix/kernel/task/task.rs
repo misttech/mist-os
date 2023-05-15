@@ -275,6 +275,7 @@ pub enum ExceptionResult {
     Unhandled,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStateCode {
     // Task is being executed.
     Running,

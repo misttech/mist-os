@@ -12,7 +12,7 @@ use crate::mm::{
     MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatmFile, ProcStatusFile,
 };
 use crate::selinux::selinux_proc_attrs;
-use crate::task::{CurrentTask, Task, ThreadGroup};
+use crate::task::{CurrentTask, Task, TaskStateCode, ThreadGroup};
 use crate::types::*;
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
@@ -547,12 +547,18 @@ impl FileOps for MemFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let task = &self.0;
-        let mut addr = UserAddress::default() + offset;
-        data.write_each(&mut |bytes| {
-            let actual = task.mm.read_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
-            addr += actual;
-            Ok(actual)
-        })
+        match task.state_code() {
+            TaskStateCode::Zombie => Ok(0),
+            TaskStateCode::Running | TaskStateCode::Sleeping => {
+                let mut addr = UserAddress::default() + offset;
+                data.write_each(&mut |bytes| {
+                    let actual =
+                        task.mm.read_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
+                    addr += actual;
+                    Ok(actual)
+                })
+            }
+        }
     }
 
     fn write_at(
@@ -563,11 +569,17 @@ impl FileOps for MemFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let task = &self.0;
-        let mut addr = UserAddress::default() + offset;
-        data.read_each(&mut |bytes| {
-            let actual = task.mm.write_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
-            addr += actual;
-            Ok(actual)
-        })
+        match task.state_code() {
+            TaskStateCode::Zombie => Ok(0),
+            TaskStateCode::Running | TaskStateCode::Sleeping => {
+                let mut addr = UserAddress::default() + offset;
+                data.read_each(&mut |bytes| {
+                    let actual =
+                        task.mm.write_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
+                    addr += actual;
+                    Ok(actual)
+                })
+            }
+        }
     }
 }

@@ -515,7 +515,6 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcPidMem.AfterExit",
                 "ProcSelfMaps.Basic",
                 "ProcSelfMaps.SharedAnon",
                 "ProcSelfFdInfo.Flags",
