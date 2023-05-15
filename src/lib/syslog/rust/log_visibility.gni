@@ -36,8 +36,4 @@ third_party_rust_crate_log_visibility = [
 
   # Tail. Benchmarking log.
   "//src/lib/diagnostics/log/bench:*",
-
-  "//src/connectivity/network/net-cli:*",
-  "//src/connectivity/network/netstack3:*",
-  "//src/connectivity/network/netstack3/core:*",
 ]
