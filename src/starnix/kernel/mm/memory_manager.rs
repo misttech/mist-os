@@ -1836,22 +1836,23 @@ fn write_map(
             fill_to_name(sink);
             sink.write(b"[vdso]");
         }
-        MappingName::File(filename) => {
+        MappingName::File(name) => {
             fill_to_name(sink);
             // File names can have newlines that need to be escaped before printing.
             // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
             // escaping applied to paths is replacing newlines with an octal sequence.
-            let path = filename.path(task);
+            let path = name.path(task);
             sink.write_iter(
                 path.iter()
                     .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
                     .copied(),
             );
-            // TODO: See https://man7.org/linux/man-pages/man5/proc.5.html
-            //
-            //   If the mapping is file-backed and the file has been
-            //   deleted, the string " (deleted)" is appended to the
-            //   pathname.
+            // If the mapping is file-backed and the file has been
+            // deleted, the string " (deleted)" is appended to the
+            // pathname.
+            if name.entry.is_dead() {
+                sink.write(b" (deleted)");
+            }
         }
         MappingName::Vma(name) => {
             fill_to_name(sink);

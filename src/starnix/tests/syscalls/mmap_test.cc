@@ -79,7 +79,8 @@ std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_vie
 
       std::string pathname;
       if (parts.size() > 5) {
-        pathname = parts[5];
+        // The pathname always starts at pos 73.
+        pathname = line.substr(73);
       }
 
       MemoryMapping mapping = {
@@ -247,6 +248,28 @@ TEST_F(MMapProcTest, MapFileWithNewlineInName) {
 
   munmap(p, page_size);
   unlink(path.c_str());
+}
+
+TEST_F(MMapProcTest, MapDeletedField) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/tmpfile";
+  ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  ASSERT_TRUE(fd);
+  SAFE_SYSCALL(ftruncate(fd.get(), page_size));
+  void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
+  std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
+  fd.reset();
+  unlink(path.c_str());
+
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
+  auto mapping = find_memory_mapping(reinterpret_cast<uintptr_t>(p), maps);
+  EXPECT_NE(mapping, std::nullopt);
+  EXPECT_EQ(mapping->pathname, dir + "/tmpfile (deleted)");
+
+  munmap(p, page_size);
 }
 
 TEST_F(MMapProcTest, AdjacentFileMappings) {

@@ -41,6 +41,9 @@ struct DirEntryState {
     /// NamespaceNodes.
     local_name: FsString,
 
+    /// Whether this directory entry has been removed from the tree.
+    is_dead: bool,
+
     /// The number of filesystem mounted on the directory entry.
     mount_count: u32,
 }
@@ -98,7 +101,12 @@ impl DirEntry {
     ) -> DirEntryHandle {
         let result = Arc::new(DirEntry {
             node,
-            state: RwLock::new(DirEntryState { parent, local_name, mount_count: 0 }),
+            state: RwLock::new(DirEntryState {
+                parent,
+                local_name,
+                is_dead: false,
+                mount_count: 0,
+            }),
             children: Default::default(),
         });
         #[cfg(any(test, debug_assertions))]
@@ -171,6 +179,11 @@ impl DirEntry {
     /// tree.
     pub fn parent_or_self(self: &DirEntryHandle) -> DirEntryHandle {
         self.state.read().parent.as_ref().unwrap_or(self).clone()
+    }
+
+    /// Whether this directory entry has been removed from the tree.
+    pub fn is_dead(&self) -> bool {
+        self.state.read().is_dead
     }
 
     /// Whether the given name has special semantics as a directory entry.
@@ -444,10 +457,17 @@ impl DirEntry {
         // to remove the FsNode from its parent's child list.
         std::mem::drop(self_children);
 
-        self.node.fs().will_destroy_dir_entry(&child);
+        child.destroy();
 
-        std::mem::drop(child);
         Ok(())
+    }
+
+    /// Destroy this directory entry.
+    ///
+    /// Notice that this method takes `self` by value to destroy this reference.
+    fn destroy(self: DirEntryHandle) {
+        self.node.fs().will_destroy_dir_entry(&self);
+        self.state.write().is_dead = true;
     }
 
     /// Returns whether this entry is a descendant of |other|.
@@ -637,7 +657,7 @@ impl DirEntry {
         fs.purge_old_entries();
 
         if let Some(replaced) = maybe_replaced {
-            replaced.node.fs().will_destroy_dir_entry(&replaced);
+            replaced.destroy();
         }
 
         // Renaming a file updates its ctime.
@@ -661,7 +681,7 @@ impl DirEntry {
         if let Some(child) = child {
             children.remove(name);
             std::mem::drop(children);
-            self.node.fs().will_destroy_dir_entry(&child);
+            child.destroy();
         }
     }
 
