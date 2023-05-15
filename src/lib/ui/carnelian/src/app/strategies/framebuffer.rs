@@ -163,7 +163,7 @@ impl DisplayCoordinator {
         );
 
         if let Some(virtcon_mode) = virtcon_mode {
-            coordinator.set_virtcon_mode(*virtcon_mode as u8)?;
+            coordinator.set_virtcon_mode(*virtcon_mode)?;
         }
 
         let mut event_stream = coordinator.take_event_stream();
@@ -408,7 +408,7 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
             .as_ref()
             .expect("display_coordinator")
             .coordinator
-            .set_virtcon_mode(virtcon_mode as u8)
+            .set_virtcon_mode(virtcon_mode)
             .expect("set_virtcon_mode");
     }
 

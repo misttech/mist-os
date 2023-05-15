@@ -81,7 +81,7 @@ class Controller : public DeviceType,
 
   void DisplayCaptureInterfaceOnCaptureComplete();
   void OnClientDead(ClientProxy* client);
-  void SetVcMode(uint8_t mode);
+  void SetVcMode(fuchsia_hardware_display::wire::VirtconMode mode);
   void ShowActiveDisplay();
 
   void ApplyConfig(DisplayConfig* configs[], int32_t count, bool vc_client,

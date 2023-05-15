@@ -691,7 +691,7 @@ impl FrameBuffer {
 
         let proxy = dc_client.into_proxy()?;
         if let Some(virtcon_mode) = virtcon_mode {
-            proxy.set_virtcon_mode(virtcon_mode as u8)?;
+            proxy.set_virtcon_mode(virtcon_mode)?;
         }
         FrameBuffer::new_with_proxy(virtcon_mode, usage, proxy, sender).await
     }
@@ -755,7 +755,7 @@ impl FrameBuffer {
 
     pub fn set_virtcon_mode(&mut self, virtcon_mode: VirtconMode) -> Result<(), Error> {
         ensure!(self.initial_virtcon_mode.is_some());
-        self.coordinator.set_virtcon_mode(virtcon_mode as u8)?;
+        self.coordinator.set_virtcon_mode(virtcon_mode)?;
         Ok(())
     }
 

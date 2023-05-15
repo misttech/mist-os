@@ -629,9 +629,9 @@ void Controller::ReleaseCaptureImage(uint64_t handle) {
   }
 }
 
-void Controller::SetVcMode(uint8_t vc_mode) {
+void Controller::SetVcMode(fuchsia_hardware_display::wire::VirtconMode vc_mode) {
   fbl::AutoLock lock(mtx());
-  vc_mode_ = static_cast<fidl_display::wire::VirtconMode>(vc_mode);
+  vc_mode_ = vc_mode;
   HandleClientOwnershipChanges();
 }
 

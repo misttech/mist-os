@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-testing/test_loop.h>
@@ -664,7 +665,7 @@ TEST_F(IntegrationTest, ClampRgb) {
     fbl::AutoLock lock(vc_client.mtx());
     // set mode to Fallback
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)vc_client.dc_->SetVirtconMode(1);
+    (void)vc_client.dc_->SetVirtconMode(fuchsia_hardware_display::VirtconMode::kFallback);
     EXPECT_TRUE(
         RunLoopWithTimeoutOrUntil([this]() { return virtcon_client_connected(); }, zx::sec(1)));
     // Clamp RGB to a minimum value
@@ -711,8 +712,7 @@ TEST_F(IntegrationTest, EmptyConfigIsNotApplied) {
   {
     fbl::AutoLock lock(vc_client.mtx());
     EXPECT_EQ(ZX_OK, vc_client.dc_
-                         ->SetVirtconMode(static_cast<uint8_t>(
-                             fuchsia_hardware_display::wire::VirtconMode::kFallback))
+                         ->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback)
                          .status());
   }
   ASSERT_TRUE(vc_client.Bind(dispatcher()));
