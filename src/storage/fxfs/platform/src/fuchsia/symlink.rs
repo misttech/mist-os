@@ -8,7 +8,7 @@ use {
     },
     anyhow::{bail, Error},
     async_trait::async_trait,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fxfs::{
         errors::FxfsError,
         object_handle::ObjectProperties,
@@ -17,7 +17,7 @@ use {
         },
     },
     std::sync::Arc,
-    vfs::symlink::Symlink,
+    vfs::{attributes, symlink::Symlink},
 };
 
 pub struct FxSymlink {
@@ -35,6 +35,27 @@ impl FxSymlink {
 impl Symlink for FxSymlink {
     async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
         self.volume.store().read_symlink(self.object_id).await.map_err(map_to_status)
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos(),
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::SYMLINK,
+                abilities: fio::Operations::GET_ATTRIBUTES | fio::Operations::UPDATE_ATTRIBUTES,
+                content_size: props.data_attribute_size,
+                storage_size: props.allocated_size,
+                link_count: props.refs,
+            }
+        ))
     }
 }
 

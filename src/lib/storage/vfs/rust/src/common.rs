@@ -7,12 +7,13 @@
 use {
     fidl::endpoints::ServerEnd,
     fidl::prelude::*,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{Status, Vmo},
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::StreamExt as _,
     libc,
     std::{convert::TryFrom, sync::Arc},
 };
+
+pub use vfs_macros::attribute_query;
 
 /// Set of known rights.
 const FS_RIGHTS: fio::OpenFlags = fio::OPEN_RIGHTS;
@@ -38,9 +39,9 @@ pub fn stricter_or_same_rights(parent_flags: fio::OpenFlags, flags: fio::OpenFla
 pub fn inherit_rights_for_clone(
     parent_flags: fio::OpenFlags,
     mut flags: fio::OpenFlags,
-) -> Result<fio::OpenFlags, Status> {
+) -> Result<fio::OpenFlags, zx::Status> {
     if flags.intersects(fio::OpenFlags::CLONE_SAME_RIGHTS) && flags.intersects(FS_RIGHTS) {
-        return Err(Status::INVALID_ARGS);
+        return Err(zx::Status::INVALID_ARGS);
     }
 
     // We preserve OPEN_FLAG_APPEND as this is what is the most convenient for the POSIX emulation.
@@ -57,7 +58,7 @@ pub fn inherit_rights_for_clone(
     }
 
     if !stricter_or_same_rights(parent_flags, flags) {
-        return Err(Status::ACCESS_DENIED);
+        return Err(zx::Status::ACCESS_DENIED);
     }
 
     // Ignore the POSIX flags for clone.
@@ -98,14 +99,14 @@ pub fn node_attributes() -> fio::NodeAttributes {
 /// issue.
 ///
 /// # Panics
-/// If `status` is `Status::OK`.  In this case `OnOpen` may need to contain a description of the
+/// If `status` is `zx::Status::OK`.  In this case `OnOpen` may need to contain a description of the
 /// object, and server_end should not be dropped.
 pub fn send_on_open_with_error(
     describe: bool,
     server_end: ServerEnd<fio::NodeMarker>,
-    status: Status,
+    status: zx::Status,
 ) {
-    if status == Status::OK {
+    if status == zx::Status::OK {
         panic!("send_on_open_with_error() should not be used to respond with Status::OK");
     }
 
@@ -188,10 +189,10 @@ pub async fn extended_attributes_sender(
 
 pub fn encode_extended_attribute_value(
     value: Vec<u8>,
-) -> Result<fio::ExtendedAttributeValue, Status> {
+) -> Result<fio::ExtendedAttributeValue, zx::Status> {
     let size = value.len() as u64;
     if size > fio::MAX_INLINE_ATTRIBUTE_VALUE {
-        let vmo = Vmo::create(size)?;
+        let vmo = zx::Vmo::create(size)?;
         vmo.write(&value, 0)?;
         Ok(fio::ExtendedAttributeValue::Buffer(vmo))
     } else {
@@ -201,7 +202,7 @@ pub fn encode_extended_attribute_value(
 
 pub fn decode_extended_attribute_value(
     value: fio::ExtendedAttributeValue,
-) -> Result<Vec<u8>, Status> {
+) -> Result<Vec<u8>, zx::Status> {
     match value {
         fio::ExtendedAttributeValue::Bytes(val) => Ok(val),
         fio::ExtendedAttributeValue::Buffer(vmo) => {
@@ -234,18 +235,62 @@ pub(crate) mod io2_conversions {
     }
 
     pub fn io1_to_io2(flags: fio::OpenFlags) -> fio::Operations {
-        let mut operations = fio::Operations::empty();
-        if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-            operations |= fio::R_STAR_DIR;
+        if flags.contains(fio::OpenFlags::NODE_REFERENCE) {
+            fio::Operations::GET_ATTRIBUTES
+        } else {
+            let mut operations = fio::Operations::empty();
+            if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                operations |= fio::R_STAR_DIR;
+            }
+            if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+                operations |= fio::W_STAR_DIR;
+            }
+            if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+                operations |= fio::X_STAR_DIR;
+            }
+            operations
         }
-        if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-            operations |= fio::W_STAR_DIR;
-        }
-        if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-            operations |= fio::X_STAR_DIR;
-        }
-        operations
     }
+}
+
+/// Helper for building fio::NodeAttributes2 given requested attributes.  Code will only run for
+/// requested attributes.
+///
+/// Example:
+///
+///   attributes!(
+///       requested,
+///       Mutable { creation_time: 123, modification_time, 456 },
+///       Immutable { content_size: 789 }
+///   );
+///
+#[macro_export]
+macro_rules! attributes {
+    ($requested:expr,
+     Mutable {$($mut_a:ident: $mut_v:expr),* $(,)?},
+     Immutable {$($immut_a:ident: $immut_v:expr),* $(,)?}) => (
+        {
+            use $crate::common::attribute_query;
+            fio::NodeAttributes2 {
+                mutable_attributes: fio::MutableNodeAttributes {
+                    $($mut_a: if $requested.contains(attribute_query!($mut_a)) {
+                        Some($mut_v)
+                    } else {
+                        None
+                    }),*,
+                    ..Default::default()
+                },
+                immutable_attributes: fio::ImmutableNodeAttributes {
+                    $($immut_a: if $requested.contains(attribute_query!($immut_a)) {
+                        Some($immut_v)
+                    } else {
+                        None
+                    }),*,
+                    ..Default::default()
+                }
+            }
+        }
+    )
 }
 
 #[cfg(test)]
@@ -268,7 +313,7 @@ mod tests {
                      Actual: {:X}",
                     $expected_new_flags, new_flags
                 ),
-                Err(status) => panic!("`inherit_rights_for_clone` failed.  Status: {}", status),
+                Err(status) => panic!("`inherit_rights_for_clone` failed.  Status: {status}"),
             }
         }};
     }

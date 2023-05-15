@@ -63,17 +63,20 @@ async fn get_connection_info_directory() {
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
         let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
 
-        // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
+        let mut rights = fio::Operations::empty();
+        if dir_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+            rights |= fio::R_STAR_DIR;
+        }
+        if dir_flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            rights |= fio::W_STAR_DIR;
+        }
+        if dir_flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+            rights |= fio::X_STAR_DIR;
+        }
         assert_eq!(
             dir.get_connection_info().await.unwrap(),
-            fio::ConnectionInfo {
-                rights: Some(
-                    fio::Operations::GET_ATTRIBUTES
-                        | fio::Operations::ENUMERATE
-                        | fio::Operations::TRAVERSE
-                ),
-                ..Default::default()
-            }
+            fio::ConnectionInfo { rights: Some(rights), ..Default::default() },
+            "flags={dir_flags:?}"
         );
     }
 }
@@ -86,8 +89,6 @@ async fn get_connection_info_directory_node_reference() {
     let root = root_directory(vec![directory("dir", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
-    // Node references should only have the ability to get attributes.
-    // TODO(http://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
     assert_eq!(
         dir.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), ..Default::default() }

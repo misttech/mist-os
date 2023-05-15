@@ -72,6 +72,9 @@ type Io1Config = table {
 
     /// Unlink is supported.
    12: supports_unlink bool;
+
+    /// Supports fuchsia.io's open2 method.
+   13: supports_open2 bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.

@@ -34,6 +34,7 @@ use {
         sync::{Arc, Mutex},
     },
     vfs::{
+        attributes,
         common::rights_to_posix_mode_bits,
         directory::{
             dirents_sink::{self, AppendResult, Sink},
@@ -46,7 +47,7 @@ use {
         execution_scope::ExecutionScope,
         path::Path,
         symlink::{self, SymlinkOptions},
-        ProtocolsExt, ToObjectRequest,
+        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -633,6 +634,55 @@ impl DirectoryEntry for FxDirectory {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.object_id(), fio::DirentType::Directory)
     }
+
+    fn open2(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        // Ignore the provided scope which might be for the parent pseudo filesystem and use the
+        // volume's scope instead.
+        let scope = self.volume().scope().clone();
+        object_request.take().spawn(&scope.clone(), move |object_request, shutdown| {
+            Box::pin(async move {
+                let node = self.lookup(&protocols, path, None).await.map_err(map_to_status)?;
+                if node.is::<FxDirectory>() {
+                    Ok(MutableConnection::create_connection_async(
+                        scope,
+                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
+                        protocols.to_directory_options()?,
+                        object_request.take(),
+                        shutdown,
+                    )
+                    .boxed())
+                } else if node.is::<FxFile>() {
+                    let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    FxFile::create_connection_async(
+                        node,
+                        scope,
+                        protocols.to_file_options()?,
+                        object_request,
+                        shutdown,
+                    )
+                } else if node.is::<FxSymlink>() {
+                    let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
+                    Ok(symlink::Connection::run(
+                        scope,
+                        node.take(),
+                        protocols.to_symlink_options()?,
+                        object_request.take(),
+                        shutdown,
+                    )
+                    .boxed())
+                } else {
+                    unreachable!();
+                }
+            })
+        });
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -763,6 +813,32 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
             creation_time: props.creation_time.as_nanos(),
             modification_time: props.modification_time.as_nanos(),
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos(),
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE
+                    | fio::Operations::MODIFY_DIRECTORY,
+                content_size: props.data_attribute_size,
+                storage_size: props.allocated_size,
+                link_count: props.refs + 1 + props.sub_dirs,
+                id: self.directory.object_id(),
+            }
+        ))
     }
 
     fn close(&self) -> Result<(), zx::Status> {

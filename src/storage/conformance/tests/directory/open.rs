@@ -426,6 +426,10 @@ async fn open_file_with_extra_rights() {
 async fn open2_directory_unsupported() {
     let harness = TestHarness::new().await;
 
+    if harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
     let root = root_directory(vec![directory("dir", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
@@ -444,3 +448,536 @@ async fn open2_directory_unsupported() {
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
     );
 }
+
+#[fuchsia::test]
+async fn open2_rights() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    const CONTENT: &[u8] = b"content";
+    let test_dir = harness.get_directory(
+        root_directory(vec![file(TEST_FILE, CONTENT.to_vec())]),
+        fio::OpenFlags::RIGHT_READABLE,
+    );
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            &TEST_FILE,
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::WRITE_BYTES),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
+    );
+
+    // Check that empty rights get copied from the parent.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    test_dir
+        .open2(
+            &TEST_FILE,
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    assert_eq!(
+        proxy.get_connection_info().await.expect("get_connection_info failed").rights,
+        test_dir.get_connection_info().await.expect("get_connection_info failed").rights
+    );
+
+    // We should be able to read from the file, but not write.
+    assert_eq!(&fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
+    assert_matches!(
+        fuchsia_fs::file::write(&proxy, "data").await,
+        Err(fuchsia_fs::file::WriteError::WriteError(zx::Status::BAD_HANDLE))
+    );
+}
+
+#[fuchsia::test]
+async fn open2_invalid() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    // It's an error to specify more than one protocol when trying to create an object.
+    for mode in [fio::OpenMode::MaybeCreate, fio::OpenMode::AlwaysCreate] {
+        let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        test_dir
+            .open2(
+                "file",
+                &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(fio::NodeProtocols {
+                        file: Some(fio::FileProtocolFlags::default()),
+                        directory: Some(fio::DirectoryProtocolOptions::default()),
+                        ..Default::default()
+                    }),
+                    mode: Some(mode),
+                    ..Default::default()
+                }),
+                server.into_channel(),
+            )
+            .unwrap();
+        assert_matches!(
+            proxy.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
+        );
+    }
+
+    // It's an error to specify create attributes when opening an object.
+    for mode in [None, Some(fio::OpenMode::OpenExisting)] {
+        let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        test_dir
+            .open2(
+                "file",
+                &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(fio::NodeProtocols {
+                        file: Some(fio::FileProtocolFlags::default()),
+                        ..Default::default()
+                    }),
+                    mode,
+                    create_attributes: Some(fio::MutableNodeAttributes {
+                        creation_time: Some(1),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                server.into_channel(),
+            )
+            .unwrap();
+        assert_matches!(
+            proxy.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
+        );
+    }
+}
+
+#[fuchsia::test]
+async fn open2_create_dot_fails_with_already_exists() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            ".",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::AlwaysCreate),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::ALREADY_EXISTS, .. })
+    );
+}
+
+#[fuchsia::test]
+async fn open2_open_directory() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![directory("dir", vec![])]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    // Should be able to open the directory specifying just the directory protocol.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    test_dir
+        .open2(
+            "dir",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    // Check it's a directory...
+    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    proxy
+        .open2(
+            ".",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(proxy2.get_connection_info().await, Ok(_));
+
+    // Any node protocol should work.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    test_dir
+        .open2(
+            "dir",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    // Check it's a directory...
+    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    proxy
+        .open2(
+            ".",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(proxy2.get_connection_info().await, Ok(_));
+
+    // Attempting to open the directory as a file should fail.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            "dir",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
+    );
+
+    // And as a symbolic link...
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            "dir",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    symlink: Some(fio::SymlinkProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::WRONG_TYPE, .. })
+    );
+}
+
+#[fuchsia::test]
+async fn open2_open_file() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    const CONTENT: &[u8] = b"content";
+    let test_dir = harness.get_directory(
+        root_directory(vec![file("file", CONTENT.to_vec())]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    // Should be able to open the file specifying just the file protocol.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    // Check it's a file...
+    assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
+
+    // Any node protocol should work.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    // Check it's a file...
+    assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
+
+    // Attempting to open the file as a directory should fail.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
+    );
+
+    // And as a symbolic link...
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    symlink: Some(fio::SymlinkProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::WRONG_TYPE, .. })
+    );
+}
+
+#[fuchsia::test]
+async fn open2_file_append() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![file("file", b"foo".to_vec())]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::APPEND),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    // Append to the file.
+    assert_matches!(fuchsia_fs::file::write(&proxy, " bar").await, Ok(()));
+
+    // Read back to check.
+    proxy.seek(fio::SeekOrigin::Start, 0).await.expect("seek FIDL failed").expect("seek failed");
+    assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), b"foo bar");
+}
+
+#[fuchsia::test]
+async fn open2_file_truncate() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![file("file", b"foo".to_vec())]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::TRUNCATE),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), b"");
+}
+
+#[fuchsia::test]
+async fn open2_directory_get_representation() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(root_directory(vec![]), fio::OpenFlags::RIGHT_READABLE);
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    test_dir
+        .open2(
+            ".",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                attributes: Some(
+                    fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
+                ),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    assert_matches!(
+        proxy
+            .take_event_stream()
+            .try_next()
+            .await
+            .expect("expected OnRepresentation event")
+            .expect("missing OnRepresentation event")
+            .into_on_representation(),
+        Some(fio::Representation::Directory(fio::DirectoryInfo {
+            attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
+            ..
+        }))
+        if mutable_attributes == fio::MutableNodeAttributes::default()
+            && immutable_attributes
+                == fio::ImmutableNodeAttributes {
+                    protocols: Some(fio::NodeProtocolKinds::DIRECTORY),
+                    abilities: Some(
+                        fio::Operations::GET_ATTRIBUTES
+                            | fio::Operations::UPDATE_ATTRIBUTES
+                            | fio::Operations::ENUMERATE
+                            | fio::Operations::TRAVERSE
+                            | fio::Operations::MODIFY_DIRECTORY
+                    ),
+                    ..Default::default()
+                }
+    );
+}
+
+#[fuchsia::test]
+async fn open2_file_get_representation() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness
+        .get_directory(root_directory(vec![file("file", vec![])]), fio::OpenFlags::RIGHT_READABLE);
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    test_dir
+        .open2(
+            "file",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::APPEND),
+                    ..Default::default()
+                }),
+                attributes: Some(
+                    fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
+                ),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    assert_matches!(
+        proxy
+            .take_event_stream()
+            .try_next()
+            .await
+            .expect("expected OnRepresentation event")
+            .expect("missing OnRepresentation event")
+            .into_on_representation(),
+        Some(fio::Representation::File(fio::FileInfo {
+            is_append: Some(true),
+            attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
+            ..
+        }))
+        if mutable_attributes == fio::MutableNodeAttributes::default()
+            && immutable_attributes
+                == fio::ImmutableNodeAttributes {
+                    protocols: Some(fio::NodeProtocolKinds::FILE),
+                    abilities: Some(
+                        fio::Operations::GET_ATTRIBUTES
+                            | fio::Operations::UPDATE_ATTRIBUTES
+                            | fio::Operations::READ_BYTES
+                            | fio::Operations::WRITE_BYTES
+                            | if harness.config.supports_executable_file.unwrap_or_default() {
+                                fio::Operations::EXECUTE
+                            } else {
+                                fio::Operations::empty()
+                            },
+                    ),
+                    ..Default::default()
+                }
+    );
+}
+
+// TODO(fxbug.dev/123390): Add open2 symlink tests.
+// TODO(fxbug.dev/77623): Add open2 connect tests.

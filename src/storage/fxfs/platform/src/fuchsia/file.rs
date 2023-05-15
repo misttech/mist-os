@@ -34,6 +34,7 @@ use {
         },
     },
     vfs::{
+        attributes,
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
@@ -320,6 +321,31 @@ impl File for FxFile {
             creation_time: props.creation_time.as_nanos(),
             modification_time: props.modification_time.as_nanos(),
         })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos(),
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: props.data_attribute_size,
+                storage_size: props.allocated_size,
+                link_count: props.refs,
+                id: self.handle.object_id(),
+            }
+        ))
     }
 
     async fn set_attrs(

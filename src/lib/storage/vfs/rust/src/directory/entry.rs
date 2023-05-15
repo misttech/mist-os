@@ -6,11 +6,11 @@
 
 #![warn(missing_docs)]
 
-use crate::{common::IntoAny, execution_scope::ExecutionScope, path::Path};
+use crate::{common::IntoAny, execution_scope::ExecutionScope, path::Path, ObjectRequestRef};
 
 use {
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{fmt, sync::Arc},
 };
 
@@ -80,6 +80,17 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     );
+
+    /// See fuchsia.io's Open2 method.
+    fn open2(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _path: Path,
+        _protocols: fio::ConnectionProtocols,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
 
     /// This method is used to populate ReadDirents() output.
     fn entry_info(&self) -> EntryInfo;

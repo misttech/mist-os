@@ -197,7 +197,6 @@ impl DerefMut for ObjectRequestRef<'_> {
 
 pub(crate) enum ObjectRequestSend {
     OnOpen,
-    #[allow(unused)]
     OnRepresentation,
     Nothing,
 }
@@ -222,6 +221,21 @@ pub trait Representation {
 /// Trait for converting fio::ConnectionProtocols and fio::OpenFlags into ObjectRequest.
 pub trait ToObjectRequest: ProtocolsExt {
     fn to_object_request(&self, object_request: impl Into<zx::Handle>) -> ObjectRequest;
+}
+
+impl ToObjectRequest for fio::ConnectionProtocols {
+    fn to_object_request(&self, object_request: impl Into<zx::Handle>) -> ObjectRequest {
+        ObjectRequest::new(
+            object_request.into().into(),
+            if self.get_representation() {
+                ObjectRequestSend::OnRepresentation
+            } else {
+                ObjectRequestSend::Nothing
+            },
+            self.attributes(),
+            self.is_truncate(),
+        )
+    }
 }
 
 impl ToObjectRequest for fio::OpenFlags {

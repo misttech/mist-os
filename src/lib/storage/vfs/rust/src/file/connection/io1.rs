@@ -273,6 +273,13 @@ where
         self.as_file().get_attrs().await
     }
 
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        self.as_file().get_attributes(requested_attributes).await
+    }
+
     async fn set_attrs(
         &self,
         flags: fio::NodeAttributeFlags,
@@ -1044,8 +1051,16 @@ impl<T: 'static + File + IoOpHandler + CloneFile> Representation for FileConnect
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, zx::Status> {
+        // TODO(fxbug.dev/77623): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
-            attributes: Some(self.file.get_attributes(requested_attributes).await?),
+            is_append: Some(self.options.is_append),
+            observer: self.file.event()?,
+            stream: self.file.duplicate_stream()?,
+            attributes: if requested_attributes.is_empty() {
+                None
+            } else {
+                Some(self.file.get_attributes(requested_attributes).await?)
+            },
             ..Default::default()
         }))
     }

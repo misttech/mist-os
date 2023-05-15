@@ -17,12 +17,13 @@ use crate::{
     execution_scope::ExecutionScope,
     object_request::Representation,
     path::Path,
+    ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
 
 use {
     anyhow::Error,
     async_trait::async_trait,
-    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::channel::oneshot,
     pin_project::pin_project,
@@ -175,12 +176,10 @@ where
                 fuchsia_trace::duration!("storage", "Directory::GetConnectionInfo");
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
                 // TODO(https://fxbug.dev/77623): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
-                let mut rights = fio::Operations::GET_ATTRIBUTES;
-                if !self.options.node {
-                    rights |= fio::Operations::ENUMERATE | fio::Operations::TRAVERSE;
-                }
-                responder
-                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
+                responder.send(fio::ConnectionInfo {
+                    rights: Some(self.options.rights),
+                    ..Default::default()
+                })?;
             }
             fio::DirectoryRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttr");
@@ -248,15 +247,23 @@ where
                 self.handle_open(flags, path, object);
             }
             fio::DirectoryRequest::Open2 {
-                path: _,
-                protocols: _,
+                path,
+                mut protocols,
                 object_request,
                 control_handle: _,
             } => {
                 fuchsia_trace::duration!("storage", "Directory::Open2");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                // Fill in rights from the parent connection if it's absent.
+                if let fio::ConnectionProtocols::Node(fio::NodeOptions { rights, .. }) =
+                    &mut protocols
+                {
+                    if rights.is_none() {
+                        *rights = Some(self.options.rights);
+                    }
+                }
+                protocols
+                    .to_object_request(object_request)
+                    .handle(|req| self.handle_open2(path, protocols, req));
             }
             fio::DirectoryRequest::AddInotifyFilter {
                 path,
@@ -406,6 +413,48 @@ where
         // It is up to the open method to handle OPEN_FLAG_DESCRIBE from this point on.
         let directory = self.directory.clone();
         directory.open(self.scope.clone(), flags, path, server_end);
+    }
+
+    fn handle_open2(
+        &self,
+        path: String,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        let path = Path::validate_and_split(path)?;
+
+        if let Some(rights) = protocols.rights() {
+            if rights.intersects(!self.options.rights) {
+                return Err(zx::Status::ACCESS_DENIED);
+            }
+        }
+
+        // If creating an object, it's not legal to specify more than one protocol.
+        if protocols.open_mode() != fio::OpenMode::OpenExisting
+            && ((protocols.is_file_allowed() && protocols.is_dir_allowed())
+                || protocols.is_symlink_allowed())
+        {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+
+        if protocols.create_attributes().is_some() {
+            if protocols.open_mode() == fio::OpenMode::OpenExisting {
+                return Err(zx::Status::INVALID_ARGS);
+            }
+            // TODO(fxbug.dev/77623): Support setting attributes at creation time.
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+
+        if path.is_dot() {
+            if !protocols.is_dir_allowed() {
+                return Err(zx::Status::INVALID_ARGS);
+            }
+            if protocols.open_mode() == fio::OpenMode::AlwaysCreate {
+                return Err(zx::Status::ALREADY_EXISTS);
+            }
+        }
+
+        self.directory.clone().open2(self.scope.clone(), path, protocols, object_request)
     }
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (zx::Status, Vec<u8>) {

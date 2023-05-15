@@ -60,7 +60,164 @@ pub trait ProtocolsExt: Sync {
     fn create_directory(&self) -> bool;
 }
 
-// TODO(fxbug.dev/77623): Implement for fio::ConnectionProtocols.
+impl ProtocolsExt for fio::ConnectionProtocols {
+    fn is_dir_allowed(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { directory: Some(_), .. }),
+                ..
+            })
+        ) || self.is_any_node_protocol_allowed()
+    }
+
+    fn is_file_allowed(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { file: Some(_), .. }),
+                ..
+            })
+        ) || self.is_any_node_protocol_allowed()
+    }
+
+    fn is_symlink_allowed(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { symlink: Some(_), .. }),
+                ..
+            })
+        ) || self.is_any_node_protocol_allowed()
+    }
+
+    fn is_any_node_protocol_allowed(&self) -> bool {
+        matches!(self, fio::ConnectionProtocols::Node(fio::NodeOptions { protocols: None, .. }))
+    }
+
+    fn open_mode(&self) -> fio::OpenMode {
+        match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions { mode: Some(mode), .. }) => *mode,
+            _ => fio::OpenMode::OpenExisting,
+        }
+    }
+
+    fn rights(&self) -> Option<fio::Operations> {
+        match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions { rights, .. }) => *rights,
+            _ => None,
+        }
+    }
+
+    fn to_directory_options(&self) -> Result<DirectoryOptions, zx::Status> {
+        if !self.is_dir_allowed() {
+            if self.is_file_allowed() && !self.is_symlink_allowed() {
+                return Err(zx::Status::NOT_FILE);
+            } else {
+                return Err(zx::Status::WRONG_TYPE);
+            }
+        }
+        // TODO(fxbug.dev/77623): Add support for maximum rights.
+        if matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions { maximum_rights: Some(_), .. }),
+                    ..
+                }),
+                ..
+            })
+        ) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+        // If is_dir_allowed() returned true, there must be rights.
+        Ok(DirectoryOptions { node: false, rights: self.rights().unwrap() })
+    }
+
+    fn to_file_options(&self) -> Result<FileOptions, zx::Status> {
+        if !self.is_file_allowed() {
+            if self.is_dir_allowed() && !self.is_symlink_allowed() {
+                return Err(zx::Status::NOT_DIR);
+            } else {
+                return Err(zx::Status::WRONG_TYPE);
+            }
+        }
+        Ok(FileOptions {
+            // If is_file_allowed() returned true, there must be rights.
+            rights: self.rights().unwrap(),
+            is_node: false,
+            is_append: self.is_append(),
+        })
+    }
+
+    fn to_symlink_options(&self) -> Result<SymlinkOptions, zx::Status> {
+        if !self.is_symlink_allowed() {
+            return Err(zx::Status::WRONG_TYPE);
+        }
+        // If is_symlink_allowed() returned true, there must be rights.
+        if !self.rights().unwrap().contains(fio::Operations::GET_ATTRIBUTES) {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        Ok(SymlinkOptions)
+    }
+
+    fn get_representation(&self) -> bool {
+        matches!(self, fio::ConnectionProtocols::Node(
+            fio::NodeOptions {
+                    flags: Some(flags),
+                ..
+            }
+        ) if flags.contains(fio::NodeFlags::GET_REPRESENTATION))
+    }
+
+    fn is_append(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { file: Some(flags), .. }),
+                ..
+            }) if flags.contains(fio::FileProtocolFlags::APPEND)
+        )
+    }
+
+    fn is_truncate(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { file: Some(flags), .. }),
+                ..
+            }) if flags.contains(fio::FileProtocolFlags::TRUNCATE)
+        )
+    }
+
+    fn attributes(&self) -> fio::NodeAttributesQuery {
+        match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                attributes: Some(query), ..
+            }) => *query,
+            _ => fio::NodeAttributesQuery::empty(),
+        }
+    }
+
+    fn create_attributes(&self) -> Option<&fio::MutableNodeAttributes> {
+        match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions { create_attributes: a, .. }) => {
+                a.as_ref()
+            }
+            _ => None,
+        }
+    }
+
+    fn create_directory(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { directory: Some(_), .. }),
+                ..
+            })
+        )
+    }
+}
 
 impl ProtocolsExt for fio::OpenFlags {
     fn is_dir_allowed(&self) -> bool {

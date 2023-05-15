@@ -127,9 +127,16 @@ void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& co
   using fuchsia_io::Operations;
   using fuchsia_io::wire::ConnectionInfo;
 
-  Operations rights = Operations::kGetAttributes;
-  if (!options().flags.node_reference) {
-    rights |= Operations::kEnumerate | Operations::kTraverse;
+  Operations rights;
+  if (options().flags.node_reference) {
+    rights = Operations::kGetAttributes;
+  } else {
+    if (options().rights.read)
+      rights |= fio::wire::kRStarDir;
+    if (options().rights.write)
+      rights |= fio::wire::kWStarDir;
+    if (options().rights.execute)
+      rights |= fio::wire::kXStarDir;
   }
   fidl::Arena arena;
   completer.Reply(ConnectionInfo::Builder(arena).rights(rights).Build());
