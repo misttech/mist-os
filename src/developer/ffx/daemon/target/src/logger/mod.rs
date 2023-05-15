@@ -12,22 +12,22 @@ use ffx_log_utils::{
     symbolizer::{is_symbolizer_context_marker, LogSymbolizer, Symbolizer},
     OrderedBatchPipeline,
 };
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_developer_remotecontrol::{
     ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, InlineData,
     RemoteDiagnosticsBridgeMarker,
 };
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration;
+use fidl_fuchsia_io::OpenFlags;
 use futures::{AsyncReadExt, StreamExt, TryFutureExt};
-use selectors::{parse_selector, VerboseError};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, future::Future, rc::Weak, sync::Arc, time::SystemTime};
 use streamer::GenericDiagnosticsStreamer;
 
 pub mod streamer;
 
-const BRIDGE_SELECTOR: &str =
-    "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge";
+const BRIDGE_MONIKER: &str = "/core/remote-diagnostics-bridge";
 /// Configuration flag to enable proactive logging. Defaults to false
 const ENABLED_CONFIG: &str = "proactive_log.enabled";
 /// Configuration flag to enable symbolizer. Default to false
@@ -416,9 +416,16 @@ impl<'a> Logger<'a> {
         let nodename = target.nodename_str();
 
         let (log_proxy, log_server_end) = create_proxy::<RemoteDiagnosticsBridgeMarker>()?;
-        let selector = parse_selector::<VerboseError>(BRIDGE_SELECTOR).unwrap();
 
-        match remote_proxy.connect(&selector, log_server_end.into_channel()).await? {
+        match remote_proxy
+            .connect_capability(
+                BRIDGE_MONIKER,
+                RemoteDiagnosticsBridgeMarker::PROTOCOL_NAME,
+                log_server_end.into_channel(),
+                OpenFlags::RIGHT_READABLE,
+            )
+            .await?
+        {
             Ok(_) => {}
             Err(e) => {
                 tracing::info!("attempt to connect to logger for {} failed. {:?}", nodename, e);
@@ -482,7 +489,6 @@ mod test {
     use fidl_fuchsia_developer_remotecontrol::{
         ArchiveIteratorError, IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy,
         RemoteControlRequest, RemoteDiagnosticsBridgeRequest, RemoteDiagnosticsBridgeRequestStream,
-        ServiceMatch,
     };
     use fidl_fuchsia_diagnostics::DataType;
     use fidl_fuchsia_overnet_protocol::NodeId;
@@ -675,15 +681,9 @@ mod test {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    RemoteControlRequest::Connect { selector: _, service_chan, responder } => {
-                        setup_fake_archive_accessor(service_chan, parameters.clone()).unwrap();
-                        responder
-                            .send(&mut Ok(ServiceMatch {
-                                moniker: vec![],
-                                subdir: String::default(),
-                                service: String::default(),
-                            }))
-                            .unwrap();
+                    RemoteControlRequest::ConnectCapability { server_chan, responder, .. } => {
+                        setup_fake_archive_accessor(server_chan, parameters.clone()).unwrap();
+                        responder.send(&mut Ok(())).unwrap();
                     }
                     RemoteControlRequest::IdentifyHost { responder } => {
                         responder

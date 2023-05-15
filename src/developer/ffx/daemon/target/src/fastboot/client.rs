@@ -22,20 +22,19 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy};
+use fidl_fuchsia_io::OpenFlags;
 use future::select;
 use futures::{
     io::{AsyncRead, AsyncWrite},
     prelude::*,
     try_join,
 };
-use selectors::{self, VerboseError};
 use std::{net::SocketAddr, rc::Rc, time::Duration, time::Instant};
 
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
 const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
 
-const ADMIN_SELECTOR: &str =
-    "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";
+const ADMIN_MONIKER: &str = "/bootstrap/power_manager";
 const FASTBOOT_PORT: u16 = 5554;
 
 #[async_trait(?Send)]
@@ -512,10 +511,14 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
     async fn init_admin_proxy(&self) -> Result<AdminProxy> {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
-        let selector = selectors::parse_selector::<VerboseError>(ADMIN_SELECTOR)?;
         self.get_remote_proxy()
             .await?
-            .connect(&selector, server_end.into_channel())
+            .connect_capability(
+                ADMIN_MONIKER,
+                AdminMarker::PROTOCOL_NAME,
+                server_end.into_channel(),
+                OpenFlags::RIGHT_READABLE,
+            )
             .await?
             .map(|_| proxy)
             .map_err(|_| anyhow!("could not get admin proxy"))
