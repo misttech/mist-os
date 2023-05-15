@@ -15,11 +15,9 @@ import argparse
 import dataclasses
 import difflib
 import filecmp
-import glob
 import os
 import re
 import subprocess
-import shlex
 import sys
 
 import fuchsia
