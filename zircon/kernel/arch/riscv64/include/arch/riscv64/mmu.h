@@ -86,6 +86,7 @@ const uint16_t MMU_RISCV64_FIRST_USER_ASID = 1;
 const uint16_t MMU_RISCV64_MAX_USER_ASID = MMU_RISCV64_GLOBAL_ASID - 1;
 
 void riscv64_mmu_early_init();
+void riscv64_mmu_early_init_percpu();
 void riscv64_mmu_init();
 
 #endif  // __ASSEMBLER__

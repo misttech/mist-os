@@ -1328,10 +1328,13 @@ void riscv64_mmu_early_init() {
 
   // Zero the bottom of the kernel page table to remove any left over boot mappings.
   memset(riscv64_kernel_translation_table, 0, PAGE_SIZE / 2);
+}
 
+void riscv64_mmu_early_init_percpu() {
   // Switch to the proper kernel translation table.
-  satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-         (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+  uint64_t satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+                  ((uint64_t)MMU_RISCV64_GLOBAL_ASID << RISCV64_SATP_ASID_SHIFT) |
+                  (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
 
   // Globally TLB flush.

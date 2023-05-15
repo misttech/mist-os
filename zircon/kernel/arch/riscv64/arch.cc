@@ -99,6 +99,7 @@ extern "C" void riscv64_boot_cpu_init(uint32_t hart_id) {
 void arch_early_init() {
   riscv64_sbi_early_init();
   riscv64_mmu_early_init();
+  riscv64_mmu_early_init_percpu();
 }
 
 void arch_prevm_init() {}
@@ -143,6 +144,7 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
 extern "C" void riscv64_secondary_entry(uint32_t hart_id, uint cpu_num) {
   riscv64_init_percpu();
   riscv64_mp_early_init_percpu(hart_id, cpu_num);
+  riscv64_mmu_early_init_percpu();
 
   // Wait until the primary has finished setting things up.
   while (!secondaries_released.load()) {
