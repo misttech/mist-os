@@ -13,6 +13,7 @@
 //!   * Allow waiting for all strongly-held references to be dropped after
 //!     marking the data. (TODO: https://fxbug.dev/122388).
 
+use alloc::vec::Vec;
 use core::{
     convert::AsRef,
     hash::{Hash, Hasher},
@@ -20,11 +21,215 @@ use core::{
     ops::Deref,
     sync::atomic::{AtomicBool, Ordering},
 };
+
 use derivative::Derivative;
+
+mod named {
+    //! Provides tracking of instances via human-readable names.
+    //!
+    //! Names are only tracked in debug builds. All operations and types
+    //! are no-ops and empty unless the `rc-debug-names` feature is enabled.
+
+    use core::marker::PhantomData;
+
+    /// Records reference-counted names of instances.
+    #[derive(Debug, Default)]
+    pub(super) struct StrongNames {
+        /// The names that were inserted and aren't known to be gone.
+        ///
+        /// This holds weak references to allow callers to drop without
+        /// synchronizing. Invalid weak pointers are cleaned up periodically but
+        /// are not logically present.
+        #[cfg(feature = "rc-debug-names")]
+        names: crate::Mutex<Vec<alloc::sync::Weak<str>>>,
+    }
+
+    impl StrongNames {
+        #[cfg(feature = "rc-debug-names")]
+        #[cfg(test)]
+        pub(super) fn names(&self) -> &crate::Mutex<Vec<alloc::sync::Weak<str>>> {
+            &self.names
+        }
+    }
+
+    /// Instance of a name produced by [`Names`].
+    ///
+    /// This should be held as a field of the named instance. When it goes out of
+    /// scope, the reference count in the creating `Names` is decremented.
+    #[derive(Clone, Debug)]
+    pub(super) struct StrongName(#[cfg(feature = "rc-debug-names")] alloc::sync::Arc<str>);
+
+    impl StrongName {
+        pub(crate) fn downgrade(&self) -> WeakName {
+            // We need to be careful to create a new Arc that is not connected
+            // to the original one, because otherwise the weak name would
+            // keep the name in Names alive.
+            WeakName(
+                #[cfg(feature = "rc-debug-names")]
+                {
+                    let Self(name) = self;
+                    let name: &str = &*name;
+                    alloc::sync::Arc::from(name)
+                },
+            )
+        }
+    }
+
+    #[cfg(test)]
+    #[cfg(feature = "rc-debug-names")]
+    impl AsRef<str> for super::named::StrongName {
+        fn as_ref(&self) -> &str {
+            let Self(name) = self;
+            name
+        }
+    }
+
+    /// A weak name that isn't tracked by the originating [`Names`] instance.
+    #[derive(Clone, Debug)]
+    pub(super) struct WeakName(
+        /// The human-readable name.
+        ///
+        /// Use an `Arc<str>` instead of a `String` to allow clones of a
+        /// `WeakName` instance to cheaply share the backing memory.
+        #[cfg(feature = "rc-debug-names")]
+        alloc::sync::Arc<str>,
+    );
+
+    impl WeakName {
+        pub(super) fn new(name: &str) -> Self {
+            #[cfg(not(feature = "rc-debug-names"))]
+            {
+                let _ = name;
+            }
+            WeakName(
+                #[cfg(feature = "rc-debug-names")]
+                {
+                    alloc::sync::Arc::from(name)
+                },
+            )
+        }
+    }
+
+    impl StrongNames {
+        /// Creates a new [`Name`] from the given name.
+        ///
+        /// On debug builds, the returned `Name` is tied to an internal
+        /// reference count that will be decremented when the `Name` and all of
+        /// its clones are dropped. Until then, the provided name will be
+        /// available via [`Names::with_names`].
+        ///
+        /// On non-debug builds, this is a no-op.
+        pub(super) fn insert(&self, name: &str) -> StrongName {
+            #[cfg(not(feature = "rc-debug-names"))]
+            {
+                let _ = name;
+            }
+            StrongName(
+                #[cfg(feature = "rc-debug-names")]
+                {
+                    let Self { names } = self;
+                    let mut names = names.lock();
+                    let mut i = 0;
+                    // Iterate over the names to find one that matches, while
+                    // also opportunistically pruning dead names to prevent
+                    // unbounded memory growth. We do this with indices instead
+                    // of iterators so that we can use Vec::swap_remove to
+                    // remove items in-place instead of allocating a new vector.
+                    while i < names.len() {
+                        let Some(existing_name) = names[i].upgrade() else {
+                            let _: alloc::sync::Weak<str> = names.swap_remove(i);
+                            continue;
+                        };
+                        if name == &*existing_name {
+                            return StrongName(existing_name);
+                        }
+                        i += 1;
+                    }
+                    let arc_name = alloc::sync::Arc::from(name);
+                    let weak = alloc::sync::Arc::downgrade(&arc_name);
+                    names.push(weak);
+                    arc_name
+                },
+            )
+        }
+
+        /// Creates a new [`Name`] from the given weak name.
+        ///
+        /// Like [`Names::insert`], but with an existing [`WeakName`] instead
+        /// of a string name.
+        pub(super) fn insert_weak(&self, weak: &WeakName) -> StrongName {
+            #[cfg(feature = "rc-debug-names")]
+            {
+                let WeakName(name) = weak;
+                self.insert(&**name)
+            }
+            #[cfg(not(feature = "rc-debug-names"))]
+            {
+                let _: &WeakName = weak;
+                StrongName()
+            }
+        }
+
+        /// Provides access to names known to be alive.
+        ///
+        /// On debug builds, `cb` is called with an iterator that yields the
+        /// names that are still alive (corresponding to calls to
+        /// [`Names::insert`] and [`Names::insert_weak`] whose `Name` objects
+        /// and their clones haven't all been dropped).
+        ///
+        /// On non-debug builds, the provided iterator is always empty.
+        pub(super) fn with_names<R>(&self, cb: impl FnOnce(Iter<'_>) -> R) -> R {
+            cb(Iter(
+                #[cfg(feature = "rc-debug-names")]
+                {
+                    (&*self.names.lock()).into_iter()
+                },
+                #[cfg(not(feature = "rc-debug-names"))]
+                {
+                    core::iter::empty()
+                },
+                PhantomData,
+            ))
+        }
+    }
+
+    pub(super) struct Iter<'a>(
+        #[cfg(feature = "rc-debug-names")] core::slice::Iter<'a, alloc::sync::Weak<str>>,
+        #[cfg(not(feature = "rc-debug-names"))] core::iter::Empty<()>,
+        PhantomData<&'a ()>,
+    );
+
+    impl Iterator for Iter<'_> {
+        type Item = StrongName;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let Self(iter, _marker) = self;
+            iter.find_map(|item| {
+                #[cfg(not(feature = "rc-debug-names"))]
+                {
+                    let _ = item;
+                }
+                Some(StrongName(
+                    #[cfg(feature = "rc-debug-names")]
+                    {
+                        item.upgrade()?
+                    },
+                ))
+            })
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            let Self(it, _marker) = self;
+            let (_lower, upper) = it.size_hint();
+            (0, upper)
+        }
+    }
+}
 
 #[derive(Debug)]
 struct Inner<T> {
     marked_for_destruction: AtomicBool,
+    strong_names: named::StrongNames,
     data: T,
 }
 
@@ -40,7 +245,7 @@ impl<T> Inner<T> {
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let Inner { marked_for_destruction, data: _ } = self;
+        let Inner { marked_for_destruction, data: _, strong_names: _ } = self;
         Self::pre_drop_check(marked_for_destruction)
     }
 }
@@ -67,7 +272,7 @@ const ONE_NONZERO_USIZE: NonZeroUsize = nonzero_ext::nonzero!(1_usize);
 impl<T> Drop for Primary<T> {
     fn drop(&mut self) {
         let Self { extra_refs_on_drops, inner } = self;
-        let Inner { marked_for_destruction, data: _ } = inner.as_ref();
+        let Inner { marked_for_destruction, data: _, strong_names } = inner.as_ref();
 
         // `Ordering::Release` because want to make sure that all memory writes
         // before dropping this `Primary` synchronizes with later attempts to
@@ -98,10 +303,17 @@ impl<T> Drop for Primary<T> {
         assert_eq!(
             alloc::sync::Arc::strong_count(inner),
             1 + extra_refs_on_drops.map_or(0, NonZeroUsize::get),
-            "extra_refs_on_drops={:?}",
+            "extra_refs_on_drops={:?}, names={:?}",
             extra_refs_on_drops,
+            strong_names.with_names(|strong_names| { strong_names.collect::<Vec<_>>() })
         );
     }
+}
+
+/// Like [`Clone`] but with a debug-only name attached to the new instance.
+pub trait NamedClone {
+    /// Creates a new instance of `self` with the provided name.
+    fn named_clone(&self, name: &'static str) -> Self;
 }
 
 impl<T> AsRef<T> for Primary<T> {
@@ -115,10 +327,12 @@ impl<T> Deref for Primary<T> {
 
     fn deref(&self) -> &T {
         let Self { extra_refs_on_drops: _, inner } = self;
-        let Inner { marked_for_destruction: _, data } = inner.deref();
+        let Inner { marked_for_destruction: _, data, strong_names: _ } = inner.deref();
         data
     }
 }
+
+const FIRST_STRONG_NAME: &str = "strong-from-primary";
 
 impl<T> Primary<T> {
     /// Returns a new strongly-held reference.
@@ -127,6 +341,7 @@ impl<T> Primary<T> {
             extra_refs_on_drops: None,
             inner: alloc::sync::Arc::new(Inner {
                 marked_for_destruction: AtomicBool::new(false),
+                strong_names: named::StrongNames::default(),
                 data,
             }),
         }
@@ -134,18 +349,20 @@ impl<T> Primary<T> {
 
     /// Clones a strongly-held reference.
     pub fn clone_strong(Self { extra_refs_on_drops: _, inner }: &Self) -> Strong<T> {
-        Strong(alloc::sync::Arc::clone(inner))
+        let Inner { data: _, strong_names: holders, marked_for_destruction: _ } = &**inner;
+        let name = holders.insert(FIRST_STRONG_NAME);
+        Strong { inner: alloc::sync::Arc::clone(inner), name }
     }
 
     /// Returns a weak reference pointing to the same underlying data.
-    pub fn downgrade(Self { extra_refs_on_drops: _, inner }: &Self) -> Weak<T> {
-        Weak(alloc::sync::Arc::downgrade(inner))
+    pub fn downgrade(Self { extra_refs_on_drops: _, inner }: &Self, name: &'static str) -> Weak<T> {
+        Weak(alloc::sync::Arc::downgrade(inner), named::WeakName::new(name))
     }
 
     /// Returns true if the two pointers point to the same allocation.
     pub fn ptr_eq(
         Self { extra_refs_on_drops: _, inner: this }: &Self,
-        Strong(other): &Strong<T>,
+        Strong { inner: other, name: _ }: &Strong<T>,
     ) -> bool {
         alloc::sync::Arc::ptr_eq(this, other)
     }
@@ -174,7 +391,7 @@ impl<T> Primary<T> {
                 // `core::mem::forget` `inner` to prevent `inner` from being
                 // destroyed which will result in `data` being destroyed as
                 // well.
-                let Inner { marked_for_destruction, data } = &mut inner;
+                let Inner { marked_for_destruction, data, strong_names: holders } = &mut inner;
 
                 // Make sure that `inner` is in a valid state for destruction.
                 //
@@ -188,8 +405,9 @@ impl<T> Primary<T> {
                 // `inner` (and its fields) will not be run as a result of
                 // `inner` being dropped.
                 let data = unsafe {
-                    // Explicitly drop since we do not need this anymore.
+                    // Explicitly drop since we do not need these anymore.
                     core::ptr::drop_in_place(marked_for_destruction);
+                    core::ptr::drop_in_place(holders);
 
                     // Read the data to return to the caller.
                     core::ptr::read(data)
@@ -222,8 +440,11 @@ impl<T> Primary<T> {
 /// Note that `Strong`'s implementation of [`Hash`] operates on the pointer
 /// itself and not the underlying data.
 #[derive(Debug, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Strong<T>(alloc::sync::Arc<Inner<T>>);
+pub struct Strong<T> {
+    inner: alloc::sync::Arc<Inner<T>>,
+    #[allow(dead_code)]
+    name: named::StrongName,
+}
 
 impl<T> AsRef<T> for Strong<T> {
     fn as_ref(&self) -> &T {
@@ -235,27 +456,46 @@ impl<T> Deref for Strong<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        let Self(arc) = self;
-        let Inner { marked_for_destruction: _, data } = arc.deref();
+        let Self { inner, name: _ } = self;
+        let Inner { marked_for_destruction: _, data, strong_names: _ } = inner.deref();
         data
     }
 }
 
 impl<T> Hash for Strong<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let Self(this) = self;
-        alloc::sync::Arc::as_ptr(this).hash(state)
+        let Self { inner, name: _ } = self;
+        alloc::sync::Arc::as_ptr(inner).hash(state)
     }
 }
+
+impl<T> Clone for Strong<T> {
+    fn clone(&self) -> Self {
+        let Self { inner, name } = self;
+        let Inner { data: _, marked_for_destruction: _, strong_names: _ } = &**inner;
+        Self { inner: alloc::sync::Arc::clone(inner), name: name.clone() }
+    }
+}
+
+impl<T> NamedClone for Strong<T> {
+    fn named_clone(&self, name: &'static str) -> Self {
+        let Self { inner, name: _ } = self;
+        let Inner { data: _, marked_for_destruction: _, strong_names } = &**inner;
+        let name = strong_names.insert(name);
+        Self { inner: alloc::sync::Arc::clone(inner), name }
+    }
+}
+
 impl<T> Strong<T> {
     /// Returns a weak reference pointing to the same underlying data.
-    pub fn downgrade(Self(arc): &Self) -> Weak<T> {
-        Weak(alloc::sync::Arc::downgrade(arc))
+    pub fn downgrade(Self { inner, name }: &Self) -> Weak<T> {
+        let weak = name.downgrade();
+        Weak(alloc::sync::Arc::downgrade(inner), weak)
     }
 
     /// Returns true if the inner value has since been marked for destruction.
-    pub fn marked_for_destruction(Self(arc): &Self) -> bool {
-        let Inner { marked_for_destruction, data: _ } = arc.as_ref();
+    pub fn marked_for_destruction(Self { inner, name: _ }: &Self) -> bool {
+        let Inner { marked_for_destruction, data: _, strong_names: _ } = inner.as_ref();
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
         // memory writes before the reference was marked for destruction is
@@ -264,12 +504,15 @@ impl<T> Strong<T> {
     }
 
     /// Returns true if the two pointers point to the same allocation.
-    pub fn weak_ptr_eq(Self(this): &Self, Weak(other): &Weak<T>) -> bool {
+    pub fn weak_ptr_eq(Self { inner: this, name: _ }: &Self, Weak(other, _name): &Weak<T>) -> bool {
         core::ptr::eq(alloc::sync::Arc::as_ptr(this), other.as_ptr())
     }
 
     /// Returns true if the two pointers point to the same allocation.
-    pub fn ptr_eq(Self(this): &Self, Self(other): &Self) -> bool {
+    pub fn ptr_eq(
+        Self { inner: this, name: _ }: &Self,
+        Self { inner: other, name: _ }: &Self,
+    ) -> bool {
         alloc::sync::Arc::ptr_eq(this, other)
     }
 }
@@ -285,20 +528,26 @@ impl<T> Strong<T> {
 /// Note that `Weak`'s implementation of [`Hash`] operates on the pointer
 /// itself and not the underlying data.
 #[derive(Debug, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Weak<T>(alloc::sync::Weak<Inner<T>>);
+pub struct Weak<T>(alloc::sync::Weak<Inner<T>>, named::WeakName);
 
 impl<T> Hash for Weak<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let Self(this) = self;
+        let Self(this, _name) = self;
         this.as_ptr().hash(state)
+    }
+}
+
+impl<T> Clone for Weak<T> {
+    fn clone(&self) -> Self {
+        let Self(this, name) = self;
+        Weak(this.clone(), name.clone())
     }
 }
 
 impl<T> Weak<T> {
     /// Returns true if the two pointers point to the same allocation.
-    pub fn ptr_eq(&self, Self(other): &Self) -> bool {
-        let Self(this) = self;
+    pub fn ptr_eq(&self, Self(other, _name): &Self) -> bool {
+        let Self(this, _name) = self;
         this.ptr_eq(other)
     }
 
@@ -306,15 +555,20 @@ impl<T> Weak<T> {
     ///
     /// Returns `None` if the inner value has since been marked for destruction.
     pub fn upgrade(&self) -> Option<Strong<T>> {
-        let Self(weak) = self;
+        let Self(weak, name) = self;
         let arc = weak.upgrade()?;
-        let Inner { marked_for_destruction, data: _ } = arc.deref();
+        let Inner { marked_for_destruction, data: _, strong_names: holders } = arc.deref();
 
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
         // memory writes before the reference was marked for destruction is
         // visible here.
-        (!marked_for_destruction.load(Ordering::Acquire)).then(|| Strong(arc))
+        if !marked_for_destruction.load(Ordering::Acquire) {
+            let name = holders.insert_weak(name);
+            Some(Strong { inner: arc, name })
+        } else {
+            None
+        }
     }
 }
 
@@ -370,5 +624,101 @@ mod tests {
         let primary = Primary::new(9);
         let _strong: Strong<_> = Primary::clone_strong(&primary);
         core::mem::drop(primary);
+    }
+
+    #[cfg(feature = "rc-debug-names")]
+    #[test]
+    fn strong_named() {
+        use std::collections::HashSet;
+
+        let primary = Primary::new(10);
+        let strong = Primary::clone_strong(&primary);
+        let Primary { extra_refs_on_drops: _, inner } = &primary;
+        let Inner { data: _, marked_for_destruction: _, strong_names } = &**inner;
+
+        let expect_names = |expected| {
+            strong_names.with_names(|it| {
+                let names: Vec<_> = it.collect();
+                let names: HashSet<_> = names.iter().map(|name| name.as_ref()).collect();
+                assert_eq!(names, expected);
+            })
+        };
+
+        // There is just the one strong reference.
+        expect_names(HashSet::from([FIRST_STRONG_NAME]));
+
+        // Cloning it without providing a name doesn't create a new name.
+        {
+            let _other_strong = strong.clone();
+            expect_names(HashSet::from([FIRST_STRONG_NAME]));
+        }
+
+        {
+            const NAME: &str = "some name";
+            let _named_strong = strong.named_clone(NAME);
+            expect_names(HashSet::from([NAME, FIRST_STRONG_NAME]));
+        }
+        // After that goes out of scope, the name goes away.
+        expect_names(HashSet::from([FIRST_STRONG_NAME]));
+
+        drop(strong);
+        expect_names(HashSet::from([]));
+    }
+
+    #[cfg(feature = "rc-debug-names")]
+    #[test]
+    #[should_panic(expected = "other strong")]
+    fn strong_names_in_panic() {
+        let primary = Primary::new(10);
+        let first_strong = Primary::clone_strong(&primary);
+        let _strong = first_strong.named_clone("other strong");
+        drop(first_strong);
+        drop(primary);
+    }
+
+    #[cfg(feature = "rc-debug-names")]
+    #[test]
+    fn name_tracking_memory_usage() {
+        // Creating and deleting strong and weak references doesn't result in
+        // the Names container becoming too large.
+        let primary = Primary::new(10);
+
+        const NUM_ITERATIONS: usize = 10_000;
+        let first_strong = Primary::clone_strong(&primary);
+
+        for _ in 0..NUM_ITERATIONS {
+            let strong = first_strong.named_clone("other strong");
+            let _weak = Strong::downgrade(&strong);
+            drop(strong);
+        }
+
+        let Primary { extra_refs_on_drops: _, inner } = &primary;
+        let Inner { data: _, marked_for_destruction: _, strong_names } = &**inner;
+
+        let strong_names = &**strong_names.names().lock();
+        assert_matches::assert_matches!(strong_names, [_first_strong, _other_strong]);
+    }
+
+    #[cfg(feature = "rc-debug-names")]
+    #[test]
+    fn names_insert_does_not_skip() {
+        // Regression test to ensure that, while inserting a new name,
+        // Names::insert doesn't skip any entries.
+        let names = named::StrongNames::default();
+        let [_a, b, _c] = ["a", "b", "c"].map(|name| names.insert(&name));
+        names.with_names(|names| {
+            let names = names.collect::<Vec<_>>();
+            let name_strs = names.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+            assert_eq!(name_strs, &["a", "b", "c"]);
+        });
+
+        drop(b);
+
+        let _another_c = names.insert("c");
+        names.with_names(|names| {
+            let names = names.collect::<Vec<_>>();
+            let name_strs = names.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+            assert_eq!(name_strs, &["a", "c"]);
+        });
     }
 }

@@ -19,10 +19,14 @@ rustc_library("netstack3_sync_instrumented") {
   edition = "2021"
   with_unit_tests = true
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  features = [ "recursive-lock-panic" ]
+  features = [
+    "recursive-lock-panic",
+    "rc-debug-names",
+  ]
 
   sources = _sources
   deps = _deps
+  test_deps = [ "//third_party/rust_crates:assert_matches" ]
 }
 
 rustc_library("netstack3_sync_not_instrumented") {
