@@ -19,8 +19,9 @@ bitflags! {
         const DOWNSTREAM = uapi::MS_SLAVE;
         const SHARED = uapi::MS_SHARED;
         const PRIVATE = uapi::MS_PRIVATE;
+        const LAZYTIME = uapi::MS_LAZYTIME;
 
         /// Flags that can be stored in Mount state.
-        const STORED_FLAGS = Self::RDONLY.bits | Self::NOEXEC.bits | Self::NOSUID.bits | Self::NODEV.bits | Self::NOATIME.bits;
+        const STORED_FLAGS = Self::RDONLY.bits | Self::NOEXEC.bits | Self::NOSUID.bits | Self::NODEV.bits | Self::NOATIME.bits | Self::LAZYTIME.bits;
     }
 }
