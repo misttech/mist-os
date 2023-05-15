@@ -25,6 +25,7 @@ use net_types::{
     LinkLocalAddress as _, MulticastAddr, MulticastAddress as _, SpecifiedAddress as _,
     Witness as _,
 };
+use netemul::InterfaceConfig;
 use netstack_testing_common::{
     constants::{eth as eth_consts, ipv6 as ipv6_consts},
     interfaces,
@@ -1237,10 +1238,10 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let endpoint = sandbox.create_endpoint(name).await.expect("create endpoint");
-    endpoint.set_link_up(true).await.expect("set link up");
-    let iface = endpoint.into_interface_in_realm(&realm).await.expect("install interface");
-    let did_enable = iface.control().enable().await.expect("calling enable").expect("enable");
-    assert!(did_enable);
+    let iface = realm
+        .install_endpoint(endpoint, InterfaceConfig::default())
+        .await
+        .expect("install interface");
 
     let id = iface.id();
 

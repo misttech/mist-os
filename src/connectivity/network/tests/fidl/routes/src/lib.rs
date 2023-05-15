@@ -23,7 +23,7 @@ use net_types::{
     self,
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
 };
-use netemul::InStack;
+use netemul::{InStack, InterfaceConfig};
 use netstack_testing_common::{
     interfaces,
     realms::{Netstack, Netstack2, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
@@ -329,9 +329,10 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
-    interface.set_link_up(true).await.expect("bring device up");
-    assert!(interface.control().enable().await.expect("send enable").expect("enable interface"));
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
 
     let (local, remote, subnet) = match I::VERSION {
         IpVersion::V4 => {
@@ -577,12 +578,14 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         .id;
 
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
-    let interface_id = interface.id();
     // TODO(https://fxbug.dev/123440) Netstack2 only installs certain routes
-    // after the interface is enabled.
-    interface.set_link_up(true).await.expect("bring device up");
-    assert!(interface.control().enable().await.expect("send enable").expect("enable interface"));
+    // after the interface is enabled. Using `install_endpoint` installs the
+    // interface, enables it, and waits for it to come online.
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let interface_id = interface.id();
 
     // The routes we expected to be installed in the netstack by default.
     #[derive(GenericOverIp)]

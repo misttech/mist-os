@@ -24,7 +24,7 @@ use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip_v6, std_socket_addr};
 use net_types::ip::{IpAddress as _, IpVersion, Ipv4};
-use netemul::RealmUdpSocket as _;
+use netemul::{InterfaceConfig, RealmUdpSocket as _};
 use netstack_testing_common::{
     devices::create_tun_device,
     interfaces,
@@ -42,9 +42,10 @@ async fn address_deprecation<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
-    assert!(interface.control().enable().await.expect("send enable").expect("enable"));
-    let () = interface.set_link_up(true).await.expect("bring device up");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
 
     const ADDR1: std::net::Ipv6Addr = std_ip_v6!("abcd::1");
     const ADDR2: std::net::Ipv6Addr = std_ip_v6!("abcd::2");
@@ -302,10 +303,11 @@ async fn add_address_removal<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
     let id = interface.id();
-    assert!(interface.control().enable().await.expect("send enable").expect("enable"));
-    let () = interface.set_link_up(true).await.expect("bring device up");
 
     let debug_control = realm
         .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
@@ -448,9 +450,10 @@ async fn duplicate_watch_address_assignment_state<N: Netstack>(name: &str, detac
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
-    assert!(interface.control().enable().await.expect("send enable").expect("enable"));
-    let () = interface.set_link_up(true).await.expect("bring device up");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
     let address = fidl_subnet!("1.1.1.1/32");
@@ -1821,10 +1824,11 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
-    assert!(interface.control().enable().await.expect("send enable").expect("enable"));
-    interface.set_link_up(true).await.expect("bring device up");
-    let id = interface.control().get_id().await.expect("failed to get interface id");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let id = interface.id();
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
