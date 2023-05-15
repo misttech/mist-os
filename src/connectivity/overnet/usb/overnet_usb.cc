@@ -386,9 +386,6 @@ void OvernetUsb::Running::MagicSent() {
 
   async::PostTask(owner_->loop_.dispatcher(), [this]() {
     fbl::AutoLock lock(&owner_->lock_);
-    if (std::get_if<Running>(&owner_->state_) != this) {
-      return;
-    }
     owner_->pending_requests_--;
 
     if (std::holds_alternative<ShuttingDown>(owner_->state_)) {
@@ -396,6 +393,10 @@ void OvernetUsb::Running::MagicSent() {
         lock.release();
         owner_->ShutdownComplete();
       }
+      return;
+    }
+
+    if (std::get_if<Running>(&owner_->state_) != this) {
       return;
     }
 
