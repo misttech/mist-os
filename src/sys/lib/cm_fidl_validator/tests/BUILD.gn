@@ -10,6 +10,7 @@ rustc_test("url_proptests") {
   source_root = "src/url_proptests.rs"
   deps = [
     "//src/sys/lib/cm_fidl_validator",
+    "//src/sys/lib/cm_types",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:url",

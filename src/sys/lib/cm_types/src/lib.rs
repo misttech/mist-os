@@ -88,9 +88,12 @@ pub enum ParseError {
     /// The string did not match a valid absolute or relative component URL
     #[error("invalid URL: {details}")]
     InvalidComponentUrl { details: String },
-    /// The string was too long or too short.
-    #[error("invalid length")]
-    InvalidLength,
+    /// The string was empty.
+    #[error("empty")]
+    Empty,
+    /// The string was too long.
+    #[error("too long")]
+    TooLong,
     /// A name was expected and the string was a path.
     #[error("not a name")]
     NotAName,
@@ -101,6 +104,8 @@ pub enum ParseError {
 
 pub const MAX_NAME_LENGTH: usize = 100;
 pub const MAX_LONG_NAME_LENGTH: usize = 1024;
+pub const MAX_PATH_LENGTH: usize = 1024;
+pub const MAX_URL_LENGTH: usize = 4096;
 
 /// A name that can refer to a component, collection, or other entity in the
 /// Component Manifest. Its length is bounded to `MAX_NAME_LENGTH`.
@@ -123,8 +128,11 @@ impl<const N: usize> BoundedName<N> {
     }
 
     pub fn validate(name: &str) -> Result<(), ParseError> {
-        if name.is_empty() || name.len() > N {
-            return Err(ParseError::InvalidLength);
+        if name.is_empty() {
+            return Err(ParseError::Empty);
+        }
+        if name.len() > N {
+            return Err(ParseError::TooLong);
         }
         let mut char_iter = name.chars();
         let first_char = char_iter.next().unwrap();
@@ -212,7 +220,7 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
                         de::Unexpected::Str(s),
                         &"a name that consists of [A-Za-z0-9_.-] and starts with [A-Za-z0-9_]",
                     ),
-                    ParseError::InvalidLength => E::invalid_length(
+                    ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
                         &format!("a non-empty name no more than {} characters in length", N)
                             .as_str(),
@@ -243,8 +251,11 @@ impl Path {
 
     /// Validates `path` but does not construct a new `Path` object.
     pub fn validate(path: &str) -> Result<(), ParseError> {
-        if path.is_empty() || path.len() > 1024 {
-            return Err(ParseError::InvalidLength);
+        if path.is_empty() {
+            return Err(ParseError::Empty);
+        }
+        if path.len() > MAX_PATH_LENGTH {
+            return Err(ParseError::TooLong);
         }
         if !path.starts_with('/') {
             return Err(ParseError::InvalidValue);
@@ -301,7 +312,7 @@ impl<'de> de::Deserialize<'de> for Path {
                         de::Unexpected::Str(s),
                         &"a path with leading `/` and non-empty segments",
                     ),
-                    ParseError::InvalidLength => E::invalid_length(
+                    ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
                         &"a non-empty path no more than 1024 characters in length",
                     ),
@@ -325,8 +336,11 @@ impl RelativePath {
     /// with a `/`, and contain no empty path segments.
     pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
         let p = path.as_ref();
-        if p.is_empty() || p.len() > 1024 {
-            return Err(ParseError::InvalidLength);
+        if p.is_empty() {
+            return Err(ParseError::Empty);
+        }
+        if p.len() > MAX_PATH_LENGTH {
+            return Err(ParseError::TooLong);
         }
         if !p.split('/').all(|part| !part.is_empty()) {
             return Err(ParseError::InvalidValue);
@@ -380,7 +394,7 @@ impl<'de> de::Deserialize<'de> for RelativePath {
                         de::Unexpected::Str(s),
                         &"a path with no leading `/` and non-empty segments",
                     ),
-                    ParseError::InvalidLength => E::invalid_length(
+                    ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
                         &"a non-empty path no more than 1024 characters in length",
                     ),
@@ -410,9 +424,11 @@ impl Url {
 
     /// Verifies the given string is a valid absolute or relative component URL.
     pub fn validate(url_str: &str) -> Result<(), ParseError> {
-        const MAX_URL_LENGTH: usize = 4096;
-        if url_str.is_empty() || url_str.len() > MAX_URL_LENGTH {
-            return Err(ParseError::InvalidLength);
+        if url_str.is_empty() {
+            return Err(ParseError::Empty);
+        }
+        if url_str.len() > MAX_URL_LENGTH {
+            return Err(ParseError::TooLong);
         }
         match url::Url::parse(url_str).map(|url| (url, false)).or_else(|err| {
             if err == url::ParseError::RelativeUrlWithoutBase {
@@ -503,7 +519,7 @@ impl<'de> de::Deserialize<'de> for Url {
                     ParseError::InvalidComponentUrl { details: _ } => {
                         E::invalid_value(de::Unexpected::Str(s), &"a valid URL")
                     }
-                    ParseError::InvalidLength => E::invalid_length(
+                    ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
                         &"a non-empty URL no more than 4096 characters in length",
                     ),
@@ -534,8 +550,11 @@ impl UrlScheme {
     /// Validates `url_scheme` but does not construct a new `UrlScheme` object.
     /// See [`UrlScheme::new`] for validation details.
     pub fn validate(url_scheme: &str) -> Result<(), ParseError> {
-        if url_scheme.is_empty() || url_scheme.len() > MAX_NAME_LENGTH {
-            return Err(ParseError::InvalidLength);
+        if url_scheme.is_empty() {
+            return Err(ParseError::Empty);
+        }
+        if url_scheme.len() > MAX_NAME_LENGTH {
+            return Err(ParseError::TooLong);
         }
         let mut iter = url_scheme.chars();
         let first_char = iter.next().unwrap();
@@ -597,7 +616,7 @@ impl<'de> de::Deserialize<'de> for UrlScheme {
                     ParseError::InvalidValue => {
                         E::invalid_value(de::Unexpected::Str(s), &"a valid URL scheme")
                     }
-                    ParseError::InvalidLength => E::invalid_length(
+                    ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
                         &"a non-empty URL scheme no more than 100 characters in length",
                     ),

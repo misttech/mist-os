@@ -217,7 +217,8 @@ impl From<ParseError> for Error {
             ParseError::InvalidComponentUrl { details } => {
                 Self::internal(&format!("invalid component url: {details}"))
             }
-            ParseError::InvalidLength => Self::internal("invalid length"),
+            ParseError::TooLong => Self::internal("too long"),
+            ParseError::Empty => Self::internal("empty"),
             ParseError::NotAName => Self::internal("not a name"),
             ParseError::NotAPath => Self::internal("not a path"),
         }

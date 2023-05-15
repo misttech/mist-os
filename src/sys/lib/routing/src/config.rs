@@ -1353,7 +1353,7 @@ mod tests {
             AllowlistEntryParseError,
             AllowlistEntryParseError::InvalidCollectionName(
                 "".into(),
-                ParseError::InvalidLength
+                ParseError::Empty
             )),
         invalid_collection_name => (
             &Some(vec!["/foo/coll:**".into(), "/*:**".into()]),

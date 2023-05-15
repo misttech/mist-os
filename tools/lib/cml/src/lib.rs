@@ -1726,8 +1726,11 @@ impl FromStr for ConfigKey {
 
     fn from_str(s: &str) -> Result<Self, ParseError> {
         let length = s.len();
-        if length == 0 || length > 64 {
-            return Err(ParseError::InvalidLength);
+        if length == 0 {
+            return Err(ParseError::Empty);
+        }
+        if length > 64 {
+            return Err(ParseError::TooLong);
         }
 
         // identifiers must start with a letter
@@ -1774,7 +1777,7 @@ impl<'de> de::Deserialize<'de> for ConfigKey {
                         &"a name which must start with a letter, can contain letters, \
                         numbers, and underscores, but cannot end with an underscore",
                     ),
-                    ParseError::InvalidLength => E::invalid_length(
+                    ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
                         &"a non-empty name no more than 64 characters in length",
                     ),
@@ -2102,7 +2105,7 @@ impl<'de> de::Deserialize<'de> for Program {
                                 serde::de::Unexpected::Str(&r),
                                 &EXPECTED_RUNNER,
                             ),
-                            ParseError::InvalidLength => {
+                            ParseError::TooLong | ParseError::Empty => {
                                 de::Error::invalid_length(r.len(), &EXPECTED_RUNNER)
                             }
                             _ => {

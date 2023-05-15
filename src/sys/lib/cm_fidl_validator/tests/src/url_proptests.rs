@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    cm_fidl_validator::{check_url, MAX_URL_LENGTH},
-    lazy_static::lazy_static,
-    proptest::prelude::*,
-    url::Url,
+    cm_fidl_validator::check_url, cm_types::MAX_URL_LENGTH, lazy_static::lazy_static,
+    proptest::prelude::*, url::Url,
 };
 
 #[macro_use]

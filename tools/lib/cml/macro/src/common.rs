@@ -24,7 +24,7 @@ pub fn gen_visit_str(ty: Option<TokenStream2>, expected: &syn::LitStr) -> TokenS
                     ParseError::InvalidValue => {
                         E::invalid_value(serde::de::Unexpected::Str(value), &#expected)
                     }
-                    ParseError::InvalidLength => {
+                    ParseError::TooLong | ParseError::Empty => {
                         E::invalid_length(value.len(), &#expected)
                     }
                     e => {

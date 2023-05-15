@@ -82,8 +82,11 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
             let inner = {
                 let mut tokens = quote!();
                 tokens.append_all(quote! {
-                    if value.len() == 0 || value.len() > 101 {
-                        return Err(ParseError::InvalidLength);
+                    if value.len() == 0 {
+                        return Err(ParseError::Empty);
+                    }
+                    if value.len() > 101 {
+                        return Err(ParseError::TooLong);
                     }
                 });
                 if self.variants.contains("Named") {

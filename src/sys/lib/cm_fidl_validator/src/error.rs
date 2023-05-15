@@ -25,8 +25,8 @@ pub enum Error {
     #[error("Field {} for {} is invalid. {}.", .0.field, .0.decl, .1)]
     InvalidUrl(DeclField, String),
 
-    #[error("Field `{}` for {} is too long. The field must be up to {1} characters.", .0.field, .0.decl)]
-    FieldTooLong(DeclField, usize),
+    #[error("Field `{}` for {} is too long.", .0.field, .0.decl)]
+    FieldTooLong(DeclField),
 
     #[error("\"{0}\" cannot declare a capability of type `{1}`.")]
     InvalidCapabilityType(DeclField, String),
@@ -108,7 +108,7 @@ impl Error {
     pub fn invalid_url(
         decl_type: impl Into<String>,
         keyword: impl Into<String>,
-        message: &str,
+        message: impl Into<String>,
     ) -> Self {
         Error::InvalidUrl(
             DeclField { decl: decl_type.into(), field: keyword.into() },
@@ -117,18 +117,7 @@ impl Error {
     }
 
     pub fn field_too_long(decl_type: impl Into<String>, keyword: impl Into<String>) -> Self {
-        Error::FieldTooLong(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            cm_types::MAX_NAME_LENGTH,
-        )
-    }
-
-    pub fn field_too_long_with_max(
-        decl_type: impl Into<String>,
-        keyword: impl Into<String>,
-        max: usize,
-    ) -> Self {
-        Error::FieldTooLong(DeclField { decl: decl_type.into(), field: keyword.into() }, max)
+        Error::FieldTooLong(DeclField { decl: decl_type.into(), field: keyword.into() })
     }
 
     pub fn invalid_capability_type(
@@ -330,8 +319,8 @@ mod tests {
             "Field `keyword` for Decl is invalid."
         );
         assert_eq!(
-            format!("{}", Error::field_too_long_with_max("Decl", "keyword", 100)),
-            "Field `keyword` for Decl is too long. The field must be up to 100 characters."
+            format!("{}", Error::field_too_long("Decl", "keyword")),
+            "Field `keyword` for Decl is too long."
         );
         assert_eq!(
             format!("{}", Error::invalid_child("Decl", "source", "child")),

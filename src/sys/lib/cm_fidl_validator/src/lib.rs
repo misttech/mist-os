@@ -6,7 +6,7 @@ pub(crate) mod util;
 
 pub mod error;
 
-pub use crate::util::{check_url, MAX_URL_LENGTH};
+pub use crate::util::check_url;
 
 use {
     crate::{error::*, util::*},
@@ -2304,6 +2304,7 @@ mod tests {
     use {
         super::*,
         crate::error::{Error, ErrorList},
+        cm_types::MAX_LONG_NAME_LENGTH,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
         test_case::test_case,
     };
@@ -4430,13 +4431,13 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long_with_max("UseService", "source_name", 100),
-                Error::field_too_long_with_max("UseService", "target_path", 1024),
-                Error::field_too_long_with_max("UseProtocol", "source_name", 100),
-                Error::field_too_long_with_max("UseProtocol", "target_path", 1024),
-                Error::field_too_long_with_max("UseDirectory", "source_name", 100),
-                Error::field_too_long_with_max("UseDirectory", "target_path", 1024),
-                Error::field_too_long_with_max("UseStorage", "target_path", 1024),
+                Error::field_too_long("UseService", "source_name"),
+                Error::field_too_long("UseService", "target_path"),
+                Error::field_too_long("UseProtocol", "source_name"),
+                Error::field_too_long("UseProtocol", "target_path"),
+                Error::field_too_long("UseDirectory", "source_name"),
+                Error::field_too_long("UseDirectory", "target_path"),
+                Error::field_too_long("UseStorage", "target_path"),
             ])),
         },
         test_validate_conflicting_paths => {
@@ -7613,9 +7614,9 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long_with_max("Child", "name", 100),
-                Error::field_too_long_with_max("Child", "url", 4096),
-                Error::field_too_long_with_max("Child", "environment", 100),
+                Error::field_too_long("Child", "name"),
+                Error::field_too_long("Child", "url"),
+                Error::field_too_long("Child", "environment"),
                 Error::invalid_environment("Child", "environment", "a".repeat(1025)),
             ])),
         },
@@ -7893,19 +7894,19 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long_with_max("Service", "name", 100),
-                Error::field_too_long_with_max("Service", "source_path", 1024),
-                Error::field_too_long_with_max("Protocol", "name", 100),
-                Error::field_too_long_with_max("Protocol", "source_path", 1024),
-                Error::field_too_long_with_max("Directory", "name", 100),
-                Error::field_too_long_with_max("Directory", "source_path", 1024),
-                Error::field_too_long_with_max("Storage", "source.child.name", 100),
-                Error::field_too_long_with_max("Storage", "name", 100),
-                Error::field_too_long_with_max("Storage", "backing_dir", 100),
-                Error::field_too_long_with_max("Runner", "name", 100),
-                Error::field_too_long_with_max("Runner", "source_path", 1024),
-                Error::field_too_long_with_max("Resolver", "name", 100),
-                Error::field_too_long_with_max("Resolver", "source_path", 1024),
+                Error::field_too_long("Service", "name"),
+                Error::field_too_long("Service", "source_path"),
+                Error::field_too_long("Protocol", "name"),
+                Error::field_too_long("Protocol", "source_path"),
+                Error::field_too_long("Directory", "name"),
+                Error::field_too_long("Directory", "source_path"),
+                Error::field_too_long("Storage", "source.child.name"),
+                Error::field_too_long("Storage", "name"),
+                Error::field_too_long("Storage", "backing_dir"),
+                Error::field_too_long("Runner", "name"),
+                Error::field_too_long("Runner", "source_path"),
+                Error::field_too_long("Resolver", "name"),
+                Error::field_too_long("Resolver", "source_path"),
             ])),
         },
         test_validate_capabilities_duplicate_name => {
@@ -9065,7 +9066,7 @@ mod tests {
         assert_eq!(
             Ok(()),
             validate_dynamic_child(&fdecl::Child {
-                name: Some("a".repeat(MAX_DYNAMIC_NAME_LENGTH).to_string()),
+                name: Some("a".repeat(MAX_LONG_NAME_LENGTH).to_string()),
                 url: Some("test:///child".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 on_terminate: None,

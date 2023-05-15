@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::error::*, fidl_fuchsia_component_decl as fdecl, std::collections::HashMap};
-
-const MAX_PATH_LENGTH: usize = 1024;
-pub const MAX_URL_LENGTH: usize = 4096;
-pub const MAX_NAME_LENGTH: usize = 100;
-pub const MAX_DYNAMIC_NAME_LENGTH: usize = 1024;
+use {
+    crate::error::*,
+    cm_types::{LongName, Name, ParseError, Path, RelativePath, Url, UrlScheme},
+    fidl_fuchsia_component_decl as fdecl,
+    std::collections::HashMap,
+};
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum AllowableIds {
@@ -35,54 +35,14 @@ pub(crate) enum OfferType {
 
 pub(crate) type IdMap<'a> = HashMap<TargetId<'a>, HashMap<&'a str, AllowableIds>>;
 
-pub(crate) fn check_presence_and_length(
-    max_len: usize,
-    prop: Option<&String>,
-    decl_type: &str,
-    keyword: &str,
-    errors: &mut Vec<Error>,
-) {
-    match prop {
-        Some(prop) if prop.len() == 0 => errors.push(Error::empty_field(decl_type, keyword)),
-        Some(prop) if prop.len() > max_len => {
-            errors.push(Error::field_too_long_with_max(decl_type, keyword, max_len))
-        }
-        Some(_) => (),
-        None => errors.push(Error::missing_field(decl_type, keyword)),
-    }
-}
-
 pub(crate) fn check_path(
     prop: Option<&String>,
     decl_type: &str,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    let start_err_len = errors.len();
-    check_presence_and_length(MAX_PATH_LENGTH, prop, decl_type, keyword, errors);
-    if let Some(path) = prop {
-        // Paths must be more than 1 character long
-        if path.len() < 2 {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-        // Paths must start with `/`
-        if !path.starts_with('/') {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-        // Paths cannot have two `/`s in a row
-        if path.contains("//") {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-        // Paths cannot end with `/`
-        if path.ends_with('/') {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-    }
-    start_err_len == errors.len()
+    let conversion_ctor = |s: &String| Path::new(s).map(|_| ());
+    check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 
 pub(crate) fn check_relative_path(
@@ -91,40 +51,8 @@ pub(crate) fn check_relative_path(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    let start_err_len = errors.len();
-    check_presence_and_length(MAX_PATH_LENGTH, prop, decl_type, keyword, errors);
-    if let Some(path) = prop {
-        // Relative paths must be nonempty
-        if path.is_empty() {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-        // Relative paths cannot start with `/`
-        if path.starts_with('/') {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-        // Relative paths cannot have two `/`s in a row
-        if path.contains("//") {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-        // Relative paths cannot end with `/`
-        if path.ends_with('/') {
-            errors.push(Error::invalid_field(decl_type, keyword));
-            return false;
-        }
-    }
-    start_err_len == errors.len()
-}
-
-pub(crate) fn check_dynamic_name(
-    prop: Option<&String>,
-    decl_type: &str,
-    keyword: &str,
-    errors: &mut Vec<Error>,
-) -> bool {
-    check_name_impl(prop, decl_type, keyword, MAX_DYNAMIC_NAME_LENGTH, errors)
+    let conversion_ctor = |s: &String| RelativePath::new(s).map(|_| ());
+    check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 
 pub(crate) fn check_name(
@@ -133,36 +61,50 @@ pub(crate) fn check_name(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    check_name_impl(prop, decl_type, keyword, MAX_NAME_LENGTH, errors)
+    let conversion_ctor = |s: &String| Name::try_new(s).map(|_| ());
+    check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 
-fn check_name_impl(
+pub(crate) fn check_dynamic_name(
     prop: Option<&String>,
     decl_type: &str,
     keyword: &str,
-    max_len: usize,
+    errors: &mut Vec<Error>,
+) -> bool {
+    let conversion_ctor = |s: &String| LongName::try_new(s).map(|_| ());
+    check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
+}
+
+fn check_identifier(
+    conversion_ctor: impl Fn(&String) -> Result<(), ParseError>,
+    prop: Option<&String>,
+    decl_type: &str,
+    keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
     let start_err_len = errors.len();
-    check_presence_and_length(max_len, prop, decl_type, keyword, errors);
-    let mut invalid_field = false;
-    if let Some(name) = prop {
-        let mut char_iter = name.chars();
-        if let Some(first_char) = char_iter.next() {
-            if !first_char.is_ascii_alphanumeric() && first_char != '_' {
-                invalid_field = true;
+    if let Some(prop) = prop {
+        match conversion_ctor(prop) {
+            Ok(()) => {}
+            Err(ParseError::Empty) => {
+                errors.push(Error::empty_field(decl_type, keyword));
+            }
+            Err(ParseError::TooLong) => {
+                errors.push(Error::field_too_long(decl_type, keyword));
+            }
+            Err(ParseError::InvalidComponentUrl { details }) => {
+                errors.push(Error::invalid_url(
+                    decl_type,
+                    keyword,
+                    format!(r#""{prop}": {details}"#),
+                ));
+            }
+            Err(ParseError::InvalidValue | ParseError::NotAName | ParseError::NotAPath) => {
+                errors.push(Error::invalid_field(decl_type, keyword));
             }
         }
-        for c in char_iter {
-            if c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' {
-                // Ok
-            } else {
-                invalid_field = true;
-            }
-        }
-    }
-    if invalid_field {
-        errors.push(Error::invalid_field(decl_type, keyword));
+    } else {
+        errors.push(Error::missing_field(decl_type, keyword));
     }
     start_err_len == errors.len()
 }
@@ -211,24 +153,8 @@ pub fn check_url(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    let start_err_len = errors.len();
-    check_presence_and_length(MAX_URL_LENGTH, prop, decl_type, keyword, errors);
-    if start_err_len == errors.len() {
-        if let Some(url_str) = prop {
-            if let Err(err) = cm_types::Url::validate(url_str) {
-                let message = match &err {
-                    cm_types::ParseError::InvalidComponentUrl { details } => details.to_owned(),
-                    _ => err.to_string(),
-                };
-                errors.push(Error::invalid_url(
-                    decl_type,
-                    keyword,
-                    &format!(r#""{url_str}": {message}"#),
-                ));
-            }
-        }
-    }
-    start_err_len == errors.len()
+    let conversion_ctor = |s: &String| Url::new(s).map(|_| ());
+    check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 
 pub(crate) fn check_url_scheme(
@@ -237,34 +163,21 @@ pub(crate) fn check_url_scheme(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    if let Some(scheme) = prop {
-        if let Err(err) = cm_types::UrlScheme::validate(scheme) {
-            errors.push(match err {
-                cm_types::ParseError::InvalidLength => {
-                    if scheme.is_empty() {
-                        Error::empty_field(decl_type, keyword)
-                    } else {
-                        Error::field_too_long(decl_type, keyword)
-                    }
-                }
-                cm_types::ParseError::InvalidValue => Error::invalid_field(decl_type, keyword),
-                e => {
-                    panic!("unexpected parse error: {:?}", e);
-                }
-            });
-            return false;
-        }
-    } else {
-        errors.push(Error::missing_field(decl_type, keyword));
-        return false;
-    }
-    true
+    let conversion_ctor = |s: &String| UrlScheme::new(s).map(|_| ());
+    check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 
 #[cfg(test)]
 mod tests {
 
-    use {super::*, lazy_static::lazy_static, proptest::prelude::*, regex::Regex, url::Url};
+    use {
+        super::*,
+        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH, MAX_PATH_LENGTH},
+        lazy_static::lazy_static,
+        proptest::prelude::*,
+        regex::Regex,
+        url::Url,
+    };
 
     const PATH_REGEX_STR: &str = r"(/[^/]+)+";
     const NAME_REGEX_STR: &str = r"[0-9a-zA-Z_][0-9a-zA-Z_\-\.]*";
@@ -383,10 +296,7 @@ mod tests {
         test_identifier_path_invalid_empty => {
             check_fn = check_path,
             input = "",
-            result = Err(ErrorList::new(vec![
-                Error::empty_field("FooDecl", "foo"),
-                Error::invalid_field("FooDecl", "foo"),
-            ])),
+            result = Err(ErrorList::new(vec![Error::empty_field("FooDecl", "foo")])),
         },
         test_identifier_path_invalid_root => {
             check_fn = check_path,
@@ -406,13 +316,13 @@ mod tests {
         test_identifier_path_too_long => {
             check_fn = check_path,
             input = &format!("/{}", "a".repeat(1024)),
-            result = Err(ErrorList::new(vec![Error::field_too_long_with_max("FooDecl", "foo", /*max=*/1024usize)])),
+            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
         },
 
         // name
         test_identifier_dynamic_name_valid => {
             check_fn = check_dynamic_name,
-            input = &format!("{}", "a".repeat(MAX_DYNAMIC_NAME_LENGTH)),
+            input = &format!("{}", "a".repeat(MAX_LONG_NAME_LENGTH)),
             result = Ok(()),
         },
         test_identifier_name_valid => {
@@ -428,12 +338,12 @@ mod tests {
         test_identifier_name_too_long => {
             check_fn = check_name,
             input = &format!("{}", "a".repeat(MAX_NAME_LENGTH + 1)),
-            result = Err(ErrorList::new(vec![Error::field_too_long_with_max("FooDecl", "foo", MAX_NAME_LENGTH)])),
+            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
         },
         test_identifier_dynamic_name_too_long => {
             check_fn = check_dynamic_name,
-            input = &format!("{}", "a".repeat(MAX_DYNAMIC_NAME_LENGTH + 1)),
-            result = Err(ErrorList::new(vec![Error::field_too_long_with_max("FooDecl", "foo", MAX_DYNAMIC_NAME_LENGTH)])),
+            input = &format!("{}", "a".repeat(MAX_LONG_NAME_LENGTH + 1)),
+            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
         },
 
         // url
@@ -487,7 +397,7 @@ mod tests {
         test_identifier_url_too_long => {
             check_fn = check_url,
             input = &format!("fuchsia-pkg://{}", "a".repeat(4083)),
-            result = Err(ErrorList::new(vec![Error::field_too_long_with_max("FooDecl", "foo", 4096)])),
+            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
         },
     }
 }
