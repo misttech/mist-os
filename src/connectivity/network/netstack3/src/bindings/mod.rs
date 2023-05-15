@@ -47,7 +47,7 @@ use futures::{
 use packet::{Buf, BufferMut};
 use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
@@ -913,7 +913,7 @@ impl NetstackSeed {
     pub async fn serve(self) -> Result<(), anyhow::Error> {
         use anyhow::Context as _;
 
-        debug!("serving netstack with netstack3");
+        info!("serving netstack with netstack3");
 
         let Self { netstack, interfaces_worker, interfaces_watcher_sink } = self;
 
