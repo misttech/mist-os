@@ -222,7 +222,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Invoked by the VFS layer whenever files are added or removed.
   virtual void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event);
 
-  virtual zx_status_t WatchDir(Vfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
+  virtual zx_status_t WatchDir(FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                                fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher);
 
   // Create a |zx::stream| for reading and writing to this vnode.

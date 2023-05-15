@@ -4,6 +4,8 @@
 
 #include "src/lib/storage/vfs/cpp/watcher.h"
 
+#include <lib/async/cpp/wait.h>
+#include <lib/fit/defer.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -13,22 +15,38 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
+#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
 
 namespace fs {
 
+// A simple structure which holds a channel to a watching client, as well as a mask of signals
+// they are interested in hearing about.
+struct WatcherContainer::VnodeWatcher
+    : public fbl::DoublyLinkedListable<VnodeWatcher*, fbl::NodeOptions::AllowRemoveFromContainer> {
+  VnodeWatcher(fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end,
+               fuchsia_io::wire::WatchMask mask)
+      : server_end(std::move(server_end)),
+        mask(mask - (fio::wire::WatchMask::kExisting | fio::wire::WatchMask::kIdle)),
+        waiter(this->server_end.channel().get(), ZX_CHANNEL_PEER_CLOSED | ZX_USER_SIGNAL_0) {}
+
+  fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end;
+  fuchsia_io::WatchMask mask;
+  async::WaitOnce waiter;
+};
+
 WatcherContainer::WatcherContainer() = default;
-WatcherContainer::~WatcherContainer() = default;
+WatcherContainer::~WatcherContainer() {
+  std::unique_lock guard(lock_);
+  for (VnodeWatcher& watcher : watch_list_) {
+    watcher.server_end.channel().signal(0, ZX_USER_SIGNAL_0);
+  }
+  watch_list_.clear();
+}
 
-WatcherContainer::VnodeWatcher::VnodeWatcher(
-    fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end, fuchsia_io::wire::WatchMask mask)
-    : server_end(std::move(server_end)),
-      mask(mask - (fio::wire::WatchMask::kExisting | fio::wire::WatchMask::kIdle)) {}
-
-WatcherContainer::VnodeWatcher::~VnodeWatcher() = default;
+std::shared_mutex WatcherContainer::lock_;
 
 namespace {
 
@@ -87,7 +105,7 @@ class WatchBuffer {
   char watch_buf_[fio::wire::kMaxBuf]{};
 };
 
-zx_status_t WatcherContainer::WatchDir(Vfs* vfs, Vnode* vn, fio::wire::WatchMask mask,
+zx_status_t WatcherContainer::WatchDir(FuchsiaVfs* vfs, Vnode* vn, fio::wire::WatchMask mask,
                                        uint32_t options,
                                        fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end) {
   if (!mask) {
@@ -138,9 +156,23 @@ zx_status_t WatcherContainer::WatchDir(Vfs* vfs, Vnode* vn, fio::wire::WatchMask
     wb.Send(watcher->server_end);
   }
 
-  std::lock_guard lock(lock_);
-  watch_list_.push_back(std::move(watcher));
-  return ZX_OK;
+  VnodeWatcher* watcher_ptr = watcher.get();
+  {
+    std::unique_lock guard(lock_);
+    watch_list_.push_back(watcher_ptr);
+  }
+
+  auto cleanup = fit::defer([watcher = std::move(watcher)] {
+    std::unique_lock guard(lock_);
+    if (watcher->InContainer()) {
+      watcher->RemoveFromContainer();
+    }
+  });
+
+  // Start watching for signals on the channel. This takes ownership of the cleanup callback.
+  return watcher_ptr->waiter.Begin(
+      vfs->dispatcher(), [cleanup = std::move(cleanup)](async_dispatcher_t*, async::WaitOnce*,
+                                                        zx_status_t, const zx_packet_signal_t*) {});
 }
 
 void WatcherContainer::Notify(std::string_view name, fio::wire::WatchEvent event) {
@@ -148,7 +180,7 @@ void WatcherContainer::Notify(std::string_view name, fio::wire::WatchEvent event
     return;
   }
 
-  std::lock_guard lock(lock_);
+  std::shared_lock guard(lock_);
 
   if (watch_list_.is_empty()) {
     return;
@@ -161,21 +193,18 @@ void WatcherContainer::Notify(std::string_view name, fio::wire::WatchEvent event
   vmsg->len = static_cast<uint8_t>(name.length());
   memcpy(vmsg->name, name.data(), name.length());
 
-  for (auto it = watch_list_.begin(); it != watch_list_.end();) {
-    if (!(it->mask & static_cast<fio::wire::WatchMask>(1 << static_cast<uint8_t>(event)))) {
-      ++it;
+  for (VnodeWatcher& watcher : watch_list_) {
+    if (!(watcher.mask & fio::wire::WatchMask(1 << static_cast<uint8_t>(event)))) {
       continue;
     }
 
     zx_status_t status =
-        it->server_end.channel().write(0, msg, static_cast<uint32_t>(msg_length), nullptr, 0);
+        watcher.server_end.channel().write(0, msg, static_cast<uint32_t>(msg_length), nullptr, 0);
     if (status < 0) {
-      // Lazily remove watchers when their handles cannot accept incoming watch messages.
-      auto to_remove = it;
-      ++it;
-      watch_list_.erase(to_remove);
-    } else {
-      ++it;
+      // Signal so the watcher can be cleaned up.
+      watcher.server_end.channel().signal(0, ZX_USER_SIGNAL_0);
+      // Clear the mask so that we don't try and send to this watcher again.
+      watcher.mask = fio::wire::WatchMask(0);
     }
   }
 }

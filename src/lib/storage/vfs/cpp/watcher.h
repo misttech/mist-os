@@ -28,29 +28,34 @@ class WatcherContainer {
   WatcherContainer();
   ~WatcherContainer();
 
-  zx_status_t WatchDir(Vfs* vfs, Vnode* vn, fuchsia_io::wire::WatchMask mask, uint32_t options,
-                       fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end);
+  // Not copyable or movable.
+  WatcherContainer(const WatcherContainer&) = delete;
+  WatcherContainer& operator=(WatcherContainer&) = delete;
+
+  zx_status_t WatchDir(FuchsiaVfs* vfs, Vnode* vn, fuchsia_io::wire::WatchMask mask,
+                       uint32_t options, fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end);
 
   // Notifies all VnodeWatchers in the watch list, if their mask indicates they are interested in
   // the incoming event.
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event);
 
+  bool HasWatchers() const {
+    std::shared_lock guard(lock_);
+    return !watch_list_.is_empty();
+  }
+
  private:
-  DISALLOW_COPY_ASSIGN_AND_MOVE(WatcherContainer);
+  struct VnodeWatcher;
 
-  // A simple structure which holds a channel to a watching client, as well as a mask of signals
-  // they are interested in hearing about.
-  struct VnodeWatcher : public fbl::DoublyLinkedListable<std::unique_ptr<VnodeWatcher>> {
-    VnodeWatcher(fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end,
-                 fuchsia_io::wire::WatchMask mask);
-    ~VnodeWatcher();
+  // This lock is static to allow the dispatcher, which effectively owns the VnodeWatcher items, to
+  // outlive the container. When the dispatcher shuts down, the callbacks can safely check whether
+  // the item is within in the container using this mutex. It is unlikely this lock will be heavily
+  // contended; the lock is only acquired uniquely when adding or removing from the watch list,
+  // whilst dispatching messages uses a shared lock. This is simpler than alternatives such as
+  // putting the watch list into a shared object (which will incur memory overheads).
+  static std::shared_mutex lock_;
 
-    fidl::ServerEnd<fuchsia_io::DirectoryWatcher> server_end;
-    fuchsia_io::WatchMask mask;
-  };
-
-  std::mutex lock_;
-  fbl::DoublyLinkedList<std::unique_ptr<VnodeWatcher>> watch_list_ __TA_GUARDED(lock_);
+  fbl::DoublyLinkedList<VnodeWatcher*> watch_list_;
 };
 
 }  // namespace fs

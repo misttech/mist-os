@@ -193,7 +193,8 @@ zx_status_t Devnode::VnodeImpl::Lookup(std::string_view name, fbl::RefPtr<fs::Vn
   return children().Lookup(name, out);
 }
 
-zx_status_t Devnode::VnodeImpl::WatchDir(fs::Vfs* vfs, fio::wire::WatchMask mask, uint32_t options,
+zx_status_t Devnode::VnodeImpl::WatchDir(fs::FuchsiaVfs* vfs, fio::wire::WatchMask mask,
+                                         uint32_t options,
                                          fidl::ServerEnd<fio::DirectoryWatcher> watcher) {
   return children().WatchDir(vfs, mask, options, std::move(watcher));
 }

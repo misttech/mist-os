@@ -175,6 +175,7 @@ test("fs-vnode-test") {
     "vfs_types_tests.cc",
     "vmo_file_tests.cc",
     "vnode_contract_tests.cc",
+    "watcher_test.cc",
   ]
   deps = [
     ":test_support",

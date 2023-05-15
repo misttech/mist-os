@@ -143,7 +143,7 @@ class VnodeF2fs : public fs::PagedVnode,
   }
 
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) final;
-  zx_status_t WatchDir(fs::Vfs *vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
+  zx_status_t WatchDir(fs::FuchsiaVfs *vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                        fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) final;
 
   // Set dirty flag and insert |this| to VnodeCache::dirty_list_.

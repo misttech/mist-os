@@ -608,7 +608,8 @@ VnodeMinfs::VnodeMinfs(Minfs* fs) : fs_(fs) {}
 void VnodeMinfs::Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {
   watcher_.Notify(name, event);
 }
-zx_status_t VnodeMinfs::WatchDir(fs::Vfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
+zx_status_t VnodeMinfs::WatchDir(fs::FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask,
+                                 uint32_t options,
                                  fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) {
   return watcher_.WatchDir(vfs, this, mask, options, std::move(watcher));
 }

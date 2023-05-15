@@ -49,7 +49,7 @@ void PseudoDir::Notify(std::string_view name, fio::wire::WatchEvent event) {
   watcher_.Notify(name, event);
 }
 
-zx_status_t PseudoDir::WatchDir(fs::Vfs* vfs, fio::wire::WatchMask mask, uint32_t options,
+zx_status_t PseudoDir::WatchDir(fs::FuchsiaVfs* vfs, fio::wire::WatchMask mask, uint32_t options,
                                 fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) {
   return watcher_.WatchDir(vfs, this, mask, options, std::move(watcher));
 }
