@@ -192,7 +192,13 @@ exec "${{_SCRIPT_DIR}}/{python3_real}" -S -s "$@"
     _CPU_MAP = {
         "amd64": "x86_64",
     }
-    host_os = repo_ctx.os.name
+
+    host_os = repo_ctx.os.name.lower()
+    if host_os.startswith("windows"):
+        host_os = "windows"
+    elif host_os.startswith("mac"):
+        host_os = "osx"
+
     host_cpu = repo_ctx.os.arch
     host_cpu = _CPU_MAP.get(host_cpu, host_cpu)
 
