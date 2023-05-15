@@ -20,6 +20,10 @@ pub(crate) struct TrelInstance {
     publication_responder: Option<Task<Result<(), anyhow::Error>>>,
     instance_name: String,
     peer_instance_sockaddr_map: HashMap<String, ot::SockAddr>,
+
+    #[allow(dead_code)] // This field must be kept around for <fxbug.dev/99755>
+    subscriber: ServiceSubscriber2Proxy,
+
     subscriber_request_stream: ServiceSubscriptionListenerRequestStream,
 }
 
@@ -95,6 +99,19 @@ fn split_txt(txt: &[u8]) -> Vec<Vec<u8>> {
 
 impl TrelInstance {
     fn new(instance_name: String) -> Result<TrelInstance, anyhow::Error> {
+        let (client, server) = create_endpoints::<ServiceSubscriptionListenerMarker>();
+
+        let subscriber =
+            fuchsia_component::client::connect_to_protocol::<ServiceSubscriber2Marker>().unwrap();
+
+        subscriber
+            .subscribe_to_service(
+                ot::TREL_DNSSD_SERVICE_NAME_WITH_DOT,
+                &ServiceSubscriptionOptions { exclude_local: Some(true), ..Default::default() },
+                client,
+            )
+            .context("Unable to subscribe to TREL services")?;
+
         Ok(TrelInstance {
             socket: fasync::net::UdpSocket::bind(&SocketAddr::V6(SocketAddrV6::new(
                 Ipv6Addr::UNSPECIFIED,
@@ -106,31 +123,9 @@ impl TrelInstance {
             publication_responder: None,
             instance_name,
             peer_instance_sockaddr_map: HashMap::default(),
-            subscriber_request_stream: Self::make_subscriber_request_stream(),
+            subscriber,
+            subscriber_request_stream: server.into_stream()?,
         })
-    }
-
-    fn make_subscriber_request_stream() -> ServiceSubscriptionListenerRequestStream {
-        let (client, server) = create_endpoints::<ServiceSubscriptionListenerMarker>();
-
-        let subscriber =
-            fuchsia_component::client::connect_to_protocol::<ServiceSubscriber2Marker>().unwrap();
-
-        if let Err(err) = subscriber.subscribe_to_service(
-            ot::TREL_DNSSD_SERVICE_NAME_WITH_DOT,
-            &ServiceSubscriptionOptions { exclude_local: Some(true), ..Default::default() },
-            client,
-        ) {
-            error!(
-                tag = "trel",
-                "Unable to subscribe to {:?}: {:?}",
-                ot::TREL_DNSSD_SERVICE_NAME_WITH_DOT,
-                err
-            );
-        }
-
-        // In the error case this channel will terminate and simply not discover any peers.
-        server.into_stream().unwrap()
     }
 
     fn port(&self) -> u16 {
