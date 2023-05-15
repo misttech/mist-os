@@ -3920,6 +3920,8 @@ pub fn create_binders(current_task: &CurrentTask) -> Result<(), Errno> {
 
 #[cfg(test)]
 pub mod tests {
+    #![allow(clippy::unused_unit)] // for compatibility with `test_case`
+
     use super::*;
     use crate::fs::{DirEntry, FdFlags};
     use crate::mm::MemoryAccessor;
@@ -3931,6 +3933,7 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
+    use test_case::test_case;
 
     const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
@@ -6731,6 +6734,9 @@ pub mod tests {
         })
     }
 
+    #[test_case(true; "with_process")]
+    #[test_case(false; "without_process")]
+    #[::fuchsia::test]
     async fn external_binder_connection(with_process: bool) {
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();
@@ -6784,6 +6790,9 @@ pub mod tests {
         process_accessor_thread.join().expect("join").expect("success");
     }
 
+    #[test_case(true; "with_process")]
+    #[test_case(false; "without_process")]
+    #[::fuchsia::test]
     fn remote_binder_task(with_process: bool) {
         const vector_size: usize = 128 * 1024 * 1024;
         let (process_accessor_client_end, process_accessor_server_end) =
@@ -6848,25 +6857,5 @@ pub mod tests {
         std::mem::drop(remote_binder_task);
         let fds = process_accessor_thread.join().expect("join").expect("fds");
         assert_eq!(fds.len(), 1);
-    }
-
-    #[fuchsia::test]
-    async fn external_binder_connection_with_process() {
-        external_binder_connection(true).await;
-    }
-
-    #[fuchsia::test]
-    async fn external_binder_connection_without_process() {
-        external_binder_connection(false).await;
-    }
-
-    #[fuchsia::test]
-    fn remote_binder_task_with_process() {
-        remote_binder_task(true);
-    }
-
-    #[fuchsia::test]
-    fn remote_binder_task_without_process() {
-        remote_binder_task(false);
     }
 }

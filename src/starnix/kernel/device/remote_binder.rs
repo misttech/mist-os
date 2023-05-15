@@ -776,6 +776,8 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unused_unit)] // for compatibility with `test_case`
+
     use super::*;
     use crate::device::binder::tests::run_process_accessor;
     use crate::device::BinderFs;
@@ -790,6 +792,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::ffi::CString;
     use std::future::Future;
+    use test_case::test_case;
 
     static REMOTE_CONTROLLER_CLIENT: Lazy<
         Mutex<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>,
@@ -929,6 +932,9 @@ mod tests {
         process_accessor_task.await.expect("process accessor wait");
     }
 
+    #[test_case(true; "with_process")]
+    #[test_case(false; "without_process")]
+    #[::fuchsia::test]
     async fn external_binder_connection(with_process: bool) {
         run_remote_binder_test(with_process, |binder| async move {
             const VMO_SIZE: usize = 10 * 1024 * 1024;
@@ -955,15 +961,5 @@ mod tests {
             binder
         })
         .await;
-    }
-
-    #[fuchsia::test]
-    async fn external_binder_connection_with_process() {
-        external_binder_connection(true).await;
-    }
-
-    #[fuchsia::test]
-    async fn external_binder_connection_without_process() {
-        external_binder_connection(false).await;
     }
 }
