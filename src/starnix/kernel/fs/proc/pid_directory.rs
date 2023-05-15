@@ -549,7 +549,7 @@ impl FileOps for MemFile {
         let task = &self.0;
         let mut addr = UserAddress::default() + offset;
         data.write_each(&mut |bytes| {
-            let actual = task.mm.read_memory_partial(addr, bytes)?;
+            let actual = task.mm.read_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
             addr += actual;
             Ok(actual)
         })
@@ -565,7 +565,7 @@ impl FileOps for MemFile {
         let task = &self.0;
         let mut addr = UserAddress::default() + offset;
         data.read_each(&mut |bytes| {
-            let actual = task.mm.write_memory_partial(addr, bytes)?;
+            let actual = task.mm.write_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
             addr += actual;
             Ok(actual)
         })
