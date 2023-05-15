@@ -125,10 +125,9 @@ func (c *Client) rxLoop() error {
 }
 
 func (c *Client) processWrite(port network.PortId, pbList stack.PacketBufferList) (int, tcpip.Error) {
-	pkts := pbList.AsSlice()
 	i := 0
 
-	for i < len(pkts) {
+	for pkt := pbList.Front(); pkt != nil; {
 		c.tx.mu.Lock()
 		for {
 			if c.tx.mu.detached {
@@ -147,9 +146,9 @@ func (c *Client) processWrite(port network.PortId, pbList stack.PacketBufferList
 
 		// Queue as many remaining packets as possible; if we run out of space,
 		// we'll return to the waiting state in the outer loop.
-		for ; i < len(pkts) && c.tx.mu.entries.haveReadied(); i++ {
+		for ; pkt != nil && c.tx.mu.entries.haveReadied(); i, pkt = i+1, pkt.Next() {
 			entry := c.tx.mu.entries.getReadied()
-			c.prepareTxDescriptor(entry, port, pkts[i])
+			c.prepareTxDescriptor(entry, port, pkt)
 			c.tx.mu.entries.incrementQueued(1)
 		}
 

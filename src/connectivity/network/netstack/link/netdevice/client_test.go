@@ -724,7 +724,7 @@ func TestReceivePacketNoMemoryLeak(t *testing.T) {
 			t.Fatalf("unexpected error on WriteFrame: %s", zx.Status(status.Err))
 		}
 		pkt := (<-dispatcher).Pkt
-		(&pkt).DecRef()
+		pkt.DecRef()
 	}); err != nil {
 		t.Fatal(err)
 	}

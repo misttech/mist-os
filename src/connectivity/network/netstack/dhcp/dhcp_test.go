@@ -124,7 +124,7 @@ func (e *endpoint) writePacket(pkt stack.PacketBufferPtr) tcpip.Error {
 	if pkt.NetworkProtocolNumber == ipv4.ProtocolNumber {
 		if fn := e.onWritePacket; fn != nil {
 			pkt, newBuf = fn(pkt)
-			if pkt == (stack.PacketBufferPtr{}) {
+			if pkt == nil {
 				return nil
 			}
 		}
@@ -179,7 +179,7 @@ func (e *endpoint) writePacket(pkt stack.PacketBufferPtr) tcpip.Error {
 
 func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	i := 0
-	for _, pkt := range pkts.AsSlice() {
+	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
 		if err := e.writePacket(pkt); err != nil {
 			return i, err
 		}
@@ -974,7 +974,7 @@ func TestRetransmissionExponentialBackoff(t *testing.T) {
 			serverEP.onWritePacket = func(pkt stack.PacketBufferPtr) (stack.PacketBufferPtr, bool) {
 				waitForSignal(ctx, unblockResponse)
 				if dropServerPackets {
-					return stack.PacketBufferPtr{}, false
+					return nil, false
 				}
 				return pkt, false
 			}
@@ -1104,7 +1104,7 @@ func TestRenewRebindBackoff(t *testing.T) {
 			serverEP.onWritePacket = func(stack.PacketBufferPtr) (stack.PacketBufferPtr, bool) {
 				// Don't send any response, keep the client renewing / rebinding
 				// to test backoff in these states.
-				return stack.PacketBufferPtr{}, false
+				return nil, false
 			}
 
 			// Start from time 0, and then advance time in test based on expected
@@ -2475,7 +2475,7 @@ func TestClientRestartLeaseTime(t *testing.T) {
 			if typ == dhcpDISCOVER && initialAcquisitionTimeout {
 				initialAcquisitionTimeout = false
 				acquisitionCancel()
-				return stack.PacketBufferPtr{}, false
+				return nil, false
 			}
 			return pkt, false
 		}

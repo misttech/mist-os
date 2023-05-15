@@ -103,7 +103,7 @@ type testNetworkDispatcher struct {
 }
 
 func (t *testNetworkDispatcher) release() {
-	if pkt := t.pkt; pkt != (stack.PacketBufferPtr{}) {
+	if pkt := t.pkt; pkt != nil {
 		pkt.DecRef()
 	}
 
@@ -112,14 +112,14 @@ func (t *testNetworkDispatcher) release() {
 
 func (t *testNetworkDispatcher) takePkt() stack.PacketBufferPtr {
 	pkt := t.pkt
-	t.pkt = stack.PacketBufferPtr{}
+	t.pkt = nil
 	return pkt
 }
 
 func (t *testNetworkDispatcher) DeliverNetworkPacket(_ tcpip.NetworkProtocolNumber, pkt stack.PacketBufferPtr) {
 	t.count++
 
-	if pkt := t.pkt; pkt != (stack.PacketBufferPtr{}) {
+	if pkt := t.pkt; pkt != nil {
 		pkt.DecRef()
 	}
 
@@ -176,7 +176,7 @@ func (*stubEndpoint) AddHeader(stack.PacketBufferPtr) {}
 
 func (e *stubEndpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	i := 0
-	for _, pkt := range pkts.AsSlice() {
+	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
 		select {
 		case e.c <- pkt:
 			pkt.IncRef()
@@ -203,7 +203,7 @@ func (e *stubEndpoint) getPacket() stack.PacketBufferPtr {
 	case pkt := <-e.c:
 		return pkt
 	default:
-		return stack.PacketBufferPtr{}
+		return nil
 	}
 }
 
@@ -218,7 +218,7 @@ func makeStubEndpoint(linkAddr tcpip.LinkAddress, size int) stubEndpoint {
 // matching fields.
 func expectPacket(t *testing.T, name string, pkt stack.PacketBufferPtr, wantSrc, wantDst tcpip.LinkAddress, wantProto tcpip.NetworkProtocolNumber, wantData []byte, wantPktType tcpip.PacketType) {
 	t.Helper()
-	if pkt == (stack.PacketBufferPtr{}) {
+	if pkt == nil {
 		t.Errorf("%s: no packet received", name)
 		return
 	}
@@ -454,7 +454,7 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 						// from itself and are not destined to the bridge itself.
 						func() {
 							pkt := ep.getPacket()
-							if pkt != (stack.PacketBufferPtr{}) {
+							if pkt != nil {
 								defer func() {
 									pkt.DecRef()
 								}()
@@ -462,7 +462,7 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 
 							if test.rxEP != beps[i] && subtest.dstAddr != bridgeEP.LinkAddress() {
 								expectPacket(t, fmt.Sprintf("ep%d", i), pkt, srcAddr, subtest.dstAddr, fakeNetworkProtocol, data, tcpip.PacketOutgoing)
-							} else if pkt != (stack.PacketBufferPtr{}) {
+							} else if pkt != nil {
 								t.Errorf("ep%d unexpectedly got a packet = %+v", i, pkt)
 							}
 						}()
@@ -786,7 +786,7 @@ type endpoint struct {
 }
 
 func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
-	for _, pkt := range pkts.AsSlice() {
+	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
 		if fn := e.onWritePacket; fn != nil {
 			fn(pkt)
 		}

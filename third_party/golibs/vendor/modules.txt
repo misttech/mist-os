@@ -236,14 +236,6 @@ golang.org/x/xerrors/internal
 ## explicit; go 1.18
 gonum.org/v1/gonum/dsp/fourier
 gonum.org/v1/gonum/dsp/fourier/internal/fftpack
-gonum.org/v1/gonum/floats
-gonum.org/v1/gonum/floats/scalar
-gonum.org/v1/gonum/integrate/quad
-gonum.org/v1/gonum/internal/asm/f64
-gonum.org/v1/gonum/mathext
-gonum.org/v1/gonum/mathext/internal/amos
-gonum.org/v1/gonum/mathext/internal/cephes
-gonum.org/v1/gonum/mathext/internal/gonum
 # google.golang.org/api v0.103.0
 ## explicit; go 1.19
 google.golang.org/api/googleapi
@@ -399,7 +391,7 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
-# gvisor.dev/gvisor v0.0.0-20230501170848-d86d98b34567
+# gvisor.dev/gvisor v0.0.0-20230513224401-f36cf26455ee
 ## explicit; go 1.20
 gvisor.dev/gvisor/pkg/atomicbitops
 gvisor.dev/gvisor/pkg/bits

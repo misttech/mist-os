@@ -35,7 +35,7 @@ const (
 
 var pkPool = sync.Pool{
 	New: func() any {
-		return &packetBuffer{}
+		return &PacketBuffer{}
 	},
 }
 
@@ -59,14 +59,9 @@ type PacketBufferOptions struct {
 }
 
 // PacketBufferPtr is a pointer to a PacketBuffer.
-//
-// +stateify savable
-type PacketBufferPtr struct {
-	// packetBuffer is the underlying packet buffer.
-	*packetBuffer
-}
+type PacketBufferPtr = *PacketBuffer
 
-// A packetBuffer contains all the data of a network packet.
+// A PacketBuffer contains all the data of a network packet.
 //
 // As a PacketBuffer traverses up the stack, it may be necessary to pass it to
 // multiple endpoints.
@@ -108,10 +103,14 @@ type PacketBufferPtr struct {
 // starting offset of each header in `buf`.
 //
 // +stateify savable
-type packetBuffer struct {
+type PacketBuffer struct {
 	_ sync.NoCopy
 
 	packetBufferRefs
+
+	// PacketBufferEntry is used to build an intrusive list of
+	// PacketBuffers.
+	PacketBufferEntry
 
 	// buf is the underlying buffer for the packet. See struct level docs for
 	// details.
@@ -178,7 +177,7 @@ type packetBuffer struct {
 
 // NewPacketBuffer creates a new PacketBuffer with opts.
 func NewPacketBuffer(opts PacketBufferOptions) PacketBufferPtr {
-	pk := pkPool.Get().(*packetBuffer)
+	pk := pkPool.Get().(*PacketBuffer)
 	pk.reset()
 	if opts.ReserveHeaderBytes != 0 {
 		v := bufferv2.NewViewSize(opts.ReserveHeaderBytes)
@@ -191,36 +190,31 @@ func NewPacketBuffer(opts PacketBufferOptions) PacketBufferPtr {
 	pk.NetworkPacketInfo.IsForwardedPacket = opts.IsForwardedPacket
 	pk.onRelease = opts.OnRelease
 	pk.InitRefs()
-	return PacketBufferPtr{
-		packetBuffer: pk,
-	}
+	return pk
 }
 
 // IncRef increments the PacketBuffer's refcount.
 func (pk PacketBufferPtr) IncRef() PacketBufferPtr {
 	pk.packetBufferRefs.IncRef()
-	return PacketBufferPtr{
-		packetBuffer: pk.packetBuffer,
-	}
+	return pk
 }
 
 // DecRef decrements the PacketBuffer's refcount. If the refcount is
 // decremented to zero, the PacketBuffer is returned to the PacketBuffer
 // pool.
-func (pk *PacketBufferPtr) DecRef() {
+func (pk PacketBufferPtr) DecRef() {
 	pk.packetBufferRefs.DecRef(func() {
 		if pk.onRelease != nil {
 			pk.onRelease()
 		}
 
 		pk.buf.Release()
-		pkPool.Put(pk.packetBuffer)
+		pkPool.Put(pk)
 	})
-	pk.packetBuffer = nil
 }
 
-func (pk *packetBuffer) reset() {
-	*pk = packetBuffer{}
+func (pk PacketBufferPtr) reset() {
+	*pk = PacketBuffer{}
 }
 
 // ReservedHeaderBytes returns the number of bytes initially reserved for
@@ -374,8 +368,9 @@ func (pk PacketBufferPtr) headerView(typ headerType) bufferv2.View {
 // Clone makes a semi-deep copy of pk. The underlying packet payload is
 // shared. Hence, no modifications is done to underlying packet payload.
 func (pk PacketBufferPtr) Clone() PacketBufferPtr {
-	newPk := pkPool.Get().(*packetBuffer)
+	newPk := pkPool.Get().(*PacketBuffer)
 	newPk.reset()
+	newPk.PacketBufferEntry = pk.PacketBufferEntry
 	newPk.buf = pk.buf.Clone()
 	newPk.reserved = pk.reserved
 	newPk.pushed = pk.pushed
@@ -394,9 +389,7 @@ func (pk PacketBufferPtr) Clone() PacketBufferPtr {
 	newPk.NetworkPacketInfo = pk.NetworkPacketInfo
 	newPk.tuple = pk.tuple
 	newPk.InitRefs()
-	return PacketBufferPtr{
-		packetBuffer: newPk,
-	}
+	return newPk
 }
 
 // ReserveHeaderBytes prepends reserved space for headers at the front
@@ -429,16 +422,14 @@ func (pk PacketBufferPtr) Network() header.Network {
 // See PacketBuffer.Data for details about how a packet buffer holds an inbound
 // packet.
 func (pk PacketBufferPtr) CloneToInbound() PacketBufferPtr {
-	newPk := pkPool.Get().(*packetBuffer)
+	newPk := pkPool.Get().(*PacketBuffer)
 	newPk.reset()
 	newPk.buf = pk.buf.Clone()
 	newPk.InitRefs()
 	// Treat unfilled header portion as reserved.
 	newPk.reserved = pk.AvailableHeaderBytes()
 	newPk.tuple = pk.tuple
-	return PacketBufferPtr{
-		packetBuffer: newPk,
-	}
+	return newPk
 }
 
 // DeepCopyForForwarding creates a deep copy of the packet buffer for
@@ -476,7 +467,29 @@ func (pk PacketBufferPtr) DeepCopyForForwarding(reservedHeaderBytes int) PacketB
 
 // IsNil returns whether the pointer is logically nil.
 func (pk PacketBufferPtr) IsNil() bool {
-	return pk.packetBuffer == nil
+	return pk == nil
+}
+
+// IncRef increases the reference count on each PacketBuffer
+// stored in the PacketBufferList.
+func (pk *PacketBufferList) IncRef() {
+	for pb := pk.Front(); pb != nil; pb = pb.Next() {
+		pb.IncRef()
+	}
+}
+
+// DecRef decreases the reference count on each PacketBuffer
+// stored in the PacketBufferList.
+func (pk *PacketBufferList) DecRef() {
+	// Using a while-loop here (instead of for-loop) because DecRef() can cause
+	// the pb to be recycled. If it is recycled during execution of this loop,
+	// there is a possibility of a data race during a call to pb.Next().
+	pb := pk.Front()
+	for pb != nil {
+		next := pb.Next()
+		pb.DecRef()
+		pb = next
+	}
 }
 
 // headerInfo stores metadata about a header in a packet.

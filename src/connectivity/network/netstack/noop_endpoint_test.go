@@ -198,7 +198,7 @@ func (ep *sentinelEndpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpi
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
 	if ep.mu.blocking {
-		for _, pb := range pkts.AsSlice() {
+		for pb := pkts.Front(); pb != nil; pb = pb.Next() {
 			pb.IncRef()
 			ep.mu.pkts.PushBack(pb)
 		}
@@ -217,6 +217,7 @@ func (ep *sentinelEndpoint) Drain() (uint, chan struct{}) {
 
 func (ep *sentinelEndpoint) drainLocked() uint {
 	drained := ep.mu.pkts.Len()
+	ep.mu.pkts.DecRef()
 	ep.mu.pkts.Reset()
 	return uint(drained)
 }
