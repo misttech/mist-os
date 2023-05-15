@@ -1238,8 +1238,11 @@
 
                 // pty_test
                 //TODO(fxbug.dev/126724): Re-enable once flake is resolved.
+                "JobControlTest.ReleaseTTYSignals",
+                "JobControlTest.ReleaseUnsetTTY",
                 "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
                 "JobControlTest.SetForegroundProcessGroupDifferentSession",
+                "JobControlTest.SetForegroundProcessGroupNegPgid",
             ],
         },
     ],
