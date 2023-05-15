@@ -2917,6 +2917,58 @@ mod tests {
         assert_eq!(result, Err(LocalAddressError::CannotBindToAddress));
     }
 
+    #[test]
+    fn test_udp_conn_picks_link_local_source_address() {
+        set_logger_for_test();
+        // When the remote address has global scope but the source address
+        // is link-local, make sure that the socket implicitly has its bound
+        // device set.
+        set_logger_for_test();
+        let local_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
+        let remote_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
+        const REMOTE_PORT: NonZeroU16 = nonzero!(100u16);
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } = UdpFakeDeviceCtx::with_sync_ctx(
+            UdpFakeDeviceSyncCtx::<Ipv6>::with_local_remote_ip_addrs(
+                vec![local_ip],
+                vec![remote_ip],
+            ),
+        );
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        let conn = SocketHandler::connect_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            ZonedAddr::Unzoned(remote_ip),
+            REMOTE_PORT,
+        )
+        .expect("can connect");
+
+        let info = SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn);
+        let (conn_local_ip, conn_remote_ip) = assert_matches!(
+            info,
+            ConnInfo {
+                local_ip: ZonedAddr::Zoned(conn_local_ip),
+                remote_ip: ZonedAddr::Unzoned(conn_remote_ip),
+                local_port: _,
+                remote_port: REMOTE_PORT
+            } => (conn_local_ip, conn_remote_ip)
+        );
+        assert_eq!(
+            conn_local_ip,
+            AddrAndZone::new(local_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap()
+        );
+        assert_eq!(conn_remote_ip, remote_ip);
+
+        // Double-check that the bound device can't be changed after being set
+        // implicitly.
+        assert_eq!(
+            SocketHandler::set_conn_udp_device(&mut sync_ctx, &mut non_sync_ctx, conn, None),
+            Err(SocketError::Local(
+                LocalAddressError::Zone(ZonedAddressError::DeviceZoneMismatch,)
+            ))
+        );
+    }
+
     fn set_device_removed<I: TestIpExt>(
         sync_ctx: &mut UdpFakeDeviceSyncCtx<I>,
         device_removed: bool,

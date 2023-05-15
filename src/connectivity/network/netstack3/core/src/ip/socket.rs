@@ -9,10 +9,11 @@ use core::cmp::Ordering;
 use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
 
-use net_types::ip::{Ip, IpVersion, Ipv6Addr, Mtu};
-use net_types::{SpecifiedAddr, UnicastAddr};
+use net_types::{
+    ip::{Ip, IpVersion, Ipv6Addr, Mtu},
+    SpecifiedAddr, UnicastAddr,
+};
 use packet::{Buf, BufferMut, SerializeError, Serializer};
-
 use thiserror::Error;
 
 use crate::{
@@ -279,6 +280,10 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
         &self.definition.remote_ip
     }
 
+    pub(crate) fn device(&self) -> Option<&D> {
+        self.definition.device.as_ref()
+    }
+
     pub(crate) fn proto(&self) -> I::Proto {
         self.definition.proto
     }
@@ -388,18 +393,23 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
-        let ResolvedRoute { src_addr, device: _, next_hop: _ } =
+        let ResolvedRoute { src_addr, device: route_device, next_hop: _ } =
             match self.lookup_route(ctx, device, local_ip, remote_ip) {
                 Ok(r) => r,
                 Err(e) => return Err((e.into(), options)),
             };
 
-        let definition = IpSockDefinition {
-            local_ip: src_addr,
-            remote_ip,
-            device: device.map(|d| self.downgrade_device_id(&d)),
-            proto,
-        };
+        // If the source or destination address require a device, make sure to
+        // set that in the socket definition. Otherwise defer to what was provided.
+        let socket_device = (crate::socket::must_have_zone(&src_addr)
+            || crate::socket::must_have_zone(&remote_ip))
+        .then_some(route_device)
+        .as_ref()
+        .or(device)
+        .map(|d| self.downgrade_device_id(d));
+
+        let definition =
+            IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };
         Ok(IpSock { definition: definition, options })
     }
 }

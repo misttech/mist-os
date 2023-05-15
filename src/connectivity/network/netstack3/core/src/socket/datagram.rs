@@ -666,7 +666,7 @@ where
 
         let c = ConnAddr {
             ip: ConnIpAddr { local: (local_ip, local_id), remote: (remote_ip, remote_id) },
-            device: socket_device.map(|d| d.as_weak(sync_ctx).into_owned()),
+            device: ip_sock.device().cloned(),
         };
         match bound.conns_mut().try_insert(
             c,
@@ -758,7 +758,7 @@ where
 
         let c = ConnAddr {
             ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_id) },
-            device: socket_device.map(|d| d.as_weak(sync_ctx).into_owned()),
+            device: ip_sock.device().cloned(),
         };
         let insert_error = match bound.conns_mut().try_insert(
             c,
@@ -834,7 +834,7 @@ where
 
         let c = ConnAddr {
             ip: ConnIpAddr { local, remote: (remote_ip, remote_id) },
-            device: socket_device.map(|d| d.as_weak(sync_ctx).into_owned()),
+            device: ip_sock.device().cloned(),
         };
 
         let insert_error = match bound.conns_mut().try_insert(
@@ -1209,10 +1209,7 @@ where
         let entry =
             bound.conns_mut().entry(&id).unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
         let (_, _, addr): &(_, S::ConnSharingState, _) = entry.get();
-        let new_addr = ConnAddr {
-            device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
-            ..addr.clone()
-        };
+        let new_addr = ConnAddr { device: new_socket.device().cloned(), ..addr.clone() };
 
         let mut entry = match entry.try_update_addr(new_addr) {
             Err((ExistsError, _entry)) => {

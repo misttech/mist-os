@@ -1367,7 +1367,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     ip_transport_ctx,
                     ctx,
                     ip_sock,
-                    device,
                     local_port,
                     remote_port,
                     netstack_buffers,
@@ -1436,7 +1435,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     ip_transport_ctx,
                     ctx,
                     ip_sock,
-                    device,
                     local_port,
                     remote_port,
                     netstack_buffers,
@@ -1637,10 +1635,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     })?;
 
                 let addr = addr.clone();
-                let mut new_entry = match entry.try_update_addr(ConnAddr {
-                    device: new_device.map(|d| ip_transport_ctx.downgrade_device_id(&d)),
-                    ..addr
-                }) {
+                let mut new_entry = match entry
+                    .try_update_addr(ConnAddr { device: new_socket.device().cloned(), ..addr })
+                {
                     Ok(entry) => Ok(entry),
                     Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
                 }?;
@@ -2543,7 +2540,6 @@ fn connect_inner<I, SC, C>(
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
     ip_sock: IpSock<I, SC::WeakDeviceId, DefaultSendOptions>,
-    device: Option<EitherDeviceId<SC::DeviceId, SC::WeakDeviceId>>,
     local_port: NonZeroU16,
     remote_port: NonZeroU16,
     netstack_buffers: C::ProvidedBuffers,
@@ -2567,7 +2563,7 @@ where
             local: (ip_sock.local_ip().clone(), local_port),
             remote: (ip_sock.remote_ip().clone(), remote_port),
         },
-        device: device.map(|d| d.as_weak(ip_transport_ctx).into_owned()),
+        device: ip_sock.device().cloned(),
     };
     let now = ctx.now();
     let (syn_sent, syn) = Closed::<Initial>::connect(
@@ -4041,6 +4037,185 @@ mod tests {
 
         sync_ctx.with_tcp_sockets(|sockets| {
             assert_matches!(sockets.socketmap.listeners().get_by_id(&bound.into()), Some(_));
+        });
+    }
+
+    #[test]
+    fn connect_unbound_picks_link_local_source_addr() {
+        set_logger_for_test();
+        let client_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
+        let server_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
+        let mut net = FakeNetwork::new(
+            [
+                (LOCAL, TcpCtx::with_sync_ctx(TcpSyncCtx::new(client_ip, server_ip, 0))),
+                (REMOTE, TcpCtx::with_sync_ctx(TcpSyncCtx::new(server_ip, client_ip, 0))),
+            ],
+            |net, meta| {
+                if net == LOCAL {
+                    alloc::vec![(REMOTE, meta, None)]
+                } else {
+                    alloc::vec![(LOCAL, meta, None)]
+                }
+            },
+        );
+        const PORT: NonZeroU16 = nonzero!(100u16);
+        let client_connection = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let socket: UnboundId<Ipv6> = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                socket,
+                ZonedAddr::Unzoned(server_ip),
+                PORT,
+                Default::default(),
+            )
+            .expect("can connect")
+        });
+        let server_listener = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let bound = SocketHandler::bind(sync_ctx, non_sync_ctx, socket, None, Some(PORT))
+                .expect("failed to bind the client socket");
+            SocketHandler::listen(sync_ctx, non_sync_ctx, bound, NonZeroUsize::MIN)
+                .expect("can listen")
+        });
+
+        // Advance until the connection is established.
+        net.run_until_idle(handle_frame, handle_timer);
+
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            assert_matches!(
+                &non_sync_ctx.take_tcp_events()[..],
+                &[NonSyncEvent::ConnectionStatusUpdate(_, ConnectionStatusUpdate::Connected)]
+            );
+
+            let info = SocketHandler::get_connection_info(sync_ctx, client_connection);
+            // The local address picked for the connection is link-local, which
+            // means the device for the connection must also be set (since the
+            // address requires a zone).
+            let (local_ip, remote_ip) = assert_matches!(
+                info,
+                ConnectionInfo {
+                    local_addr: SocketAddr { ip: ZonedAddr::Zoned(local_ip), port: _ },
+                    remote_addr: SocketAddr { ip: ZonedAddr::Unzoned(remote_ip), port: PORT },
+                    device: Some(FakeWeakDeviceId(FakeDeviceId))
+                } => (local_ip, remote_ip)
+            );
+            assert_eq!(
+                local_ip,
+                AddrAndZone::new(client_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap().into()
+            );
+            assert_eq!(remote_ip, server_ip);
+
+            // Double-check that the bound device can't be changed after being set
+            // implicitly.
+            assert_matches!(
+                SocketHandler::set_connection_device(
+                    sync_ctx,
+                    non_sync_ctx,
+                    client_connection,
+                    None
+                ),
+                Err(SetDeviceError::ZoneChange)
+            );
+        });
+        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                &non_sync_ctx.take_tcp_events()[..],
+                &[NonSyncEvent::ListenerConnectionCount(server_listener.into(), 1)]
+            );
+        });
+    }
+
+    #[test]
+    fn accept_connect_picks_link_local_addr() {
+        set_logger_for_test();
+        let server_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
+        let client_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
+        let mut net = FakeNetwork::new(
+            [
+                (LOCAL, TcpCtx::with_sync_ctx(TcpSyncCtx::new(server_ip, client_ip, 0))),
+                (REMOTE, TcpCtx::with_sync_ctx(TcpSyncCtx::new(client_ip, server_ip, 0))),
+            ],
+            |net, meta| {
+                if net == LOCAL {
+                    alloc::vec![(REMOTE, meta, None)]
+                } else {
+                    alloc::vec![(LOCAL, meta, None)]
+                }
+            },
+        );
+        const PORT: NonZeroU16 = nonzero!(100u16);
+        let server_listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let socket: UnboundId<Ipv6> = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let bound = SocketHandler::bind(sync_ctx, non_sync_ctx, socket, None, Some(PORT))
+                .expect("failed to bind the client socket");
+            SocketHandler::listen(sync_ctx, non_sync_ctx, bound, NonZeroUsize::MIN)
+                .expect("can listen")
+        });
+        let _client_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                socket,
+                AddrAndZone::new(server_ip.get(), FakeDeviceId).unwrap().into(),
+                PORT,
+                Default::default(),
+            )
+            .expect("failed to open a connection")
+        });
+
+        // Advance until the connection is established.
+        net.run_until_idle(handle_frame, handle_timer);
+
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            assert_eq!(
+                &non_sync_ctx.take_tcp_events()[..],
+                &[NonSyncEvent::ListenerConnectionCount(server_listener.into(), 1)]
+            );
+            let (server_connection, _addr, _buffers) =
+                SocketHandler::accept(sync_ctx, non_sync_ctx, server_listener)
+                    .expect("connection is waiting");
+            assert_eq!(
+                &non_sync_ctx.take_tcp_events()[..],
+                &[NonSyncEvent::ListenerConnectionCount(server_listener.into(), 0)]
+            );
+
+            let info = SocketHandler::get_connection_info(sync_ctx, server_connection);
+            // The local address picked for the connection is link-local, which
+            // means the device for the connection must also be set (since the
+            // address requires a zone).
+            let (local_ip, remote_ip) = assert_matches!(
+                info,
+                ConnectionInfo {
+                    local_addr: SocketAddr { ip: ZonedAddr::Zoned(local_ip), port: PORT },
+                    remote_addr: SocketAddr { ip: ZonedAddr::Unzoned(remote_ip), port: _ },
+                    device: Some(FakeWeakDeviceId(FakeDeviceId))
+                } => (local_ip, remote_ip)
+            );
+            assert_eq!(
+                local_ip,
+                AddrAndZone::new(server_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap().into()
+            );
+            assert_eq!(remote_ip, client_ip);
+
+            // Double-check that the bound device can't be changed after being set
+            // implicitly.
+            assert_matches!(
+                SocketHandler::set_connection_device(
+                    sync_ctx,
+                    non_sync_ctx,
+                    server_connection,
+                    None
+                ),
+                Err(SetDeviceError::ZoneChange)
+            );
+        });
+        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_matches!(
+                &non_sync_ctx.take_tcp_events()[..],
+                &[NonSyncEvent::ConnectionStatusUpdate(_, ConnectionStatusUpdate::Connected)]
+            );
         });
     }
 

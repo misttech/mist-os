@@ -407,19 +407,6 @@ impl<S: Id, W: Id> EitherDeviceId<&'_ S, &'_ W> {
             EitherDeviceId::Weak(w) => sync_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
         }
     }
-
-    pub(crate) fn as_weak_ref<
-        'a,
-        SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>,
-    >(
-        &'a self,
-        sync_ctx: &SC,
-    ) -> Cow<'a, SC::WeakDeviceId> {
-        match self {
-            EitherDeviceId::Strong(s) => Cow::Owned(sync_ctx.downgrade_device_id(s)),
-            EitherDeviceId::Weak(w) => Cow::Borrowed(w),
-        }
-    }
 }
 
 impl<S, W> EitherDeviceId<S, W> {

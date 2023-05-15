@@ -243,25 +243,18 @@ fn handle_incoming_packet<I, B, C, SC>(
         // there is no TCB, and therefore, no connection.
         if let Some(seg) = (Closed { reason: None::<Option<ConnectionError>> }.on_segment(incoming))
         {
-            match ip_transport_ctx.new_ip_socket(
+            match ip_transport_ctx.send_oneshot_ip_packet(
                 ctx,
                 None,
                 Some(local_ip),
                 remote_ip,
                 IpProto::Tcp.into(),
                 DefaultSendOptions,
+                |_addr| tcp_serialize_segment(seg, conn_addr),
+                None,
             ) {
-                Ok(ip_sock) => {
-                    let body = tcp_serialize_segment(seg, conn_addr);
-                    match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
-                        Ok(()) => {}
-                        Err((body, err)) => {
-                            // TODO(https://fxbug.dev/101993): Increment the counter.
-                            trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
-                        }
-                    }
-                }
-                Err(err) => {
+                Ok(()) => {}
+                Err((_body, err, DefaultSendOptions)) => {
                     // TODO(https://fxbug.dev/101993): Increment the counter.
                     trace!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
                 }
@@ -589,7 +582,7 @@ where
         let poll_send_at = state.poll_send_at().expect("no retrans timer");
         let socket_options = socket_options.clone();
         let ListenerSharingState { sharing, listening: _ } = *sharing;
-        let bound_device = bound_device.map(|d| d.as_weak_ref(ip_transport_ctx).into_owned());
+        let bound_device = ip_sock.device().cloned();
         let MaybeListenerId(listener_index, _marker) = listener_id;
         // We could just reuse the old allocation for the new connection but
         // because of the restrictions on the socket map data structure (for
