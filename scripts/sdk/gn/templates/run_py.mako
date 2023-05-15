@@ -127,7 +127,7 @@ class GnTester(object):
         invocation = [
             self.gn, "gen",
             os.path.join(self.out_dir, arch),
-            "--args=target_cpu=\"{cpu}\" target_os=\"fuchsia\" clang_base_path=\"{clang}\" buildidtool=\"{buildidtool}\" {additional_args}"
+            "--args=target_cpu=\"{cpu}\" target_os=\"fuchsia\" clang_base_path=\"{clang}\" buildidtool=\"{buildidtool}\" fuchsia_sdk_readelf_exec=\"{clang}/bin/llvm-readelf\" {additional_args}"
             .format(
                 cpu=arch, clang=self.clang, buildidtool=self.buildidtool, additional_args=additional_args)
         ]
