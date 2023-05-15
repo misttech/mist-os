@@ -323,7 +323,30 @@ impl TrelInstance {
         Ok(())
     }
 
-    /// Async entrypoint.
+    /// Async entrypoint for I/O.
+    ///
+    /// This is explicitly not `mut` so that `on_trel_send` can be called reentrantly from here.
+    pub fn poll_io(&self, instance: &ot::Instance, cx: &mut Context<'_>) {
+        let mut buffer = [0u8; crate::UDP_PACKET_MAX_LENGTH];
+        loop {
+            match self.socket.async_recv_from(&mut buffer, cx) {
+                Poll::Ready(Ok((len, sockaddr))) => {
+                    let sockaddr: ot::SockAddr = sockaddr.as_socket_ipv6().unwrap().into();
+                    debug!(tag = "trel", "Incoming {} byte TREL packet from {:?}", len, sockaddr);
+                    instance.plat_trel_handle_received(&buffer[..len])
+                }
+                Poll::Ready(Err(err)) => {
+                    warn!(tag = "trel", "Error receiving packet: {:?}", err);
+                    break;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Async entrypoint for non-I/O
     pub fn poll(&mut self, instance: &ot::Instance, cx: &mut Context<'_>) {
         if let Some(task) = &mut self.publication_responder {
             if let Poll::Ready(x) = task.poll_unpin(cx) {
@@ -333,19 +356,6 @@ impl TrelInstance {
                 );
                 self.publication_responder = None;
             }
-        }
-
-        let mut buffer = [0u8; crate::UDP_PACKET_MAX_LENGTH];
-        match self.socket.async_recv_from(&mut buffer, cx) {
-            Poll::Ready(Ok((len, sockaddr))) => {
-                let sockaddr: ot::SockAddr = sockaddr.as_socket_ipv6().unwrap().into();
-                debug!(tag = "trel", "Incoming {} byte TREL packet from {:?}", len, sockaddr);
-                instance.plat_trel_handle_received(&buffer[..len])
-            }
-            Poll::Ready(Err(err)) => {
-                warn!(tag = "trel", "Error receiving packet: {:?}", err);
-            }
-            _ => {}
         }
 
         if !self.subscriber_request_stream.is_terminated() {

@@ -251,10 +251,24 @@ impl Platform {
     }
 
     fn process_poll_trel(&mut self, instance: &ot::Instance, cx: &mut Context<'_>) {
-        // SAFETY: Guaranteed to only be called from the OpenThread thread.
-        let mut trel = unsafe { PlatformBacking::as_ref() }.trel.borrow_mut();
-        if let Some(trel) = trel.as_mut() {
-            trel.poll(instance, cx);
+        // Poll for discovery. This must be `mut` because it calls poll methods internally,
+        // and is not reentrant.
+        {
+            // SAFETY: Guaranteed to only be called from the OpenThread thread.
+            let mut trel = unsafe { PlatformBacking::as_ref() }.trel.borrow_mut();
+            if let Some(trel) = trel.as_mut() {
+                trel.poll(instance, cx);
+            }
+        }
+
+        // Poll for I/O. This is separate from the above poll because it must not be
+        // `mut` so that it can be reentrant.
+        {
+            // SAFETY: Guaranteed to only be called from the OpenThread thread.
+            let trel = unsafe { PlatformBacking::as_ref() }.trel.borrow();
+            if let Some(trel) = trel.as_ref() {
+                trel.poll_io(instance, cx);
+            }
         }
     }
 
