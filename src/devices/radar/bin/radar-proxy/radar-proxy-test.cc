@@ -1071,7 +1071,8 @@ TEST_F(RadarReaderProxyInjectionTest, CallsFailsWithBadState) {
   injector_client_.value()->StartBurstInjection().Then([&](auto& result) {
     ASSERT_FALSE(result.is_ok());
     ASSERT_TRUE(result.error_value().is_domain_error());
-    EXPECT_EQ(result.error_value().domain_error(), fuchsia_hardware_radar::StatusCode::kBadState);
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_hardware_radar::StatusCode::kAlreadyBound);
   });
 
   injector_client_.value()->StopBurstInjection().Then(
@@ -1080,7 +1081,8 @@ TEST_F(RadarReaderProxyInjectionTest, CallsFailsWithBadState) {
   injector_client_.value()->StopBurstInjection().Then([&](auto& result) {
     ASSERT_FALSE(result.is_ok());
     ASSERT_TRUE(result.error_value().is_domain_error());
-    EXPECT_EQ(result.error_value().domain_error(), fuchsia_hardware_radar::StatusCode::kBadState);
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_hardware_radar::StatusCode::kAlreadyBound);
 
     loop_.Quit();
   });

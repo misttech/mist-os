@@ -60,7 +60,8 @@ void BurstInjector::GetBurstProperties(GetBurstPropertiesCompleter::Sync& comple
 void BurstInjector::EnqueueBursts(EnqueueBurstsRequest& request,
                                   EnqueueBurstsCompleter::Sync& completer) {
   if (stop_burst_injection_completer_) {
-    completer.Reply(fit::error(FidlRadar::StatusCode::kBadState));
+    // TODO(bradenkell): Return kBadState once OOT clients are on the latest protocol version.
+    completer.Reply(fit::error(FidlRadar::StatusCode::kAlreadyBound));
     return;
   }
   if (request.bursts().burst_count() == 0) {
@@ -95,7 +96,8 @@ void BurstInjector::EnqueueBursts(EnqueueBurstsRequest& request,
 
 void BurstInjector::StartBurstInjection(StartBurstInjectionCompleter::Sync& completer) {
   if (inject_bursts_ || stop_burst_injection_completer_) {
-    completer.Reply(fit::error(FidlRadar::StatusCode::kBadState));
+    // TODO(bradenkell): Return kBadState.
+    completer.Reply(fit::error(FidlRadar::StatusCode::kAlreadyBound));
     return;
   }
 
@@ -107,7 +109,8 @@ void BurstInjector::StartBurstInjection(StartBurstInjectionCompleter::Sync& comp
 
 void BurstInjector::StopBurstInjection(StopBurstInjectionCompleter::Sync& completer) {
   if (!inject_bursts_ || stop_burst_injection_completer_) {
-    completer.Reply(fit::error(FidlRadar::StatusCode::kBadState));
+    // TODO(bradenkell): Return kBadState.
+    completer.Reply(fit::error(FidlRadar::StatusCode::kAlreadyBound));
   } else if (injector_vmo_queue_.empty()) {
     FinishBurstInjection(completer.ToAsync());
   } else {
