@@ -206,41 +206,65 @@ pub struct FileBackedConfig<'a> {
 impl<'a> FileBackedConfig<'a> {
     /// Loads the persistent/stable interface names from the backing file.
     pub fn load<P: AsRef<path::Path>>(path: &'a P) -> Result<Self, anyhow::Error> {
+        const INITIAL_TEMP_ID: u64 = 0;
+
         let path = path.as_ref();
-        let config = match fs::File::open(path) {
-            Ok(mut file) => Config::load(&file).or_else(|_| {
-                // Since deserialization as Config failed, try loading the file
-                // as the legacy config format.
-                let _seek = file.seek(SeekFrom::Start(0))?;
-                let legacy_config: LegacyConfig = serde_json::from_reader(&file)?;
-                // Transfer the values from the old format to the new format.
-                let new_config = Config {
-                    interfaces: legacy_config
-                        .names
-                        .into_iter()
-                        .map(|(id, name)| InterfaceConfig {
-                            id,
-                            device_class: if name.starts_with(INTERFACE_PREFIX_WLAN) {
-                                crate::InterfaceType::Wlan
-                            } else {
-                                crate::InterfaceType::Ethernet
+        match fs::File::open(path) {
+            Ok(mut file) => {
+                Config::load(&file)
+                    .map(|config| Self { path, config, temp_id: INITIAL_TEMP_ID })
+                    .or_else(|_| {
+                        // Since deserialization as Config failed, try loading the file
+                        // as the legacy config format.
+                        let _seek = file.seek(SeekFrom::Start(0))?;
+                        let legacy_config: LegacyConfig = serde_json::from_reader(&file)?;
+                        // Transfer the values from the old format to the new format.
+                        let new_config = Self {
+                            config: Config {
+                                interfaces: legacy_config
+                                    .names
+                                    .into_iter()
+                                    .map(|(id, name)| InterfaceConfig {
+                                        id,
+                                        device_class: if name.starts_with(INTERFACE_PREFIX_WLAN) {
+                                            crate::InterfaceType::Wlan
+                                        } else {
+                                            crate::InterfaceType::Ethernet
+                                        },
+                                        name,
+                                    })
+                                    .collect::<Vec<_>>(),
                             },
-                            name,
-                        })
-                        .collect::<Vec<_>>(),
-                };
-                Ok(new_config)
-            }),
+                            path,
+                            temp_id: INITIAL_TEMP_ID,
+                        };
+                        // Overwrite the legacy config file with the current format.
+                        //
+                        // TODO(https://fxbug.dev/118197): Remove this logic once all devices
+                        // persist interface configuration in the current format.
+                        new_config.store().unwrap_or_else(|e| {
+                            tracing::error!(
+                                "failed to overwrite legacy interface config with current \
+                                format: {:?}",
+                                e
+                            )
+                        });
+                        Ok(new_config)
+                    })
+            }
             Err(error) => {
                 if error.kind() == io::ErrorKind::NotFound {
-                    Ok(Config { interfaces: vec![] })
+                    Ok(Self {
+                        path,
+                        temp_id: INITIAL_TEMP_ID,
+                        config: Config { interfaces: vec![] },
+                    })
                 } else {
                     Err(error)
                         .with_context(|| format!("could not open config file {}", path.display()))
                 }
             }
-        }?;
-        Ok(Self { path, config, temp_id: 0 })
+        }
     }
 
     /// Stores the persistent/stable interface names to the backing file.
@@ -575,13 +599,14 @@ mod tests {
         );
     }
 
+    const ETHERNET_TOPO_PATH: &str =
+        "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet";
+    const ETHERNET_NAME: &str = "ethx2";
+    const WLAN_TOPO_PATH: &str = "/dev/pci-00:14.0/ethernet";
+    const WLAN_NAME: &str = "wlanp0014";
+
     #[test]
     fn test_load_legacy_config_file() {
-        const ETHERNET_TOPO_PATH: &str =
-            "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet";
-        const ETHERNET_NAME: &str = "ethx2";
-        const WLAN_TOPO_PATH: &str = "/dev/pci-00:14.0/ethernet";
-        const WLAN_NAME: &str = "wlanp0014";
         let test_config = LegacyConfig {
             names: vec![
                 (
@@ -625,5 +650,34 @@ mod tests {
                 }
             )
         }
+    }
+
+    #[test]
+    fn overwrites_legacy_config_file_on_load() {
+        let legacy_config = LegacyConfig {
+            names: vec![
+                (
+                    PersistentIdentifier::TopologicalPath(ETHERNET_TOPO_PATH.to_string()),
+                    ETHERNET_NAME.to_string(),
+                ),
+                (
+                    PersistentIdentifier::TopologicalPath(WLAN_TOPO_PATH.to_string()),
+                    WLAN_NAME.to_string(),
+                ),
+            ],
+        };
+
+        let temp_dir = tempfile::tempdir_in("/tmp").expect("failed to create the temp dir");
+        let path = temp_dir.path().join("net.config.json");
+
+        let file = fs::File::create(&path).expect("create config file");
+        serde_json::to_writer_pretty(file, &legacy_config).expect("serialize legacy config");
+
+        let new_config = FileBackedConfig::load(&path).expect("load interface config");
+
+        let persisted = std::fs::read_to_string(&path).expect("read persisted config");
+        let expected_new_format =
+            serde_json::to_string_pretty(&new_config.config).expect("serialize config");
+        assert_eq!(persisted, expected_new_format);
     }
 }
