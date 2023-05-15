@@ -1559,6 +1559,10 @@ mod tests {
             ssid: types::Ssid::try_from("bar").unwrap(),
             security_type: types::SecurityType::Wpa3,
         };
+        let test_id_hidden_but_seen = types::NetworkIdentifier {
+            ssid: types::Ssid::try_from("baz").unwrap(),
+            security_type: types::SecurityType::Wpa3,
+        };
         let credential = Credential::Password("some_pass".as_bytes().to_vec());
 
         // insert saved networks
@@ -1578,10 +1582,23 @@ mod tests {
             )
             .unwrap()
             .is_none());
+        assert!(exec
+            .run_singlethreaded(
+                test_values
+                    .saved_network_manager
+                    .store(test_id_hidden_but_seen.clone(), credential.clone()),
+            )
+            .unwrap()
+            .is_none());
 
-        // Set the hidden probability for test_id_not_hidden
+        // Set the hidden probability for test_id_not_hidden and test_id_hidden_but_seen
         exec.run_singlethreaded(
             test_values.saved_network_manager.update_hidden_prob(test_id_not_hidden.clone(), 0.0),
+        );
+        exec.run_singlethreaded(
+            test_values
+                .saved_network_manager
+                .update_hidden_prob(test_id_hidden_but_seen.clone(), 1.0),
         );
         // Set the hidden probability for test_id_maybe_hidden based on test variant
         exec.run_singlethreaded(
@@ -1594,10 +1611,22 @@ mod tests {
         let mutual_security_protocols = [SecurityDescriptor::WPA3_PERSONAL];
         let bss_desc = random_fidl_bss_description!();
         if hidden {
-            // Initial passive scan has non-hidden result
+            // Initial passive scan has non-hidden result and hidden-but-seen result
             exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![
                 types::ScanResult {
                     ssid: test_id_not_hidden.ssid.clone(),
+                    security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
+                    compatibility: types::Compatibility::Supported,
+                    entries: vec![types::Bss {
+                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                            mutual_security_protocols,
+                        ),
+                        bss_description: bss_desc.clone().into(),
+                        ..generate_random_bss()
+                    }],
+                },
+                types::ScanResult {
+                    ssid: test_id_hidden_but_seen.ssid.clone(),
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
@@ -1629,7 +1658,7 @@ mod tests {
                 generate_random_scan_result(),
             ])));
         } else {
-            // Non-hidden test case, only one scan, return both results
+            // Non-hidden test case, only one scan, return all results
             exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![
                 types::ScanResult {
                     ssid: test_id_not_hidden.ssid.clone(),
@@ -1655,6 +1684,18 @@ mod tests {
                         ..generate_random_bss()
                     }],
                 },
+                types::ScanResult {
+                    ssid: test_id_hidden_but_seen.ssid.clone(),
+                    security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
+                    compatibility: types::Compatibility::Supported,
+                    entries: vec![types::Bss {
+                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                            mutual_security_protocols,
+                        ),
+                        bss_description: bss_desc.clone().into(),
+                        ..generate_random_bss()
+                    }],
+                },
                 generate_random_scan_result(),
                 generate_random_scan_result(),
             ])));
@@ -1664,9 +1705,10 @@ mod tests {
         let network_selection_fut = network_selector.find_available_bss_candidate_list(None);
         pin_mut!(network_selection_fut);
         let results = exec.run_singlethreaded(&mut network_selection_fut);
-        assert_eq!(results.len(), 2);
+        assert_eq!(results.len(), 3);
 
-        // Check that the right scan request(s) were sent
+        // Check that the right scan request(s) were sent. The hidden-but-seen SSID should never
+        // be requested for the active scan.
         if hidden {
             assert_eq!(
                 *exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock()),
