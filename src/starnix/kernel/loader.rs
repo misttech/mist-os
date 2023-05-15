@@ -409,7 +409,7 @@ pub fn load_executable(
         prot_flags,
         prot_flags.to_vmar_flags(),
         MappingOptions::empty(),
-        MappingName::None,
+        MappingName::Stack,
     )?;
     let stack = stack_base + (stack_size - 8);
 
@@ -424,7 +424,7 @@ pub fn load_executable(
             prot_flags,
             prot_flags.to_vmar_flags(),
             MappingOptions::empty(),
-            MappingName::None,
+            MappingName::Vdso,
         )?;
         map_result.ptr() as u64
     } else {

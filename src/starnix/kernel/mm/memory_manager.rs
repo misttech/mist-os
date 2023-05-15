@@ -82,8 +82,17 @@ bitflags! {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum MappingName {
-    // No name.
+    /// No name.
     None,
+
+    /// This mapping is the initial stack.
+    Stack,
+
+    /// This mapping is the heap.
+    Heap,
+
+    /// This ampping is the vdso.
+    Vdso,
 
     /// The file backing this mapping.
     File(NamespaceNode),
@@ -1219,7 +1228,7 @@ impl MemoryManager {
                     prot_flags,
                     prot_flags.to_vmar_flags(),
                     MappingOptions::empty(),
-                    MappingName::None,
+                    MappingName::Heap,
                 )?;
                 let brk = ProgramBreak { base: addr, current: addr };
                 state.brk = Some(brk);
@@ -1799,29 +1808,44 @@ fn write_map(
         map.vmo_offset,
         if let MappingName::File(filename) = &map.name { filename.entry.node.inode_num } else { 0 }
     )?;
-    if let MappingName::File(filename) = &map.name {
+    let fill_to_name = |sink: &mut DynamicFileBuf| {
         // The filename goes at >= the 74th column (73rd when zero indexed)
         for _ in line_length..73 {
             sink.write(b" ");
         }
-        // File names can have newlines that need to be escaped before printing.
-        // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
-        // escaping applied to paths is replacing newlines with an octal sequence.
-        let path = filename.path(task);
-        sink.write_iter(
-            path.iter()
-                .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
-                .copied(),
-        );
-    }
-    if let MappingName::Vma(name) = &map.name {
-        // The filename goes at >= the 74th column (73rd when zero indexed)
-        for _ in line_length..73 {
-            sink.write(b" ");
+    };
+    match &map.name {
+        MappingName::None => (),
+        MappingName::Stack => {
+            fill_to_name(sink);
+            sink.write(b"[stack]");
         }
-        sink.write(b"[anon:");
-        sink.write(name.as_bytes());
-        sink.write(b"]");
+        MappingName::Heap => {
+            fill_to_name(sink);
+            sink.write(b"[heap]");
+        }
+        MappingName::Vdso => {
+            fill_to_name(sink);
+            sink.write(b"[vdso]");
+        }
+        MappingName::File(filename) => {
+            fill_to_name(sink);
+            // File names can have newlines that need to be escaped before printing.
+            // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
+            // escaping applied to paths is replacing newlines with an octal sequence.
+            let path = filename.path(task);
+            sink.write_iter(
+                path.iter()
+                    .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
+                    .copied(),
+            );
+        }
+        MappingName::Vma(name) => {
+            fill_to_name(sink);
+            sink.write(b"[anon:");
+            sink.write(name.as_bytes());
+            sink.write(b"]");
+        }
     }
     sink.write(b"\n");
     Ok(())

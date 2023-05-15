@@ -445,7 +445,7 @@ mod tests {
                 prot_flags,
                 prot_flags.to_vmar_flags(),
                 MappingOptions::empty(),
-                MappingName::None,
+                MappingName::Stack,
             )
             .expect("failed to map stack VMO");
         current_task.registers.rsp = (stack_base + (STACK_SIZE - 8)).ptr() as u64;
