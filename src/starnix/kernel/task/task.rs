@@ -1221,7 +1221,8 @@ impl CurrentTask {
         flags: OpenFlags,
         mode: FileMode,
     ) -> Result<FileHandle, Errno> {
-        let mut flags = flags;
+        // 64-bit kernels force the O_LARGEFILE flag to be on.
+        let mut flags = flags | OpenFlags::LARGEFILE;
         if flags.contains(OpenFlags::PATH) {
             // When O_PATH is specified in flags, flag bits other than O_CLOEXEC,
             // O_DIRECTORY, and O_NOFOLLOW are ignored.

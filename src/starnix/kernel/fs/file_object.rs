@@ -683,7 +683,7 @@ impl FileObject {
             fs,
             ops,
             offset: Mutex::new(0),
-            flags: Mutex::new(flags),
+            flags: Mutex::new(flags - OpenFlags::CREAT),
             async_owner: Mutex::new(0),
         })
     }

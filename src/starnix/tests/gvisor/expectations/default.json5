@@ -100,8 +100,6 @@
                 "FcntlLockTest.TestOFDCanUpgradeLock",
                 "FcntlTest.SetFileStatusFlagWithOpath",
                 "FcntlTest.BadFcntlsWithOpath",
-                "FcntlTest.GetAllFlags",
-                "FcntlTest.SetFlags",
                 "FcntlTest.SetFlO_ASYNC",
                 "FcntlTest.DupAfterO_ASYNC",
                 "FcntlTest.GetOwnExNone",
@@ -464,8 +462,6 @@
                 "PingSockets/Fixture.Bind/ICMP_socket_IPv6UnknownUnicast",
 
                 // pipe_test
-                "Pipes/PipeTest.Flags/namednonblocking",
-                "Pipes/PipeTest.Flags/namedblocking",
                 "Pipes/PipeTest.OffsetCalls/*",
 
                 // pivot_root_test
@@ -515,7 +511,6 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcSelfFdInfo.Flags",
                 "ProcSelfCwd.Absolute",
                 "ProcSelfRoot.IsRoot",
                 "ProcCpuinfo.RequiredFieldsArePresent",
