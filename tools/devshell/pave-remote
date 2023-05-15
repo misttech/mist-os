@@ -130,7 +130,7 @@ case "${flash_source}" in
   flash-manifest:*)
     flash_manifest="${flash_source#flash-manifest:}"
     product_bundle=""
-    paving_script="pave.sh"
+    paving_script="./pave.sh"
     ;;
   product-bundle:*)
     flash_manifest=""
