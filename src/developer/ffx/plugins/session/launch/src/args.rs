@@ -9,14 +9,10 @@ use {argh::FromArgs, ffx_core::ffx_command};
 #[argh(
     subcommand,
     name = "launch",
-    description = "Launch a session",
-    example = "To use the tiling session component:
+    description = "Launch a session component.",
+    example = "To launch the `hello-world-session.cm` component as a session:
 
-       $ fx set workstation_eng.x64 --with //src/ui/bin/tiles-session
-
-       $ ffx session launch fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm
-
-This will launch the tiling session component. See https://fuchsia.dev/glossary#session-component
+    $ ffx session launch fuchsia-pkg://fuchsia.com/hello-world-session#meta/hello-world-session.cm
 "
 )]
 pub struct SessionLaunchCommand {

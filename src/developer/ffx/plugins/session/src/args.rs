@@ -9,7 +9,8 @@ use {argh::FromArgs, ffx_core::ffx_command, ffx_session_sub_command::SubCommand}
 #[argh(
     subcommand,
     name = "session",
-    description = "Control the session component. See https://fuchsia.dev/glossary#session-component."
+    description = "Control the session component.",
+    note = "See https://fuchsia.dev/fuchsia-src/glossary#session-component."
 )]
 pub struct SessionCommand {
     #[argh(subcommand)]

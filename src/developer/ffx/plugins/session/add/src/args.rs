@@ -9,8 +9,8 @@ use {argh::FromArgs, ffx_core::ffx_command};
 #[argh(
     subcommand,
     name = "add",
-    description = "Add an element to the current session",
-    example = "To add the bouncing_ball.cm component as an element:
+    description = "Add an element to the current session.",
+    example = "To add the `bouncing_ball.cm` component as an element:
 
     $ ffx session add fuchsia-pkg://fuchsia.com/bouncing_ball#meta/bouncing_ball.cm"
 )]
