@@ -34,6 +34,6 @@ third_party_rust_crate_log_visibility = [
   # Can't be migrated. This is a test using //third_party sources.
   "//src/sys/pkg/lib/tuf:*",
 
-  # Tail. Benchmarking log.
+  # Benchmarking log.
   "//src/lib/diagnostics/log/bench:*",
 ]

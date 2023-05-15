@@ -426,7 +426,7 @@ if (current_os == "fuchsia") {
   }
 }
 
-import("//src/lib/syslog/rust/log_visibility.gni")
+import("//src/lib/diagnostics/log/log_visibility.gni")
 
 group("log") {
   public_deps = [ ":log-v0_4_11" ]
