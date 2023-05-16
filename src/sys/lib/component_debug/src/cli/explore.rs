@@ -16,6 +16,7 @@ pub async fn explore_cmd(
     tools_urls: Vec<String>,
     dash_launcher: fdash::LauncherProxy,
     realm_query: fsys::RealmQueryProxy,
+    stdout: Stdout<'_>,
 ) -> Result<()> {
     let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
 
@@ -26,8 +27,6 @@ pub async fn explore_cmd(
     let relative_moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
 
     let (client, server) = fidl::Socket::create_stream();
-
-    let stdout = if command.is_some() { Stdout::buffered() } else { Stdout::raw()? };
 
     launch_with_socket(relative_moniker, server, tools_urls, command, ns_layout, &dash_launcher)
         .await?;

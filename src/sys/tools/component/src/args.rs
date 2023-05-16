@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::cli::{GraphFilter, GraphOrientation, ListFilter};
+use component_debug::{
+    cli::{GraphFilter, GraphOrientation, ListFilter},
+    explore::DashNamespaceLayout,
+};
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::AbsoluteMoniker;
 
@@ -35,6 +38,7 @@ pub enum ComponentSubcommand {
     Copy(CopyArgs),
     Storage(StorageArgs),
     Collection(CollectionArgs),
+    Explore(ExploreArgs),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -252,4 +256,35 @@ pub struct CollectionListArgs {
 pub struct CollectionShowArgs {
     #[argh(positional)]
     pub query: String,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "explore", description = "Same as `ffx component explore`")]
+pub struct ExploreArgs {
+    #[argh(positional)]
+    /// component URL, moniker or instance ID. Partial matches allowed.
+    pub query: String,
+
+    #[argh(option)]
+    /// list of URLs of tools packages to include in the shell environment.
+    /// the PATH variable will be updated to include binaries from these tools packages.
+    /// repeat `--tools url` for each package to be included.
+    /// The path preference is given by command line order.
+    pub tools: Vec<String>,
+
+    #[argh(option, short = 'c', long = "command")]
+    /// execute a command instead of reading from stdin.
+    /// the exit code of the command will be forwarded to the host.
+    pub command: Option<String>,
+
+    #[argh(
+        option,
+        short = 'l',
+        long = "layout",
+        default = "DashNamespaceLayout::NestAllInstanceDirs"
+    )]
+    /// changes the namespace layout that is created for the shell.
+    /// nested: nests all instance directories under subdirs (default)
+    /// namespace: sets the instance namespace as the root (works better for tools)
+    pub ns_layout: DashNamespaceLayout,
 }

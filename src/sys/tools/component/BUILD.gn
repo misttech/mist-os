@@ -8,6 +8,7 @@ rustc_binary("component") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

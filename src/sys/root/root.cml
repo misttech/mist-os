@@ -264,6 +264,17 @@
             source_availability: "unknown",
         },
 
+        // The source of this protocol, debug-dash-launcher,
+        // may not be available on all products.
+        // Used by console-launcher.
+        {
+            protocol: "fuchsia.dash.Launcher",
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+        },
+
         // RCS uses the root hub for service discovery.
         {
             directory: "hub",

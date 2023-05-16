@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use component_debug::cli::explore_cmd;
+use component_debug::{cli::explore_cmd, explore::Stdout};
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
@@ -19,10 +19,19 @@ pub async fn cmd(
     args: ExploreComponentCommand,
 ) -> Result<()> {
     let realm_query = connect_to_realm_query(&rcs).await?;
+    let stdout = if args.command.is_some() { Stdout::buffered() } else { Stdout::raw()? };
 
     // All errors from component_debug library are user-visible.
-    explore_cmd(args.query, args.ns_layout, args.command, args.tools, dash_launcher, realm_query)
-        .await
-        .map_err(|e| FfxError::Error(e, 1))?;
+    explore_cmd(
+        args.query,
+        args.ns_layout,
+        args.command,
+        args.tools,
+        dash_launcher,
+        realm_query,
+        stdout,
+    )
+    .await
+    .map_err(|e| FfxError::Error(e, 1))?;
     Ok(())
 }

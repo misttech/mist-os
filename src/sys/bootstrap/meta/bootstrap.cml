@@ -231,7 +231,10 @@
             ],
         },
         {
-            protocol: "fuchsia.tracing.controller.Controller",
+            protocol: [
+                "fuchsia.dash.Launcher",
+                "fuchsia.tracing.controller.Controller",
+            ],
             from: "parent",
             to: [ "#console-launcher" ],
             availability: "optional",

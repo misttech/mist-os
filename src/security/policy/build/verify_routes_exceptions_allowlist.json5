@@ -1605,6 +1605,26 @@
                 // ################################################################################
                 // END: TODO(https://fxbug.dev/115632): Fix broken routes in /core/test_manager/*
                 // ################################################################################
+
+                // TODO(fxbug.dev/107231): Optionally expose fuchsia.dash.Launcher from core
+                {
+                    using_node: "/bootstrap/console-launcher",
+                    capability: "fuchsia.dash.Launcher",
+                    error: {
+                        error: {
+                            analyzer_model_error: {
+                                routing_error: {
+                                    offer_from_child_expose_not_found: {
+                                        child_moniker: "core",
+                                        moniker: "/",
+                                        capability_id: "fuchsia.dash.Launcher"
+                                    }
+                                }
+                            }
+                        },
+                        message: "`fuchsia.dash.Launcher` was not exposed to `/` from child `#core`."
+                    }
+                }
             ],
         },
     },

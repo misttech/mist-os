@@ -12,6 +12,14 @@
             url: "fuchsia-pkg://fuchsia.com/debug-dash-launcher#meta/debug_dash_launcher.cm",
         },
     ],
+
+    // Used by the `component` shell tool, when launched under sshd-host.
+    use: [
+        {
+            protocol: [ "fuchsia.dash.Launcher" ],
+            from: "#debug-dash-launcher",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.process.Resolver" ],
@@ -22,6 +30,12 @@
             protocol: [ "fuchsia.kernel.VmexResource" ],
             from: "parent",
             to: "#debug-dash-launcher",
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.dash.Launcher" ],
+            from: "#debug-dash-launcher",
         },
     ],
 }

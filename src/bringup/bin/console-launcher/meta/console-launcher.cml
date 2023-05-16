@@ -146,5 +146,12 @@
             // product and non-eng builds of any product.
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.dash.Launcher",
+
+            // The source of this protocol, debug-dash-launcher,
+            // may not be available on all products.
+            availability: "optional",
+        },
     ],
 }

@@ -8,8 +8,10 @@ use crate::args::*;
 use anyhow::Result;
 use component_debug::cli::*;
 use component_debug::copy::copy_cmd;
+use component_debug::explore::Stdout;
+use fidl_fuchsia_dash as fdash;
 use fidl_fuchsia_sys2 as fsys;
-use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 
 pub async fn exec() -> Result<()> {
     let args: ComponentArgs = argh::from_env();
@@ -34,6 +36,24 @@ pub async fn exec() -> Result<()> {
         }
         ComponentSubcommand::Resolve(args) => {
             resolve_cmd(args.query, lifecycle_controller, realm_query, writer).await
+        }
+        ComponentSubcommand::Explore(args) => {
+            // TODO(fxbug.dev/95554): Verify that the optional Launcher protocol is available
+            // before connecting.
+            let dash_launcher = connect_to_protocol::<fdash::LauncherMarker>()?;
+            // TODO(fxbug.dev/127189): Use Stdout::raw instead, when a command is not provided
+            let stdout = Stdout::buffered();
+
+            explore_cmd(
+                args.query,
+                args.ns_layout,
+                args.command,
+                args.tools,
+                dash_launcher,
+                realm_query,
+                stdout,
+            )
+            .await
         }
         ComponentSubcommand::Reload(args) => {
             reload_cmd(args.query, lifecycle_controller, realm_query, writer).await
