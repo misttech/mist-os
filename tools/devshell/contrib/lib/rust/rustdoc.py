@@ -36,9 +36,7 @@ def main():
                 to a Cargo.toml file of a package for which to generate docs.",
     )
     parser.add_argument(
-        "--target",
-        help="Target triple for which this crate is being compiled",
-        default="x86_64-fuchsia")
+        "--target", help="Target triple for which this crate is being compiled")
     parser.add_argument("--out-dir", help="Path to the Fuchsia build directory")
     parser.add_argument(
         "--no-deps",
@@ -60,7 +58,6 @@ def main():
     rust_dir = ROOT_PATH / "prebuilt/third_party/rust" / HOST_PLATFORM / "bin"
     buildtools_dir = ROOT_PATH / "prebuilt/third_party"
     clang_prefix = buildtools_dir / "clang" / HOST_PLATFORM / "bin"
-    cmake_dir = buildtools_dir / "cmake" / HOST_PLATFORM / "bin"
     clang = str(clang_prefix / "clang")
     shared_libs_root = ROOT_PATH / build_dir
     sysroot = (
@@ -69,21 +66,15 @@ def main():
 
     env = os.environ.copy()
 
-    env["CARGO_TARGET_LINKER"] = clang
-    env["CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER"] = clang
-    env["CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER"] = clang
-    env["CARGO_TARGET_%s_LINKER" %
-        args.target.replace("-", "_").upper()] = clang
-    if "fuchsia" in args.target:
-        env["CARGO_TARGET_%s_RUSTFLAGS" %
-            args.target.replace("-", "_").upper()] = (
-                "-Clink-arg=--target=" + args.target +
-                " -Clink-arg=--sysroot=" + str(sysroot) + " -Lnative=" +
-                str(shared_libs_root))
-    else:
-        env["CARGO_TARGET_%s_RUSTFLAGS" %
-            args.target.replace("-", "_").upper()] = (
-                "-Clink-arg=--target=" + args.target)
+    for target in (
+            "X86_64_APPLE_DARWIN",
+            "X86_64_UNKNOWN_LINUX_GNU",
+            "X86_64_FUCHSIA",
+            "AARCH64_FUCHSIA",
+    ):
+        env[f"CARGO_TARGET_{target}_LINKER"] = clang
+        if "FUCHSIA" in target:
+            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = f"-Clink-arg=--sysroot={sysroot} -Lnative={shared_libs_root}"
     env["CC"] = clang
     env["CXX"] = str(clang_prefix / "clang++")
     env["AR"] = str(clang_prefix / "llvm-ar")
@@ -93,14 +84,13 @@ def main():
         ROOT_PATH / "scripts/rust/rustdoc_no_ld_library_path.sh")
     env["RUSTDOCFLAGS"] = "-Z unstable-options --enable-index-page"
     env["RUST_BACKTRACE"] = "1"
-    if "fuchsia" in args.target:
-        env["CFLAGS"] = "--sysroot=%s -L %s" % (sysroot, shared_libs_root)
-    env["PATH"] = "%s:%s" % (env["PATH"], cmake_dir)
 
     call_args = [
-        rust_dir / "cargo", "doc", "--manifest-path=" + str(args.manifest_path),
-        "--target=%s" % args.target
+        rust_dir / "cargo", "doc", "--manifest-path=" + str(args.manifest_path)
     ]
+
+    if args.target:
+        call_args.append("--target=" + args.target)
 
     if args.no_deps:
         call_args.append("--no-deps")
