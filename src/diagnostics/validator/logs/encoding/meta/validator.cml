@@ -2,30 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "sys/testing/elf_test_runner.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "syslog/client.shard.cml" ],
     program: {
+        runner: "elf",
         binary: "bin/encoding_validator",
     },
-    children: [
-        {
-            name: "puppet",
-            url: "#meta/puppet.cm",
-        },
+    capabilities: [
+        { protocol: "fuchsia.validate.logs.EncodingValidator" },
     ],
     use: [
         {
             protocol: "fuchsia.validate.logs.EncodingPuppet",
-            from: "#puppet",
+            from: "parent",
         },
     ],
-    offer: [
+    expose: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#puppet",
+            protocol: "fuchsia.validate.logs.EncodingValidator",
+            from: "self",
         },
     ],
 }

@@ -3,23 +3,23 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dart/config.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
 
 rustc_binary("bin") {
   output_name = "encoding_validator"
   edition = "2021"
   with_unit_tests = true
   deps = [
-    "fidl:validate_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
+    "//src/diagnostics/validator/logs/encoding/fidl:validate_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
-
   sources = [ "src/main.rs" ]
 }
 
@@ -27,40 +27,71 @@ fuchsia_unittest_package("encoding-validator-tests") {
   deps = [ ":bin_test" ]
 }
 
-### C++ ###
-
-fuchsia_component("encoding-validator-for-cpp") {
+fuchsia_component("validator-component") {
+  component_name = "validator"
   manifest = "meta/validator.cml"
   deps = [ ":bin" ]
+}
+
+fuchsia_package("validator") {
+  package_name = "log-encoding-validator"
+  deps = [ ":validator-component" ]
+}
+
+rustc_test("test_bin") {
+  name = "log_encoding_validator_test"
+  edition = "2021"
+  source_root = "src/test.rs"
+  sources = [ "src/test.rs" ]
+  deps = [
+    "//src/diagnostics/validator/logs/encoding/fidl:validate_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_test_component("component") {
+  component_name = "validator_test"
+  manifest = "meta/test.cml"
+  deps = [ ":test_bin" ]
 }
 
 fuchsia_test_package("log-encoding-validator-cpp") {
-  deps = [ "puppet/cpp:component" ]
-  test_components = [ ":encoding-validator-for-cpp" ]
-}
-
-### Dart ###
-
-fuchsia_component("encoding-validator-for-dart") {
-  manifest = "meta/validator.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_test_package("log-encoding-validator-dart") {
-  deps = [ "puppet/dart:component" ]
-  test_components = [ ":encoding-validator-for-dart" ]
-}
-
-### Rust ###
-
-fuchsia_component("encoding-validator-for-rust") {
-  manifest = "meta/validator.cml"
-  deps = [ ":bin" ]
+  deps = [ ":test_bin" ]
+  subpackages = [ ":validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//src/diagnostics/validator/logs/encoding/puppet/cpp"
+    },
+  ]
+  test_components = [ ":component" ]
 }
 
 fuchsia_test_package("log-encoding-validator-rust") {
-  deps = [ "puppet/rust:component" ]
-  test_components = [ ":encoding-validator-for-rust" ]
+  deps = [ ":test_bin" ]
+  subpackages = [ ":validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//src/diagnostics/validator/logs/encoding/puppet/rust"
+    },
+  ]
+  test_components = [ ":component" ]
+}
+
+fuchsia_test_package("log-encoding-validator-dart") {
+  deps = [ ":test_bin" ]
+  subpackages = [ ":validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//src/diagnostics/validator/logs/encoding/puppet/dart"
+    },
+  ]
+  test_components = [ ":component" ]
 }
 
 group("tests") {

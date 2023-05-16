@@ -11,8 +11,8 @@ rustc_binary("puppet") {
   testonly = true
 
   deps = [
-    "../../fidl:validate_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+    "//src/diagnostics/validator/logs/encoding/fidl:validate_rust",
     "//src/lib/diagnostics/log/encoding/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -30,4 +30,10 @@ fuchsia_component("component") {
   testonly = true
   manifest = "meta/puppet.cml"
   deps = [ ":puppet" ]
+}
+
+fuchsia_package("rust") {
+  testonly = true
+  package_name = "rust-puppet"
+  deps = [ ":component" ]
 }

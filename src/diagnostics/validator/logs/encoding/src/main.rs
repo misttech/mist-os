@@ -2,52 +2,110 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
 use fidl_fuchsia_diagnostics::Severity;
 use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
-use fidl_fuchsia_validate_logs::EncodingPuppetMarker;
-use fuchsia_component::client;
+use fidl_fuchsia_validate_logs::{
+    EncodingPuppetMarker, EncodingValidatorRequest, EncodingValidatorRequestStream, TestFailure,
+    TestSuccess, ValidateResult, ValidateResultsIteratorGetNextResponse,
+    ValidateResultsIteratorRequest, ValidateResultsIteratorRequestStream,
+};
+use fuchsia_async as fasync;
+use fuchsia_component::{client, server::ServiceFs};
+use futures::StreamExt;
 use tracing::*;
 
+type TestCase = (&'static str, Record, Vec<u8>);
+
 #[fuchsia::main]
-async fn main() -> Result<(), Error> {
+async fn main() {
+    let mut fs = ServiceFs::new();
+
+    fs.dir("svc").add_fidl_service(move |stream| {
+        fasync::Task::spawn(serve_requests(stream)).detach();
+    });
+    fs.take_and_serve_directory_handle().expect("serev dir");
+    fs.collect::<()>().await;
+}
+
+async fn serve_requests(mut stream: EncodingValidatorRequestStream) {
+    while let Some(Ok(request)) = stream.next().await {
+        match request {
+            EncodingValidatorRequest::Validate { results, control_handle: _ } => {
+                let stream = results.into_stream().expect("stream");
+                fasync::Task::spawn(async move {
+                    serve_results(stream).await;
+                })
+                .detach();
+            }
+        }
+    }
+}
+
+async fn serve_results(mut stream: ValidateResultsIteratorRequestStream) {
     let proxy = client::connect_to_protocol::<EncodingPuppetMarker>().unwrap();
 
     info!("Testing encoding.");
-    let arr: Vec<&dyn Fn() -> TestCase> = vec![
-        &test_signed_int_positive,
-        &test_signed_int_negative,
-        &test_unsigned_int,
-        &test_float,
-        &test_string,
-        &test_multiword_string,
-        &test_empty_string,
-        &test_multiword_arg_name,
-        &test_word_size_arg_name,
-        &test_unsigned_int_max,
-        &test_no_args,
-        &test_multiple_args,
-        &test_boolean,
+    let mut test_cases: Vec<TestCase> = vec![
+        test_signed_int_positive(),
+        test_signed_int_negative(),
+        test_unsigned_int(),
+        test_float(),
+        test_string(),
+        test_multiword_string(),
+        test_empty_string(),
+        test_multiword_arg_name(),
+        test_word_size_arg_name(),
+        test_unsigned_int_max(),
+        test_no_args(),
+        test_multiple_args(),
+        test_boolean(),
     ];
-    let mut expected = vec![];
-    let mut actual = vec![];
-    for f in &arr {
-        let test_case = (f)();
-        let result = proxy.encode(&test_case.1).await?.expect("Unable to get Record");
-        let size = result.size;
-        let vmo = result.vmo;
-        let test_name = test_case.0;
-        let mut buffer = vec![0; size.try_into().expect("Unable to convert size")];
-        vmo.read(&mut buffer, 0)?;
-        expected.push((test_name, test_case.2));
-        actual.push((test_name, buffer));
+    while let Some(Ok(request)) = stream.next().await {
+        match request {
+            ValidateResultsIteratorRequest::GetNext { responder } => {
+                let (test_name, mut record_to_encode, expected) = {
+                    let Some(test_case) = test_cases.pop() else {
+                        responder.send(ValidateResultsIteratorGetNextResponse::default()).ok();
+                        continue;
+                    };
+                    test_case
+                };
+                let result = proxy
+                    .encode(&mut record_to_encode)
+                    .await
+                    .expect("encode")
+                    .expect("Unable to get Record");
+                let size = result.size;
+                let vmo = result.vmo;
+                let mut buffer = vec![0; size.try_into().expect("Unable to convert size")];
+                vmo.read(&mut buffer, 0).expect("Read vmo");
+                if expected != buffer {
+                    responder
+                        .send(ValidateResultsIteratorGetNextResponse {
+                            result: Some(ValidateResult::Failure(TestFailure {
+                                test_name: test_name.to_string(),
+                                reason: format!(
+                                    "Expected: {:#04X?}, actual: {:#04X?}",
+                                    expected, buffer
+                                ),
+                            })),
+                            ..ValidateResultsIteratorGetNextResponse::default()
+                        })
+                        .ok();
+                } else {
+                    responder
+                        .send(ValidateResultsIteratorGetNextResponse {
+                            result: Some(ValidateResult::Success(TestSuccess {
+                                test_name: test_name.to_string(),
+                            })),
+                            ..ValidateResultsIteratorGetNextResponse::default()
+                        })
+                        .ok();
+                }
+            }
+        }
     }
-    assert_eq!(expected, actual);
-    info!("Ran {:?} tests successfully", arr.len());
-    Ok(())
 }
-
-type TestCase = (&'static str, Record, Vec<u8>);
 
 fn test_string() -> TestCase {
     let timestamp = 12;

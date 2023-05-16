@@ -30,3 +30,9 @@ fuchsia_component("component") {
   manifest = "meta/puppet.cml"
   deps = [ ":puppet" ]
 }
+
+fuchsia_package("cpp") {
+  testonly = true
+  package_name = "cpp-puppet"
+  deps = [ ":component" ]
+}

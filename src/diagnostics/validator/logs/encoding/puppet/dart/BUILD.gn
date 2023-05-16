@@ -6,7 +6,7 @@ import("//build/dart/dart_component.gni")
 import("//build/dart/dart_library.gni")
 
 dart_library("lib") {
-  package_name = "log_validator_puppet"
+  package_name = "dart-puppet"
   sources = [ "main.dart" ]
   source_dir = "lib"
 
@@ -25,7 +25,13 @@ dart_library("lib") {
 dart_component("component") {
   component_name = "puppet"
   main_dart = "main.dart"
-  main_package = "log_validator_puppet"
+  main_package = "dart-puppet"
   manifest = "meta/puppet.cml"
   deps = [ ":lib" ]
+}
+
+fuchsia_package("dart") {
+  testonly = true
+  package_name = "dart-puppet"
+  deps = [ ":component" ]
 }
