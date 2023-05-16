@@ -415,7 +415,6 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
     } else {
       // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
       remote->multiplex_node = true;
-      remote->multiplex_controller = true;
     }
   }
 
