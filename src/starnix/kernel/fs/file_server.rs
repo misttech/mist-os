@@ -538,7 +538,6 @@ mod tests {
     use super::*;
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::*;
-    use futures::channel::oneshot;
     use std::collections::HashSet;
     use syncio::Zxio;
 
@@ -555,8 +554,7 @@ mod tests {
     async fn access_file_system() {
         let (kernel, _current_task) = create_kernel_and_task();
 
-        let (sender, receiver) = oneshot::channel::<bool>();
-        let _thread = std::thread::spawn(move || {
+        fasync::unblock(move || {
             let fs = TmpFs::new_fs(&kernel);
 
             let root_handle =
@@ -658,10 +656,7 @@ mod tests {
             assert_directory_content(&bar_zxio, &[b"."]);
             assert_directory_content(&root_zxio, &[b".", b"foo", b"bar", b"quz"]);
             assert_directory_content(&baz_zxio, &[b"."]);
-
-            sender.send(true).expect("sent");
-        });
-
-        assert!(receiver.await.expect("received"));
+        })
+        .await;
     }
 }
