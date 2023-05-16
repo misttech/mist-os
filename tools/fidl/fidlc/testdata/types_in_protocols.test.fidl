@@ -161,37 +161,46 @@ type Resource = resource struct {
 protocol Protocol {
     OneWayBasic(Basic);
     TwoWayBasic(Basic) -> (Basic);
+    ErrorBasic() -> (Basic) error uint32;
     -> EventBasic(Basic);
 
     OneWayCompound(Compound);
     TwoWayCompound(Compound) -> (Compound);
+    ErrorCompound() -> (Compound) error uint32;
     -> EventCompound(Compound);
 
     OneWayArrayBasic(ArrayBasic);
     TwoWayArrayBasic(ArrayBasic) -> (ArrayBasic);
+    ErrorArrayBasic() -> (ArrayBasic) error uint32;
     -> EventArrayBasic(ArrayBasic);
 
     OneWayArrayCompound(ArrayCompound);
     TwoWayArrayCompound(ArrayCompound) -> (ArrayCompound);
+    ErrorArrayCompound() -> (ArrayCompound) error uint32;
     -> EventArrayCompound(ArrayCompound);
 
     OneWayVectorBasic(VectorBasic);
     TwoWayVectorBasic(VectorBasic) -> (VectorBasic);
+    ErrorVectorBasic() -> (VectorBasic) error uint32;
     -> EventVectorBasic(VectorBasic);
 
     OneWayVectorCompound(VectorCompound);
     TwoWayVectorCompound(VectorCompound) -> (VectorCompound);
+    ErrorVectorCompound() -> (VectorCompound) error uint32;
     -> EventVectorCompound(VectorCompound);
 
     OneWayVectorOptional(VectorOptional);
     TwoWayVectorOptional(VectorOptional) -> (VectorOptional);
+    ErrorVectorOptional() -> (VectorOptional) error uint32;
     -> EventVectorOptional(VectorOptional);
 
     OneWayArrayVectorNested(ArrayVectorNested);
     TwoWayArrayVectorNested(ArrayVectorNested) -> (ArrayVectorNested);
+    ErrorArrayVectorNested() -> (ArrayVectorNested) error uint32;
     -> EventArrayVectorNested(ArrayVectorNested);
 
     OneWayResource(Resource);
     TwoWayResource(Resource) -> (Resource);
+    ErrorResource() -> (Resource) error uint32;
     -> EventResource(Resource);
 };

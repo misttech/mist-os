@@ -1302,6 +1302,2113 @@ zx_status_t Resource::Clone(Resource* _result) const {
 #endif  // __Fuchsia__
 
 
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
+const fidl_type_t* Protocol_ErrorBasic_Result::FidlType = &test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
+
+Protocol_ErrorBasic_Result::Protocol_ErrorBasic_Result() {}
+
+Protocol_ErrorBasic_Result::~Protocol_ErrorBasic_Result() {
+  Destroy();
+}
+
+Protocol_ErrorBasic_Result::Protocol_ErrorBasic_Result(Protocol_ErrorBasic_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::Basic();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorBasic_Result& Protocol_ErrorBasic_Result::operator=(Protocol_ErrorBasic_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::Basic();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorBasic_Result Protocol_ErrorBasic_Result::WithResponse(::test::typesinprotocols::Basic&& val) {
+  Protocol_ErrorBasic_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorBasic_Result Protocol_ErrorBasic_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorBasic_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::Basic>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::Basic, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorBasic_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::Basic();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorBasic_Result::Clone(Protocol_ErrorBasic_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::Basic();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorBasic_Result& Protocol_ErrorBasic_Result::set_response(::test::typesinprotocols::Basic value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorBasic_Result& Protocol_ErrorBasic_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorBasic_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorBasic_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::Basic();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+const fidl_type_t* ProtocolErrorBasicTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+
+void ProtocolErrorBasicTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorBasicTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorBasicTopResponse>(_offset), this, sizeof(ProtocolErrorBasicTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorBasicTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorBasicTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorBasicTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorBasicTopResponse>(_offset), sizeof(ProtocolErrorBasicTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorBasicTopResponse::Clone(ProtocolErrorBasicTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
+const fidl_type_t* Protocol_ErrorCompound_Result::FidlType = &test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
+
+Protocol_ErrorCompound_Result::Protocol_ErrorCompound_Result() {}
+
+Protocol_ErrorCompound_Result::~Protocol_ErrorCompound_Result() {
+  Destroy();
+}
+
+Protocol_ErrorCompound_Result::Protocol_ErrorCompound_Result(Protocol_ErrorCompound_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::Compound();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorCompound_Result& Protocol_ErrorCompound_Result::operator=(Protocol_ErrorCompound_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::Compound();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorCompound_Result Protocol_ErrorCompound_Result::WithResponse(::test::typesinprotocols::Compound&& val) {
+  Protocol_ErrorCompound_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorCompound_Result Protocol_ErrorCompound_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorCompound_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::Compound>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::Compound, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorCompound_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorCompound_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::Compound();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorCompound_Result::Clone(Protocol_ErrorCompound_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::Compound();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorCompound_Result& Protocol_ErrorCompound_Result::set_response(::test::typesinprotocols::Compound value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorCompound_Result& Protocol_ErrorCompound_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorCompound_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorCompound_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::Compound();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+const fidl_type_t* ProtocolErrorCompoundTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+
+void ProtocolErrorCompoundTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorCompoundTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorCompoundTopResponse>(_offset), this, sizeof(ProtocolErrorCompoundTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorCompoundTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorCompoundTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorCompoundTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorCompoundTopResponse>(_offset), sizeof(ProtocolErrorCompoundTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorCompoundTopResponse::Clone(ProtocolErrorCompoundTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
+const fidl_type_t* Protocol_ErrorArrayBasic_Result::FidlType = &test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
+
+Protocol_ErrorArrayBasic_Result::Protocol_ErrorArrayBasic_Result() {}
+
+Protocol_ErrorArrayBasic_Result::~Protocol_ErrorArrayBasic_Result() {
+  Destroy();
+}
+
+Protocol_ErrorArrayBasic_Result::Protocol_ErrorArrayBasic_Result(Protocol_ErrorArrayBasic_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::ArrayBasic();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorArrayBasic_Result& Protocol_ErrorArrayBasic_Result::operator=(Protocol_ErrorArrayBasic_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::ArrayBasic();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorArrayBasic_Result Protocol_ErrorArrayBasic_Result::WithResponse(::test::typesinprotocols::ArrayBasic&& val) {
+  Protocol_ErrorArrayBasic_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorArrayBasic_Result Protocol_ErrorArrayBasic_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorArrayBasic_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorArrayBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::ArrayBasic>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::ArrayBasic, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorArrayBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorArrayBasic_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::ArrayBasic();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorArrayBasic_Result::Clone(Protocol_ErrorArrayBasic_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::ArrayBasic();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorArrayBasic_Result& Protocol_ErrorArrayBasic_Result::set_response(::test::typesinprotocols::ArrayBasic value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorArrayBasic_Result& Protocol_ErrorArrayBasic_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorArrayBasic_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorArrayBasic_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::ArrayBasic();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+const fidl_type_t* ProtocolErrorArrayBasicTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+
+void ProtocolErrorArrayBasicTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorArrayBasicTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorArrayBasicTopResponse>(_offset), this, sizeof(ProtocolErrorArrayBasicTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorArrayBasicTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorArrayBasicTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorArrayBasicTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorArrayBasicTopResponse>(_offset), sizeof(ProtocolErrorArrayBasicTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorArrayBasicTopResponse::Clone(ProtocolErrorArrayBasicTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
+const fidl_type_t* Protocol_ErrorArrayCompound_Result::FidlType = &test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
+
+Protocol_ErrorArrayCompound_Result::Protocol_ErrorArrayCompound_Result() {}
+
+Protocol_ErrorArrayCompound_Result::~Protocol_ErrorArrayCompound_Result() {
+  Destroy();
+}
+
+Protocol_ErrorArrayCompound_Result::Protocol_ErrorArrayCompound_Result(Protocol_ErrorArrayCompound_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::ArrayCompound();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorArrayCompound_Result& Protocol_ErrorArrayCompound_Result::operator=(Protocol_ErrorArrayCompound_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::ArrayCompound();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorArrayCompound_Result Protocol_ErrorArrayCompound_Result::WithResponse(::test::typesinprotocols::ArrayCompound&& val) {
+  Protocol_ErrorArrayCompound_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorArrayCompound_Result Protocol_ErrorArrayCompound_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorArrayCompound_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorArrayCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::ArrayCompound>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::ArrayCompound, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorArrayCompound_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorArrayCompound_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::ArrayCompound();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorArrayCompound_Result::Clone(Protocol_ErrorArrayCompound_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::ArrayCompound();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorArrayCompound_Result& Protocol_ErrorArrayCompound_Result::set_response(::test::typesinprotocols::ArrayCompound value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorArrayCompound_Result& Protocol_ErrorArrayCompound_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorArrayCompound_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorArrayCompound_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::ArrayCompound();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+const fidl_type_t* ProtocolErrorArrayCompoundTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+
+void ProtocolErrorArrayCompoundTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorArrayCompoundTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorArrayCompoundTopResponse>(_offset), this, sizeof(ProtocolErrorArrayCompoundTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorArrayCompoundTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorArrayCompoundTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorArrayCompoundTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorArrayCompoundTopResponse>(_offset), sizeof(ProtocolErrorArrayCompoundTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorArrayCompoundTopResponse::Clone(ProtocolErrorArrayCompoundTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
+const fidl_type_t* Protocol_ErrorVectorBasic_Result::FidlType = &test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
+
+Protocol_ErrorVectorBasic_Result::Protocol_ErrorVectorBasic_Result() {}
+
+Protocol_ErrorVectorBasic_Result::~Protocol_ErrorVectorBasic_Result() {
+  Destroy();
+}
+
+Protocol_ErrorVectorBasic_Result::Protocol_ErrorVectorBasic_Result(Protocol_ErrorVectorBasic_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::VectorBasic();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorVectorBasic_Result& Protocol_ErrorVectorBasic_Result::operator=(Protocol_ErrorVectorBasic_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::VectorBasic();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorVectorBasic_Result Protocol_ErrorVectorBasic_Result::WithResponse(::test::typesinprotocols::VectorBasic&& val) {
+  Protocol_ErrorVectorBasic_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorVectorBasic_Result Protocol_ErrorVectorBasic_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorVectorBasic_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorVectorBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::VectorBasic>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::VectorBasic, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorVectorBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorVectorBasic_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::VectorBasic();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorVectorBasic_Result::Clone(Protocol_ErrorVectorBasic_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::VectorBasic();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorVectorBasic_Result& Protocol_ErrorVectorBasic_Result::set_response(::test::typesinprotocols::VectorBasic value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorVectorBasic_Result& Protocol_ErrorVectorBasic_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorVectorBasic_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorVectorBasic_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::VectorBasic();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+const fidl_type_t* ProtocolErrorVectorBasicTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+
+void ProtocolErrorVectorBasicTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorVectorBasicTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorVectorBasicTopResponse>(_offset), this, sizeof(ProtocolErrorVectorBasicTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorVectorBasicTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorVectorBasicTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorVectorBasicTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorVectorBasicTopResponse>(_offset), sizeof(ProtocolErrorVectorBasicTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorVectorBasicTopResponse::Clone(ProtocolErrorVectorBasicTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
+const fidl_type_t* Protocol_ErrorVectorCompound_Result::FidlType = &test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
+
+Protocol_ErrorVectorCompound_Result::Protocol_ErrorVectorCompound_Result() {}
+
+Protocol_ErrorVectorCompound_Result::~Protocol_ErrorVectorCompound_Result() {
+  Destroy();
+}
+
+Protocol_ErrorVectorCompound_Result::Protocol_ErrorVectorCompound_Result(Protocol_ErrorVectorCompound_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::VectorCompound();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorVectorCompound_Result& Protocol_ErrorVectorCompound_Result::operator=(Protocol_ErrorVectorCompound_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::VectorCompound();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorVectorCompound_Result Protocol_ErrorVectorCompound_Result::WithResponse(::test::typesinprotocols::VectorCompound&& val) {
+  Protocol_ErrorVectorCompound_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorVectorCompound_Result Protocol_ErrorVectorCompound_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorVectorCompound_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorVectorCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::VectorCompound>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::VectorCompound, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorVectorCompound_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorVectorCompound_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::VectorCompound();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorVectorCompound_Result::Clone(Protocol_ErrorVectorCompound_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::VectorCompound();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorVectorCompound_Result& Protocol_ErrorVectorCompound_Result::set_response(::test::typesinprotocols::VectorCompound value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorVectorCompound_Result& Protocol_ErrorVectorCompound_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorVectorCompound_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorVectorCompound_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::VectorCompound();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+const fidl_type_t* ProtocolErrorVectorCompoundTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+
+void ProtocolErrorVectorCompoundTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorVectorCompoundTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorVectorCompoundTopResponse>(_offset), this, sizeof(ProtocolErrorVectorCompoundTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorVectorCompoundTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorVectorCompoundTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorVectorCompoundTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorVectorCompoundTopResponse>(_offset), sizeof(ProtocolErrorVectorCompoundTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorVectorCompoundTopResponse::Clone(ProtocolErrorVectorCompoundTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
+const fidl_type_t* Protocol_ErrorVectorOptional_Result::FidlType = &test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
+
+Protocol_ErrorVectorOptional_Result::Protocol_ErrorVectorOptional_Result() {}
+
+Protocol_ErrorVectorOptional_Result::~Protocol_ErrorVectorOptional_Result() {
+  Destroy();
+}
+
+Protocol_ErrorVectorOptional_Result::Protocol_ErrorVectorOptional_Result(Protocol_ErrorVectorOptional_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::VectorOptional();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorVectorOptional_Result& Protocol_ErrorVectorOptional_Result::operator=(Protocol_ErrorVectorOptional_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::VectorOptional();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorVectorOptional_Result Protocol_ErrorVectorOptional_Result::WithResponse(::test::typesinprotocols::VectorOptional&& val) {
+  Protocol_ErrorVectorOptional_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorVectorOptional_Result Protocol_ErrorVectorOptional_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorVectorOptional_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorVectorOptional_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::VectorOptional>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::VectorOptional, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorVectorOptional_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorVectorOptional_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::VectorOptional();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorVectorOptional_Result::Clone(Protocol_ErrorVectorOptional_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::VectorOptional();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorVectorOptional_Result& Protocol_ErrorVectorOptional_Result::set_response(::test::typesinprotocols::VectorOptional value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorVectorOptional_Result& Protocol_ErrorVectorOptional_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorVectorOptional_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorVectorOptional_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::VectorOptional();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+const fidl_type_t* ProtocolErrorVectorOptionalTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+
+void ProtocolErrorVectorOptionalTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorVectorOptionalTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorVectorOptionalTopResponse>(_offset), this, sizeof(ProtocolErrorVectorOptionalTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorVectorOptionalTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorVectorOptionalTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorVectorOptionalTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorVectorOptionalTopResponse>(_offset), sizeof(ProtocolErrorVectorOptionalTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorVectorOptionalTopResponse::Clone(ProtocolErrorVectorOptionalTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
+const fidl_type_t* Protocol_ErrorArrayVectorNested_Result::FidlType = &test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
+
+Protocol_ErrorArrayVectorNested_Result::Protocol_ErrorArrayVectorNested_Result() {}
+
+Protocol_ErrorArrayVectorNested_Result::~Protocol_ErrorArrayVectorNested_Result() {
+  Destroy();
+}
+
+Protocol_ErrorArrayVectorNested_Result::Protocol_ErrorArrayVectorNested_Result(Protocol_ErrorArrayVectorNested_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::ArrayVectorNested();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorArrayVectorNested_Result& Protocol_ErrorArrayVectorNested_Result::operator=(Protocol_ErrorArrayVectorNested_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::ArrayVectorNested();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorArrayVectorNested_Result Protocol_ErrorArrayVectorNested_Result::WithResponse(::test::typesinprotocols::ArrayVectorNested&& val) {
+  Protocol_ErrorArrayVectorNested_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorArrayVectorNested_Result Protocol_ErrorArrayVectorNested_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorArrayVectorNested_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorArrayVectorNested_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::ArrayVectorNested>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::ArrayVectorNested, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorArrayVectorNested_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorArrayVectorNested_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::ArrayVectorNested();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorArrayVectorNested_Result::Clone(Protocol_ErrorArrayVectorNested_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::ArrayVectorNested();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorArrayVectorNested_Result& Protocol_ErrorArrayVectorNested_Result::set_response(::test::typesinprotocols::ArrayVectorNested value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorArrayVectorNested_Result& Protocol_ErrorArrayVectorNested_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorArrayVectorNested_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorArrayVectorNested_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::ArrayVectorNested();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+const fidl_type_t* ProtocolErrorArrayVectorNestedTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+
+void ProtocolErrorArrayVectorNestedTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorArrayVectorNestedTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorArrayVectorNestedTopResponse>(_offset), this, sizeof(ProtocolErrorArrayVectorNestedTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorArrayVectorNestedTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorArrayVectorNestedTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorArrayVectorNestedTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorArrayVectorNestedTopResponse>(_offset), sizeof(ProtocolErrorArrayVectorNestedTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorArrayVectorNestedTopResponse::Clone(ProtocolErrorArrayVectorNestedTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
+const fidl_type_t* Protocol_ErrorResource_Result::FidlType = &test_typesinprotocols_Protocol_ErrorResource_ResultTable;
+
+Protocol_ErrorResource_Result::Protocol_ErrorResource_Result() {}
+
+Protocol_ErrorResource_Result::~Protocol_ErrorResource_Result() {
+  Destroy();
+}
+
+Protocol_ErrorResource_Result::Protocol_ErrorResource_Result(Protocol_ErrorResource_Result&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse:
+      new (&response_) ::test::typesinprotocols::Resource();
+      response_ = std::move(other.response_);
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
+      err_ = std::move(other.err_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid):
+      break;
+  }
+}
+
+Protocol_ErrorResource_Result& Protocol_ErrorResource_Result::operator=(Protocol_ErrorResource_Result&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::Resource();
+        response_ = std::move(other.response_);
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
+        err_ = std::move(other.err_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid):
+        break;
+    }
+  }
+  return *this;
+}
+
+Protocol_ErrorResource_Result Protocol_ErrorResource_Result::WithResponse(::test::typesinprotocols::Resource&& val) {
+  Protocol_ErrorResource_Result result;
+  result.set_response(std::move(val));
+  return result;
+}
+Protocol_ErrorResource_Result Protocol_ErrorResource_Result::WithErr(uint32_t&& val) {
+  Protocol_ErrorResource_Result result;
+  result.set_err(std::move(val));
+  return result;
+}
+
+
+void Protocol_ErrorResource_Result::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse: {
+      if (::fidl::EncodingInlineSize<::test::typesinprotocols::Resource>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &response_,
+        encoder->Alloc(::fidl::EncodingInlineSize<::test::typesinprotocols::Resource, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr: {
+      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &err_,
+        encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void Protocol_ErrorResource_Result::Decode(::fidl::Decoder* _decoder, Protocol_ErrorResource_Result* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse: {
+      new (&value->response_) ::test::typesinprotocols::Resource();
+      ::fidl::Decode(_decoder, &value->response_, value_offset);
+      break;
+    }
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr: {
+      ::fidl::Decode(_decoder, &value->err_, value_offset);
+      break;
+    }
+    default: {
+  break;
+    }
+  }
+
+}
+
+zx_status_t Protocol_ErrorResource_Result::Clone(Protocol_ErrorResource_Result* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse:
+      new (&result->response_) ::test::typesinprotocols::Resource();
+      return ::fidl::Clone(response_, &result->response_);
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
+      return ::fidl::Clone(err_, &result->err_);
+    default:return ZX_OK;
+  }
+}
+
+Protocol_ErrorResource_Result& Protocol_ErrorResource_Result::set_response(::test::typesinprotocols::Resource value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse);
+  response_ = std::move(value);
+  return *this;
+}
+
+Protocol_ErrorResource_Result& Protocol_ErrorResource_Result::set_err(uint32_t value) {
+  EnsureStorageInitialized(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr);
+  err_ = std::move(value);
+  return *this;
+}
+
+void Protocol_ErrorResource_Result::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse:
+      response_.~decltype(response_)();
+      break;
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
+      break;
+  
+    default:
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid);
+}
+
+void Protocol_ErrorResource_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse:
+        new (&response_) ::test::typesinprotocols::Resource();
+        break;
+      case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
+        new (&err_) uint32_t();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+#endif  // __Fuchsia__
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+const fidl_type_t* ProtocolErrorResourceTopResponse::FidlType = &test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+
+void ProtocolErrorResourceTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorResourceTopResponse>::value) {
+    memcpy(_encoder->template GetPtr<ProtocolErrorResourceTopResponse>(_offset), this, sizeof(ProtocolErrorResourceTopResponse));
+  } else {::fidl::Encode(_encoder, &result, _offset + 0);
+    
+  }
+}
+
+void ProtocolErrorResourceTopResponse::Decode(::fidl::Decoder* _decoder, ProtocolErrorResourceTopResponse* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ProtocolErrorResourceTopResponse>::value) {
+    memcpy(_value, _decoder->template GetPtr<ProtocolErrorResourceTopResponse>(_offset), sizeof(ProtocolErrorResourceTopResponse));
+  } else {
+    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
+  }
+}
+
+zx_status_t ProtocolErrorResourceTopResponse::Clone(ProtocolErrorResourceTopResponse* _result) const {
+  zx_status_t _status = ::fidl::Clone(result, &_result->result);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+#endif  // __Fuchsia__
+
+
 //
 // Proxies and stubs definitions
 //
@@ -1314,11 +3421,17 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
   
   
   
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+  
+  
   
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
   
   
   
+  
+  
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
   
   
   
@@ -1328,11 +3441,17 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
   
   
   
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+  
+  
   
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
   
   
   
+  
+  
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
   
   
   
@@ -1342,11 +3461,17 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
   
   
   
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+  
+  
   
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
   
   
   
+  
+  
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
   
   
   
@@ -1356,6 +3481,9 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
   
   
   
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+  
+  
   
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
   
@@ -1363,11 +3491,17 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTabl
   
   
   
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+  
+  
   
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
   
   
   
+  
+  
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
   
   
 
@@ -1388,6 +3522,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorBasic_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayCompound_Ordinal:
       *out_is_known = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
@@ -1396,6 +3535,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_is_known = true;
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorCompound_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
         ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayArrayBasic_Ordinal:
       *out_is_known = true;
@@ -1406,6 +3550,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayArrayCompound_Ordinal:
       *out_is_known = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
@@ -1414,6 +3563,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_is_known = true;
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
         ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorBasic_Ordinal:
       *out_is_known = true;
@@ -1424,6 +3578,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorCompound_Ordinal:
       *out_is_known = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
@@ -1432,6 +3591,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_is_known = true;
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
         ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal:
       *out_is_known = true;
@@ -1442,6 +3606,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayArrayVectorNested_Ordinal:
       *out_is_known = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
@@ -1451,6 +3620,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal:
       *out_is_known = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
@@ -1459,6 +3633,11 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_is_known = true;
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorResource_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return nullptr;
         ;
     default:
       return nullptr;
@@ -1470,11 +3649,17 @@ const fidl_type_t* Protocol_ResponseDecoder::GetType(uint64_t ordinal) {
     case ::test::typesinprotocols::internal::kProtocol_TwoWayBasic_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorBasic_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_EventBasic_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_TwoWayCompound_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorCompound_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_EventCompound_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
@@ -1482,11 +3667,17 @@ const fidl_type_t* Protocol_ResponseDecoder::GetType(uint64_t ordinal) {
     case ::test::typesinprotocols::internal::kProtocol_TwoWayArrayBasic_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_EventArrayBasic_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_TwoWayArrayCompound_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_EventArrayCompound_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
@@ -1494,11 +3685,17 @@ const fidl_type_t* Protocol_ResponseDecoder::GetType(uint64_t ordinal) {
     case ::test::typesinprotocols::internal::kProtocol_TwoWayVectorBasic_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_EventVectorBasic_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_TwoWayVectorCompound_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_EventVectorCompound_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
@@ -1506,17 +3703,26 @@ const fidl_type_t* Protocol_ResponseDecoder::GetType(uint64_t ordinal) {
     case ::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_EventVectorOptional_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_TwoWayArrayVectorNested_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+        ;
     case ::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_ErrorResource_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
         ;
     case ::test::typesinprotocols::internal::kProtocol_EventResource_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
@@ -1709,6 +3915,26 @@ void Protocol_Proxy::TwoWayBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_BasicTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayBasic(&_encoder, &uint8, &uint16, &uint32, &uint64, &int8, &int16, &int32, &int64, &float32, &float64, &string, &opt_string), Protocol_TwoWayBasic_ResponseHandler(std::move(callback)));
 }
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorBasic_ResponseHandler(Protocol::ErrorBasicCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorBasic\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorBasic_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorBasicTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorBasic(ErrorBasicCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorBasic_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorBasic(&_encoder), Protocol_ErrorBasic_ResponseHandler(std::move(callback)));
+}
 void Protocol_Proxy::OneWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayCompound_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
@@ -1733,6 +3959,26 @@ void Protocol_Proxy::TwoWayCompound(::test::typesinprotocols::Bits bits, ::test:
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayCompound_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayCompound(&_encoder, &bits, &enum_, &struct_, &table, &union_, &opt_struct, &opt_union), Protocol_TwoWayCompound_ResponseHandler(std::move(callback)));
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorCompound_ResponseHandler(Protocol::ErrorCompoundCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorCompound\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorCompound_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorCompound(ErrorCompoundCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorCompound_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorCompound(&_encoder), Protocol_ErrorCompound_ResponseHandler(std::move(callback)));
 }
 void Protocol_Proxy::OneWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayArrayBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayArrayBasic_DynamicFlags);
@@ -1759,6 +4005,26 @@ void Protocol_Proxy::TwoWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::st
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayBasicTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayArrayBasic(&_encoder, &array_uint8, &array_uint16, &array_uint32, &array_uint64, &array_int8, &array_int16, &array_int32, &array_int64, &array_float32, &array_float64, &array_string, &array_opt_string), Protocol_TwoWayArrayBasic_ResponseHandler(std::move(callback)));
 }
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorArrayBasic_ResponseHandler(Protocol::ErrorArrayBasicCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorArrayBasic\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorArrayBasic(ErrorArrayBasicCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorArrayBasic(&_encoder), Protocol_ErrorArrayBasic_ResponseHandler(std::move(callback)));
+}
 void Protocol_Proxy::OneWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayArrayCompound_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
@@ -1783,6 +4049,26 @@ void Protocol_Proxy::TwoWayArrayCompound(::std::array<::test::typesinprotocols::
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayArrayCompound_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayArrayCompound(&_encoder, &array_bits, &array_enum, &array_struct, &array_table, &array_union, &array_opt_struct, &array_opt_union), Protocol_TwoWayArrayCompound_ResponseHandler(std::move(callback)));
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorArrayCompound_ResponseHandler(Protocol::ErrorArrayCompoundCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorArrayCompound\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorArrayCompound(ErrorArrayCompoundCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorArrayCompound(&_encoder), Protocol_ErrorArrayCompound_ResponseHandler(std::move(callback)));
 }
 void Protocol_Proxy::OneWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorBasic_DynamicFlags);
@@ -1809,6 +4095,26 @@ void Protocol_Proxy::TwoWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::st
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorBasicTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorBasic(&_encoder, &vector_uint8, &vector_uint16, &vector_uint32, &vector_uint64, &vector_int8, &vector_int16, &vector_int32, &vector_int64, &vector_float32, &vector_float64, &vector_string, &vector_opt_string), Protocol_TwoWayVectorBasic_ResponseHandler(std::move(callback)));
 }
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorVectorBasic_ResponseHandler(Protocol::ErrorVectorBasicCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorVectorBasic\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorVectorBasic(ErrorVectorBasicCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorBasic(&_encoder), Protocol_ErrorVectorBasic_ResponseHandler(std::move(callback)));
+}
 void Protocol_Proxy::OneWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorCompound_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
@@ -1833,6 +4139,26 @@ void Protocol_Proxy::TwoWayVectorCompound(::std::vector<::test::typesinprotocols
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayVectorCompound_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorCompound(&_encoder, &vector_bits, &vector_enum, &vector_struct, &vector_table, &vector_union, &vector_opt_struct, &vector_opt_union), Protocol_TwoWayVectorCompound_ResponseHandler(std::move(callback)));
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorVectorCompound_ResponseHandler(Protocol::ErrorVectorCompoundCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorVectorCompound\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorVectorCompound(ErrorVectorCompoundCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorCompound(&_encoder), Protocol_ErrorVectorCompound_ResponseHandler(std::move(callback)));
 }
 void Protocol_Proxy::OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_DynamicFlags);
@@ -1859,6 +4185,26 @@ void Protocol_Proxy::TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct), Protocol_TwoWayVectorOptional_ResponseHandler(std::move(callback)));
 }
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorVectorOptional_ResponseHandler(Protocol::ErrorVectorOptionalCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorVectorOptional\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorVectorOptional(ErrorVectorOptionalCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorOptional(&_encoder), Protocol_ErrorVectorOptional_ResponseHandler(std::move(callback)));
+}
 void Protocol_Proxy::OneWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayArrayVectorNested_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
@@ -1883,6 +4229,26 @@ void Protocol_Proxy::TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayArrayVectorNested_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayArrayVectorNested(&_encoder, &array_array_uint8, &array_vector_uint8, &vector_array_uint8, &vector_vector_uint8), Protocol_TwoWayArrayVectorNested_ResponseHandler(std::move(callback)));
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorArrayVectorNested_ResponseHandler(Protocol::ErrorArrayVectorNestedCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorArrayVectorNested\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorArrayVectorNested(ErrorArrayVectorNestedCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorArrayVectorNested(&_encoder), Protocol_ErrorArrayVectorNested_ResponseHandler(std::move(callback)));
 }
 void Protocol_Proxy::OneWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayResource_DynamicFlags);
@@ -1909,6 +4275,26 @@ void Protocol_Proxy::TwoWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union), Protocol_TwoWayResource_ResponseHandler(std::move(callback)));
 }
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_ErrorResource_ResponseHandler(Protocol::ErrorResourceCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::ErrorResource\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorResource_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorResourceTopResponseTable);
+}
+
+}  // namespace
+void Protocol_Proxy::ErrorResource(ErrorResourceCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorResource_DynamicFlags);
+  const fidl_type_t* req_type =nullptr;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorResource(&_encoder), Protocol_ErrorResource_ResponseHandler(std::move(callback)));
+}
 
 Protocol_Stub::Protocol_Stub(::test::typesinprotocols::Protocol_Stub::Protocol_clazz* impl) : impl_(impl) {
   (void)impl_;
@@ -1933,6 +4319,21 @@ class Protocol_TwoWayBasic_Responder final {
   ::fidl::internal::PendingResponse response_;
 };
 
+class Protocol_ErrorBasic_Responder final {
+ public:
+  Protocol_ErrorBasic_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorBasic_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorBasic_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorBasic(&_encoder, &result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
 class Protocol_TwoWayCompound_Responder final {
  public:
   Protocol_TwoWayCompound_Responder(::fidl::internal::PendingResponse response)
@@ -1942,6 +4343,21 @@ class Protocol_TwoWayCompound_Responder final {
     ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayCompound_DynamicFlags);
     const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
     response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayCompound(&_encoder, &bits, &enum_, &struct_, &table, &union_, &opt_struct, &opt_union));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class Protocol_ErrorCompound_Responder final {
+ public:
+  Protocol_ErrorCompound_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorCompound_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorCompound_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorCompound(&_encoder, &result));
   }
 
  private:
@@ -1963,6 +4379,21 @@ class Protocol_TwoWayArrayBasic_Responder final {
   ::fidl::internal::PendingResponse response_;
 };
 
+class Protocol_ErrorArrayBasic_Responder final {
+ public:
+  Protocol_ErrorArrayBasic_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorArrayBasic(&_encoder, &result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
 class Protocol_TwoWayArrayCompound_Responder final {
  public:
   Protocol_TwoWayArrayCompound_Responder(::fidl::internal::PendingResponse response)
@@ -1972,6 +4403,21 @@ class Protocol_TwoWayArrayCompound_Responder final {
     ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayArrayCompound_DynamicFlags);
     const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
     response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayArrayCompound(&_encoder, &array_bits, &array_enum, &array_struct, &array_table, &array_union, &array_opt_struct, &array_opt_union));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class Protocol_ErrorArrayCompound_Responder final {
+ public:
+  Protocol_ErrorArrayCompound_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorArrayCompound(&_encoder, &result));
   }
 
  private:
@@ -1993,6 +4439,21 @@ class Protocol_TwoWayVectorBasic_Responder final {
   ::fidl::internal::PendingResponse response_;
 };
 
+class Protocol_ErrorVectorBasic_Responder final {
+ public:
+  Protocol_ErrorVectorBasic_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorVectorBasic(&_encoder, &result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
 class Protocol_TwoWayVectorCompound_Responder final {
  public:
   Protocol_TwoWayVectorCompound_Responder(::fidl::internal::PendingResponse response)
@@ -2002,6 +4463,21 @@ class Protocol_TwoWayVectorCompound_Responder final {
     ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayVectorCompound_DynamicFlags);
     const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
     response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayVectorCompound(&_encoder, &vector_bits, &vector_enum, &vector_struct, &vector_table, &vector_union, &vector_opt_struct, &vector_opt_union));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class Protocol_ErrorVectorCompound_Responder final {
+ public:
+  Protocol_ErrorVectorCompound_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorVectorCompound(&_encoder, &result));
   }
 
  private:
@@ -2023,6 +4499,21 @@ class Protocol_TwoWayVectorOptional_Responder final {
   ::fidl::internal::PendingResponse response_;
 };
 
+class Protocol_ErrorVectorOptional_Responder final {
+ public:
+  Protocol_ErrorVectorOptional_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorVectorOptional(&_encoder, &result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
 class Protocol_TwoWayArrayVectorNested_Responder final {
  public:
   Protocol_TwoWayArrayVectorNested_Responder(::fidl::internal::PendingResponse response)
@@ -2038,6 +4529,21 @@ class Protocol_TwoWayArrayVectorNested_Responder final {
   ::fidl::internal::PendingResponse response_;
 };
 
+class Protocol_ErrorArrayVectorNested_Responder final {
+ public:
+  Protocol_ErrorArrayVectorNested_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorArrayVectorNested(&_encoder, &result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
 class Protocol_TwoWayResource_Responder final {
  public:
   Protocol_TwoWayResource_Responder(::fidl::internal::PendingResponse response)
@@ -2047,6 +4553,21 @@ class Protocol_TwoWayResource_Responder final {
     ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayResource_DynamicFlags);
     const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
     response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class Protocol_ErrorResource_Responder final {
+ public:
+  Protocol_ErrorResource_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::typesinprotocols::Protocol_ErrorResource_Result result) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorResource_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::ErrorResource(&_encoder, &result));
   }
 
  private:
@@ -2101,6 +4622,11 @@ zx_status_t Protocol_Stub::Dispatch_(
       impl_->TwoWayBasic(::fidl::DecodeAs<uint8_t>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<uint16_t>(&decoder, 2 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<uint32_t>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<uint64_t>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<int8_t>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<int16_t>(&decoder, 18 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<int32_t>(&decoder, 20 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<int64_t>(&decoder, 24 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<float>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<double>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::string>(&decoder, 48 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::StringPtr>(&decoder, 64 + sizeof(fidl_message_header_t)), Protocol_TwoWayBasic_Responder(std::move(response)));
       break;
     }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorBasic_Ordinal:
+    {
+      impl_->ErrorBasic(Protocol_ErrorBasic_Responder(std::move(response)));
+      break;
+    }
     case ::test::typesinprotocols::internal::kProtocol_OneWayCompound_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
@@ -2111,6 +4637,11 @@ zx_status_t Protocol_Stub::Dispatch_(
     {
       ::fidl::Decoder decoder(std::move(message));
       impl_->TwoWayCompound(::fidl::DecodeAs<::test::typesinprotocols::Bits>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::Enum>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::Struct>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::Table>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::Union>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::Struct>>(&decoder, 48 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::Union>>(&decoder, 56 + sizeof(fidl_message_header_t)), Protocol_TwoWayCompound_Responder(std::move(response)));
+      break;
+    }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorCompound_Ordinal:
+    {
+      impl_->ErrorCompound(Protocol_ErrorCompound_Responder(std::move(response)));
       break;
     }
     case ::test::typesinprotocols::internal::kProtocol_OneWayArrayBasic_Ordinal:
@@ -2125,6 +4656,11 @@ zx_status_t Protocol_Stub::Dispatch_(
       impl_->TwoWayArrayBasic(::fidl::DecodeAs<::std::array<uint8_t, 5>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<uint16_t, 5>>(&decoder, 6 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<uint32_t, 5>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<uint64_t, 5>>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<int8_t, 5>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<int16_t, 5>>(&decoder, 86 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<int32_t, 5>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<int64_t, 5>>(&decoder, 120 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<float, 5>>(&decoder, 160 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<double, 5>>(&decoder, 184 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::std::string, 5>>(&decoder, 224 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::StringPtr, 5>>(&decoder, 304 + sizeof(fidl_message_header_t)), Protocol_TwoWayArrayBasic_Responder(std::move(response)));
       break;
     }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_Ordinal:
+    {
+      impl_->ErrorArrayBasic(Protocol_ErrorArrayBasic_Responder(std::move(response)));
+      break;
+    }
     case ::test::typesinprotocols::internal::kProtocol_OneWayArrayCompound_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
@@ -2135,6 +4671,11 @@ zx_status_t Protocol_Stub::Dispatch_(
     {
       ::fidl::Decoder decoder(std::move(message));
       impl_->TwoWayArrayCompound(::fidl::DecodeAs<::std::array<::test::typesinprotocols::Bits, 5>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::Enum, 5>>(&decoder, 20 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::Struct, 5>>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::Table, 5>>(&decoder, 48 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::Union, 5>>(&decoder, 128 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>>(&decoder, 208 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>(&decoder, 248 + sizeof(fidl_message_header_t)), Protocol_TwoWayArrayCompound_Responder(std::move(response)));
+      break;
+    }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_Ordinal:
+    {
+      impl_->ErrorArrayCompound(Protocol_ErrorArrayCompound_Responder(std::move(response)));
       break;
     }
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorBasic_Ordinal:
@@ -2149,6 +4690,11 @@ zx_status_t Protocol_Stub::Dispatch_(
       impl_->TwoWayVectorBasic(::fidl::DecodeAs<::std::vector<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<uint16_t>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<uint32_t>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<uint64_t>>(&decoder, 48 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<int8_t>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<int16_t>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<int32_t>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<int64_t>>(&decoder, 112 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<float>>(&decoder, 128 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<double>>(&decoder, 144 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::string>>(&decoder, 160 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::StringPtr>>(&decoder, 176 + sizeof(fidl_message_header_t)), Protocol_TwoWayVectorBasic_Responder(std::move(response)));
       break;
     }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_Ordinal:
+    {
+      impl_->ErrorVectorBasic(Protocol_ErrorVectorBasic_Responder(std::move(response)));
+      break;
+    }
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorCompound_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
@@ -2159,6 +4705,11 @@ zx_status_t Protocol_Stub::Dispatch_(
     {
       ::fidl::Decoder decoder(std::move(message));
       impl_->TwoWayVectorCompound(::fidl::DecodeAs<::std::vector<::test::typesinprotocols::Bits>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::Enum>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::Struct>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::Table>>(&decoder, 48 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::Union>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>(&decoder, 96 + sizeof(fidl_message_header_t)), Protocol_TwoWayVectorCompound_Responder(std::move(response)));
+      break;
+    }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_Ordinal:
+    {
+      impl_->ErrorVectorCompound(Protocol_ErrorVectorCompound_Responder(std::move(response)));
       break;
     }
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal:
@@ -2173,6 +4724,11 @@ zx_status_t Protocol_Stub::Dispatch_(
       impl_->TwoWayVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)), Protocol_TwoWayVectorOptional_Responder(std::move(response)));
       break;
     }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal:
+    {
+      impl_->ErrorVectorOptional(Protocol_ErrorVectorOptional_Responder(std::move(response)));
+      break;
+    }
     case ::test::typesinprotocols::internal::kProtocol_OneWayArrayVectorNested_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
@@ -2185,6 +4741,11 @@ zx_status_t Protocol_Stub::Dispatch_(
       impl_->TwoWayArrayVectorNested(::fidl::DecodeAs<::std::array<::std::array<uint8_t, 5>, 5>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::std::vector<uint8_t>, 5>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::array<uint8_t, 5>>>(&decoder, 112 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::vector<uint8_t>>>(&decoder, 128 + sizeof(fidl_message_header_t)), Protocol_TwoWayArrayVectorNested_Responder(std::move(response)));
       break;
     }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_Ordinal:
+    {
+      impl_->ErrorArrayVectorNested(Protocol_ErrorArrayVectorNested_Responder(std::move(response)));
+      break;
+    }
     case ::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
@@ -2195,6 +4756,11 @@ zx_status_t Protocol_Stub::Dispatch_(
     {
       ::fidl::Decoder decoder(std::move(message));
       impl_->TwoWayResource(::fidl::DecodeAs<::zx::handle>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 12 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceStruct>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceTable>(&decoder, 24 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceUnion>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::handle>(&decoder, 56 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 60 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 68 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>(&decoder, 72 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::handle, 5>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::vmo, 5>>(&decoder, 116 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>(&decoder, 136 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>(&decoder, 156 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceStruct, 5>>(&decoder, 176 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceTable, 5>>(&decoder, 184 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceUnion, 5>>(&decoder, 264 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::handle>>(&decoder, 344 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::vmo>>(&decoder, 360 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>(&decoder, 376 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>(&decoder, 392 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder, 408 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder, 424 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder, 440 + sizeof(fidl_message_header_t)), Protocol_TwoWayResource_Responder(std::move(response)));
+      break;
+    }
+    case ::test::typesinprotocols::internal::kProtocol_ErrorResource_Ordinal:
+    {
+      impl_->ErrorResource(Protocol_ErrorResource_Responder(std::move(response)));
       break;
     }
     default: {
@@ -2278,6 +4844,20 @@ zx_status_t Protocol_SyncProxy::TwoWayBasic(uint8_t uint8, uint16_t uint16, uint
   return ZX_OK;
 }
 
+zx_status_t Protocol_SyncProxy::ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorBasic_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorBasic(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorBasic_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
 zx_status_t Protocol_SyncProxy::OneWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayCompound_DynamicFlags);
     const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_CompoundTable;
@@ -2301,6 +4881,20 @@ zx_status_t Protocol_SyncProxy::TwoWayCompound(::test::typesinprotocols::Bits bi
   *out_union_ = ::fidl::DecodeAs<::test::typesinprotocols::Union>(&decoder_, 32 + sizeof(fidl_message_header_t));
   *out_opt_struct = ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::Struct>>(&decoder_, 48 + sizeof(fidl_message_header_t));
   *out_opt_union = ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::Union>>(&decoder_, 56 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t Protocol_SyncProxy::ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorCompound_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorCompound(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorCompound_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -2335,6 +4929,20 @@ zx_status_t Protocol_SyncProxy::TwoWayArrayBasic(::std::array<uint8_t, 5> array_
   return ZX_OK;
 }
 
+zx_status_t Protocol_SyncProxy::ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayBasic_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorArrayBasic(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
 zx_status_t Protocol_SyncProxy::OneWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayArrayCompound_DynamicFlags);
     const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayCompoundTable;
@@ -2358,6 +4966,20 @@ zx_status_t Protocol_SyncProxy::TwoWayArrayCompound(::std::array<::test::typesin
   *out_array_union = ::fidl::DecodeAs<::std::array<::test::typesinprotocols::Union, 5>>(&decoder_, 128 + sizeof(fidl_message_header_t));
   *out_array_opt_struct = ::fidl::DecodeAs<::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>>(&decoder_, 208 + sizeof(fidl_message_header_t));
   *out_array_opt_union = ::fidl::DecodeAs<::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>(&decoder_, 248 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t Protocol_SyncProxy::ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayCompound_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorArrayCompound(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -2392,6 +5014,20 @@ zx_status_t Protocol_SyncProxy::TwoWayVectorBasic(::std::vector<uint8_t> vector_
   return ZX_OK;
 }
 
+zx_status_t Protocol_SyncProxy::ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorBasic_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorBasic(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
 zx_status_t Protocol_SyncProxy::OneWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorCompound_DynamicFlags);
     const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;
@@ -2418,6 +5054,20 @@ zx_status_t Protocol_SyncProxy::TwoWayVectorCompound(::std::vector<::test::types
   return ZX_OK;
 }
 
+zx_status_t Protocol_SyncProxy::ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorCompound_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorCompound(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
 zx_status_t Protocol_SyncProxy::OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_DynamicFlags);
     const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
@@ -2437,6 +5087,20 @@ zx_status_t Protocol_SyncProxy::TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> 
   *out_opt_vector_uint8 = ::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder_, 0 + sizeof(fidl_message_header_t));
   *out_opt_vector_string = ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder_, 16 + sizeof(fidl_message_header_t));
   *out_opt_vector_opt_struct = ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder_, 48 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t Protocol_SyncProxy::ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorOptional(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -2460,6 +5124,20 @@ zx_status_t Protocol_SyncProxy::TwoWayArrayVectorNested(::std::array<::std::arra
   *out_array_vector_uint8 = ::fidl::DecodeAs<::std::array<::std::vector<uint8_t>, 5>>(&decoder_, 32 + sizeof(fidl_message_header_t));
   *out_vector_array_uint8 = ::fidl::DecodeAs<::std::vector<::std::array<uint8_t, 5>>>(&decoder_, 112 + sizeof(fidl_message_header_t));
   *out_vector_vector_uint8 = ::fidl::DecodeAs<::std::vector<::std::vector<uint8_t>>>(&decoder_, 128 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t Protocol_SyncProxy::ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorArrayVectorNested_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorArrayVectorNested(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -2506,6 +5184,20 @@ zx_status_t Protocol_SyncProxy::TwoWayResource(::zx::handle handle, ::zx::vmo vm
   *out_vector_struct = ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder_, 408 + sizeof(fidl_message_header_t));
   *out_vector_table = ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder_, 424 + sizeof(fidl_message_header_t));
   *out_vector_union = ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder_, 440 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t Protocol_SyncProxy::ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result* out_result) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_ErrorResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_ErrorResource_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =nullptr;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorResource(&_encoder), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_result = ::fidl::DecodeAs<::test::typesinprotocols::Protocol_ErrorResource_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 

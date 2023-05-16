@@ -190,6 +190,96 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Resource> {
   static inline ::test_typesinprotocols::Resource Convert(::test::typesinprotocols::Resource&&);
 };
 template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorBasicTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorBasicTopResponse Convert(::test_typesinprotocols::ProtocolErrorBasicTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorBasicTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorBasicTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorBasicTopResponse Convert(::test::typesinprotocols::ProtocolErrorBasicTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorCompoundTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorCompoundTopResponse Convert(::test_typesinprotocols::ProtocolErrorCompoundTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorCompoundTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorCompoundTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorCompoundTopResponse Convert(::test::typesinprotocols::ProtocolErrorCompoundTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse Convert(::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse Convert(::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse Convert(::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse Convert(::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse Convert(::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse Convert(::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse Convert(::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse Convert(::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse Convert(::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse Convert(::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse Convert(::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse Convert(::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorResourceTopResponse> {
+  using HLCPPType = ::test::typesinprotocols::ProtocolErrorResourceTopResponse;
+  static inline ::test::typesinprotocols::ProtocolErrorResourceTopResponse Convert(::test_typesinprotocols::ProtocolErrorResourceTopResponse&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorResourceTopResponse> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorResourceTopResponse;
+  static inline ::test_typesinprotocols::ProtocolErrorResourceTopResponse Convert(::test::typesinprotocols::ProtocolErrorResourceTopResponse&&);
+};
+template <>
 struct NaturalToHLCPPTraits<::test_typesinprotocols::Table> {
   using HLCPPType = ::test::typesinprotocols::Table;
   static inline ::test::typesinprotocols::Table Convert(::test_typesinprotocols::Table&&);
@@ -228,6 +318,96 @@ template <>
 struct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceUnion> {
   using NaturalType = ::test_typesinprotocols::ResourceUnion;
   static inline ::test_typesinprotocols::ResourceUnion Convert(::test::typesinprotocols::ResourceUnion&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorBasicResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorBasic_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorBasic_Result Convert(::test_typesinprotocols::ProtocolErrorBasicResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorBasic_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorBasicResult;
+  static inline ::test_typesinprotocols::ProtocolErrorBasicResult Convert(::test::typesinprotocols::Protocol_ErrorBasic_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorCompoundResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorCompound_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorCompound_Result Convert(::test_typesinprotocols::ProtocolErrorCompoundResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorCompound_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorCompoundResult;
+  static inline ::test_typesinprotocols::ProtocolErrorCompoundResult Convert(::test::typesinprotocols::Protocol_ErrorCompound_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result Convert(::test_typesinprotocols::ProtocolErrorArrayBasicResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorArrayBasicResult;
+  static inline ::test_typesinprotocols::ProtocolErrorArrayBasicResult Convert(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result Convert(::test_typesinprotocols::ProtocolErrorArrayCompoundResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult;
+  static inline ::test_typesinprotocols::ProtocolErrorArrayCompoundResult Convert(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result Convert(::test_typesinprotocols::ProtocolErrorVectorBasicResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorVectorBasicResult;
+  static inline ::test_typesinprotocols::ProtocolErrorVectorBasicResult Convert(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result Convert(::test_typesinprotocols::ProtocolErrorVectorCompoundResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult;
+  static inline ::test_typesinprotocols::ProtocolErrorVectorCompoundResult Convert(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result Convert(::test_typesinprotocols::ProtocolErrorVectorOptionalResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult;
+  static inline ::test_typesinprotocols::ProtocolErrorVectorOptionalResult Convert(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result Convert(::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult;
+  static inline ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult Convert(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorResourceResult> {
+  using HLCPPType = ::test::typesinprotocols::Protocol_ErrorResource_Result;
+  static inline ::test::typesinprotocols::Protocol_ErrorResource_Result Convert(::test_typesinprotocols::ProtocolErrorResourceResult&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorResource_Result> {
+  using NaturalType = ::test_typesinprotocols::ProtocolErrorResourceResult;
+  static inline ::test_typesinprotocols::ProtocolErrorResourceResult Convert(::test::typesinprotocols::Protocol_ErrorResource_Result&&);
 };
 
 ::test::typesinprotocols::Struct NaturalToHLCPPTraits<::test_typesinprotocols::Struct>::Convert(::test_typesinprotocols::Struct&& value) {
@@ -517,6 +697,105 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceUnion> {
       .vector_union = ::fidl::HLCPPToNatural(std::move(value.vector_union)),
   }};
 }
+::test::typesinprotocols::ProtocolErrorBasicTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorBasicTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorBasicTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorBasicTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorBasicTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorBasicTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorBasicTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorCompoundTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorCompoundTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorCompoundTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorCompoundTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorCompoundTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorCompoundTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorCompoundTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
+::test::typesinprotocols::ProtocolErrorResourceTopResponse NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorResourceTopResponse>::Convert(::test_typesinprotocols::ProtocolErrorResourceTopResponse&& value) {
+  ::test::typesinprotocols::ProtocolErrorResourceTopResponse hlcpp;
+  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorResourceTopResponse HLCPPToNaturalTraits<::test::typesinprotocols::ProtocolErrorResourceTopResponse>::Convert(::test::typesinprotocols::ProtocolErrorResourceTopResponse&& value) {
+  return ::test_typesinprotocols::ProtocolErrorResourceTopResponse{{
+      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
+  }};
+}
 ::test::typesinprotocols::Table NaturalToHLCPPTraits<::test_typesinprotocols::Table>::Convert(::test_typesinprotocols::Table&& value) {
   ::test::typesinprotocols::Table hlcpp;
   return hlcpp;
@@ -578,6 +857,258 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceUnion> {
           ::fidl::HLCPPToNatural(std::move(value.b())));
     default:
       return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
+  }
+}
+::test::typesinprotocols::Protocol_ErrorBasic_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorBasicResult>::Convert(::test_typesinprotocols::ProtocolErrorBasicResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorBasic_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorBasicResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorBasic_Result>::Convert(::test::typesinprotocols::Protocol_ErrorBasic_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorBasicResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorBasic_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorCompound_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorCompoundResult>::Convert(::test_typesinprotocols::ProtocolErrorCompoundResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorCompound_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorCompoundResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorCompound_Result>::Convert(::test::typesinprotocols::Protocol_ErrorCompound_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorCompoundResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorCompound_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorArrayBasic_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult>::Convert(::test_typesinprotocols::ProtocolErrorArrayBasicResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorArrayBasicResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>::Convert(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorArrayBasicResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorArrayBasic_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorArrayCompound_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult>::Convert(::test_typesinprotocols::ProtocolErrorArrayCompoundResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorArrayCompoundResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>::Convert(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorArrayCompound_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorVectorBasic_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult>::Convert(::test_typesinprotocols::ProtocolErrorVectorBasicResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorVectorBasicResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>::Convert(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorVectorBasicResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorVectorBasic_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorVectorCompound_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult>::Convert(::test_typesinprotocols::ProtocolErrorVectorCompoundResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorVectorCompoundResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>::Convert(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorVectorCompound_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorVectorOptional_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult>::Convert(::test_typesinprotocols::ProtocolErrorVectorOptionalResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorVectorOptionalResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>::Convert(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorVectorOptional_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult>::Convert(::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>::Convert(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result");
+  }
+}
+::test::typesinprotocols::Protocol_ErrorResource_Result NaturalToHLCPPTraits<::test_typesinprotocols::ProtocolErrorResourceResult>::Convert(::test_typesinprotocols::ProtocolErrorResourceResult&& value) {
+  ::test::typesinprotocols::Protocol_ErrorResource_Result hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kResponse:
+      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
+      break;
+    case ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kErr:
+      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ProtocolErrorResourceResult HLCPPToNaturalTraits<::test::typesinprotocols::Protocol_ErrorResource_Result>::Convert(::test::typesinprotocols::Protocol_ErrorResource_Result&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ProtocolErrorResourceResult;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse:
+      return _NaturalUnion::WithResponse(
+          ::fidl::HLCPPToNatural(std::move(value.response())));
+    case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
+      return _NaturalUnion::WithErr(
+          ::fidl::HLCPPToNatural(std::move(value.err())));
+    default:
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::typesinprotocols::Protocol_ErrorResource_Result");
   }
 }
 

@@ -292,6 +292,78 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Forma
   os << "}";
   return os;
 }
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorBasicTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorBasicResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorCompoundTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorCompoundTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorCompoundResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorArrayBasicTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorArrayBasicResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorArrayCompoundResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorVectorBasicTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorVectorBasicResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorVectorCompoundResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorVectorOptionalResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceTopResponse>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceTopResponse& value) {
+  os << "test_typesinprotocols::ProtocolErrorResourceTopResponse";
+  os << "{ ";
+  os << "result";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ProtocolErrorResourceResult>(value.result()) << ", ";
+  os << "}";
+  return os;
+}
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Table>::Format(std::ostream& os, const ::test_typesinprotocols::Table& value) {
   os << "test_typesinprotocols::Table";
   os << "{ ";
@@ -320,6 +392,132 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::
   switch (value.Which()) {
     case ::test_typesinprotocols::ResourceUnion::Tag::kB:
       os << "b(" << fidl::ostream::Formatted<bool>(value.b().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorBasicResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::Basic>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorCompoundResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorCompoundResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::Compound>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayBasicResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorArrayBasicResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::ArrayBasic>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayCompoundResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorArrayCompoundResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::ArrayCompound>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorBasicResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorVectorBasicResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::VectorBasic>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorCompoundResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorVectorCompoundResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::VectorCompound>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorOptionalResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorVectorOptionalResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::VectorOptional>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::ArrayVectorNested>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value) {
+  os << "test_typesinprotocols::ProtocolErrorResourceResult::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kResponse:
+      os << "response(" << fidl::ostream::Formatted<::test_typesinprotocols::Resource>(value.response().value()) << ")";
+      break;
+    case ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kErr:
+      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
       break;
     default:
       os << "Unknown";
@@ -395,6 +593,78 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ArrayV
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resource& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorCompoundResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorCompoundTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayBasicResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayCompoundResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorBasicResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorCompoundResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorOptionalResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceResult>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceTopResponse& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceTopResponse>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

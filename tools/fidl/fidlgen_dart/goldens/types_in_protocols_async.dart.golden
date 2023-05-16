@@ -130,6 +130,834 @@ class Bits extends $fidl.Bits {
 const $fidl.BitsType<Bits> kBits_Type =
     $fidl.BitsType<Bits>(type: $fidl.Uint32Type(), ctor: Bits._ctor);
 
+enum ProtocolErrorArrayBasicResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorArrayBasicResultTag>
+    _ProtocolErrorArrayBasicResultTag_map = {
+  1: ProtocolErrorArrayBasicResultTag.response,
+  2: ProtocolErrorArrayBasicResultTag.err,
+};
+
+class ProtocolErrorArrayBasicResult extends $fidl.Union {
+  const ProtocolErrorArrayBasicResult.withResponse(ArrayBasic value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorArrayBasicResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorArrayBasicResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorArrayBasicResultTag get $tag =>
+      _ProtocolErrorArrayBasicResultTag_map[_ordinal]!;
+
+  ArrayBasic? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorArrayBasicResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorArrayBasicResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorArrayBasicResult>
+    kProtocol_ErrorArrayBasic_Result_Type =
+    $fidl.UnionType<ProtocolErrorArrayBasicResult>(
+  members: <int, $fidl.FidlType>{
+    1: kArrayBasic_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorArrayBasicResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorArrayBasicResult>
+    kProtocol_ErrorArrayBasic_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorArrayBasicResult>(
+  members: <int, $fidl.FidlType>{
+    1: kArrayBasic_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorArrayBasicResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorArrayCompoundResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorArrayCompoundResultTag>
+    _ProtocolErrorArrayCompoundResultTag_map = {
+  1: ProtocolErrorArrayCompoundResultTag.response,
+  2: ProtocolErrorArrayCompoundResultTag.err,
+};
+
+class ProtocolErrorArrayCompoundResult extends $fidl.Union {
+  const ProtocolErrorArrayCompoundResult.withResponse(ArrayCompound value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorArrayCompoundResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorArrayCompoundResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorArrayCompoundResultTag get $tag =>
+      _ProtocolErrorArrayCompoundResultTag_map[_ordinal]!;
+
+  ArrayCompound? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorArrayCompoundResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorArrayCompoundResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorArrayCompoundResult>
+    kProtocol_ErrorArrayCompound_Result_Type =
+    $fidl.UnionType<ProtocolErrorArrayCompoundResult>(
+  members: <int, $fidl.FidlType>{
+    1: kArrayCompound_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorArrayCompoundResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorArrayCompoundResult>
+    kProtocol_ErrorArrayCompound_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorArrayCompoundResult>(
+  members: <int, $fidl.FidlType>{
+    1: kArrayCompound_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorArrayCompoundResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorArrayVectorNestedResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorArrayVectorNestedResultTag>
+    _ProtocolErrorArrayVectorNestedResultTag_map = {
+  1: ProtocolErrorArrayVectorNestedResultTag.response,
+  2: ProtocolErrorArrayVectorNestedResultTag.err,
+};
+
+class ProtocolErrorArrayVectorNestedResult extends $fidl.Union {
+  const ProtocolErrorArrayVectorNestedResult.withResponse(
+      ArrayVectorNested value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorArrayVectorNestedResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorArrayVectorNestedResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorArrayVectorNestedResultTag get $tag =>
+      _ProtocolErrorArrayVectorNestedResultTag_map[_ordinal]!;
+
+  ArrayVectorNested? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorArrayVectorNestedResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorArrayVectorNestedResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorArrayVectorNestedResult>
+    kProtocol_ErrorArrayVectorNested_Result_Type =
+    $fidl.UnionType<ProtocolErrorArrayVectorNestedResult>(
+  members: <int, $fidl.FidlType>{
+    1: kArrayVectorNested_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorArrayVectorNestedResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorArrayVectorNestedResult>
+    kProtocol_ErrorArrayVectorNested_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorArrayVectorNestedResult>(
+  members: <int, $fidl.FidlType>{
+    1: kArrayVectorNested_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorArrayVectorNestedResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorBasicResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorBasicResultTag> _ProtocolErrorBasicResultTag_map = {
+  1: ProtocolErrorBasicResultTag.response,
+  2: ProtocolErrorBasicResultTag.err,
+};
+
+class ProtocolErrorBasicResult extends $fidl.Union {
+  const ProtocolErrorBasicResult.withResponse(Basic value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorBasicResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorBasicResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorBasicResultTag get $tag =>
+      _ProtocolErrorBasicResultTag_map[_ordinal]!;
+
+  Basic? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorBasicResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorBasicResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorBasicResult>
+    kProtocol_ErrorBasic_Result_Type =
+    $fidl.UnionType<ProtocolErrorBasicResult>(
+  members: <int, $fidl.FidlType>{
+    1: kBasic_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorBasicResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorBasicResult>
+    kProtocol_ErrorBasic_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorBasicResult>(
+  members: <int, $fidl.FidlType>{
+    1: kBasic_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorBasicResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorCompoundResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorCompoundResultTag>
+    _ProtocolErrorCompoundResultTag_map = {
+  1: ProtocolErrorCompoundResultTag.response,
+  2: ProtocolErrorCompoundResultTag.err,
+};
+
+class ProtocolErrorCompoundResult extends $fidl.Union {
+  const ProtocolErrorCompoundResult.withResponse(Compound value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorCompoundResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorCompoundResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorCompoundResultTag get $tag =>
+      _ProtocolErrorCompoundResultTag_map[_ordinal]!;
+
+  Compound? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorCompoundResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorCompoundResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorCompoundResult>
+    kProtocol_ErrorCompound_Result_Type =
+    $fidl.UnionType<ProtocolErrorCompoundResult>(
+  members: <int, $fidl.FidlType>{
+    1: kCompound_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorCompoundResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorCompoundResult>
+    kProtocol_ErrorCompound_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorCompoundResult>(
+  members: <int, $fidl.FidlType>{
+    1: kCompound_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorCompoundResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorResourceResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorResourceResultTag>
+    _ProtocolErrorResourceResultTag_map = {
+  1: ProtocolErrorResourceResultTag.response,
+  2: ProtocolErrorResourceResultTag.err,
+};
+
+class ProtocolErrorResourceResult extends $fidl.Union {
+  const ProtocolErrorResourceResult.withResponse(Resource value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorResourceResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorResourceResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorResourceResultTag get $tag =>
+      _ProtocolErrorResourceResultTag_map[_ordinal]!;
+
+  Resource? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorResourceResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorResourceResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorResourceResult>
+    kProtocol_ErrorResource_Result_Type =
+    $fidl.UnionType<ProtocolErrorResourceResult>(
+  members: <int, $fidl.FidlType>{
+    1: kResource_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorResourceResult._ctor,
+  flexible: false,
+  resource: true,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorResourceResult>
+    kProtocol_ErrorResource_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorResourceResult>(
+  members: <int, $fidl.FidlType>{
+    1: kResource_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorResourceResult._ctor,
+  flexible: false,
+  resource: true,
+);
+
+enum ProtocolErrorVectorBasicResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorVectorBasicResultTag>
+    _ProtocolErrorVectorBasicResultTag_map = {
+  1: ProtocolErrorVectorBasicResultTag.response,
+  2: ProtocolErrorVectorBasicResultTag.err,
+};
+
+class ProtocolErrorVectorBasicResult extends $fidl.Union {
+  const ProtocolErrorVectorBasicResult.withResponse(VectorBasic value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorVectorBasicResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorVectorBasicResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorVectorBasicResultTag get $tag =>
+      _ProtocolErrorVectorBasicResultTag_map[_ordinal]!;
+
+  VectorBasic? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorVectorBasicResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorVectorBasicResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorVectorBasicResult>
+    kProtocol_ErrorVectorBasic_Result_Type =
+    $fidl.UnionType<ProtocolErrorVectorBasicResult>(
+  members: <int, $fidl.FidlType>{
+    1: kVectorBasic_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorVectorBasicResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorVectorBasicResult>
+    kProtocol_ErrorVectorBasic_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorVectorBasicResult>(
+  members: <int, $fidl.FidlType>{
+    1: kVectorBasic_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorVectorBasicResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorVectorCompoundResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorVectorCompoundResultTag>
+    _ProtocolErrorVectorCompoundResultTag_map = {
+  1: ProtocolErrorVectorCompoundResultTag.response,
+  2: ProtocolErrorVectorCompoundResultTag.err,
+};
+
+class ProtocolErrorVectorCompoundResult extends $fidl.Union {
+  const ProtocolErrorVectorCompoundResult.withResponse(VectorCompound value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorVectorCompoundResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorVectorCompoundResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorVectorCompoundResultTag get $tag =>
+      _ProtocolErrorVectorCompoundResultTag_map[_ordinal]!;
+
+  VectorCompound? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorVectorCompoundResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorVectorCompoundResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorVectorCompoundResult>
+    kProtocol_ErrorVectorCompound_Result_Type =
+    $fidl.UnionType<ProtocolErrorVectorCompoundResult>(
+  members: <int, $fidl.FidlType>{
+    1: kVectorCompound_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorVectorCompoundResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorVectorCompoundResult>
+    kProtocol_ErrorVectorCompound_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorVectorCompoundResult>(
+  members: <int, $fidl.FidlType>{
+    1: kVectorCompound_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorVectorCompoundResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
+enum ProtocolErrorVectorOptionalResultTag {
+  response, // 0x1
+  err, // 0x2
+}
+
+const Map<int, ProtocolErrorVectorOptionalResultTag>
+    _ProtocolErrorVectorOptionalResultTag_map = {
+  1: ProtocolErrorVectorOptionalResultTag.response,
+  2: ProtocolErrorVectorOptionalResultTag.err,
+};
+
+class ProtocolErrorVectorOptionalResult extends $fidl.Union {
+  const ProtocolErrorVectorOptionalResult.withResponse(VectorOptional value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ProtocolErrorVectorOptionalResult.withErr(int value)
+      : _ordinal = 2,
+        _data = value;
+
+  ProtocolErrorVectorOptionalResult._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ProtocolErrorVectorOptionalResultTag get $tag =>
+      _ProtocolErrorVectorOptionalResultTag_map[_ordinal]!;
+
+  VectorOptional? get response {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  int? get err {
+    if (_ordinal != 2) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 2:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ProtocolErrorVectorOptionalResult _ctor(int ordinal, Object data) {
+    return ProtocolErrorVectorOptionalResult._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ProtocolErrorVectorOptionalResult>
+    kProtocol_ErrorVectorOptional_Result_Type =
+    $fidl.UnionType<ProtocolErrorVectorOptionalResult>(
+  members: <int, $fidl.FidlType>{
+    1: kVectorOptional_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorVectorOptionalResult._ctor,
+  flexible: false,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ProtocolErrorVectorOptionalResult>
+    kProtocol_ErrorVectorOptional_Result_OptType =
+    $fidl.NullableUnionType<ProtocolErrorVectorOptionalResult>(
+  members: <int, $fidl.FidlType>{
+    1: kVectorOptional_Type,
+    2: $fidl.Uint32Type(),
+  },
+  ctor: ProtocolErrorVectorOptionalResult._ctor,
+  flexible: false,
+  resource: false,
+);
+
 enum ResourceUnionTag {
   $unknown,
   b, // 0x1
@@ -2041,6 +2869,18 @@ const $fidl.MethodType _kProtocol_TwoWayBasic_Type = $fidl.MethodType(
   requestInlineSizeV2: 80,
   responseInlineSizeV2: 80,
 );
+// errorBasic: () -> (int uint8, int uint16, int uint32, int uint64, int int8, int int16, int int32, int int64, double float32, double float64, String string, String? optString)
+const int _kProtocol_ErrorBasic_Ordinal = 0x459eaa5d11b9ff93;
+const $fidl.MethodType _kProtocol_ErrorBasic_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorBasicResult>(
+        type: kProtocol_ErrorBasic_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorBasic",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
+);
 // eventBasic:  -> (int uint8, int uint16, int uint32, int uint64, int int8, int int16, int int32, int int64, double float32, double float64, String string, String? optString)
 const int _kProtocol_EventBasic_Ordinal = 0x51c5b06295c10c40;
 const $fidl.MethodType _kProtocol_EventBasic_Type = $fidl.MethodType(
@@ -2109,6 +2949,18 @@ const $fidl.MethodType _kProtocol_TwoWayCompound_Type = $fidl.MethodType(
   name: r"Protocol.TwoWayCompound",
   requestInlineSizeV2: 72,
   responseInlineSizeV2: 72,
+);
+// errorCompound: () -> (Bits bits, Enum enum$, Struct struct, Table table, Union union, Struct? optStruct, Union? optUnion)
+const int _kProtocol_ErrorCompound_Ordinal = 0x29817d89a19ec77d;
+const $fidl.MethodType _kProtocol_ErrorCompound_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorCompoundResult>(
+        type: kProtocol_ErrorCompound_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorCompound",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
 );
 // eventCompound:  -> (Bits bits, Enum enum$, Struct struct, Table table, Union union, Struct? optStruct, Union? optUnion)
 const int _kProtocol_EventCompound_Ordinal = 0x617c5410858734d5;
@@ -2299,6 +3151,18 @@ const $fidl.MethodType _kProtocol_TwoWayArrayBasic_Type = $fidl.MethodType(
   requestInlineSizeV2: 384,
   responseInlineSizeV2: 384,
 );
+// errorArrayBasic: () -> (Uint8List arrayUint8, Uint16List arrayUint16, Uint32List arrayUint32, Uint64List arrayUint64, Int8List arrayInt8, Int16List arrayInt16, Int32List arrayInt32, Int64List arrayInt64, Float32List arrayFloat32, Float64List arrayFloat64, List<String> arrayString, List<String?> arrayOptString)
+const int _kProtocol_ErrorArrayBasic_Ordinal = 0xf0dbde9626fff79;
+const $fidl.MethodType _kProtocol_ErrorArrayBasic_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorArrayBasicResult>(
+        type: kProtocol_ErrorArrayBasic_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorArrayBasic",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
+);
 // eventArrayBasic:  -> (Uint8List arrayUint8, Uint16List arrayUint16, Uint32List arrayUint32, Uint64List arrayUint64, Int8List arrayInt8, Int16List arrayInt16, Int32List arrayInt32, Int64List arrayInt64, Float32List arrayFloat32, Float64List arrayFloat64, List<String> arrayString, List<String?> arrayOptString)
 const int _kProtocol_EventArrayBasic_Ordinal = 0x51b76208b148f02e;
 const $fidl.MethodType _kProtocol_EventArrayBasic_Type = $fidl.MethodType(
@@ -2466,6 +3330,18 @@ const $fidl.MethodType _kProtocol_TwoWayArrayCompound_Type = $fidl.MethodType(
   name: r"Protocol.TwoWayArrayCompound",
   requestInlineSizeV2: 328,
   responseInlineSizeV2: 328,
+);
+// errorArrayCompound: () -> (List<Bits> arrayBits, List<Enum> arrayEnum, List<Struct> arrayStruct, List<Table> arrayTable, List<Union> arrayUnion, List<Struct?> arrayOptStruct, List<Union?> arrayOptUnion)
+const int _kProtocol_ErrorArrayCompound_Ordinal = 0x52257f80e29c1a04;
+const $fidl.MethodType _kProtocol_ErrorArrayCompound_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorArrayCompoundResult>(
+        type: kProtocol_ErrorArrayCompound_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorArrayCompound",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
 );
 // eventArrayCompound:  -> (List<Bits> arrayBits, List<Enum> arrayEnum, List<Struct> arrayStruct, List<Table> arrayTable, List<Union> arrayUnion, List<Struct?> arrayOptStruct, List<Union?> arrayOptUnion)
 const int _kProtocol_EventArrayCompound_Ordinal = 0x1e63a00079aa7415;
@@ -2677,6 +3553,18 @@ const $fidl.MethodType _kProtocol_TwoWayVectorBasic_Type = $fidl.MethodType(
   requestInlineSizeV2: 192,
   responseInlineSizeV2: 192,
 );
+// errorVectorBasic: () -> (Uint8List vectorUint8, Uint16List vectorUint16, Uint32List vectorUint32, Uint64List vectorUint64, Int8List vectorInt8, Int16List vectorInt16, Int32List vectorInt32, Int64List vectorInt64, Float32List vectorFloat32, Float64List vectorFloat64, List<String> vectorString, List<String?> vectorOptString)
+const int _kProtocol_ErrorVectorBasic_Ordinal = 0xc27f841d6313f72;
+const $fidl.MethodType _kProtocol_ErrorVectorBasic_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorVectorBasicResult>(
+        type: kProtocol_ErrorVectorBasic_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorVectorBasic",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
+);
 // eventVectorBasic:  -> (Uint8List vectorUint8, Uint16List vectorUint16, Uint32List vectorUint32, Uint64List vectorUint64, Int8List vectorInt8, Int16List vectorInt16, Int32List vectorInt32, Int64List vectorInt64, Float32List vectorFloat32, Float64List vectorFloat64, List<String> vectorString, List<String?> vectorOptString)
 const int _kProtocol_EventVectorBasic_Ordinal = 0x3f9d405e7191eff6;
 const $fidl.MethodType _kProtocol_EventVectorBasic_Type = $fidl.MethodType(
@@ -2845,6 +3733,18 @@ const $fidl.MethodType _kProtocol_TwoWayVectorCompound_Type = $fidl.MethodType(
   requestInlineSizeV2: 112,
   responseInlineSizeV2: 112,
 );
+// errorVectorCompound: () -> (List<Bits> vectorBits, List<Enum> vectorEnum, List<Struct> vectorStruct, List<Table> vectorTable, List<Union> vectorUnion, List<Struct?> vectorOptStruct, List<Union?> vectorOptUnion)
+const int _kProtocol_ErrorVectorCompound_Ordinal = 0x760e278628f7a985;
+const $fidl.MethodType _kProtocol_ErrorVectorCompound_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorVectorCompoundResult>(
+        type: kProtocol_ErrorVectorCompound_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorVectorCompound",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
+);
 // eventVectorCompound:  -> (List<Bits> vectorBits, List<Enum> vectorEnum, List<Struct> vectorStruct, List<Table> vectorTable, List<Union> vectorUnion, List<Struct?> vectorOptStruct, List<Union?> vectorOptUnion)
 const int _kProtocol_EventVectorCompound_Ordinal = 0x53a1fc56e8b3cff3;
 const $fidl.MethodType _kProtocol_EventVectorCompound_Type = $fidl.MethodType(
@@ -2958,6 +3858,18 @@ const $fidl.MethodType _kProtocol_TwoWayVectorOptional_Type = $fidl.MethodType(
   name: r"Protocol.TwoWayVectorOptional",
   requestInlineSizeV2: 64,
   responseInlineSizeV2: 64,
+);
+// errorVectorOptional: () -> (Uint8List? optVectorUint8, List<String>? optVectorString, List<Struct>? optVectorStruct, List<Struct?>? optVectorOptStruct)
+const int _kProtocol_ErrorVectorOptional_Ordinal = 0x58e75cf86e2d715e;
+const $fidl.MethodType _kProtocol_ErrorVectorOptional_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorVectorOptionalResult>(
+        type: kProtocol_ErrorVectorOptional_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorVectorOptional",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
 );
 // eventVectorOptional:  -> (Uint8List? optVectorUint8, List<String>? optVectorString, List<Struct>? optVectorStruct, List<Struct?>? optVectorOptStruct)
 const int _kProtocol_EventVectorOptional_Ordinal = 0x17617b54dfa8d85d;
@@ -3081,6 +3993,19 @@ const $fidl.MethodType _kProtocol_TwoWayArrayVectorNested_Type =
   name: r"Protocol.TwoWayArrayVectorNested",
   requestInlineSizeV2: 144,
   responseInlineSizeV2: 144,
+);
+// errorArrayVectorNested: () -> (List<Uint8List> arrayArrayUint8, List<Uint8List> arrayVectorUint8, List<Uint8List> vectorArrayUint8, List<Uint8List> vectorVectorUint8)
+const int _kProtocol_ErrorArrayVectorNested_Ordinal = 0x7e168d89e1dac8a7;
+const $fidl.MethodType _kProtocol_ErrorArrayVectorNested_Type =
+    $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorArrayVectorNestedResult>(
+        type: kProtocol_ErrorArrayVectorNested_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorArrayVectorNested",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
 );
 // eventArrayVectorNested:  -> (List<Uint8List> arrayArrayUint8, List<Uint8List> arrayVectorUint8, List<Uint8List> vectorArrayUint8, List<Uint8List> vectorVectorUint8)
 const int _kProtocol_EventArrayVectorNested_Ordinal = 0x110b72cfebc4037e;
@@ -3417,6 +4342,18 @@ const $fidl.MethodType _kProtocol_TwoWayResource_Type = $fidl.MethodType(
   requestInlineSizeV2: 456,
   responseInlineSizeV2: 456,
 );
+// errorResource: () -> ($zircon.Handle handle, $zircon.Vmo vmo, $fidl.InterfaceHandle<Protocol> clientEnd, $fidl.InterfaceRequest<Protocol> serverEnd, ResourceStruct struct, ResourceTable table, ResourceUnion union, $zircon.Handle? optHandle, $zircon.Vmo? optVmo, $fidl.InterfaceHandle<Protocol>? optClientEnd, $fidl.InterfaceRequest<Protocol>? optServerEnd, ResourceStruct? optStruct, ResourceUnion? optUnion, List<$zircon.Handle> arrayHandle, List<$zircon.Vmo> arrayVmo, List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd, List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd, List<ResourceStruct> arrayStruct, List<ResourceTable> arrayTable, List<ResourceUnion> arrayUnion, List<$zircon.Handle> vectorHandle, List<$zircon.Vmo> vectorVmo, List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd, List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd, List<ResourceStruct> vectorStruct, List<ResourceTable> vectorTable, List<ResourceUnion> vectorUnion)
+const int _kProtocol_ErrorResource_Ordinal = 0x5b28634d603175b6;
+const $fidl.MethodType _kProtocol_ErrorResource_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<ProtocolErrorResourceResult>(
+        type: kProtocol_ErrorResource_Result_Type, offset: 0),
+  ],
+  name: r"Protocol.ErrorResource",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 16,
+);
 // eventResource:  -> ($zircon.Handle handle, $zircon.Vmo vmo, $fidl.InterfaceHandle<Protocol> clientEnd, $fidl.InterfaceRequest<Protocol> serverEnd, ResourceStruct struct, ResourceTable table, ResourceUnion union, $zircon.Handle? optHandle, $zircon.Vmo? optVmo, $fidl.InterfaceHandle<Protocol>? optClientEnd, $fidl.InterfaceRequest<Protocol>? optServerEnd, ResourceStruct? optStruct, ResourceUnion? optUnion, List<$zircon.Handle> arrayHandle, List<$zircon.Vmo> arrayVmo, List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd, List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd, List<ResourceStruct> arrayStruct, List<ResourceTable> arrayTable, List<ResourceUnion> arrayUnion, List<$zircon.Handle> vectorHandle, List<$zircon.Vmo> vectorVmo, List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd, List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd, List<ResourceStruct> vectorStruct, List<ResourceTable> vectorTable, List<ResourceUnion> vectorUnion)
 const int _kProtocol_EventResource_Ordinal = 0x4fbde2864601698b;
 const $fidl.MethodType _kProtocol_EventResource_Type = $fidl.MethodType(
@@ -3550,6 +4487,35 @@ class Protocol$TwoWayBasic$Response {
   );
 }
 
+class Protocol$ErrorBasic$Response {
+  final int uint8;
+  final int uint16;
+  final int uint32;
+  final int uint64;
+  final int int8;
+  final int int16;
+  final int int32;
+  final int int64;
+  final double float32;
+  final double float64;
+  final String string;
+  final String? optString;
+  Protocol$ErrorBasic$Response(
+    this.uint8,
+    this.uint16,
+    this.uint32,
+    this.uint64,
+    this.int8,
+    this.int16,
+    this.int32,
+    this.int64,
+    this.float32,
+    this.float64,
+    this.string,
+    this.optString,
+  );
+}
+
 class Protocol$EventBasic$Response {
   final int uint8;
   final int uint16;
@@ -3598,6 +4564,25 @@ class Protocol$TwoWayCompound$Response {
   );
 }
 
+class Protocol$ErrorCompound$Response {
+  final Bits bits;
+  final Enum enum$;
+  final Struct struct;
+  final Table table;
+  final Union union;
+  final Struct? optStruct;
+  final Union? optUnion;
+  Protocol$ErrorCompound$Response(
+    this.bits,
+    this.enum$,
+    this.struct,
+    this.table,
+    this.union,
+    this.optStruct,
+    this.optUnion,
+  );
+}
+
 class Protocol$EventCompound$Response {
   final Bits bits;
   final Enum enum$;
@@ -3631,6 +4616,35 @@ class Protocol$TwoWayArrayBasic$Response {
   final List<String> arrayString;
   final List<String?> arrayOptString;
   Protocol$TwoWayArrayBasic$Response(
+    this.arrayUint8,
+    this.arrayUint16,
+    this.arrayUint32,
+    this.arrayUint64,
+    this.arrayInt8,
+    this.arrayInt16,
+    this.arrayInt32,
+    this.arrayInt64,
+    this.arrayFloat32,
+    this.arrayFloat64,
+    this.arrayString,
+    this.arrayOptString,
+  );
+}
+
+class Protocol$ErrorArrayBasic$Response {
+  final Uint8List arrayUint8;
+  final Uint16List arrayUint16;
+  final Uint32List arrayUint32;
+  final Uint64List arrayUint64;
+  final Int8List arrayInt8;
+  final Int16List arrayInt16;
+  final Int32List arrayInt32;
+  final Int64List arrayInt64;
+  final Float32List arrayFloat32;
+  final Float64List arrayFloat64;
+  final List<String> arrayString;
+  final List<String?> arrayOptString;
+  Protocol$ErrorArrayBasic$Response(
     this.arrayUint8,
     this.arrayUint16,
     this.arrayUint32,
@@ -3694,6 +4708,25 @@ class Protocol$TwoWayArrayCompound$Response {
   );
 }
 
+class Protocol$ErrorArrayCompound$Response {
+  final List<Bits> arrayBits;
+  final List<Enum> arrayEnum;
+  final List<Struct> arrayStruct;
+  final List<Table> arrayTable;
+  final List<Union> arrayUnion;
+  final List<Struct?> arrayOptStruct;
+  final List<Union?> arrayOptUnion;
+  Protocol$ErrorArrayCompound$Response(
+    this.arrayBits,
+    this.arrayEnum,
+    this.arrayStruct,
+    this.arrayTable,
+    this.arrayUnion,
+    this.arrayOptStruct,
+    this.arrayOptUnion,
+  );
+}
+
 class Protocol$EventArrayCompound$Response {
   final List<Bits> arrayBits;
   final List<Enum> arrayEnum;
@@ -3727,6 +4760,35 @@ class Protocol$TwoWayVectorBasic$Response {
   final List<String> vectorString;
   final List<String?> vectorOptString;
   Protocol$TwoWayVectorBasic$Response(
+    this.vectorUint8,
+    this.vectorUint16,
+    this.vectorUint32,
+    this.vectorUint64,
+    this.vectorInt8,
+    this.vectorInt16,
+    this.vectorInt32,
+    this.vectorInt64,
+    this.vectorFloat32,
+    this.vectorFloat64,
+    this.vectorString,
+    this.vectorOptString,
+  );
+}
+
+class Protocol$ErrorVectorBasic$Response {
+  final Uint8List vectorUint8;
+  final Uint16List vectorUint16;
+  final Uint32List vectorUint32;
+  final Uint64List vectorUint64;
+  final Int8List vectorInt8;
+  final Int16List vectorInt16;
+  final Int32List vectorInt32;
+  final Int64List vectorInt64;
+  final Float32List vectorFloat32;
+  final Float64List vectorFloat64;
+  final List<String> vectorString;
+  final List<String?> vectorOptString;
+  Protocol$ErrorVectorBasic$Response(
     this.vectorUint8,
     this.vectorUint16,
     this.vectorUint32,
@@ -3790,6 +4852,25 @@ class Protocol$TwoWayVectorCompound$Response {
   );
 }
 
+class Protocol$ErrorVectorCompound$Response {
+  final List<Bits> vectorBits;
+  final List<Enum> vectorEnum;
+  final List<Struct> vectorStruct;
+  final List<Table> vectorTable;
+  final List<Union> vectorUnion;
+  final List<Struct?> vectorOptStruct;
+  final List<Union?> vectorOptUnion;
+  Protocol$ErrorVectorCompound$Response(
+    this.vectorBits,
+    this.vectorEnum,
+    this.vectorStruct,
+    this.vectorTable,
+    this.vectorUnion,
+    this.vectorOptStruct,
+    this.vectorOptUnion,
+  );
+}
+
 class Protocol$EventVectorCompound$Response {
   final List<Bits> vectorBits;
   final List<Enum> vectorEnum;
@@ -3822,6 +4903,19 @@ class Protocol$TwoWayVectorOptional$Response {
   );
 }
 
+class Protocol$ErrorVectorOptional$Response {
+  final Uint8List? optVectorUint8;
+  final List<String>? optVectorString;
+  final List<Struct>? optVectorStruct;
+  final List<Struct?>? optVectorOptStruct;
+  Protocol$ErrorVectorOptional$Response(
+    this.optVectorUint8,
+    this.optVectorString,
+    this.optVectorStruct,
+    this.optVectorOptStruct,
+  );
+}
+
 class Protocol$EventVectorOptional$Response {
   final Uint8List? optVectorUint8;
   final List<String>? optVectorString;
@@ -3841,6 +4935,19 @@ class Protocol$TwoWayArrayVectorNested$Response {
   final List<Uint8List> vectorArrayUint8;
   final List<Uint8List> vectorVectorUint8;
   Protocol$TwoWayArrayVectorNested$Response(
+    this.arrayArrayUint8,
+    this.arrayVectorUint8,
+    this.vectorArrayUint8,
+    this.vectorVectorUint8,
+  );
+}
+
+class Protocol$ErrorArrayVectorNested$Response {
+  final List<Uint8List> arrayArrayUint8;
+  final List<Uint8List> arrayVectorUint8;
+  final List<Uint8List> vectorArrayUint8;
+  final List<Uint8List> vectorVectorUint8;
+  Protocol$ErrorArrayVectorNested$Response(
     this.arrayArrayUint8,
     this.arrayVectorUint8,
     this.vectorArrayUint8,
@@ -3890,6 +4997,65 @@ class Protocol$TwoWayResource$Response {
   final List<ResourceTable> vectorTable;
   final List<ResourceUnion> vectorUnion;
   Protocol$TwoWayResource$Response(
+    this.handle,
+    this.vmo,
+    this.clientEnd,
+    this.serverEnd,
+    this.struct,
+    this.table,
+    this.union,
+    this.optHandle,
+    this.optVmo,
+    this.optClientEnd,
+    this.optServerEnd,
+    this.optStruct,
+    this.optUnion,
+    this.arrayHandle,
+    this.arrayVmo,
+    this.arrayClientEnd,
+    this.arrayServerEnd,
+    this.arrayStruct,
+    this.arrayTable,
+    this.arrayUnion,
+    this.vectorHandle,
+    this.vectorVmo,
+    this.vectorClientEnd,
+    this.vectorServerEnd,
+    this.vectorStruct,
+    this.vectorTable,
+    this.vectorUnion,
+  );
+}
+
+class Protocol$ErrorResource$Response {
+  final $zircon.Handle handle;
+  final $zircon.Vmo vmo;
+  final $fidl.InterfaceHandle<Protocol> clientEnd;
+  final $fidl.InterfaceRequest<Protocol> serverEnd;
+  final ResourceStruct struct;
+  final ResourceTable table;
+  final ResourceUnion union;
+  final $zircon.Handle? optHandle;
+  final $zircon.Vmo? optVmo;
+  final $fidl.InterfaceHandle<Protocol>? optClientEnd;
+  final $fidl.InterfaceRequest<Protocol>? optServerEnd;
+  final ResourceStruct? optStruct;
+  final ResourceUnion? optUnion;
+  final List<$zircon.Handle> arrayHandle;
+  final List<$zircon.Vmo> arrayVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd;
+  final List<ResourceStruct> arrayStruct;
+  final List<ResourceTable> arrayTable;
+  final List<ResourceUnion> arrayUnion;
+  final List<$zircon.Handle> vectorHandle;
+  final List<$zircon.Vmo> vectorVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd;
+  final List<ResourceStruct> vectorStruct;
+  final List<ResourceTable> vectorTable;
+  final List<ResourceUnion> vectorUnion;
+  Protocol$ErrorResource$Response(
     this.handle,
     this.vmo,
     this.clientEnd,
@@ -4007,6 +5173,7 @@ abstract class Protocol {
       double float64,
       String string,
       String? optString);
+  $async.Future<Protocol$ErrorBasic$Response> errorBasic();
   $async.Stream<Protocol$EventBasic$Response>? get eventBasic;
   $async.Future<void> oneWayCompound(Bits bits, Enum enum$, Struct struct,
       Table table, Union union, Struct? optStruct, Union? optUnion);
@@ -4018,6 +5185,7 @@ abstract class Protocol {
       Union union,
       Struct? optStruct,
       Union? optUnion);
+  $async.Future<Protocol$ErrorCompound$Response> errorCompound();
   $async.Stream<Protocol$EventCompound$Response>? get eventCompound;
   $async.Future<void> oneWayArrayBasic(
       Uint8List arrayUint8,
@@ -4045,6 +5213,7 @@ abstract class Protocol {
       Float64List arrayFloat64,
       List<String> arrayString,
       List<String?> arrayOptString);
+  $async.Future<Protocol$ErrorArrayBasic$Response> errorArrayBasic();
   $async.Stream<Protocol$EventArrayBasic$Response>? get eventArrayBasic;
   $async.Future<void> oneWayArrayCompound(
       List<Bits> arrayBits,
@@ -4062,6 +5231,7 @@ abstract class Protocol {
       List<Union> arrayUnion,
       List<Struct?> arrayOptStruct,
       List<Union?> arrayOptUnion);
+  $async.Future<Protocol$ErrorArrayCompound$Response> errorArrayCompound();
   $async.Stream<Protocol$EventArrayCompound$Response>? get eventArrayCompound;
   $async.Future<void> oneWayVectorBasic(
       Uint8List vectorUint8,
@@ -4089,6 +5259,7 @@ abstract class Protocol {
       Float64List vectorFloat64,
       List<String> vectorString,
       List<String?> vectorOptString);
+  $async.Future<Protocol$ErrorVectorBasic$Response> errorVectorBasic();
   $async.Stream<Protocol$EventVectorBasic$Response>? get eventVectorBasic;
   $async.Future<void> oneWayVectorCompound(
       List<Bits> vectorBits,
@@ -4106,6 +5277,7 @@ abstract class Protocol {
       List<Union> vectorUnion,
       List<Struct?> vectorOptStruct,
       List<Union?> vectorOptUnion);
+  $async.Future<Protocol$ErrorVectorCompound$Response> errorVectorCompound();
   $async.Stream<Protocol$EventVectorCompound$Response>? get eventVectorCompound;
   $async.Future<void> oneWayVectorOptional(
       Uint8List? optVectorUint8,
@@ -4117,6 +5289,7 @@ abstract class Protocol {
       List<String>? optVectorString,
       List<Struct>? optVectorStruct,
       List<Struct?>? optVectorOptStruct);
+  $async.Future<Protocol$ErrorVectorOptional$Response> errorVectorOptional();
   $async.Stream<Protocol$EventVectorOptional$Response>? get eventVectorOptional;
   $async.Future<void> oneWayArrayVectorNested(
       List<Uint8List> arrayArrayUint8,
@@ -4129,6 +5302,8 @@ abstract class Protocol {
           List<Uint8List> arrayVectorUint8,
           List<Uint8List> vectorArrayUint8,
           List<Uint8List> vectorVectorUint8);
+  $async.Future<Protocol$ErrorArrayVectorNested$Response>
+      errorArrayVectorNested();
   $async.Stream<Protocol$EventArrayVectorNested$Response>?
       get eventArrayVectorNested;
   $async.Future<void> oneWayResource(
@@ -4187,6 +5362,7 @@ abstract class Protocol {
       List<ResourceStruct> vectorStruct,
       List<ResourceTable> vectorTable,
       List<ResourceUnion> vectorUnion);
+  $async.Future<Protocol$ErrorResource$Response> errorResource();
   $async.Stream<Protocol$EventResource$Response>? get eventResource;
 } // TODO: Remove ServiceData for non-service
 
@@ -4598,6 +5774,44 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
           $completer.complete($response);
         });
         break;
+      case _kProtocol_ErrorBasic_Ordinal:
+        final String _name = _kProtocol_ErrorBasic_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorBasic_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorBasic_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorBasicResult $response = $fidl.decodeMessage(
+              $message,
+              _kProtocol_ErrorBasic_Type.responseInlineSize($wireFormat),
+              $types[0]);
+          if ($response.$tag == ProtocolErrorBasicResultTag.response) {
+            $completer.complete(Protocol$ErrorBasic$Response(
+              $response.response!.uint8,
+              $response.response!.uint16,
+              $response.response!.uint32,
+              $response.response!.uint64,
+              $response.response!.int8,
+              $response.response!.int16,
+              $response.response!.int32,
+              $response.response!.int64,
+              $response.response!.float32,
+              $response.response!.float64,
+              $response.response!.string,
+              $response.response!.optString,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
+        });
+        break;
       case _kProtocol_TwoWayCompound_Ordinal:
         final String _name = _kProtocol_TwoWayCompound_Type.name;
         $fidl.performCtrlWithExceptionHandling(
@@ -4624,6 +5838,39 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
             );
           });
           $completer.complete($response);
+        });
+        break;
+      case _kProtocol_ErrorCompound_Ordinal:
+        final String _name = _kProtocol_ErrorCompound_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorCompound_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorCompound_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorCompoundResult $response = $fidl.decodeMessage(
+              $message,
+              _kProtocol_ErrorCompound_Type.responseInlineSize($wireFormat),
+              $types[0]);
+          if ($response.$tag == ProtocolErrorCompoundResultTag.response) {
+            $completer.complete(Protocol$ErrorCompound$Response(
+              $response.response!.bits,
+              $response.response!.enum$,
+              $response.response!.struct,
+              $response.response!.table,
+              $response.response!.union,
+              $response.response!.optStruct,
+              $response.response!.optUnion,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
         });
         break;
       case _kProtocol_TwoWayArrayBasic_Ordinal:
@@ -4659,6 +5906,44 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
           $completer.complete($response);
         });
         break;
+      case _kProtocol_ErrorArrayBasic_Ordinal:
+        final String _name = _kProtocol_ErrorArrayBasic_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorArrayBasic_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorArrayBasic_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorArrayBasicResult $response = $fidl.decodeMessage(
+              $message,
+              _kProtocol_ErrorArrayBasic_Type.responseInlineSize($wireFormat),
+              $types[0]);
+          if ($response.$tag == ProtocolErrorArrayBasicResultTag.response) {
+            $completer.complete(Protocol$ErrorArrayBasic$Response(
+              $response.response!.arrayUint8,
+              $response.response!.arrayUint16,
+              $response.response!.arrayUint32,
+              $response.response!.arrayUint64,
+              $response.response!.arrayInt8,
+              $response.response!.arrayInt16,
+              $response.response!.arrayInt32,
+              $response.response!.arrayInt64,
+              $response.response!.arrayFloat32,
+              $response.response!.arrayFloat64,
+              $response.response!.arrayString,
+              $response.response!.arrayOptString,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
+        });
+        break;
       case _kProtocol_TwoWayArrayCompound_Ordinal:
         final String _name = _kProtocol_TwoWayArrayCompound_Type.name;
         $fidl.performCtrlWithExceptionHandling(
@@ -4685,6 +5970,41 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
             );
           });
           $completer.complete($response);
+        });
+        break;
+      case _kProtocol_ErrorArrayCompound_Ordinal:
+        final String _name = _kProtocol_ErrorArrayCompound_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorArrayCompound_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorArrayCompound_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorArrayCompoundResult $response =
+              $fidl.decodeMessage(
+                  $message,
+                  _kProtocol_ErrorArrayCompound_Type
+                      .responseInlineSize($wireFormat),
+                  $types[0]);
+          if ($response.$tag == ProtocolErrorArrayCompoundResultTag.response) {
+            $completer.complete(Protocol$ErrorArrayCompound$Response(
+              $response.response!.arrayBits,
+              $response.response!.arrayEnum,
+              $response.response!.arrayStruct,
+              $response.response!.arrayTable,
+              $response.response!.arrayUnion,
+              $response.response!.arrayOptStruct,
+              $response.response!.arrayOptUnion,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
         });
         break;
       case _kProtocol_TwoWayVectorBasic_Ordinal:
@@ -4720,6 +6040,44 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
           $completer.complete($response);
         });
         break;
+      case _kProtocol_ErrorVectorBasic_Ordinal:
+        final String _name = _kProtocol_ErrorVectorBasic_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorVectorBasic_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorVectorBasic_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorVectorBasicResult $response = $fidl.decodeMessage(
+              $message,
+              _kProtocol_ErrorVectorBasic_Type.responseInlineSize($wireFormat),
+              $types[0]);
+          if ($response.$tag == ProtocolErrorVectorBasicResultTag.response) {
+            $completer.complete(Protocol$ErrorVectorBasic$Response(
+              $response.response!.vectorUint8,
+              $response.response!.vectorUint16,
+              $response.response!.vectorUint32,
+              $response.response!.vectorUint64,
+              $response.response!.vectorInt8,
+              $response.response!.vectorInt16,
+              $response.response!.vectorInt32,
+              $response.response!.vectorInt64,
+              $response.response!.vectorFloat32,
+              $response.response!.vectorFloat64,
+              $response.response!.vectorString,
+              $response.response!.vectorOptString,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
+        });
+        break;
       case _kProtocol_TwoWayVectorCompound_Ordinal:
         final String _name = _kProtocol_TwoWayVectorCompound_Type.name;
         $fidl.performCtrlWithExceptionHandling(
@@ -4748,6 +6106,41 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
           $completer.complete($response);
         });
         break;
+      case _kProtocol_ErrorVectorCompound_Ordinal:
+        final String _name = _kProtocol_ErrorVectorCompound_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorVectorCompound_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorVectorCompound_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorVectorCompoundResult $response =
+              $fidl.decodeMessage(
+                  $message,
+                  _kProtocol_ErrorVectorCompound_Type
+                      .responseInlineSize($wireFormat),
+                  $types[0]);
+          if ($response.$tag == ProtocolErrorVectorCompoundResultTag.response) {
+            $completer.complete(Protocol$ErrorVectorCompound$Response(
+              $response.response!.vectorBits,
+              $response.response!.vectorEnum,
+              $response.response!.vectorStruct,
+              $response.response!.vectorTable,
+              $response.response!.vectorUnion,
+              $response.response!.vectorOptStruct,
+              $response.response!.vectorOptUnion,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
+        });
+        break;
       case _kProtocol_TwoWayVectorOptional_Ordinal:
         final String _name = _kProtocol_TwoWayVectorOptional_Type.name;
         $fidl.performCtrlWithExceptionHandling(
@@ -4773,6 +6166,38 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
           $completer.complete($response);
         });
         break;
+      case _kProtocol_ErrorVectorOptional_Ordinal:
+        final String _name = _kProtocol_ErrorVectorOptional_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorVectorOptional_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorVectorOptional_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorVectorOptionalResult $response =
+              $fidl.decodeMessage(
+                  $message,
+                  _kProtocol_ErrorVectorOptional_Type
+                      .responseInlineSize($wireFormat),
+                  $types[0]);
+          if ($response.$tag == ProtocolErrorVectorOptionalResultTag.response) {
+            $completer.complete(Protocol$ErrorVectorOptional$Response(
+              $response.response!.optVectorUint8,
+              $response.response!.optVectorString,
+              $response.response!.optVectorStruct,
+              $response.response!.optVectorOptStruct,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
+        });
+        break;
       case _kProtocol_TwoWayArrayVectorNested_Ordinal:
         final String _name = _kProtocol_TwoWayArrayVectorNested_Type.name;
         $fidl.performCtrlWithExceptionHandling(
@@ -4796,6 +6221,39 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
             );
           });
           $completer.complete($response);
+        });
+        break;
+      case _kProtocol_ErrorArrayVectorNested_Ordinal:
+        final String _name = _kProtocol_ErrorArrayVectorNested_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorArrayVectorNested_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorArrayVectorNested_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorArrayVectorNestedResult $response =
+              $fidl.decodeMessage(
+                  $message,
+                  _kProtocol_ErrorArrayVectorNested_Type
+                      .responseInlineSize($wireFormat),
+                  $types[0]);
+          if ($response.$tag ==
+              ProtocolErrorArrayVectorNestedResultTag.response) {
+            $completer.complete(Protocol$ErrorArrayVectorNested$Response(
+              $response.response!.arrayArrayUint8,
+              $response.response!.arrayVectorUint8,
+              $response.response!.vectorArrayUint8,
+              $response.response!.vectorVectorUint8,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
         });
         break;
       case _kProtocol_TwoWayResource_Ordinal:
@@ -4844,6 +6302,59 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
             );
           });
           $completer.complete($response);
+        });
+        break;
+      case _kProtocol_ErrorResource_Ordinal:
+        final String _name = _kProtocol_ErrorResource_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorResource_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorResource_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final ProtocolErrorResourceResult $response = $fidl.decodeMessage(
+              $message,
+              _kProtocol_ErrorResource_Type.responseInlineSize($wireFormat),
+              $types[0]);
+          if ($response.$tag == ProtocolErrorResourceResultTag.response) {
+            $completer.complete(Protocol$ErrorResource$Response(
+              $response.response!.handle,
+              $response.response!.vmo,
+              $response.response!.clientEnd,
+              $response.response!.serverEnd,
+              $response.response!.struct,
+              $response.response!.table,
+              $response.response!.union,
+              $response.response!.optHandle,
+              $response.response!.optVmo,
+              $response.response!.optClientEnd,
+              $response.response!.optServerEnd,
+              $response.response!.optStruct,
+              $response.response!.optUnion,
+              $response.response!.arrayHandle,
+              $response.response!.arrayVmo,
+              $response.response!.arrayClientEnd,
+              $response.response!.arrayServerEnd,
+              $response.response!.arrayStruct,
+              $response.response!.arrayTable,
+              $response.response!.arrayUnion,
+              $response.response!.vectorHandle,
+              $response.response!.vectorVmo,
+              $response.response!.vectorClientEnd,
+              $response.response!.vectorServerEnd,
+              $response.response!.vectorStruct,
+              $response.response!.vectorTable,
+              $response.response!.vectorUnion,
+            ));
+          } else {
+            $completer.completeError($fidl.MethodException($response.err));
+          }
         });
         break;
       default:
@@ -4941,6 +6452,22 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     return $completer.future;
   }
 
+  @override
+  $async.Future<Protocol$ErrorBasic$Response> errorBasic() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorBasic_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer = $async.Completer<Protocol$ErrorBasic$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
   final _eventBasicEventStreamController =
       $async.StreamController<Protocol$EventBasic$Response>.broadcast();
   @override
@@ -5009,6 +6536,22 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
       $types[6].encode($encoder, optUnion, $fidl.kMessageHeaderSize, 1);
     });
     final $completer = $async.Completer<Protocol$TwoWayCompound$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
+  @override
+  $async.Future<Protocol$ErrorCompound$Response> errorCompound() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorCompound_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer = $async.Completer<Protocol$ErrorCompound$Response>();
     ctrl.sendMessageWithResponse($encoder.message, $completer);
     return $completer.future;
   }
@@ -5111,6 +6654,22 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     return $completer.future;
   }
 
+  @override
+  $async.Future<Protocol$ErrorArrayBasic$Response> errorArrayBasic() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorArrayBasic_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer = $async.Completer<Protocol$ErrorArrayBasic$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
   final _eventArrayBasicEventStreamController =
       $async.StreamController<Protocol$EventArrayBasic$Response>.broadcast();
   @override
@@ -5188,6 +6747,22 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     });
     final $completer =
         $async.Completer<Protocol$TwoWayArrayCompound$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
+  @override
+  $async.Future<Protocol$ErrorArrayCompound$Response> errorArrayCompound() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorArrayCompound_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer = $async.Completer<Protocol$ErrorArrayCompound$Response>();
     ctrl.sendMessageWithResponse($encoder.message, $completer);
     return $completer.future;
   }
@@ -5292,6 +6867,22 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     return $completer.future;
   }
 
+  @override
+  $async.Future<Protocol$ErrorVectorBasic$Response> errorVectorBasic() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorVectorBasic_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer = $async.Completer<Protocol$ErrorVectorBasic$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
   final _eventVectorBasicEventStreamController =
       $async.StreamController<Protocol$EventVectorBasic$Response>.broadcast();
   @override
@@ -5373,6 +6964,23 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     return $completer.future;
   }
 
+  @override
+  $async.Future<Protocol$ErrorVectorCompound$Response> errorVectorCompound() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorVectorCompound_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer =
+        $async.Completer<Protocol$ErrorVectorCompound$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
   final _eventVectorCompoundEventStreamController = $async
       .StreamController<Protocol$EventVectorCompound$Response>.broadcast();
   @override
@@ -5441,6 +7049,23 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     });
     final $completer =
         $async.Completer<Protocol$TwoWayVectorOptional$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
+  @override
+  $async.Future<Protocol$ErrorVectorOptional$Response> errorVectorOptional() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorVectorOptional_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer =
+        $async.Completer<Protocol$ErrorVectorOptional$Response>();
     ctrl.sendMessageWithResponse($encoder.message, $completer);
     return $completer.future;
   }
@@ -5514,6 +7139,24 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
     });
     final $completer =
         $async.Completer<Protocol$TwoWayArrayVectorNested$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
+  @override
+  $async.Future<Protocol$ErrorArrayVectorNested$Response>
+      errorArrayVectorNested() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(_kProtocol_ErrorArrayVectorNested_Ordinal, 0,
+        $fidl.CallStrictness.strict);
+    final $completer =
+        $async.Completer<Protocol$ErrorArrayVectorNested$Response>();
     ctrl.sendMessageWithResponse($encoder.message, $completer);
     return $completer.future;
   }
@@ -5673,6 +7316,22 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
       $types[26].encode($encoder, vectorUnion, $fidl.kMessageHeaderSize, 1);
     });
     final $completer = $async.Completer<Protocol$TwoWayResource$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
+  @override
+  $async.Future<Protocol$ErrorResource$Response> errorResource() {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_ErrorResource_Ordinal, 0, $fidl.CallStrictness.strict);
+    final $completer = $async.Completer<Protocol$ErrorResource$Response>();
     ctrl.sendMessageWithResponse($encoder.message, $completer);
     return $completer.future;
   }
@@ -6197,6 +7856,65 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           });
         }, close);
         break;
+      case _kProtocol_ErrorBasic_Ordinal:
+        final String _name = _kProtocol_ErrorBasic_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorBasic_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorBasic_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorBasic$Response> $future = $fidl
+              .decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorBasic$Response>>($message,
+                  _kProtocol_ErrorBasic_Type.requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorBasic();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorBasicResult.withResponse(Basic(
+              uint8: $responseValue.uint8,
+              uint16: $responseValue.uint16,
+              uint32: $responseValue.uint32,
+              uint64: $responseValue.uint64,
+              int8: $responseValue.int8,
+              int16: $responseValue.int16,
+              int32: $responseValue.int32,
+              int64: $responseValue.int64,
+              float32: $responseValue.float32,
+              float64: $responseValue.float64,
+              string: $responseValue.string,
+              optString: $responseValue.optString,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorBasicResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorBasic_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorBasic_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorBasic_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
       case _kProtocol_OneWayCompound_Ordinal:
         final String _name = _kProtocol_OneWayCompound_Type.name;
         $fidl.performWithExceptionHandling(_name, () {
@@ -6269,6 +7987,60 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               $types[6].encode(
                   $encoder, $response.optUnion, $fidl.kMessageHeaderSize, 1);
             });
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
+      case _kProtocol_ErrorCompound_Ordinal:
+        final String _name = _kProtocol_ErrorCompound_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorCompound_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorCompound_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorCompound$Response> $future = $fidl
+              .decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorCompound$Response>>($message,
+                  _kProtocol_ErrorCompound_Type.requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorCompound();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorCompoundResult.withResponse(Compound(
+              bits: $responseValue.bits,
+              enum$: $responseValue.enum$,
+              struct: $responseValue.struct,
+              table: $responseValue.table,
+              union: $responseValue.union,
+              optStruct: $responseValue.optStruct,
+              optUnion: $responseValue.optUnion,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorCompoundResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorCompound_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorCompound_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorCompound_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
             $respond($encoder.message);
           }, onError: (_e) {
             $fidl.handleException(_name, _e, close);
@@ -6374,6 +8146,66 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           });
         }, close);
         break;
+      case _kProtocol_ErrorArrayBasic_Ordinal:
+        final String _name = _kProtocol_ErrorArrayBasic_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorArrayBasic_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorArrayBasic_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorArrayBasic$Response> $future = $fidl
+              .decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorArrayBasic$Response>>(
+                  $message,
+                  _kProtocol_ErrorArrayBasic_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorArrayBasic();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorArrayBasicResult.withResponse(ArrayBasic(
+              arrayUint8: $responseValue.arrayUint8,
+              arrayUint16: $responseValue.arrayUint16,
+              arrayUint32: $responseValue.arrayUint32,
+              arrayUint64: $responseValue.arrayUint64,
+              arrayInt8: $responseValue.arrayInt8,
+              arrayInt16: $responseValue.arrayInt16,
+              arrayInt32: $responseValue.arrayInt32,
+              arrayInt64: $responseValue.arrayInt64,
+              arrayFloat32: $responseValue.arrayFloat32,
+              arrayFloat64: $responseValue.arrayFloat64,
+              arrayString: $responseValue.arrayString,
+              arrayOptString: $responseValue.arrayOptString,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorArrayBasicResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorArrayBasic_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorArrayBasic_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorArrayBasic_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
       case _kProtocol_OneWayArrayCompound_Ordinal:
         final String _name = _kProtocol_OneWayArrayCompound_Type.name;
         $fidl.performWithExceptionHandling(_name, () {
@@ -6447,6 +8279,61 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               $types[6].encode($encoder, $response.arrayOptUnion,
                   $fidl.kMessageHeaderSize, 1);
             });
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
+      case _kProtocol_ErrorArrayCompound_Ordinal:
+        final String _name = _kProtocol_ErrorArrayCompound_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorArrayCompound_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorArrayCompound_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorArrayCompound$Response> $future =
+              $fidl.decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorArrayCompound$Response>>(
+                  $message,
+                  _kProtocol_ErrorArrayCompound_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorArrayCompound();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorArrayCompoundResult.withResponse(ArrayCompound(
+              arrayBits: $responseValue.arrayBits,
+              arrayEnum: $responseValue.arrayEnum,
+              arrayStruct: $responseValue.arrayStruct,
+              arrayTable: $responseValue.arrayTable,
+              arrayUnion: $responseValue.arrayUnion,
+              arrayOptStruct: $responseValue.arrayOptStruct,
+              arrayOptUnion: $responseValue.arrayOptUnion,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorArrayCompoundResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorArrayCompound_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorArrayCompound_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorArrayCompound_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
             $respond($encoder.message);
           }, onError: (_e) {
             $fidl.handleException(_name, _e, close);
@@ -6552,6 +8439,66 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           });
         }, close);
         break;
+      case _kProtocol_ErrorVectorBasic_Ordinal:
+        final String _name = _kProtocol_ErrorVectorBasic_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorVectorBasic_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorVectorBasic_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorVectorBasic$Response> $future =
+              $fidl.decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorVectorBasic$Response>>(
+                  $message,
+                  _kProtocol_ErrorVectorBasic_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorVectorBasic();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorVectorBasicResult.withResponse(VectorBasic(
+              vectorUint8: $responseValue.vectorUint8,
+              vectorUint16: $responseValue.vectorUint16,
+              vectorUint32: $responseValue.vectorUint32,
+              vectorUint64: $responseValue.vectorUint64,
+              vectorInt8: $responseValue.vectorInt8,
+              vectorInt16: $responseValue.vectorInt16,
+              vectorInt32: $responseValue.vectorInt32,
+              vectorInt64: $responseValue.vectorInt64,
+              vectorFloat32: $responseValue.vectorFloat32,
+              vectorFloat64: $responseValue.vectorFloat64,
+              vectorString: $responseValue.vectorString,
+              vectorOptString: $responseValue.vectorOptString,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorVectorBasicResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorVectorBasic_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorVectorBasic_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorVectorBasic_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
       case _kProtocol_OneWayVectorCompound_Ordinal:
         final String _name = _kProtocol_OneWayVectorCompound_Type.name;
         $fidl.performWithExceptionHandling(_name, () {
@@ -6633,6 +8580,62 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           });
         }, close);
         break;
+      case _kProtocol_ErrorVectorCompound_Ordinal:
+        final String _name = _kProtocol_ErrorVectorCompound_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorVectorCompound_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorVectorCompound_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorVectorCompound$Response> $future =
+              $fidl.decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorVectorCompound$Response>>(
+                  $message,
+                  _kProtocol_ErrorVectorCompound_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorVectorCompound();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorVectorCompoundResult.withResponse(
+                VectorCompound(
+              vectorBits: $responseValue.vectorBits,
+              vectorEnum: $responseValue.vectorEnum,
+              vectorStruct: $responseValue.vectorStruct,
+              vectorTable: $responseValue.vectorTable,
+              vectorUnion: $responseValue.vectorUnion,
+              vectorOptStruct: $responseValue.vectorOptStruct,
+              vectorOptUnion: $responseValue.vectorOptUnion,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorVectorCompoundResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorVectorCompound_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorVectorCompound_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorVectorCompound_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
       case _kProtocol_OneWayVectorOptional_Ordinal:
         final String _name = _kProtocol_OneWayVectorOptional_Type.name;
         $fidl.performWithExceptionHandling(_name, () {
@@ -6702,6 +8705,59 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           });
         }, close);
         break;
+      case _kProtocol_ErrorVectorOptional_Ordinal:
+        final String _name = _kProtocol_ErrorVectorOptional_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorVectorOptional_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorVectorOptional_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorVectorOptional$Response> $future =
+              $fidl.decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorVectorOptional$Response>>(
+                  $message,
+                  _kProtocol_ErrorVectorOptional_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorVectorOptional();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorVectorOptionalResult.withResponse(
+                VectorOptional(
+              optVectorUint8: $responseValue.optVectorUint8,
+              optVectorString: $responseValue.optVectorString,
+              optVectorStruct: $responseValue.optVectorStruct,
+              optVectorOptStruct: $responseValue.optVectorOptStruct,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorVectorOptionalResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorVectorOptional_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorVectorOptional_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorVectorOptional_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
       case _kProtocol_OneWayArrayVectorNested_Ordinal:
         final String _name = _kProtocol_OneWayArrayVectorNested_Type.name;
         $fidl.performWithExceptionHandling(_name, () {
@@ -6765,6 +8821,61 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               $types[3].encode($encoder, $response.vectorVectorUint8,
                   $fidl.kMessageHeaderSize, 1);
             });
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
+      case _kProtocol_ErrorArrayVectorNested_Ordinal:
+        final String _name = _kProtocol_ErrorArrayVectorNested_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorArrayVectorNested_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorArrayVectorNested_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorArrayVectorNested$Response>
+              $future = $fidl.decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorArrayVectorNested$Response>>(
+                  $message,
+                  _kProtocol_ErrorArrayVectorNested_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorArrayVectorNested();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorArrayVectorNestedResult.withResponse(
+                ArrayVectorNested(
+              arrayArrayUint8: $responseValue.arrayArrayUint8,
+              arrayVectorUint8: $responseValue.arrayVectorUint8,
+              vectorArrayUint8: $responseValue.vectorArrayUint8,
+              vectorVectorUint8: $responseValue.vectorVectorUint8,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorArrayVectorNestedResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(
+                _kProtocol_ErrorArrayVectorNested_Ordinal,
+                $message.txid,
+                $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorArrayVectorNested_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorArrayVectorNested_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
             $respond($encoder.message);
           }, onError: (_e) {
             $fidl.handleException(_name, _e, close);
@@ -6923,6 +9034,80 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               $types[26].encode(
                   $encoder, $response.vectorUnion, $fidl.kMessageHeaderSize, 1);
             });
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
+      case _kProtocol_ErrorResource_Ordinal:
+        final String _name = _kProtocol_ErrorResource_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_ErrorResource_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_ErrorResource_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final $async.Future<Protocol$ErrorResource$Response> $future = $fidl
+              .decodeMessageWithCallback<
+                      $async.Future<Protocol$ErrorResource$Response>>($message,
+                  _kProtocol_ErrorResource_Type.requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
+            return _impl.errorResource();
+          });
+          $future.then(($responseValue) {
+            return ProtocolErrorResourceResult.withResponse(Resource(
+              handle: $responseValue.handle,
+              vmo: $responseValue.vmo,
+              clientEnd: $responseValue.clientEnd,
+              serverEnd: $responseValue.serverEnd,
+              struct: $responseValue.struct,
+              table: $responseValue.table,
+              union: $responseValue.union,
+              optHandle: $responseValue.optHandle,
+              optVmo: $responseValue.optVmo,
+              optClientEnd: $responseValue.optClientEnd,
+              optServerEnd: $responseValue.optServerEnd,
+              optStruct: $responseValue.optStruct,
+              optUnion: $responseValue.optUnion,
+              arrayHandle: $responseValue.arrayHandle,
+              arrayVmo: $responseValue.arrayVmo,
+              arrayClientEnd: $responseValue.arrayClientEnd,
+              arrayServerEnd: $responseValue.arrayServerEnd,
+              arrayStruct: $responseValue.arrayStruct,
+              arrayTable: $responseValue.arrayTable,
+              arrayUnion: $responseValue.arrayUnion,
+              vectorHandle: $responseValue.vectorHandle,
+              vectorVmo: $responseValue.vectorVmo,
+              vectorClientEnd: $responseValue.vectorClientEnd,
+              vectorServerEnd: $responseValue.vectorServerEnd,
+              vectorStruct: $responseValue.vectorStruct,
+              vectorTable: $responseValue.vectorTable,
+              vectorUnion: $responseValue.vectorUnion,
+            ));
+          }, onError: ($error) {
+            if ($error is $fidl.MethodException) {
+              return ProtocolErrorResourceResult.withErr($error.value);
+            } else {
+              return Future.error($error, StackTrace.current);
+            }
+          }).then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_ErrorResource_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_ErrorResource_Type.response!;
+            $fidl.encodeMessage(
+                $encoder,
+                _kProtocol_ErrorResource_Type
+                    .responseInlineSize($encoder.wireFormat),
+                $types[0],
+                $response);
             $respond($encoder.message);
           }, onError: (_e) {
             $fidl.handleException(_name, _e, close);

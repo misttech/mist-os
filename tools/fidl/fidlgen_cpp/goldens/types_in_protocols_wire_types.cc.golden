@@ -81,6 +81,13 @@ void ::test_typesinprotocols::wire::Resource::_CloseHandles() {
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+void ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse::_CloseHandles() {
+  result._CloseHandles();
+}
+
+#endif  // __Fuchsia__
+
 auto ::test_typesinprotocols::wire::Union::Which() const -> ::test_typesinprotocols::wire::Union::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -137,6 +144,101 @@ void ::test_typesinprotocols::wire::ResourceUnion::_Move(ResourceUnion&& other) 
 
 void ::test_typesinprotocols::wire::ResourceUnion::_CloseHandles() {
   switch (ordinal_) {
+    default:
+      break;
+  }
+}
+
+#endif  // __Fuchsia__
+
+void ::test_typesinprotocols::wire::ProtocolErrorBasicResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorBasicResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorBasicResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorBasicResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorCompoundResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorCompoundResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorCompoundResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorArrayBasicResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorArrayBasicResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorArrayBasicResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorArrayCompoundResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorArrayCompoundResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorArrayCompoundResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorVectorBasicResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorVectorBasicResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorVectorBasicResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorVectorCompoundResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorVectorCompoundResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorVectorCompoundResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorVectorOptionalResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorVectorOptionalResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorVectorOptionalResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorArrayVectorNestedResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorArrayVectorNestedResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorArrayVectorNestedResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+
+#ifdef __Fuchsia__
+
+void ::test_typesinprotocols::wire::ProtocolErrorResourceResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ProtocolErrorResourceResult) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ProtocolErrorResourceResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ProtocolErrorResourceResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+::test_typesinprotocols::wire::ProtocolErrorResourceResult::~ProtocolErrorResourceResult() {
+  switch (ordinal_) {
+    case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse:
+      envelope_.As<::test_typesinprotocols::wire::Resource>().clear_data();
+      break;
+    case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kErr:
+      envelope_.As<uint32_t>().clear_data();
+      break;
+    default:
+      break;
+  }
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorResourceResult::_Move(ProtocolErrorResourceResult&& other) {
+  ordinal_ = other.ordinal_;
+  switch (ordinal_) {
+    case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse:
+      envelope_.As<::test_typesinprotocols::wire::Resource>() = std::move(other.envelope_.As<::test_typesinprotocols::wire::Resource>());
+      break;
+    case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kErr:
+      envelope_.As<uint32_t>() = std::move(other.envelope_.As<uint32_t>());
+      break;
+    default:
+      break;
+  }
+}
+
+void ::test_typesinprotocols::wire::ProtocolErrorResourceResult::_CloseHandles() {
+  switch (ordinal_) {
+    case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse: {
+      response()._CloseHandles();
+      break;
+    }
     default:
       break;
   }

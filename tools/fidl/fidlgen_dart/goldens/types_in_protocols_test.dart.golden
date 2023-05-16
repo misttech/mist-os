@@ -71,6 +71,14 @@ class Protocol$TestBase extends Protocol {
   }
 
   @override
+  $async.Future<Protocol$ErrorBasic$Response> errorBasic() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorBasic not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
   $async.Stream<Protocol$EventBasic$Response> get eventBasic {
     return $async.Stream.fromFuture($async.Future.error(
         UnimplementedError(
@@ -99,6 +107,14 @@ class Protocol$TestBase extends Protocol {
     return $async.Future.error(
         UnimplementedError(
             r'twoWayCompound not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Future<Protocol$ErrorCompound$Response> errorCompound() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorCompound not implemented on Protocol test base. Please implement.'),
         StackTrace.current);
   }
 
@@ -151,6 +167,14 @@ class Protocol$TestBase extends Protocol {
   }
 
   @override
+  $async.Future<Protocol$ErrorArrayBasic$Response> errorArrayBasic() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorArrayBasic not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
   $async.Stream<Protocol$EventArrayBasic$Response> get eventArrayBasic {
     return $async.Stream.fromFuture($async.Future.error(
         UnimplementedError(
@@ -185,6 +209,14 @@ class Protocol$TestBase extends Protocol {
     return $async.Future.error(
         UnimplementedError(
             r'twoWayArrayCompound not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Future<Protocol$ErrorArrayCompound$Response> errorArrayCompound() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorArrayCompound not implemented on Protocol test base. Please implement.'),
         StackTrace.current);
   }
 
@@ -237,6 +269,14 @@ class Protocol$TestBase extends Protocol {
   }
 
   @override
+  $async.Future<Protocol$ErrorVectorBasic$Response> errorVectorBasic() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorVectorBasic not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
   $async.Stream<Protocol$EventVectorBasic$Response> get eventVectorBasic {
     return $async.Stream.fromFuture($async.Future.error(
         UnimplementedError(
@@ -275,6 +315,14 @@ class Protocol$TestBase extends Protocol {
   }
 
   @override
+  $async.Future<Protocol$ErrorVectorCompound$Response> errorVectorCompound() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorVectorCompound not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
   $async.Stream<Protocol$EventVectorCompound$Response> get eventVectorCompound {
     return $async.Stream.fromFuture($async.Future.error(
         UnimplementedError(
@@ -303,6 +351,14 @@ class Protocol$TestBase extends Protocol {
     return $async.Future.error(
         UnimplementedError(
             r'twoWayVectorOptional not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Future<Protocol$ErrorVectorOptional$Response> errorVectorOptional() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorVectorOptional not implemented on Protocol test base. Please implement.'),
         StackTrace.current);
   }
 
@@ -336,6 +392,15 @@ class Protocol$TestBase extends Protocol {
     return $async.Future.error(
         UnimplementedError(
             r'twoWayArrayVectorNested not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Future<Protocol$ErrorArrayVectorNested$Response>
+      errorArrayVectorNested() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorArrayVectorNested not implemented on Protocol test base. Please implement.'),
         StackTrace.current);
   }
 
@@ -415,6 +480,14 @@ class Protocol$TestBase extends Protocol {
     return $async.Future.error(
         UnimplementedError(
             r'twoWayResource not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Future<Protocol$ErrorResource$Response> errorResource() {
+    return $async.Future.error(
+        UnimplementedError(
+            r'errorResource not implemented on Protocol test base. Please implement.'),
         StackTrace.current);
   }
 

@@ -11,6 +11,204 @@
 *Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=161)*
 
 
+### ErrorArrayBasic {#Protocol.ErrorArrayBasic}
+
+
+
+
+#### Request {#Protocol.ErrorArrayBasic_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorArrayBasic_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorArrayBasic_Result'>Protocol_ErrorArrayBasic_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorArrayCompound {#Protocol.ErrorArrayCompound}
+
+
+
+
+#### Request {#Protocol.ErrorArrayCompound_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorArrayCompound_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorArrayCompound_Result'>Protocol_ErrorArrayCompound_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorArrayVectorNested {#Protocol.ErrorArrayVectorNested}
+
+
+
+
+#### Request {#Protocol.ErrorArrayVectorNested_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorArrayVectorNested_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorArrayVectorNested_Result'>Protocol_ErrorArrayVectorNested_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorBasic {#Protocol.ErrorBasic}
+
+
+
+
+#### Request {#Protocol.ErrorBasic_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorBasic_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorBasic_Result'>Protocol_ErrorBasic_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorCompound {#Protocol.ErrorCompound}
+
+
+
+
+#### Request {#Protocol.ErrorCompound_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorCompound_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorCompound_Result'>Protocol_ErrorCompound_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorResource {#Protocol.ErrorResource}
+
+
+
+
+#### Request {#Protocol.ErrorResource_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorResource_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorResource_Result'>Protocol_ErrorResource_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorVectorBasic {#Protocol.ErrorVectorBasic}
+
+
+
+
+#### Request {#Protocol.ErrorVectorBasic_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorVectorBasic_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorVectorBasic_Result'>Protocol_ErrorVectorBasic_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorVectorCompound {#Protocol.ErrorVectorCompound}
+
+
+
+
+#### Request {#Protocol.ErrorVectorCompound_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorVectorCompound_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorVectorCompound_Result'>Protocol_ErrorVectorCompound_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### ErrorVectorOptional {#Protocol.ErrorVectorOptional}
+
+
+
+
+#### Request {#Protocol.ErrorVectorOptional_Request}
+
+&lt;EMPTY&gt;
+
+
+#### Response {#Protocol.ErrorVectorOptional_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>result</code></td>
+            <td>
+                <code><a class='link' href='#Protocol_ErrorVectorOptional_Result'>Protocol_ErrorVectorOptional_Result</a></code>
+            </td>
+        </tr>
+</table>
+
 ### EventArrayBasic {#Protocol.EventArrayBasic}
 
 
@@ -3449,6 +3647,204 @@ Type: <code>uint32</code>
 
 
 ## **UNIONS**
+
+### Protocol_ErrorArrayBasic_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorArrayBasic_Result data-text="Protocol_ErrorArrayBasic_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=174)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorArrayBasic_Result.response">
+<td><h3 id="Protocol_ErrorArrayBasic_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#ArrayBasic'>ArrayBasic</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorArrayBasic_Result.err">
+<td><h3 id="Protocol_ErrorArrayBasic_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorArrayCompound_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorArrayCompound_Result data-text="Protocol_ErrorArrayCompound_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=179)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorArrayCompound_Result.response">
+<td><h3 id="Protocol_ErrorArrayCompound_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#ArrayCompound'>ArrayCompound</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorArrayCompound_Result.err">
+<td><h3 id="Protocol_ErrorArrayCompound_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorArrayVectorNested_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorArrayVectorNested_Result data-text="Protocol_ErrorArrayVectorNested_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=199)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorArrayVectorNested_Result.response">
+<td><h3 id="Protocol_ErrorArrayVectorNested_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#ArrayVectorNested'>ArrayVectorNested</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorArrayVectorNested_Result.err">
+<td><h3 id="Protocol_ErrorArrayVectorNested_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorBasic_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorBasic_Result data-text="Protocol_ErrorBasic_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=164)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorBasic_Result.response">
+<td><h3 id="Protocol_ErrorBasic_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#Basic'>Basic</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorBasic_Result.err">
+<td><h3 id="Protocol_ErrorBasic_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorCompound_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorCompound_Result data-text="Protocol_ErrorCompound_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=169)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorCompound_Result.response">
+<td><h3 id="Protocol_ErrorCompound_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#Compound'>Compound</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorCompound_Result.err">
+<td><h3 id="Protocol_ErrorCompound_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorResource_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Protocol_ErrorResource_Result data-text="Protocol_ErrorResource_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=204)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorResource_Result.response">
+<td><h3 id="Protocol_ErrorResource_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#Resource'>Resource</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorResource_Result.err">
+<td><h3 id="Protocol_ErrorResource_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorVectorBasic_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorVectorBasic_Result data-text="Protocol_ErrorVectorBasic_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=184)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorVectorBasic_Result.response">
+<td><h3 id="Protocol_ErrorVectorBasic_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#VectorBasic'>VectorBasic</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorVectorBasic_Result.err">
+<td><h3 id="Protocol_ErrorVectorBasic_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorVectorCompound_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorVectorCompound_Result data-text="Protocol_ErrorVectorCompound_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=189)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorVectorCompound_Result.response">
+<td><h3 id="Protocol_ErrorVectorCompound_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#VectorCompound'>VectorCompound</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorVectorCompound_Result.err">
+<td><h3 id="Protocol_ErrorVectorCompound_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
+### Protocol_ErrorVectorOptional_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorVectorOptional_Result data-text="Protocol_ErrorVectorOptional_Result"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=194)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="Protocol_ErrorVectorOptional_Result.response">
+<td><h3 id="Protocol_ErrorVectorOptional_Result.response" class="add-link hide-from-toc">1</h3></td>
+            <td><code>response</code></td>
+            <td>
+                <code><a class='link' href='#VectorOptional'>VectorOptional</a></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="Protocol_ErrorVectorOptional_Result.err">
+<td><h3 id="Protocol_ErrorVectorOptional_Result.err" class="add-link hide-from-toc">2</h3></td>
+            <td><code>err</code></td>
+            <td>
+                <code>uint32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
 
 ### ResourceUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#ResourceUnion data-text="ResourceUnion"}
 *Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=21)*

@@ -48,6 +48,20 @@ class Protocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
+  class ErrorBasic final {
+    ErrorBasic() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
+    static constexpr bool kHasFrameworkError = false;
+  };
   class EventBasic final {
     EventBasic() = delete;
 
@@ -88,6 +102,20 @@ class Protocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
+  class ErrorCompound final {
+    ErrorCompound() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
   class EventCompound final {
@@ -132,6 +160,20 @@ class Protocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
+  class ErrorArrayBasic final {
+    ErrorArrayBasic() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
+    static constexpr bool kHasFrameworkError = false;
+  };
   class EventArrayBasic final {
     EventArrayBasic() = delete;
 
@@ -172,6 +214,20 @@ class Protocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
+  class ErrorArrayCompound final {
+    ErrorArrayCompound() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
   class EventArrayCompound final {
@@ -216,6 +272,20 @@ class Protocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
+  class ErrorVectorBasic final {
+    ErrorVectorBasic() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
+    static constexpr bool kHasFrameworkError = false;
+  };
   class EventVectorBasic final {
     EventVectorBasic() = delete;
 
@@ -256,6 +326,20 @@ class Protocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
+  class ErrorVectorCompound final {
+    ErrorVectorCompound() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
   class EventVectorCompound final {
@@ -300,6 +384,20 @@ class Protocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
+  class ErrorVectorOptional final {
+    ErrorVectorOptional() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
+    static constexpr bool kHasFrameworkError = false;
+  };
   class EventVectorOptional final {
     EventVectorOptional() = delete;
 
@@ -342,6 +440,20 @@ class Protocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
+  class ErrorArrayVectorNested final {
+    ErrorArrayVectorNested() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
+    static constexpr bool kHasFrameworkError = false;
+  };
   class EventArrayVectorNested final {
     EventArrayVectorNested() = delete;
 
@@ -382,6 +494,20 @@ class Protocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
+  class ErrorResource final {
+    ErrorResource() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
   class EventResource final {

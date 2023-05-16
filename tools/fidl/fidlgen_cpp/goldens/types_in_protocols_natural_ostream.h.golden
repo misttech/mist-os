@@ -83,6 +83,78 @@ template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::Resource> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Resource& value);
 };
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorCompoundResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorCompoundTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayBasicResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorBasicResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceResult> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceTopResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceTopResponse& value);
+};
 
 namespace test_typesinprotocols {
 
@@ -119,6 +191,42 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Vector
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ArrayVectorNested& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resource& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorCompoundTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceTopResponse& value);
 
 }  // namespace test_typesinprotocols
 

@@ -35,6 +35,24 @@ using VectorCompound = ::test::typesinprotocols::VectorCompound;
 using VectorOptional = ::test::typesinprotocols::VectorOptional;
 using ArrayVectorNested = ::test::typesinprotocols::ArrayVectorNested;
 using Resource = ::test::typesinprotocols::Resource;
+using Protocol_ErrorBasic_Result = ::test::typesinprotocols::Protocol_ErrorBasic_Result;
+using ProtocolErrorBasicTopResponse = ::test::typesinprotocols::ProtocolErrorBasicTopResponse;
+using Protocol_ErrorCompound_Result = ::test::typesinprotocols::Protocol_ErrorCompound_Result;
+using ProtocolErrorCompoundTopResponse = ::test::typesinprotocols::ProtocolErrorCompoundTopResponse;
+using Protocol_ErrorArrayBasic_Result = ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result;
+using ProtocolErrorArrayBasicTopResponse = ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse;
+using Protocol_ErrorArrayCompound_Result = ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result;
+using ProtocolErrorArrayCompoundTopResponse = ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse;
+using Protocol_ErrorVectorBasic_Result = ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result;
+using ProtocolErrorVectorBasicTopResponse = ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse;
+using Protocol_ErrorVectorCompound_Result = ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result;
+using ProtocolErrorVectorCompoundTopResponse = ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse;
+using Protocol_ErrorVectorOptional_Result = ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result;
+using ProtocolErrorVectorOptionalTopResponse = ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse;
+using Protocol_ErrorArrayVectorNested_Result = ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result;
+using ProtocolErrorArrayVectorNestedTopResponse = ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse;
+using Protocol_ErrorResource_Result = ::test::typesinprotocols::Protocol_ErrorResource_Result;
+using ProtocolErrorResourceTopResponse = ::test::typesinprotocols::ProtocolErrorResourceTopResponse;
 
 template <>
 struct MinSize<Bits> {
@@ -514,6 +532,465 @@ struct Allocate<Resource> {
     out.vector_table = Allocate<::std::vector<::test::typesinprotocols::ResourceTable>>{}(src, &out_size);
     out_size = MinSize<::std::vector<::test::typesinprotocols::ResourceUnion>>() + slack_per_member;
     out.vector_union = Allocate<::std::vector<::test::typesinprotocols::ResourceUnion>>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorBasic_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::Basic>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorBasic_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorBasic_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorBasic_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorBasic_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::Basic>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorBasicTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorBasic_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorBasicTopResponse> {
+  ProtocolErrorBasicTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorBasicTopResponse>());
+    ProtocolErrorBasicTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorBasicTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorBasic_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorBasic_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorCompound_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::Compound>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorCompound_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorCompound_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorCompound_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorCompound_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::Compound>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorCompoundTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorCompound_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorCompoundTopResponse> {
+  ProtocolErrorCompoundTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorCompoundTopResponse>());
+    ProtocolErrorCompoundTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorCompoundTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorCompound_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorCompound_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorArrayBasic_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::ArrayBasic>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorArrayBasic_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorArrayBasic_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorArrayBasic_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorArrayBasic_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::ArrayBasic>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorArrayBasicTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorArrayBasicTopResponse> {
+  ProtocolErrorArrayBasicTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorArrayBasicTopResponse>());
+    ProtocolErrorArrayBasicTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorArrayBasicTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorArrayCompound_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::ArrayCompound>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorArrayCompound_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorArrayCompound_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorArrayCompound_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorArrayCompound_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::ArrayCompound>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorArrayCompoundTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorArrayCompoundTopResponse> {
+  ProtocolErrorArrayCompoundTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorArrayCompoundTopResponse>());
+    ProtocolErrorArrayCompoundTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorArrayCompoundTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorVectorBasic_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::VectorBasic>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorVectorBasic_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorVectorBasic_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorVectorBasic_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorVectorBasic_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::VectorBasic>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorVectorBasicTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorVectorBasicTopResponse> {
+  ProtocolErrorVectorBasicTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorVectorBasicTopResponse>());
+    ProtocolErrorVectorBasicTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorVectorBasicTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorVectorCompound_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::VectorCompound>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorVectorCompound_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorVectorCompound_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorVectorCompound_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorVectorCompound_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::VectorCompound>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorVectorCompoundTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorVectorCompoundTopResponse> {
+  ProtocolErrorVectorCompoundTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorVectorCompoundTopResponse>());
+    ProtocolErrorVectorCompoundTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorVectorCompoundTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorVectorOptional_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::VectorOptional>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorVectorOptional_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorVectorOptional_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorVectorOptional_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorVectorOptional_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::VectorOptional>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorVectorOptionalTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorVectorOptionalTopResponse> {
+  ProtocolErrorVectorOptionalTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorVectorOptionalTopResponse>());
+    ProtocolErrorVectorOptionalTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorVectorOptionalTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorArrayVectorNested_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::ArrayVectorNested>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorArrayVectorNested_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorArrayVectorNested_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorArrayVectorNested_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorArrayVectorNested_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::ArrayVectorNested>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorArrayVectorNestedTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorArrayVectorNestedTopResponse> {
+  ProtocolErrorArrayVectorNestedTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorArrayVectorNestedTopResponse>());
+    ProtocolErrorArrayVectorNestedTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorArrayVectorNestedTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Protocol_ErrorResource_Result> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<::test::typesinprotocols::Resource>(), MinSize<uint32_t>()};
+    return 1 + *std::max_element(sizes, sizes + 2 + 1);
+  }
+};
+template <>
+struct Allocate<Protocol_ErrorResource_Result> {
+  static_assert(2 > 0, "xunion must have at least one member");
+
+  Protocol_ErrorResource_Result operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Protocol_ErrorResource_Result>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    Protocol_ErrorResource_Result out;
+    switch (selector % 2) {
+      case 0: {
+        out.set_response(Allocate<::test::typesinprotocols::Resource>{}(src, size));
+        break;
+      }
+      case 1: {
+        out.set_err(Allocate<uint32_t>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ProtocolErrorResourceTopResponse> {
+  operator size_t() {
+    return MinSize<::test::typesinprotocols::Protocol_ErrorResource_Result>();
+  }
+};
+template <>
+struct Allocate<ProtocolErrorResourceTopResponse> {
+  ProtocolErrorResourceTopResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ProtocolErrorResourceTopResponse>());
+    ProtocolErrorResourceTopResponse out;
+    const size_t slack_per_member = (*size - MinSize<ProtocolErrorResourceTopResponse>()) / 1;
+    size_t out_size;
+    out_size = MinSize<::test::typesinprotocols::Protocol_ErrorResource_Result>() + slack_per_member;
+    out.result = Allocate<::test::typesinprotocols::Protocol_ErrorResource_Result>{}(src, &out_size);
     return out;
   }
 };

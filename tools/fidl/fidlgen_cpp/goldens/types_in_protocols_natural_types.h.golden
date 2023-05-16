@@ -69,6 +69,33 @@ class ArrayVectorNested;
 class Resource;
 
 
+class ProtocolErrorBasicTopResponse;
+
+
+class ProtocolErrorCompoundTopResponse;
+
+
+class ProtocolErrorArrayBasicTopResponse;
+
+
+class ProtocolErrorArrayCompoundTopResponse;
+
+
+class ProtocolErrorVectorBasicTopResponse;
+
+
+class ProtocolErrorVectorCompoundTopResponse;
+
+
+class ProtocolErrorVectorOptionalTopResponse;
+
+
+class ProtocolErrorArrayVectorNestedTopResponse;
+
+
+class ProtocolErrorResourceTopResponse;
+
+
 
 
 class Table;
@@ -85,6 +112,42 @@ class Union;
 
 
 class ResourceUnion;
+
+
+
+class ProtocolErrorBasicResult;
+
+
+
+class ProtocolErrorCompoundResult;
+
+
+
+class ProtocolErrorArrayBasicResult;
+
+
+
+class ProtocolErrorArrayCompoundResult;
+
+
+
+class ProtocolErrorVectorBasicResult;
+
+
+
+class ProtocolErrorVectorCompoundResult;
+
+
+
+class ProtocolErrorVectorOptionalResult;
+
+
+
+class ProtocolErrorArrayVectorNestedResult;
+
+
+
+class ProtocolErrorResourceResult;
 
 
 
@@ -2699,6 +2762,1791 @@ class Resource {
   
 
 
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
+
+
+class ProtocolErrorBasicResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::Basic
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorBasicResult(ProtocolErrorBasicResult&& other) noexcept
+      : ProtocolErrorBasicResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorBasicResult& operator=(ProtocolErrorBasicResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorBasicResult(const ProtocolErrorBasicResult& other) noexcept : ProtocolErrorBasicResult(other.CloneStorage_()){}
+    ProtocolErrorBasicResult& operator=(const ProtocolErrorBasicResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorBasicResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorBasicResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorBasicResult::Tag Which() const {
+    return ProtocolErrorBasicResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorBasicResult WithResponse(::test_typesinprotocols::Basic val) {
+      return ProtocolErrorBasicResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorBasicResult& response(::test_typesinprotocols::Basic value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorBasicResult WithErr(uint32_t val) {
+      return ProtocolErrorBasicResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorBasicResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorBasicResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorBasicResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorBasicResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorBasicResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorBasicResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorBasicResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+
+
+class ProtocolErrorBasicTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorBasicTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorBasicTopResponse(::test_typesinprotocols::ProtocolErrorBasicResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorBasicTopResponse| only if all of its members are default constructible.
+  ProtocolErrorBasicTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorBasicTopResponse(ProtocolErrorBasicTopResponse&&) noexcept = default;
+  ProtocolErrorBasicTopResponse& operator=(ProtocolErrorBasicTopResponse&&) noexcept = default;
+    ProtocolErrorBasicTopResponse(const ProtocolErrorBasicTopResponse& other) noexcept;
+    ProtocolErrorBasicTopResponse& operator=(const ProtocolErrorBasicTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorBasicTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorBasicTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorBasicResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorBasicResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorBasicTopResponse& result(::test_typesinprotocols::ProtocolErrorBasicResult value);
+
+  ProtocolErrorBasicTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorBasicResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorBasicTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorBasicResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
+
+
+class ProtocolErrorCompoundResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::Compound
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorCompoundResult(ProtocolErrorCompoundResult&& other) noexcept
+      : ProtocolErrorCompoundResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorCompoundResult& operator=(ProtocolErrorCompoundResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorCompoundResult(const ProtocolErrorCompoundResult& other) noexcept : ProtocolErrorCompoundResult(other.CloneStorage_()){}
+    ProtocolErrorCompoundResult& operator=(const ProtocolErrorCompoundResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorCompoundResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorCompoundResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag Which() const {
+    return ProtocolErrorCompoundResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorCompoundResult WithResponse(::test_typesinprotocols::Compound val) {
+      return ProtocolErrorCompoundResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorCompoundResult& response(::test_typesinprotocols::Compound value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorCompoundResult WithErr(uint32_t val) {
+      return ProtocolErrorCompoundResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorCompoundResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorCompoundResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorCompoundResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorCompoundResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorCompoundResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+
+
+class ProtocolErrorCompoundTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorCompoundTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorCompoundTopResponse(::test_typesinprotocols::ProtocolErrorCompoundResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorCompoundTopResponse| only if all of its members are default constructible.
+  ProtocolErrorCompoundTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorCompoundTopResponse(ProtocolErrorCompoundTopResponse&&) noexcept = default;
+  ProtocolErrorCompoundTopResponse& operator=(ProtocolErrorCompoundTopResponse&&) noexcept = default;
+    ProtocolErrorCompoundTopResponse(const ProtocolErrorCompoundTopResponse& other) noexcept;
+    ProtocolErrorCompoundTopResponse& operator=(const ProtocolErrorCompoundTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorCompoundTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorCompoundTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorCompoundResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorCompoundResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorCompoundTopResponse& result(::test_typesinprotocols::ProtocolErrorCompoundResult value);
+
+  ProtocolErrorCompoundTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorCompoundResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorCompoundTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorCompoundResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
+
+
+class ProtocolErrorArrayBasicResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::ArrayBasic
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorArrayBasicResult(ProtocolErrorArrayBasicResult&& other) noexcept
+      : ProtocolErrorArrayBasicResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorArrayBasicResult& operator=(ProtocolErrorArrayBasicResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorArrayBasicResult(const ProtocolErrorArrayBasicResult& other) noexcept : ProtocolErrorArrayBasicResult(other.CloneStorage_()){}
+    ProtocolErrorArrayBasicResult& operator=(const ProtocolErrorArrayBasicResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorArrayBasicResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorArrayBasicResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag Which() const {
+    return ProtocolErrorArrayBasicResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorArrayBasicResult WithResponse(::test_typesinprotocols::ArrayBasic val) {
+      return ProtocolErrorArrayBasicResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorArrayBasicResult& response(::test_typesinprotocols::ArrayBasic value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorArrayBasicResult WithErr(uint32_t val) {
+      return ProtocolErrorArrayBasicResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorArrayBasicResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorArrayBasicResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorArrayBasicResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorArrayBasicResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+
+
+class ProtocolErrorArrayBasicTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorArrayBasicTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorArrayBasicTopResponse(::test_typesinprotocols::ProtocolErrorArrayBasicResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorArrayBasicTopResponse| only if all of its members are default constructible.
+  ProtocolErrorArrayBasicTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorArrayBasicTopResponse(ProtocolErrorArrayBasicTopResponse&&) noexcept = default;
+  ProtocolErrorArrayBasicTopResponse& operator=(ProtocolErrorArrayBasicTopResponse&&) noexcept = default;
+    ProtocolErrorArrayBasicTopResponse(const ProtocolErrorArrayBasicTopResponse& other) noexcept;
+    ProtocolErrorArrayBasicTopResponse& operator=(const ProtocolErrorArrayBasicTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorArrayBasicTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorArrayBasicTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorArrayBasicResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorArrayBasicResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorArrayBasicTopResponse& result(::test_typesinprotocols::ProtocolErrorArrayBasicResult value);
+
+  ProtocolErrorArrayBasicTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorArrayBasicResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorArrayBasicResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
+
+
+class ProtocolErrorArrayCompoundResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::ArrayCompound
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorArrayCompoundResult(ProtocolErrorArrayCompoundResult&& other) noexcept
+      : ProtocolErrorArrayCompoundResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorArrayCompoundResult& operator=(ProtocolErrorArrayCompoundResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorArrayCompoundResult(const ProtocolErrorArrayCompoundResult& other) noexcept : ProtocolErrorArrayCompoundResult(other.CloneStorage_()){}
+    ProtocolErrorArrayCompoundResult& operator=(const ProtocolErrorArrayCompoundResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorArrayCompoundResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorArrayCompoundResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag Which() const {
+    return ProtocolErrorArrayCompoundResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorArrayCompoundResult WithResponse(::test_typesinprotocols::ArrayCompound val) {
+      return ProtocolErrorArrayCompoundResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorArrayCompoundResult& response(::test_typesinprotocols::ArrayCompound value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorArrayCompoundResult WithErr(uint32_t val) {
+      return ProtocolErrorArrayCompoundResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorArrayCompoundResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorArrayCompoundResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorArrayCompoundResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+
+
+class ProtocolErrorArrayCompoundTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorArrayCompoundTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorArrayCompoundTopResponse(::test_typesinprotocols::ProtocolErrorArrayCompoundResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorArrayCompoundTopResponse| only if all of its members are default constructible.
+  ProtocolErrorArrayCompoundTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorArrayCompoundTopResponse(ProtocolErrorArrayCompoundTopResponse&&) noexcept = default;
+  ProtocolErrorArrayCompoundTopResponse& operator=(ProtocolErrorArrayCompoundTopResponse&&) noexcept = default;
+    ProtocolErrorArrayCompoundTopResponse(const ProtocolErrorArrayCompoundTopResponse& other) noexcept;
+    ProtocolErrorArrayCompoundTopResponse& operator=(const ProtocolErrorArrayCompoundTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorArrayCompoundTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorArrayCompoundTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorArrayCompoundResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorArrayCompoundResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorArrayCompoundTopResponse& result(::test_typesinprotocols::ProtocolErrorArrayCompoundResult value);
+
+  ProtocolErrorArrayCompoundTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorArrayCompoundResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorArrayCompoundResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
+
+
+class ProtocolErrorVectorBasicResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::VectorBasic
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorVectorBasicResult(ProtocolErrorVectorBasicResult&& other) noexcept
+      : ProtocolErrorVectorBasicResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorVectorBasicResult& operator=(ProtocolErrorVectorBasicResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorVectorBasicResult(const ProtocolErrorVectorBasicResult& other) noexcept : ProtocolErrorVectorBasicResult(other.CloneStorage_()){}
+    ProtocolErrorVectorBasicResult& operator=(const ProtocolErrorVectorBasicResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorVectorBasicResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorVectorBasicResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag Which() const {
+    return ProtocolErrorVectorBasicResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorVectorBasicResult WithResponse(::test_typesinprotocols::VectorBasic val) {
+      return ProtocolErrorVectorBasicResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorVectorBasicResult& response(::test_typesinprotocols::VectorBasic value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorVectorBasicResult WithErr(uint32_t val) {
+      return ProtocolErrorVectorBasicResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorVectorBasicResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorVectorBasicResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorVectorBasicResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorVectorBasicResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+
+
+class ProtocolErrorVectorBasicTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorVectorBasicTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorVectorBasicTopResponse(::test_typesinprotocols::ProtocolErrorVectorBasicResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorVectorBasicTopResponse| only if all of its members are default constructible.
+  ProtocolErrorVectorBasicTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorVectorBasicTopResponse(ProtocolErrorVectorBasicTopResponse&&) noexcept = default;
+  ProtocolErrorVectorBasicTopResponse& operator=(ProtocolErrorVectorBasicTopResponse&&) noexcept = default;
+    ProtocolErrorVectorBasicTopResponse(const ProtocolErrorVectorBasicTopResponse& other) noexcept;
+    ProtocolErrorVectorBasicTopResponse& operator=(const ProtocolErrorVectorBasicTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorVectorBasicTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorVectorBasicTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorVectorBasicResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorVectorBasicResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorVectorBasicTopResponse& result(::test_typesinprotocols::ProtocolErrorVectorBasicResult value);
+
+  ProtocolErrorVectorBasicTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorVectorBasicResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorVectorBasicResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
+
+
+class ProtocolErrorVectorCompoundResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::VectorCompound
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorVectorCompoundResult(ProtocolErrorVectorCompoundResult&& other) noexcept
+      : ProtocolErrorVectorCompoundResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorVectorCompoundResult& operator=(ProtocolErrorVectorCompoundResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorVectorCompoundResult(const ProtocolErrorVectorCompoundResult& other) noexcept : ProtocolErrorVectorCompoundResult(other.CloneStorage_()){}
+    ProtocolErrorVectorCompoundResult& operator=(const ProtocolErrorVectorCompoundResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorVectorCompoundResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorVectorCompoundResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag Which() const {
+    return ProtocolErrorVectorCompoundResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorVectorCompoundResult WithResponse(::test_typesinprotocols::VectorCompound val) {
+      return ProtocolErrorVectorCompoundResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorVectorCompoundResult& response(::test_typesinprotocols::VectorCompound value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorVectorCompoundResult WithErr(uint32_t val) {
+      return ProtocolErrorVectorCompoundResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorVectorCompoundResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorVectorCompoundResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorVectorCompoundResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+
+
+class ProtocolErrorVectorCompoundTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorVectorCompoundTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorVectorCompoundTopResponse(::test_typesinprotocols::ProtocolErrorVectorCompoundResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorVectorCompoundTopResponse| only if all of its members are default constructible.
+  ProtocolErrorVectorCompoundTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorVectorCompoundTopResponse(ProtocolErrorVectorCompoundTopResponse&&) noexcept = default;
+  ProtocolErrorVectorCompoundTopResponse& operator=(ProtocolErrorVectorCompoundTopResponse&&) noexcept = default;
+    ProtocolErrorVectorCompoundTopResponse(const ProtocolErrorVectorCompoundTopResponse& other) noexcept;
+    ProtocolErrorVectorCompoundTopResponse& operator=(const ProtocolErrorVectorCompoundTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorVectorCompoundTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorVectorCompoundTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorVectorCompoundResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorVectorCompoundResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorVectorCompoundTopResponse& result(::test_typesinprotocols::ProtocolErrorVectorCompoundResult value);
+
+  ProtocolErrorVectorCompoundTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorVectorCompoundResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorVectorCompoundResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
+
+
+class ProtocolErrorVectorOptionalResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::VectorOptional
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorVectorOptionalResult(ProtocolErrorVectorOptionalResult&& other) noexcept
+      : ProtocolErrorVectorOptionalResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorVectorOptionalResult& operator=(ProtocolErrorVectorOptionalResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorVectorOptionalResult(const ProtocolErrorVectorOptionalResult& other) noexcept : ProtocolErrorVectorOptionalResult(other.CloneStorage_()){}
+    ProtocolErrorVectorOptionalResult& operator=(const ProtocolErrorVectorOptionalResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorVectorOptionalResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorVectorOptionalResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag Which() const {
+    return ProtocolErrorVectorOptionalResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorVectorOptionalResult WithResponse(::test_typesinprotocols::VectorOptional val) {
+      return ProtocolErrorVectorOptionalResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorVectorOptionalResult& response(::test_typesinprotocols::VectorOptional value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorVectorOptionalResult WithErr(uint32_t val) {
+      return ProtocolErrorVectorOptionalResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorVectorOptionalResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorVectorOptionalResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorVectorOptionalResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+
+
+class ProtocolErrorVectorOptionalTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorVectorOptionalTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorVectorOptionalTopResponse(::test_typesinprotocols::ProtocolErrorVectorOptionalResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorVectorOptionalTopResponse| only if all of its members are default constructible.
+  ProtocolErrorVectorOptionalTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorVectorOptionalTopResponse(ProtocolErrorVectorOptionalTopResponse&&) noexcept = default;
+  ProtocolErrorVectorOptionalTopResponse& operator=(ProtocolErrorVectorOptionalTopResponse&&) noexcept = default;
+    ProtocolErrorVectorOptionalTopResponse(const ProtocolErrorVectorOptionalTopResponse& other) noexcept;
+    ProtocolErrorVectorOptionalTopResponse& operator=(const ProtocolErrorVectorOptionalTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorVectorOptionalTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorVectorOptionalTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorVectorOptionalResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorVectorOptionalResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorVectorOptionalTopResponse& result(::test_typesinprotocols::ProtocolErrorVectorOptionalResult value);
+
+  ProtocolErrorVectorOptionalTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorVectorOptionalResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorVectorOptionalResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
+
+
+class ProtocolErrorArrayVectorNestedResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::ArrayVectorNested
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorArrayVectorNestedResult(ProtocolErrorArrayVectorNestedResult&& other) noexcept
+      : ProtocolErrorArrayVectorNestedResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorArrayVectorNestedResult& operator=(ProtocolErrorArrayVectorNestedResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+    ProtocolErrorArrayVectorNestedResult(const ProtocolErrorArrayVectorNestedResult& other) noexcept : ProtocolErrorArrayVectorNestedResult(other.CloneStorage_()){}
+    ProtocolErrorArrayVectorNestedResult& operator=(const ProtocolErrorArrayVectorNestedResult& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const ProtocolErrorArrayVectorNestedResult& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const ProtocolErrorArrayVectorNestedResult& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag Which() const {
+    return ProtocolErrorArrayVectorNestedResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorArrayVectorNestedResult WithResponse(::test_typesinprotocols::ArrayVectorNested val) {
+      return ProtocolErrorArrayVectorNestedResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorArrayVectorNestedResult& response(::test_typesinprotocols::ArrayVectorNested value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorArrayVectorNestedResult WithErr(uint32_t val) {
+      return ProtocolErrorArrayVectorNestedResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorArrayVectorNestedResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorArrayVectorNestedResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+    std::shared_ptr<Storage_> CloneStorage_() const;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorArrayVectorNestedResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+  
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+
+
+class ProtocolErrorArrayVectorNestedTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorArrayVectorNestedTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorArrayVectorNestedTopResponse(::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorArrayVectorNestedTopResponse| only if all of its members are default constructible.
+  ProtocolErrorArrayVectorNestedTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorArrayVectorNestedTopResponse(ProtocolErrorArrayVectorNestedTopResponse&&) noexcept = default;
+  ProtocolErrorArrayVectorNestedTopResponse& operator=(ProtocolErrorArrayVectorNestedTopResponse&&) noexcept = default;
+    ProtocolErrorArrayVectorNestedTopResponse(const ProtocolErrorArrayVectorNestedTopResponse& other) noexcept;
+    ProtocolErrorArrayVectorNestedTopResponse& operator=(const ProtocolErrorArrayVectorNestedTopResponse& other) noexcept;
+
+    bool operator==(const ProtocolErrorArrayVectorNestedTopResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse, 16>::Equal(this, &other);
+    }
+    bool operator!=(const ProtocolErrorArrayVectorNestedTopResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse, 16>::Equal(this, &other);
+    }
+    
+      const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorArrayVectorNestedTopResponse& result(::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult value);
+
+  ProtocolErrorArrayVectorNestedTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult result;
+  };
+
+  Storage_ storage_;
+    Storage_ CloneStorage_() const;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+  
+  
+  
+  
+  
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
+
+
+class ProtocolErrorResourceResult {
+ private:
+  using Storage_ =
+    std::variant<
+      std::monostate
+        , ::test_typesinprotocols::Resource
+        , uint32_t>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  ProtocolErrorResourceResult(ProtocolErrorResourceResult&& other) noexcept
+      : ProtocolErrorResourceResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  ProtocolErrorResourceResult& operator=(ProtocolErrorResourceResult&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+
+  constexpr ::test_typesinprotocols::ProtocolErrorResourceResult::Tag Which() const {
+    return ProtocolErrorResourceResult::IndexToTag(storage_->index()).value();
+  }
+    static ProtocolErrorResourceResult WithResponse(::test_typesinprotocols::Resource val) {
+      return ProtocolErrorResourceResult(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<1, Storage_> response() {
+      return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the response member.
+    //
+    
+    ProtocolErrorResourceResult& response(::test_typesinprotocols::Resource value) {
+      storage_->emplace<1>(std::move(value));
+      return *this;
+    }
+    static ProtocolErrorResourceResult WithErr(uint32_t val) {
+      return ProtocolErrorResourceResult(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<2, Storage_> err() {
+      return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+    }
+
+    // Sets the union to hold the err member.
+    //
+    
+    ProtocolErrorResourceResult& err(uint32_t value) {
+      storage_->emplace<2>(std::move(value));
+      return *this;
+    }
+
+  ProtocolErrorResourceResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorResourceResult>;
+  static constexpr auto kMembers = std::make_tuple(
+    ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
+      , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit ProtocolErrorResourceResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_typesinprotocols::ProtocolErrorResourceResult::Tag tag) {
+    switch (tag) {
+        case ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kResponse: return 1;
+        case ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kErr: return 2;
+      default: {
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_typesinprotocols::ProtocolErrorResourceResult::Tag> IndexToTag(size_t index) {
+    switch (index) {
+        case 1: return ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kResponse;
+        case 2: return ::test_typesinprotocols::ProtocolErrorResourceResult::Tag::kErr;
+        default: return std::nullopt;
+    }
+  }
+
+};
+
+
+
+#endif  // __Fuchsia__
+
+  
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+
+
+class ProtocolErrorResourceTopResponse {
+ private:
+  struct Storage_;
+ public:
+  ProtocolErrorResourceTopResponse(Storage_ storage) noexcept;
+    ProtocolErrorResourceTopResponse(::test_typesinprotocols::ProtocolErrorResourceResult result) noexcept;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |ProtocolErrorResourceTopResponse| only if all of its members are default constructible.
+  ProtocolErrorResourceTopResponse() = default;
+#pragma clang diagnostic pop
+
+  ProtocolErrorResourceTopResponse(ProtocolErrorResourceTopResponse&&) noexcept = default;
+  ProtocolErrorResourceTopResponse& operator=(ProtocolErrorResourceTopResponse&&) noexcept = default;
+    
+      const ::test_typesinprotocols::ProtocolErrorResourceResult &
+    result() const {
+      return storage_.result;
+    }
+
+    
+    ::test_typesinprotocols::ProtocolErrorResourceResult& result() {
+      return storage_.result;
+    }
+
+    // Setter for result.
+    //
+    
+    ProtocolErrorResourceTopResponse& result(::test_typesinprotocols::ProtocolErrorResourceResult value);
+
+  ProtocolErrorResourceTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+
+ private:
+  struct Storage_ final {
+      ::test_typesinprotocols::ProtocolErrorResourceResult result;
+  };
+
+  Storage_ storage_;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorResourceTopResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ProtocolErrorResourceTopResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_typesinprotocols::ProtocolErrorResourceResult, fidl::internal::NaturalCodingConstraintEmpty>{
+        &Storage_::result, 0
+      });
+  static constexpr auto kPadding = std::make_tuple();
+
+};
+
+
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+  
+  
+
+
   
   
   
@@ -3525,6 +5373,258 @@ class Resource {
   
   
   
+  
+  
+
+  
+
+  inline ProtocolErrorBasicTopResponse::ProtocolErrorBasicTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorBasicTopResponse::ProtocolErrorBasicTopResponse(::test_typesinprotocols::ProtocolErrorBasicResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorBasicTopResponse::ProtocolErrorBasicTopResponse(const ::test_typesinprotocols::ProtocolErrorBasicTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorBasicTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorBasicTopResponse& ::test_typesinprotocols::ProtocolErrorBasicTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorBasicTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorBasicTopResponse::ProtocolErrorBasicTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorBasicTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorBasicTopResponse& ProtocolErrorBasicTopResponse::result(::test_typesinprotocols::ProtocolErrorBasicResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorCompoundTopResponse::ProtocolErrorCompoundTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorCompoundTopResponse::ProtocolErrorCompoundTopResponse(::test_typesinprotocols::ProtocolErrorCompoundResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorCompoundTopResponse::ProtocolErrorCompoundTopResponse(const ::test_typesinprotocols::ProtocolErrorCompoundTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorCompoundTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorCompoundTopResponse& ::test_typesinprotocols::ProtocolErrorCompoundTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorCompoundTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorCompoundTopResponse::ProtocolErrorCompoundTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorCompoundTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorCompoundTopResponse& ProtocolErrorCompoundTopResponse::result(::test_typesinprotocols::ProtocolErrorCompoundResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorArrayBasicTopResponse::ProtocolErrorArrayBasicTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorArrayBasicTopResponse::ProtocolErrorArrayBasicTopResponse(::test_typesinprotocols::ProtocolErrorArrayBasicResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorArrayBasicTopResponse::ProtocolErrorArrayBasicTopResponse(const ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorArrayBasicTopResponse& ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorArrayBasicTopResponse::ProtocolErrorArrayBasicTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorArrayBasicTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorArrayBasicTopResponse& ProtocolErrorArrayBasicTopResponse::result(::test_typesinprotocols::ProtocolErrorArrayBasicResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorArrayCompoundTopResponse::ProtocolErrorArrayCompoundTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorArrayCompoundTopResponse::ProtocolErrorArrayCompoundTopResponse(::test_typesinprotocols::ProtocolErrorArrayCompoundResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorArrayCompoundTopResponse::ProtocolErrorArrayCompoundTopResponse(const ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorArrayCompoundTopResponse& ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorArrayCompoundTopResponse::ProtocolErrorArrayCompoundTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorArrayCompoundTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorArrayCompoundTopResponse& ProtocolErrorArrayCompoundTopResponse::result(::test_typesinprotocols::ProtocolErrorArrayCompoundResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorVectorBasicTopResponse::ProtocolErrorVectorBasicTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorVectorBasicTopResponse::ProtocolErrorVectorBasicTopResponse(::test_typesinprotocols::ProtocolErrorVectorBasicResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorVectorBasicTopResponse::ProtocolErrorVectorBasicTopResponse(const ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorVectorBasicTopResponse& ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorVectorBasicTopResponse::ProtocolErrorVectorBasicTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorVectorBasicTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorVectorBasicTopResponse& ProtocolErrorVectorBasicTopResponse::result(::test_typesinprotocols::ProtocolErrorVectorBasicResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorVectorCompoundTopResponse::ProtocolErrorVectorCompoundTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorVectorCompoundTopResponse::ProtocolErrorVectorCompoundTopResponse(::test_typesinprotocols::ProtocolErrorVectorCompoundResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorVectorCompoundTopResponse::ProtocolErrorVectorCompoundTopResponse(const ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorVectorCompoundTopResponse& ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorVectorCompoundTopResponse::ProtocolErrorVectorCompoundTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorVectorCompoundTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorVectorCompoundTopResponse& ProtocolErrorVectorCompoundTopResponse::result(::test_typesinprotocols::ProtocolErrorVectorCompoundResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorVectorOptionalTopResponse::ProtocolErrorVectorOptionalTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorVectorOptionalTopResponse::ProtocolErrorVectorOptionalTopResponse(::test_typesinprotocols::ProtocolErrorVectorOptionalResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorVectorOptionalTopResponse::ProtocolErrorVectorOptionalTopResponse(const ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorVectorOptionalTopResponse& ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorVectorOptionalTopResponse::ProtocolErrorVectorOptionalTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorVectorOptionalTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorVectorOptionalTopResponse& ProtocolErrorVectorOptionalTopResponse::result(::test_typesinprotocols::ProtocolErrorVectorOptionalResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ProtocolErrorArrayVectorNestedTopResponse::ProtocolErrorArrayVectorNestedTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorArrayVectorNestedTopResponse::ProtocolErrorArrayVectorNestedTopResponse(::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ProtocolErrorArrayVectorNestedTopResponse::ProtocolErrorArrayVectorNestedTopResponse(const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& other) noexcept : ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse(other.CloneStorage_()){}
+    inline ProtocolErrorArrayVectorNestedTopResponse& ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse::operator=(const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ProtocolErrorArrayVectorNestedTopResponse::ProtocolErrorArrayVectorNestedTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorArrayVectorNestedTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorArrayVectorNestedTopResponse& ProtocolErrorArrayVectorNestedTopResponse::result(::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline ProtocolErrorResourceTopResponse::ProtocolErrorResourceTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolErrorResourceTopResponse::ProtocolErrorResourceTopResponse(::test_typesinprotocols::ProtocolErrorResourceResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+
+  inline ProtocolErrorResourceTopResponse::ProtocolErrorResourceTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolErrorResourceTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ProtocolErrorResourceTopResponse& ProtocolErrorResourceTopResponse::result(::test_typesinprotocols::ProtocolErrorResourceResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
 
 }  // namespace test_typesinprotocols
 namespace fidl {
@@ -3830,6 +5930,247 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorBasicTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorBasicTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorBasicTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorCompoundTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 80;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorCompoundTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 368;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse, 16> {};
+
+  
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse, 16> {};
+
+  
+  
+#ifdef __Fuchsia__
+
+
+  extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+
+  
+  template <>
+  struct IsResource<::test_typesinprotocols::ProtocolErrorResourceTopResponse> : public std::true_type {};
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorResourceTopResponse> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorResourceTopResponse> {
+    static constexpr uint32_t kMaxNumHandles = 4294967295;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsStruct<::test_typesinprotocols::ProtocolErrorResourceTopResponse> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorResourceTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ProtocolErrorResourceTopResponse, 16> {};
+
+  
+
+#endif  // __Fuchsia__
+
 
   
 
@@ -3947,6 +6288,247 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_typesinprotocols::ResourceUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ResourceUnion> {};
+
+
+
+#endif  // __Fuchsia__
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorBasicResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorBasicResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorBasicResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorBasicResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorBasicResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorCompoundResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorCompoundResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 80;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorCompoundResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayBasicResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorArrayBasicResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 2;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 368;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorBasicResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorVectorBasicResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> {};
+
+
+  
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
+
+  
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> {
+    static constexpr uint32_t kMaxNumHandles = 0;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> {};
+
+
+  
+#ifdef __Fuchsia__
+
+
+  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
+
+  
+  template <>
+  struct IsResource<::test_typesinprotocols::ProtocolErrorResourceResult> : public std::true_type {};
+  template <>
+  struct IsFidlType<::test_typesinprotocols::ProtocolErrorResourceResult> : public std::true_type {};
+
+  template<>
+  struct TypeTraits<::test_typesinprotocols::ProtocolErrorResourceResult> {
+    static constexpr uint32_t kMaxNumHandles = 4294967295;
+    static constexpr uint32_t kMaxDepth = 3;
+    static constexpr uint32_t kPrimarySize = 16;
+    static constexpr uint32_t kMaxOutOfLine = 4294967295;
+    static constexpr bool kHasEnvelope = true;
+    static constexpr bool kHasPointer = true;
+  };
+
+  template <>
+  struct IsUnion<::test_typesinprotocols::ProtocolErrorResourceResult> : public std::true_type {};
+
+  template <>
+  struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorResourceResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorResourceResult> {};
 
 
 

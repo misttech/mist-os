@@ -120,6 +120,50 @@
 
 #endif  // __Fuchsia__
 
+::test_typesinprotocols::ProtocolErrorBasicTopResponse::Storage_ test_typesinprotocols::ProtocolErrorBasicTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorCompoundTopResponse::Storage_ test_typesinprotocols::ProtocolErrorCompoundTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse::Storage_ test_typesinprotocols::ProtocolErrorArrayBasicTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse::Storage_ test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse::Storage_ test_typesinprotocols::ProtocolErrorVectorBasicTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse::Storage_ test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse::Storage_ test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse::Storage_ test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse::CloneStorage_() const {
+  return Storage_{
+      ::fidl::internal::NaturalClone(storage_.result)};
+}
+
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
 ::test_typesinprotocols::Table::Storage_ test_typesinprotocols::Table::CloneStorage_() const {
   return Storage_{};
 }
@@ -135,6 +179,138 @@ std::shared_ptr<::test_typesinprotocols::Union::Storage_> test_typesinprotocols:
       return std::make_shared<Storage_>(
           std::in_place_index<1>,
           ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorBasicResult::Storage_> test_typesinprotocols::ProtocolErrorBasicResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorCompoundResult::Storage_> test_typesinprotocols::ProtocolErrorCompoundResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorArrayBasicResult::Storage_> test_typesinprotocols::ProtocolErrorArrayBasicResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorArrayCompoundResult::Storage_> test_typesinprotocols::ProtocolErrorArrayCompoundResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorVectorBasicResult::Storage_> test_typesinprotocols::ProtocolErrorVectorBasicResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorVectorCompoundResult::Storage_> test_typesinprotocols::ProtocolErrorVectorCompoundResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorVectorOptionalResult::Storage_> test_typesinprotocols::ProtocolErrorVectorOptionalResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
+    default:
+      return std::make_shared<Storage_>();
+  }
+}
+
+std::shared_ptr<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Storage_> test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::CloneStorage_() const {
+  const Storage_& storage = *storage_;
+  switch (storage_->index()) {
+    case 1:
+      return std::make_shared<Storage_>(
+          std::in_place_index<1>,
+          ::fidl::internal::NaturalClone(std::get<1>(storage)));
+    case 2:
+      return std::make_shared<Storage_>(
+          std::in_place_index<2>,
+          ::fidl::internal::NaturalClone(std::get<2>(storage)));
     default:
       return std::make_shared<Storage_>();
   }

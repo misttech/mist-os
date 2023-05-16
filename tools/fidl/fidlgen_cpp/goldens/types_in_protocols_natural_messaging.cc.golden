@@ -21,6 +21,10 @@ namespace test_typesinprotocols {
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorBasic_Ordinal = 5016634351643393939lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventBasic_Ordinal = 5892309624949902400lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -32,6 +36,10 @@ namespace test_typesinprotocols {
 [[maybe_unused]] constexpr inline uint64_t kProtocol_TwoWayCompound_Ordinal = 8787219719097524529lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorCompound_Ordinal = 2990809657626249085lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventCompound_Ordinal = 7024581948727571669lu;
 
@@ -45,6 +53,10 @@ namespace test_typesinprotocols {
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorArrayBasic_Ordinal = 1084731895342694265lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventArrayBasic_Ordinal = 5888282827283820590lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -56,6 +68,10 @@ namespace test_typesinprotocols {
 [[maybe_unused]] constexpr inline uint64_t kProtocol_TwoWayArrayCompound_Ordinal = 849744466051983995lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorArrayCompound_Ordinal = 5919277476782807556lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventArrayCompound_Ordinal = 2189769767733851157lu;
 
@@ -69,6 +85,10 @@ namespace test_typesinprotocols {
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorVectorBasic_Ordinal = 875941614196965234lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventVectorBasic_Ordinal = 4583890770109526006lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -80,6 +100,10 @@ namespace test_typesinprotocols {
 [[maybe_unused]] constexpr inline uint64_t kProtocol_TwoWayVectorCompound_Ordinal = 3968024057912959924lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorVectorCompound_Ordinal = 8506780203315865989lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventVectorCompound_Ordinal = 6026375226599919603lu;
 
@@ -93,6 +117,10 @@ namespace test_typesinprotocols {
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorVectorOptional_Ordinal = 6406191217027936606lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventVectorOptional_Ordinal = 1684763340073130077lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -105,6 +133,10 @@ namespace test_typesinprotocols {
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorArrayVectorNested_Ordinal = 9085604921605802151lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventArrayVectorNested_Ordinal = 1228201560727880574lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -116,6 +148,10 @@ namespace test_typesinprotocols {
 [[maybe_unused]] constexpr inline uint64_t kProtocol_TwoWayResource_Ordinal = 1802709005492464987lu;
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kProtocol_ErrorResource_Ordinal = 6568609240497354166lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_ErrorResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]] constexpr inline uint64_t kProtocol_EventResource_Ordinal = 5745997765922613643lu;
 
@@ -130,6 +166,22 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayBasi
       &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayBasic_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayBasic_DynamicFlags,
       [request = request](NaturalMessageEncoder& encoder) mutable {
         encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorBasic>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorBasic() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorBasic>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorBasic_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
       [](
@@ -158,12 +210,44 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayComp
       });
 }
 
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorCompound>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorCompound() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorCompound>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorCompound_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
 ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayArrayBasic>
 fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayArrayBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayArrayBasic>& request) const {
   return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayArrayBasic>(
       &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayArrayBasic_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayArrayBasic_DynamicFlags,
       [request = request](NaturalMessageEncoder& encoder) mutable {
         encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorArrayBasic>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorArrayBasic() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorArrayBasic>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayBasic_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
       [](
@@ -192,12 +276,44 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayArra
       });
 }
 
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorArrayCompound>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorArrayCompound() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorArrayCompound>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayCompound_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
 ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayVectorBasic>
 fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayVectorBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayVectorBasic>& request) const {
   return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayVectorBasic>(
       &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayVectorBasic_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayVectorBasic_DynamicFlags,
       [request = request](NaturalMessageEncoder& encoder) mutable {
         encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorVectorBasic>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorVectorBasic() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorVectorBasic>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorBasic_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
       [](
@@ -226,12 +342,44 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayVect
       });
 }
 
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorVectorCompound>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorVectorCompound() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorVectorCompound>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorCompound_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
 ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayVectorOptional>
 fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayVectorOptional(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayVectorOptional>& request) const {
   return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayVectorOptional>(
       &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayVectorOptional_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayVectorOptional_DynamicFlags,
       [request = request](NaturalMessageEncoder& encoder) mutable {
         encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorVectorOptional>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorVectorOptional() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorVectorOptional>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorOptional_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorOptional_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
       [](
@@ -260,12 +408,44 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayArra
       });
 }
 
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorArrayVectorNested() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
 ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayResource>
 fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayResource(::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource> request) const {
   return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayResource>(
       &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayResource_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayResource_DynamicFlags,
       [request = std::move(request)](NaturalMessageEncoder& encoder) mutable {
         encoder.EncodeBody(std::move(request));
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorResource>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::ErrorResource() const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::ErrorResource>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorResource_Ordinal, ::test_typesinprotocols::kProtocol_ErrorResource_DynamicFlags,
+      [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
       [](
@@ -394,6 +574,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorBasic>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorBasic() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorBasic_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorBasic>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
 ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayCompound>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayCompound(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayCompound>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -402,6 +592,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayCompound>> response_storage;
   return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::TwoWayCompound>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorCompound>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorCompound() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorCompound_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorCompound>(
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
@@ -416,6 +616,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorArrayBasic>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorArrayBasic() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayBasic_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorArrayBasic>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
 ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayArrayCompound>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayArrayCompound(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayArrayCompound>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -424,6 +634,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayCompound>> response_storage;
   return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::TwoWayArrayCompound>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorArrayCompound>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorArrayCompound() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayCompound_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorArrayCompound>(
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
@@ -438,6 +658,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorVectorBasic>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorVectorBasic() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorBasic_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorVectorBasic>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
 ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayVectorCompound>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayVectorCompound(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayVectorCompound>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -446,6 +676,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorCompound>> response_storage;
   return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::TwoWayVectorCompound>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorVectorCompound>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorVectorCompound() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorCompound_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorVectorCompound>(
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
@@ -460,6 +700,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorVectorOptional>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorVectorOptional() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorOptional_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorOptional_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorVectorOptional>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
 ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayArrayVectorNested(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -471,6 +721,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorArrayVectorNested() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
 ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayResource>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayResource(::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource> request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -479,6 +739,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayResource>> response_storage;
   return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::TwoWayResource>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_typesinprotocols::Protocol::ErrorResource>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::ErrorResource() {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorResource_Ordinal, ::test_typesinprotocols::kProtocol_ErrorResource_DynamicFlags};
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::ErrorResource>(
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
@@ -860,11 +1130,29 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Two
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorBasic>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorBasic>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorBasic_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorBasic>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayCompound>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayCompound>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayCompound_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayCompound_DynamicFlags};
   _encoder.EncodeBody(
       ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::TwoWayCompound>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorCompound>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorCompound>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorCompound_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorCompound>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
@@ -878,11 +1166,29 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Two
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayBasic>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayBasic>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayBasic_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorArrayBasic>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayArrayCompound>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayCompound>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayArrayCompound_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayArrayCompound_DynamicFlags};
   _encoder.EncodeBody(
       ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::TwoWayArrayCompound>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayCompound>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayCompound>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayCompound_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorArrayCompound>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
@@ -896,11 +1202,29 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Two
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorBasic>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorBasic>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorBasic_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorBasic_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorVectorBasic>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayVectorCompound>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayVectorCompound>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayVectorCompound_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayVectorCompound_DynamicFlags};
   _encoder.EncodeBody(
       ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::TwoWayVectorCompound>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorCompound>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorCompound>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorCompound_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorCompound_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorVectorCompound>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
@@ -914,6 +1238,15 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Two
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorOptional>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorOptional>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorVectorOptional_Ordinal, ::test_typesinprotocols::kProtocol_ErrorVectorOptional_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorVectorOptional>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayArrayVectorNested_DynamicFlags};
@@ -923,11 +1256,29 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Two
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayResource>::Reply(::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayResource_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayResource_DynamicFlags};
   _encoder.EncodeBody(
       ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::TwoWayResource>::IntoDomainObject(std::move(response)));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorResource>::Reply(::fidl::Response<::test_typesinprotocols::Protocol::ErrorResource> response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_ErrorResource_Ordinal, ::test_typesinprotocols::kProtocol_ErrorResource_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorResource>::IntoDomainObject(std::move(response)));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
@@ -968,6 +1319,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
         },
     },
     {
+        ::test_typesinprotocols::kProtocol_ErrorBasic_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorBasic>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorBasic(
+
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
         ::test_typesinprotocols::kProtocol_OneWayCompound_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
@@ -995,6 +1362,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::TwoWayCompound>::Sync completer(txn);
           static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->TwoWayCompound(
               decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_typesinprotocols::kProtocol_ErrorCompound_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorCompound>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorCompound(
+
               completer);
           return ::fidl::Status::Ok();
         },
@@ -1032,6 +1415,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
         },
     },
     {
+        ::test_typesinprotocols::kProtocol_ErrorArrayBasic_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorArrayBasic>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorArrayBasic(
+
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
         ::test_typesinprotocols::kProtocol_OneWayArrayCompound_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
@@ -1059,6 +1458,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::TwoWayArrayCompound>::Sync completer(txn);
           static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->TwoWayArrayCompound(
               decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_typesinprotocols::kProtocol_ErrorArrayCompound_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorArrayCompound>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorArrayCompound(
+
               completer);
           return ::fidl::Status::Ok();
         },
@@ -1096,6 +1511,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
         },
     },
     {
+        ::test_typesinprotocols::kProtocol_ErrorVectorBasic_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorVectorBasic>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorVectorBasic(
+
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
         ::test_typesinprotocols::kProtocol_OneWayVectorCompound_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
@@ -1123,6 +1554,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::TwoWayVectorCompound>::Sync completer(txn);
           static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->TwoWayVectorCompound(
               decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_typesinprotocols::kProtocol_ErrorVectorCompound_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorVectorCompound>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorVectorCompound(
+
               completer);
           return ::fidl::Status::Ok();
         },
@@ -1160,6 +1607,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
         },
     },
     {
+        ::test_typesinprotocols::kProtocol_ErrorVectorOptional_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorVectorOptional>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorVectorOptional(
+
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
         ::test_typesinprotocols::kProtocol_OneWayArrayVectorNested_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
@@ -1187,6 +1650,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>::Sync completer(txn);
           static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->TwoWayArrayVectorNested(
               decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_typesinprotocols::kProtocol_ErrorArrayVectorNested_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorArrayVectorNested(
+
               completer);
           return ::fidl::Status::Ok();
         },
@@ -1223,10 +1702,26 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           return ::fidl::Status::Ok();
         },
     },
+    {
+        ::test_typesinprotocols::kProtocol_ErrorResource_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
+              msg, metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::ErrorResource>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->ErrorResource(
+
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
 };
 
 const ::fidl::internal::MethodEntry* fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol>::entries_end_ =
-    &entries_[18];
+    &entries_[27];
 
 void fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol>::Dispatch(::fidl::Server<::test_typesinprotocols::Protocol>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
                                                                                           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {

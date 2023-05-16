@@ -78,6 +78,33 @@ struct ArrayVectorNested;
 
 
 struct Resource;
+
+
+struct ProtocolErrorBasicTopResponse;
+
+
+struct ProtocolErrorCompoundTopResponse;
+
+
+struct ProtocolErrorArrayBasicTopResponse;
+
+
+struct ProtocolErrorArrayCompoundTopResponse;
+
+
+struct ProtocolErrorVectorBasicTopResponse;
+
+
+struct ProtocolErrorVectorCompoundTopResponse;
+
+
+struct ProtocolErrorVectorOptionalTopResponse;
+
+
+struct ProtocolErrorArrayVectorNestedTopResponse;
+
+
+struct ProtocolErrorResourceTopResponse;
   
 
 
@@ -92,6 +119,33 @@ class Union;
 
 
 class ResourceUnion;
+
+
+class ProtocolErrorBasicResult;
+
+
+class ProtocolErrorCompoundResult;
+
+
+class ProtocolErrorArrayBasicResult;
+
+
+class ProtocolErrorArrayCompoundResult;
+
+
+class ProtocolErrorVectorBasicResult;
+
+
+class ProtocolErrorVectorCompoundResult;
+
+
+class ProtocolErrorVectorOptionalResult;
+
+
+class ProtocolErrorArrayVectorNestedResult;
+
+
+class ProtocolErrorResourceResult;
     
 
 
@@ -119,6 +173,15 @@ struct ResourceStruct {
 
 #endif  // __Fuchsia__
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
@@ -572,6 +635,767 @@ class ResourceUnion {
 
 #endif  // __Fuchsia__
 
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
+
+class ProtocolErrorBasicResult {
+  public:
+
+  ProtocolErrorBasicResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorBasicResult(const ProtocolErrorBasicResult&) = default;
+  ProtocolErrorBasicResult& operator=(const ProtocolErrorBasicResult&) = default;
+  ProtocolErrorBasicResult(ProtocolErrorBasicResult&&) = default;
+  ProtocolErrorBasicResult& operator=(ProtocolErrorBasicResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorBasicResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::Basic> val) {
+    ProtocolErrorBasicResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::Basic>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorBasicResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::Basic>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::Basic& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::Basic>().get_data();
+  }
+  const ::test_typesinprotocols::wire::Basic& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::Basic>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kErr; }
+  
+  static ProtocolErrorBasicResult WithErr(uint32_t val) {
+    ProtocolErrorBasicResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
+
+class ProtocolErrorCompoundResult {
+  public:
+
+  ProtocolErrorCompoundResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorCompoundResult(const ProtocolErrorCompoundResult&) = default;
+  ProtocolErrorCompoundResult& operator=(const ProtocolErrorCompoundResult&) = default;
+  ProtocolErrorCompoundResult(ProtocolErrorCompoundResult&&) = default;
+  ProtocolErrorCompoundResult& operator=(ProtocolErrorCompoundResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorCompoundResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::Compound> val) {
+    ProtocolErrorCompoundResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::Compound>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorCompoundResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::Compound>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::Compound& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::Compound>().get_data();
+  }
+  const ::test_typesinprotocols::wire::Compound& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::Compound>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kErr; }
+  
+  static ProtocolErrorCompoundResult WithErr(uint32_t val) {
+    ProtocolErrorCompoundResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
+
+class ProtocolErrorArrayBasicResult {
+  public:
+
+  ProtocolErrorArrayBasicResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorArrayBasicResult(const ProtocolErrorArrayBasicResult&) = default;
+  ProtocolErrorArrayBasicResult& operator=(const ProtocolErrorArrayBasicResult&) = default;
+  ProtocolErrorArrayBasicResult(ProtocolErrorArrayBasicResult&&) = default;
+  ProtocolErrorArrayBasicResult& operator=(ProtocolErrorArrayBasicResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorArrayBasicResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::ArrayBasic> val) {
+    ProtocolErrorArrayBasicResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::ArrayBasic>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorArrayBasicResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::ArrayBasic>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::ArrayBasic& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::ArrayBasic>().get_data();
+  }
+  const ::test_typesinprotocols::wire::ArrayBasic& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::ArrayBasic>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kErr; }
+  
+  static ProtocolErrorArrayBasicResult WithErr(uint32_t val) {
+    ProtocolErrorArrayBasicResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
+
+class ProtocolErrorArrayCompoundResult {
+  public:
+
+  ProtocolErrorArrayCompoundResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorArrayCompoundResult(const ProtocolErrorArrayCompoundResult&) = default;
+  ProtocolErrorArrayCompoundResult& operator=(const ProtocolErrorArrayCompoundResult&) = default;
+  ProtocolErrorArrayCompoundResult(ProtocolErrorArrayCompoundResult&&) = default;
+  ProtocolErrorArrayCompoundResult& operator=(ProtocolErrorArrayCompoundResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorArrayCompoundResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::ArrayCompound> val) {
+    ProtocolErrorArrayCompoundResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::ArrayCompound>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorArrayCompoundResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::ArrayCompound>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::ArrayCompound& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::ArrayCompound>().get_data();
+  }
+  const ::test_typesinprotocols::wire::ArrayCompound& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::ArrayCompound>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kErr; }
+  
+  static ProtocolErrorArrayCompoundResult WithErr(uint32_t val) {
+    ProtocolErrorArrayCompoundResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
+
+class ProtocolErrorVectorBasicResult {
+  public:
+
+  ProtocolErrorVectorBasicResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorVectorBasicResult(const ProtocolErrorVectorBasicResult&) = default;
+  ProtocolErrorVectorBasicResult& operator=(const ProtocolErrorVectorBasicResult&) = default;
+  ProtocolErrorVectorBasicResult(ProtocolErrorVectorBasicResult&&) = default;
+  ProtocolErrorVectorBasicResult& operator=(ProtocolErrorVectorBasicResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorVectorBasicResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::VectorBasic> val) {
+    ProtocolErrorVectorBasicResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::VectorBasic>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorVectorBasicResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::VectorBasic>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::VectorBasic& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::VectorBasic>().get_data();
+  }
+  const ::test_typesinprotocols::wire::VectorBasic& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::VectorBasic>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kErr; }
+  
+  static ProtocolErrorVectorBasicResult WithErr(uint32_t val) {
+    ProtocolErrorVectorBasicResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
+
+class ProtocolErrorVectorCompoundResult {
+  public:
+
+  ProtocolErrorVectorCompoundResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorVectorCompoundResult(const ProtocolErrorVectorCompoundResult&) = default;
+  ProtocolErrorVectorCompoundResult& operator=(const ProtocolErrorVectorCompoundResult&) = default;
+  ProtocolErrorVectorCompoundResult(ProtocolErrorVectorCompoundResult&&) = default;
+  ProtocolErrorVectorCompoundResult& operator=(ProtocolErrorVectorCompoundResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorVectorCompoundResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::VectorCompound> val) {
+    ProtocolErrorVectorCompoundResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::VectorCompound>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorVectorCompoundResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::VectorCompound>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::VectorCompound& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::VectorCompound>().get_data();
+  }
+  const ::test_typesinprotocols::wire::VectorCompound& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::VectorCompound>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kErr; }
+  
+  static ProtocolErrorVectorCompoundResult WithErr(uint32_t val) {
+    ProtocolErrorVectorCompoundResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
+
+class ProtocolErrorVectorOptionalResult {
+  public:
+
+  ProtocolErrorVectorOptionalResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorVectorOptionalResult(const ProtocolErrorVectorOptionalResult&) = default;
+  ProtocolErrorVectorOptionalResult& operator=(const ProtocolErrorVectorOptionalResult&) = default;
+  ProtocolErrorVectorOptionalResult(ProtocolErrorVectorOptionalResult&&) = default;
+  ProtocolErrorVectorOptionalResult& operator=(ProtocolErrorVectorOptionalResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorVectorOptionalResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::VectorOptional> val) {
+    ProtocolErrorVectorOptionalResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::VectorOptional>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorVectorOptionalResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::VectorOptional>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::VectorOptional& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::VectorOptional>().get_data();
+  }
+  const ::test_typesinprotocols::wire::VectorOptional& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::VectorOptional>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kErr; }
+  
+  static ProtocolErrorVectorOptionalResult WithErr(uint32_t val) {
+    ProtocolErrorVectorOptionalResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
+
+class ProtocolErrorArrayVectorNestedResult {
+  public:
+
+  ProtocolErrorArrayVectorNestedResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::Invalid), envelope_{} {}
+
+  ProtocolErrorArrayVectorNestedResult(const ProtocolErrorArrayVectorNestedResult&) = default;
+  ProtocolErrorArrayVectorNestedResult& operator=(const ProtocolErrorArrayVectorNestedResult&) = default;
+  ProtocolErrorArrayVectorNestedResult(ProtocolErrorArrayVectorNestedResult&&) = default;
+  ProtocolErrorArrayVectorNestedResult& operator=(ProtocolErrorArrayVectorNestedResult&&) = default;
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorArrayVectorNestedResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::ArrayVectorNested> val) {
+    ProtocolErrorArrayVectorNestedResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::ArrayVectorNested>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorArrayVectorNestedResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::ArrayVectorNested>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::ArrayVectorNested& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::ArrayVectorNested>().get_data();
+  }
+  const ::test_typesinprotocols::wire::ArrayVectorNested& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::ArrayVectorNested>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kErr; }
+  
+  static ProtocolErrorArrayVectorNestedResult WithErr(uint32_t val) {
+    ProtocolErrorArrayVectorNestedResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag>(ordinal_);
+  }
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
+
+class ProtocolErrorResourceResult {
+  public:
+
+  ProtocolErrorResourceResult() : ordinal_(::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::Invalid), envelope_{} {}
+
+  
+  ~ProtocolErrorResourceResult();
+  ProtocolErrorResourceResult(ProtocolErrorResourceResult&& other) {
+    _Move(std::move(other));
+  }
+  ProtocolErrorResourceResult& operator=(ProtocolErrorResourceResult&& other) {
+    if (this != &other) {
+      _Move(std::move(other));
+    }
+    return *this;
+  }
+
+  enum class Tag : fidl_xunion_tag_t {
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+
+  bool has_invalid_tag() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::Invalid; }
+
+  bool is_response() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse; }
+  
+  static ProtocolErrorResourceResult WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::Resource> val) {
+    ProtocolErrorResourceResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse;
+    result.envelope_.As<::test_typesinprotocols::wire::Resource>().set_data(std::move(val));
+    return result;
+  }
+
+  
+  template <typename... Args>
+  static ProtocolErrorResourceResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
+    return WithResponse(::fidl::ObjectView<::test_typesinprotocols::wire::Resource>(allocator,
+                                         std::forward<Args>(args)...));
+  }
+
+
+  ::test_typesinprotocols::wire::Resource& response() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::Resource>().get_data();
+  }
+  const ::test_typesinprotocols::wire::Resource& response() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kResponse);
+    return envelope_.As<::test_typesinprotocols::wire::Resource>().get_data();
+  }
+
+  bool is_err() const { return ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kErr; }
+  
+  static ProtocolErrorResourceResult WithErr(uint32_t val) {
+    ProtocolErrorResourceResult result;
+    result.ordinal_ = ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kErr;
+    result.envelope_.As<uint32_t>().set_data(std::move(val));
+    return result;
+  }
+
+
+  uint32_t& err() {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  const uint32_t& err() const {
+    ZX_ASSERT(ordinal_ == ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal::kErr);
+    return envelope_.As<uint32_t>().get_data();
+  }
+  ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag Which() const {
+    ZX_ASSERT(!has_invalid_tag());
+    return static_cast<::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag>(ordinal_);
+  }
+  void _CloseHandles();
+
+ private:
+  enum class Ordinal : fidl_xunion_tag_t {
+    Invalid = 0,
+    kResponse = 1,  // 0x1
+    kErr = 2,  // 0x2
+  };
+  void _Move(ProtocolErrorResourceResult&& other);
+
+  static void SizeAndOffsetAssertionHelper();
+  ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Ordinal ordinal_;
+  FIDL_ALIGNDECL
+  ::fidl::UntypedEnvelope envelope_;
+};
+
+#endif  // __Fuchsia__
+
   
   
     
@@ -833,6 +1657,112 @@ struct Resource {
     ::fidl::VectorView<::test_typesinprotocols::wire::ResourceTable> vector_table = {};
 
     ::fidl::VectorView<::test_typesinprotocols::wire::ResourceUnion> vector_union = {};
+
+  void _CloseHandles();
+};
+
+#endif  // __Fuchsia__
+
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+
+struct ProtocolErrorBasicTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorBasicResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorBasicResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+
+struct ProtocolErrorCompoundTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorCompoundResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorCompoundResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+
+struct ProtocolErrorArrayBasicTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorArrayBasicResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+
+struct ProtocolErrorArrayCompoundTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+
+struct ProtocolErrorVectorBasicTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorVectorBasicResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+
+struct ProtocolErrorVectorCompoundTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+
+struct ProtocolErrorVectorOptionalTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result = {};
+};
+    
+
+
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+
+struct ProtocolErrorArrayVectorNestedTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result = {};
+};
+    
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+
+struct ProtocolErrorResourceTopResponse {
+  using Result = test_typesinprotocols::wire::ProtocolErrorResourceResult;
+
+    ::test_typesinprotocols::wire::ProtocolErrorResourceResult result = {};
 
   void _CloseHandles();
 };
@@ -1844,6 +2774,498 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Resourc
 
 #endif  // __Fuchsia__
 
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 80;
+  static constexpr uint32_t kMaxOutOfLineV1 = 112;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 368;
+  static constexpr uint32_t kMaxOutOfLineV1 = 528;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+#ifdef __Fuchsia__
+template <>
+struct IsResource<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse> : public std::true_type {};
+
+// TODO(fxbug.dev/95833) Remove this.
+template<>
+struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse>{
+  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+};
+
+template<>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse> {
+  static constexpr uint32_t kMaxNumHandles = 4294967295;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse> : public std::true_type {};
+template <>
+struct IsStruct<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse>);
+static_assert(offsetof(::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse, result) == 0);
+static_assert(sizeof(::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse) == TypeTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse>::kPrimarySize);
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_typesinprotocols::wire::ProtocolErrorResourceResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr bool kHasPadding = false;
+  using Base = WireStructCodingTraitsBase<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (is_memcpy_compatible) {
+      memcpy(position.As<void>(), value, sizeof(::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse));
+    } else {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
+    }
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    if constexpr (!Base::are_members_memcpy_compatible) {
+      internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+        decoder, position + 0, recursion_depth);
+    }
+  }
+};
+
+#endif  // __Fuchsia__
+
   
 
 
@@ -2241,6 +3663,1146 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Resourc
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ResourceUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ResourceUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#endif  // __Fuchsia__
+
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorBasicResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorBasicResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorBasicResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorBasicResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Basic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::Basic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Basic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::Basic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorBasicResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 80;
+  static constexpr uint32_t kMaxOutOfLineV1 = 112;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorCompoundResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorCompoundResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorCompoundResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorCompoundResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Compound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::Compound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Compound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::Compound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorCompoundResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::ArrayBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::ArrayBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 2;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 368;
+  static constexpr uint32_t kMaxOutOfLineV1 = 528;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::ArrayCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::ArrayCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::VectorBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::VectorBasic, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::VectorCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::VectorCompound, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorOptional, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::VectorOptional, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorOptional, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::VectorOptional, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayVectorNested, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::ArrayVectorNested, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayVectorNested, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::ArrayVectorNested, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#ifdef __Fuchsia__
+template <>
+struct IsResource<::test_typesinprotocols::wire::ProtocolErrorResourceResult> : public std::true_type {};
+
+template <>
+struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult> {
+  static constexpr uint32_t kMaxNumHandles = 4294967295;
+  static constexpr uint32_t kMaxDepth = 3;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kPrimarySizeV1 = 24;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
+  static constexpr bool kHasFlexibleEnvelope = true;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsFidlType<::test_typesinprotocols::wire::ProtocolErrorResourceResult> : public std::true_type {};
+template <>
+struct IsUnion<::test_typesinprotocols::wire::ProtocolErrorResourceResult> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_typesinprotocols::wire::ProtocolErrorResourceResult>);
+
+template <typename Constraint, bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, Constraint, IsRecursive> {
+  static constexpr size_t inline_size = 16;
+  static constexpr bool is_memcpy_compatible = false;
+
+  static void Encode(internal::WireEncoder* encoder, ::test_typesinprotocols::wire::ProtocolErrorResourceResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+
+    if (unlikely(u->tag == 0)) {
+      if constexpr (Constraint::is_optional) {
+        *position.As<fidl_xunion_v2_t>() = {};
+        return;
+      }
+      encoder->SetError(kCodingErrorInvalidUnionTag);
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    *position.As<fidl_xunion_tag_t>() = u->tag;
+
+    
+    size_t encode_inline_size;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kResponse
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Resource, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kErr
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        encode_inline_size = 0;
+        break;
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+    switch (u->tag) {
+      case 1: // ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kResponse
+        encode_fn = ::fidl::internal::MakeEncodeFn<::test_typesinprotocols::wire::Resource, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case 2: // ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kErr
+        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        encode_fn = nullptr;
+        break;
+    }
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag tag = *position.As<::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag>();
+    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+      if constexpr (!Constraint::is_optional) {
+        decoder->SetError(kCodingErrorInvalidUnionTag);
+        return;
+      }
+      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
+      }
+      return;
+    }
+
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+    if (!inner_depth.IsValid()) {
+      return;
+    }
+
+    
+    size_t decode_inline_size;
+    switch (tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kResponse:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Resource, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kErr:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        break;
+      default:
+        decode_inline_size = 0;
+        break;
+    }
+    DecodeFn<IsRecursive> decode_fn;
+    switch(tag) {
+      case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kResponse:
+        decode_fn = ::fidl::internal::MakeDecodeFn<::test_typesinprotocols::wire::Resource, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      case ::test_typesinprotocols::wire::ProtocolErrorResourceResult::Tag::kErr:
+        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
+        break;
+      default:
+        decode_fn = nullptr;
+        break;
+    }
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  }
+};
+
+// Top-level union.
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
 #endif  // __Fuchsia__
 

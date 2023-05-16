@@ -305,6 +305,663 @@ func (msg *VectorOptional) Marshaler() _bindings.Marshaler {
 	return _mVectorOptional
 }
 
+type protocolWithCtxErrorBasicResponse struct {
+	_      struct{}                 `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorBasicResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorBasicResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorBasicResponse{})
+
+func (msg *protocolWithCtxErrorBasicResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorBasicResponse
+}
+
+type protocolWithCtxErrorCompoundResponse struct {
+	_      struct{}                    `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorCompoundResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorCompoundResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorCompoundResponse{})
+
+func (msg *protocolWithCtxErrorCompoundResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorCompoundResponse
+}
+
+type protocolWithCtxErrorArrayBasicResponse struct {
+	_      struct{}                      `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorArrayBasicResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorArrayBasicResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorArrayBasicResponse{})
+
+func (msg *protocolWithCtxErrorArrayBasicResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorArrayBasicResponse
+}
+
+type protocolWithCtxErrorArrayCompoundResponse struct {
+	_      struct{}                         `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorArrayCompoundResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorArrayCompoundResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorArrayCompoundResponse{})
+
+func (msg *protocolWithCtxErrorArrayCompoundResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorArrayCompoundResponse
+}
+
+type protocolWithCtxErrorVectorBasicResponse struct {
+	_      struct{}                       `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorVectorBasicResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorVectorBasicResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorVectorBasicResponse{})
+
+func (msg *protocolWithCtxErrorVectorBasicResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorVectorBasicResponse
+}
+
+type protocolWithCtxErrorVectorCompoundResponse struct {
+	_      struct{}                          `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorVectorCompoundResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorVectorCompoundResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorVectorCompoundResponse{})
+
+func (msg *protocolWithCtxErrorVectorCompoundResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorVectorCompoundResponse
+}
+
+type protocolWithCtxErrorVectorOptionalResponse struct {
+	_      struct{}                          `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorVectorOptionalResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorVectorOptionalResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorVectorOptionalResponse{})
+
+func (msg *protocolWithCtxErrorVectorOptionalResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorVectorOptionalResponse
+}
+
+type protocolWithCtxErrorArrayVectorNestedResponse struct {
+	_      struct{}                             `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorArrayVectorNestedResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorArrayVectorNestedResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorArrayVectorNestedResponse{})
+
+func (msg *protocolWithCtxErrorArrayVectorNestedResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorArrayVectorNestedResponse
+}
+
+type protocolWithCtxErrorResourceResponse struct {
+	_      struct{}                    `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	Result ProtocolErrorResourceResult `fidl_offset_v2:"0"`
+}
+
+var _mprotocolWithCtxErrorResourceResponse = _bindings.CreateLazyMarshaler(protocolWithCtxErrorResourceResponse{})
+
+func (msg *protocolWithCtxErrorResourceResponse) Marshaler() _bindings.Marshaler {
+	return _mprotocolWithCtxErrorResourceResponse
+}
+
+type I_protocolErrorArrayBasicResultTag uint64
+
+const (
+	ProtocolErrorArrayBasicResultResponse = 1 // 0x00000001
+	ProtocolErrorArrayBasicResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorArrayBasicResult struct {
+	I_protocolErrorArrayBasicResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                           ArrayBasic `fidl_ordinal:"1"`
+	Err                                uint32     `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorArrayBasicResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayBasicResult{})
+
+func (msg *ProtocolErrorArrayBasicResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorArrayBasicResult
+}
+
+func (_m *ProtocolErrorArrayBasicResult) reset() {
+	switch _m.I_protocolErrorArrayBasicResultTag {
+	case 1:
+		var _zeroed ArrayBasic
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorArrayBasicResult) Which() I_protocolErrorArrayBasicResultTag {
+	return _m.I_protocolErrorArrayBasicResultTag
+}
+
+func (_m *ProtocolErrorArrayBasicResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorArrayBasicResultTag)
+}
+
+func (_m *ProtocolErrorArrayBasicResult) SetResponse(response ArrayBasic) {
+	_m.reset()
+	_m.I_protocolErrorArrayBasicResultTag = ProtocolErrorArrayBasicResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorArrayBasicResultWithResponse(response ArrayBasic) ProtocolErrorArrayBasicResult {
+	var _u ProtocolErrorArrayBasicResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorArrayBasicResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorArrayBasicResultTag = ProtocolErrorArrayBasicResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorArrayBasicResultWithErr(err uint32) ProtocolErrorArrayBasicResult {
+	var _u ProtocolErrorArrayBasicResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorArrayCompoundResultTag uint64
+
+const (
+	ProtocolErrorArrayCompoundResultResponse = 1 // 0x00000001
+	ProtocolErrorArrayCompoundResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorArrayCompoundResult struct {
+	I_protocolErrorArrayCompoundResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                              ArrayCompound `fidl_ordinal:"1"`
+	Err                                   uint32        `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorArrayCompoundResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayCompoundResult{})
+
+func (msg *ProtocolErrorArrayCompoundResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorArrayCompoundResult
+}
+
+func (_m *ProtocolErrorArrayCompoundResult) reset() {
+	switch _m.I_protocolErrorArrayCompoundResultTag {
+	case 1:
+		var _zeroed ArrayCompound
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorArrayCompoundResult) Which() I_protocolErrorArrayCompoundResultTag {
+	return _m.I_protocolErrorArrayCompoundResultTag
+}
+
+func (_m *ProtocolErrorArrayCompoundResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorArrayCompoundResultTag)
+}
+
+func (_m *ProtocolErrorArrayCompoundResult) SetResponse(response ArrayCompound) {
+	_m.reset()
+	_m.I_protocolErrorArrayCompoundResultTag = ProtocolErrorArrayCompoundResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorArrayCompoundResultWithResponse(response ArrayCompound) ProtocolErrorArrayCompoundResult {
+	var _u ProtocolErrorArrayCompoundResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorArrayCompoundResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorArrayCompoundResultTag = ProtocolErrorArrayCompoundResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorArrayCompoundResultWithErr(err uint32) ProtocolErrorArrayCompoundResult {
+	var _u ProtocolErrorArrayCompoundResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorArrayVectorNestedResultTag uint64
+
+const (
+	ProtocolErrorArrayVectorNestedResultResponse = 1 // 0x00000001
+	ProtocolErrorArrayVectorNestedResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorArrayVectorNestedResult struct {
+	I_protocolErrorArrayVectorNestedResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                                  ArrayVectorNested `fidl_ordinal:"1"`
+	Err                                       uint32            `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorArrayVectorNestedResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayVectorNestedResult{})
+
+func (msg *ProtocolErrorArrayVectorNestedResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorArrayVectorNestedResult
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) reset() {
+	switch _m.I_protocolErrorArrayVectorNestedResultTag {
+	case 1:
+		var _zeroed ArrayVectorNested
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) Which() I_protocolErrorArrayVectorNestedResultTag {
+	return _m.I_protocolErrorArrayVectorNestedResultTag
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorArrayVectorNestedResultTag)
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) SetResponse(response ArrayVectorNested) {
+	_m.reset()
+	_m.I_protocolErrorArrayVectorNestedResultTag = ProtocolErrorArrayVectorNestedResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorArrayVectorNestedResultWithResponse(response ArrayVectorNested) ProtocolErrorArrayVectorNestedResult {
+	var _u ProtocolErrorArrayVectorNestedResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorArrayVectorNestedResultTag = ProtocolErrorArrayVectorNestedResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorArrayVectorNestedResultWithErr(err uint32) ProtocolErrorArrayVectorNestedResult {
+	var _u ProtocolErrorArrayVectorNestedResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorBasicResultTag uint64
+
+const (
+	ProtocolErrorBasicResultResponse = 1 // 0x00000001
+	ProtocolErrorBasicResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorBasicResult struct {
+	I_protocolErrorBasicResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                      Basic  `fidl_ordinal:"1"`
+	Err                           uint32 `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorBasicResult = _bindings.CreateLazyMarshaler(ProtocolErrorBasicResult{})
+
+func (msg *ProtocolErrorBasicResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorBasicResult
+}
+
+func (_m *ProtocolErrorBasicResult) reset() {
+	switch _m.I_protocolErrorBasicResultTag {
+	case 1:
+		var _zeroed Basic
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorBasicResult) Which() I_protocolErrorBasicResultTag {
+	return _m.I_protocolErrorBasicResultTag
+}
+
+func (_m *ProtocolErrorBasicResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorBasicResultTag)
+}
+
+func (_m *ProtocolErrorBasicResult) SetResponse(response Basic) {
+	_m.reset()
+	_m.I_protocolErrorBasicResultTag = ProtocolErrorBasicResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorBasicResultWithResponse(response Basic) ProtocolErrorBasicResult {
+	var _u ProtocolErrorBasicResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorBasicResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorBasicResultTag = ProtocolErrorBasicResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorBasicResultWithErr(err uint32) ProtocolErrorBasicResult {
+	var _u ProtocolErrorBasicResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorCompoundResultTag uint64
+
+const (
+	ProtocolErrorCompoundResultResponse = 1 // 0x00000001
+	ProtocolErrorCompoundResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorCompoundResult struct {
+	I_protocolErrorCompoundResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                         Compound `fidl_ordinal:"1"`
+	Err                              uint32   `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorCompoundResult = _bindings.CreateLazyMarshaler(ProtocolErrorCompoundResult{})
+
+func (msg *ProtocolErrorCompoundResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorCompoundResult
+}
+
+func (_m *ProtocolErrorCompoundResult) reset() {
+	switch _m.I_protocolErrorCompoundResultTag {
+	case 1:
+		var _zeroed Compound
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorCompoundResult) Which() I_protocolErrorCompoundResultTag {
+	return _m.I_protocolErrorCompoundResultTag
+}
+
+func (_m *ProtocolErrorCompoundResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorCompoundResultTag)
+}
+
+func (_m *ProtocolErrorCompoundResult) SetResponse(response Compound) {
+	_m.reset()
+	_m.I_protocolErrorCompoundResultTag = ProtocolErrorCompoundResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorCompoundResultWithResponse(response Compound) ProtocolErrorCompoundResult {
+	var _u ProtocolErrorCompoundResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorCompoundResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorCompoundResultTag = ProtocolErrorCompoundResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorCompoundResultWithErr(err uint32) ProtocolErrorCompoundResult {
+	var _u ProtocolErrorCompoundResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorResourceResultTag uint64
+
+const (
+	ProtocolErrorResourceResultResponse = 1 // 0x00000001
+	ProtocolErrorResourceResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorResourceResult struct {
+	I_protocolErrorResourceResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
+	Response                         Resource `fidl_ordinal:"1"`
+	Err                              uint32   `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorResourceResult = _bindings.CreateLazyMarshaler(ProtocolErrorResourceResult{})
+
+func (msg *ProtocolErrorResourceResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorResourceResult
+}
+
+func (_m *ProtocolErrorResourceResult) reset() {
+	switch _m.I_protocolErrorResourceResultTag {
+	case 1:
+		var _zeroed Resource
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorResourceResult) Which() I_protocolErrorResourceResultTag {
+	return _m.I_protocolErrorResourceResultTag
+}
+
+func (_m *ProtocolErrorResourceResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorResourceResultTag)
+}
+
+func (_m *ProtocolErrorResourceResult) SetResponse(response Resource) {
+	_m.reset()
+	_m.I_protocolErrorResourceResultTag = ProtocolErrorResourceResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorResourceResultWithResponse(response Resource) ProtocolErrorResourceResult {
+	var _u ProtocolErrorResourceResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorResourceResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorResourceResultTag = ProtocolErrorResourceResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorResourceResultWithErr(err uint32) ProtocolErrorResourceResult {
+	var _u ProtocolErrorResourceResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorVectorBasicResultTag uint64
+
+const (
+	ProtocolErrorVectorBasicResultResponse = 1 // 0x00000001
+	ProtocolErrorVectorBasicResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorVectorBasicResult struct {
+	I_protocolErrorVectorBasicResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                            VectorBasic `fidl_ordinal:"1"`
+	Err                                 uint32      `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorVectorBasicResult = _bindings.CreateLazyMarshaler(ProtocolErrorVectorBasicResult{})
+
+func (msg *ProtocolErrorVectorBasicResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorVectorBasicResult
+}
+
+func (_m *ProtocolErrorVectorBasicResult) reset() {
+	switch _m.I_protocolErrorVectorBasicResultTag {
+	case 1:
+		var _zeroed VectorBasic
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorVectorBasicResult) Which() I_protocolErrorVectorBasicResultTag {
+	return _m.I_protocolErrorVectorBasicResultTag
+}
+
+func (_m *ProtocolErrorVectorBasicResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorVectorBasicResultTag)
+}
+
+func (_m *ProtocolErrorVectorBasicResult) SetResponse(response VectorBasic) {
+	_m.reset()
+	_m.I_protocolErrorVectorBasicResultTag = ProtocolErrorVectorBasicResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorVectorBasicResultWithResponse(response VectorBasic) ProtocolErrorVectorBasicResult {
+	var _u ProtocolErrorVectorBasicResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorVectorBasicResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorVectorBasicResultTag = ProtocolErrorVectorBasicResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorVectorBasicResultWithErr(err uint32) ProtocolErrorVectorBasicResult {
+	var _u ProtocolErrorVectorBasicResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorVectorCompoundResultTag uint64
+
+const (
+	ProtocolErrorVectorCompoundResultResponse = 1 // 0x00000001
+	ProtocolErrorVectorCompoundResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorVectorCompoundResult struct {
+	I_protocolErrorVectorCompoundResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                               VectorCompound `fidl_ordinal:"1"`
+	Err                                    uint32         `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorVectorCompoundResult = _bindings.CreateLazyMarshaler(ProtocolErrorVectorCompoundResult{})
+
+func (msg *ProtocolErrorVectorCompoundResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorVectorCompoundResult
+}
+
+func (_m *ProtocolErrorVectorCompoundResult) reset() {
+	switch _m.I_protocolErrorVectorCompoundResultTag {
+	case 1:
+		var _zeroed VectorCompound
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorVectorCompoundResult) Which() I_protocolErrorVectorCompoundResultTag {
+	return _m.I_protocolErrorVectorCompoundResultTag
+}
+
+func (_m *ProtocolErrorVectorCompoundResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorVectorCompoundResultTag)
+}
+
+func (_m *ProtocolErrorVectorCompoundResult) SetResponse(response VectorCompound) {
+	_m.reset()
+	_m.I_protocolErrorVectorCompoundResultTag = ProtocolErrorVectorCompoundResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorVectorCompoundResultWithResponse(response VectorCompound) ProtocolErrorVectorCompoundResult {
+	var _u ProtocolErrorVectorCompoundResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorVectorCompoundResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorVectorCompoundResultTag = ProtocolErrorVectorCompoundResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorVectorCompoundResultWithErr(err uint32) ProtocolErrorVectorCompoundResult {
+	var _u ProtocolErrorVectorCompoundResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorVectorOptionalResultTag uint64
+
+const (
+	ProtocolErrorVectorOptionalResultResponse = 1 // 0x00000001
+	ProtocolErrorVectorOptionalResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorVectorOptionalResult struct {
+	I_protocolErrorVectorOptionalResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                               VectorOptional `fidl_ordinal:"1"`
+	Err                                    uint32         `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorVectorOptionalResult = _bindings.CreateLazyMarshaler(ProtocolErrorVectorOptionalResult{})
+
+func (msg *ProtocolErrorVectorOptionalResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorVectorOptionalResult
+}
+
+func (_m *ProtocolErrorVectorOptionalResult) reset() {
+	switch _m.I_protocolErrorVectorOptionalResultTag {
+	case 1:
+		var _zeroed VectorOptional
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorVectorOptionalResult) Which() I_protocolErrorVectorOptionalResultTag {
+	return _m.I_protocolErrorVectorOptionalResultTag
+}
+
+func (_m *ProtocolErrorVectorOptionalResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorVectorOptionalResultTag)
+}
+
+func (_m *ProtocolErrorVectorOptionalResult) SetResponse(response VectorOptional) {
+	_m.reset()
+	_m.I_protocolErrorVectorOptionalResultTag = ProtocolErrorVectorOptionalResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorVectorOptionalResultWithResponse(response VectorOptional) ProtocolErrorVectorOptionalResult {
+	var _u ProtocolErrorVectorOptionalResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorVectorOptionalResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorVectorOptionalResultTag = ProtocolErrorVectorOptionalResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorVectorOptionalResultWithErr(err uint32) ProtocolErrorVectorOptionalResult {
+	var _u ProtocolErrorVectorOptionalResult
+	_u.SetErr(err)
+	return _u
+}
+
 type I_resourceUnionTag uint64
 
 const (
@@ -462,30 +1119,39 @@ func (u *Table) GetUnknownData() map[uint64]_bindings.UnknownData {
 const (
 	ProtocolOneWayBasicOrdinal             uint64 = 0x7c311f0d9e662df9
 	ProtocolTwoWayBasicOrdinal             uint64 = 0x205b92db5139c88f
+	ProtocolErrorBasicOrdinal              uint64 = 0x459eaa5d11b9ff93
 	ProtocolEventBasicOrdinal              uint64 = 0x51c5b06295c10c40
 	ProtocolOneWayCompoundOrdinal          uint64 = 0x2bc2bc3a9237c6cc
 	ProtocolTwoWayCompoundOrdinal          uint64 = 0x79f279c7201da131
+	ProtocolErrorCompoundOrdinal           uint64 = 0x29817d89a19ec77d
 	ProtocolEventCompoundOrdinal           uint64 = 0x617c5410858734d5
 	ProtocolOneWayArrayBasicOrdinal        uint64 = 0x62e2ebcadf35ca19
 	ProtocolTwoWayArrayBasicOrdinal        uint64 = 0x49ad7a74e28ba114
+	ProtocolErrorArrayBasicOrdinal         uint64 = 0xf0dbde9626fff79
 	ProtocolEventArrayBasicOrdinal         uint64 = 0x51b76208b148f02e
 	ProtocolOneWayArrayCompoundOrdinal     uint64 = 0x464948bae1bda09d
 	ProtocolTwoWayArrayCompoundOrdinal     uint64 = 0xbcae616f8e1ea7b
+	ProtocolErrorArrayCompoundOrdinal      uint64 = 0x52257f80e29c1a04
 	ProtocolEventArrayCompoundOrdinal      uint64 = 0x1e63a00079aa7415
 	ProtocolOneWayVectorBasicOrdinal       uint64 = 0x4f907dde77464657
 	ProtocolTwoWayVectorBasicOrdinal       uint64 = 0x7860cb3ed8362e74
+	ProtocolErrorVectorBasicOrdinal        uint64 = 0xc27f841d6313f72
 	ProtocolEventVectorBasicOrdinal        uint64 = 0x3f9d405e7191eff6
 	ProtocolOneWayVectorCompoundOrdinal    uint64 = 0x19baae42829dbe90
 	ProtocolTwoWayVectorCompoundOrdinal    uint64 = 0x371140db701b23b4
+	ProtocolErrorVectorCompoundOrdinal     uint64 = 0x760e278628f7a985
 	ProtocolEventVectorCompoundOrdinal     uint64 = 0x53a1fc56e8b3cff3
 	ProtocolOneWayVectorOptionalOrdinal    uint64 = 0x153c6b333c21c52f
 	ProtocolTwoWayVectorOptionalOrdinal    uint64 = 0xe4b620aaafd73f3
+	ProtocolErrorVectorOptionalOrdinal     uint64 = 0x58e75cf86e2d715e
 	ProtocolEventVectorOptionalOrdinal     uint64 = 0x17617b54dfa8d85d
 	ProtocolOneWayArrayVectorNestedOrdinal uint64 = 0x520dc9cb9b9b5ed7
 	ProtocolTwoWayArrayVectorNestedOrdinal uint64 = 0x4a438ce0948817dc
+	ProtocolErrorArrayVectorNestedOrdinal  uint64 = 0x7e168d89e1dac8a7
 	ProtocolEventArrayVectorNestedOrdinal  uint64 = 0x110b72cfebc4037e
 	ProtocolOneWayResourceOrdinal          uint64 = 0x5af4795a9ed3a022
 	ProtocolTwoWayResourceOrdinal          uint64 = 0x1904824a11c6ad5b
+	ProtocolErrorResourceOrdinal           uint64 = 0x5b28634d603175b6
 	ProtocolEventResourceOrdinal           uint64 = 0x4fbde2864601698b
 )
 
@@ -502,6 +1168,13 @@ func (p *ProtocolWithCtxInterface) TwoWayBasic(ctx_ _bindings.Context, uint8_ ui
 	resp_ := &Basic{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolTwoWayBasicOrdinal, req_, resp_)
 	return (*resp_).Uint8, (*resp_).Uint16, (*resp_).Uint32, (*resp_).Uint64, (*resp_).Int8, (*resp_).Int16, (*resp_).Int32, (*resp_).Int64, (*resp_).Float32, (*resp_).Float64, (*resp_).String, (*resp_).OptString, err_
+}
+
+func (p *ProtocolWithCtxInterface) ErrorBasic(ctx_ _bindings.Context) (ProtocolErrorBasicResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorBasicResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorBasicOrdinal, req_, resp_)
+	return (*resp_).Result, err_
 }
 
 func (p *ProtocolWithCtxInterface) ExpectEventBasic(ctx_ _bindings.Context) (uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string, *string, error) {
@@ -523,6 +1196,13 @@ func (p *ProtocolWithCtxInterface) TwoWayCompound(ctx_ _bindings.Context, bits B
 	return (*resp_).Bits, (*resp_).Enum, (*resp_).Struct, (*resp_).Table, (*resp_).Union, (*resp_).OptStruct, (*resp_).OptUnion, err_
 }
 
+func (p *ProtocolWithCtxInterface) ErrorCompound(ctx_ _bindings.Context) (ProtocolErrorCompoundResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorCompoundResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorCompoundOrdinal, req_, resp_)
+	return (*resp_).Result, err_
+}
+
 func (p *ProtocolWithCtxInterface) ExpectEventCompound(ctx_ _bindings.Context) (Bits, Enum, Struct, Table, Union, *Struct, *Union, error) {
 	resp_ := &Compound{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ProtocolEventCompoundOrdinal, resp_)
@@ -540,6 +1220,13 @@ func (p *ProtocolWithCtxInterface) TwoWayArrayBasic(ctx_ _bindings.Context, arra
 	resp_ := &ArrayBasic{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolTwoWayArrayBasicOrdinal, req_, resp_)
 	return (*resp_).ArrayUint8, (*resp_).ArrayUint16, (*resp_).ArrayUint32, (*resp_).ArrayUint64, (*resp_).ArrayInt8, (*resp_).ArrayInt16, (*resp_).ArrayInt32, (*resp_).ArrayInt64, (*resp_).ArrayFloat32, (*resp_).ArrayFloat64, (*resp_).ArrayString, (*resp_).ArrayOptString, err_
+}
+
+func (p *ProtocolWithCtxInterface) ErrorArrayBasic(ctx_ _bindings.Context) (ProtocolErrorArrayBasicResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorArrayBasicResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorArrayBasicOrdinal, req_, resp_)
+	return (*resp_).Result, err_
 }
 
 func (p *ProtocolWithCtxInterface) ExpectEventArrayBasic(ctx_ _bindings.Context) ([5]uint8, [5]uint16, [5]uint32, [5]uint64, [5]int8, [5]int16, [5]int32, [5]int64, [5]float32, [5]float64, [5]string, [5]*string, error) {
@@ -561,6 +1248,13 @@ func (p *ProtocolWithCtxInterface) TwoWayArrayCompound(ctx_ _bindings.Context, a
 	return (*resp_).ArrayBits, (*resp_).ArrayEnum, (*resp_).ArrayStruct, (*resp_).ArrayTable, (*resp_).ArrayUnion, (*resp_).ArrayOptStruct, (*resp_).ArrayOptUnion, err_
 }
 
+func (p *ProtocolWithCtxInterface) ErrorArrayCompound(ctx_ _bindings.Context) (ProtocolErrorArrayCompoundResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorArrayCompoundResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorArrayCompoundOrdinal, req_, resp_)
+	return (*resp_).Result, err_
+}
+
 func (p *ProtocolWithCtxInterface) ExpectEventArrayCompound(ctx_ _bindings.Context) ([5]Bits, [5]Enum, [5]Struct, [5]Table, [5]Union, [5]*Struct, [5]*Union, error) {
 	resp_ := &ArrayCompound{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ProtocolEventArrayCompoundOrdinal, resp_)
@@ -578,6 +1272,13 @@ func (p *ProtocolWithCtxInterface) TwoWayVectorBasic(ctx_ _bindings.Context, vec
 	resp_ := &VectorBasic{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolTwoWayVectorBasicOrdinal, req_, resp_)
 	return (*resp_).VectorUint8, (*resp_).VectorUint16, (*resp_).VectorUint32, (*resp_).VectorUint64, (*resp_).VectorInt8, (*resp_).VectorInt16, (*resp_).VectorInt32, (*resp_).VectorInt64, (*resp_).VectorFloat32, (*resp_).VectorFloat64, (*resp_).VectorString, (*resp_).VectorOptString, err_
+}
+
+func (p *ProtocolWithCtxInterface) ErrorVectorBasic(ctx_ _bindings.Context) (ProtocolErrorVectorBasicResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorVectorBasicResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorVectorBasicOrdinal, req_, resp_)
+	return (*resp_).Result, err_
 }
 
 func (p *ProtocolWithCtxInterface) ExpectEventVectorBasic(ctx_ _bindings.Context) ([]uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64, []float32, []float64, []string, []*string, error) {
@@ -599,6 +1300,13 @@ func (p *ProtocolWithCtxInterface) TwoWayVectorCompound(ctx_ _bindings.Context, 
 	return (*resp_).VectorBits, (*resp_).VectorEnum, (*resp_).VectorStruct, (*resp_).VectorTable, (*resp_).VectorUnion, (*resp_).VectorOptStruct, (*resp_).VectorOptUnion, err_
 }
 
+func (p *ProtocolWithCtxInterface) ErrorVectorCompound(ctx_ _bindings.Context) (ProtocolErrorVectorCompoundResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorVectorCompoundResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorVectorCompoundOrdinal, req_, resp_)
+	return (*resp_).Result, err_
+}
+
 func (p *ProtocolWithCtxInterface) ExpectEventVectorCompound(ctx_ _bindings.Context) ([]Bits, []Enum, []Struct, []Table, []Union, []*Struct, []*Union, error) {
 	resp_ := &VectorCompound{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ProtocolEventVectorCompoundOrdinal, resp_)
@@ -616,6 +1324,13 @@ func (p *ProtocolWithCtxInterface) TwoWayVectorOptional(ctx_ _bindings.Context, 
 	resp_ := &VectorOptional{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolTwoWayVectorOptionalOrdinal, req_, resp_)
 	return (*resp_).OptVectorUint8, (*resp_).OptVectorString, (*resp_).OptVectorStruct, (*resp_).OptVectorOptStruct, err_
+}
+
+func (p *ProtocolWithCtxInterface) ErrorVectorOptional(ctx_ _bindings.Context) (ProtocolErrorVectorOptionalResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorVectorOptionalResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorVectorOptionalOrdinal, req_, resp_)
+	return (*resp_).Result, err_
 }
 
 func (p *ProtocolWithCtxInterface) ExpectEventVectorOptional(ctx_ _bindings.Context) (*[]uint8, *[]string, *[]Struct, *[]*Struct, error) {
@@ -637,6 +1352,13 @@ func (p *ProtocolWithCtxInterface) TwoWayArrayVectorNested(ctx_ _bindings.Contex
 	return (*resp_).ArrayArrayUint8, (*resp_).ArrayVectorUint8, (*resp_).VectorArrayUint8, (*resp_).VectorVectorUint8, err_
 }
 
+func (p *ProtocolWithCtxInterface) ErrorArrayVectorNested(ctx_ _bindings.Context) (ProtocolErrorArrayVectorNestedResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorArrayVectorNestedResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorArrayVectorNestedOrdinal, req_, resp_)
+	return (*resp_).Result, err_
+}
+
 func (p *ProtocolWithCtxInterface) ExpectEventArrayVectorNested(ctx_ _bindings.Context) ([5][5]uint8, [5][]uint8, [][5]uint8, [][]uint8, error) {
 	resp_ := &ArrayVectorNested{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ProtocolEventArrayVectorNestedOrdinal, resp_)
@@ -656,6 +1378,13 @@ func (p *ProtocolWithCtxInterface) TwoWayResource(ctx_ _bindings.Context, handle
 	return (*resp_).Handle, (*resp_).Vmo, (*resp_).ClientEnd, (*resp_).ServerEnd, (*resp_).Struct, (*resp_).Table, (*resp_).Union, (*resp_).OptHandle, (*resp_).OptVmo, (*resp_).OptClientEnd, (*resp_).OptServerEnd, (*resp_).OptStruct, (*resp_).OptUnion, (*resp_).ArrayHandle, (*resp_).ArrayVmo, (*resp_).ArrayClientEnd, (*resp_).ArrayServerEnd, (*resp_).ArrayStruct, (*resp_).ArrayTable, (*resp_).ArrayUnion, (*resp_).VectorHandle, (*resp_).VectorVmo, (*resp_).VectorClientEnd, (*resp_).VectorServerEnd, (*resp_).VectorStruct, (*resp_).VectorTable, (*resp_).VectorUnion, err_
 }
 
+func (p *ProtocolWithCtxInterface) ErrorResource(ctx_ _bindings.Context) (ProtocolErrorResourceResult, error) {
+	var req_ _bindings.Message
+	resp_ := &protocolWithCtxErrorResourceResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolErrorResourceOrdinal, req_, resp_)
+	return (*resp_).Result, err_
+}
+
 func (p *ProtocolWithCtxInterface) ExpectEventResource(ctx_ _bindings.Context) (_zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, ResourceStruct, ResourceTable, ResourceUnion, _zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, *ResourceStruct, *ResourceUnion, [5]_zx.Handle, [5]_zx.VMO, [5]ProtocolWithCtxInterface, [5]ProtocolWithCtxInterfaceRequest, [5]ResourceStruct, [5]ResourceTable, [5]ResourceUnion, []_zx.Handle, []_zx.VMO, []ProtocolWithCtxInterface, []ProtocolWithCtxInterfaceRequest, []ResourceStruct, []ResourceTable, []ResourceUnion, error) {
 	resp_ := &Resource{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ProtocolEventResourceOrdinal, resp_)
@@ -665,22 +1394,31 @@ func (p *ProtocolWithCtxInterface) ExpectEventResource(ctx_ _bindings.Context) (
 type ProtocolWithCtx interface {
 	OneWayBasic(ctx_ _bindings.Context, uint8_ uint8, uint16_ uint16, uint32_ uint32, uint64_ uint64, int8_ int8, int16_ int16, int32_ int32, int64_ int64, float32 float32, float64 float64, string_ string, optString *string) error
 	TwoWayBasic(ctx_ _bindings.Context, uint8_ uint8, uint16_ uint16, uint32_ uint32, uint64_ uint64, int8_ int8, int16_ int16, int32_ int32, int64_ int64, float32 float32, float64 float64, string_ string, optString *string) (uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string, *string, error)
+	ErrorBasic(ctx_ _bindings.Context) (ProtocolErrorBasicResult, error)
 	OneWayCompound(ctx_ _bindings.Context, bits Bits, enum Enum, struct_ Struct, table Table, union Union, optStruct *Struct, optUnion *Union) error
 	TwoWayCompound(ctx_ _bindings.Context, bits Bits, enum Enum, struct_ Struct, table Table, union Union, optStruct *Struct, optUnion *Union) (Bits, Enum, Struct, Table, Union, *Struct, *Union, error)
+	ErrorCompound(ctx_ _bindings.Context) (ProtocolErrorCompoundResult, error)
 	OneWayArrayBasic(ctx_ _bindings.Context, arrayUint8 [5]uint8, arrayUint16 [5]uint16, arrayUint32 [5]uint32, arrayUint64 [5]uint64, arrayInt8 [5]int8, arrayInt16 [5]int16, arrayInt32 [5]int32, arrayInt64 [5]int64, arrayFloat32 [5]float32, arrayFloat64 [5]float64, arrayString [5]string, arrayOptString [5]*string) error
 	TwoWayArrayBasic(ctx_ _bindings.Context, arrayUint8 [5]uint8, arrayUint16 [5]uint16, arrayUint32 [5]uint32, arrayUint64 [5]uint64, arrayInt8 [5]int8, arrayInt16 [5]int16, arrayInt32 [5]int32, arrayInt64 [5]int64, arrayFloat32 [5]float32, arrayFloat64 [5]float64, arrayString [5]string, arrayOptString [5]*string) ([5]uint8, [5]uint16, [5]uint32, [5]uint64, [5]int8, [5]int16, [5]int32, [5]int64, [5]float32, [5]float64, [5]string, [5]*string, error)
+	ErrorArrayBasic(ctx_ _bindings.Context) (ProtocolErrorArrayBasicResult, error)
 	OneWayArrayCompound(ctx_ _bindings.Context, arrayBits [5]Bits, arrayEnum [5]Enum, arrayStruct [5]Struct, arrayTable [5]Table, arrayUnion [5]Union, arrayOptStruct [5]*Struct, arrayOptUnion [5]*Union) error
 	TwoWayArrayCompound(ctx_ _bindings.Context, arrayBits [5]Bits, arrayEnum [5]Enum, arrayStruct [5]Struct, arrayTable [5]Table, arrayUnion [5]Union, arrayOptStruct [5]*Struct, arrayOptUnion [5]*Union) ([5]Bits, [5]Enum, [5]Struct, [5]Table, [5]Union, [5]*Struct, [5]*Union, error)
+	ErrorArrayCompound(ctx_ _bindings.Context) (ProtocolErrorArrayCompoundResult, error)
 	OneWayVectorBasic(ctx_ _bindings.Context, vectorUint8 []uint8, vectorUint16 []uint16, vectorUint32 []uint32, vectorUint64 []uint64, vectorInt8 []int8, vectorInt16 []int16, vectorInt32 []int32, vectorInt64 []int64, vectorFloat32 []float32, vectorFloat64 []float64, vectorString []string, vectorOptString []*string) error
 	TwoWayVectorBasic(ctx_ _bindings.Context, vectorUint8 []uint8, vectorUint16 []uint16, vectorUint32 []uint32, vectorUint64 []uint64, vectorInt8 []int8, vectorInt16 []int16, vectorInt32 []int32, vectorInt64 []int64, vectorFloat32 []float32, vectorFloat64 []float64, vectorString []string, vectorOptString []*string) ([]uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64, []float32, []float64, []string, []*string, error)
+	ErrorVectorBasic(ctx_ _bindings.Context) (ProtocolErrorVectorBasicResult, error)
 	OneWayVectorCompound(ctx_ _bindings.Context, vectorBits []Bits, vectorEnum []Enum, vectorStruct []Struct, vectorTable []Table, vectorUnion []Union, vectorOptStruct []*Struct, vectorOptUnion []*Union) error
 	TwoWayVectorCompound(ctx_ _bindings.Context, vectorBits []Bits, vectorEnum []Enum, vectorStruct []Struct, vectorTable []Table, vectorUnion []Union, vectorOptStruct []*Struct, vectorOptUnion []*Union) ([]Bits, []Enum, []Struct, []Table, []Union, []*Struct, []*Union, error)
+	ErrorVectorCompound(ctx_ _bindings.Context) (ProtocolErrorVectorCompoundResult, error)
 	OneWayVectorOptional(ctx_ _bindings.Context, optVectorUint8 *[]uint8, optVectorString *[]string, optVectorStruct *[]Struct, optVectorOptStruct *[]*Struct) error
 	TwoWayVectorOptional(ctx_ _bindings.Context, optVectorUint8 *[]uint8, optVectorString *[]string, optVectorStruct *[]Struct, optVectorOptStruct *[]*Struct) (*[]uint8, *[]string, *[]Struct, *[]*Struct, error)
+	ErrorVectorOptional(ctx_ _bindings.Context) (ProtocolErrorVectorOptionalResult, error)
 	OneWayArrayVectorNested(ctx_ _bindings.Context, arrayArrayUint8 [5][5]uint8, arrayVectorUint8 [5][]uint8, vectorArrayUint8 [][5]uint8, vectorVectorUint8 [][]uint8) error
 	TwoWayArrayVectorNested(ctx_ _bindings.Context, arrayArrayUint8 [5][5]uint8, arrayVectorUint8 [5][]uint8, vectorArrayUint8 [][5]uint8, vectorVectorUint8 [][]uint8) ([5][5]uint8, [5][]uint8, [][5]uint8, [][]uint8, error)
+	ErrorArrayVectorNested(ctx_ _bindings.Context) (ProtocolErrorArrayVectorNestedResult, error)
 	OneWayResource(ctx_ _bindings.Context, handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) error
 	TwoWayResource(ctx_ _bindings.Context, handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) (_zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, ResourceStruct, ResourceTable, ResourceUnion, _zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, *ResourceStruct, *ResourceUnion, [5]_zx.Handle, [5]_zx.VMO, [5]ProtocolWithCtxInterface, [5]ProtocolWithCtxInterfaceRequest, [5]ResourceStruct, [5]ResourceTable, [5]ResourceUnion, []_zx.Handle, []_zx.VMO, []ProtocolWithCtxInterface, []ProtocolWithCtxInterfaceRequest, []ResourceStruct, []ResourceTable, []ResourceUnion, error)
+	ErrorResource(ctx_ _bindings.Context) (ProtocolErrorResourceResult, error)
 }
 
 type ProtocolWithCtxTransitionalBase struct{}
@@ -721,6 +1459,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		uint8_, uint16_, uint32_, uint64_, int8_, int16_, int32_, int64_, float32, float64, string_, optString, err_ := s_.Impl.TwoWayBasic(args_.Ctx, (*in_).Uint8, (*in_).Uint16, (*in_).Uint32, (*in_).Uint64, (*in_).Int8, (*in_).Int16, (*in_).Int32, (*in_).Int64, (*in_).Float32, (*in_).Float64, (*in_).String, (*in_).OptString)
 		out_ := &Basic{Uint8: uint8_, Uint16: uint16_, Uint32: uint32_, Uint64: uint64_, Int8: int8_, Int16: int16_, Int32: int32_, Int64: int64_, Float32: float32, Float64: float64, String: string_, OptString: optString}
 		return out_, true, err_
+	case ProtocolErrorBasicOrdinal:
+		result, err_ := s_.Impl.ErrorBasic(args_.Ctx)
+		out_ := &protocolWithCtxErrorBasicResponse{Result: result}
+		return out_, true, err_
 	case ProtocolOneWayCompoundOrdinal:
 		in_ := &Compound{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
@@ -743,6 +1485,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		}
 		bits, enum, struct_, table, union, optStruct, optUnion, err_ := s_.Impl.TwoWayCompound(args_.Ctx, (*in_).Bits, (*in_).Enum, (*in_).Struct, (*in_).Table, (*in_).Union, (*in_).OptStruct, (*in_).OptUnion)
 		out_ := &Compound{Bits: bits, Enum: enum, Struct: struct_, Table: table, Union: union, OptStruct: optStruct, OptUnion: optUnion}
+		return out_, true, err_
+	case ProtocolErrorCompoundOrdinal:
+		result, err_ := s_.Impl.ErrorCompound(args_.Ctx)
+		out_ := &protocolWithCtxErrorCompoundResponse{Result: result}
 		return out_, true, err_
 	case ProtocolOneWayArrayBasicOrdinal:
 		in_ := &ArrayBasic{}
@@ -767,6 +1513,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		arrayUint8, arrayUint16, arrayUint32, arrayUint64, arrayInt8, arrayInt16, arrayInt32, arrayInt64, arrayFloat32, arrayFloat64, arrayString, arrayOptString, err_ := s_.Impl.TwoWayArrayBasic(args_.Ctx, (*in_).ArrayUint8, (*in_).ArrayUint16, (*in_).ArrayUint32, (*in_).ArrayUint64, (*in_).ArrayInt8, (*in_).ArrayInt16, (*in_).ArrayInt32, (*in_).ArrayInt64, (*in_).ArrayFloat32, (*in_).ArrayFloat64, (*in_).ArrayString, (*in_).ArrayOptString)
 		out_ := &ArrayBasic{ArrayUint8: arrayUint8, ArrayUint16: arrayUint16, ArrayUint32: arrayUint32, ArrayUint64: arrayUint64, ArrayInt8: arrayInt8, ArrayInt16: arrayInt16, ArrayInt32: arrayInt32, ArrayInt64: arrayInt64, ArrayFloat32: arrayFloat32, ArrayFloat64: arrayFloat64, ArrayString: arrayString, ArrayOptString: arrayOptString}
 		return out_, true, err_
+	case ProtocolErrorArrayBasicOrdinal:
+		result, err_ := s_.Impl.ErrorArrayBasic(args_.Ctx)
+		out_ := &protocolWithCtxErrorArrayBasicResponse{Result: result}
+		return out_, true, err_
 	case ProtocolOneWayArrayCompoundOrdinal:
 		in_ := &ArrayCompound{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
@@ -789,6 +1539,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		}
 		arrayBits, arrayEnum, arrayStruct, arrayTable, arrayUnion, arrayOptStruct, arrayOptUnion, err_ := s_.Impl.TwoWayArrayCompound(args_.Ctx, (*in_).ArrayBits, (*in_).ArrayEnum, (*in_).ArrayStruct, (*in_).ArrayTable, (*in_).ArrayUnion, (*in_).ArrayOptStruct, (*in_).ArrayOptUnion)
 		out_ := &ArrayCompound{ArrayBits: arrayBits, ArrayEnum: arrayEnum, ArrayStruct: arrayStruct, ArrayTable: arrayTable, ArrayUnion: arrayUnion, ArrayOptStruct: arrayOptStruct, ArrayOptUnion: arrayOptUnion}
+		return out_, true, err_
+	case ProtocolErrorArrayCompoundOrdinal:
+		result, err_ := s_.Impl.ErrorArrayCompound(args_.Ctx)
+		out_ := &protocolWithCtxErrorArrayCompoundResponse{Result: result}
 		return out_, true, err_
 	case ProtocolOneWayVectorBasicOrdinal:
 		in_ := &VectorBasic{}
@@ -813,6 +1567,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		vectorUint8, vectorUint16, vectorUint32, vectorUint64, vectorInt8, vectorInt16, vectorInt32, vectorInt64, vectorFloat32, vectorFloat64, vectorString, vectorOptString, err_ := s_.Impl.TwoWayVectorBasic(args_.Ctx, (*in_).VectorUint8, (*in_).VectorUint16, (*in_).VectorUint32, (*in_).VectorUint64, (*in_).VectorInt8, (*in_).VectorInt16, (*in_).VectorInt32, (*in_).VectorInt64, (*in_).VectorFloat32, (*in_).VectorFloat64, (*in_).VectorString, (*in_).VectorOptString)
 		out_ := &VectorBasic{VectorUint8: vectorUint8, VectorUint16: vectorUint16, VectorUint32: vectorUint32, VectorUint64: vectorUint64, VectorInt8: vectorInt8, VectorInt16: vectorInt16, VectorInt32: vectorInt32, VectorInt64: vectorInt64, VectorFloat32: vectorFloat32, VectorFloat64: vectorFloat64, VectorString: vectorString, VectorOptString: vectorOptString}
 		return out_, true, err_
+	case ProtocolErrorVectorBasicOrdinal:
+		result, err_ := s_.Impl.ErrorVectorBasic(args_.Ctx)
+		out_ := &protocolWithCtxErrorVectorBasicResponse{Result: result}
+		return out_, true, err_
 	case ProtocolOneWayVectorCompoundOrdinal:
 		in_ := &VectorCompound{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
@@ -835,6 +1593,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		}
 		vectorBits, vectorEnum, vectorStruct, vectorTable, vectorUnion, vectorOptStruct, vectorOptUnion, err_ := s_.Impl.TwoWayVectorCompound(args_.Ctx, (*in_).VectorBits, (*in_).VectorEnum, (*in_).VectorStruct, (*in_).VectorTable, (*in_).VectorUnion, (*in_).VectorOptStruct, (*in_).VectorOptUnion)
 		out_ := &VectorCompound{VectorBits: vectorBits, VectorEnum: vectorEnum, VectorStruct: vectorStruct, VectorTable: vectorTable, VectorUnion: vectorUnion, VectorOptStruct: vectorOptStruct, VectorOptUnion: vectorOptUnion}
+		return out_, true, err_
+	case ProtocolErrorVectorCompoundOrdinal:
+		result, err_ := s_.Impl.ErrorVectorCompound(args_.Ctx)
+		out_ := &protocolWithCtxErrorVectorCompoundResponse{Result: result}
 		return out_, true, err_
 	case ProtocolOneWayVectorOptionalOrdinal:
 		in_ := &VectorOptional{}
@@ -859,6 +1621,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		optVectorUint8, optVectorString, optVectorStruct, optVectorOptStruct, err_ := s_.Impl.TwoWayVectorOptional(args_.Ctx, (*in_).OptVectorUint8, (*in_).OptVectorString, (*in_).OptVectorStruct, (*in_).OptVectorOptStruct)
 		out_ := &VectorOptional{OptVectorUint8: optVectorUint8, OptVectorString: optVectorString, OptVectorStruct: optVectorStruct, OptVectorOptStruct: optVectorOptStruct}
 		return out_, true, err_
+	case ProtocolErrorVectorOptionalOrdinal:
+		result, err_ := s_.Impl.ErrorVectorOptional(args_.Ctx)
+		out_ := &protocolWithCtxErrorVectorOptionalResponse{Result: result}
+		return out_, true, err_
 	case ProtocolOneWayArrayVectorNestedOrdinal:
 		in_ := &ArrayVectorNested{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
@@ -882,6 +1648,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		arrayArrayUint8, arrayVectorUint8, vectorArrayUint8, vectorVectorUint8, err_ := s_.Impl.TwoWayArrayVectorNested(args_.Ctx, (*in_).ArrayArrayUint8, (*in_).ArrayVectorUint8, (*in_).VectorArrayUint8, (*in_).VectorVectorUint8)
 		out_ := &ArrayVectorNested{ArrayArrayUint8: arrayArrayUint8, ArrayVectorUint8: arrayVectorUint8, VectorArrayUint8: vectorArrayUint8, VectorVectorUint8: vectorVectorUint8}
 		return out_, true, err_
+	case ProtocolErrorArrayVectorNestedOrdinal:
+		result, err_ := s_.Impl.ErrorArrayVectorNested(args_.Ctx)
+		out_ := &protocolWithCtxErrorArrayVectorNestedResponse{Result: result}
+		return out_, true, err_
 	case ProtocolOneWayResourceOrdinal:
 		in_ := &Resource{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
@@ -904,6 +1674,10 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		}
 		handle, vmo, clientEnd, serverEnd, struct_, table, union, optHandle, optVmo, optClientEnd, optServerEnd, optStruct, optUnion, arrayHandle, arrayVmo, arrayClientEnd, arrayServerEnd, arrayStruct, arrayTable, arrayUnion, vectorHandle, vectorVmo, vectorClientEnd, vectorServerEnd, vectorStruct, vectorTable, vectorUnion, err_ := s_.Impl.TwoWayResource(args_.Ctx, (*in_).Handle, (*in_).Vmo, (*in_).ClientEnd, (*in_).ServerEnd, (*in_).Struct, (*in_).Table, (*in_).Union, (*in_).OptHandle, (*in_).OptVmo, (*in_).OptClientEnd, (*in_).OptServerEnd, (*in_).OptStruct, (*in_).OptUnion, (*in_).ArrayHandle, (*in_).ArrayVmo, (*in_).ArrayClientEnd, (*in_).ArrayServerEnd, (*in_).ArrayStruct, (*in_).ArrayTable, (*in_).ArrayUnion, (*in_).VectorHandle, (*in_).VectorVmo, (*in_).VectorClientEnd, (*in_).VectorServerEnd, (*in_).VectorStruct, (*in_).VectorTable, (*in_).VectorUnion)
 		out_ := &Resource{Handle: handle, Vmo: vmo, ClientEnd: clientEnd, ServerEnd: serverEnd, Struct: struct_, Table: table, Union: union, OptHandle: optHandle, OptVmo: optVmo, OptClientEnd: optClientEnd, OptServerEnd: optServerEnd, OptStruct: optStruct, OptUnion: optUnion, ArrayHandle: arrayHandle, ArrayVmo: arrayVmo, ArrayClientEnd: arrayClientEnd, ArrayServerEnd: arrayServerEnd, ArrayStruct: arrayStruct, ArrayTable: arrayTable, ArrayUnion: arrayUnion, VectorHandle: vectorHandle, VectorVmo: vectorVmo, VectorClientEnd: vectorClientEnd, VectorServerEnd: vectorServerEnd, VectorStruct: vectorStruct, VectorTable: vectorTable, VectorUnion: vectorUnion}
+		return out_, true, err_
+	case ProtocolErrorResourceOrdinal:
+		result, err_ := s_.Impl.ErrorResource(args_.Ctx)
+		out_ := &protocolWithCtxErrorResourceResponse{Result: result}
 		return out_, true, err_
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal
