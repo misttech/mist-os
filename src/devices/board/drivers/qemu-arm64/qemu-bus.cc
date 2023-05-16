@@ -19,7 +19,7 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/board/drivers/qemu-arm64/qemu_bus_bind.h"
+#include "src/devices/board/drivers/qemu-arm64/qemu-arm64_bind.h"
 
 namespace board_qemu_arm64 {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -103,5 +103,5 @@ static constexpr zx_driver_ops_t driver_ops = []() {
 }();
 
 // clang-format off
-ZIRCON_DRIVER(qemu_bus, driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(qemu-arm64, driver_ops, "zircon", "0.1");
 //clang-format on

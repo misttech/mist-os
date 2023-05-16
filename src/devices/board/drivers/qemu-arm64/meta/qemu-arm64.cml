@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/qemu_bus_bind.bindbc",
+        bind: "meta/bind/qemu-arm64_bind.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         compat: "driver/qemu-arm64.so",
         colocate: "true",
