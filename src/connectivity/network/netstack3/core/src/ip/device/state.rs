@@ -18,10 +18,12 @@ use packet_formats::utils::NonZeroDuration;
 
 use crate::{
     ip::{
-        device::{route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration},
+        device::{
+            route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
+        },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
     },
-    sync::{Mutex, RwLock},
+    sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     Instant,
 };
 
@@ -72,6 +74,26 @@ impl IpDeviceStateIpExt for Ipv4 {
     }
 }
 
+impl IpAddressId<Ipv4Addr> for StrongRc<AddrSubnet<Ipv4Addr>> {
+    fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
+        AddrSubnet::addr(&*self)
+    }
+
+    fn addr_sub(&self) -> AddrSubnet<Ipv4Addr> {
+        **self
+    }
+}
+
+impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
+    fn addr(&self) -> SpecifiedAddr<Ipv6Addr> {
+        self.addr_sub.addr().into_specified()
+    }
+
+    fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+        self.addr_sub
+    }
+}
+
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddress<I: Instant> = Ipv6AddressEntry<I>;
     type GmpState<I: Instant> = MldGroupState<I>;
@@ -83,7 +105,7 @@ impl IpDeviceStateIpExt for Ipv6 {
         // device) and deprecated IP addresses (addresses which have been
         // assigned but should no longer be used for new connections) will not
         // be returned.
-        addr.state.flags.assigned.then_some((*addr.addr_sub()).to_witness())
+        addr.state.read().flags.assigned.then_some((*addr.addr_sub()).to_witness())
     }
 }
 
@@ -237,7 +259,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<I
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct IpDeviceAddresses<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> {
-    addrs: Vec<I::AssignedAddress<Instant>>,
+    addrs: Vec<PrimaryRc<I::AssignedAddress<Instant>>>,
 }
 
 // TODO(https://fxbug.dev/84871): Once we figure out what invariants we want to
@@ -247,47 +269,37 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
     /// Iterates over the addresses assigned to this device.
     pub(crate) fn iter(
         &self,
-    ) -> impl ExactSizeIterator<Item = &I::AssignedAddress<Instant>> + ExactSizeIterator + Clone
+    ) -> impl ExactSizeIterator<Item = &PrimaryRc<I::AssignedAddress<Instant>>> + ExactSizeIterator + Clone
     {
         self.addrs.iter()
     }
 
-    /// Iterates mutably over the addresses assigned to this device.
-    pub(crate) fn iter_mut(
-        &mut self,
-    ) -> impl ExactSizeIterator<Item = &mut I::AssignedAddress<Instant>> + ExactSizeIterator {
-        self.addrs.iter_mut()
-    }
-
     /// Finds the entry for `addr` if any.
     #[cfg(test)]
-    pub(crate) fn find(&self, addr: &I::Addr) -> Option<&I::AssignedAddress<Instant>> {
+    pub(crate) fn find(&self, addr: &I::Addr) -> Option<&PrimaryRc<I::AssignedAddress<Instant>>> {
         self.addrs.iter().find(|entry| &entry.addr().get() == addr)
-    }
-
-    /// Finds the mutable entry for `addr` if any.
-    pub(crate) fn find_mut(&mut self, addr: &I::Addr) -> Option<&mut I::AssignedAddress<Instant>> {
-        self.addrs.iter_mut().find(|entry| &entry.addr().get() == addr)
     }
 
     /// Adds an IP address to this interface.
     pub(crate) fn add(
         &mut self,
         addr: I::AssignedAddress<Instant>,
-    ) -> Result<(), crate::error::ExistsError> {
+    ) -> Result<StrongRc<I::AssignedAddress<Instant>>, crate::error::ExistsError> {
         if self.iter().any(|a| a.addr() == addr.addr()) {
             return Err(crate::error::ExistsError);
         }
-
-        Ok(self.addrs.push(addr))
+        let primary = PrimaryRc::new(addr);
+        let strong = PrimaryRc::clone_strong(&primary);
+        self.addrs.push(primary);
+        Ok(strong)
     }
 
     /// Removes the address.
     pub(crate) fn remove(
         &mut self,
         addr: &I::Addr,
-    ) -> Result<I::AssignedAddress<Instant>, crate::error::NotFoundError> {
-        let (index, _entry): (_, &I::AssignedAddress<Instant>) = self
+    ) -> Result<PrimaryRc<I::AssignedAddress<Instant>>, crate::error::NotFoundError> {
+        let (index, _entry): (_, &PrimaryRc<I::AssignedAddress<Instant>>) = self
             .addrs
             .iter()
             .enumerate()
@@ -640,8 +652,8 @@ pub(crate) struct Ipv6AddressState<Instant> {
 #[derive(Debug)]
 pub(crate) struct Ipv6AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-    pub(crate) dad_state: Ipv6DadState,
-    pub(crate) state: Ipv6AddressState<Instant>,
+    pub(crate) dad_state: Mutex<Ipv6DadState>,
+    pub(crate) state: RwLock<Ipv6AddressState<Instant>>,
 }
 
 impl<Instant> Ipv6AddressEntry<Instant> {
@@ -658,16 +670,40 @@ impl<Instant> Ipv6AddressEntry<Instant> {
 
         Self {
             addr_sub,
-            dad_state,
-            state: Ipv6AddressState {
+            dad_state: Mutex::new(dad_state),
+            state: RwLock::new(Ipv6AddressState {
                 config,
                 flags: Ipv6AddressFlags { deprecated: false, assigned },
-            },
+            }),
         }
     }
 
     pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
         &self.addr_sub
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad> for Ipv6AddressEntry<I> {
+    type Data<'l> = crate::sync::LockGuard<'l, Ipv6DadState>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.dad_state.lock()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv6AddressEntry<I> {
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv6AddressState<I>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6AddressState<I>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.state.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.state.write()
     }
 }
 
@@ -684,9 +720,12 @@ mod tests {
 
         let mut ipv4 = IpDeviceAddresses::<FakeInstant, Ipv4>::default();
 
-        assert_eq!(ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap()), Ok(()));
+        let _: StrongRc<_> = ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap()).unwrap();
         // Adding the same address with different prefix should fail.
-        assert_eq!(ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap()), Err(ExistsError));
+        assert_eq!(
+            ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap()).unwrap_err(),
+            ExistsError
+        );
     }
 
     #[test]
@@ -697,14 +736,13 @@ mod tests {
 
         let mut ipv6 = IpDeviceAddresses::<FakeInstant, Ipv6>::default();
 
-        assert_eq!(
-            ipv6.add(Ipv6AddressEntry::new(
+        let _: StrongRc<_> = ipv6
+            .add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
                 Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 AddrConfig::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite }),
-            )),
-            Ok(())
-        );
+            ))
+            .unwrap();
         // Adding the same address with different prefix and configuration
         // should fail.
         assert_eq!(
@@ -712,8 +750,9 @@ mod tests {
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 Ipv6DadState::Assigned,
                 AddrConfig::Manual,
-            )),
-            Err(ExistsError)
+            ))
+            .unwrap_err(),
+            ExistsError,
         );
     }
 }

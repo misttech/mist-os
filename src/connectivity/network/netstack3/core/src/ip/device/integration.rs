@@ -5,7 +5,12 @@
 //! The integrations for protocols built on top of an IP device.
 
 use alloc::boxed::Box;
-use core::{borrow::Borrow, marker::PhantomData, num::NonZeroU8};
+use core::{
+    borrow::Borrow,
+    marker::PhantomData,
+    num::NonZeroU8,
+    ops::{Deref as _, DerefMut as _},
+};
 
 use lock_order::{relation::LockBefore, Locked};
 use net_types::{
@@ -44,11 +49,11 @@ use crate::{
                 SlaacContext,
             },
             state::{
-                AddrConfig, IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6AddressEntry,
-                Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
+                AddrConfig, IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6AddressFlags,
+                Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
             },
-            IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext,
-            Ipv6AddressRefs, RemovedReason,
+            DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext,
+            RemovedReason,
         },
         forwarding::AddRouteError,
         gmp::{
@@ -76,52 +81,32 @@ pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
     pub(crate) _marker: PhantomData<C>,
 }
 
-type SyncCtxWithIpv6DeviceConfiguration<'a, C> =
-    SyncCtxWithIpDeviceConfiguration<'a, &'a Ipv6DeviceConfiguration, Ipv6, C>;
-
-fn with_iter_slaac_addrs_mut<
-    'a,
-    C: NonSyncContext,
-    O,
-    F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntryMut<'_, C::Instant>> + '_>) -> O,
->(
-    SyncCtxWithIpDeviceConfiguration { config: _, sync_ctx }: &mut SyncCtxWithIpv6DeviceConfiguration<'a, C>,
-    device_id: &<SyncCtxWithIpv6DeviceConfiguration<'a, C> as DeviceIdContext<AnyDevice>>::DeviceId,
-    cb: F,
-) -> O {
-    crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
-        let mut addrs = state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
-        cb(Box::new(
-            addrs.iter_mut().filter_map(
-                |Ipv6AddressEntry {
-                     addr_sub,
-                     dad_state: _,
-                     state:
-                         Ipv6AddressState {
-                             config,
-                             flags: Ipv6AddressFlags { deprecated, assigned: _ },
-                         },
-                 }| match config {
-                    AddrConfig::Slaac(config) => {
-                        Some(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
-                    }
-                    AddrConfig::Manual => None,
-                },
-            ),
-        ))
-    })
-}
-
 impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
-    fn with_addrs_mut<
-        O,
-        F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntryMut<'_, C::Instant>> + '_>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
+    fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, C::Instant>)>(&mut self, mut cb: F) {
         let SlaacAddrs { sync_ctx, device_id, config: _, _marker } = self;
-        with_iter_slaac_addrs_mut(sync_ctx, device_id, cb)
+        let SyncCtxWithIpDeviceConfiguration { config: _, sync_ctx } = sync_ctx;
+        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
+            let addrs = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
+            addrs.iter().for_each(|entry| {
+                let addr_sub = entry.addr_sub;
+                let mut entry =
+                    Locked::<_, crate::lock_ordering::IpDeviceAddresses<Ipv6>>::new_locked(
+                        &**entry,
+                    );
+                let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+                let Ipv6AddressState {
+                    config,
+                    flags: Ipv6AddressFlags { deprecated, assigned: _ },
+                } = &mut *state;
+
+                match config {
+                    AddrConfig::Slaac(config) => {
+                        cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
+                    }
+                    AddrConfig::Manual => {}
+                }
+            })
+        })
     }
 
     fn with_addrs<
@@ -132,28 +117,33 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
         cb: F,
     ) -> O {
         let SlaacAddrs { sync_ctx, device_id, config: _, _marker } = self;
-        device::Ipv6DeviceContext::with_ipv6_addresses_and_states(sync_ctx, device_id, |addrs| {
-            cb(Box::new(addrs.filter_map(
-                |Ipv6AddressRefs {
-                     addr_id,
-                     state:
-                         Ipv6AddressState {
+        device::IpDeviceStateContext::<Ipv6, C>::with_address_ids(
+            sync_ctx,
+            device_id,
+            |addrs, sync_ctx| {
+                cb(Box::new(addrs.filter_map(|addr_id| {
+                    device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                        sync_ctx,
+                        device_id,
+                        &addr_id,
+                        |Ipv6AddressState {
                              flags: Ipv6AddressFlags { deprecated, assigned: _ },
                              config,
-                         },
-                 }| {
-                    let addr_sub = addr_id.addr_sub();
-                    match config {
-                        AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
-                            addr_sub,
-                            config: *config,
-                            deprecated: *deprecated,
-                        }),
-                        AddrConfig::Manual => None,
-                    }
-                },
-            )))
-        })
+                         }| {
+                            let addr_sub = addr_id.addr_sub();
+                            match config {
+                                AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
+                                    addr_sub,
+                                    config: *config,
+                                    deprecated: *deprecated,
+                                }),
+                                AddrConfig::Manual => None,
+                            }
+                        },
+                    )
+                })))
+            },
+        )
     }
 
     fn add_addr_sub_and_then<O, F: FnOnce(SlaacAddressEntryMut<'_, C::Instant>, &mut C) -> O>(
@@ -173,17 +163,25 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
             AddrConfig::Slaac(slaac_config),
             config,
         )
-        .map(|()| {
-            with_iter_slaac_addrs_mut(sync_ctx, device_id, |mut addrs| {
-                and_then(
-                    addrs
-                        .find(|SlaacAddressEntryMut { addr_sub, config: _, deprecated: _ }| {
-                            addr_sub == &add_addr_sub
-                        })
-                        .unwrap(),
-                    ctx,
-                )
-            })
+        .map(|entry| {
+            let addr_sub = entry.addr_sub;
+            let mut entry = Locked::<_, crate::lock_ordering::IpDeviceAddresses<Ipv6>>::new_locked(
+                entry.deref(),
+            );
+            let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+            let Ipv6AddressState { config, flags: Ipv6AddressFlags { deprecated, assigned: _ } } =
+                &mut *state;
+            and_then(
+                SlaacAddressEntryMut {
+                    addr_sub,
+                    config: assert_matches::assert_matches!(
+                        config,
+                        AddrConfig::Slaac(c) => c
+                    ),
+                    deprecated,
+                },
+                ctx,
+            )
         })
     }
 
@@ -198,7 +196,7 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
             sync_ctx,
             ctx,
             device_id,
-            &addr.into_specified(),
+            DelIpv6Addr::SpecifiedAddr(addr.into_specified()),
             RemovedReason::Manual,
             config,
         )
@@ -326,9 +324,11 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
         device_id: &Self::DeviceId,
         _remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<SpecifiedAddr<Ipv4Addr>> {
-        device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(self, device_id, |mut addrs| {
-            addrs.next().as_ref().map(IpAddressId::addr)
-        })
+        device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
+            self,
+            device_id,
+            |mut addrs, _sync_ctx| addrs.next().as_ref().map(IpAddressId::addr),
+        )
     }
 
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
@@ -389,22 +389,29 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<Ipv6Addr>>,
     ) -> Option<SpecifiedAddr<Ipv6Addr>> {
-        device::Ipv6DeviceContext::with_ipv6_addresses_and_states(self, device_id, |addrs| {
-            crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
-                remote,
-                device_id,
-                addrs.map(
-                    |Ipv6AddressRefs { addr_id, state: Ipv6AddressState { flags, config: _ } }| {
-                        SasCandidate {
-                            addr_sub: addr_id.addr_sub(),
-                            flags: *flags,
-                            device: device_id.clone(),
-                        }
-                    },
-                ),
-            )
-            .map(|a| a.into_specified())
-        })
+        device::IpDeviceStateContext::<Ipv6, C>::with_address_ids(
+            self,
+            device_id,
+            |addrs, sync_ctx| {
+                crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
+                    remote,
+                    device_id,
+                    addrs.map(|addr_id| {
+                        device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                            sync_ctx,
+                            device_id,
+                            &addr_id,
+                            |Ipv6AddressState { flags, config: _ }| SasCandidate {
+                                addr_sub: addr_id.addr_sub(),
+                                flags: *flags,
+                                device: device_id.clone(),
+                            },
+                        )
+                    }),
+                )
+                .map(|a| a.into_specified())
+            },
+        )
     }
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
@@ -467,7 +474,7 @@ fn assignment_state_v4<
         return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
     }
 
-    sync_ctx.with_address_ids(device, |mut addrs| {
+    sync_ctx.with_address_ids(device, |mut addrs, _sync_ctx| {
         addrs
             .find_map(|addr_id| {
                 let dev_addr = addr_id.addr_sub();
@@ -499,26 +506,24 @@ fn assignment_state_v6<
         return AddressStatus::Present(Ipv6PresentAddressStatus::Multicast);
     }
 
-    sync_ctx.with_ipv6_addresses_and_states(device, |mut addrs| {
-        addrs
-            .find_map(
-                |Ipv6AddressRefs {
-                     addr_id,
-                     state:
-                         Ipv6AddressState {
-                             flags: Ipv6AddressFlags { deprecated: _, assigned },
-                             config: _,
-                         },
-                 }| { (addr_id.addr() == addr).then_some(*assigned) },
-            )
-            .map_or(AddressStatus::Unassigned, |assigned| {
-                if assigned {
-                    AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
-                } else {
-                    AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
-                }
-            })
-    })
+    let addr_id = match sync_ctx.get_address_id(device, addr) {
+        Ok(o) => o,
+        Err(NotFoundError) => return AddressStatus::Unassigned,
+    };
+
+    let assigned = sync_ctx.with_ip_address_state(
+        device,
+        &addr_id,
+        |Ipv6AddressState { flags: Ipv6AddressFlags { deprecated: _, assigned }, config: _ }| {
+            *assigned
+        },
+    );
+
+    if assigned {
+        AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
+    } else {
+        AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
+    }
 }
 
 impl<
@@ -687,23 +692,24 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
         let retrans_timer =
             device::Ipv6DeviceContext::<C>::with_retrans_timer(sync_ctx, device_id, |s| *s);
 
-        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
-            let mut addrs = state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
-            cb(DadStateRef {
-                state: addrs.find_mut(&addr.addr()).map(
-                    |Ipv6AddressEntry {
-                         addr_sub: _,
-                         dad_state,
-                         state:
-                             Ipv6AddressState {
-                                 config: _,
-                                 flags: Ipv6AddressFlags { deprecated: _, assigned },
-                             },
-                     }| DadAddressStateRef { dad_state, assigned },
-                ),
-                retrans_timer: &retrans_timer,
-                max_dad_transmits: &Borrow::borrow(&*config).dad_transmits,
-            })
+        let mut entry = {
+            // Get a `Locked` at the same lock-level of our `sync_ctx`. We show
+            // add an empty assignment here for readability to make it clear that
+            // we are operating at the same lock-level.
+            let _: &mut Locked<_, crate::lock_ordering::IpDeviceConfiguration<Ipv6>> = sync_ctx;
+            Locked::<_, crate::lock_ordering::IpDeviceConfiguration<Ipv6>>::new_locked(addr.deref())
+        };
+
+        let (mut dad_state, mut entry) =
+            entry.lock_and::<crate::lock_ordering::Ipv6DeviceAddressDad>();
+        let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+        cb(DadStateRef {
+            state: Some(DadAddressStateRef {
+                dad_state: dad_state.deref_mut(),
+                assigned: &mut state.flags.assigned,
+            }),
+            retrans_timer: &retrans_timer,
+            max_dad_transmits: &Borrow::borrow(&*config).dad_transmits,
         })
     }
 
@@ -778,23 +784,25 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> RsContext<C
     ) -> Result<(), S> {
         let Self { config: _, sync_ctx } = self;
         let dst_ip = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
-        let src_ip = device::Ipv6DeviceContext::with_ipv6_addresses_and_states(
+        let src_ip = device::IpDeviceStateContext::<Ipv6, C>::with_address_ids(
             sync_ctx,
             device_id,
-            |addrs| {
+            |addrs, sync_ctx| {
                 crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
                     Some(dst_ip),
                     device_id,
-                    addrs.map(
-                        |Ipv6AddressRefs {
-                             addr_id,
-                             state: Ipv6AddressState { flags, config: _ },
-                         }| SasCandidate {
-                            addr_sub: addr_id.addr_sub(),
-                            flags: *flags,
-                            device: device_id.clone(),
-                        },
-                    ),
+                    addrs.map(|addr_id| {
+                        device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                            sync_ctx,
+                            device_id,
+                            &addr_id,
+                            |Ipv6AddressState { flags, config: _ }| SasCandidate {
+                                addr_sub: addr_id.addr_sub(),
+                                flags: *flags,
+                                device: device_id.clone(),
+                            },
+                        )
+                    }),
                 )
             },
         );
@@ -935,20 +943,6 @@ impl<'a, Config, C: NonSyncContext> device::Ipv6DeviceContext<C>
         let Self { config: _, sync_ctx } = self;
         device::Ipv6DeviceContext::with_retrans_timer_mut(sync_ctx, device_id, cb)
     }
-
-    fn with_ipv6_addresses_and_states<
-        O,
-        F: FnOnce(
-            Box<dyn Iterator<Item = Ipv6AddressRefs<'_, Self::AddressId, C::Instant>> + '_>,
-        ) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        let Self { config: _, sync_ctx } = self;
-        device::Ipv6DeviceContext::with_ipv6_addresses_and_states(sync_ctx, device_id, cb)
-    }
 }
 
 impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> device::IpDeviceAddressIdContext<I>
@@ -960,12 +954,36 @@ where
     type AddressId = <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as device::IpDeviceAddressIdContext<I>>::AddressId;
 }
 
+impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> device::IpDeviceAddressContext<I, C>
+    for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
+where
+    Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
+        device::IpDeviceAddressContext<I, C>,
+{
+    fn with_ip_address_state<O, F: FnOnce(&I::AddressState<C::Instant>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr_id: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let Self { config: _, sync_ctx } = self;
+        device::IpDeviceAddressContext::<I, C>::with_ip_address_state(
+            sync_ctx, device_id, addr_id, cb,
+        )
+    }
+}
+
 impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> device::IpDeviceStateContext<I, C>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
 where
     Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
         device::IpDeviceStateContext<I, C>,
 {
+    type IpDeviceAddressCtx<'b> = <Locked<
+        &'a SyncCtx<C>,
+        crate::lock_ordering::IpDeviceConfiguration<I>,
+    > as device::IpDeviceStateContext<I, C>>::IpDeviceAddressCtx<'b>;
+
     fn add_ip_address(
         &mut self,
         device_id: &Self::DeviceId,
@@ -994,7 +1012,13 @@ where
         device::IpDeviceStateContext::<I, C>::get_address_id(sync_ctx, device_id, addr)
     }
 
-    fn with_address_ids<O, F: FnOnce(Box<dyn Iterator<Item = Self::AddressId> + '_>) -> O>(
+    fn with_address_ids<
+        O,
+        F: FnOnce(
+            Box<dyn Iterator<Item = Self::AddressId> + '_>,
+            &mut Self::IpDeviceAddressCtx<'_>,
+        ) -> O,
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -1135,24 +1159,29 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> MldContext<
         device: &Self::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
         let Self { config: _, sync_ctx } = self;
-        device::Ipv6DeviceContext::with_ipv6_addresses_and_states(sync_ctx, device, |mut addrs| {
-            addrs.find_map(
-                |Ipv6AddressRefs {
-                     addr_id,
-                     state:
-                         Ipv6AddressState {
+        device::IpDeviceStateContext::<Ipv6, C>::with_address_ids(
+            sync_ctx,
+            device,
+            |mut addrs, sync_ctx| {
+                addrs.find_map(|addr_id| {
+                    device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                        sync_ctx,
+                        device,
+                        &addr_id,
+                        |Ipv6AddressState {
                              flags: Ipv6AddressFlags { deprecated: _, assigned },
                              config: _,
-                         },
-                 }| {
-                    if *assigned {
-                        LinkLocalUnicastAddr::new(addr_id.addr_sub().addr())
-                    } else {
-                        None
-                    }
-                },
-            )
-        })
+                         }| {
+                            if *assigned {
+                                LinkLocalUnicastAddr::new(addr_id.addr_sub().addr())
+                            } else {
+                                None
+                            }
+                        },
+                    )
+                })
+            },
+        )
     }
 }
 

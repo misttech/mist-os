@@ -89,11 +89,12 @@ impl<NonSyncCtx: crate::NonSyncContext + Default> Ctx<NonSyncCtx> {
 #[track_caller]
 pub(crate) fn assert_empty<I: IntoIterator>(into_iter: I)
 where
-    I::Item: Debug + PartialEq,
+    I::Item: Debug,
 {
     // NOTE: Collecting into a `Vec` is cheap in the happy path because
     // zero-capacity vectors are guaranteed not to allocate.
-    assert_eq!(into_iter.into_iter().collect::<Vec<_>>(), &[]);
+    let vec = into_iter.into_iter().collect::<Vec<_>>();
+    assert!(vec.is_empty(), "vec={vec:?}");
 }
 
 /// Utilities to allow running benchmarks as tests.

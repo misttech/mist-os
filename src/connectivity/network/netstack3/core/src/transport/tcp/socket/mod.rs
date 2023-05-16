@@ -3558,7 +3558,7 @@ mod tests {
         ) -> IpDeviceState<FakeInstant, Self> {
             let device_state = IpDeviceState::default();
             for addr in addrs {
-                device_state
+                let _addr_id = device_state
                     .addrs
                     .write()
                     .add(AddrSubnet::new(addr, prefix).unwrap())
@@ -3579,7 +3579,7 @@ mod tests {
         ) -> IpDeviceState<FakeInstant, Self> {
             let device_state = IpDeviceState::default();
             for addr in addrs {
-                device_state
+                let _addr_id = device_state
                     .addrs
                     .write()
                     .add(Ipv6AddressEntry::new(

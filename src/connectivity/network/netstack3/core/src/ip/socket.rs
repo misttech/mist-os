@@ -898,6 +898,7 @@ pub(crate) mod testutil {
             HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
             DEFAULT_HOP_LIMITS,
         },
+        sync::PrimaryRc,
     };
 
     /// A fake implementation of [`IpSocketContext`].
@@ -1125,7 +1126,7 @@ pub(crate) mod testutil {
                     .addrs
                     .read()
                     .find(&addr)
-                    .map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
+                    .map(|_: &PrimaryRc<I::AssignedAddress<FakeInstant>>| device.clone())
             }))
         }
 
@@ -1266,14 +1267,14 @@ pub(crate) mod testutil {
                         I::map_ip(
                             (&mut device_state, ip),
                             |(device_state, ip)| {
-                                device_state
+                                let _addr_id = device_state
                                     .addrs
                                     .write()
                                     .add(AddrSubnet::new(ip.get(), 32).unwrap())
-                                    .expect("add address")
+                                    .expect("add address");
                             },
                             |(device_state, ip)| {
-                                device_state
+                                let _addr_id = device_state
                                     .addrs
                                     .write()
                                     .add(Ipv6AddressEntry::new(
@@ -1281,7 +1282,7 @@ pub(crate) mod testutil {
                                         Ipv6DadState::Assigned,
                                         AddrConfig::Manual,
                                     ))
-                                    .expect("add address")
+                                    .expect("add address");
                             },
                         )
                     }

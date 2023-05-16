@@ -669,7 +669,7 @@ mod tests {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
                 &mut Locked::new(sync_ctx),
                 &device,
-                |addrs| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
+                |addrs, _sync_ctx| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
             )
         };
 

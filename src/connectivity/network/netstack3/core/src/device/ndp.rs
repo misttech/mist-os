@@ -85,8 +85,8 @@ mod tests {
                     TemporarySlaacConfig,
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
-                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6AddressRefs,
-                Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId,
+                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+                Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             receive_ip_packet,
             testutil::is_in_ip_multicast,
@@ -117,15 +117,18 @@ mod tests {
         sync_ctx: &SyncCtx<C>,
         device_id: &DeviceId<C>,
     ) -> Vec<GlobalIpv6Addr<C::Instant>> {
-        crate::ip::device::Ipv6DeviceContext::with_ipv6_addresses_and_states(
+        crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
             &mut Locked::new(sync_ctx),
             device_id,
-            |addrs| {
+            |addrs, sync_ctx| {
                 addrs
-                    .filter_map(
-                        |Ipv6AddressRefs { addr_id, state: Ipv6AddressState { flags, config } }| {
-                            let addr_sub = addr_id.addr_sub();
-                            match addr_sub.addr().scope() {
+                    .filter_map(|addr_id| {
+                        let addr_sub = addr_id.addr_sub();
+                        crate::ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                            sync_ctx,
+                            device_id,
+                            &addr_id,
+                            |Ipv6AddressState { flags, config }| match addr_sub.addr().scope() {
                                 Ipv6Scope::Global => Some(GlobalIpv6Addr {
                                     addr_sub,
                                     flags: *flags,
@@ -138,9 +141,9 @@ mod tests {
                                 | Ipv6Scope::OrganizationLocal
                                 | Ipv6Scope::Reserved(_)
                                 | Ipv6Scope::Unassigned(_) => None,
-                            }
-                        },
-                    )
+                            },
+                        )
+                    })
                     .collect()
             },
         )
@@ -708,22 +711,23 @@ mod tests {
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<bool> {
-        crate::ip::device::Ipv6DeviceContext::with_ipv6_addresses_and_states(
+        crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
             &mut Locked::new(sync_ctx),
             device,
-            |mut addrs| {
-                addrs.find_map(
-                    |Ipv6AddressRefs {
-                         addr_id,
-                         state:
-                             Ipv6AddressState {
-                                 flags: Ipv6AddressFlags { deprecated: _, assigned },
-                                 config: _,
-                             },
-                     }| {
-                        (addr_id.addr_sub().addr() == addr).then_some(*assigned)
-                    },
-                )
+            |mut addrs, sync_ctx| {
+                addrs.find_map(|addr_id| {
+                    crate::ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                        sync_ctx,
+                        device,
+                        &addr_id,
+                        |Ipv6AddressState {
+                             flags: Ipv6AddressFlags { deprecated: _, assigned },
+                             config: _,
+                         }| {
+                            (addr_id.addr_sub().addr() == addr).then_some(*assigned)
+                        },
+                    )
+                })
             },
         )
     }

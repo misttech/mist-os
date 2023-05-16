@@ -127,6 +127,8 @@ pub(crate) struct IpDeviceDefaultHopLimit<I>(PhantomData<I>, Never);
 pub(crate) enum Ipv6DeviceRouterSolicitations {}
 pub(crate) enum Ipv6DeviceRouteDiscovery {}
 pub(crate) enum Ipv6DeviceRetransTimeout {}
+pub(crate) enum Ipv6DeviceAddressDad {}
+pub(crate) enum Ipv6DeviceAddressState {}
 
 // This is not a real lock level, but it is useful for writing bounds that
 // require "before IPv4" or "before IPv6".
@@ -207,11 +209,13 @@ impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 // before IPv6 is correct and won't interfere with dual-stack sockets.
 impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceGmp<Ipv4>);
 impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);
-impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceDefaultHopLimit<Ipv4>);
-impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
-impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceGmp<Ipv6>);
+impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceGmp<Ipv6>);
 impl_lock_after!(IpDeviceGmp<Ipv6> => IpDeviceAddresses<Ipv6>);
-impl_lock_after!(IpDeviceAddresses<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
+impl_lock_after!(IpDeviceAddresses<Ipv6> => Ipv6DeviceAddressDad);
+impl_lock_after!(Ipv6DeviceAddressDad => Ipv6DeviceAddressState);
+impl_lock_after!(Ipv6DeviceAddressState => IpDeviceDefaultHopLimit<Ipv4>);
+impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
+impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv6> => Ipv6DeviceRouterSolicitations);
 impl_lock_after!(Ipv6DeviceRouterSolicitations => Ipv6DeviceRetransTimeout);
 impl_lock_after!(Ipv6DeviceRetransTimeout => EthernetDeviceDynamicState);

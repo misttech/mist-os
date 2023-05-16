@@ -120,13 +120,7 @@ pub(super) struct SlaacAddressEntryMut<'a, Instant> {
 pub(super) trait SlaacAddresses<C: InstantContext> {
     /// Returns an iterator providing a mutable view of mutable SLAAC address
     /// state.
-    fn with_addrs_mut<
-        O,
-        F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntryMut<'_, C::Instant>> + '_>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
+    fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, C::Instant>)>(&mut self, cb: F);
 
     /// Returns an iterator over the SLAAC addresses.
     fn with_addrs<O, F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<C::Instant>> + '_>) -> O>(
@@ -297,12 +291,13 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
         self.with_slaac_addrs_mut_and_configs(device_id, |SlaacAddrsMutAndConfig { addrs: slaac_addrs, config, dad_transmits, retrans_timer, interface_identifier: iid, _marker }| {
         // Apply the update to each existing address, static or temporary, for the
         // prefix.
-        slaac_addrs.with_addrs_mut(|iter| {
-        for entry in iter.filter(|a| a.addr_sub.subnet() == subnet) {
-            let addr_sub = entry.addr_sub;
+        slaac_addrs.for_each_addr_mut(|SlaacAddressEntryMut { addr_sub, config: slaac_config, deprecated }| {
+            if addr_sub.subnet() != subnet {
+                return;
+            }
+
             let addr = addr_sub.addr();
-            let slaac_config = &*entry.config;
-            let slaac_type = SlaacType::from(slaac_config);
+            let slaac_type = SlaacType::from(&*slaac_config);
 
             trace!(
                 "receive_ndp_packet: already have a {:?} SLAAC address {:?} configured on device {:?}",
@@ -486,8 +481,8 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
             // Update the preferred lifetime for this address.
             match preferred_for_and_regen_at {
                 None => {
-                    if !*entry.deprecated {
-                        *entry.deprecated = true;
+                    if !*deprecated {
+                        *deprecated = true;
                         let _: Option<C::Instant> = ctx.cancel_timer(
                             SlaacTimerId::new_deprecate_slaac_address(device_id.clone(), addr),
                         );
@@ -498,8 +493,8 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                     }
                 }
                 Some((preferred_for, regen_at)) => {
-                    if *entry.deprecated {
-                        *entry.deprecated = false;
+                    if *deprecated {
+                        *deprecated = false;
                     }
 
                     let timer_id =
@@ -598,7 +593,7 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                         trace!("receive_ndp_packet: updating valid lifetime to {:?} for SLAAC address {:?} on device {:?}", valid_until, addr, device_id);
 
                         // Set the valid lifetime for this address.
-                        update_slaac_addr_valid_until(entry.config, Lifetime::Finite(valid_until));
+                        update_slaac_addr_valid_until(slaac_config, Lifetime::Finite(valid_until));
 
                         let _: Option<C::Instant> = ctx.schedule_timer_instant(
                             valid_until,
@@ -607,7 +602,7 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                     }
                     NonZeroNdpLifetime::Infinite => {
                         // Set the valid lifetime for this address.
-                        update_slaac_addr_valid_until(entry.config, Lifetime::Infinite);
+                        update_slaac_addr_valid_until(slaac_config, Lifetime::Infinite);
 
                         let _: Option<C::Instant> = ctx.cancel_timer(
                             SlaacTimerId::new_invalidate_slaac_address(device_id.clone(), addr).into(),
@@ -618,8 +613,6 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                     trace!("receive_ndp_packet: not updating valid lifetime for SLAAC address {:?} on device {:?} as remaining lifetime is less than 2 hours and new valid lifetime ({:?}) is less than remaining lifetime", addr, device_id, valid_for.get());
                 }
             }
-        }
-
         });
 
         // As per RFC 4862 section 5.5.3.e, if the prefix advertised is not equal to
@@ -817,13 +810,13 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
         match inner {
             InnerSlaacTimerId::DeprecateSlaacAddress { addr } => {
                 self.with_slaac_addrs_mut(&device_id, |slaac_addrs| {
-                    slaac_addrs.with_addrs_mut(|mut addrs| {
-                        let entry = addrs
-                            .find(|a| a.addr_sub.addr() == addr)
-                            .expect("entry for expired timer");
-
-                        *entry.deprecated = true;
-                    })
+                    slaac_addrs.for_each_addr_mut(
+                        |SlaacAddressEntryMut { addr_sub, config: _, deprecated }| {
+                            if addr_sub.addr() == addr {
+                                *deprecated = true;
+                            }
+                        },
+                    )
                 })
             }
             InnerSlaacTimerId::InvalidateSlaacAddress { addr } => {
@@ -1620,21 +1613,14 @@ mod tests {
     }
 
     impl<'a> SlaacAddresses<FakeNonSyncCtxImpl> for &'a mut FakeSlaacAddrs {
-        fn with_addrs_mut<
-            O,
-            F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntryMut<'_, FakeInstant>> + '_>) -> O,
-        >(
+        fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, FakeInstant>)>(
             &mut self,
-            cb: F,
-        ) -> O {
+            mut cb: F,
+        ) {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _ } = self;
-            cb(Box::new(slaac_addrs.iter_mut().map(
-                |SlaacAddressEntry { addr_sub, config, deprecated }| SlaacAddressEntryMut {
-                    addr_sub: *addr_sub,
-                    config,
-                    deprecated,
-                },
-            )))
+            slaac_addrs.iter_mut().for_each(|SlaacAddressEntry { addr_sub, config, deprecated }| {
+                cb(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
+            })
         }
 
         fn with_addrs<
@@ -1674,9 +1660,10 @@ mod tests {
                 deprecated: false,
             });
 
-            Ok(self.with_addrs_mut(|mut addrs| {
-                and_then(addrs.find(|a| a.addr_sub == add_addr_sub).unwrap(), ctx)
-            }))
+            let SlaacAddressEntry { addr_sub, config, deprecated } =
+                slaac_addrs.iter_mut().last().unwrap();
+
+            Ok(and_then(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated }, ctx))
         }
 
         fn remove_addr(

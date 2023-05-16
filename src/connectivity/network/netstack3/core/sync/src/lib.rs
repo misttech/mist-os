@@ -92,6 +92,13 @@ impl<T> RwLock<T> {
     pub fn write(&self) -> RwLockWriteGuard<'_, T> {
         lock_guard::LockGuard::new(self, |Self(rw)| rw.write().expect("unexpectedly poisoned"))
     }
+
+    /// Consumes this rwlock, returning the underlying data.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        let Self(rwlock) = self;
+        rwlock.into_inner().expect("unexpectedly poisoned")
+    }
 }
 
 mod lock_guard {

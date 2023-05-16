@@ -1057,7 +1057,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
             let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
-            let x = ipv4.iter().next().cloned().map(|addr| addr.addr().get());
+            let x = ipv4.iter().next().map(|addr| addr.addr().get());
             x
         })
     }
@@ -1229,8 +1229,9 @@ mod tests {
         },
         error::{ExistsError, NotFoundError},
         ip::{
-            device::nud::DynamicNeighborUpdateSource, dispatch_receive_ip_packet_name,
-            receive_ip_packet, testutil::is_in_ip_multicast,
+            device::{nud::DynamicNeighborUpdateSource, IpAddressId as _},
+            dispatch_receive_ip_packet_name, receive_ip_packet,
+            testutil::is_in_ip_multicast,
         },
         testutil::{
             add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng, Ctx,
@@ -1489,14 +1490,14 @@ mod tests {
                 crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |mut addrs| addrs.any(|a| a.addr() == addr),
+                    |mut addrs, _sync_ctx| addrs.any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |mut addrs| addrs.any(|a| a.addr().into_specified() == addr),
+                    |mut addrs, _sync_ctx| addrs.any(|a| a.addr() == addr),
                 )
             }
         }
