@@ -4,6 +4,7 @@
 library fuchsia.hardware.thermal;
 
 using zx;
+using fuchsia.hardware.fan;
 using fuchsia.hardware.temperature;
 
 /// The maximum number of trip points that can be used.
@@ -94,7 +95,9 @@ type ThermalDeviceInfo = struct {
     opps array<OperatingPoint, MAX_DVFS_DOMAINS>;
 };
 
+@deprecated
 protocol Device {
+    compose fuchsia.hardware.fan.Fan;
     compose fuchsia.hardware.temperature.Device;
 
     /// Get information about the device's current state.
@@ -152,19 +155,6 @@ protocol Device {
     SetDvfsOperatingPoint(struct {
         op_idx uint16;
         power_domain PowerDomain;
-    }) -> (struct {
-        status zx.Status;
-    });
-
-    /// Get the current fan level.
-    GetFanLevel() -> (struct {
-        status zx.Status;
-        fan_level uint32;
-    });
-
-    /// Set the fan level.
-    SetFanLevel(struct {
-        fan_level uint32;
     }) -> (struct {
         status zx.Status;
     });

@@ -184,5 +184,6 @@ DDK_PROTOCOL_DEF(USB_INTERFACE_ASSOCIATION, 166, "usb-interface-association", PF
 DDK_PROTOCOL_DEF(FASTBOOT, 167, "fastboot", 0)
 DDK_PROTOCOL_DEF(WLAN_FACTORY,            168,   "wlan-factory", 0)
 DDK_PROTOCOL_DEF(OVERNET,                 169, "overnet-usb", 0)
+DDK_PROTOCOL_DEF(FAN,                     170, "fan", 0)
 #undef DDK_PROTOCOL_DEF
 #endif

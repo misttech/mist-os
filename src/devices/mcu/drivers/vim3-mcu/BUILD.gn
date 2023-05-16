@@ -37,8 +37,10 @@ source_set("common_sources") {
 
   public_deps = [
     ":vim3_mcu_bind",
+    "//sdk/fidl/fuchsia.hardware.fan:fuchsia.hardware.fan_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

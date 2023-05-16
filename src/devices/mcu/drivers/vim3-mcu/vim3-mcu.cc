@@ -89,16 +89,17 @@ void StmMcu::Init() {
 }
 
 zx_status_t StmMcu::SetFanLevel(FanLevel level) {
-  // TODO fxbug.dev/56400: rsubr clean this up to implement outward intf for rd/wr
-  // for now just turning on the fan to prevent soc from overheating
   fbl::AutoLock lock(&i2c_lock_);
   uint8_t cmd[] = {STM_MCU_REG_CMD_FAN_STATUS_CTRL_REG, static_cast<uint8_t>(level)};
   auto status = i2c_.WriteSync(cmd, sizeof(cmd));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not set the fan level: %d", status);
+    return status;
   }
-  return status;
+  fan_level_ = level;
+  return ZX_OK;
 }
+
 static constexpr zx_driver_ops_t stm_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;

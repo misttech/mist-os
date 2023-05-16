@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_MCU_DRIVERS_VIM3_MCU_VIM3_MCU_H_
 #define SRC_DEVICES_MCU_DRIVERS_VIM3_MCU_VIM3_MCU_H_
 
+#include <fidl/fuchsia.hardware.fan/cpp/fidl.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -13,6 +14,7 @@
 #include <optional>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
 
 // STM8S003 MCU specific reg definitions
@@ -64,11 +66,14 @@ enum FanLevel {
   FL1,
   FL2,
   FL3,
+
+  MAX,
 };
 class StmMcu;
-using DeviceType = ddk::Device<StmMcu, ddk::Unbindable>;
+using DeviceType =
+    ddk::Device<StmMcu, ddk::Unbindable, ddk::Messageable<fuchsia_hardware_fan::Device>::Mixin>;
 
-class StmMcu : public DeviceType {
+class StmMcu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_FAN> {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(StmMcu);
   StmMcu(zx_device_t* parent, ddk::I2cChannel i2c) : DeviceType(parent), i2c_(std::move(i2c)) {}
@@ -80,6 +85,23 @@ class StmMcu : public DeviceType {
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
+  // fuchsia_hardware_fan.Device protocol implementation.
+  void GetFanLevel(GetFanLevelCompleter::Sync& completer) override {
+    if (fan_level_ >= FanLevel::MAX) {
+      completer.Reply(ZX_ERR_INTERNAL, fan_level_);
+      return;
+    }
+    completer.Reply(ZX_OK, fan_level_);
+  }
+  void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override {
+    if (request->fan_level >= FanLevel::MAX) {
+      completer.Reply(ZX_ERR_OUT_OF_RANGE);
+      return;
+    }
+    completer.Reply(SetFanLevel(static_cast<FanLevel>(request->fan_level)));
+  }
+  void GetClientType(GetClientTypeCompleter::Sync& completer) override { completer.Reply("fan"); }
+
   zx::vmo inspect_vmo() const { return inspect_.DuplicateVmo(); }
 
  private:
@@ -89,6 +111,8 @@ class StmMcu : public DeviceType {
   void ShutDown();
   fbl::Mutex i2c_lock_;
   inspect::Inspector inspect_;
+
+  FanLevel fan_level_ = FanLevel::MAX;
 };
 
 }  // namespace stm
