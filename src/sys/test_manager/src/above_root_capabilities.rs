@@ -126,7 +126,7 @@ impl AboveRootCapabilitiesForTest {
                     ..
                 }) if collection_data.contains_key(name.as_str())
                     && target_name != "fuchsia.logger.LogSink"
-                    && target_name != "fuchsia.diagnostics.InspectSink" =>
+                    && target_name != "fuchsia.inspect.InspectSink" =>
                 {
                     collection_data.get_mut(name.as_str()).unwrap().capabilities.push(
                         Capability::protocol_by_name(target_name)

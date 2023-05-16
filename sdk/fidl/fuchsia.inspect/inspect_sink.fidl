@@ -1,9 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.diagnostics;
-
-using fuchsia.inspect;
+library fuchsia.inspect;
 
 @available(added=HEAD)
 const MAX_NAME_LENGTH uint64 = 4096;
@@ -14,7 +12,7 @@ protocol InspectSink {
     /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the server can use to read
     /// Inspect data, including lazy nodes.
     Publish(resource table {
-        1: tree client_end:fuchsia.inspect.Tree;
+        1: tree client_end:Tree;
         2: name string:MAX_NAME_LENGTH;
     });
 };

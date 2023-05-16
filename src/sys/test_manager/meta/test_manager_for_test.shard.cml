@@ -14,7 +14,7 @@
         {
             protocol: [
                 "fuchsia.component.resolution.Resolver",
-                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],

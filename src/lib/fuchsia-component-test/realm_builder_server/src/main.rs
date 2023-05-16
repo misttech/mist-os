@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_config as fconfig,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_diagnostics::InspectSinkMarker,
+    fidl_fuchsia_inspect::InspectSinkMarker,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
     fuchsia_async as fasync,

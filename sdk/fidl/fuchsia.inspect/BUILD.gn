@@ -7,7 +7,10 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.inspect") {
   sdk_category = "partner"
   api = "fuchsia.inspect.api"
-  sources = [ "tree.fidl" ]
+  sources = [
+    "inspect_sink.fidl",
+    "tree.fidl",
+  ]
   public_deps = [ "//sdk/fidl/fuchsia.mem" ]
   enable_hlcpp = true
 }

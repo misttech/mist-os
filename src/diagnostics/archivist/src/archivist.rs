@@ -72,7 +72,7 @@ pub struct Archivist {
     /// The server handling fuchsia.logger.Log
     log_server: Arc<LogServer>,
 
-    /// The server handling fuchsia.diagnostics.InspectSink
+    /// The server handling fuchsia.inspect.InspectSink
     inspect_server: Arc<InspectSinkServer>,
 
     /// The server handling fuchsia.diagnostics.LogSettings
@@ -439,12 +439,12 @@ impl Archivist {
             });
         }
 
-        // Ingest unattributed fuchsia.diagnostics.InspectSink connections.
+        // Ingest unattributed fuchsia.inspect.InspectSink connections.
         if let Some(mut unattributed_inspect_sink_source) =
             self.unattributed_inspect_sink_source.take()
         {
             svc_dir.add_fidl_service(move |stream| {
-                debug!("unattributed fuchsia.diagnostics.InspectSink connection");
+                debug!("unattributed fuchsia.inspect.InspectSink connection");
                 unattributed_inspect_sink_source.new_connection(stream);
             });
         }

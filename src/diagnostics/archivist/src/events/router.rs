@@ -402,7 +402,7 @@ mod tests {
     use crate::events::types::ComponentIdentifier;
     use assert_matches::assert_matches;
     use fidl::endpoints::RequestStream;
-    use fidl_fuchsia_diagnostics::InspectSinkMarker;
+    use fidl_fuchsia_inspect::InspectSinkMarker;
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;

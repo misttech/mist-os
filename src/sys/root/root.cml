@@ -29,7 +29,7 @@
         },
         {
             protocol: [
-                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "#bootstrap",
@@ -40,7 +40,7 @@
         // that the protocols routed everywhere. Bootstrap is exposing them itself.
         {
             protocol: [
-                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "void",
@@ -155,7 +155,6 @@
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.driver.development.DriverDevelopment",
@@ -166,6 +165,7 @@
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.hardware.usb.DeviceWatcher",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.logger.Log",

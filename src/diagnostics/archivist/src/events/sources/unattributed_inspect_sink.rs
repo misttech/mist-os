@@ -9,7 +9,7 @@ use crate::{
     },
     identity::ComponentIdentity,
 };
-use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_inspect as finspect;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 
@@ -19,7 +19,7 @@ pub struct UnattributedInspectSinkSource {
 }
 
 impl UnattributedInspectSinkSource {
-    pub fn new_connection(&mut self, request_stream: fdiagnostics::InspectSinkRequestStream) {
+    pub fn new_connection(&mut self, request_stream: finspect::InspectSinkRequestStream) {
         self.dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
@@ -42,7 +42,7 @@ impl EventProducer for UnattributedInspectSinkSource {
 mod tests {
     use super::*;
     use crate::events::types::*;
-    use fidl_fuchsia_diagnostics::InspectSinkMarker;
+    use fidl_fuchsia_inspect::InspectSinkMarker;
     use flyweights::FlyStr;
     use fuchsia_async as fasync;
     use futures::StreamExt;

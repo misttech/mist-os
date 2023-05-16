@@ -172,7 +172,7 @@
         // Disable the required offer for Archivist
         {
             protocol: [
-                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "void",
@@ -940,7 +940,7 @@
         },
         {
             protocol: [
-                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
@@ -1124,7 +1124,7 @@
             to: "#pkg-cache",
         },
         {
-            protocol: "fuchsia.diagnostics.InspectSink",
+            protocol: "fuchsia.inspect.InspectSink",
             from: "#archivist",
             to: "#pkg-cache",
         },
@@ -1150,7 +1150,7 @@
             to: "#full_resolver",
         },
         {
-            protocol: "fuchsia.diagnostics.InspectSink",
+            protocol: "fuchsia.inspect.InspectSink",
             from: "#archivist",
             to: "#full_resolver",
         },
@@ -1276,9 +1276,9 @@
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
             ],

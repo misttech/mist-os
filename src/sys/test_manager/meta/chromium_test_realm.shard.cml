@@ -17,7 +17,7 @@
             // Hermetic protocols offered to all tests. See
             // https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework#hermetic_capabilities_for_tests.
             protocol: [
-                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],

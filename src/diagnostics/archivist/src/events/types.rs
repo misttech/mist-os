@@ -9,7 +9,7 @@ use crate::{
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_inspect as finspect;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_sys_internal::SourceIdentity;
@@ -135,7 +135,7 @@ pub struct InspectSinkRequestedPayload {
     /// The component that is connecting to `InspectSink`.
     pub component: Arc<ComponentIdentity>,
     /// The stream containing requests made on the `InspectSink` channel by the component.
-    pub request_stream: fdiagnostics::InspectSinkRequestStream,
+    pub request_stream: finspect::InspectSinkRequestStream,
 }
 
 impl std::fmt::Debug for InspectSinkRequestedPayload {

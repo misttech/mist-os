@@ -745,7 +745,7 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.diagnostics.InspectSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(Ref::parent())
                 .to(&wrapper_realm),
         )
@@ -755,7 +755,7 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.diagnostics.InspectSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(Ref::parent())
                 .to(&archivist),
         )
@@ -774,7 +774,7 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.diagnostics.InspectSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(&archivist)
                 .to(test_root.clone())
                 .to(&resolver),
@@ -819,7 +819,7 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.diagnostics.InspectSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(&archivist)
                 .to(&enclosing_env),
         )

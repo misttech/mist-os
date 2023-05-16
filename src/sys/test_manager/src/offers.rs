@@ -21,7 +21,7 @@ pub(crate) fn map_offers(offers: Vec<fdecl::Offer>) -> Result<Vec<ftest::Capabil
             fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 target_name: Some(target_name), ..
             }) if target_name != "fuchsia.logger.LogSink"
-                && target_name != "fuchsia.diagnostics.InspectSink" =>
+                && target_name != "fuchsia.inspect.InspectSink" =>
             {
                 capabilities.push(
                     Capability::protocol_by_name(target_name).availability_same_as_target().into(),

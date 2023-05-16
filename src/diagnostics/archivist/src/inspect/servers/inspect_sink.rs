@@ -13,7 +13,7 @@ use crate::{
 use anyhow::Error;
 use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
-use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_inspect as finspect;
 use fuchsia_async as fasync;
 use futures::{channel::mpsc, StreamExt};
 use std::sync::Arc;
@@ -51,7 +51,7 @@ impl InspectSinkServer {
     async fn spawn(
         &self,
         component: Arc<ComponentIdentity>,
-        stream: fdiagnostics::InspectSinkRequestStream,
+        stream: finspect::InspectSinkRequestStream,
     ) {
         let repo = Arc::clone(&self.repo);
 
@@ -69,12 +69,12 @@ impl InspectSinkServer {
     async fn handle_requests(
         repo: Arc<InspectRepository>,
         component: Arc<ComponentIdentity>,
-        mut stream: fdiagnostics::InspectSinkRequestStream,
+        mut stream: finspect::InspectSinkRequestStream,
     ) -> Result<(), Error> {
         while let Some(Ok(request)) = stream.next().await {
             match request {
-                fdiagnostics::InspectSinkRequest::Publish {
-                    payload: fdiagnostics::InspectSinkPublishRequest { tree: Some(tree), name, .. },
+                finspect::InspectSinkRequest::Publish {
+                    payload: finspect::InspectSinkPublishRequest { tree: Some(tree), name, .. },
                     ..
                 } => {
                     repo.add_inspect_handle(
@@ -136,10 +136,8 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
-    use fidl_fuchsia_diagnostics::{
-        InspectSinkMarker, InspectSinkProxy, InspectSinkPublishRequest,
-    };
     use fidl_fuchsia_inspect::TreeMarker;
+    use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkProxy, InspectSinkPublishRequest};
     use fuchsia_async::Task;
     use fuchsia_inspect::{
         assert_json_diff, hierarchy::DiagnosticsHierarchy, reader::read, Inspector,
