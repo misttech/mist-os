@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/use.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -19,14 +20,6 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.ui.activity.Provider",
             ],
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-
-            // Trace manager may be excluded from builds where tracing is not
-            // expected to be used for observability, such as in the bringup
-            // product and non-eng builds of any product.
-            availability: "optional",
         },
         {
             storage: "data",
