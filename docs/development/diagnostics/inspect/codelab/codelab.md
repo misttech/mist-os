@@ -1,12 +1,11 @@
 # Inspect codelab
 
-This document contains the codelab for Inspect in C++, Dart and Rust.
+This document contains the codelab for Inspect in C++ and Rust.
 
 The code is available at:
 
 * [//examples/diagnostics/inspect/codelab/cpp][inspect-cpp-codelab].
 * [//examples/diagnostics/inspect/codelab/rust][inspect-rust-codelab].
-* [//examples/diagnostics/inspect/codelab/dart][inspect-dart-codelab].
 
 This codelab is organized into several parts, each with their own
 subdirectory. The starting point for the codelab is part 1,
@@ -14,7 +13,6 @@ and the code for each part contains the solution for the previous parts.
 
 * [C++ Part 1][cpp-part1]
 * [Rust Part 1][rust-part1]
-* [Dart Part 1][dart-part1]
 
 Note: For Rust we also have an ergonomic library with a higher level API:
 [fuchsia-inspect-derive][fuchsia-inspect-derive]. However, it's recommended to understand the
@@ -56,17 +54,6 @@ to your `fx set` invocation:
    --with //examples/diagnostics/inspect/codelab/rust:tests
    ```
 
-* {Dart}
-
-   Note: Replace `workstation.x64` with your preferred product and board configuration.
-
-   ```
-   fx set core.x64
-       --with //examples/diagnostics/inspect/codelab/dart \
-       --with //examples/diagnostics/inspect/codelab/dart:tests \
-       --with-base //src/dart \
-       --args='core_realm_shards += [ "//src/dart:dart_runner_core_shard" ]'
-   ```
 
 ## Part 1: A buggy component
 
@@ -106,19 +93,13 @@ command line arguments as strings to Reverse:
       ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_2.cm
       ```
 
-   * {Dart}
-
-      ```
-      ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/client_part_2.cm
-      ```
 
 2. Run part 1 code, and reverse the string "Hello"
 
-   * {C++}
+   To specify just the single string "Hello" modify the `program.args` section of
+   the [common.shard.cml][cpp-common-cml], build and run the following:
 
-      <!-- TODO(fxbug.dev/88383): this applies to all languages once Dart supports args -->
-      To specify just the single string "Hello" modify the `program.args` section of
-      the [common.shard.cml][cpp-common-cml], build and run the following:
+   * {C++}
 
       ```
       ffx component run /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_1.cm
@@ -134,10 +115,6 @@ command line arguments as strings to Reverse:
 
    * {Rust}
 
-      <!-- TODO(fxbug.dev/88383): this applies to all languages once Dart supports args -->
-      To specify just the single string "Hello" modify the `program.args` section of
-      the [common.shard.cml][cpp-common-cml], build and run the following:
-
       ```
       ffx component run /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
       ```
@@ -151,47 +128,27 @@ command line arguments as strings to Reverse:
       We see in the logs that the component got the "Hello" as input, but we
       don't see the correct reversed output.
 
-   * {Dart}
-
-      <!-- TODO(fxbug.dev/88383): this applies to all languages once Dart supports args -->
-      To specify just the string "Hello" modify the `args` variable in the
-      [client main][dart-client-main].
-
-      ```
-      ffx component run /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/client_part_1.cm
-      ```
-
-      To see the command output take a look at the logs:
-
-      ```
-      ffx log --tags inspect_dart_codelab
-      ```
-
-      We see in the logs that the component got the "Hello" as input, but we
-      don't see the reversed output.
-
    As you can see in the log the reverser doesn't work properly.
 
 3. Try running the client with more arguments:
 
+   Add the string "World" to the `program.args` section of the
+   [common.shard.cml][cpp-common-cml]:
+
+   ```json5
+   {
+       program: {
+           args: [
+               "Hello",
+               "World",
+           ],
+       },
+   }
+   ```
+
+   Build and run the following:
+
    * {C++}
-
-      <!-- TODO(fxbug.dev/88383): this applies to all languages once Dart supports args -->
-      Add the string "World" to the `program.args` section of the
-      [common.shard.cml][cpp-common-cml]:
-
-      ```json5
-      {
-          program: {
-              args: [
-                  "Hello",
-                  "World",
-              ],
-          },
-      }
-      ```
-
-      Build and run the following:
 
       ```
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_1.cm
@@ -199,40 +156,8 @@ command line arguments as strings to Reverse:
 
    * {Rust}
 
-      <!-- TODO(fxbug.dev/88383): this applies to all languages once Dart supports args -->
-      Add the string "World" to the `program.args` section of the
-      [common.shard.cml][rust-common-cml]:
-
-      ```json5
-      {
-          program: {
-              args: [
-                  "Hello",
-                  "World",
-              ],
-          },
-      }
-      ```
-
-      Build and run the following:
-
       ```
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
-      ```
-
-   * {Dart}
-
-      <!-- TODO(fxbug.dev/88383): this applies to all languages once Dart supports args -->
-      Add the string "World" to the `args` list in the [client main][dart-client-main].
-
-      ```json5
-      final args = ["Hello", "World"];
-      ```
-
-      Build and run the following:
-
-      ```
-      ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/client_part_1.cm
       ```
 
    We can see that the component printed the first input, but we don't see the
@@ -259,14 +184,6 @@ Now that you can reproduce the problem, take a look at what the client is doing:
    ```rust
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/client/src/main.rs" region_tag="reverse_loop" adjust_indentation="auto" %}
    ```
-
-* {Dart}
-
-  In the [client main][dart-client-main]:
-
-  ```dart
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/client/lib/main.dart" region_tag="reverse_loop" adjust_indentation="auto" %}
-  ```
 
 
 In this code snippet, the client calls the `Reverse` method but never
@@ -326,22 +243,6 @@ codelab. There is a lot of standard component setup:
      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_1/src/main.rs" region_tag="serve_service" adjust_indentation="auto" %}
      ```
 
-* {Dart}
-
-   In the [part 1 main][dart-part1-main]:
-
-   - Logging initialization
-
-     ```dart
-     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_1/lib/main.dart" region_tag="init_logger" adjust_indentation="auto" %}
-     ```
-
-   - Serving a public service
-
-     ```dart
-     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_1/lib/main.dart" region_tag="serve_service" adjust_indentation="auto" %}
-     ```
-
 See what the reverser definition is:
 
 * {C++}
@@ -366,17 +267,6 @@ See what the reverser definition is:
 
    This struct serves the `Reverser` protocol. The `ReverserServerFactory` (will make more sense
    later) constructs a `ReverserServer` when a new connection to `Reverser` is established.
-
-- {Dart}
-
-   In [reverser.dart][dart-part1-reverser]:
-
-   ```dart
-   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_1/lib/reverser.dart" region_tag="reverser_impl" adjust_indentation="auto" %}
-   ```
-
-   This class implements the `Reverser` protocol. A helper method called `getDefaultBinder` returns
-   a closure that creates new `Reverser`s for incoming requests.
 
 
 ### Add Inspect
@@ -412,15 +302,6 @@ state without needing to dig through logs.
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/BUILD.gn" region_tag="part_1_solution_build_dep" adjust_indentation="auto" %}
       ```
 
-   * {Dart}
-
-     In [BUILD.gn][dart-part1-build] in `deps` under `dart_library("lib")` and
-     `dart_component("bin")`:
-
-     ```
-     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/BUILD.gn" region_tag="part_1_solution_build_dep" adjust_indentation="auto" %}
-     ```
-
 2. Initialize Inspect:
 
    * {C++}
@@ -440,15 +321,6 @@ state without needing to dig through logs.
       ```rust
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/main.rs" region_tag="part_1_use_inspect" adjust_indentation="auto" %}
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/main.rs" region_tag="part_1_serve_inspect" adjust_indentation="auto" %}
-      ```
-
-   * {Dart}
-
-      In [main.dart][dart-part1-main]:
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/main.dart" region_tag="part_1_import_inspect" adjust_indentation="auto" %}
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/main.dart" region_tag="part_1_init_inspect" adjust_indentation="auto" %}
       ```
 
    You are now using Inspect.
@@ -510,31 +382,6 @@ state without needing to dig through logs.
         method was called. As a result, the new property lives as long as the node itself (in this
         case, as long as the root node, so the entire execution of the component).
 
-   * {Dart}
-
-     ```dart
-     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/main.dart" region_tag="part_1_write_version" adjust_indentation="auto" %}
-     ```
-
-     This snippet does the following:
-
-     1. Obtain the "root" node of the Inspect hierarchy.
-
-        The Inspect hierarchy for your component consists of a tree of Nodes,
-        each of which contains any number of properties.
-
-     2. Create a new property using `stringProperty(...).setValue(...)`.
-
-        This adds a new `StringProperty` on the root. This `StringProperty`
-        is called "version", and its value is "part2". We're going to set our
-        property to "part1".
-
-     3. It records it in the root node.
-
-        The lifetime of a property is tied to the lifetime of the node where it was created (in this
-        case root, so the lifetime of the component). To delete the property one would have to call
-        `delete()` on it.
-
 
 ### Reading Inspect data
 
@@ -560,13 +407,6 @@ Now that you have added Inspect to your component, you can read what it says:
       ```
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
       ffx log --tags inspect_rust_codelab
-      ```
-
-   * {Dart}
-
-      ```
-      ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/client_part_1.cm
-      ffx log --tags inspect_dart_codelab
       ```
 
 3. Use `ffx inspect` to view your output:
@@ -601,20 +441,6 @@ Now that you have added Inspect to your component, you can read what it says:
       metadata:
         filename = fuchsia.inspect.Tree
         component_url = fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/part_1.cm
-        timestamp = 4728864898476
-      payload:
-        root:
-          version = part1
-      ```
-
-   * {Dart}
-
-      ```
-      $ ffx inspect show 'core/session-manager/session\:session/workstation_session/ffx-laboratory\:part_1/reverser'
-      # or `ffx inspect show --manifest inspect_dart_codelab`
-      metadata:
-        filename = root.inspect
-        component_url = fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/part_1.cm
         timestamp = 4728864898476
       payload:
         root:
@@ -669,29 +495,6 @@ Now that you have added Inspect to your component, you can read what it says:
       ]
       ```
 
-   * {Dart}
-
-      ```
-      $ ffx inspect --machine json-pretty show 'core/session-manager/session\:session/workstation_session/ffx-laboratory\:part_1/reverser'
-      [
-        {
-          "data_source": "Inspect",
-          "metadata": {
-            "errors": null,
-            "filename": "root.inspect",
-            "component_url": "fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/part_1.cm",
-            "timestamp": 5031116776282
-          },
-          "moniker": "core/session-manager/session\:session/workstation_session/ffx-laboratory\:part_1/reverser",
-          "payload": {
-            "root": {
-              "version": "part1",
-          },
-          "version": 1
-        }
-      ]
-      ```
-
 ### Instrumenting the code to find the bug
 
 Now that you have initialized Inspect and know how to read data, you
@@ -719,13 +522,6 @@ is even being handled by your component.
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/main.rs" region_tag="part_1_new_child" adjust_indentation="auto" %}
       ```
 
-   * {Dart}
-
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/main.dart" region_tag="part_1_new_child" adjust_indentation="auto" %}
-      ```
-
 2. Update your server to accept this node:
 
    * {C++}
@@ -745,15 +541,6 @@ is even being handled by your component.
       ```rust
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/reverser.rs" region_tag="part_1_use" adjust_indentation="auto" %}
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/reverser.rs" region_tag="part_1_update_reverser" adjust_indentation="auto" %}
-      ```
-
-   * {Dart}
-
-      Update the definition of `getDefaultBinder` in [reverser.dart][dart-part1-reverser]:
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/reverser.dart" region_tag="part_1_import" adjust_indentation="auto" %}
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/reverser.dart" region_tag="part_1_update_reverser" adjust_indentation="auto" %}
       ```
 
 3. Add a property to keep track of the number of connections:
@@ -784,12 +571,6 @@ is even being handled by your component.
      existing despite not being read. In the following steps, the example calls `self.node`, so the compiler
      will stop complaining!
 
-   * {Dart}
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/reverser.dart" region_tag="part_1_add_connection_count" adjust_indentation="auto" %}
-      ```
-
    This snippet demonstrates creating a new `UintProperty` (containing a 64
    bit unsigned int) called `connection_count` and setting it to 0. In the handler
    (which runs for each connection), the property is incremented by 1.
@@ -806,12 +587,6 @@ is even being handled by your component.
 
       ```
       $ ffx --machine json-pretty inspect show --manifest inspect_rust_codelab
-      ```
-
-   * {Dart}
-
-      ```
-      $ ffx --machine json-pretty inspect show --manifest inspect_dart_codelab
       ```
 
    You should now see:
@@ -854,12 +629,6 @@ implementation itself. In particular, it will be helpful to know:
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/reverser.rs" region_tag="part_1_connection_child" adjust_indentation="auto" %}
       ```
 
-   * {Dart}
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/reverser.dart" region_tag="part_1_connection_child" adjust_indentation="auto" %}
-      ```
-
    This will create unique names starting with "connection".
 
 
@@ -873,12 +642,6 @@ implementation itself. In particular, it will be helpful to know:
 
    *Hint*: You will find it helpful to create a constructor for `ReverserServer`
    that takes `inspect::Node` for the same reason as we did for `ReverserServerFactory`.
-
-* {Dart}
-
-   *Hint*: You will find it helpful to create a constructor for `ReverserImpl`
-   that takes `inspect.Node`. [Part 3](#part-3) of this codelab explains why this is
-   a useful pattern.
 
 - *Hint*: You will need to create a member on Reverser to hold the
 `request_count` property. Its type will be `inspect::UintProperty`.
@@ -920,11 +683,6 @@ The output above shows that the connection is still open and it received one req
    If you added "response\_count" as well, you may have noticed the bug.
    The `Reverse` method receives a `responder`, but it is never called with the value of `result`.
 
-* {Dart}
-
-   If you added "response\_count" as well, you may have noticed the bug.
-   The `reverse` method receives never returns the value of `result`.
-
 
 1. Send the response:
 
@@ -939,12 +697,6 @@ The output above shows that the connection is still open and it received one req
 
       ```rust
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/reverser.rs" region_tag="part_1_respond" adjust_indentation="auto" %}
-      ```
-
-   * {Dart}
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/reverser.dart" region_tag="part_1_result" adjust_indentation="auto" %}
       ```
 
 2. Run the client again:
@@ -970,18 +722,6 @@ The output above shows that the connection is still open and it received one req
       Creating component instance: client_part_1
 
       ffx log --tags inspect_rust_codelab
-      [00039.129068][39163][39165][inspect_rust_codelab, client] INFO: Input: Hello
-      [00039.194151][39163][39165][inspect_rust_codelab, client] INFO: Output: olleH
-      [00039.194170][39163][39165][inspect_rust_codelab, client] INFO: Input: World
-      [00039.194402][39163][39165][inspect_rust_codelab, client] INFO: Output: dlroW
-      [00039.194407][39163][39165][inspect_rust_codelab, client] INFO: Done reversing! Please use `ffx component stop`
-      ```
-
-   * {Dart}
-
-      ```
-      ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/client_part_1.cm
-      ffx log --tags inspect_dart_codelab
       [00039.129068][39163][39165][inspect_rust_codelab, client] INFO: Input: Hello
       [00039.194151][39163][39165][inspect_rust_codelab, client] INFO: Output: olleH
       [00039.194170][39163][39165][inspect_rust_codelab, client] INFO: Input: World
@@ -1021,12 +761,6 @@ out to the "FizzBuzz" service and prints the response:
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_1/src/main.rs" region_tag="fizzbuzz_connect" adjust_indentation="auto" %}
    ```
 
-* {Dart}
-
-   ```dart
-   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_1/lib/main.dart" region_tag="connect_fizzbuzz" adjust_indentation="auto" %}
-   ```
-
 If you see the logs, you will see that this log is never printed.
 
 * {C++}
@@ -1039,12 +773,6 @@ If you see the logs, you will see that this log is never printed.
 
    ```rust
    ffx log --tags inspect_rust_codelab
-   ```
-
-* {Dart}
-
-   ```dart
-   ffx log --tags inspect_dart_codelab
    ```
 
 You will need to diagnose and solve this problem.
@@ -1065,12 +793,6 @@ You will need to diagnose and solve this problem.
 
       ```
       ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_2.cm
-      ```
-
-   * {Dart}
-
-      ```
-      ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_dart_codelab#meta/client_part_2.cm
       ```
 
    Fortunately the FizzBuzz team instrumented their component using Inspect.
@@ -1101,12 +823,6 @@ You will need to diagnose and solve this problem.
 
       ```rust
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/main.rs" region_tag="instrument_fizzbuzz" adjust_indentation="auto" %}
-      ```
-
-   * {Dart}
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_2/lib/main.dart" region_tag="instrument_fizzbuzz" adjust_indentation="auto" %}
       ```
 
 **Exercise**: Add Inspect to the FizzBuzz connection to identify the problem
@@ -1178,37 +894,6 @@ error handler for the connection attempt.
    fuchsia_inspect::component::health().set_unhealthy("something went wrong!");
    ```
 
-* {Dart}
-
-   *Advanced*: `fuchsia_inspect::Inspect` has a getter called `health` that returns an object
-   that announces overall health status in a special location (a node child of the root of the
-   inspect tree). Since our service is not healthy unless it can connect to FizzBuzz, can
-   you incorporate this:
-
-   ```dart
-   /*
-   "fuchsia.inspect.Health": {
-       "status": "STARTING_UP"
-   }
-   */
-   inspect.Inspect().health.setStartingUp();
-
-   /*
-   "fuchsia.inspect.Health": {
-       "status": "OK"
-   }
-   */
-   inspect.Inspect().health.setOk();
-
-   /*
-   "fuchsia.inspect.Health": {
-       "status": "UNHEALTHY",
-       "message": "Something went wrong!"
-   }
-   */
-   inspect.Inspect().health.setUnhealthy('Something went wrong!');
-   ```
-
 Once you complete this exercise, you should see that the connection
 error handler is being called with a "not found" error. Inspect
 output showed that FizzBuzz is running, so maybe something is
@@ -1233,15 +918,6 @@ look at the logs:
    ... No capability available at path /svc/fuchsia.examples.inspect.FizzBuzz
    for component /core/ffx-laboratory:client_part_2/reverser, verify the
    component has the proper `use` declaration. ...
-   ```
-
-* {Dart}
-
-   ```
-   $ ffx log --filter FizzBuzz
-   [106.395][reverser][][W] No capability available at path /svc/fuchsia.examples.inspect.FizzBuzz
-   for component /core/session-manager/session:session/workstation_session/ffx-laboratory:part_1/reverser,
-   verify the component has the proper `use` declaration.
    ```
 
 Sandboxing errors are a common pitfall that are sometimes difficult to uncover.
@@ -1271,15 +947,6 @@ Looking at part2 meta, you can see it is missing the service:
     ],
     ```
 
-* {Dart}
-
-    Add a `use` entry for `Fizzbuzz` to [part_2/meta][dart-part2-meta]
-    ```
-    use: [
-        { protocol: "fuchsia.examples.inspect.FizzBuzz" },
-    ],
-    ```
-
 After you added "fuchsia.examples.inspect.FizzBuzz", rebuild,
 and run again. You should now see FizzBuzz in the logs and an OK status:
 
@@ -1297,15 +964,6 @@ and run again. You should now see FizzBuzz in the logs and an OK status:
    ```
    $ ffx log --tags inspect_rust_codelab
    [inspect_rust_codelab, part2] INFO: main.rs(52): Got FizzBuzz: 1 2 Fizz
-   4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz 16 17 Fizz 19 Buzz Fizz
-   22 23 Fizz Buzz 26 Fizz 28 29 FizzBuzz
-   ```
-
-* {Dart}
-
-   ```
-   $ ffx log --tags inspect_dart_codelab
-   [inspect_dart_codelab, part2] INFO: main.dart(35): Got FizzBuzz: 1 2 Fizz
    4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz 16 17 Fizz 19 Buzz Fizz
    22 23 Fizz Buzz 26 Fizz 28 29 FizzBuzz
    ```
@@ -1347,14 +1005,6 @@ Reverser has a basic unit test. Run it:
    fx test inspect_rust_codelab_unittests
    ```
 
-* {Dart}
-
-   The unit test is located in [reverser\_test.dart][dart-part3-unittest].
-
-   ```
-   fx test inspect_dart_codelab_unittests
-   ```
-
 Note: This runs unit tests for all parts of this codelab.
 
 The unit test ensures that Reverser works properly (and doesn't hang!), but it does
@@ -1385,12 +1035,6 @@ The code to open a Reverser looks like the following:
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_2/src/reverser.rs" region_tag="open_reverser" adjust_indentation="auto" %}
    ```
 
-* {Dart}
-
-   ```dart
-   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_3/test/reverser_test.dart" region_tag="open_reverser" adjust_indentation="auto" %}
-   ```
-
 A default version of the Inspect Node is passed into the Reverser. This
 allows the reverser code to run properly in tests, but it does not
 support asserting on Inspect output.
@@ -1419,17 +1063,6 @@ support asserting on Inspect output.
      For unit tests, alwas prefer to use a new `fuchsia_inspect::Inspector`
 
    - *Hint*: You will need to create a child on the root to pass in to `ReverserServerFactory::new`.
-
-* {Dart}
-
-   **Exercise**: Change `openReverser` to take the dependency for an `inspect.Node`
-   as an argument and use it when constructing Reverser.
-
-   - *Hint*: Use `inspect.Inspect.forTesting` and `FakeVmoHolder` to create
-     an Inspect object without fuchsia dependencies to run your test on host.
-
-   - *Hint*: You will need to create a child on the root to pass in to `openReverser`.
-
 
 **Follow up**: Create multiple reverser connections and test them independently.
 
@@ -1465,15 +1098,6 @@ Add code to test the output in Inspect:
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_4/src/reverser.rs" region_tag="test_inspector" adjust_indentation="auto" %}
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_4/src/reverser.rs" region_tag="assert_tree" adjust_indentation="auto" %}
    ```
-
-* {Dart}
-
-   ```dart
-   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_4/test/reverser_test.dart" region_tag="reverser_test" adjust_indentation="auto" %}
-   ```
-
-   The `VmoMatcher` is a convenient utility for testing inspect integrations. It allows to assert
-   existing properties and children and missing ones, among other features.
 
 The snippets above read a snapshot from the underlying virtual memory object (VMO)
 containing Inspect data and parses it into a readable hierarchy.
@@ -1515,12 +1139,6 @@ You can run the integration tests for the codelab as follows:
    $ fx test inspect_rust_codelab_integration_tests
    ```
 
-* {Dart}
-
-   ```
-   $ fx test inspect_dart_codelab_integration_tests
-   ```
-
 Note: This runs integration tests for all parts of this codelab.
 
 ### View the code
@@ -1536,10 +1154,6 @@ Look at how the integration test is setup:
    * {Rust}
 
      Find the component manifest (cml) in [part_4/meta][rust-part4-integration-meta]
-
-   * {Dart}
-
-     Find the component manifest (cml) in [part_4/meta][dart-part4-integration-meta]
 
 
 ```json5
@@ -1585,19 +1199,6 @@ realm.
       launch the FizzBuzz component. This feature tests that your Inspect
       output is as expected in case it fails to connect to FizzBuzz as in Part 2.
 
-   * {Dart}
-
-      Locate the integration test in [part_4/test/integration_test.dart][dart-part4-integration].
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_4/test/integration_test.dart" region_tag="integration_test" adjust_indentation="auto" %}
-      ```
-
-      `IntegrationTest.create` is responsible for creating a new test environment.
-      `connectToReverser` launches the reverser component and optionally launches the
-      FizzBuzz component. This feature tests that the Inspect output is as expected in case it fails
-      to connect to FizzBuzz as in Part 2.
-
 3. Add the following method to your test fixture to read from the ArchiveAccessor service:
 
    * {C++}
@@ -1613,14 +1214,6 @@ realm.
      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_5/tests/integration_test.rs" region_tag="include_test_stuff" adjust_indentation="auto" %}
      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/rust/part_5/tests/integration_test.rs" region_tag="get_inspect" adjust_indentation="auto" %}
      ```
-
-   * {Dart}
-
-     ```dart
-     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/testing/lib/integration_test.dart" region_tag="include_test_stuff" adjust_indentation="auto" %}
-     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/testing/lib/integration_test.dart" region_tag="get_inspect" adjust_indentation="auto" %}
-     ```
-
 
 4. **Exercise**. Use the returned data in your tests and add assertions to the returned data:
 
@@ -1650,16 +1243,6 @@ realm.
       ```
 
       Add assertions on the returned `DiagnosticsHierarchy`.
-
-      - *Hint*: It may help to print the JSON output to view the schema.
-
-   * {Dart}
-
-      ```dart
-      {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/dart/part_5/test/integration_test.dart" region_tag="result_hierarchy" adjust_indentation="auto" %}
-      ```
-
-      Add assertions on the returned Map data.
 
       - *Hint*: It may help to print the JSON output to view the schema.
 
@@ -1709,16 +1292,5 @@ This section is under construction.
 [rust-part3-unittest]: /examples/diagnostics/inspect/codelab/rust/part_3/src/reverser.rs#99
 [rust-part4-integration]: /examples/diagnostics/inspect/codelab/rust/part_4/tests/integration_test.rs
 [rust-part4-integration-meta]: /examples/diagnostics/inspect/codelab/rust/part_4/meta/integration_test.cml
-
-[inspect-dart-codelab]: /examples/diagnostics/inspect/codelab/dart
-[dart-part1]: /examples/diagnostics/inspect/codelab/dart/part_1
-[dart-part1-main]: /examples/diagnostics/inspect/codelab/dart/part_1/lib/main.dart
-[dart-part1-reverser]: /examples/diagnostics/inspect/codelab/dart/part_1/lib/reverser.dart
-[dart-part1-build]: /examples/diagnostics/inspect/codelab/dart/part_1/BUILD.gn
-[dart-client-main]: /examples/diagnostics/inspect/codelab/dart/client/lib/main.dart
-[dart-part2-meta]: /examples/diagnostics/inspect/codelab/dart/part_2/meta/part_2.cml
-[dart-part3-unittest]: /examples/diagnostics/inspect/codelab/dart/part_3/test/reverser_test.dart
-[dart-part4-integration]: /examples/diagnostics/inspect/codelab/dart/part_4/test/integration_test.dart
-[dart-part4-integration-meta]: /examples/diagnostics/inspect/codelab/dart/part_4/meta/integration_tests.cml
 
 [fuchsia-inspect-derive]: /docs/development/languages/rust/ergonomic_inspect.md

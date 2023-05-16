@@ -2,7 +2,7 @@
 
 Contributors: cphoenix@, crjohns@, miguelfrde@
 
-In this codelab, Rust, Dart, and C++ programmers will learn to use the Inspect
+In this codelab, Rust, and C++ programmers will learn to use the Inspect
 library to publish diagnostic information from their programs, and use Inspect
 information to debug their programs.
 
@@ -56,9 +56,6 @@ Inspect. Some examples include:
 
 [fuchsia-inspect crate documentation](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/index.html)
 
-* {Dart}
-
-[fuchsia_inspect dart package documentation](https://fuchsia.dev/reference/dart/package-fuchsia_inspect_inspect/package-fuchsia_inspect_inspect-library)
 
 ## Codelab
 
@@ -75,7 +72,7 @@ You will learn:
 
 ## What you’ll need
 
-* Basic knowledge of Rust, Dart, or C++.
+* Basic knowledge of Rust, or C++.
 * Access to a Fuchsia source tree you can execute build commands in.
 
 ## Get Started

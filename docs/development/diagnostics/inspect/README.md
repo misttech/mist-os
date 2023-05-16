@@ -14,10 +14,9 @@ that expose information.
 
 * [Quickstart](quickstart.md) – A get-started guide for component inspection.
 * [`ffx inspect`][ffx-inspect] – The `ffx` command for inspecting components.
-* [Codelab](codelab/README.md) – A full codelab in C++, Rust, and Dart.
+* [Codelab](codelab/README.md) – A full codelab in C++ and Rust.
 * API reference for [C++](https://fuchsia-docs.firebaseapp.com/cpp/inspect/index.html),
-  [Rust](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/index.html),
-  and [Dart](https://fuchsia-docs.firebaseapp.com/dart/package-fuchsia_inspect_inspect/package-fuchsia_inspect_inspect-library.html).
+  [Rust](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/index.html).
 
 * [Health checks] – Describes the health check subsystem.
 
@@ -184,25 +183,6 @@ about the component to the hub. For instance, appmgr exposes
   The [testing][rust-6] module supports the `assert_data_tree!` macro to
   match Inspect data for testing.
 
-* {[Dart](/sdk/dart/fuchsia_inspect/README.md)}
-
-  The Dart Inspect Library provides [write][dart-1] support for the Inspect File Format.
-
-  The `Inspect` class provides a wrapper around exposing and writing
-  to named Inspect files on the Hub.  Nodes and Properties have typed
-  [wrappers][dart-2].
-
-  Node children and properties are deduplicated automatically by the
-  library, so creating the same named property twice simply returns a
-  reference to the previously existing property.
-
-  [Deletion][dart-3] is manual, but it is compatible with Futures and callbacks in Dart:
-
-  ```dart
-  var item = parent.child('item');
-  itemDeletedFuture.then(() => item.delete());
-  ```
-
 ## Testing
 
 [Validator Architecture] describes an integration test framework for Inspect
@@ -250,9 +230,6 @@ ffx target snapshot
 [rust-4]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/component/index.html
 [rust-5]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/health/index.html
 [rust-6]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/testing/index.html
-[dart-1]: https://fuchsia-docs.firebaseapp.com/dart/package-fuchsia_inspect_inspect/Inspect-class.html
-[dart-2]: https://fuchsia-docs.firebaseapp.com/dart/package-fuchsia_inspect_inspect/package-fuchsia_inspect_inspect-library.html
-[dart-3]: https://fuchsia-docs.firebaseapp.com/dart/package-fuchsia_inspect_inspect/Node/delete.html
 [Inspect File Format]: /docs/reference/platform-spec/diagnostics/inspect-vmo-format.md
 [Validator Architecture]: /docs/reference/diagnostics/inspect/validator/README.md
 [Health checks]: /docs/development/diagnostics/inspect/health.md

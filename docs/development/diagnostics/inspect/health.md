@@ -119,21 +119,6 @@ various programming languages.
     }
   ```
 
-* {Dart}
-
-  ```dart
-    import 'package:fuchsia_inspect/inspect.dart' as inspect;
-
-    void main(List<String> args) {
-      final inspector = inspect.Inspect();
-      inspector.health.setStartingUp();
-      // ...Do startup work...
-      inspector.health.setOk();
-      inspector.health.setUnhealthy("I'm not feeling well.");
-      inspector.health.setOk();
-    }
-  ```
-
 <!-- Reference links -->
 
 [ffx-inspect]: https://fuchsia.dev/reference/tools/sdk/ffx.md#inspect
