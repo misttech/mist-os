@@ -415,11 +415,12 @@ func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route,
 	ifs.mu.Lock()
 	defer ifs.mu.Unlock()
 
-	ifs.addRoutesWithPreferenceLocked(rs, prf, metric, dynamic)
+	ifs.addRoutesWithPreferenceLocked(rs, prf, metric, dynamic, true /* overwriteIfAlreadyExist */)
 	return nil
 }
 
-func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.Preference, metric routes.Metric, dynamic bool) {
+// Returns a slice of the routes that were added.
+func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.Preference, metric routes.Metric, dynamic bool, overwriteIfAlreadyExist bool) []tcpip.Route {
 	metricTracksInterface := false
 	if metric == metricNotSet {
 		metricTracksInterface = true
@@ -434,11 +435,16 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.P
 	defer ifs.ns.routeTable.Unlock()
 
 	var v4DefaultRouteAdded, v6DefaultRouteAdded bool
+	var addedRoutes []tcpip.Route
+
 	for _, r := range rs {
 		r.NIC = ifs.nicid
 
-		ifs.ns.routeTable.AddRouteLocked(r, prf, metric, metricTracksInterface, dynamic, enabled)
+		newlyAdded := ifs.ns.routeTable.AddRouteLocked(r, prf, metric, metricTracksInterface, dynamic, enabled, overwriteIfAlreadyExist)
 		_ = syslog.Infof("adding route [%s] prf=%d metric=%d dynamic=%t", r, prf, metric, dynamic)
+		if newlyAdded {
+			addedRoutes = append(addedRoutes, r)
+		}
 
 		if enabled {
 			if r.Destination.Equal(header.IPv4EmptySubnet) {
@@ -457,6 +463,8 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.P
 	if v6DefaultRouteAdded {
 		ifs.ns.onDefaultIPv6RouteChangeLocked(ifs.nicid, true /* hasDefaultRoute */)
 	}
+
+	return addedRoutes
 }
 
 // delRouteLocked deletes routes from a single interface identified by `r.NIC`.
@@ -805,7 +813,7 @@ func (ifs *ifState) dhcpAcquired(ctx context.Context, lost, acquired tcpip.Addre
 				_ = syslog.Infof("adding routes %s with metric=<not-set> dynamic=true", rs)
 
 				ifs.mu.Lock()
-				ifs.addRoutesWithPreferenceLocked(rs, routes.MediumPreference, metricNotSet, true /* dynamic */)
+				ifs.addRoutesWithPreferenceLocked(rs, routes.MediumPreference, metricNotSet, true /* dynamic */, true /* overwriteIfAlreadyExist */)
 				ifs.mu.Unlock()
 			}
 		}
@@ -1208,6 +1216,7 @@ func (ns *Netstack) addLoopback() error {
 		routes.MediumPreference,
 		metricNotSet, /* use interface metric */
 		false,        /* dynamic */
+		true,         /* overwriteIfAlreadyExist */
 	)
 	ifs.mu.Unlock()
 

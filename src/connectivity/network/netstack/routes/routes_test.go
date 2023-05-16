@@ -11,6 +11,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -410,6 +411,42 @@ func TestDelRoute(t *testing.T) {
 				t.Errorf("got\n%s, want\n%s", tableGot, tableWant)
 			}
 		})
+	}
+}
+
+func TestDelRouteLockedIfDynamic(t *testing.T) {
+	for i := range testRouteTable {
+		tb := routes.RouteTable{}
+		tb.Set(testRouteTable)
+		routeToRemove := testRouteTable[i]
+		tb.Lock()
+		gotRemovedRoutes := tb.DelRouteIfDynamicLocked(routeToRemove.Route)
+		tb.Unlock()
+
+		wantRemovedRoutes := func() []routes.ExtendedRoute {
+			if routeToRemove.Dynamic {
+				return []routes.ExtendedRoute{routeToRemove}
+			} else {
+				return nil
+			}
+		}()
+
+		tableWant := func() routes.ExtendedRouteTable {
+			if routeToRemove.Dynamic {
+				return append(append(routes.ExtendedRouteTable(nil), testRouteTable[:i]...), testRouteTable[(i+1):]...)
+			} else {
+				return append(routes.ExtendedRouteTable(nil), testRouteTable...)
+			}
+		}()
+
+		if diff := cmp.Diff(gotRemovedRoutes, wantRemovedRoutes); diff != "" {
+			t.Errorf("unexpected difference in removed routes (-got +want): %s", diff)
+		}
+
+		tableGot := tb.GetExtendedRouteTable()
+		if !isSameRouteTable(tableGot, tableWant) {
+			t.Errorf("got\n%s, want\n%s", tableGot, tableWant)
+		}
 	}
 }
 

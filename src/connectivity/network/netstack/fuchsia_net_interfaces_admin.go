@@ -95,6 +95,10 @@ type adminAddressStateProviderImpl struct {
 		// therefore no longer needs to be removed when this protocol terminates.
 		removed bool
 	}
+	// If the `add_subnet_route` field AddressParameters field was set when
+	// this address was added to the stack, then this contains the subnet route
+	// added as a result.
+	addedSubnetRoutes []tcpip.Route
 }
 
 func (pi *adminAddressStateProviderImpl) UpdateAddressProperties(_ fidl.Context, properties admin.AddressProperties) error {
@@ -302,6 +306,20 @@ func (pi *adminAddressStateProviderImpl) OnRemoved(reason stack.AddressRemovalRe
 		}
 	}
 	pi.cancelServe()
+	pi.cleanUpSubnetRoute()
+}
+
+func (pi *adminAddressStateProviderImpl) cleanUpSubnetRoute() {
+	if len(pi.addedSubnetRoutes) > 0 {
+		pi.ns.routeTable.Lock()
+		defer pi.ns.routeTable.Unlock()
+
+		for _, route := range pi.addedSubnetRoutes {
+			pi.ns.routeTable.DelRouteIfDynamicLocked(route)
+		}
+
+		pi.ns.routeTable.UpdateStackLocked(pi.ns.stack, pi.ns.resetDestinationCache)
+	}
 }
 
 func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parameters admin.AddressParameters, request admin.AddressStateProviderWithCtxInterfaceRequest) error {
@@ -356,6 +374,19 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		return nil
 	}
 
+	addSubnetRoute := parameters.GetAddSubnetRouteWithDefault(false)
+	impl.addedSubnetRoutes = func() []tcpip.Route {
+		if addSubnetRoute {
+			subnetRoute := addressWithPrefixRoute(ifs.nicid, protocolAddr.AddressWithPrefix)
+			ifs.mu.Lock()
+			addedSubnetRoutes := ifs.addRoutesWithPreferenceLocked([]tcpip.Route{subnetRoute}, routes.MediumPreference, metricNotSet, true /* dynamic */, false /* overwriteIfAlreadyExist */)
+			ifs.mu.Unlock()
+			return addedSubnetRoutes
+		} else {
+			return []tcpip.Route{}
+		}
+	}()
+
 	go func() {
 		defer cancel()
 		component.Serve(ctx, &admin.AddressStateProviderWithCtxStub{Impl: impl}, request.Channel, component.ServeOptions{
@@ -384,6 +415,8 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 			default:
 				panic(fmt.Sprintf("NICID=%d unknown error trying to remove address %s upon channel closure: %s", impl.nicid, addr, status))
 			}
+
+			impl.cleanUpSubnetRoute()
 		}
 	}()
 	return nil

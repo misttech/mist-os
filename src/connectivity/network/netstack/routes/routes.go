@@ -227,17 +227,23 @@ func (rt *RouteTable) Set(r []ExtendedRoute) {
 	rt.routes = append([]ExtendedRoute(nil), r...)
 }
 
-func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric Metric, tracksInterface bool, dynamic bool, enabled bool) {
-	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, trackIf=%t, dynamic=%t, enabled=%t", route, prf, metric, tracksInterface, dynamic, enabled)
+func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric Metric, tracksInterface bool, dynamic bool, enabled bool, overwriteIfAlreadyExists bool) (newlyAdded bool) {
+	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, trackIf=%t, dynamic=%t, enabled=%t, overwriteIfAlreadyExists=%t", route, prf, metric, tracksInterface, dynamic, enabled, overwriteIfAlreadyExists)
 
+	newlyAdded = true
 	// First check if the route already exists, and remove it.
 	for i, er := range rt.routes {
 		if er.Route == route {
+			if !overwriteIfAlreadyExists {
+				return false
+			}
+
 			rt.routes = append(rt.routes[:i], rt.routes[i+1:]...)
 			rt.sender.queueChange(RoutingTableChange{
 				Change: RouteRemoved,
 				Route:  er,
 			})
+			newlyAdded = false
 			break
 		}
 	}
@@ -270,6 +276,8 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 		Change: RouteAdded,
 		Route:  newEr,
 	})
+
+	return newlyAdded
 }
 
 // AddRoute inserts the given route to the table in a sorted fashion. If the
@@ -279,10 +287,18 @@ func (rt *RouteTable) AddRoute(route tcpip.Route, prf Preference, metric Metric,
 	rt.Lock()
 	defer rt.Unlock()
 
-	rt.AddRouteLocked(route, prf, metric, tracksInterface, dynamic, enabled)
+	rt.AddRouteLocked(route, prf, metric, tracksInterface, dynamic, enabled, true /* overwriteIfAlreadyExists */)
 }
 
 func (rt *RouteTable) DelRouteLocked(route tcpip.Route) []ExtendedRoute {
+	return rt.delRouteLocked(route, false)
+}
+
+func (rt *RouteTable) DelRouteIfDynamicLocked(route tcpip.Route) []ExtendedRoute {
+	return rt.delRouteLocked(route, true)
+}
+
+func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool) []ExtendedRoute {
 	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Deleting route %s", route)
 
 	var routesDeleted []ExtendedRoute
@@ -295,7 +311,8 @@ func (rt *RouteTable) DelRouteLocked(route tcpip.Route) []ExtendedRoute {
 	for _, er := range oldTable {
 		if er.Route.Destination == route.Destination && er.Route.NIC == route.NIC {
 			// Match any route if Gateway is empty.
-			if len(route.Gateway) == 0 || er.Route.Gateway == route.Gateway {
+			if (len(route.Gateway) == 0 ||
+				er.Route.Gateway == route.Gateway) && (!onlyDeleteIfDynamic || er.Dynamic) {
 				routesDeleted = append(routesDeleted, er)
 				continue
 			}

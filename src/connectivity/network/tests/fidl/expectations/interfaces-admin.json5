@@ -26,10 +26,6 @@
                 // TODO(https://fxbug.dev/106959): Should pass against Netstack3 once
                 // updating adddress lifetimes is supported.
                 "update_address_lifetimes_ns3",
-
-                // TODO(https://fxbug.dev/125716): Should pass against Netstack2 once
-                // it supports AddressProperties.add_subnet_route`.
-                "add_address_*ns2::add_subnet_route_is_true*",
             ],
         },
     ],
