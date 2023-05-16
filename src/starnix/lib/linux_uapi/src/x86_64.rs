@@ -4433,6 +4433,10 @@ pub const ARCH_REQ_XCOMP_GUEST_PERM: u32 = 4133;
 pub const ARCH_MAP_VDSO_X32: u32 = 8193;
 pub const ARCH_MAP_VDSO_32: u32 = 8194;
 pub const ARCH_MAP_VDSO_64: u32 = 8195;
+pub const SPLICE_F_MOVE: u32 = 1;
+pub const SPLICE_F_NONBLOCK: u32 = 2;
+pub const SPLICE_F_MORE: u32 = 4;
+pub const SPLICE_F_GIFT: u32 = 8;
 pub type wchar_t = crate::x86_64_types::c_int;
 #[repr(C)]
 #[repr(align(16))]

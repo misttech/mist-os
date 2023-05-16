@@ -72,6 +72,8 @@
 #include <asm/prctl.h>
 #endif
 
+#include <fcntl.h>
+
 #include "stub/missing_includes.h"
 
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_WRAPPER_H_

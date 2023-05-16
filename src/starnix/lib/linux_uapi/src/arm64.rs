@@ -4395,6 +4395,10 @@ pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_default\0") };
 pub const VDSO_CONSTANTS_ALIGN: u32 = 8;
 pub const VDSO_CONSTANTS_SIZE: u32 = 16;
+pub const SPLICE_F_MOVE: u32 = 1;
+pub const SPLICE_F_NONBLOCK: u32 = 2;
+pub const SPLICE_F_MORE: u32 = 4;
+pub const SPLICE_F_GIFT: u32 = 8;
 pub type wchar_t = crate::arm64_types::c_uint;
 #[repr(C)]
 #[repr(align(16))]
