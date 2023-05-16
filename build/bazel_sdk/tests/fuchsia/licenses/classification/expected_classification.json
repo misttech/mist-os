@@ -41,6 +41,9 @@
                         }
                     }
                 ],
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -76,6 +79,9 @@
                         ]
                     }
                 },
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 3,
@@ -168,6 +174,9 @@
                     "http://mirror1",
                     "http://mirror2"
                 ],
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -204,6 +213,9 @@
                         ]
                     }
                 },
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 3,
@@ -256,6 +268,9 @@
                         ]
                     }
                 },
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -291,6 +306,9 @@
                         ]
                     }
                 },
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 0.5,
                 "start_line": 2,
                 "end_line": 3,
@@ -341,6 +359,9 @@
                         ]
                     }
                 },
+                "is_project_shipped": true,
+                "is_notice_shipped": true,
+                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 3,

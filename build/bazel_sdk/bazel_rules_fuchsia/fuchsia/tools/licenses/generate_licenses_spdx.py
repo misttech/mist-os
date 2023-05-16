@@ -89,7 +89,6 @@ def _create_doc_from_licenses_used_json(
             SpdxRelationship(root_package.spdx_id, package_id, "CONTAINS"))
 
         if other_doc:
-            _log(f'Merging {license_text_file_path}!')
             other_doc = other_doc.refactor_ids(
                 package_id_factory, license_id_factory)
 
@@ -105,6 +104,10 @@ def _create_doc_from_licenses_used_json(
             packages.extend(other_doc.packages)
             relationships.extend(other_doc.relationships)
             extracted_licenses.extend(other_doc.extracted_licenses)
+
+            _log(
+                f'Merged {license_text_file_path}: packages={len(other_doc.packages)} licenses={len(other_doc.extracted_licenses)}'
+            )
 
     return SpdxDocument(
         file_path=None,

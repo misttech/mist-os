@@ -14,6 +14,12 @@ def _fuchsia_licenses_classification_impl(ctx):
         "--output_file=%s" % out_json.path,
     ]
 
+    if ctx.attr.default_is_project_shipped:
+        arguments.append("--default_is_project_shipped=True")
+    if ctx.attr.default_is_notice_shipped:
+        arguments.append("--default_is_notice_shipped=True")
+    if ctx.attr.default_is_source_code_shipped:
+        arguments.append("--default_is_source_code_shipped=True")
     if ctx.attr.default_condition:
         arguments.append("--default_condition=%s" % ctx.attr.default_condition)
     if ctx.attr.allowed_conditions:
@@ -82,13 +88,6 @@ and build identify_license to match their organization OSS compliance policies.
             cfg = "exec",
             mandatory = True,
         ),
-        # TODO(tqr/121609): Remove once v/g usage is removed.
-        "conditions_policy": attr.label(
-            doc = """Unused""",
-            allow_single_file = True,
-            mandatory = False,
-            default = None,
-        ),
         "policy_override_rules": attr.label_list(
             doc = """Condition override rule files""",
             allow_files = True,
@@ -99,6 +98,21 @@ and build identify_license to match their organization OSS compliance policies.
             doc = "The default condition for unmapped or unidentified licenses",
             mandatory = False,
             default = "",
+        ),
+        "default_is_project_shipped": attr.bool(
+            doc = "Whether by default OSS projects are shipped",
+            mandatory = False,
+            default = True,
+        ),
+        "default_is_notice_shipped": attr.bool(
+            doc = "Whether by default OSS notices are shipped",
+            mandatory = False,
+            default = True,
+        ),
+        "default_is_source_code_shipped": attr.bool(
+            doc = "Whether by default OSS source code is shipped",
+            mandatory = False,
+            default = False,
         ),
         "allowed_conditions": attr.string_list(
             doc = """List of allowed conditions.""",

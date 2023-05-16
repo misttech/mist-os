@@ -30,6 +30,12 @@ class IdentifiedSnippet:
     overriden_conditions: List[str] = None
     # Optional public source code mirroring urls (supplied by some override rules)
     public_source_mirrors: List[str] = None
+    # Whether the project is shipped.
+    is_project_shipped: bool = None
+    # Whether notice is shipped.
+    is_notice_shipped: bool = None
+    # Whether source code is shipped.
+    is_source_code_shipped: bool = None
     # Dependents that were not matched by any rule
     dependents_unmatched_by_overriding_rules: List[str] = None
     # all rules that matched this IdentifiedSnippet
@@ -118,6 +124,12 @@ class IdentifiedSnippet:
             )
         if self.public_source_mirrors:
             out["public_source_mirrors"] = self.public_source_mirrors
+        if self.is_project_shipped != None:
+            out["is_project_shipped"] = self.is_project_shipped
+        if self.is_notice_shipped != None:
+            out["is_notice_shipped"] = self.is_notice_shipped
+        if self.is_source_code_shipped != None:
+            out["is_source_code_shipped"] = self.is_source_code_shipped
 
         out.update(
             {
@@ -152,6 +164,12 @@ class IdentifiedSnippet:
                 "overriden_conditions", default=None, expected_type=list),
             public_source_mirrors=reader.get_or(
                 "public_source_mirrors", default=None, expected_type=list),
+            is_project_shipped=reader.get_or(
+                "is_project_shipped", default=None, expected_type=bool),
+            is_notice_shipped=reader.get_or(
+                "is_notice_shipped", default=None, expected_type=bool),
+            is_source_code_shipped=reader.get_or(
+                "is_source_code_shipped", default=None, expected_type=bool),
             dependents_unmatched_by_overriding_rules=reader.get_or(
                 "dependents_unmatched_by_overriding_rules",
                 default=None,
@@ -173,6 +191,26 @@ class IdentifiedSnippet:
         checksum = md5(text.encode('utf-8')).hexdigest()
         return dataclasses.replace(
             self, snippet_text=text, snippet_checksum=checksum)
+
+    def set_is_shipped_defaults(
+            self, default_is_project_shipped, default_is_notice_shipped,
+            default_is_source_code_shipped) -> "IdentifiedSnippet":
+
+        def default_if_none(value, default):
+            if value == None:
+                return default
+            else:
+                return value
+
+        return dataclasses.replace(
+            self,
+            is_project_shipped=default_if_none(
+                self.is_project_shipped, default_is_project_shipped),
+            is_notice_shipped=default_if_none(
+                self.is_notice_shipped, default_is_notice_shipped),
+            is_source_code_shipped=default_if_none(
+                self.is_source_code_shipped, default_is_source_code_shipped),
+        )
 
     def is_identified(self):
         return self.identified_as != IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
@@ -292,7 +330,10 @@ class IdentifiedSnippet:
             snippet = snippet[0:max_snippet_length] + "<TRUNCATED>"
 
         message = f"""
-License '{license.name}' has a snippet identified as '{self.identified_as}'.
+License '{license.name}' has a snippet identified as '{self.identified_as}' [{self.condition}].
+
+Verification message:
+{self.verification_message}
 
 License links:
 {license_links}
@@ -306,9 +347,6 @@ Snippet checksum: {self.snippet_checksum}
 Snippet: <begin>
 {snippet}
 <end>
-
-Verification message:
-{self.verification_message}
 
 To fix this verification problem you should either:
 1. Remove the dependency on projects with this license in the dependent code bases.
@@ -418,15 +456,12 @@ class LicenseClassification:
             unidentified_lines=len(extracted_lines) - lines_identified,
         )
 
-    def _transform_identifications(self, function) -> "LicenseClassification":
+    def _transform_identifications(
+        self, function: Callable[[IdentifiedSnippet], IdentifiedSnippet]
+    ) -> "LicenseClassification":
         """Returns a copy of this object with the identifications transformed by function"""
         return dataclasses.replace(
             self, identifications=[function(i) for i in self.identifications])
-
-    def set_default_condition(
-            self, default_condition: str) -> "LicenseClassification":
-        return self._transform_identifications(
-            lambda x: x.set_condition(default_condition))
 
     def override_conditions(self, rule_set: "ConditionOverrideRuleSet"):
         # Optimize by filtering rules that match the license name and any dependents
@@ -460,6 +495,24 @@ class LicenseClassification:
             if i.public_source_mirrors:
                 out.extend(i.public_source_mirrors)
         return sorted(list(set(out)))
+
+    def is_project_shipped(self) -> bool:
+        for i in self.identifications:
+            if i.is_project_shipped:
+                return True
+        return False
+
+    def is_notice_shipped(self) -> bool:
+        for i in self.identifications:
+            if i.is_notice_shipped:
+                return True
+        return False
+
+    def is_source_code_shipped(self) -> bool:
+        for i in self.identifications:
+            if i.is_source_code_shipped:
+                return True
+        return False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -569,10 +622,24 @@ class LicensesClassifications:
             new[k] = function(v)
         return dataclasses.replace(self, classifications_by_id=new)
 
+    def _transform_each_identification(
+        self, function: Callable[[IdentifiedSnippet], IdentifiedSnippet]
+    ) -> "LicensesClassifications":
+        """Returns a copy of this object with the classifications' identified snippets transformed by function"""
+        return self._transform_each_classification(
+            lambda x: x._transform_identifications(function))
+
     def set_default_condition(
             self, default_condition: str) -> "LicensesClassifications":
-        return self._transform_each_classification(
-            lambda x: x.set_default_condition(default_condition))
+        return self._transform_each_identification(
+            lambda x: x.set_condition(default_condition))
+
+    def set_is_shipped_defaults(
+            self, is_project_shipped: bool, is_notice_shipped: bool,
+            is_source_code_shipped: bool) -> "LicensesClassifications":
+        return self._transform_each_identification(
+            lambda x: x.set_is_shipped_defaults(
+                is_project_shipped, is_notice_shipped, is_source_code_shipped))
 
     def add_classifications(
             self,
@@ -773,7 +840,7 @@ class ConditionOverrideRule:
         if not bug:
             raise LicenseException(
                 "'bug' fields cannot be empty", rule_file_path)
-        comment = reader.get("comment", expected_type=list)
+        comment = reader.get_string_list("comment")
 
         def verify_list_not_empty(list_value) -> str:
             if not list_value:

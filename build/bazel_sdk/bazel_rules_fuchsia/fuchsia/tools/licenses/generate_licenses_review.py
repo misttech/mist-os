@@ -48,6 +48,9 @@ def _write_summary_csv(
                 "tracking_issues",
                 "comments",
                 "public_source_mirrors",
+                "is_project_shipped",
+                "is_notice_shipped",
+                "is_source_code_shipped",
                 # The following 'debugging' fields begin with _ so can be easily
                 # filtered/hidden/sorted once in a spreadsheet.
                 "_spdx_license_id",
@@ -70,6 +73,7 @@ def _write_summary_csv(
             tracking_issues = []
             comments = []
             public_source_mirrors = []
+            shipped_info = {}
             identification_stats = {}
             if license_id in classifications.classifications_by_id:
                 license_classification = classifications.classifications_by_id[
@@ -83,6 +87,15 @@ def _write_summary_csv(
                         license_classification.size_lines,
                     "_unidentified_lines":
                         license_classification.unidentified_lines,
+                }
+
+                shipped_info = {
+                    "is_project_shipped":
+                        license_classification.is_project_shipped(),
+                    "is_notice_shipped":
+                        license_classification.is_notice_shipped(),
+                    "is_source_code_shipped":
+                        license_classification.is_source_code_shipped(),
                 }
 
                 for i in license_classification.identifications:
@@ -101,6 +114,7 @@ def _write_summary_csv(
                             )
                             tracking_issues.append(r.bug)
                             comments.append("\n".join(r.comment))
+
                     if i.public_source_mirrors:
                         public_source_mirrors.extend(i.public_source_mirrors)
 
@@ -132,6 +146,7 @@ def _write_summary_csv(
                 "_detailed_overrides":
                     ",\n".join(_dedup(detailed_overrides)),
             }
+            row.update(shipped_info)
             row.update(identification_stats)
 
             writer.writerow(row)

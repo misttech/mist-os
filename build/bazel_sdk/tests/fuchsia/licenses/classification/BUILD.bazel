@@ -11,7 +11,6 @@ load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 fuchsia_licenses_classification(
     name = "actual_classification.json",
     allowed_conditions = ["allowed condition"],
-    conditions_policy = "test_policy.csv",
     default_condition = "default condition",
     fail_on_disallowed_conditions = False,
     identify_license = "mock_identify_license.sh",

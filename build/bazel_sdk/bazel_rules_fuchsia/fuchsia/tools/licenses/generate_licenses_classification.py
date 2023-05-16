@@ -102,7 +102,6 @@ def _add_missing_identifications(
 def _load_override_rules(rule_paths: List[str]) -> ConditionOverrideRuleSet:
     rules = []
     for p in rule_paths:
-        _log(f'Loading condition override rule {p}')
         rule_set = ConditionOverrideRuleSet.from_json(p)
         rules.extend(rule_set.rules)
     return ConditionOverrideRuleSet(rules)
@@ -113,6 +112,7 @@ def _apply_policy_and_overrides(
     policy_override_rules_file_paths: List[str],
     allowed_conditions: List[str],
 ) -> LicensesClassifications:
+
     if policy_override_rules_file_paths:
         override_rules = _load_override_rules(policy_override_rules_file_paths)
         classification = classification.override_conditions(override_rules)
@@ -173,9 +173,8 @@ def main():
     parser.add_argument(
         '--policy_override_rules',
         help='Condition override rule files (JSON files)',
-        # TODO(yaar): Document schema.
         nargs='*',
-        required=False,
+        required=True,
         default=[],
     )
     parser.add_argument(
@@ -184,7 +183,27 @@ def main():
         required=False,
         default=None,
     )
-
+    parser.add_argument(
+        '--default_is_project_shipped',
+        help='Default value for whether OSS projects are shipped',
+        type=bool,
+        required=False,
+        default=False,
+    )
+    parser.add_argument(
+        '--default_is_notice_shipped',
+        help='Default value for whether OSS notice files are shipped',
+        type=bool,
+        required=False,
+        default=False,
+    )
+    parser.add_argument(
+        '--default_is_source_code_shipped',
+        help='Default value for whether OSS source code is shipped',
+        type=bool,
+        required=False,
+        default=False,
+    )
     parser.add_argument(
         '--allowed_conditions',
         help='Conditions that are allowed',
@@ -218,7 +237,6 @@ allowing downstream customers to provide project specific instructions.
     )
     args = parser.parse_args()
 
-    _log(f'Got these args {args}!')
     spdx_input = args.spdx_input
 
     _log(f'Reading license info from {spdx_input}!')
@@ -238,9 +256,13 @@ allowing downstream customers to provide project specific instructions.
 
     classification = _add_missing_identifications(
         spdx_doc, classification, default_condition=args.default_condition)
+    classification = classification.set_is_shipped_defaults(
+        is_project_shipped=args.default_is_project_shipped,
+        is_notice_shipped=args.default_is_notice_shipped,
+        is_source_code_shipped=args.default_is_source_code_shipped)
+
     classification = classification.compute_identification_stats(spdx_index)
     classification = classification.add_licenses_information(spdx_index)
-
     classification = _apply_policy_and_overrides(
         classification,
         policy_override_rules_file_paths=args.policy_override_rules,

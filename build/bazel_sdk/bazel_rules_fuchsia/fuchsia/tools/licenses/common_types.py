@@ -83,7 +83,7 @@ class DictReader:
                 return value
             if not isinstance(value, expected_type):
                 raise LicenseException(
-                    f"Expected value of type {expected_type} but got {type(value)}",
+                    f"Expected value of type {expected_type} but got {type(value)}, value='{value}'",
                     self._key_location(key))
             if verify:
                 msg = verify(value)
