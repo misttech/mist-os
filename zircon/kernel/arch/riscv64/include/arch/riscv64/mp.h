@@ -96,7 +96,7 @@ template <typename T, size_t Offset>
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline void riscv64_write_percpu_field(T value) {
   if constexpr (sizeof(T) == sizeof(uint32_t)) {
-    __asm__ volatile("sw %0, %1(s11)" : : "r"(static_cast<uint64_t>(value)), "I"(Offset));
+    __asm__ volatile("sw %0, %1(s11)" : : "r"(static_cast<uint32_t>(value)), "I"(Offset));
   } else {
     static_assert(sizeof(T) == sizeof(uint64_t));
     __asm__ volatile("sd %0, %1(s11)" : : "r"(static_cast<uint64_t>(value)), "I"(Offset));
