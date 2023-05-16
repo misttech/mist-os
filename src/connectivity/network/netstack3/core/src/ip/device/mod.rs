@@ -412,7 +412,7 @@ impl<
 }
 
 /// An IP address ID.
-pub(crate) trait IpAddressId<A: IpAddress>: Clone {
+pub(crate) trait IpAddressId<A: IpAddress>: Clone + Debug {
     /// Returns the specified address this ID represents.
     fn addr(&self) -> SpecifiedAddr<A>;
 
@@ -1040,17 +1040,16 @@ fn enable_ipv6_device_with_config<
     // performed) as while the device was disabled, another node could have
     // assigned the address and we wouldn't have responded to its DAD
     // solicitations.
-    sync_ctx
-        .with_address_ids(device_id, |addrs| addrs.map(|a| a.addr_sub().addr()).collect::<Vec<_>>())
-        .into_iter()
-        .for_each(|addr| {
+    sync_ctx.with_address_ids(device_id, |addrs| addrs.collect::<Vec<_>>()).into_iter().for_each(
+        |addr_id| {
             ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
-                addr: addr.into_specified(),
+                addr: addr_id.addr(),
                 state: IpAddressState::Tentative,
             });
-            DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
-        });
+            DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, &addr_id);
+        },
+    );
 
     // TODO(https://fxbug.dev/95946): Generate link-local address with opaque
     // IIDs.
@@ -1123,27 +1122,27 @@ fn disable_ipv6_device_with_config<
         .with_ipv6_addresses_and_states(device_id, |addrs| {
             addrs
                 .map(|Ipv6AddressRefs { addr_id, state: Ipv6AddressState { flags: _, config } }| {
-                    (addr_id.addr_sub().addr(), *config)
+                    (addr_id, *config)
                 })
                 .collect::<Vec<_>>()
         })
         .into_iter()
-        .for_each(|(addr, config)| {
+        .for_each(|(addr_id, config)| {
             if config == AddrConfig::SLAAC_LINK_LOCAL {
                 del_ipv6_addr_with_reason_with_config(
                     sync_ctx,
                     ctx,
                     device_id,
-                    &addr.into_specified(),
+                    &addr_id.addr(),
                     DelIpv6AddrReason::ManualAction,
                     device_config,
                 )
                 .expect("delete listed address")
             } else {
-                DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
+                DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, &addr_id);
                 ctx.on_event(IpDeviceEvent::AddressStateChanged {
                     device: device_id.clone(),
-                    addr: addr.into_specified(),
+                    addr: addr_id.addr(),
                     state: IpAddressState::Unavailable,
                 });
             }
@@ -1475,7 +1474,7 @@ fn add_ipv6_addr_subnet_with_config<
     if *ip_enabled {
         // NB: We don't start DAD if the device is disabled. DAD will be
         // performed when the device is enabled for all addressed.
-        DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, addr_sub.addr())
+        DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, &addr_id)
     }
 
     Ok(())
@@ -1513,10 +1512,9 @@ fn del_ipv6_addr_with_config<
     config: &Ipv6DeviceConfiguration,
 ) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, AddrConfig<C::Instant>), NotFoundError> {
     let addr_id = sync_ctx.get_address_id(device_id, *addr)?;
+    DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, &addr_id);
     let (addr_sub, addr_config) = sync_ctx.remove_ip_address(device_id, addr_id);
     let addr = addr_sub.addr();
-
-    DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
 
     leave_ip_multicast_with_config(
         sync_ctx,

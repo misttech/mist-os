@@ -664,10 +664,23 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContex
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<C>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
 {
-    fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
+    fn get_address_id(
         &mut self,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
+    ) -> Self::AddressId {
+        device::IpDeviceStateContext::<Ipv6, C>::get_address_id(
+            self,
+            device_id,
+            addr.into_specified(),
+        )
+        .expect("DAD address must always exist")
+    }
+
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr: &Self::AddressId,
         cb: F,
     ) -> O {
         let Self { config, sync_ctx } = self;
@@ -677,7 +690,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
         crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
             let mut addrs = state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
             cb(DadStateRef {
-                state: addrs.find_mut(&addr).map(
+                state: addrs.find_mut(&addr.addr()).map(
                     |Ipv6AddressEntry {
                          addr_sub: _,
                          dad_state,
