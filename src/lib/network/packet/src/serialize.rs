@@ -698,7 +698,7 @@ pub trait PacketBuilder {
 pub trait NestedPacketBuilder {
     /// Gets the constraints for this `NestedPacketBuilder`.
     ///
-    /// If `constraints` returns `None`, it means that a valid
+    /// If `try_constraints` returns `None`, it means that a valid
     /// [`PacketConstraints`] cannot be constructed. Since
     /// `NestedPacketBuilder`s can be nested, multiple valid
     /// `NestedPacketBuilder`s can nest to create an invalid
@@ -807,7 +807,7 @@ pub trait NestedPacketBuilder {
     }
 
     /// Constructs a new `NestedPacketBuilder` with an additional size limit
-    /// constraint
+    /// constraint.
     ///
     /// The returned `NestedPacketBuilder` will have a maximum body length
     /// constraint equal to the minimum of its original maximum body length
@@ -916,7 +916,7 @@ impl<I: NestedPacketBuilder, O: NestedPacketBuilder> NestedPacketBuilder for Nes
         // Test case 2 in test_nested_packet_builder
         let footer_len = inner.footer_len.checked_add(outer.footer_len)?;
         // This is guaranteed not to overflow by the invariants on
-        // PacketConstraint.
+        // PacketConstraints.
         let inner_header_footer_len = inner.header_len + inner.footer_len;
         // Note the saturating_sub here - it's OK if the inner PacketBuilder
         // more than satisfies the outer PacketBuilder's minimum body length

@@ -1586,7 +1586,10 @@ impl ParseMetadata {
 /// packet object as possible be stored as references into the body in order to
 /// avoid copying.
 pub trait ParsablePacket<B: ByteSlice, ParseArgs>: Sized {
-    /// The type of errors returned from `parse` and `parse_mut`.
+    /// The type of errors returned from [`parse`] and [`parse_mut`].
+    ///
+    /// [`parse`]: ParsablePacket::parse
+    /// [`parse_mut`]: ParsablePacket::parse_mut
     type Error;
 
     /// Parses a packet from a buffer.
@@ -1624,8 +1627,10 @@ pub trait ParsablePacket<B: ByteSlice, ParseArgs>: Sized {
     ///
     /// Pre-packet padding is not supported; if a protocol supports such
     /// padding, it must be handled in a way that is transparent to this API. In
-    /// particular, that means that the `parse_metadata` method must treat that
+    /// particular, that means that the [`parse_metadata`] method must treat that
     /// padding as part of the packet.
+    ///
+    /// [`parse_metadata`]: ParsablePacket::parse_metadata
     fn parse<BV: BufferView<B>>(buffer: BV, args: ParseArgs) -> Result<Self, Self::Error>;
 
     /// Parses a packet from a mutable buffer.
