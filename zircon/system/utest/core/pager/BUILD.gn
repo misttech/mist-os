@@ -37,10 +37,7 @@ source_set("userpager") {
     "test_thread.cc",
     "userpager.cc",
   ]
-  if (current_cpu != "riscv64") {
-    deps = [ "//zircon/system/ulib/inspector" ]
-  }
-
+  deps = [ "//zircon/system/ulib/inspector" ]
   public_deps = [
     ":userpager_headers",
     "//zircon/system/ulib/fbl",

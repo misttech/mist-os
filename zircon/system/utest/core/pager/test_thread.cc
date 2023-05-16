@@ -13,9 +13,7 @@
 #include <zircon/syscalls/debug.h>
 #include <zircon/threads.h>
 
-#ifndef __riscv
 #include <inspector/inspector.h>
-#endif
 
 namespace pager_tests {
 
@@ -126,26 +124,19 @@ bool TestThread::Wait(bool expect_failure, bool expect_crash, uintptr_t crash_ad
 void TestThread::PrintDebugInfo(const zx_exception_report_t& report) {
   printf("\nCrash info:\n");
 
-#ifdef __riscv
-
-  printf("*** inspector library not supported on riscv64 ***\n");
-
-#else
-
   zx_thread_state_general_regs_t regs;
-
   ZX_ASSERT(inspector_read_general_regs(zx_thread_.get(), &regs) == ZX_OK);
   // Delay setting this until here so Fail will know we now have the regs.
 #if defined(__x86_64__)
   inspector_print_general_regs(stdout, &regs, &report.context.arch.u.x86_64);
 #elif defined(__aarch64__)
   inspector_print_general_regs(stdout, &regs, &report.context.arch.u.arm_64);
+#elif defined(__riscv)
+  inspector_print_general_regs(stdout, &regs, &report.context.arch.u.riscv_64);
 #else
 #error Unsupported architecture
 #endif
   inspector_print_backtrace_markup(stdout, zx_process_self(), zx_thread_.get());
-
-#endif
 }
 
 bool TestThread::WaitForBlocked() {
