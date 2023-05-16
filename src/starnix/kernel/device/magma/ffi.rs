@@ -274,28 +274,35 @@ pub fn execute_immediate_commands(
     let mut commands =
         vec![magma_inline_command_buffer::default(); std::cmp::max(descriptors.len(), 1)];
 
+    let mut commands_vec = Vec::<Vec<u8>>::with_capacity(control.command_count as usize);
+    let mut semaphore_ids_vec = Vec::<Vec<u64>>::with_capacity(control.command_count as usize);
+
     for i in 0..control.command_count as usize {
         let size = descriptors[i].command_buffer_size;
-        let mut data = current_task.mm.read_buffer(&UserBuffer {
+        let data = current_task.mm.read_buffer(&UserBuffer {
             address: UserAddress::from(descriptors[i].command_buffers),
             length: size as usize,
         })?;
-        commands[i].data = &mut data[0] as *mut u8 as *mut std::ffi::c_void;
+        commands_vec.push(data);
         commands[i].size = size;
 
         let semaphore_count =
             (descriptors[i].semaphore_size / core::mem::size_of::<u64>() as u64) as u32;
         commands[i].semaphore_count = semaphore_count;
 
-        let mut semaphore_ids = read_objects(
+        let semaphore_ids = read_objects(
             current_task,
             UserAddress::from(descriptors[i].semaphores),
             semaphore_count as usize,
         )?;
-        commands[i].semaphore_ids = &mut semaphore_ids[0];
+        semaphore_ids_vec.push(semaphore_ids);
     }
 
     let status = unsafe {
+        for i in 0..control.command_count as usize {
+            commands[i].data = &mut commands_vec[i][0] as *mut u8 as *mut std::ffi::c_void;
+            commands[i].semaphore_ids = &mut semaphore_ids_vec[i][0];
+        }
         magma_connection_execute_immediate_commands(
             control.connection,
             control.context_id,
