@@ -11,8 +11,10 @@
 #include <inttypes.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
+
+// Forward-declared; defined in <lib/zbi-format/graphics.h>.
+using zbi_pixel_format_t = uint32_t;
 
 int display_init(void *framebuffer);
 int display_enable(bool enable);
@@ -29,7 +31,7 @@ void display_post_freq_change(void);
 
 struct display_info {
   void *framebuffer;
-  zx_pixel_format_t format;
+  zbi_pixel_format_t format;
   uint width;
   uint height;
   uint stride;

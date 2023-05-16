@@ -18,6 +18,7 @@ test("image-format-test") {
   ]
   deps = [
     "//sdk/lib/fdio",
+    "//sdk/lib/zbi-format",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zxtest",

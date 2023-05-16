@@ -10,9 +10,9 @@
 #include <lib/image-format/image_format.h>
 #include <lib/mmio/mmio.h>
 #include <lib/syslog/global.h>
+#include <lib/zbi-format/graphics.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <zircon/pixelformat.h>
 #include <zircon/syscalls.h>
 
 #include <condition_variable>
@@ -446,7 +446,7 @@ TEST_F(TaskTest, InvalidFormatTest) {
   image_format_2_t format;
   EXPECT_OK(camera::GetImageFormat(
       format, static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12), kWidth, kHeight));
-  format.pixel_format.type = ZX_PIXEL_FORMAT_MONO_8;
+  format.pixel_format.type = ZBI_PIXEL_FORMAT_MONO_8;
   auto task = std::make_unique<Ge2dTask>();
   EXPECT_EQ(ZX_ERR_INVALID_ARGS,
             task->InitResize(&input_buffer_collection_, &output_buffer_collection_, &resize_info_,
@@ -815,7 +815,7 @@ TEST_F(TaskTest, NonContigVmoTest) {
   ASSERT_OK(status);
 
   uint32_t watermark_size =
-      (kWidth / 4) * (kHeight / 4) * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_ARGB_8888);
+      (kWidth / 4) * (kHeight / 4) * ZBI_PIXEL_FORMAT_BYTES(ZBI_PIXEL_FORMAT_ARGB_8888);
   status = zx::vmo::create_contiguous(bti_handle, watermark_size, 0, &watermark_vmo);
   ASSERT_OK(status);
   auto task = std::make_unique<Ge2dTask>();
@@ -859,7 +859,7 @@ TEST_F(TaskTest, InvalidBufferCollectionTest) {
   ASSERT_OK(fake_bti_create(bti_handle.reset_and_get_address()));
 
   uint32_t watermark_size =
-      (kWidth / 4) * (kHeight / 4) * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_ARGB_8888);
+      (kWidth / 4) * (kHeight / 4) * ZBI_PIXEL_FORMAT_BYTES(ZBI_PIXEL_FORMAT_ARGB_8888);
   zx_status_t status = zx::vmo::create_contiguous(bti_handle, watermark_size, 0, &watermark_vmo);
   ASSERT_OK(status);
   auto task = std::make_unique<Ge2dTask>();

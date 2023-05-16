@@ -11,7 +11,10 @@ group("tests") {
 
 fuchsia_library_fuzzer("gfx-fuzzer") {
   sources = [ "gfx_fuzzer.cc" ]
-  deps = [ "//zircon/system/ulib/gfx" ]
+  deps = [
+    "//sdk/lib/zbi-format",
+    "//zircon/system/ulib/gfx",
+  ]
 }
 
 fuchsia_fuzzer_component("gfx-fuzzer-component") {

@@ -21,6 +21,7 @@
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
@@ -31,7 +32,6 @@
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
-#include <zircon/pixelformat.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
@@ -2947,7 +2947,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV1) {
 TEST(Sysmem, PixelFormatBgr24V1) {
   constexpr uint32_t kWidth = 600;
   constexpr uint32_t kHeight = 1;
-  constexpr uint32_t kStride = kWidth * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
+  constexpr uint32_t kStride = kWidth * ZBI_PIXEL_FORMAT_BYTES(ZBI_PIXEL_FORMAT_RGB_888);
   constexpr uint32_t divisor = 32;
   constexpr uint32_t kStrideAlign = (kStride + divisor - 1) & ~(divisor - 1);
 

@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <zircon/limits.h>
-#include <zircon/pixelformat.h>
 
 #include <algorithm>
 #include <numeric>
@@ -118,21 +117,21 @@ bool AppendAcpiRsdp(zbi_header_t* image, size_t capacity) {
   return true;
 }
 
-zx_pixel_format_t PixelFormatFromBitmask(const efi_pixel_bitmask& bitmask) {
+zbi_pixel_format_t PixelFormatFromBitmask(const efi_pixel_bitmask& bitmask) {
   struct entry {
     efi_pixel_bitmask mask;
-    zx_pixel_format_t pixel_format;
+    zbi_pixel_format_t pixel_format;
   };
   // Ignore reserved field
   constexpr entry entries[] = {
       {.mask = {.RedMask = 0xFF0000, .GreenMask = 0xFF00, .BlueMask = 0xFF},
-       .pixel_format = ZX_PIXEL_FORMAT_RGB_x888},
+       .pixel_format = ZBI_PIXEL_FORMAT_RGB_x888},
       {.mask = {.RedMask = 0xE0, .GreenMask = 0x1C, .BlueMask = 0x3},
-       .pixel_format = ZX_PIXEL_FORMAT_RGB_332},
+       .pixel_format = ZBI_PIXEL_FORMAT_RGB_332},
       {.mask = {.RedMask = 0xF800, .GreenMask = 0x7E0, .BlueMask = 0x1F},
-       .pixel_format = ZX_PIXEL_FORMAT_RGB_565},
+       .pixel_format = ZBI_PIXEL_FORMAT_RGB_565},
       {.mask = {.RedMask = 0xC0, .GreenMask = 0x30, .BlueMask = 0xC},
-       .pixel_format = ZX_PIXEL_FORMAT_RGB_2220},
+       .pixel_format = ZBI_PIXEL_FORMAT_RGB_2220},
   };
 
   auto equal_p = [&bitmask](const entry& e) -> bool {
@@ -145,22 +144,22 @@ zx_pixel_format_t PixelFormatFromBitmask(const efi_pixel_bitmask& bitmask) {
   if (res == std::end(entries)) {
     printf("unsupported pixel format bitmask: r %08x / g %08x / b %08x\n", bitmask.RedMask,
            bitmask.GreenMask, bitmask.BlueMask);
-    return ZX_PIXEL_FORMAT_NONE;
+    return ZBI_PIXEL_FORMAT_NONE;
   }
 
   return res->pixel_format;
 }
 
-uint32_t GetZxPixelFormat(efi_graphics_output_mode_information* info) {
+uint32_t GetZbiPixelFormat(efi_graphics_output_mode_information* info) {
   efi_graphics_pixel_format efi_fmt = info->PixelFormat;
   switch (efi_fmt) {
     case PixelBlueGreenRedReserved8BitPerColor:
-      return ZX_PIXEL_FORMAT_RGB_x888;
+      return ZBI_PIXEL_FORMAT_RGB_x888;
     case PixelBitMask:
       return PixelFormatFromBitmask(info->PixelInformation);
     default:
       printf("unsupported pixel format %d!\n", efi_fmt);
-      return ZX_PIXEL_FORMAT_NONE;
+      return ZBI_PIXEL_FORMAT_NONE;
   }
 }
 
@@ -183,7 +182,7 @@ bool AddFramebufferIfSupported(zbi_header_t* image, size_t capacity) {
       .width = graphics_protocol.value()->Mode->Info->HorizontalResolution,
       .height = graphics_protocol.value()->Mode->Info->VerticalResolution,
       .stride = graphics_protocol.value()->Mode->Info->PixelsPerScanLine,
-      .format = GetZxPixelFormat(graphics_protocol.value()->Mode->Info),
+      .format = GetZbiPixelFormat(graphics_protocol.value()->Mode->Info),
   };
   if (zbi_result_t result = zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_FRAMEBUFFER, 0,
                                                           0, &framebuffer, sizeof(framebuffer));

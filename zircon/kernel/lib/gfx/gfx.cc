@@ -7,6 +7,7 @@
 
 #include <debug.h>
 #include <lib/gfx.h>
+#include <lib/zbi-format/graphics.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -63,12 +64,12 @@ gfx_surface* gfx_create_surface_from_display(struct display_info* info) {
 zx_status_t gfx_init_surface_from_display(gfx_surface* surface, struct display_info* info) {
   zx_status_t r;
   switch (info->format) {
-    case ZX_PIXEL_FORMAT_RGB_565:
-    case ZX_PIXEL_FORMAT_RGB_332:
-    case ZX_PIXEL_FORMAT_RGB_2220:
-    case ZX_PIXEL_FORMAT_ARGB_8888:
-    case ZX_PIXEL_FORMAT_RGB_x888:
-    case ZX_PIXEL_FORMAT_MONO_8:
+    case ZBI_PIXEL_FORMAT_RGB_565:
+    case ZBI_PIXEL_FORMAT_RGB_332:
+    case ZBI_PIXEL_FORMAT_RGB_2220:
+    case ZBI_PIXEL_FORMAT_ARGB_8888:
+    case ZBI_PIXEL_FORMAT_RGB_x888:
+    case ZBI_PIXEL_FORMAT_MONO_8:
       // supported formats
       break;
     default:

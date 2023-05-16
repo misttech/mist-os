@@ -10,8 +10,8 @@
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <lib/zx/clock.h>
-#include <zircon/pixelformat.h>
 
 #include <random>
 
@@ -3136,7 +3136,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
 TEST(Sysmem, PixelFormatBgr24V2) {
   constexpr uint32_t kWidth = 600;
   constexpr uint32_t kHeight = 1;
-  constexpr uint32_t kStride = kWidth * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
+  constexpr uint32_t kStride = kWidth * ZBI_PIXEL_FORMAT_BYTES(ZBI_PIXEL_FORMAT_RGB_888);
   constexpr uint32_t divisor = 32;
   constexpr uint32_t kStrideAlign = (kStride + divisor - 1) & ~(divisor - 1);
 

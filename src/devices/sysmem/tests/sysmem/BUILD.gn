@@ -22,6 +22,7 @@ test("sysmem") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
+    "//sdk/lib/zbi-format",
     "//src/lib/ddk",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

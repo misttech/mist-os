@@ -11,6 +11,7 @@ source_set("gfx-common") {
   sources = [ "gfx-common.cc" ]
   deps = [ "//src/zircon/lib/zircon" ]
   public_deps = [
+    "//sdk/lib/zbi-format",
     "//zircon/system/public",
     "//zircon/system/ulib/gfx-font",
   ]

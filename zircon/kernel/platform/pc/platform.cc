@@ -41,7 +41,6 @@
 #include <string.h>
 #include <trace.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 #include <dev/uart.h>

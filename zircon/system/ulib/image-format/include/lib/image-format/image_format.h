@@ -18,8 +18,8 @@
 #include <lib/fpromise/result.h>
 #include <lib/sysmem-version/sysmem-version.h>
 
-// Forward-declared; defined in <zircon/pixelformat.h>.
-using zx_pixel_format_t = uint32_t;
+// Forward-declared; defined in <lib/zbi-format/graphics.h>.
+using zbi_pixel_format_t = uint32_t;
 
 // Iff this returns true, the two pixel formats are equal.
 bool ImageFormatIsPixelFormatEqual(const PixelFormatAndModifier& a,
@@ -99,8 +99,8 @@ bool ImageFormatMinimumRowBytes(const fuchsia_sysmem2::wire::ImageFormatConstrai
 bool ImageFormatMinimumRowBytes(const fuchsia_sysmem::wire::ImageFormatConstraints& constraints,
                                 uint32_t width, uint32_t* minimum_row_bytes_out);
 
-fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZxToSysmemPixelFormat_v2(
-    zx_pixel_format_t zx_pixel_format);
+fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysmemPixelFormat_v2(
+    zbi_pixel_format_t zbi_pixel_format);
 
 fpromise::result<fuchsia_images2::ImageFormat> ImageConstraintsToFormat(
     const fuchsia_sysmem2::ImageFormatConstraints& constraints, uint32_t width, uint32_t height);

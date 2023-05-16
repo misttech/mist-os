@@ -12,8 +12,8 @@
 #endif
 #include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <zircon/assert.h>
-#include <zircon/pixelformat.h>
 
 #include <algorithm>
 #include <map>
@@ -1321,34 +1321,34 @@ bool ImageFormatMinimumRowBytes(
   return ImageFormatMinimumRowBytes(image_format_constraints_v2, width, minimum_row_bytes_out);
 }
 
-fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZxToSysmemPixelFormat_v2(
-    zx_pixel_format_t zx_pixel_format) {
+fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysmemPixelFormat_v2(
+    zbi_pixel_format_t zx_pixel_format) {
   switch (zx_pixel_format) {
-    case ZX_PIXEL_FORMAT_RGB_565:
+    case ZBI_PIXEL_FORMAT_RGB_565:
       return fpromise::ok(PixelFormat::kRgb565);
-    case ZX_PIXEL_FORMAT_RGB_332:
+    case ZBI_PIXEL_FORMAT_RGB_332:
       return fpromise::ok(PixelFormat::kRgb332);
-    case ZX_PIXEL_FORMAT_RGB_2220:
+    case ZBI_PIXEL_FORMAT_RGB_2220:
       return fpromise::ok(PixelFormat::kRgb2220);
-    case ZX_PIXEL_FORMAT_ARGB_8888:
+    case ZBI_PIXEL_FORMAT_ARGB_8888:
       // Switching to using alpha.
-    case ZX_PIXEL_FORMAT_RGB_x888:
+    case ZBI_PIXEL_FORMAT_RGB_x888:
       return fpromise::ok(PixelFormat::kBgra32);
-    case ZX_PIXEL_FORMAT_MONO_8:
+    case ZBI_PIXEL_FORMAT_MONO_8:
       return fpromise::ok(PixelFormat::kL8);
-    case ZX_PIXEL_FORMAT_I420:
+    case ZBI_PIXEL_FORMAT_I420:
       return fpromise::ok(PixelFormat::kI420);
-    case ZX_PIXEL_FORMAT_NV12:
+    case ZBI_PIXEL_FORMAT_NV12:
       return fpromise::ok(PixelFormat::kNv12);
-    case ZX_PIXEL_FORMAT_RGB_888:
+    case ZBI_PIXEL_FORMAT_RGB_888:
       return fpromise::ok(PixelFormat::kBgr24);
-    case ZX_PIXEL_FORMAT_ABGR_8888:
+    case ZBI_PIXEL_FORMAT_ABGR_8888:
       // Switching to using alpha.
-    case ZX_PIXEL_FORMAT_BGR_888x:
+    case ZBI_PIXEL_FORMAT_BGR_888x:
       return fpromise::ok(PixelFormat::kR8G8B8A8);
-    case ZX_PIXEL_FORMAT_ARGB_2_10_10_10:
+    case ZBI_PIXEL_FORMAT_ARGB_2_10_10_10:
       return fpromise::ok(PixelFormat::kA2R10G10B10);
-    case ZX_PIXEL_FORMAT_ABGR_2_10_10_10:
+    case ZBI_PIXEL_FORMAT_ABGR_2_10_10_10:
       return fpromise::ok(PixelFormat::kA2B10G10R10);
     default:
       return fpromise::error();

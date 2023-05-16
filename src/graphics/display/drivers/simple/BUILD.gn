@@ -17,6 +17,7 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
+    "//sdk/lib/zbi-format",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",

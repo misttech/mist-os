@@ -6,7 +6,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio.h>
-#include <zircon/pixelformat.h>
+#include <lib/zbi-format/graphics.h>
 
 #include <condition_variable>
 #include <memory>
@@ -282,7 +282,7 @@ TEST_F(TaskTest, InvalidFormatTest) {
   image_format_2_t format;
   EXPECT_OK(camera::GetImageFormat(
       format, fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kNv12), kWidth, kHeight));
-  format.pixel_format.type = ZX_PIXEL_FORMAT_MONO_8;
+  format.pixel_format.type = ZBI_PIXEL_FORMAT_MONO_8;
   auto task = std::make_unique<GdcTask>();
   EXPECT_EQ(ZX_ERR_INVALID_ARGS,
             task->Init(&input_buffer_collection_, &output_buffer_collection_, &format,

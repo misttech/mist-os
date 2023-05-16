@@ -17,7 +17,6 @@
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/image.h>
 #include <stdlib.h>
-#include <zircon/pixelformat.h>
 
 #include <ktl/iterator.h>
 #include <ktl/type_traits.h>
@@ -76,15 +75,15 @@ void FixRamdiskSize() {
 uint32_t FixPixelFormat(uint32_t format) {
   switch (format) {
     case 1:
-      return ZX_PIXEL_FORMAT_RGB_565;
+      return ZBI_PIXEL_FORMAT_RGB_565;
     case 2:
-      return ZX_PIXEL_FORMAT_RGB_332;
+      return ZBI_PIXEL_FORMAT_RGB_332;
     case 3:
-      return ZX_PIXEL_FORMAT_RGB_2220;
+      return ZBI_PIXEL_FORMAT_RGB_2220;
     case 4:
-      return ZX_PIXEL_FORMAT_ARGB_8888;
+      return ZBI_PIXEL_FORMAT_ARGB_8888;
     case 5:
-      return ZX_PIXEL_FORMAT_RGB_x888;
+      return ZBI_PIXEL_FORMAT_RGB_x888;
     default:
       return format;
   }

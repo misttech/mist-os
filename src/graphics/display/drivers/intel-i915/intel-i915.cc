@@ -18,6 +18,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
@@ -28,7 +29,6 @@
 #include <string.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -152,7 +152,7 @@ struct FramebufferInfo {
   uint32_t width;
   uint32_t height;
   uint32_t stride;
-  zx_pixel_format_t format;
+  zbi_pixel_format_t format;
   int bytes_per_pixel;
 };
 
@@ -168,7 +168,7 @@ zx::result<FramebufferInfo> GetFramebufferInfo() {
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  info.bytes_per_pixel = ZX_PIXEL_FORMAT_BYTES(info.format);
+  info.bytes_per_pixel = ZBI_PIXEL_FORMAT_BYTES(info.format);
   info.size = info.stride * info.height * info.bytes_per_pixel;
   return zx::ok(info);
 }

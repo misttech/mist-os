@@ -26,7 +26,6 @@
 #include <unistd.h>
 #include <zircon/errors.h>
 #include <zircon/fidl.h>
-#include <zircon/pixelformat.h>
 #include <zircon/rights.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>

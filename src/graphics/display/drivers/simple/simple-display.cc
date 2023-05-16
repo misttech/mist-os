@@ -16,11 +16,11 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <zircon/pixelformat.h>
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
@@ -504,7 +504,7 @@ void SimpleDisplay::OnPeriodicVSync() {
 
 zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar,
                                                bool use_fidl) {
-  zx_pixel_format_t format;
+  zbi_pixel_format_t format;
   uint32_t width, height, stride;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx_status_t status =
@@ -514,7 +514,7 @@ zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* nam
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  auto sysmem2_format_type_result = ImageFormatConvertZxToSysmemPixelFormat_v2(format);
+  auto sysmem2_format_type_result = ImageFormatConvertZbiToSysmemPixelFormat_v2(format);
   if (!sysmem2_format_type_result.is_ok()) {
     zxlogf(ERROR, "%s: failed to convert framebuffer format: %u", name, format);
     return ZX_ERR_NOT_SUPPORTED;

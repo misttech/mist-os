@@ -11,8 +11,8 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/zbi-format/graphics.h>
 #include <threads.h>
-#include <zircon/pixelformat.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/time.h>
@@ -496,7 +496,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
   if (!kernel_framebuffer_released_) {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
     zx_framebuffer_set_range(get_root_resource(), /*vmo=*/ZX_HANDLE_INVALID, /*len=*/0,
-                             /*format=*/ZX_PIXEL_FORMAT_NONE, /*width=*/0, /*height=*/0,
+                             /*format=*/ZBI_PIXEL_FORMAT_NONE, /*width=*/0, /*height=*/0,
                              /*stride=*/0);
     kernel_framebuffer_released_ = true;
   }

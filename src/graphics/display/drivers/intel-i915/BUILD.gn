@@ -56,6 +56,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/lib/stdcompat",
+    "//sdk/lib/zbi-format",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",

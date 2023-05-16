@@ -7,17 +7,17 @@
 
 #include <inttypes.h>
 #include <lib/gfx-font/gfx-font.h>
+#include <lib/zbi-format/graphics.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 __BEGIN_CDECLS
 
-typedef zx_pixel_format_t gfx_format;
+typedef zbi_pixel_format_t gfx_format;
 
 // gfx library
 

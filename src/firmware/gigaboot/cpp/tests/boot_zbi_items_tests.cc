@@ -19,7 +19,6 @@
 #include "gpt.h"
 #include "mock_boot_service.h"
 #include "utils.h"
-#include "zircon/pixelformat.h"
 
 extern "C" efi_status generate_efi_memory_attributes_table_item(
     void *ramdisk, const size_t ramdisk_size, efi_system_table *sys, const void *mmap,
@@ -279,32 +278,32 @@ INSTANTIATE_TEST_SUITE_P(
         {
             .test_name = "RGB_x888",
             .mask = {.RedMask = 0xFF0000, .GreenMask = 0xFF00, .BlueMask = 0xFF},
-            .expected_format = ZX_PIXEL_FORMAT_RGB_x888,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_x888,
         },
         {
             .test_name = "RGB_332",
             .mask = {.RedMask = 0xE0, .GreenMask = 0x1C, .BlueMask = 0x3},
-            .expected_format = ZX_PIXEL_FORMAT_RGB_332,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_332,
         },
         {
             .test_name = "RGB_565",
             .mask = {.RedMask = 0xF800, .GreenMask = 0x7E0, .BlueMask = 0x1F},
-            .expected_format = ZX_PIXEL_FORMAT_RGB_565,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_565,
         },
         {
             .test_name = "RGB_2220",
             .mask = {.RedMask = 0xC0, .GreenMask = 0x30, .BlueMask = 0xC},
-            .expected_format = ZX_PIXEL_FORMAT_RGB_2220,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_2220,
         },
         {
             .test_name = "unsupported",
             .mask = {.RedMask = 0x0, .GreenMask = 0x0, .BlueMask = 0x0},
-            .expected_format = ZX_PIXEL_FORMAT_NONE,
+            .expected_format = ZBI_PIXEL_FORMAT_NONE,
         },
         {
             .test_name = "no_mask",
             .format = PixelBlueGreenRedReserved8BitPerColor,
-            .expected_format = ZX_PIXEL_FORMAT_RGB_x888,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_x888,
         },
     }),
     [](testing::TestParamInfo<PixelFormatTest::ParamType> const &info) {

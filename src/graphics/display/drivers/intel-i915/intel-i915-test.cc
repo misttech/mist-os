@@ -17,9 +17,9 @@
 #include <lib/ddk/driver.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/mmio-ptr/fake.h>
+#include <lib/zbi-format/graphics.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/vmar.h>
-#include <zircon/pixelformat.h>
 
 #include <type_traits>
 #include <vector>
@@ -602,7 +602,7 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   constexpr uint32_t kStride = 1920;
   constexpr uint32_t kHeight = 1080;
   SetFramebuffer({
-      .format = ZX_PIXEL_FORMAT_RGB_888,
+      .format = ZBI_PIXEL_FORMAT_RGB_888,
       .width = kStride,
       .height = kHeight,
       .stride = kStride,

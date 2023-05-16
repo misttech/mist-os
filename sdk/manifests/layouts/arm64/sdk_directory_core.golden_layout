@@ -206,7 +206,6 @@ arch/arm64/sysroot/include/zircon/hw/pci.h
 arch/arm64/sysroot/include/zircon/limits.h
 arch/arm64/sysroot/include/zircon/listnode.h
 arch/arm64/sysroot/include/zircon/lookup.h
-arch/arm64/sysroot/include/zircon/pixelformat.h
 arch/arm64/sysroot/include/zircon/process.h
 arch/arm64/sysroot/include/zircon/processargs.h
 arch/arm64/sysroot/include/zircon/rights.h

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zbi-format/graphics.h>
+
 #include <map>
 
 #include <fuzzer/FuzzedDataProvider.h>
@@ -16,11 +18,11 @@ static bool IsBlendable(gfx_surface* a, gfx_surface* b) {
   }
 
   switch (a->format) {
-    case ZX_PIXEL_FORMAT_ARGB_8888:
+    case ZBI_PIXEL_FORMAT_ARGB_8888:
       return true;
-    case ZX_PIXEL_FORMAT_RGB_x888:
+    case ZBI_PIXEL_FORMAT_RGB_x888:
       return true;
-    case ZX_PIXEL_FORMAT_MONO_8:
+    case ZBI_PIXEL_FORMAT_MONO_8:
       return true;
     default:
       return false;
@@ -39,9 +41,9 @@ static gfx_surface* LookupSurface(FuzzedDataProvider* input,
 
 unsigned ReadPixelFormat(FuzzedDataProvider* input) {
   static const unsigned LEGAL_PIXEL_FORMATS[] = {
-      ZX_PIXEL_FORMAT_RGB_565,   ZX_PIXEL_FORMAT_RGB_332,  ZX_PIXEL_FORMAT_RGB_2220,
-      ZX_PIXEL_FORMAT_ARGB_8888, ZX_PIXEL_FORMAT_RGB_x888, ZX_PIXEL_FORMAT_MONO_8,
-      ZX_PIXEL_FORMAT_GRAY_8,    ZX_PIXEL_FORMAT_NV12,     ZX_PIXEL_FORMAT_RGB_888,
+      ZBI_PIXEL_FORMAT_RGB_565,   ZBI_PIXEL_FORMAT_RGB_332,  ZBI_PIXEL_FORMAT_RGB_2220,
+      ZBI_PIXEL_FORMAT_ARGB_8888, ZBI_PIXEL_FORMAT_RGB_x888, ZBI_PIXEL_FORMAT_MONO_8,
+      ZBI_PIXEL_FORMAT_GRAY_8,    ZBI_PIXEL_FORMAT_NV12,     ZBI_PIXEL_FORMAT_RGB_888,
   };
   return LEGAL_PIXEL_FORMATS[input->ConsumeIntegralInRange<uint8_t>(
       0, sizeof(LEGAL_PIXEL_FORMATS) / sizeof(*LEGAL_PIXEL_FORMATS) - 1)];

@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 
 #include <fbl/algorithm.h>
 #include <safemath/safe_conversions.h>

@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 #include <memory>

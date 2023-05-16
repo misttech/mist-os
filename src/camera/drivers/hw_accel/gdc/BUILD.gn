@@ -88,6 +88,7 @@ executable("gdc_task_unittest_bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/lib/zbi-format",
     "//src/camera/drivers/test_utils",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",

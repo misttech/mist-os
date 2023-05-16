@@ -20,6 +20,7 @@ zx_library("image-format") {
   ]
   deps = [
     "//sdk/lib/fidl",
+    "//sdk/lib/zbi-format",
     "//zircon/system/ulib/fbl",
     "//zircon/third_party/ulib/safemath",
   ]
