@@ -7,11 +7,11 @@ Process build "force clean fences". If it detects that the build should be clobb
 it will run `gn clean`.
 
 A fence is crossed when a machine checks out a different revision and
-there is a diff between $BUILD_DIR/.force_clean_fences and the output of get_fences.py.
+there is a diff between $BUILD_DIR/.force_clean_fences and the outputs of the main
+get_fences.py file and get_fences.py files under vendor/*/.
 """
 
 import argparse
-import os
 import pathlib
 import subprocess
 import sys
@@ -38,6 +38,10 @@ def main():
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
+    def _log(message):
+        if args.verbose:
+            print(message)
+
     # check that inputs are valid
     if not args.gn_bin.is_file():
         raise RuntimeError(f"{args.gn_bin} is not a file")
@@ -46,38 +50,55 @@ def main():
     if not args.build_dir.is_dir():
         raise RuntimeError(f"{args.build_dir} is not a directory")
 
-    get_fences_script = args.checkout_dir / "build" / "force_clean" / "get_fences.py"
+    # Find the main get_fences.py script and all those under vendor/*/
+    get_fences_scripts = []
+    subdirs = [args.checkout_dir]
+    vendor_dir = args.checkout_dir / "vendor"
+    if vendor_dir.exists():
+        subdirs.extend(vendor_dir.iterdir())
+    for subdir in subdirs:
+        get_fences_script = subdir / "build" / "force_clean" / "get_fences.py"
+        if get_fences_script.exists():
+            get_fences_scripts.append(get_fences_script)
+
+    # execute fences scripts using the same interpreter as us
+    current_fences = []
+    for script in sorted(get_fences_scripts):
+        _log(f"generating clean-build fences from {script}")
+        current_fences.append(
+            subprocess.run(
+                [sys.executable, script],
+                stdout=subprocess.PIPE,
+                text=True,
+                check=True).stdout)
+
+    current_fences = "\n".join(current_fences)
+
+    existing_fences = None
     existing_fences_path = args.build_dir / ".force_clean_fences"
+    if existing_fences_path.exists():
+        _log("reading existing build dir's force-clean fences")
+        with open(existing_fences_path, "r") as f:
+            existing_fences = f.read()
 
-    # create an empty fences file if it doesn't exist
-    if not existing_fences_path.exists():
-        if args.verbose:
-            print("no fences file found, assuming nothing to clean")
-        return 0
-
-    # read existing fences
-    if args.verbose:
-        print("reading existing build dir's force-clean fences")
-    with open(existing_fences_path, "r") as f:
-        existing_fences = f.read()
-
-    # execute new fences script using the same interpreter as us
-    if args.verbose:
-        print("generating current fences from script")
-    current_fences = subprocess.run(
-        [sys.executable, get_fences_script], stdout=subprocess.PIPE,
-        text=True).stdout
-
-    # clobber if needed
-    if existing_fences != current_fences:
-        if args.verbose:
-            print(f"cleaning build and updating `{existing_fences_path}`")
-        subprocess.run([args.gn_bin, "clean", args.build_dir])
+    def _write_fences():
+        _log(
+            f"writing new fences:\n=============\n{current_fences}\n============="
+        )
         with open(existing_fences_path, "w") as f:
             f.write(current_fences)
+
+    # clobber if needed
+    if existing_fences == None:
+        _log("no fences file found, assuming nothing to clean")
+        _write_fences()
+
+    elif existing_fences != current_fences:
+        _log(f"new fences found, clobbering build...")
+        subprocess.run([args.gn_bin, "clean", args.build_dir])
+        _write_fences()
     else:
-        if args.verbose:
-            print("force_clean fences up-to-date, not clobbering")
+        _log("force_clean fences up-to-date, not clobbering")
 
     return 0
 
