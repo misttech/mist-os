@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::update::{config::Initiator, FetchError, PrepareError, ResolveError, UpdateCanceled},
+    crate::update::{
+        config::Initiator, AttemptError, FetchError, PrepareError, ResolveError, StageError,
+    },
     anyhow::{format_err, Context, Error},
     cobalt_client::traits::AsEventCode,
     cobalt_sw_delivery_registry as metrics,
@@ -90,25 +92,18 @@ fn error_to_status_code(error: &fidl_fuchsia_pkg_ext::ResolveError) -> StatusCod
     }
 }
 
-pub fn result_to_status_code(res: Result<(), &anyhow::Error>) -> StatusCode {
+pub(super) fn result_to_status_code(res: Result<(), &AttemptError>) -> StatusCode {
     match res {
         Ok(()) => StatusCode::Success,
-
-        Err(e) => {
-            if let Some(FetchError::Resolve(ResolveError::Error(error, _))) = e.downcast_ref() {
-                error_to_status_code(error)
-            } else if let Some(PrepareError::ResolveUpdate(ResolveError::Error(error, _))) =
-                e.downcast_ref()
-            {
-                error_to_status_code(error)
-            } else if let Some(UpdateCanceled) = e.downcast_ref() {
-                StatusCode::Canceled
-            } else {
-                // Fallback to a generic catch-all error status code when the error didn't contain
-                // context indicating more clearly what type of error happened.
-                StatusCode::Error
-            }
-        }
+        Err(
+            AttemptError::Prepare(PrepareError::ResolveUpdate(ResolveError::Error(error, _)))
+            | AttemptError::Stage(StageError::Resolve(ResolveError::Error(error, _)))
+            | AttemptError::Fetch(FetchError::Resolve(ResolveError::Error(error, _))),
+        ) => error_to_status_code(error),
+        Err(AttemptError::UpdateCanceled) => StatusCode::Canceled,
+        // Fallback to a generic catch-all error status code when the error didn't contain
+        // context indicating more clearly what type of error happened.
+        Err(_) => StatusCode::Error,
     }
 }
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, bail, Context, Error},
+    anyhow::{anyhow, Context as _, Error},
     async_trait::async_trait,
     epoch::EpochFile,
     fidl::endpoints::ProtocolMarker as _,
@@ -181,9 +181,27 @@ impl FetchError {
     }
 }
 
+/// Error encountered during an update attempt.
 #[derive(Debug, Error)]
-#[error("update was canceled")]
-struct UpdateCanceled;
+enum AttemptError {
+    #[error("during prepare state")]
+    Prepare(#[from] PrepareError),
+
+    #[error("during stage state")]
+    Stage(#[from] StageError),
+
+    #[error("during fetch state")]
+    Fetch(#[from] FetchError),
+
+    #[error("during commit state")]
+    Commit(#[source] anyhow::Error),
+
+    #[error("update was canceled")]
+    UpdateCanceled,
+
+    #[error("cancel sender dropped")]
+    CancelSenderDropped(oneshot::Canceled),
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CommitAction {
@@ -309,8 +327,8 @@ async fn update(
                 attempt_res = attempt_fut => attempt_res,
                 cancel_res = cancel_receiver => {
                     match cancel_res {
-                        Ok(()) => Err(anyhow!(UpdateCanceled)),
-                        Err(e) => Err(anyhow!(e).context("cancel sender dropped")),
+                        Ok(()) => Err(AttemptError::UpdateCanceled),
+                        Err(e) => Err(AttemptError::CancelSenderDropped(e)),
                     }
                 }
             };
@@ -320,10 +338,8 @@ async fn update(
             attempt_res
         };
 
-        if let Err(e) = attempt_res.as_ref() {
-            if let Some(UpdateCanceled) = e.downcast_ref() {
-                co.yield_(State::Canceled).await;
-            }
+        if let Err(AttemptError::UpdateCanceled) = attempt_res.as_ref() {
+            co.yield_(State::Canceled).await;
         }
 
         info!("system update attempt completed, logging metrics");
@@ -612,7 +628,7 @@ impl<'a> Attempt<'a> {
         co: &mut async_generator::Yield<State>,
         phase: &mut metrics::Phase,
         target_version: &mut history::Version,
-    ) -> Result<(state::WaitToReboot, UpdateMode, Vec<fio::DirectoryProxy>), Error> {
+    ) -> Result<(state::WaitToReboot, UpdateMode, Vec<fio::DirectoryProxy>), AttemptError> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
@@ -627,7 +643,7 @@ impl<'a> Attempt<'a> {
                 )) => (update_pkg, mode, packages_to_fetch, images_to_write, current_configuration),
                 Err(e) => {
                     state.fail(co, e.reason()).await;
-                    bail!(e);
+                    return Err(e.into());
                 }
             };
 
@@ -656,7 +672,7 @@ impl<'a> Attempt<'a> {
             Ok(()) => (),
             Err(e) => {
                 state.fail(co, e.reason()).await;
-                bail!(e);
+                return Err(e.into());
             }
         };
 
@@ -668,7 +684,7 @@ impl<'a> Attempt<'a> {
             Ok(packages) => packages,
             Err(e) => {
                 state.fail(co, e.reason()).await;
-                bail!(e);
+                return Err(e.into());
             }
         };
 
@@ -680,7 +696,7 @@ impl<'a> Attempt<'a> {
             Ok(()) => (),
             Err(e) => {
                 state.fail(co).await;
-                bail!(e);
+                return Err(AttemptError::Commit(e));
             }
         };
 
