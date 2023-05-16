@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "trace/client.shard.cml" ],
     children: [
         {
             name: "password_authenticator",
@@ -41,11 +42,6 @@
                 "#account_manager",
                 "#password_authenticator",
             ],
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: "#account_manager",
         },
         {
             protocol: [ "fuchsia.fxfs.Volumes" ],

@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/use.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -23,9 +24,6 @@
         },
     ],
     use: [
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-        },
         {
             protocol: [ "fuchsia.process.Launcher" ],
         },
