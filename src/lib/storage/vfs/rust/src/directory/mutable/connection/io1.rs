@@ -189,9 +189,8 @@ impl MutableConnection {
             }
             fio::DirectoryRequest::GetExtendedAttribute { name, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetExtendedAttribute");
-                let mut res =
-                    this.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(&mut res)?;
+                let res = this.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
+                responder.send(res)?;
             }
             fio::DirectoryRequest::SetExtendedAttribute { name, value, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");

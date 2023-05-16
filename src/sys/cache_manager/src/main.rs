@@ -215,7 +215,7 @@ mod tests {
                             // note that we can panic here, but that is okay because if more
                             // status values are requested than expect that is also an error
                             let status = self.storage_statuses.remove(0);
-                            let _ = responder.send(&mut Ok(status));
+                            let _ = responder.send(Ok(&status));
                         }
                         None => return,
                         _ => panic!("unexpected call not supported by fake server"),

@@ -453,12 +453,13 @@ impl StorageAdmin {
                         storage::open_storage_root(&backing_dir_source_info).await
                     {
                         responder.send_no_shutdown_on_err(
-                            &mut Self::get_storage_status(&storage_root)
-                                .await
-                                .map_err(|e| e.into()),
+                            match Self::get_storage_status(&storage_root).await {
+                                Ok(ref status) => Ok(status),
+                                Err(e) => Err(e.into()),
+                            },
                         )?;
                     } else {
-                        responder.send_no_shutdown_on_err(&mut Err(fsys::StatusError::Provider))?;
+                        responder.send_no_shutdown_on_err(Err(fsys::StatusError::Provider))?;
                     }
                 }
                 fsys::StorageAdminRequest::DeleteAllStorageContents { responder } => {

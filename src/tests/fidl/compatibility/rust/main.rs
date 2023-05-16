@@ -7,16 +7,14 @@ use {
     fidl_fidl_test_compatibility::{
         EchoEchoArraysWithErrorResult, EchoEchoMinimalWithErrorResult,
         EchoEchoNamedStructWithErrorResult, EchoEchoStructWithErrorResult,
-        EchoEchoTablePayloadWithErrorResult, EchoEchoTableWithErrorResult,
-        EchoEchoUnionPayloadWithErrorRequest, EchoEchoUnionPayloadWithErrorRequestUnknown,
-        EchoEchoUnionPayloadWithErrorResult, EchoEchoVectorsWithErrorResult,
+        EchoEchoTableWithErrorResult, EchoEchoUnionPayloadWithErrorRequest,
+        EchoEchoUnionPayloadWithErrorRequestUnknown, EchoEchoVectorsWithErrorResult,
         EchoEchoXunionsWithErrorResult, EchoEvent, EchoMarker, EchoProxy, EchoRequest,
         EchoRequestStream, RequestUnion, RequestUnionUnknown, RespondWith, ResponseTable,
         ResponseUnion,
     },
     fidl_fidl_test_imported::{
-        ComposedEchoUnionResponseWithErrorComposedResponse,
-        ComposedEchoUnionResponseWithErrorComposedResult, SimpleStruct, WantResponse,
+        ComposedEchoUnionResponseWithErrorComposedResponse, SimpleStruct, WantResponse,
     },
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
@@ -354,24 +352,27 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     match forward_to_server {
                         Some(_forward_to_server) => {
                             let echo = connect_to_echo().context("Error connecting to proxy")?;
-                            let mut res = echo
+                            let res = echo
                                 .echo_table_payload_with_error(&payload)
                                 .await
                                 .context("Error calling echo_table_payload_with_error on proxy")?;
-                            responder.send(&mut res).context("Error responding")?;
+                            responder
+                                .send(res.as_ref().map_err(|e| *e))
+                                .context("Error responding")?;
                         }
                         None => {
-                            let mut result =
-                                if let RespondWith::Err = payload.result_variant.unwrap() {
-                                    EchoEchoTablePayloadWithErrorResult::Err(
-                                        payload.result_err.unwrap(),
-                                    )
-                                } else {
-                                    let mut resp = ResponseTable::default();
-                                    resp.value = payload.value;
-                                    EchoEchoTablePayloadWithErrorResult::Ok(resp)
-                                };
-                            responder.send(&mut result).context("Error responding")?;
+                            let table;
+                            let result = match payload.result_variant.unwrap() {
+                                RespondWith::Success => {
+                                    table = ResponseTable {
+                                        value: payload.value,
+                                        ..Default::default()
+                                    };
+                                    Ok(&table)
+                                }
+                                RespondWith::Err => Err(payload.result_err.unwrap()),
+                            };
+                            responder.send(result).context("Error responding")?;
                         }
                     }
                 }
@@ -467,36 +468,38 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     };
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        let mut res = echo
+                        let res = echo
                             .echo_union_payload_with_error(&payload)
                             .await
                             .context("Error calling echo_union_payload_with_error on proxy")?;
-                        responder.send(&mut res).context("Error responding")?;
+                        responder.send(res.as_ref().map_err(|e| *e)).context("Error responding")?;
                     } else {
-                        let mut result = match payload {
-                            EchoEchoUnionPayloadWithErrorRequest::Unsigned(ref mut unsigned) => {
-                                if let RespondWith::Err = unsigned.result_variant {
-                                    EchoEchoUnionPayloadWithErrorResult::Err(unsigned.result_err)
-                                } else {
-                                    EchoEchoUnionPayloadWithErrorResult::Ok(
-                                        ResponseUnion::Unsigned(unsigned.value.clone()),
-                                    )
+                        let unsigned;
+                        let signed;
+                        let result = match payload {
+                            EchoEchoUnionPayloadWithErrorRequest::Unsigned(errorable) => {
+                                match errorable.result_variant {
+                                    RespondWith::Success => {
+                                        unsigned = ResponseUnion::Unsigned(errorable.value);
+                                        Ok(&unsigned)
+                                    }
+                                    RespondWith::Err => Err(errorable.result_err),
                                 }
                             }
-                            EchoEchoUnionPayloadWithErrorRequest::Signed(ref mut signed) => {
-                                if let RespondWith::Err = signed.result_variant {
-                                    EchoEchoUnionPayloadWithErrorResult::Err(signed.result_err)
-                                } else {
-                                    EchoEchoUnionPayloadWithErrorResult::Ok(ResponseUnion::Signed(
-                                        signed.value.clone(),
-                                    ))
+                            EchoEchoUnionPayloadWithErrorRequest::Signed(errorable) => {
+                                match errorable.result_variant {
+                                    RespondWith::Success => {
+                                        signed = ResponseUnion::Signed(errorable.value);
+                                        Ok(&signed)
+                                    }
+                                    RespondWith::Err => Err(errorable.result_err),
                                 }
                             }
                             EchoEchoUnionPayloadWithErrorRequestUnknown!() => {
                                 return Err(format_err!("Unknown union variant"))
                             }
                         };
-                        responder.send(&mut result).context("Error responding")?
+                        responder.send(result).context("Error responding")?
                     }
                 }
                 EchoRequest::EchoUnionPayloadNoRetVal { mut payload, control_handle } => {
@@ -553,7 +556,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                 } => {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        let mut res = echo
+                        let res = echo
                             .echo_union_response_with_error_composed(
                                 value,
                                 want_absolute_value,
@@ -565,29 +568,28 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                             .context(
                                 "Error calling echo_union_response_with_error_composed on proxy",
                             )?;
-                        responder.send(&mut res).context("Error responding")?;
+                        responder.send(res.as_ref().map_err(|e| *e)).context("Error responding")?;
                     } else {
-                        let mut resp = match result_variant {
-                            WantResponse::Err => {
-                                ComposedEchoUnionResponseWithErrorComposedResult::Err(result_err)
-                            }
+                        let unsigned;
+                        let signed;
+                        let resp = match result_variant {
+                            WantResponse::Err => Err(result_err),
                             WantResponse::Success => {
                                 if want_absolute_value {
-                                    ComposedEchoUnionResponseWithErrorComposedResult::Ok(
-                                        ComposedEchoUnionResponseWithErrorComposedResponse::Unsigned(
-                                            value.abs() as u64,
-                                        ),
-                                    )
+                                    unsigned =  ComposedEchoUnionResponseWithErrorComposedResponse::Unsigned(
+                                        value.abs() as u64,
+                                    );
+                                    Ok(&unsigned)
                                 } else {
-                                    ComposedEchoUnionResponseWithErrorComposedResult::Ok(
+                                    signed =
                                         ComposedEchoUnionResponseWithErrorComposedResponse::Signed(
                                             value,
-                                        ),
-                                    )
+                                        );
+                                    Ok(&signed)
                                 }
                             }
                         };
-                        responder.send(&mut resp).context("Error responding")?
+                        responder.send(resp).context("Error responding")?
                     }
                 }
             }

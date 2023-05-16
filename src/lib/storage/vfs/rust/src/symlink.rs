@@ -156,7 +156,7 @@ impl Connection {
                 iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
             }
             fio::SymlinkRequest::GetExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::SetExtendedAttribute { responder, .. } => {
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;

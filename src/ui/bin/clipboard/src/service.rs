@@ -493,11 +493,11 @@ impl<T: ServiceDependencies> Service<T> {
                         Ok(Some(req)) => {
                             match req {
                                 fclip::ReaderRequest::GetItem { payload, responder } => {
-                                    let mut result = this
+                                    let result = this
                                         .handle_get_item(payload, view_ref_koid)
                                         .map_err(|e| e.into());
                                     debug!("GetItem response: {:?}", &result);
-                                    responder.send(&mut result)?;
+                                    responder.send(result)?;
                                 },
                                 fclip::ReaderRequest::Watch { payload: _, responder } => {
                                     // Errors logged and handled inside called method.

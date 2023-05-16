@@ -172,7 +172,7 @@ impl Connection {
                 iterator.close_with_epitaph(Status::NOT_SUPPORTED)?;
             }
             fio::NodeRequest::GetExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::SetExtendedAttribute { responder, .. } => {
                 responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;

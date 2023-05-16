@@ -2125,16 +2125,16 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_anon_composed_with_error(
         &self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult,
+        mut result: Result<
+            &fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResponse,
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResponse,
             u32,
         >, false>(
-            result.as_ref().map_err(|e| *e),
-            0,
-            0x9e24af9a2790a3b,
-            fidl::encoding::DynamicFlags::empty(),
+            result, 0, 0x9e24af9a2790a3b, fidl::encoding::DynamicFlags::empty()
         )
     }
     pub fn send_on_named_composed(
@@ -2150,16 +2150,13 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_named_composed_with_error(
         &self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportTablePayload, u32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             fidl_test_protocollayouts_imported::ImportTablePayload,
             u32,
         >, false>(
-            result.as_ref().map_err(|e| *e),
-            0,
-            0x67eb74dad2a05c0b,
-            fidl::encoding::DynamicFlags::empty(),
+            result, 0, 0x67eb74dad2a05c0b, fidl::encoding::DynamicFlags::empty()
         )
     }
     pub fn send_on_import(
@@ -2175,16 +2172,13 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_import_with_error(
         &self,
-        mut result: &mut MainProtocolOnImportWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportTablePayload, u32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             fidl_test_protocollayouts_imported::ImportTablePayload,
             u32,
         >, false>(
-            result.as_ref().map_err(|e| *e),
-            0,
-            0xf988d72f8ee4fd7,
-            fidl::encoding::DynamicFlags::empty(),
+            result, 0, 0xf988d72f8ee4fd7, fidl::encoding::DynamicFlags::empty()
         )
     }
     pub fn send_on_local(&self, mut payload: &LocalUnionPayload) -> Result<(), fidl::Error> {
@@ -2197,10 +2191,10 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_local_with_error(
         &self,
-        mut result: &mut MainProtocolOnLocalWithErrorResult,
+        mut result: Result<&LocalTablePayload, u32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<LocalTablePayload, u32>, false>(
-            result.as_ref().map_err(|e| *e),
+            result,
             0,
             0x79ac5bbdc7114e24,
             fidl::encoding::DynamicFlags::empty(),
@@ -2216,11 +2210,11 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_anon_with_error(
         &self,
-        mut result: &mut MainProtocolOnAnonWithErrorResult,
+        mut result: Result<&MainProtocolOnAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         self.inner
             .send::<fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>, false>(
-                result.as_ref().map_err(|e| *e),
+                result,
                 0,
                 0x32f63a6e25a83699,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2355,7 +2349,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -2369,7 +2363,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -2378,7 +2372,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -2386,7 +2380,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_ref().map_err(|e| *e),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -2529,7 +2523,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -2543,7 +2537,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -2552,7 +2546,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -2560,7 +2554,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_ref().map_err(|e| *e),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -2708,7 +2702,7 @@ impl MainProtocolTwoWayImportWithErrorResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut MainProtocolTwoWayImportWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -2722,7 +2716,7 @@ impl MainProtocolTwoWayImportWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut MainProtocolTwoWayImportWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -2731,7 +2725,7 @@ impl MainProtocolTwoWayImportWithErrorResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut MainProtocolTwoWayImportWithErrorResult,
+        mut result: Result<&fidl_test_protocollayouts_imported::ImportUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -2739,7 +2733,7 @@ impl MainProtocolTwoWayImportWithErrorResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_ref().map_err(|e| *e),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -2877,10 +2871,7 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut MainProtocolTwoWayLocalWithErrorResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<&LocalUnionPayload, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -2893,24 +2884,21 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut MainProtocolTwoWayLocalWithErrorResult,
+        mut result: Result<&LocalUnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut MainProtocolTwoWayLocalWithErrorResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<&LocalUnionPayload, u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_ref().map_err(|e| *e),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -3047,7 +3035,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut MainProtocolTwoWayAnonWithErrorResult,
+        mut result: Result<&MainProtocolTwoWayAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -3061,7 +3049,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut MainProtocolTwoWayAnonWithErrorResult,
+        mut result: Result<&MainProtocolTwoWayAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -3070,7 +3058,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut MainProtocolTwoWayAnonWithErrorResult,
+        mut result: Result<&MainProtocolTwoWayAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -3078,7 +3066,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_ref().map_err(|e| *e),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

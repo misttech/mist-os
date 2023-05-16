@@ -307,7 +307,7 @@ pub mod tests {
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(fgpu::DeviceRequest::Query { query_id, responder }) => {
-                        let _ = responder.send(&mut query(query_id));
+                        let _ = responder.send(query(query_id));
                     }
                     _ => assert!(false),
                 }

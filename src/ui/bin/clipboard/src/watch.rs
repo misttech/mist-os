@@ -239,10 +239,9 @@ impl WatchServer {
             let unsent_message = try_send_error.into_inner();
             warn!("[enqueue_message] Couldn't enqueue {:?}: {}", unsent_message, err_str);
             if let Some(responder) = unsent_message.into_responder() {
-                let _ =
-                    responder.send(&mut Err(fclip::ClipboardError::Internal)).map_err(|fidl_err| {
-                        warn!(?fidl_err, "[enqueue_message] Couldn't send error response");
-                    });
+                let _ = responder.send(Err(fclip::ClipboardError::Internal)).map_err(|fidl_err| {
+                    warn!(?fidl_err, "[enqueue_message] Couldn't send error response");
+                });
             }
             ClipboardError::Internal(zx::Status::UNAVAILABLE)
         })
@@ -357,9 +356,11 @@ impl WatchServer {
         match view_ref_state {
             Some(view_ref_state) if view_ref_state.is_watching() => {
                 if is_forced || view_ref_state.is_dirty() {
-                    let mut response: Result<fclip::ClipboardMetadata, fclip::ClipboardError> =
+                    let metadata: fclip::ClipboardMetadata;
+                    let response: Result<&fclip::ClipboardMetadata, fclip::ClipboardError> =
                         if is_focused {
-                            Ok((&*clipboard_metadata).into())
+                            metadata = (&*clipboard_metadata).into();
+                            Ok(&metadata)
                         } else {
                             Err(ClipboardError::Unauthorized.into())
                         };
@@ -369,7 +370,7 @@ impl WatchServer {
                         "[internal_notify] Sending"
                     );
                     let responder = view_ref_state.watching.take_responder().unwrap();
-                    if let Err(fidl_err) = responder.send(&mut response) {
+                    if let Err(fidl_err) = responder.send(response) {
                         Self::log_fidl_send_error(fidl_err, recipient_view_ref_koid.unwrap());
                     } else {
                         // If the client was successfully sent actual metadata, clear the "dirty"

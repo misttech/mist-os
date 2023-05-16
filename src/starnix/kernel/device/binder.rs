@@ -6707,7 +6707,7 @@ pub mod tests {
                     let mut response = fbinder::FileResponse::default();
                     for fd in payload.close_requests.unwrap_or(vec![]) {
                         if fds.remove(&fd).is_none() {
-                            responder.send(&mut Err(fposix::Errno::Ebadf))?;
+                            responder.send(Err(fposix::Errno::Ebadf))?;
                             continue 'event_loop;
                         }
                     }
@@ -6715,7 +6715,7 @@ pub mod tests {
                         if let Some(file) = fds.remove(&fd) {
                             response.get_responses.get_or_insert_with(Vec::new).push(file);
                         } else {
-                            responder.send(&mut Err(fposix::Errno::Ebadf))?;
+                            responder.send(Err(fposix::Errno::Ebadf))?;
                             continue 'event_loop;
                         }
                     }
@@ -6725,7 +6725,7 @@ pub mod tests {
                         fds.insert(fd, file);
                         response.add_responses.get_or_insert_with(Vec::new).push(fd);
                     }
-                    responder.send(&mut Ok(response))?;
+                    responder.send(Ok(response))?;
                 }
             }
         }

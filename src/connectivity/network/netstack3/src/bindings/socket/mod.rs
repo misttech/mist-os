@@ -111,7 +111,7 @@ pub(crate) async fn serve(
                     responder_send!(responder, &mut response);
                 }
                 psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
-                    let mut response = (|| {
+                    let response = (|| {
                         let (client, request_stream) = create_request_stream();
                         let () = datagram::spawn_worker(
                             domain,
@@ -124,7 +124,7 @@ pub(crate) async fn serve(
                             client,
                         ))
                     })();
-                    responder_send!(responder, &mut response);
+                    responder_send!(responder, response);
                 }
                 psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
                     responder_send!(responder, &get_interface_addresses(&ctx));

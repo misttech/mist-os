@@ -509,7 +509,7 @@ impl BlockServer {
                 iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
             }
             VolumeAndNodeRequest::GetExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::SetExtendedAttribute { responder, .. } => {
                 responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;

@@ -216,7 +216,7 @@ where
             }
             fio::DirectoryRequest::GetExtendedAttribute { responder, .. } => {
                 fuchsia_trace::duration!("storage", "Directory::GetExtendedAttribute");
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::SetExtendedAttribute { responder, .. } => {
                 fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");

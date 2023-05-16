@@ -792,9 +792,8 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::GetExtendedAttribute { name, responder } => {
                 fuchsia_trace::duration!("storage", "File::GetExtendedAttribute");
-                let mut res =
-                    self.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(&mut res)?;
+                let res = self.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
+                responder.send(res)?;
             }
             fio::FileRequest::SetExtendedAttribute { name, value, responder } => {
                 fuchsia_trace::duration!("storage", "File::SetExtendedAttribute");

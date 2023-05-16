@@ -114,11 +114,9 @@ async fn handle_provider_request(
             >()
             .context("create request stream")?;
             responder
-                .send(&mut Ok(
-                    fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
-                        client_end,
-                    ),
-                ))
+                .send(Ok(fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
+                    client_end,
+                )))
                 .context("send DatagramSocket response")?;
             let socket = Rc::new(RefCell::new(
                 DatagramSocket::new(proto, domain, request_stream.control_handle())

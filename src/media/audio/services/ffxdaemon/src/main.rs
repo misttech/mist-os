@@ -605,7 +605,7 @@ impl AudioDaemon {
                     };
 
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(response))
                         .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))?;
 
                     match payload.location {
@@ -627,7 +627,7 @@ impl AudioDaemon {
                         ..Default::default()
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(response))
                         .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))?;
 
                     let stderr_copy =
@@ -672,7 +672,7 @@ impl AudioDaemon {
                         ..Default::default()
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(response))
                         .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                 }
 
@@ -687,7 +687,7 @@ impl AudioDaemon {
                         Err(e) => {
                             println!("Could not connect to device. {e}");
                             responder
-                                .send(&mut Err(zx::Status::INTERNAL.into_raw()))
+                                .send(Err(zx::Status::INTERNAL.into_raw()))
                                 .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                         }
 
@@ -700,13 +700,13 @@ impl AudioDaemon {
                                         ..Default::default()
                                     };
                                     responder
-                                        .send(&mut Ok(response))
+                                        .send(Ok(response))
                                         .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                                 }
                                 Err(e) => {
                                     println!("Could not connect to device. {e}");
                                     responder
-                                        .send(&mut Err(zx::Status::INTERNAL.into_raw()))
+                                        .send(Err(zx::Status::INTERNAL.into_raw()))
                                         .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                                 }
                             }

@@ -137,7 +137,7 @@ mod tests {
                     devices: Some(devices.clone()),
                     ..Default::default()
                 };
-                responder.send(&mut Ok(response)).unwrap();
+                responder.send(Ok(response)).unwrap();
             }
             _ => {}
         };
