@@ -55,8 +55,12 @@ pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
 pub(crate) async fn test_stop() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-stop").await?;
     let out = isolate.ffx(&["daemon", "stop", "-w"]).await?;
-    let want = "Stopped daemon.\n";
+    let want = "No daemon was running.\n";
+    assert_eq!(out.stdout, want);
 
+    let _ = isolate.ffx(&["daemon", "echo"]).await?;
+    let out = isolate.ffx(&["daemon", "stop", "-w"]).await?;
+    let want = "Stopped daemon.\n";
     assert_eq!(out.stdout, want);
 
     Ok(Some(isolate))

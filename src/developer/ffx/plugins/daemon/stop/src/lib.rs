@@ -119,9 +119,10 @@ impl FfxMain for StopTool {
                     wait_for_daemon_to_exit(&mut writer, &self.context, Some(t)).await?
                 }
             }
+            writeln!(writer, "Stopped daemon.").bug()?;
+        } else {
+            writeln!(writer, "No daemon was running.").bug()?;
         }
-        // It might be worth considering informing the user that no daemon was running here.
-        writeln!(writer, "Stopped daemon.").bug()?;
         Ok(())
     }
 }
