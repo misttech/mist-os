@@ -32,6 +32,7 @@ pub enum State {
     FailStage(FailStageData),
     FailFetch(FailFetchData),
     FailCommit(UpdateInfoAndProgress),
+    Canceled,
 }
 
 /// The variant names for each state, with data stripped.
@@ -50,6 +51,7 @@ pub enum StateId {
     FailStage,
     FailFetch,
     FailCommit,
+    Canceled,
 }
 
 /// Immutable metadata for an update attempt.
@@ -152,6 +154,7 @@ impl State {
             State::FailStage(_) => StateId::FailStage,
             State::FailFetch(_) => StateId::FailFetch,
             State::FailCommit(_) => StateId::FailCommit,
+            State::Canceled => StateId::Canceled,
         }
     }
 
@@ -162,10 +165,13 @@ impl State {
 
     /// Determines if this state is terminal and represents a failure.
     pub fn is_failure(&self) -> bool {
-        matches!(self.id(), StateId::FailPrepare | StateId::FailFetch | StateId::FailStage)
+        matches!(
+            self.id(),
+            StateId::FailPrepare | StateId::FailFetch | StateId::FailStage | StateId::Canceled
+        )
     }
 
-    /// Determines if this state is terminal (terminal states are final, no futher state
+    /// Determines if this state is terminal (terminal states are final, no further state
     /// transitions should occur).
     pub fn is_terminal(&self) -> bool {
         self.is_success() || self.is_failure()
@@ -186,6 +192,7 @@ impl State {
             State::FailStage(_) => "fail_stage",
             State::FailFetch(_) => "fail_fetch",
             State::FailCommit(_) => "fail_commit",
+            State::Canceled => "canceled",
         }
     }
 
@@ -195,7 +202,7 @@ impl State {
         use State::*;
 
         match self {
-            Prepare => {}
+            Prepare | Canceled => {}
             FailStage(data) => data.write_to_inspect(node),
             FailFetch(data) => data.write_to_inspect(node),
             FailPrepare(reason) => reason.write_to_inspect(node),
@@ -215,7 +222,7 @@ impl State {
     /// Extracts info_and_progress, if the state supports it.
     fn info_and_progress(&self) -> Option<&UpdateInfoAndProgress> {
         match self {
-            State::Prepare | State::FailPrepare(_) => None,
+            State::Prepare | State::FailPrepare(_) | State::Canceled => None,
             State::FailStage(data) => Some(&data.info_and_progress),
             State::FailFetch(data) => Some(&data.info_and_progress),
             State::Stage(data)
@@ -709,6 +716,7 @@ impl From<State> for fidl::State {
                     ..Default::default()
                 })
             }
+            State::Canceled => fidl::State::Canceled(fidl::CanceledData::default()),
         }
     }
 }
@@ -781,6 +789,7 @@ impl TryFrom<fidl::State> for State {
             fidl::State::FailCommit(fidl::FailCommitData { info, progress, .. }) => {
                 State::FailCommit(decode_info_progress(info, progress)?)
             }
+            fidl::State::Canceled(fidl::CanceledData { .. }) => State::Canceled,
         })
     }
 }
@@ -1097,6 +1106,7 @@ mod tests {
                 fidl::State::FailStage(fidl::FailStageData { info, progress, .. }) => break_info_progress(info, progress),
                 fidl::State::FailFetch(fidl::FailFetchData { info, progress, .. }) => break_info_progress(info, progress),
                 fidl::State::FailCommit(fidl::FailCommitData { info, progress, .. }) => break_info_progress(info, progress),
+                fidl::State::Canceled(fidl::CanceledData { .. }) => prop_assume!(false),
             }
             prop_assert_eq!(
                 State::try_from(as_fidl),
@@ -1120,20 +1130,21 @@ mod tests {
             different_stage_reason: StageFailureReason,
         ) {
             let state_with_different_data = match state {
-                 State::Prepare => State::Prepare,
-                 State::Stage(_) => State::Stage(different_data),
-                    State::Fetch(_) => State::Fetch(different_data),
-                    State::Commit(_) => State::Commit(different_data),
-                    State::WaitToReboot(_) => State::WaitToReboot(different_data),
-                    State::Reboot(_) => State::Reboot(different_data),
-                    State::DeferReboot(_) => State::DeferReboot(different_data),
-                    State::Complete(_) => State::Complete(different_data),
-                    // We currently allow merging states with different failure reasons, though
-                    // we don't expect that to ever happen in practice.
-                    State::FailPrepare(_) => State::FailPrepare(different_prepare_reason),
-                    State::FailStage(_) => State::FailStage(different_data.with_stage_reason(different_stage_reason)),
-                    State::FailFetch(_) => State::FailFetch(different_data.with_fetch_reason(different_fetch_reason)),
-                    State::FailCommit(_) => State::FailCommit(different_data),
+                State::Prepare => State::Prepare,
+                State::Stage(_) => State::Stage(different_data),
+                State::Fetch(_) => State::Fetch(different_data),
+                State::Commit(_) => State::Commit(different_data),
+                State::WaitToReboot(_) => State::WaitToReboot(different_data),
+                State::Reboot(_) => State::Reboot(different_data),
+                State::DeferReboot(_) => State::DeferReboot(different_data),
+                State::Complete(_) => State::Complete(different_data),
+                // We currently allow merging states with different failure reasons, though
+                // we don't expect that to ever happen in practice.
+                State::FailPrepare(_) => State::FailPrepare(different_prepare_reason),
+                State::FailStage(_) => State::FailStage(different_data.with_stage_reason(different_stage_reason)),
+                State::FailFetch(_) => State::FailFetch(different_data.with_fetch_reason(different_fetch_reason)),
+                State::FailCommit(_) => State::FailCommit(different_data),
+                State::Canceled => State::Canceled,
             };
             prop_assert!(state.can_merge(&state_with_different_data));
         }

@@ -88,7 +88,9 @@ async fn run<N, U, E>(
         // Now we can actually start the task that manages the update attempt.
         let update_url = &config.update_url.clone();
         let should_write_recovery = config.should_write_recovery;
-        let (attempt_id, attempt_stream) = updater.update(config, env, reboot_controller).await;
+        let (cancel_sender, cancel_receiver) = oneshot::channel();
+        let (attempt_id, attempt_stream) =
+            updater.update(config, env, reboot_controller, cancel_receiver).await;
         futures::pin_mut!(attempt_stream);
 
         // Set up inspect nodes.
@@ -104,6 +106,7 @@ async fn run<N, U, E>(
 
         let mut suspend_state = SuspendState::Running;
         let suspend_deadline = start_time + MAX_SUSPEND_DURATION.into();
+        let mut cancel_sender = Some(cancel_sender);
 
         // For this update attempt, handle events both from the FIDL server and the update task.
         loop {
@@ -142,6 +145,7 @@ async fn run<N, U, E>(
                         should_write_recovery,
                         &mut suspend_state,
                         suspend_deadline,
+                        &mut cancel_sender,
                     )
                     .await
                 }
@@ -201,6 +205,9 @@ where
             ControlRequest::Resume(responder) => {
                 let _ = responder.send(Err(ResumeError::NoUpdateInProgress));
             }
+            ControlRequest::Cancel(responder) => {
+                let _ = responder.send(Err(CancelError::NoUpdateInProgress));
+            }
         }
     }
     None
@@ -216,6 +223,7 @@ async fn handle_active_control_request<N>(
     should_write_recovery: bool,
     suspend_state: &mut SuspendState,
     suspend_deadline: zx::Time,
+    cancel_sender: &mut Option<oneshot::Sender<()>>,
 ) where
     N: Notify,
 {
@@ -268,6 +276,13 @@ async fn handle_active_control_request<N>(
         ControlRequest::Resume(responder) => {
             suspend_state.resume();
             let _ = responder.send(Ok(()));
+        }
+        ControlRequest::Cancel(responder) => {
+            let response = match cancel_sender.take() {
+                Some(cancel_sender) => cancel_sender.send(()).map_err(|()| CancelError::TooLate),
+                None => Ok(()),
+            };
+            let _ = responder.send(response);
         }
     }
 }
@@ -349,6 +364,15 @@ where
         self.0.send(ControlRequest::Resume(responder)).await?;
         Ok(receive_response.await?)
     }
+
+    /// Forward CancelUpdate requests to the install manager task.
+    // TODO(fxbug.dev/125721): use this
+    #[allow(dead_code)]
+    pub async fn cancel_update(&mut self) -> Result<Result<(), CancelError>, InstallManagerGone> {
+        let (responder, receive_response) = oneshot::channel();
+        self.0.send(ControlRequest::Cancel(responder)).await?;
+        Ok(receive_response.await?)
+    }
 }
 
 /// Requests that can be forwarded to the install manager task.
@@ -360,6 +384,7 @@ where
     Monitor(MonitorRequestData<N>),
     Suspend(oneshot::Sender<Result<(), SuspendError>>),
     Resume(oneshot::Sender<Result<(), ResumeError>>),
+    Cancel(oneshot::Sender<Result<(), CancelError>>),
 }
 
 impl<N: Notify> ControlRequest<N> {
@@ -382,6 +407,9 @@ impl<N: Notify> ControlRequest<N> {
             }
             Self::Resume(_) => {
                 node.record_string("request", "resume");
+            }
+            Self::Cancel(_) => {
+                node.record_string("request", "cancel");
             }
         }
     }
@@ -420,6 +448,14 @@ pub enum ResumeError {
     NoUpdateInProgress,
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum CancelError {
+    #[error("no update in progress")]
+    NoUpdateInProgress,
+    #[error("update has past the point that can be canceled")]
+    TooLate,
+}
+
 enum SuspendState {
     Suspended,
     Running,
@@ -455,7 +491,7 @@ mod tests {
         fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
         mpsc::{Receiver, Sender},
         parking_lot::Mutex,
-        std::{sync::Arc, task::Poll},
+        std::{pin::Pin, sync::Arc, task::Poll},
     };
 
     const CALLBACK_CHANNEL_SIZE: usize = 20;
@@ -523,6 +559,7 @@ mod tests {
             _config: Config,
             _env: Environment,
             _reboot_controller: RebootController,
+            _cancel_receiver: oneshot::Receiver<()>,
         ) -> (String, Self::UpdateStream) {
             self.0.next().await.unwrap()
         }
@@ -860,6 +897,109 @@ mod tests {
             let () = send_fut.await.unwrap();
             assert_eq!(recv_fut.await, Some(State::FailPrepare(PrepareFailureReason::Internal)));
         });
+    }
+
+    struct CancelableUpdater;
+
+    #[async_trait(?Send)]
+    impl Updater for CancelableUpdater {
+        type UpdateStream = Pin<Box<dyn FusedStream<Item = State>>>;
+
+        async fn update(
+            &mut self,
+            _config: Config,
+            _env: Environment,
+            _reboot_controller: RebootController,
+            cancel_receiver: oneshot::Receiver<()>,
+        ) -> (String, Self::UpdateStream) {
+            let stream = async_generator::generate(move |mut co| async move {
+                co.yield_(State::Prepare).await;
+                let () = cancel_receiver.await.unwrap();
+                co.yield_(State::Canceled).await;
+            })
+            .into_yielded();
+            ("my-attempt".to_string(), Box::pin(stream))
+        }
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn cancel_update() {
+        let inspector = Inspector::default();
+        let node = inspector.root().create_child("current_attempt");
+        let (mut install_manager_ch, fut) = start_install_manager::<
+            FakeStateNotifier,
+            CancelableUpdater,
+            StubEnvironmentConnector,
+        >(CancelableUpdater, node)
+        .await;
+        let _install_manager_task = fasync::Task::local(fut);
+
+        assert_eq!(
+            install_manager_ch.cancel_update().await,
+            Ok(Err(CancelError::NoUpdateInProgress))
+        );
+
+        let (notifier, mut state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+        assert_eq!(
+            install_manager_ch
+                .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                .await,
+            Ok(Ok("my-attempt".to_string()))
+        );
+
+        assert_eq!(state_receiver.next().await, Some(State::Prepare));
+
+        assert_eq!(install_manager_ch.cancel_update().await, Ok(Ok(())));
+
+        assert_eq!(state_receiver.next().await, Some(State::Canceled));
+
+        assert_eq!(
+            install_manager_ch.cancel_update().await,
+            Ok(Err(CancelError::NoUpdateInProgress))
+        );
+
+        assert_data_tree!(
+            inspector,
+            root: {
+                current_attempt: contains {
+                    requests: {
+                        "0": {
+                            request: "cancel",
+                            time: AnyProperty,
+                        },
+                        "1": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                        "2": {
+                            request: "cancel",
+                            time: AnyProperty,
+                        },
+                        "3": {
+                            request: "cancel",
+                            time: AnyProperty,
+                        },
+                    },
+                }
+            }
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn cancel_update_too_late() {
+        let (mut install_manager_ch, _install_manager_task, _updater_sender, _state_sender) =
+            start_install_manager_with_update_id("my-attempt").await;
+
+        let (notifier, _state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+        assert_eq!(
+            install_manager_ch
+                .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                .await,
+            Ok(Ok("my-attempt".to_string()))
+        );
+
+        assert_eq!(install_manager_ch.cancel_update().await, Ok(Err(CancelError::TooLate)));
     }
 
     #[fasync::run_singlethreaded(test)]

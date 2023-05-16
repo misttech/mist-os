@@ -20,7 +20,7 @@ use {
     fuchsia_async::{Task, TimeoutExt as _},
     fuchsia_hash::Hash,
     fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl},
-    futures::{prelude::*, stream::FusedStream},
+    futures::{channel::oneshot, prelude::*, stream::FusedStream},
     parking_lot::Mutex,
     sha2::{Digest, Sha256},
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
@@ -181,6 +181,10 @@ impl FetchError {
     }
 }
 
+#[derive(Debug, Error)]
+#[error("update was canceled")]
+struct UpdateCanceled;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum CommitAction {
     /// A reboot is required to apply the update, which should be performed by the system updater.
@@ -201,6 +205,7 @@ pub trait Updater {
         config: Config,
         env: Environment,
         reboot_controller: RebootController,
+        cancel_receiver: oneshot::Receiver<()>,
     ) -> (String, Self::UpdateStream);
 }
 
@@ -227,6 +232,7 @@ impl Updater for RealUpdater {
         config: Config,
         env: Environment,
         reboot_controller: RebootController,
+        cancel_receiver: oneshot::Receiver<()>,
     ) -> (String, Self::UpdateStream) {
         let (attempt_id, attempt) = update(
             config,
@@ -234,6 +240,7 @@ impl Updater for RealUpdater {
             Arc::clone(&self.history),
             reboot_controller,
             self.structured_config.concurrent_package_resolves.into(),
+            cancel_receiver,
         )
         .await;
         (attempt_id, Box::pin(attempt))
@@ -255,6 +262,7 @@ async fn update(
     history: Arc<Mutex<UpdateHistory>>,
     reboot_controller: RebootController,
     concurrent_package_resolves: usize,
+    mut cancel_receiver: oneshot::Receiver<()>,
 ) -> (String, impl FusedStream<Item = State>) {
     let attempt_fut = history.lock().start_update_attempt(
         Options {
@@ -290,9 +298,33 @@ async fn update(
 
         let mut target_version = history::Version::default();
 
-        let attempt_res = Attempt { config: &config, env: &env, concurrent_package_resolves }
-            .run(&mut co, &mut phase, &mut target_version)
-            .await;
+        let attempt_res = {
+            let attempt_fut = Attempt { config: &config, env: &env, concurrent_package_resolves }
+                .run(&mut co, &mut phase, &mut target_version)
+                .fuse();
+
+            futures::pin_mut!(attempt_fut);
+
+            let attempt_res = futures::select! {
+                attempt_res = attempt_fut => attempt_res,
+                cancel_res = cancel_receiver => {
+                    match cancel_res {
+                        Ok(()) => Err(anyhow!(UpdateCanceled)),
+                        Err(e) => Err(anyhow!(e).context("cancel sender dropped")),
+                    }
+                }
+            };
+            // at this point the attempt has finished running, drop the receiver to indicate that
+            // the update can no longer be canceled.
+            drop(cancel_receiver);
+            attempt_res
+        };
+
+        if let Err(e) = attempt_res.as_ref() {
+            if let Some(UpdateCanceled) = e.downcast_ref() {
+                co.yield_(State::Canceled).await;
+            }
+        }
 
         info!("system update attempt completed, logging metrics");
         let status_code = metrics::result_to_status_code(attempt_res.as_ref().map(|_| ()));
@@ -573,6 +605,8 @@ struct Attempt<'a> {
 }
 
 impl<'a> Attempt<'a> {
+    // Run the update attempt, if update is canceled, any await during this attempt could be an
+    // early return point.
     async fn run(
         mut self,
         co: &mut async_generator::Yield<State>,
@@ -850,7 +884,6 @@ impl<'a> Attempt<'a> {
     }
 
     /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
-    #[allow(clippy::too_many_arguments)]
     async fn stage_images(
         &mut self,
         co: &mut async_generator::Yield<State>,
@@ -1262,7 +1295,6 @@ async fn gc(space_manager: &SpaceManagerProxy) -> Result<(), Error> {
 
 // Resolve and write the image packages to their appropriate partitions,
 // incorporating an increasingly aggressive GC and retry strategy.
-#[allow(clippy::too_many_arguments)]
 async fn write_image_packages(
     images_to_write: ImagesToWrite,
     pkg_resolver: &PackageResolverProxy,

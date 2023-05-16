@@ -181,7 +181,6 @@ impl UpdateHistory {
 
     /// Start a new update attempt, returns an PendingAttempt with initial information, caller
     /// should fill in additional information and pass it back to `record_update_attempt()`.
-    #[allow(clippy::too_many_arguments)]
     pub fn start_update_attempt<'a>(
         &self,
         options: Options,

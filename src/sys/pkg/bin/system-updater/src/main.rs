@@ -4,6 +4,7 @@
 
 #![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
+#![allow(clippy::too_many_arguments)]
 
 use {
     crate::{

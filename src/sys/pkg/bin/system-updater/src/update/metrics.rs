@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::update::{config::Initiator, FetchError, PrepareError, ResolveError},
+    crate::update::{config::Initiator, FetchError, PrepareError, ResolveError, UpdateCanceled},
     anyhow::{format_err, Context, Error},
     cobalt_client::traits::AsEventCode,
     cobalt_sw_delivery_registry as metrics,
@@ -101,6 +101,8 @@ pub fn result_to_status_code(res: Result<(), &anyhow::Error>) -> StatusCode {
                 e.downcast_ref()
             {
                 error_to_status_code(error)
+            } else if let Some(UpdateCanceled) = e.downcast_ref() {
+                StatusCode::Canceled
             } else {
                 // Fallback to a generic catch-all error status code when the error didn't contain
                 // context indicating more clearly what type of error happened.

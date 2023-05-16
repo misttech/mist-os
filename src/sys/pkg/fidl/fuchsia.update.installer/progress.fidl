@@ -44,36 +44,36 @@ closed protocol Monitor {
 /// # State Machine Diagram
 ///
 /// ```
-///     +----------------+     +----------------+
-///     |    prepare     |---->|  fail_prepare  |
-///     +----------------+     +----------------+
-///             |
-///             v
-///     +----------------+     +----------------+
-///     |     stage      |---->|   fail_stage   |
-///     +----------------+     +----------------+
-///             |
-///             v
-///     +----------------+     +----------------+
-///     |     fetch      |---->|   fail_fetch   |
-///     +----------------+     +----------------+
-///             |
-///             v
-///     +----------------+     +----------------+
-///     |     commit     |---->|   fail_commit  |
-///     +----------------+     +----------------+
-///             |
-///             |              +----------------+
-///             +------------> |    complete    |
-///             |              +----------------+
-///             v
-///     +----------------+     +----------------+
-///     | wait_to_reboot |---->|  defer_reboot  |
-///     +----------------+     +----------------+
-///             |
-///             |              +----------------+
-///             +------------->|     reboot     |
-///                            +----------------+
+///                       +----------------+     +----------------+
+///            +----------|    prepare     |---->|  fail_prepare  |
+///            |          +----------------+     +----------------+
+///            |                  |
+///            |                  v
+///            |          +----------------+     +----------------+
+///            +----------|     stage      |---->|   fail_stage   |
+///            |          +----------------+     +----------------+
+///            |                  |
+///            |                  v
+///            |          +----------------+     +----------------+
+///            +----------|     fetch      |---->|   fail_fetch   |
+///            |          +----------------+     +----------------+
+///            |                  |
+///            |                  v
+///            |          +----------------+     +----------------+
+///            +----------|     commit     |---->|   fail_commit  |
+///            |          +----------------+     +----------------+
+///            v                  |
+///    +----------------+         |              +----------------+
+///    |    canceled    |         +------------> |    complete    |
+///    +----------------+         |              +----------------+
+///                               v
+///                       +----------------+     +----------------+
+///                       | wait_to_reboot |---->|  defer_reboot  |
+///                       +----------------+     +----------------+
+///                               |
+///                               |              +----------------+
+///                               +------------->|     reboot     |
+///                                              +----------------+
 /// ```
 type State = strict union {
     /// Fetching required metadata to begin the update and verifying system
@@ -82,6 +82,7 @@ type State = strict union {
     /// Next States:
     /// * `stage` system is ready to install the update.
     /// * `fail_prepare` on error.
+    /// * `canceled` on cancel.
     1: prepare PrepareData;
 
     /// Fetching and writing kernel and firmware images.
@@ -89,6 +90,7 @@ type State = strict union {
     /// Next States:
     /// * `fetch`  required kernel and firmware images are written.
     /// * `fail_stage`  on error.
+    /// * `canceled` on cancel.
     2: stage StageData;
 
     /// Fetching packages.
@@ -96,6 +98,7 @@ type State = strict union {
     /// Next States:
     /// * `commit` packages were fetched successfully.
     /// * `fail_fetch` on error.
+    /// * `canceled` on cancel.
     3: fetch FetchData;
 
     /// Prepare to switch over to the new system by writing the packages
@@ -105,6 +108,7 @@ type State = strict union {
     /// * `wait_to_reboot` if a reboot is necessary to complete the update.
     /// * `complete` if no reboot is necessary to complete the update.
     /// * `fail_commit` on error.
+    /// * `canceled` on cancel.
     4: commit CommitData;
 
     /// The system is configured to boot the updated OS on next boot, and the
@@ -158,6 +162,12 @@ type State = strict union {
     /// **This is a terminal state**
     ///
    12: fail_commit FailCommitData;
+
+    /// The update is canceled.
+    ///
+    /// **This is a terminal state**
+    ///
+   13: canceled CanceledData;
 };
 
 /// Data associated with [`State.prepare`].
@@ -229,6 +239,9 @@ type FailCommitData = table {
     1: info UpdateInfo;
     2: progress InstallationProgress;
 };
+
+/// Data associated with [`State.canceled`].
+type CanceledData = table {};
 
 /// Metadata for an update.  Once a field is populated during an installation
 /// attempt, the value will not change.
