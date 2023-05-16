@@ -842,6 +842,13 @@ static void sys_device_suspend(void* ctx, uint8_t requested_state, bool enable_w
   device_suspend_reply(p->sys_root, ZX_OK, 0);
 }
 
+static void sys_device_child_pre_release(void* ctx, void* child_ctx) {
+  auto* p = reinterpret_cast<sysdev_suspend_t*>(ctx);
+  if (child_ctx == p->pbus_instance) {
+    p->pbus_instance = nullptr;
+  }
+}
+
 static void sys_device_release(void* ctx) {
   auto* p = reinterpret_cast<sysdev_suspend_t*>(ctx);
   delete p;
@@ -870,6 +877,7 @@ static zx_protocol_device_t sys_device_proto = []() {
 
   result.version = DEVICE_OPS_VERSION;
   result.suspend = sys_device_suspend;
+  result.child_pre_release = sys_device_child_pre_release;
   result.release = sys_device_release;
   return result;
 }();
