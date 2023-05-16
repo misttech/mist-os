@@ -151,7 +151,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindChildrenAutoBind) {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform/11:0e:0")
                 .status_value());
   zx::result channel = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
+      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/device_controller");
   ASSERT_OK(channel.status_value());
 
   fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
@@ -194,7 +194,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindChildrenManualBind) {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform/11:0e:0")
                 .status_value());
   zx::result channel = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
+      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/device_controller");
   ASSERT_OK(channel.status_value());
   fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
@@ -238,7 +238,7 @@ TEST_F(DeviceControllerIntegrationTest, TestUnbindChildrenSuccess) {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform/11:0e:0")
                 .status_value());
   zx::result channel = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
+      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/device_controller");
   ASSERT_OK(channel.status_value());
 
   fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
@@ -462,7 +462,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindWithInit_Success) {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform/11:0e:0")
                 .status_value());
   zx::result channel = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
+      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/device_controller");
   ASSERT_OK(channel.status_value());
   fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
@@ -504,7 +504,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindWithInit_Failure) {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform/11:0e:0")
                 .status_value());
   zx::result channel = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
+      devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/device_controller");
   ASSERT_OK(channel.status_value());
   fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
