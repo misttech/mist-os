@@ -319,7 +319,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_sys_dup2() {
+    async fn test_sys_dup2() {
         // Most tests are handled by test_sys_dup3, only test the case where both fds are equals.
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let fd = FdNumber::from_raw(42);
@@ -331,7 +331,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sys_creat() -> Result<(), Errno> {
+    async fn test_sys_creat() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task();
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"newfile.txt";
@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_time() {
+    async fn test_time() {
         let (_kernel, current_task) = create_kernel_and_task();
         let time1 = sys_time(&current_task, Default::default()).expect("time");
         assert!(time1 > 0);

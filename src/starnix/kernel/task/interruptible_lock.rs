@@ -165,7 +165,7 @@ mod test {
     };
 
     #[::fuchsia::test]
-    fn test_lock() {
+    async fn test_lock() {
         let (kernel, task) = create_kernel_and_task();
         let value = Arc::new(InterruptibleMutex::new(0));
         let mut guard = value.lock(&task).expect("lock");
@@ -184,7 +184,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_rwlock_write_write() {
+    async fn test_rwlock_write_write() {
         let (kernel, task) = create_kernel_and_task();
         let value = Arc::new(InterruptibleRwLock::new(0));
         let mut guard = value.write(&task).expect("write");
@@ -203,7 +203,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_rwlock_read_write() {
+    async fn test_rwlock_read_write() {
         let (kernel, task) = create_kernel_and_task();
         let value = Arc::new(InterruptibleRwLock::new(0));
         let guard = value.read(&task).expect("read");
@@ -222,7 +222,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_rwlock_read_read() {
+    async fn test_rwlock_read_read() {
         let (kernel, task) = create_kernel_and_task();
         let value = Arc::new(InterruptibleRwLock::new(0));
         let guard = value.read(&task).expect("read");
@@ -238,7 +238,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_interrupt() {
+    async fn test_interrupt() {
         let (kernel, task) = create_kernel_and_task();
         let (sender, receiver) = sync_channel::<pid_t>(1);
         let value = Arc::new(InterruptibleMutex::new(0));

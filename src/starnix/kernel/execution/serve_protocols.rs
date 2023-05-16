@@ -18,6 +18,7 @@ use std::sync::Arc;
 use crate::execution::{execute_task, Container};
 use crate::fs::buffers::*;
 use crate::fs::devpts::create_main_and_replica;
+use crate::fs::file_server::serve_file;
 use crate::fs::fuchsia::create_fuchsia_pipe;
 use crate::fs::socket::VsockSocket;
 use crate::fs::*;
@@ -30,7 +31,7 @@ use super::*;
 /// Returns a DirectoryProxy to the root of the initial namespace of the container.
 pub fn expose_root(container: &Arc<Container>) -> Result<fio::DirectoryProxy, Error> {
     let dir_fd = container.root_fs.root().open(&container.system_task, OpenFlags::RDWR, false)?;
-    let client = container.kernel.file_server.serve(&dir_fd)?;
+    let client = serve_file(&container.kernel, &dir_fd)?;
     Ok(fio::DirectoryProxy::new(AsyncChannel::from_channel(client.into_channel())?))
 }
 

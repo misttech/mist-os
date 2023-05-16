@@ -143,7 +143,7 @@ mod test {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_umask() {
+    async fn test_umask() {
         let (kernel, _task) = create_kernel_and_task();
         let fs = FsContext::new(TmpFs::new_fs(&kernel));
 
@@ -154,7 +154,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_chdir() {
+    async fn test_chdir() {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
 
         assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());

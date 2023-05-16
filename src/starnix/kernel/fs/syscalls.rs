@@ -2113,7 +2113,7 @@ mod tests {
     use std::sync::Arc;
 
     #[::fuchsia::test]
-    fn test_sys_lseek() -> Result<(), Errno> {
+    async fn test_sys_lseek() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let fd = FdNumber::from_raw(10);
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
@@ -2140,7 +2140,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sys_dup() -> Result<(), Errno> {
+    async fn test_sys_dup() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
         let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
@@ -2156,7 +2156,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sys_dup3() -> Result<(), Errno> {
+    async fn test_sys_dup3() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
         let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
@@ -2187,7 +2187,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sys_open_cloexec() -> Result<(), Errno> {
+    async fn test_sys_open_cloexec() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"data/testfile.txt\0";
@@ -2204,7 +2204,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sys_epoll() -> Result<(), Errno> {
+    async fn test_sys_epoll() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
 
         let epoll_fd = sys_epoll_create1(&current_task, 0).expect("sys_epoll_create1 failed");
@@ -2214,7 +2214,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_fstat_tmp_file() {
+    async fn test_fstat_tmp_file() {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
 
         // Create the file that will be used to stat.
@@ -2240,7 +2240,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_unlinkat_dir() {
+    async fn test_unlinkat_dir() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Create the dir that we will attempt to unlink later.
@@ -2278,7 +2278,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_rename_noreplace() {
+    async fn test_rename_noreplace() {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
 
         // Create the file that will be renamed.

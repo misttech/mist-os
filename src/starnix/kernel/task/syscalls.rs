@@ -1169,7 +1169,7 @@ mod tests {
     use std::u64;
 
     #[::fuchsia::test]
-    fn test_prctl_set_vma_anon_name() {
+    async fn test_prctl_set_vma_anon_name() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -1199,7 +1199,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_special_chars() {
+    async fn test_set_vma_name_special_chars() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -1235,7 +1235,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_long() {
+    async fn test_set_vma_name_long() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -1276,7 +1276,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_misaligned() {
+    async fn test_set_vma_name_misaligned() {
         let (_kernel, mut current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -1315,7 +1315,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_prctl_get_set_dumpable() {
+    async fn test_prctl_get_set_dumpable() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         sys_prctl(&mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
@@ -1329,7 +1329,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sys_getsid() {
+    async fn test_sys_getsid() {
         let (kernel, current_task) = create_kernel_and_task();
 
         assert_eq!(
@@ -1346,7 +1346,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_get_affinity_size() {
+    async fn test_get_affinity_size() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let pid = current_task.get_pid();
@@ -1359,7 +1359,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_affinity_size() {
+    async fn test_set_affinity_size() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.mm.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
@@ -1369,7 +1369,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_task_name() {
+    async fn test_task_name() {
         let (_kernel, mut current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
@@ -1397,7 +1397,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sched_get_priority_min_max() {
+    async fn test_sched_get_priority_min_max() {
         let (_kernel, current_task) = create_kernel_and_task();
         let non_rt_min = sys_sched_get_priority_min(&current_task, SCHED_NORMAL).unwrap();
         assert_eq!(non_rt_min, 0);
@@ -1419,7 +1419,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sched_setscheduler() {
+    async fn test_sched_setscheduler() {
         let (_kernel, current_task) = create_kernel_and_task();
         let scheduler = sys_sched_getscheduler(&current_task, 0).unwrap();
         assert_eq!(scheduler, SCHED_NORMAL, "tasks should have normal scheduler by default");
@@ -1441,7 +1441,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sched_getparam() {
+    async fn test_sched_getparam() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&current_task, 0, mapped_address).expect("sched_getparam");
@@ -1451,7 +1451,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_setuid() {
+    async fn test_setuid() {
         let (_kernel, current_task) = create_kernel_and_task();
         // Test for root.
         current_task.set_creds(Credentials::root());

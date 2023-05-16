@@ -179,7 +179,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_remove_duplicates() {
+    async fn test_remove_duplicates() {
         let (kernel, current_task) = create_kernel_and_task();
         let base = TmpFs::new_fs(&kernel);
         base.root().create_dir(&current_task, b"d1").expect("create_dir");

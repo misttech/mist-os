@@ -8,6 +8,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::file_server::serve_file;
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, not_implemented};
@@ -256,8 +257,12 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Return a handle that allows access to this file descritor through the zxio protocols.
     ///
     /// If None is returned, the file will act as if it was a fd to `/dev/null`.
-    fn to_handle(&self, file: &FileHandle, kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
-        kernel.file_server.serve(file).map(|c| Some(c.into_handle()))
+    fn to_handle(
+        &self,
+        file: &FileHandle,
+        kernel: &Arc<Kernel>,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        serve_file(kernel, file).map(|c| Some(c.into_handle()))
     }
 }
 
@@ -960,7 +965,7 @@ impl FileObject {
         self.node().fallocate(offset, length)
     }
 
-    pub fn to_handle(self: &Arc<Self>, kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
+    pub fn to_handle(self: &Arc<Self>, kernel: &Arc<Kernel>) -> Result<Option<zx::Handle>, Errno> {
         self.ops().to_handle(self, kernel)
     }
 

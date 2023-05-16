@@ -1141,7 +1141,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn open_device_file() {
+    async fn open_device_file() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Create a device file that points to the `zero` device (which is automatically
@@ -1165,7 +1165,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn node_info_is_reflected_in_stat() {
+    async fn node_info_is_reflected_in_stat() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Create a node.
@@ -1227,7 +1227,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_check_access() {
+    async fn test_check_access() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mut creds = Credentials::with_ids(1, 2);
         creds.groups = vec![3, 4];

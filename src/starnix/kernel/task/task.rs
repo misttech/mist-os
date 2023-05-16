@@ -1775,7 +1775,7 @@ mod test {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_tid_allocation() {
+    async fn test_tid_allocation() {
         let (kernel, current_task) = create_kernel_and_task();
 
         assert_eq!(current_task.get_tid(), 1);
@@ -1789,7 +1789,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_clone_pid_and_parent_pid() {
+    async fn test_clone_pid_and_parent_pid() {
         let (_kernel, current_task) = create_kernel_and_task();
         let thread = current_task
             .clone_task_for_test((CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64, Some(SIGCHLD));
@@ -1804,7 +1804,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_root_capabilities() {
+    async fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert!(current_task.creds().has_capability(CAP_SYS_ADMIN));
         current_task.set_creds(Credentials::with_ids(1, 1));

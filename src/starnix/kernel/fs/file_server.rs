@@ -18,47 +18,38 @@ use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use std::ffi::CString;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use vfs::{directory, execution_scope, file, path, ProtocolsExt, ToObjectRequest};
 
-/// FIDL io server to expose starnix file descriptors to external fuchsia component.
-pub struct FileServer {
-    kernel: Weak<Kernel>,
-}
+/// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
+pub fn serve_file(
+    kernel: &Arc<Kernel>,
+    file: &FileHandle,
+) -> Result<ClientEnd<fio::NodeMarker>, Errno> {
+    // Create a task to serve the file. Fow now, this will be a root task, rooted on init.
+    let task =
+        Task::create_init_child_process(kernel, &CString::new("kthread".to_string()).unwrap())
+            .map(Arc::new)?;
 
-impl FileServer {
-    pub fn new(kernel: Weak<Kernel>) -> Self {
-        Self { kernel }
-    }
+    // Reopen file object to not share state with the given FileObject.
+    let file = file.name.open(&task, file.flags(), false)?;
+    let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+    let open_flags = file.flags();
+    let starnix_file = StarnixNodeConnection::new(task, file);
+    fasync::Task::spawn_on(&kernel.ehandle, async move {
+        let scope = execution_scope::ExecutionScope::new();
+        directory::entry::DirectoryEntry::open(
+            starnix_file,
+            scope.clone(),
+            open_flags.into(),
+            path::Path::dot(),
+            server,
+        );
+        scope.wait().await;
+    })
+    .detach();
 
-    /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
-    pub fn serve(&self, file: &FileHandle) -> Result<ClientEnd<fio::NodeMarker>, Errno> {
-        // Create a task to serve the file. Fow now, this will be a root task, rooted on init.
-        let kernel = self.kernel.upgrade().ok_or_else(|| errno!(EINVAL))?;
-        let task =
-            Task::create_init_child_process(&kernel, &CString::new("kthread".to_string()).unwrap())
-                .map(Arc::new)?;
-
-        // Reopen file object to not share state with the given FileObject.
-        let file = file.name.open(&task, file.flags(), false)?;
-        let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-        let open_flags = file.flags();
-        let starnix_file = StarnixNodeConnection::new(task, file);
-        kernel.thread_pool.dispatch(move || {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let scope = execution_scope::ExecutionScope::new();
-                directory::entry::DirectoryEntry::open(
-                    starnix_file,
-                    scope.clone(),
-                    open_flags.into(),
-                    path::Path::dot(),
-                    server,
-                );
-                scope.wait().await;
-            });
-        });
-        Ok(client)
-    }
+    Ok(client)
 }
 
 /// A representation of `file` for the rust vfs.
@@ -547,6 +538,7 @@ mod tests {
     use super::*;
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::*;
+    use futures::channel::oneshot;
     use std::collections::HashSet;
     use syncio::Zxio;
 
@@ -563,107 +555,113 @@ mod tests {
     async fn access_file_system() {
         let (kernel, _current_task) = create_kernel_and_task();
 
-        let fs = TmpFs::new_fs(&kernel);
+        let (sender, receiver) = oneshot::channel::<bool>();
+        let _thread = std::thread::spawn(move || {
+            let fs = TmpFs::new_fs(&kernel);
 
-        let root_handle = kernel
-            .file_server
-            .serve(&fs.root().open_anonymous(OpenFlags::RDWR).expect("open"))
-            .expect("serve");
+            let root_handle =
+                serve_file(&kernel, &fs.root().open_anonymous(OpenFlags::RDWR).expect("open"))
+                    .expect("serve");
 
-        let root_zxio = Zxio::create(root_handle.into_handle()).expect("create");
+            let root_zxio = Zxio::create(root_handle.into_handle()).expect("create");
 
-        assert_directory_content(&root_zxio, &[b"."]);
-        // Check that one can reiterate from the start.
-        assert_directory_content(&root_zxio, &[b"."]);
+            assert_directory_content(&root_zxio, &[b"."]);
+            // Check that one can reiterate from the start.
+            assert_directory_content(&root_zxio, &[b"."]);
 
-        let attrs = root_zxio.attr_get().expect("attr_get");
-        assert_eq!(attrs.id, fs.dev_id.bits());
+            let attrs = root_zxio.attr_get().expect("attr_get");
+            assert_eq!(attrs.id, fs.dev_id.bits());
 
-        let mut attrs = syncio::zxio_node_attributes_t::default();
-        attrs.has.creation_time = true;
-        attrs.has.modification_time = true;
-        attrs.creation_time = 0;
-        attrs.modification_time = 42;
-        root_zxio.attr_set(&attrs).expect("attr_set");
-        let attrs = root_zxio.attr_get().expect("attr_get");
-        assert_eq!(attrs.creation_time, 0);
-        assert_eq!(attrs.modification_time, 42);
+            let mut attrs = syncio::zxio_node_attributes_t::default();
+            attrs.has.creation_time = true;
+            attrs.has.modification_time = true;
+            attrs.creation_time = 0;
+            attrs.modification_time = 42;
+            root_zxio.attr_set(&attrs).expect("attr_set");
+            let attrs = root_zxio.attr_get().expect("attr_get");
+            assert_eq!(attrs.creation_time, 0);
+            assert_eq!(attrs.modification_time, 42);
 
-        assert_eq!(
-            root_zxio
-                .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-                .expect_err("open"),
-            zx::Status::NOT_FOUND
-        );
-        let foo_zxio = root_zxio
-            .open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
-                "foo",
-            )
-            .expect("zxio_open");
-        assert_directory_content(&root_zxio, &[b".", b"foo"]);
+            assert_eq!(
+                root_zxio
+                    .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+                    .expect_err("open"),
+                zx::Status::NOT_FOUND
+            );
+            let foo_zxio = root_zxio
+                .open(
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::CREATE,
+                    "foo",
+                )
+                .expect("zxio_open");
+            assert_directory_content(&root_zxio, &[b".", b"foo"]);
 
-        assert_eq!(foo_zxio.write(b"hello").expect("write"), 5);
-        assert_eq!(foo_zxio.write_at(2, b"ch").expect("write_at"), 2);
-        let mut buffer = [0; 7];
-        assert_eq!(foo_zxio.read_at(2, &mut buffer).expect("read_at"), 3);
-        assert_eq!(&buffer[..3], b"cho");
-        assert_eq!(foo_zxio.seek(syncio::SeekOrigin::Start, 0).expect("seek"), 0);
-        assert_eq!(foo_zxio.read(&mut buffer).expect("read"), 5);
-        assert_eq!(&buffer[..5], b"hecho");
+            assert_eq!(foo_zxio.write(b"hello").expect("write"), 5);
+            assert_eq!(foo_zxio.write_at(2, b"ch").expect("write_at"), 2);
+            let mut buffer = [0; 7];
+            assert_eq!(foo_zxio.read_at(2, &mut buffer).expect("read_at"), 3);
+            assert_eq!(&buffer[..3], b"cho");
+            assert_eq!(foo_zxio.seek(syncio::SeekOrigin::Start, 0).expect("seek"), 0);
+            assert_eq!(foo_zxio.read(&mut buffer).expect("read"), 5);
+            assert_eq!(&buffer[..5], b"hecho");
 
-        let attrs = foo_zxio.attr_get().expect("attr_get");
-        assert_eq!(attrs.id, fs.dev_id.bits());
+            let attrs = foo_zxio.attr_get().expect("attr_get");
+            assert_eq!(attrs.id, fs.dev_id.bits());
 
-        let mut attrs = syncio::zxio_node_attributes_t::default();
-        attrs.has.creation_time = true;
-        attrs.has.modification_time = true;
-        attrs.creation_time = 0;
-        attrs.modification_time = 42;
-        foo_zxio.attr_set(&attrs).expect("attr_set");
-        let attrs = foo_zxio.attr_get().expect("attr_get");
-        assert_eq!(attrs.creation_time, 0);
-        assert_eq!(attrs.modification_time, 42);
+            let mut attrs = syncio::zxio_node_attributes_t::default();
+            attrs.has.creation_time = true;
+            attrs.has.modification_time = true;
+            attrs.creation_time = 0;
+            attrs.modification_time = 42;
+            foo_zxio.attr_set(&attrs).expect("attr_set");
+            let attrs = foo_zxio.attr_get().expect("attr_get");
+            assert_eq!(attrs.creation_time, 0);
+            assert_eq!(attrs.modification_time, 42);
 
-        assert_eq!(
-            root_zxio
+            assert_eq!(
+                root_zxio
+                    .open(
+                        fio::OpenFlags::DIRECTORY
+                            | fio::OpenFlags::CREATE
+                            | fio::OpenFlags::RIGHT_READABLE
+                            | fio::OpenFlags::RIGHT_WRITABLE,
+                        "bar/baz"
+                    )
+                    .expect_err("open"),
+                zx::Status::NOT_FOUND
+            );
+
+            let bar_zxio = root_zxio
                 .open(
                     fio::OpenFlags::DIRECTORY
                         | fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE,
-                    "bar/baz"
+                    "bar",
                 )
-                .expect_err("open"),
-            zx::Status::NOT_FOUND
-        );
+                .expect("open");
+            let baz_zxio = root_zxio
+                .open(
+                    fio::OpenFlags::DIRECTORY
+                        | fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE,
+                    "bar/baz",
+                )
+                .expect("open");
+            assert_directory_content(&root_zxio, &[b".", b"foo", b"bar"]);
+            assert_directory_content(&bar_zxio, &[b".", b"baz"]);
 
-        let bar_zxio = root_zxio
-            .open(
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                "bar",
-            )
-            .expect("open");
-        let baz_zxio = root_zxio
-            .open(
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                "bar/baz",
-            )
-            .expect("open");
-        assert_directory_content(&root_zxio, &[b".", b"foo", b"bar"]);
-        assert_directory_content(&bar_zxio, &[b".", b"baz"]);
+            bar_zxio.rename("baz", &root_zxio, "quz").expect("rename");
+            assert_directory_content(&bar_zxio, &[b"."]);
+            assert_directory_content(&root_zxio, &[b".", b"foo", b"bar", b"quz"]);
+            assert_directory_content(&baz_zxio, &[b"."]);
 
-        bar_zxio.rename("baz", &root_zxio, "quz").expect("rename");
-        assert_directory_content(&bar_zxio, &[b"."]);
-        assert_directory_content(&root_zxio, &[b".", b"foo", b"bar", b"quz"]);
-        assert_directory_content(&baz_zxio, &[b"."]);
+            sender.send(true).expect("sent");
+        });
+
+        assert!(receiver.await.expect("received"));
     }
 }

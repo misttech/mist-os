@@ -676,7 +676,7 @@ mod tests {
     static FINAL_VAL: u64 = 42;
 
     #[::fuchsia::test]
-    fn test_async_wait_exec() {
+    async fn test_async_wait_exec() {
         static COUNTER: AtomicU64 = AtomicU64::new(INIT_VAL);
         static WRITE_COUNT: AtomicU64 = AtomicU64::new(0);
 
@@ -719,7 +719,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_async_wait_cancel() {
+    async fn test_async_wait_cancel() {
         for do_cancel in [true, false] {
             let (_kernel, current_task) = create_kernel_and_task();
             let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
@@ -756,7 +756,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn single_waiter_multiple_waits_cancel_one_waiter_still_notified() {
+    async fn single_waiter_multiple_waits_cancel_one_waiter_still_notified() {
         let (_kernel, current_task) = create_kernel_and_task();
         let wait_queue = WaitQueue::default();
         let waiter = Waiter::new();
@@ -768,7 +768,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn multiple_waiters_cancel_one_other_still_notified() {
+    async fn multiple_waiters_cancel_one_other_still_notified() {
         let (_kernel, current_task) = create_kernel_and_task();
         let wait_queue = WaitQueue::default();
         let waiter1 = Waiter::new();
@@ -782,7 +782,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_wait_queue() {
+    async fn test_wait_queue() {
         let (_kernel, current_task) = create_kernel_and_task();
         let queue = WaitQueue::default();
 
@@ -811,7 +811,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_wait_queue_mask() {
+    async fn test_wait_queue_mask() {
         let (_kernel, current_task) = create_kernel_and_task();
         let queue = WaitQueue::default();
 

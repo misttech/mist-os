@@ -323,7 +323,7 @@ mod test {
     use std::collections::{HashMap, HashSet};
 
     #[::fuchsia::test]
-    fn test_read_image() {
+    async fn test_read_image() {
         let (kernel, current_task) = create_kernel_and_task();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();

@@ -442,7 +442,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_dgram_socket() {
+    async fn test_dgram_socket() {
         let (kernel, current_task) = create_kernel_and_task();
         let bind_address = SocketAddress::Unix(b"dgram_test".to_vec());
         let rec_dgram = Socket::new(

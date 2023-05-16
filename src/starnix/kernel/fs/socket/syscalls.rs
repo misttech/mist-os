@@ -745,7 +745,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_socketpair_invalid_arguments() {
+    async fn test_socketpair_invalid_arguments() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert_eq!(
             sys_socketpair(

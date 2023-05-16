@@ -33,13 +33,13 @@ mod test {
     use zx::HandleBased;
 
     #[::fuchsia::test]
-    fn test_create_from_invalid_handle() {
+    async fn test_create_from_invalid_handle() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert!(create_file_from_handle(&current_task, zx::Handle::invalid()).is_err());
     }
 
     #[::fuchsia::test]
-    fn test_create_pipe_from_handle() {
+    async fn test_create_pipe_from_handle() {
         let (_kernel, current_task) = create_kernel_and_task();
         let (left_handle, right_handle) = zx::Socket::create_stream();
         create_file_from_handle(&current_task, left_handle.into_handle())

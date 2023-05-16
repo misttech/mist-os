@@ -493,7 +493,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_epoll_read_ready() {
+    async fn test_epoll_read_ready() {
         static WRITE_COUNT: AtomicU64 = AtomicU64::new(0);
         const EVENT_DATA: u64 = 42;
 
@@ -541,7 +541,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_epoll_ready_then_wait() {
+    async fn test_epoll_ready_then_wait() {
         const EVENT_DATA: u64 = 42;
 
         let (_kernel, current_task) = create_kernel_and_task();
@@ -582,7 +582,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_epoll_ctl_cancel() {
+    async fn test_epoll_ctl_cancel() {
         for do_cancel in [true, false] {
             let (_kernel, current_task) = create_kernel_and_task();
             let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
@@ -639,7 +639,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_multiple_events() {
+    async fn test_multiple_events() {
         let (_kernel, current_task) = create_kernel_and_task();
         let (client1, server1) = zx::Socket::create_stream();
         let (client2, server2) = zx::Socket::create_stream();
@@ -701,7 +701,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_cancel_after_notify() {
+    async fn test_cancel_after_notify() {
         let (_kernel, current_task) = create_kernel_and_task();
         let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
         let epoll_file_handle = EpollFileObject::new_file(&current_task);
@@ -736,7 +736,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_add_then_modify() {
+    async fn test_add_then_modify() {
         let (_kernel, current_task) = create_kernel_and_task();
         let (socket1, _socket2) = UnixSocket::new_pair(
             &current_task,

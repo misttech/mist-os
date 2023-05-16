@@ -866,7 +866,7 @@ mod test {
     #[test_case((1920, 1080), uapi::EVIOCGABS_X => (0, 1920))]
     #[test_case((1280, 1024), uapi::EVIOCGABS_Y => (0, 1024))]
     #[::fuchsia::test]
-    fn provides_correct_axis_ranges((x_max, y_max): (u16, u16), ioctl_op: u32) -> (i32, i32) {
+    async fn provides_correct_axis_ranges((x_max, y_max): (u16, u16), ioctl_op: u32) -> (i32, i32) {
         // Set up resources.
         let input_file = InputFile::new_with_dimensions(x_max, y_max);
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());

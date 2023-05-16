@@ -378,7 +378,7 @@ mod test {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_nanosleep_without_remainder() {
+    async fn test_nanosleep_without_remainder() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let task_clone = current_task.task_arc_clone();
@@ -410,7 +410,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_clock_nanosleep_relative_to_slow_clock() {
+    async fn test_clock_nanosleep_relative_to_slow_clock() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();

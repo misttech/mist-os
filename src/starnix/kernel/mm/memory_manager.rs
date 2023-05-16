@@ -2127,7 +2127,7 @@ mod tests {
     use std::ffi::CString;
 
     #[::fuchsia::test]
-    fn test_brk() {
+    async fn test_brk() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2188,7 +2188,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_mm_exec() {
+    async fn test_mm_exec() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2221,7 +2221,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_get_contiguous_mappings_at() {
+    async fn test_get_contiguous_mappings_at() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2315,7 +2315,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_write_crossing_mappings() {
+    async fn test_read_write_crossing_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2338,7 +2338,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_write_errors() {
+    async fn test_read_write_errors() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2365,7 +2365,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_c_string() {
+    async fn test_read_c_string() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2403,7 +2403,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_unmap_returned_mappings() {
+    async fn test_unmap_returned_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2415,7 +2415,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_unmap_returns_multiple_mappings() {
+    async fn test_unmap_returns_multiple_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2430,7 +2430,7 @@ mod tests {
     /// Maps two pages, then unmaps the first page.
     /// The second page should be re-mapped with a new child COW VMO.
     #[::fuchsia::test]
-    fn test_unmap_beginning() {
+    async fn test_unmap_beginning() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2469,7 +2469,7 @@ mod tests {
     /// Maps two pages, then unmaps the second page.
     /// The first page's VMO should be shrunk.
     #[::fuchsia::test]
-    fn test_unmap_end() {
+    async fn test_unmap_end() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2509,7 +2509,7 @@ mod tests {
     /// The last page should be re-mapped with a new COW child VMO.
     /// The first page's VMO should be shrunk,
     #[::fuchsia::test]
-    fn test_unmap_middle() {
+    async fn test_unmap_middle() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2555,7 +2555,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_write_objects() {
+    async fn test_read_write_objects() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2571,7 +2571,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_write_objects_null() {
+    async fn test_read_write_objects_null() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
         let items_ref = UserRef::<i32>::new(UserAddress::default());
@@ -2586,7 +2586,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_object_partial() {
+    async fn test_read_object_partial() {
         #[derive(Debug, Default, Copy, Clone, FromBytes, PartialEq)]
         struct Items {
             val: [i32; 4],
@@ -2631,7 +2631,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_partial_read() {
+    async fn test_partial_read() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2657,7 +2657,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_mapping_empty_mm() {
+    async fn test_grow_mapping_empty_mm() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2667,7 +2667,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_inside_mapping() {
+    async fn test_grow_inside_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2677,7 +2677,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_write_fault_inside_read_only_mapping() {
+    async fn test_grow_write_fault_inside_read_only_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2697,7 +2697,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_fault_inside_prot_none_mapping() {
+    async fn test_grow_fault_inside_prot_none_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2717,7 +2717,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_below_mapping() {
+    async fn test_grow_below_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2730,7 +2730,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_above_mapping() {
+    async fn test_grow_above_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2740,7 +2740,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_grow_write_fault_below_read_only_mapping() {
+    async fn test_grow_write_fault_below_read_only_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -2757,7 +2757,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_snapshot_paged_memory() {
+    async fn test_snapshot_paged_memory() {
         use fuchsia_zircon::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
 
         let (kernel, current_task) = create_kernel_and_task();
@@ -2843,7 +2843,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name() {
+    async fn test_set_vma_name() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2867,7 +2867,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_adjacent_mappings() {
+    async fn test_set_vma_name_adjacent_mappings() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2909,7 +2909,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_beyond_end() {
+    async fn test_set_vma_name_beyond_end() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2946,7 +2946,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_before_start() {
+    async fn test_set_vma_name_before_start() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2984,7 +2984,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_vma_name_partial() {
+    async fn test_set_vma_name_partial() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -3022,8 +3022,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_preserve_name_snapshot() {
+    #[::fuchsia::test]
+    async fn test_preserve_name_snapshot() {
         let (kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);

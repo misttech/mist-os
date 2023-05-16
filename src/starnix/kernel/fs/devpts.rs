@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn opening_ptmx_creates_pts() {
+    async fn opening_ptmx_creates_pts() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let root = fs.root();
@@ -631,7 +631,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn closing_ptmx_closes_pts() {
+    async fn closing_ptmx_closes_pts() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let root = fs.root();
@@ -643,7 +643,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn pts_are_reused() {
+    async fn pts_are_reused() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let root = fs.root();
@@ -664,7 +664,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn opening_inexistant_replica_fails() {
+    async fn opening_inexistant_replica_fails() {
         let (kernel, task) = create_kernel_and_task();
         // Initialize pts devices
         dev_pts_fs(&kernel);
@@ -683,7 +683,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_open_tty() {
+    async fn test_open_tty() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let devfs = crate::fs::devtmpfs::dev_tmp_fs(&task);
@@ -708,7 +708,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_unknown_ioctl() {
+    async fn test_unknown_ioctl() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
 
@@ -720,7 +720,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_tiocgptn_ioctl() {
+    async fn test_tiocgptn_ioctl() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let ptmx0 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
@@ -734,7 +734,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_new_terminal_is_locked() {
+    async fn test_new_terminal_is_locked() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let _ptmx_file = open_file(&task, fs, b"ptmx").expect("open file");
@@ -744,7 +744,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_lock_ioctls() {
+    async fn test_lock_ioctls() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
@@ -764,7 +764,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_ptmx_stats() {
+    async fn test_ptmx_stats() {
         let (kernel, task) = create_kernel_and_task();
         task.set_creds(Credentials::with_ids(22, 22));
         let fs = dev_pts_fs(&kernel);
@@ -779,7 +779,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_attach_terminal_when_open() {
+    async fn test_attach_terminal_when_open() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let _opened_main = open_ptmx_and_unlock(&task, fs).expect("ptmx");
@@ -819,7 +819,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_attach_terminal() {
+    async fn test_attach_terminal() {
         let (kernel, task1) = create_kernel_and_task();
         let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.thread_group.setsid().expect("setsid");
@@ -846,7 +846,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_steal_terminal() {
+    async fn test_steal_terminal() {
         let (kernel, task1) = create_kernel_and_task();
         task1.set_creds(Credentials::with_ids(1, 1));
 
@@ -899,7 +899,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_foreground_process() {
+    async fn test_set_foreground_process() {
         let (kernel, init) = create_kernel_and_task();
         let task1 = init.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
@@ -967,7 +967,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_detach_session() {
+    async fn test_detach_session() {
         let (kernel, task1) = create_kernel_and_task();
         let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.thread_group.setsid().expect("setsid");
@@ -997,7 +997,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_send_data_back_and_forth() {
+    async fn test_send_data_back_and_forth() {
         let (kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&kernel);
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");

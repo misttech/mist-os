@@ -353,7 +353,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_mmap_with_colliding_hint() {
+    async fn test_mmap_with_colliding_hint() {
         let (_kernel, current_task) = create_kernel_and_task();
         let page_size = *PAGE_SIZE;
 
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_mmap_with_fixed_collision() {
+    async fn test_mmap_with_fixed_collision() {
         let (_kernel, current_task) = create_kernel_and_task();
         let page_size = *PAGE_SIZE;
 
@@ -401,7 +401,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_mmap_with_fixed_noreplace_collision() {
+    async fn test_mmap_with_fixed_noreplace_collision() {
         let (_kernel, current_task) = create_kernel_and_task();
         let page_size = *PAGE_SIZE;
 
@@ -427,7 +427,7 @@ mod tests {
     /// It is ok to call munmap with an address that is a multiple of the page size, and
     /// a non-zero length.
     #[::fuchsia::test]
-    fn test_munmap() {
+    async fn test_munmap() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -440,7 +440,7 @@ mod tests {
 
     /// It is ok to call munmap on an unmapped range.
     #[::fuchsia::test]
-    fn test_munmap_not_mapped() {
+    async fn test_munmap_not_mapped() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -450,7 +450,7 @@ mod tests {
 
     /// It is an error to call munmap with a length of 0.
     #[::fuchsia::test]
-    fn test_munmap_0_length() {
+    async fn test_munmap_0_length() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -459,7 +459,7 @@ mod tests {
 
     /// It is an error to call munmap with an address that is not a multiple of the page size.
     #[::fuchsia::test]
-    fn test_munmap_not_aligned() {
+    async fn test_munmap_not_aligned() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -475,7 +475,7 @@ mod tests {
 
     /// The entire page should be unmapped, not just the range [address, address + length).
     #[::fuchsia::test]
-    fn test_munmap_unmap_partial() {
+    async fn test_munmap_unmap_partial() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -492,7 +492,7 @@ mod tests {
 
     /// All pages that intersect the munmap range should be unmapped.
     #[::fuchsia::test]
-    fn test_munmap_multiple_pages() {
+    async fn test_munmap_multiple_pages() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
@@ -509,7 +509,7 @@ mod tests {
 
     /// Only the pages that intersect the munmap range should be unmapped.
     #[::fuchsia::test]
-    fn test_munmap_one_of_many_pages() {
+    async fn test_munmap_one_of_many_pages() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
@@ -526,7 +526,7 @@ mod tests {
 
     /// Unmap the middle page of a mapping.
     #[::fuchsia::test]
-    fn test_munmap_middle_page() {
+    async fn test_munmap_middle_page() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
@@ -550,7 +550,7 @@ mod tests {
 
     /// Unmap a range of pages that includes disjoint mappings.
     #[::fuchsia::test]
-    fn test_munmap_many_mappings() {
+    async fn test_munmap_many_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mapped_addresses: Vec<_> = std::iter::repeat_with(|| {
@@ -572,7 +572,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_msync_validates_address_range() {
+    async fn test_msync_validates_address_range() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 3 pages and test that ranges covering these pages return no error.
@@ -602,7 +602,7 @@ mod tests {
 
     /// Shrinks an entire range.
     #[::fuchsia::test]
-    fn test_mremap_shrink_whole_range_from_end() {
+    async fn test_mremap_shrink_whole_range_from_end() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 2 pages.
@@ -629,7 +629,7 @@ mod tests {
 
     /// Shrinks part of a range, introducing a hole in the middle.
     #[::fuchsia::test]
-    fn test_mremap_shrink_partial_range() {
+    async fn test_mremap_shrink_partial_range() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 3 pages.
@@ -658,7 +658,7 @@ mod tests {
 
     /// Shrinking doesn't care if the range specified spans multiple mappings.
     #[::fuchsia::test]
-    fn test_mremap_shrink_across_ranges() {
+    async fn test_mremap_shrink_across_ranges() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 3 pages, unmap the middle, then map the middle again. This will leave us with
@@ -691,7 +691,7 @@ mod tests {
 
     /// Grows a mapping in-place.
     #[::fuchsia::test]
-    fn test_mremap_grow_in_place() {
+    async fn test_mremap_grow_in_place() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 3 pages, unmap the middle, leaving a hole.
@@ -725,7 +725,7 @@ mod tests {
 
     /// Tries to grow a set of pages that cannot fit, and forces a move.
     #[::fuchsia::test]
-    fn test_mremap_grow_maymove() {
+    async fn test_mremap_grow_maymove() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 3 pages.
@@ -764,7 +764,7 @@ mod tests {
 
     /// Shrinks a set of pages and move them to a fixed location.
     #[::fuchsia::test]
-    fn test_mremap_shrink_fixed() {
+    async fn test_mremap_shrink_fixed() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Map 2 pages which will act as the destination.
@@ -807,7 +807,7 @@ mod tests {
 
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
-    fn test_map_32_bit() {
+    async fn test_map_32_bit() {
         let (_kernel, current_task) = create_kernel_and_task();
         let page_size = *PAGE_SIZE;
 
@@ -833,7 +833,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_membarrier() {
+    async fn test_membarrier() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert_eq!(sys_membarrier(&current_task, 0, 0, 0), Ok(0));
         assert_eq!(sys_membarrier(&current_task, 3, 0, 0), error!(EINVAL));

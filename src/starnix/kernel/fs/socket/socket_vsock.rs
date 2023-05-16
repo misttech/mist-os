@@ -292,7 +292,7 @@ mod tests {
     use syncio::Zxio;
 
     #[::fuchsia::test]
-    fn test_vsock_socket() {
+    async fn test_vsock_socket() {
         let (kernel, current_task) = create_kernel_and_task();
         let (fs1, fs2) = fidl::Socket::create_stream();
         const VSOCK_PORT: u32 = 5555;
@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_vsock_write_while_read() {
+    async fn test_vsock_write_while_read() {
         let (kernel, current_task) = create_kernel_and_task();
         let (fs1, fs2) = fidl::Socket::create_stream();
         let socket = Socket::new(
@@ -386,7 +386,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_vsock_poll() {
+    async fn test_vsock_poll() {
         let (kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();

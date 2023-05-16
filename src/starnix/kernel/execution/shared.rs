@@ -301,7 +301,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_block_while_stopped_stop_and_continue() {
+    async fn test_block_while_stopped_stop_and_continue() {
         let (_kernel, task) = create_kernel_and_task();
 
         // block_while_stopped must immediately returned if the task is not stopped.
@@ -332,7 +332,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_block_while_stopped_stop_and_exit() {
+    async fn test_block_while_stopped_stop_and_exit() {
         let (_kernel, task) = create_kernel_and_task();
 
         // block_while_stopped must immediately returned if the task is neither stopped nor exited.

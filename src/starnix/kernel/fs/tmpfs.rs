@@ -240,7 +240,7 @@ mod test {
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]
-    fn test_tmpfs() {
+    async fn test_tmpfs() {
         let (kernel, current_task) = create_kernel_and_task();
         let fs = TmpFs::new_fs(&kernel);
         let root = fs.root();
@@ -253,7 +253,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_write_read() {
+    async fn test_write_read() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let path = b"test.bin";
@@ -279,7 +279,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_read_past_eof() {
+    async fn test_read_past_eof() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Open an empty file
@@ -300,7 +300,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_permissions() {
+    async fn test_permissions() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let path = b"test.bin";
@@ -341,7 +341,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_persistence() {
+    async fn test_persistence() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         {
@@ -413,7 +413,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_data() {
+    async fn test_data() {
         let (kernel, _current_task) = create_kernel_and_task();
         let fs = TmpFs::new_fs_with_data(&kernel, b"mode=0123,uid=42,gid=84").expect("new_fs");
         let info = fs.root().node.info();

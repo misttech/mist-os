@@ -292,7 +292,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_fd_table_install() {
+    async fn test_fd_table_install() {
         let (_kernel, current_task) = create_kernel_and_task();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
@@ -308,7 +308,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_fd_table_fork() {
+    async fn test_fd_table_fork() {
         let (_kernel, current_task) = create_kernel_and_task();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
@@ -330,7 +330,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_fd_table_exec() {
+    async fn test_fd_table_exec() {
         let (_kernel, current_task) = create_kernel_and_task();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
@@ -350,7 +350,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_fd_table_pack_values() {
+    async fn test_fd_table_pack_values() {
         let (_kernel, current_task) = create_kernel_and_task();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);

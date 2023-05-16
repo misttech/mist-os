@@ -4067,7 +4067,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn handle_0_succeeds_when_context_manager_is_set() {
+    async fn handle_0_succeeds_when_context_manager_is_set() {
         let driver = BinderDriver::new();
         let (_kernel, current_task) = create_kernel_and_task();
         let context_manager_proc = driver.create_local_process(1);
@@ -4845,7 +4845,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn copy_transaction_data_between_processes() {
+    async fn copy_transaction_data_between_processes() {
         let test = TranslateHandlesTestFixture::new();
 
         // Explicitly install a VMO that we can read from later.
@@ -4947,7 +4947,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_translate_binder_leaving_process() {
+    async fn transaction_translate_binder_leaving_process() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -5020,7 +5020,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_translate_binder_handle_entering_owning_process() {
+    async fn transaction_translate_binder_handle_entering_owning_process() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -5081,7 +5081,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_translate_binder_handle_passed_between_non_owning_processes() {
+    async fn transaction_translate_binder_handle_passed_between_non_owning_processes() {
         let test = TranslateHandlesTestFixture::new();
         let owner_proc = test.driver.create_local_process(3);
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
@@ -5164,8 +5164,8 @@ pub mod tests {
         assert_eq!(object.local, binder_object);
     }
 
-    #[test]
-    fn transaction_translate_binder_handles_with_same_address() {
+    #[fuchsia::test]
+    async fn transaction_translate_binder_handles_with_same_address() {
         let test = TranslateHandlesTestFixture::new();
         let other_proc = test.driver.create_local_process(3);
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
@@ -5276,7 +5276,7 @@ pub mod tests {
 
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
     #[fuchsia::test]
-    fn transaction_translate_buffers() {
+    async fn transaction_translate_buffers() {
         let test = TranslateHandlesTestFixture::new();
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
@@ -5396,7 +5396,7 @@ pub mod tests {
     /// Tests that when the scatter-gather buffer size reported by userspace is too small, we stop
     /// processing and fail, instead of skipping a buffer object that doesn't fit.
     #[fuchsia::test]
-    fn transaction_fails_when_sg_buffer_size_is_too_small() {
+    async fn transaction_fails_when_sg_buffer_size_is_too_small() {
         let test = TranslateHandlesTestFixture::new();
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
@@ -5477,7 +5477,7 @@ pub mod tests {
     /// Tests that when a scatter-gather buffer refers to a parent that comes *after* it in the
     /// object list, the transaction fails.
     #[fuchsia::test]
-    fn transaction_fails_when_sg_buffer_parent_is_out_of_order() {
+    async fn transaction_fails_when_sg_buffer_parent_is_out_of_order() {
         let test = TranslateHandlesTestFixture::new();
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
@@ -5553,7 +5553,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_translate_fd_array() {
+    async fn transaction_translate_fd_array() {
         let test = TranslateHandlesTestFixture::new();
 
         // Open a file in the sender process that we won't be using. It is there to occupy a file
@@ -5719,7 +5719,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_translation_fails_on_invalid_handle() {
+    async fn transaction_translation_fails_on_invalid_handle() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -5751,7 +5751,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_translation_fails_on_invalid_object_type() {
+    async fn transaction_translation_fails_on_invalid_object_type() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -5783,7 +5783,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn transaction_drop_references_on_failed_transaction() {
+    async fn transaction_drop_references_on_failed_transaction() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -5832,7 +5832,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn process_state_cleaned_up_after_binder_fd_closed() {
+    async fn process_state_cleaned_up_after_binder_fd_closed() {
         let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDriver::new();
         let node = FsNode::new_root(PanickingFsNode);
@@ -5854,7 +5854,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn close_binder() {
+    async fn close_binder() {
         let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDriver::new();
         let node = FsNode::new_root(PanickingFsNode);
@@ -5885,7 +5885,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn flush_kicks_threads() {
+    async fn flush_kicks_threads() {
         let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDriver::new();
         let node = FsNode::new_root(PanickingFsNode);
@@ -5986,7 +5986,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn death_notification_fires_when_process_dies() {
+    async fn death_notification_fires_when_process_dies() {
         let (_kernel, _current_task) = create_kernel_and_task();
         let driver = BinderDriver::new();
 
@@ -6025,7 +6025,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn death_notification_fires_when_request_for_death_notification_is_made_on_dead_binder() {
+    async fn death_notification_fires_when_request_for_death_notification_is_made_on_dead_binder() {
         let (_kernel, _current_task) = create_kernel_and_task();
         let driver = BinderDriver::new();
 
@@ -6066,7 +6066,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn death_notification_is_cleared_before_process_dies() {
+    async fn death_notification_is_cleared_before_process_dies() {
         let (_kernel, _current_task) = create_kernel_and_task();
         let driver = BinderDriver::new();
 
@@ -6128,7 +6128,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn send_fd_in_transaction() {
+    async fn send_fd_in_transaction() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -6201,7 +6201,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn cleanup_fd_in_failed_transaction() {
+    async fn cleanup_fd_in_failed_transaction() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
@@ -6269,7 +6269,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn next_oneway_transaction_scheduled_after_buffer_freed() {
+    async fn next_oneway_transaction_scheduled_after_buffer_freed() {
         let (kernel, sender_task) = create_kernel_and_task();
         let receiver_task = create_task(&kernel, "test-task2");
 
@@ -6386,7 +6386,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn synchronous_transactions_bypass_oneway_transaction_queue() {
+    async fn synchronous_transactions_bypass_oneway_transaction_queue() {
         let (kernel, sender_task) = create_kernel_and_task();
         let receiver_task = create_task(&kernel, "test-task2");
 
@@ -6471,7 +6471,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn dead_reply_when_transaction_recipient_proc_dies() {
+    async fn dead_reply_when_transaction_recipient_proc_dies() {
         let test = TranslateHandlesTestFixture::new();
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
@@ -6523,7 +6523,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn dead_reply_when_transaction_recipient_thread_dies() {
+    async fn dead_reply_when_transaction_recipient_thread_dies() {
         let test = TranslateHandlesTestFixture::new();
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
@@ -6575,7 +6575,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn dead_reply_when_transaction_recipient_thread_dies_while_processing_reply() {
+    async fn dead_reply_when_transaction_recipient_thread_dies_while_processing_reply() {
         let test = TranslateHandlesTestFixture::new();
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
@@ -6654,7 +6654,7 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    fn connect_to_multiple_binder() {
+    async fn connect_to_multiple_binder() {
         let (_kernel, task) = create_kernel_and_task();
         let driver = BinderDriver::new();
         let node = FsNode::new_root(PanickingFsNode);
@@ -6805,7 +6805,7 @@ pub mod tests {
     #[test_case(true; "with_process")]
     #[test_case(false; "without_process")]
     #[::fuchsia::test]
-    fn remote_binder_task(with_process: bool) {
+    async fn remote_binder_task(with_process: bool) {
         const vector_size: usize = 128 * 1024 * 1024;
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();

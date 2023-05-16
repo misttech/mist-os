@@ -1111,7 +1111,7 @@ mod test {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_namespace() -> anyhow::Result<()> {
+    async fn test_namespace() -> anyhow::Result<()> {
         let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
@@ -1149,7 +1149,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_mount_does_not_upgrade() -> anyhow::Result<()> {
+    async fn test_mount_does_not_upgrade() -> anyhow::Result<()> {
         let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
@@ -1186,7 +1186,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_path() -> anyhow::Result<()> {
+    async fn test_path() -> anyhow::Result<()> {
         let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
@@ -1221,7 +1221,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_shadowing() -> anyhow::Result<()> {
+    async fn test_shadowing() -> anyhow::Result<()> {
         let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let ns = Namespace::new(root_fs.clone());
@@ -1260,7 +1260,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_unlink_mounted_directory() -> anyhow::Result<()> {
+    async fn test_unlink_mounted_directory() -> anyhow::Result<()> {
         let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let ns1 = Namespace::new(root_fs.clone());

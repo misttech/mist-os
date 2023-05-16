@@ -528,7 +528,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_load_hello_starnix() {
+    async fn test_load_hello_starnix() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_pkgfs();
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
         assert!(current_task.mm.get_mapping_count() > 0);
@@ -537,7 +537,7 @@ mod tests {
     // TODO(fxbug.dev/121659): Figure out why this snapshot fails.
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
-    fn test_snapshot_hello_starnix() {
+    async fn test_snapshot_hello_starnix() {
         let (kernel, mut current_task) = create_kernel_and_task_with_pkgfs();
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
 

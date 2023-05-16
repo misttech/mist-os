@@ -823,8 +823,8 @@ mod tests {
             create_endpoints::<fbinder::RemoteControllerMarker>();
         REMOTE_CONTROLLER_CLIENT.lock().insert(service_name.clone(), remote_controller_client);
         // Simulate the remote binder user process.
+        let (kernel, init_task) = create_kernel_and_task();
         let starnix_thread = std::thread::spawn(move || {
-            let (kernel, init_task) = create_kernel_and_task();
             init_task
                 .fs()
                 .root()

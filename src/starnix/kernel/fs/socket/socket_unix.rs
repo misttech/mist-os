@@ -879,7 +879,7 @@ mod tests {
     use std::convert::TryInto;
 
     #[::fuchsia::test]
-    fn test_socket_send_capacity() {
+    async fn test_socket_send_capacity() {
         let (kernel, current_task) = create_kernel_and_task();
         let socket =
             Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())

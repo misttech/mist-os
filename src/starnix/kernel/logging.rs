@@ -169,8 +169,8 @@ mod test {
     use std::ffi::{CStr, CString};
     use zx::{sys, AsHandleRef};
 
-    #[test]
-    fn test_truncate_name() {
+    #[fuchsia::test]
+    async fn test_truncate_name() {
         assert_eq!(truncate_name(b"foo").as_ref(), CStr::from_bytes_with_nul(b"foo\0").unwrap());
         assert_eq!(truncate_name(b"").as_ref(), CStr::from_bytes_with_nul(b"\0").unwrap());
         assert_eq!(
@@ -180,8 +180,8 @@ mod test {
         assert_eq!(truncate_name(b"a\0b").as_ref(), CStr::from_bytes_with_nul(b"a?b\0").unwrap());
     }
 
-    #[test]
-    fn test_long_name() {
+    #[fuchsia::test]
+    async fn test_long_name() {
         let (_kernel, current_task) = create_kernel_and_task();
         let bytes = [1; sys::ZX_MAX_NAME_LEN];
         let name = CString::new(bytes).unwrap();
@@ -193,8 +193,8 @@ mod test {
         assert_eq!(current_task.thread_group.process.get_name(), Ok(expected_name));
     }
 
-    #[test]
-    fn test_max_length_name() {
+    #[fuchsia::test]
+    async fn test_max_length_name() {
         let (_kernel, current_task) = create_kernel_and_task();
         let bytes = [1; sys::ZX_MAX_NAME_LEN - 1];
         let name = CString::new(bytes).unwrap();
@@ -203,8 +203,8 @@ mod test {
         assert_eq!(current_task.thread_group.process.get_name(), Ok(name));
     }
 
-    #[test]
-    fn test_short_name() {
+    #[fuchsia::test]
+    async fn test_short_name() {
         let (_kernel, current_task) = create_kernel_and_task();
         let bytes = [1; sys::ZX_MAX_NAME_LEN - 10];
         let name = CString::new(bytes).unwrap();

@@ -189,7 +189,7 @@ mod tests {
     const SA_HANDLER2_ADDRESS: UserAddress = UserAddress::from(0xBADDAD00);
 
     #[::fuchsia::test]
-    fn syscall_restart_adjusts_instruction_pointer_and_rax() {
+    async fn syscall_restart_adjusts_instruction_pointer_and_rax() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
@@ -253,7 +253,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn syscall_nested_restart() {
+    async fn syscall_nested_restart() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
 
         // Register the signal actions.
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn syscall_does_not_restart_if_signal_action_has_no_sa_restart_flag() {
+    async fn syscall_does_not_restart_if_signal_action_has_no_sa_restart_flag() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
 
         // Register the signal action.

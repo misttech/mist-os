@@ -894,7 +894,7 @@ mod test {
     use itertools::Itertools;
 
     #[::fuchsia::test]
-    fn test_setsid() {
+    async fn test_setsid() {
         fn get_process_group(task: &Task) -> Arc<ProcessGroup> {
             Arc::clone(&task.thread_group.read().process_group)
         }
@@ -914,7 +914,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_exit_status() {
+    async fn test_exit_status() {
         let (_kernel, current_task) = create_kernel_and_task();
         let child = current_task.clone_task_for_test(0, Some(SIGCHLD));
         child.thread_group.exit(ExitStatus::Exit(42));
@@ -926,7 +926,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_setgpid() {
+    async fn test_setgpid() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert_eq!(current_task.thread_group.setsid(), error!(EPERM));
 
@@ -959,7 +959,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_adopt_children() {
+    async fn test_adopt_children() {
         let (_kernel, current_task) = create_kernel_and_task();
         let task1 = current_task
             .clone_task(

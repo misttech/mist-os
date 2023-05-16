@@ -531,7 +531,11 @@ impl FileOps for RemoteDirectoryObject {
         Ok(())
     }
 
-    fn to_handle(&self, _file: &FileHandle, _kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
+    fn to_handle(
+        &self,
+        _file: &FileHandle,
+        _kernel: &Arc<Kernel>,
+    ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
             .clone()
             .and_then(Zxio::release)
@@ -607,7 +611,11 @@ impl FileOps for RemoteFileObject {
         zxio_query_events(&self.zxio)
     }
 
-    fn to_handle(&self, _file: &FileHandle, _kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
+    fn to_handle(
+        &self,
+        _file: &FileHandle,
+        _kernel: &Arc<Kernel>,
+    ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
             .as_ref()
             .clone()
@@ -676,7 +684,11 @@ impl FileOps for RemotePipeObject {
         zxio_query_events(&self.zxio)
     }
 
-    fn to_handle(&self, _file: &FileHandle, _kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
+    fn to_handle(
+        &self,
+        _file: &FileHandle,
+        _kernel: &Arc<Kernel>,
+    ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
             .as_ref()
             .clone()
@@ -718,7 +730,7 @@ mod test {
     use fxfs_testing::TestFixture;
 
     #[::fuchsia::test]
-    fn test_tree() -> Result<(), anyhow::Error> {
+    async fn test_tree() -> Result<(), anyhow::Error> {
         let (kernel, current_task) = create_kernel_and_task();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();
@@ -742,7 +754,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_blocking_io() -> Result<(), anyhow::Error> {
+    async fn test_blocking_io() -> Result<(), anyhow::Error> {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
@@ -765,7 +777,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_poll() {
+    async fn test_poll() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
@@ -834,7 +846,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_new_remote_vmo() {
+    async fn test_new_remote_vmo() {
         let (kernel, _current_task) = create_kernel_and_task();
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
         let fd = new_remote_file(&kernel, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");

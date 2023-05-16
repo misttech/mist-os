@@ -646,7 +646,7 @@ mod tests {
 
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
-    fn test_sigaltstack() {
+    async fn test_sigaltstack() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -686,7 +686,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sigaltstack_invalid_size() {
+    async fn test_sigaltstack_invalid_size() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -712,7 +712,7 @@ mod tests {
 
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
-    fn test_sigaltstack_active_stack() {
+    async fn test_sigaltstack_active_stack() {
         let (_kernel, mut current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -752,7 +752,7 @@ mod tests {
 
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
-    fn test_sigaltstack_active_stack_saturates() {
+    async fn test_sigaltstack_active_stack_saturates() {
         let (_kernel, mut current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -791,7 +791,7 @@ mod tests {
     /// It is invalid to call rt_sigprocmask with a sigsetsize that does not match the size of
     /// SigSet.
     #[::fuchsia::test]
-    fn test_sigprocmask_invalid_size() {
+    async fn test_sigprocmask_invalid_size() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let set = UserRef::<SigSet>::default();
@@ -810,7 +810,7 @@ mod tests {
 
     /// It is invalid to call rt_sigprocmask with a bad `how`.
     #[::fuchsia::test]
-    fn test_sigprocmask_invalid_how() {
+    async fn test_sigprocmask_invalid_how() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -827,7 +827,7 @@ mod tests {
     /// It is valid to call rt_sigprocmask with a null value for set. In that case, old_set should
     /// contain the current signal mask.
     #[::fuchsia::test]
-    fn test_sigprocmask_null_set() {
+    async fn test_sigprocmask_null_set() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let original_mask = SigSet::from(SIGTRAP);
@@ -856,7 +856,7 @@ mod tests {
     /// It is valid to call rt_sigprocmask with null values for both set and old_set.
     /// In this case, how should be ignored and the set remains the same.
     #[::fuchsia::test]
-    fn test_sigprocmask_null_set_and_old_set() {
+    async fn test_sigprocmask_null_set_and_old_set() {
         let (_kernel, current_task) = create_kernel_and_task();
         let original_mask = SigSet::from(SIGTRAP);
         {
@@ -876,7 +876,7 @@ mod tests {
 
     /// Calling rt_sigprocmask with SIG_SETMASK should set the mask to the provided set.
     #[::fuchsia::test]
-    fn test_sigprocmask_setmask() {
+    async fn test_sigprocmask_setmask() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -908,7 +908,7 @@ mod tests {
 
     /// Calling st_sigprocmask with a how of SIG_BLOCK should add to the existing set.
     #[::fuchsia::test]
-    fn test_sigprocmask_block() {
+    async fn test_sigprocmask_block() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -940,7 +940,7 @@ mod tests {
 
     /// Calling st_sigprocmask with a how of SIG_UNBLOCK should remove from the existing set.
     #[::fuchsia::test]
-    fn test_sigprocmask_unblock() {
+    async fn test_sigprocmask_unblock() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -972,7 +972,7 @@ mod tests {
 
     /// It's ok to call sigprocmask to unblock a signal that is not set.
     #[::fuchsia::test]
-    fn test_sigprocmask_unblock_not_set() {
+    async fn test_sigprocmask_unblock_not_set() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -1004,7 +1004,7 @@ mod tests {
 
     /// It's not possible to block SIGKILL or SIGSTOP.
     #[::fuchsia::test]
-    fn test_sigprocmask_kill_stop() {
+    async fn test_sigprocmask_kill_stop() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -1035,7 +1035,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sigaction_invalid_signal() {
+    async fn test_sigaction_invalid_signal() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert_eq!(
             sys_rt_sigaction(
@@ -1073,7 +1073,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sigaction_old_value_set() {
+    async fn test_sigaction_old_value_set() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -1106,7 +1106,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sigaction_new_value_set() {
+    async fn test_sigaction_new_value_set() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -1138,7 +1138,7 @@ mod tests {
 
     /// A task should be able to signal itself.
     #[::fuchsia::test]
-    fn test_kill_same_task() {
+    async fn test_kill_same_task() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         assert_eq!(sys_kill(&current_task, current_task.id, SIGINT.into()), Ok(()));
@@ -1146,7 +1146,7 @@ mod tests {
 
     /// A task should be able to signal its own thread group.
     #[::fuchsia::test]
-    fn test_kill_own_thread_group() {
+    async fn test_kill_own_thread_group() {
         let (_kernel, init_task) = create_kernel_and_task();
         let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
@@ -1160,7 +1160,7 @@ mod tests {
 
     /// A task should be able to signal a thread group.
     #[::fuchsia::test]
-    fn test_kill_thread_group() {
+    async fn test_kill_thread_group() {
         let (_kernel, init_task) = create_kernel_and_task();
         let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
@@ -1174,7 +1174,7 @@ mod tests {
 
     /// A task should be able to signal everything but init and itself.
     #[::fuchsia::test]
-    fn test_kill_all() {
+    async fn test_kill_all() {
         let (_kernel, init_task) = create_kernel_and_task();
         let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
@@ -1188,7 +1188,7 @@ mod tests {
 
     /// A task should not be able to signal a nonexistent task.
     #[::fuchsia::test]
-    fn test_kill_inexistant_task() {
+    async fn test_kill_inexistant_task() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         assert_eq!(sys_kill(&current_task, 9, SIGINT.into()), error!(ESRCH));
@@ -1196,7 +1196,7 @@ mod tests {
 
     /// A task should not be able to signal a task owned by another uid.
     #[::fuchsia::test]
-    fn test_kill_invalid_task() {
+    async fn test_kill_invalid_task() {
         let (_kernel, task1) = create_kernel_and_task();
         // Task must not have the kill capability.
         task1.set_creds(Credentials::with_ids(1, 1));
@@ -1210,7 +1210,7 @@ mod tests {
 
     /// A task should not be able to signal a task owned by another uid in a thead group.
     #[::fuchsia::test]
-    fn test_kill_invalid_task_in_thread_group() {
+    async fn test_kill_invalid_task_in_thread_group() {
         let (_kernel, init_task) = create_kernel_and_task();
         let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
@@ -1225,7 +1225,7 @@ mod tests {
 
     /// A task should not be able to send an invalid signal.
     #[::fuchsia::test]
-    fn test_kill_invalid_signal() {
+    async fn test_kill_invalid_signal() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         assert_eq!(
@@ -1236,7 +1236,7 @@ mod tests {
 
     /// Sending a blocked signal should result in a pending signal.
     #[::fuchsia::test]
-    fn test_blocked_signal_pending() {
+    async fn test_blocked_signal_pending() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -1268,7 +1268,7 @@ mod tests {
 
     /// More than one instance of a real-time signal can be blocked.
     #[::fuchsia::test]
-    fn test_blocked_real_time_signal_pending() {
+    async fn test_blocked_real_time_signal_pending() {
         let (_kernel, current_task) = create_kernel_and_task();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -1299,7 +1299,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_suspend() {
+    async fn test_suspend() {
         let (kernel, first_current) = create_kernel_and_task();
         let first_task_clone = first_current.task_arc_clone();
         let first_task_id = first_task_clone.id;
@@ -1337,7 +1337,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_stop_cont() {
+    async fn test_stop_cont() {
         let (_kernel, task) = create_kernel_and_task();
         let mut child = task.clone_task_for_test(0, Some(SIGCHLD));
 
@@ -1388,7 +1388,7 @@ mod tests {
 
     /// Waitid does not support all options.
     #[::fuchsia::test]
-    fn test_waitid_options() {
+    async fn test_waitid_options() {
         let (_kernel, current_task) = create_kernel_and_task();
         let id = 1;
         assert_eq!(sys_waitid(&current_task, P_PID, id, UserAddress::default(), 0), error!(EINVAL));
@@ -1400,7 +1400,7 @@ mod tests {
 
     /// Wait4 does not support all options.
     #[::fuchsia::test]
-    fn test_wait4_options() {
+    async fn test_wait4_options() {
         let (_kernel, current_task) = create_kernel_and_task();
         let id = 1;
         assert_eq!(
@@ -1418,7 +1418,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_echild_when_no_zombie() {
+    async fn test_echild_when_no_zombie() {
         let (_kernel, current_task) = create_kernel_and_task();
         // Send the signal to the task.
         assert!(
@@ -1437,7 +1437,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_no_error_when_zombie() {
+    async fn test_no_error_when_zombie() {
         let (_kernel, current_task) = create_kernel_and_task();
         let child = current_task.clone_task_for_test(0, Some(SIGCHLD));
         let expected_zombie = ZombieProcess {
@@ -1461,7 +1461,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_waiting_for_child() {
+    async fn test_waiting_for_child() {
         let (_kernel, task) = create_kernel_and_task();
         let child = task.clone_task_for_test(0, Some(SIGCHLD));
 
@@ -1501,7 +1501,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_waiting_for_child_with_signal_pending() {
+    async fn test_waiting_for_child_with_signal_pending() {
         let (_kernel, task) = create_kernel_and_task();
 
         // Register a signal action to ensure that the `SIGUSR1` signal interrupts the task.
@@ -1531,7 +1531,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sigkill() {
+    async fn test_sigkill() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mut child = current_task.clone_task_for_test(0, Some(SIGCHLD));
 
@@ -1568,7 +1568,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_exit_status() {
+    async fn test_exit_status() {
         // Default action is Terminate
         test_exit_status_for_signal(SIGTERM, SIGTERM.number() as i32, Some(SIGCHLD));
         // Default action is CoreDump
@@ -1576,7 +1576,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_wait4_by_pgid() {
+    async fn test_wait4_by_pgid() {
         let (_kernel, current_task) = create_kernel_and_task();
         let child1 = current_task.clone_task_for_test(0, Some(SIGCHLD));
         let child1_pid = child1.id;
@@ -1599,7 +1599,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_waitid_by_pgid() {
+    async fn test_waitid_by_pgid() {
         let (_kernel, current_task) = create_kernel_and_task();
         let child1 = current_task.clone_task_for_test(0, Some(SIGCHLD));
         let child1_pid = child1.id;
@@ -1620,7 +1620,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sigqueue() {
+    async fn test_sigqueue() {
         let (kernel, current_task) = create_kernel_and_task();
         let current_uid = current_task.creds().uid;
         let current_pid = current_task.get_pid();

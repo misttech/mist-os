@@ -223,7 +223,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn registry_opens_device() {
+    async fn registry_opens_device() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mut registry = DeviceRegistry::new();
@@ -266,7 +266,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_dynamic_misc() {
+    async fn test_dynamic_misc() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         struct TestDevice;

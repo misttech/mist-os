@@ -443,7 +443,7 @@ mod tests {
     use crate::testing::*;
 
     #[::fuchsia::test]
-    fn test_data_input_buffer() {
+    async fn test_data_input_buffer() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
@@ -510,7 +510,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_data_output_buffer() {
+    async fn test_data_output_buffer() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 

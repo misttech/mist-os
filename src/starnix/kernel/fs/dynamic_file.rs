@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_sequence() -> Result<(), Errno> {
+    async fn test_sequence() -> Result<(), Errno> {
         let (current_task, file) = create_test_file(TestSequenceFileSource {});
 
         let read_at = |offset: usize, length: usize| -> Result<Vec<u8>, Errno> {
@@ -350,7 +350,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_at() -> Result<(), Errno> {
+    async fn test_read_at() -> Result<(), Errno> {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
         let (current_task, file) = create_test_file(TestFileSource { counter });
         let read_at = |offset: usize, length: usize| -> Result<Vec<u8>, Errno> {
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_read_and_seek() -> Result<(), Errno> {
+    async fn test_read_and_seek() -> Result<(), Errno> {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
         let (current_task, file) = create_test_file(TestFileSource { counter: counter.clone() });
         let read = |length: usize| -> Result<Vec<u8>, Errno> {

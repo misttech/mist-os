@@ -4,6 +4,7 @@
 
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl_fuchsia_io as fio;
+use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Process};
 use once_cell::sync::OnceCell;
 use std::collections::{BTreeMap, HashSet};
@@ -14,7 +15,6 @@ use crate::device::framebuffer::Framebuffer;
 use crate::device::input::InputFile;
 use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
 use crate::dynamic_thread_pool::DynamicThreadPool;
-use crate::fs::file_server::FileServer;
 use crate::fs::socket::SocketAddress;
 use crate::fs::{FileOps, FileSystemHandle, FsNode};
 use crate::lock::RwLock;
@@ -32,6 +32,13 @@ pub struct Kernel {
     /// The main starnix process. This process is used to create new processes when using the
     /// restricted executor.
     pub starnix_process: Process,
+
+    /// A handle to the async executor running in `starnix_process`.
+    ///
+    /// You can spawn tasks on this executor using `fasync::Task::spawn_on`.
+    /// However, those task must not block. If you need to block, you can dispatch to
+    /// a worker thread using `thread_pool`.
+    pub ehandle: fasync::EHandle,
 
     /// The processes and threads running in this kernel, organized by pid_t.
     pub pids: RwLock<PidTable>,
@@ -102,9 +109,6 @@ pub struct Kernel {
     /// The futexes shared across processes.
     pub shared_futexes: FutexTable,
 
-    /// The server allowing starnix to expose file and directory to fuchsia component.
-    pub file_server: FileServer,
-
     /// The thread pool to dispatch blocking calls to.
     pub thread_pool: DynamicThreadPool,
 
@@ -130,11 +134,12 @@ impl Kernel {
         let job = fuchsia_runtime::job_default().create_child_job()?;
         set_zx_name(&job, name);
 
-        Ok(Arc::<Kernel>::new_cyclic(|kernel| Kernel {
+        Ok(Arc::new(Kernel {
             job,
             starnix_process: fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("Failed to duplicate process self"),
+            ehandle: fasync::EHandle::local(),
             pids: RwLock::new(PidTable::new()),
             default_abstract_socket_namespace: AbstractUnixSocketNamespace::new(unix_address_maker),
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(
@@ -157,7 +162,6 @@ impl Kernel {
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),
-            file_server: FileServer::new(kernel.clone()),
             thread_pool: DynamicThreadPool::new(2),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: load_vdso_from_file().expect("Couldn't read vDSO from disk"),
