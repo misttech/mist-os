@@ -5,7 +5,8 @@
 //! Type-safe bindings for Zircon jobs.
 
 use crate::ok;
-use crate::{object_get_info, ObjectQuery, Topic};
+use crate::sys::{zx_handle_t, zx_rights_t};
+use crate::{object_get_info, object_get_info_vec, Koid, ObjectQuery, Topic};
 use crate::{
     AsHandleRef, Duration, Handle, HandleBased, HandleRef, Process, ProcessOptions, Status, Task,
     Vmar,
@@ -36,6 +37,20 @@ impl From<sys::zx_info_job_t> for JobInfo {
 unsafe impl ObjectQuery for JobInfo {
     const TOPIC: Topic = Topic::JOB;
     type InfoTy = JobInfo;
+}
+
+struct JobProcessesInfo;
+
+unsafe impl ObjectQuery for JobProcessesInfo {
+    const TOPIC: Topic = Topic::JOB_PROCESSES;
+    type InfoTy = Koid;
+}
+
+struct JobChildrenInfo;
+
+unsafe impl ObjectQuery for JobChildrenInfo {
+    const TOPIC: Topic = Topic::JOB_CHILDREN;
+    type InfoTy = Koid;
 }
 
 impl Job {
@@ -160,6 +175,37 @@ impl Job {
         ok(unsafe {
             sys::zx_job_set_critical(self.raw_handle(), opts.bits(), process.raw_handle())
         })
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_JOB_PROCESSES topic.
+    pub fn processes(&self) -> Result<Vec<Koid>, Status> {
+        object_get_info_vec::<JobProcessesInfo>(self.as_handle_ref())
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_JOB_CHILDREN topic.
+    pub fn children(&self) -> Result<Vec<Koid>, Status> {
+        object_get_info_vec::<JobChildrenInfo>(self.as_handle_ref())
+    }
+
+    /// Wraps the
+    /// [zx_object_get_child](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_child.md)
+    /// syscall.
+    pub fn get_child(&self, koid: &Koid, rights: zx_rights_t) -> Result<Handle, Status> {
+        let mut handle: zx_handle_t = Default::default();
+        let status = unsafe {
+            sys::zx_object_get_child(
+                self.raw_handle(),
+                Koid::from(*koid).raw_koid(),
+                rights,
+                &mut handle as *mut zx_handle_t,
+            )
+        };
+        ok(status)?;
+        Ok(unsafe { Handle::from_raw(handle) })
     }
 }
 
@@ -286,11 +332,12 @@ bitflags! {
 mod tests {
     // The unit tests are built with a different crate name, but fuchsia_runtime returns a "real"
     // fuchsia_zircon::Job that we need to use.
+    use crate::{sys::ZX_RIGHT_SAME_RIGHTS, INFO_VEC_SIZE_INITIAL};
     use fuchsia_zircon::{
-        sys, AsHandleRef, Duration, JobAction, JobCondition, JobCriticalOptions,
-        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Signals, Task, Time,
+        sys, AsHandleRef, Duration, Job, JobAction, JobCondition, JobCriticalOptions,
+        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, Signals, Task, Time,
     };
-    use std::ffi::CString;
+    use std::{collections::HashSet, ffi::CString};
 
     #[test]
     fn info_default() {
@@ -371,5 +418,86 @@ mod tests {
         child_job
             .set_critical(JobCriticalOptions::RETCODE_NONZERO, &process)
             .expect("failed to set critical process for job");
+    }
+
+    #[test]
+    fn create_and_report_children() {
+        let fresh_job =
+            fuchsia_runtime::job_default().create_child_job().expect("failed to create child job");
+        let mut created_children = Vec::new();
+        created_children.push(fresh_job.create_child_job().expect("failed to create child job"));
+        let reported_children_koids = fresh_job.children().unwrap();
+        assert_eq!(reported_children_koids.len(), 1);
+        assert_eq!(Koid::from(reported_children_koids[0]), created_children[0].get_koid().unwrap());
+        for _ in 0..INFO_VEC_SIZE_INITIAL {
+            created_children
+                .push(fresh_job.create_child_job().expect("failed to create child job"));
+        }
+        let reported_children_koids = fresh_job.children().unwrap();
+        let created_children_koids =
+            created_children.iter().map(|p| p.get_koid().unwrap()).collect::<Vec<_>>();
+        assert_eq!(reported_children_koids.len(), INFO_VEC_SIZE_INITIAL + 1);
+        assert_eq!(
+            HashSet::<_>::from_iter(&reported_children_koids),
+            HashSet::from_iter(&created_children_koids)
+        );
+    }
+
+    #[test]
+    fn create_and_report_processes() {
+        let fresh_job =
+            fuchsia_runtime::job_default().create_child_job().expect("failed to create child job");
+        let mut created_processes = Vec::new();
+        let options = fuchsia_zircon::ProcessOptions::empty();
+        created_processes.push(
+            fresh_job
+                .create_child_process(options.clone(), "first".as_bytes())
+                .expect("failed to create child process")
+                .0,
+        );
+        let reported_process_koids = fresh_job.processes().unwrap();
+        assert_eq!(reported_process_koids.len(), 1);
+        assert_eq!(Koid::from(reported_process_koids[0]), created_processes[0].get_koid().unwrap());
+        for index in 0..INFO_VEC_SIZE_INITIAL {
+            created_processes.push(
+                fresh_job
+                    .create_child_process(options.clone(), format!("{index}").as_bytes())
+                    .expect("failed to create child process")
+                    .0,
+            );
+        }
+        let reported_process_koids = fresh_job.processes().unwrap();
+        let created_process_koids =
+            created_processes.iter().map(|p| p.get_koid().unwrap()).collect::<Vec<_>>();
+        assert_eq!(reported_process_koids.len(), INFO_VEC_SIZE_INITIAL + 1);
+        assert_eq!(
+            HashSet::<_>::from_iter(&reported_process_koids),
+            HashSet::from_iter(&created_process_koids)
+        );
+    }
+
+    #[test]
+    fn get_child_from_koid() {
+        let fresh_job =
+            fuchsia_runtime::job_default().create_child_job().expect("failed to create child job");
+        let created_job = fresh_job.create_child_job().expect("failed to create child job");
+        let mut reported_job_koids = fresh_job.children().unwrap();
+        assert_eq!(reported_job_koids.len(), 1);
+        let reported_job_koid = reported_job_koids.remove(0);
+        let reported_job_handle =
+            Job::from(fresh_job.get_child(&reported_job_koid, ZX_RIGHT_SAME_RIGHTS).unwrap());
+        assert_eq!(reported_job_handle.get_koid(), created_job.get_koid());
+
+        // We can even create a process on the handle we got back, and test ProcessKoid
+        let created_process = reported_job_handle
+            .create_child_process(fuchsia_zircon::ProcessOptions::empty(), "first".as_bytes())
+            .expect("failed to create child process")
+            .0;
+        let mut reported_process_koids = reported_job_handle.processes().unwrap();
+        assert_eq!(reported_process_koids.len(), 1);
+        let reported_process_koid = reported_process_koids.remove(0);
+        let reported_process_handle =
+            reported_job_handle.get_child(&reported_process_koid, ZX_RIGHT_SAME_RIGHTS).unwrap();
+        assert_eq!(reported_process_handle.get_koid(), created_process.get_koid());
     }
 }

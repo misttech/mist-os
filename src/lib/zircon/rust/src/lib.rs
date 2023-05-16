@@ -9,6 +9,10 @@ pub mod sys {
     pub use fuchsia_zircon_sys::*;
 }
 
+// Tuning constants for get_info_vec(). pub(crate) to support unit tests.
+pub(crate) const INFO_VEC_SIZE_INITIAL: usize = 16;
+const INFO_VEC_SIZE_PAD: usize = 2;
+
 // Implements the HandleBased traits for a Handle newtype struct
 macro_rules! impl_handle_based {
     ($type_name:path) => {
@@ -38,7 +42,7 @@ macro_rules! impl_handle_based {
 ///
 /// This is for use when the underlying property type is a simple raw type.
 /// It creates an empty 'tag' struct to implement the relevant PropertyQuery*
-/// traits against. One, or both, of a getting and setter may be defined
+/// traits against. One, or both, of a getter and setter may be defined
 /// depending upon what the property supports. Example usage is
 /// unsafe_handle_propertyes!(ObjectType[get_foo_prop,set_foo_prop:FooPropTag,FOO,u32;]);
 /// unsafe_handle_properties!(object: Foo,
@@ -269,6 +273,47 @@ pub fn object_get_info<Q: ObjectQuery>(
         )
     };
     ok(status).map(|_| (actual, avail - actual))
+}
+
+/// Query multiple records of information about a zircon object.
+/// Returns a vec of Q::InfoTy on success.
+/// Intended for calls that return multiple small objects.
+pub fn object_get_info_vec<Q: ObjectQuery>(
+    handle: HandleRef<'_>,
+) -> Result<Vec<Q::InfoTy>, Status> {
+    // Start with a few slots
+    let mut out = Vec::<Q::InfoTy>::with_capacity(INFO_VEC_SIZE_INITIAL);
+    let mut actual = 0;
+    let mut avail = 0;
+    loop {
+        let status = unsafe {
+            let uninit = out.spare_capacity_mut();
+            sys::zx_object_get_info(
+                handle.raw_handle(),
+                *Q::TOPIC,
+                uninit.as_mut_ptr() as *mut u8,
+                std::mem::size_of_val(uninit),
+                &mut actual as *mut usize,
+                &mut avail as *mut usize,
+            )
+        };
+        match Status::ok(status) {
+            Err(status) => return Err(status),
+            Ok(()) if actual == avail => {
+                unsafe { out.set_len(actual) };
+                return Ok(out);
+            }
+            Ok(()) => {
+                if avail < out.capacity() {
+                    // This should only happen if there's a bug somewhere
+                    return Err(Status::INTERNAL);
+                }
+                // The number of records may increase between retries; reserve space for that.
+                let needed_space = avail * INFO_VEC_SIZE_PAD;
+                out.reserve_exact(/* amount to grow */ needed_space - out.capacity());
+            }
+        }
+    }
 }
 
 /// Get a property on a zircon object
