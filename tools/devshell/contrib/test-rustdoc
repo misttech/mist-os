@@ -1,0 +1,42 @@
+#!/bin/bash
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Test
+### runs "fx rustdoc" on all rust targets
+##
+## Runs "fx rustdoc" on all rust targets, placing logs for failed
+## crates in $FUCHSIA_OUT_DIR/rustdoc_errors/$target_name
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
+fx-config-read
+
+cargo_dir="$FUCHSIA_BUILD_DIR/cargo"
+readarray -t rustdoc_targets < <(
+  fx-command-run jq -cr '.[]' "$cargo_dir/rustdoc_targets.json" \
+    "$cargo_dir/rustdoc_host_targets.json" | sort
+)
+
+total="${#rustdoc_targets[@]}"
+failures=0
+err_dir="$FUCHSIA_OUT_DIR/rustdoc_errors"
+rm -rf "$err_dir"
+mkdir -p "$err_dir"
+
+for ((i = 0; i < "${#rustdoc_targets[@]}"; ++i)); do
+  cur=${rustdoc_targets[i]}
+  # echo $cur
+  label=$(jq -r .label <<<"$cur")
+  manifest=$cargo_dir/$(jq -r .cargo_manifest_dir <<<"$cur")/Cargo.toml
+  echo "[$i/$total] $label"
+  if ! fx-command-run rustdoc --no-deps "$manifest" 2>/tmp/rustdoc_stderr >/dev/null; then
+    ((failures += 1))
+    sanitized_label=$(echo "$label" | sed 's,//,,' | sed 's,/,__,g')
+    mv /tmp/rustdoc_stderr "$err_dir/$sanitized_label"
+    echo "❌ falilure, see '$err_dir/$sanitized_label'"
+    echo "for logs, or run 'fx rustdoc $manifest'" to reproduce
+  fi
+done
+
+echo "Test finished with $failures failures, see $err_dir for their logs"

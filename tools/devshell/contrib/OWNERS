@@ -35,6 +35,7 @@ per-file run-dart-action=zra@google.com
 per-file run-e2e-tests=isma@google.com
 per-file run-recovery=abarth@google.com
 per-file             rustdoc = tmandry@google.com
+per-file        test-rustdoc = josephry@google.com
 per-file             rustfmt = tmandry@google.com
 per-file scrutiny=benwright@google.com
 per-file set-petal=abarth@google.com
