@@ -23,17 +23,14 @@ using ::wmemset;
 // These are called by libc++ header code that should never be instantiated.
 
 constexpr size_t __constexpr_wcslen(const wchar_t* str) {
-  __builtin_abort();
   return 0;
 }
 
 constexpr int __constexpr_wmemcmp(const wchar_t* lhs, const wchar_t* rhs, size_t count) {
-  __builtin_abort();
   return -1;
 }
 
 constexpr const wchar_t* __constexpr_wmemchr(const wchar_t* str, wchar_t wc, size_t count) {
-  __builtin_abort();
   return nullptr;
 }
 
