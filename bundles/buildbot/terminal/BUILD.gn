@@ -19,15 +19,5 @@ group("terminal") {
     # General end to end dependencies.
     "//src/tests/end_to_end/bundles:end_to_end_deps",
     "//src/tests/end_to_end/bundles:terminal_end_to_end_deps",
-
-    # Used by Chromium tests, such as //src/chromium:tests.
-    # In Chromium infra, these tests run on this image, so they must be in cache.
-    # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
-    "//src/developer/build_info/testing:fake-build-info",
-    "//src/testing/fidl/intl_property_manager",
-
-    # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
-    # moniker and is unable to ingest Inspect. Used in Chromium tests.
-    "//src/diagnostics/archivist:archivist-without-attribution",
   ]
 }

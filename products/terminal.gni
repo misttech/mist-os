@@ -60,21 +60,12 @@ legacy_base_package_labels += [
   "//src/dart:dart_aot",
 ]
 
-# End to end (E2E) product test runtime dependencies. Must be added to cache,
-# not universe, so the test can run on bots where there is no package server.
-#
-# TODO(fxbug.dev/9892): Support a package server on bots so this can be added to
-# universe like the tests.
+# Used by Chromium tests, such as //src/chromium:tests.
+# Although deps in the individual tests ensures these are available in Fuchsia
+# infrastructure, Chromium infrastructure runs such tests run on this image,
+# so they must be explicitly included in cached packages.
+# TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
 legacy_cache_package_labels += [
-  # General end to end dependencies.
-  "//src/tests/end_to_end/bundles:end_to_end_deps",
-  "//src/tests/end_to_end/bundles:terminal_end_to_end_deps",
-
-  # Used by Chromium tests, such as //src/chromium:tests.
-  # Although deps in the individual tests ensures these are available in Fuchsia
-  # infrastructure, Chromium infrastructure runs such tests run on this image,
-  # so they must be explicitly included in cached packages.
-  # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
   "//src/chromium:chromium_test_base_deps",
 
   # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
@@ -107,15 +98,6 @@ legacy_base_package_labels += [
 # Include virtual_audio in developer-focused products/builds, for interactive audio debugging.
 base_driver_package_labels +=
     [ "//src/media/audio/bundles:virtual_audio_driver" ]
-
-legacy_universe_package_labels += [
-  # E2E Product Tests. They don't produce fuchsia packages, but host
-  # executables, and must just be included somewhere in the build configuration
-  # of the product.
-  "//src/tests/end_to_end/sl4f:test",
-  "//src/tests/end_to_end/perf:test",
-  "//src/tests/end_to_end/time_sync:test",
-]
 
 # Add Test UI Stack for use in tests.
 # TODO(fxbug.dev/105105): Remove once we migrate client usage to subpackages.
