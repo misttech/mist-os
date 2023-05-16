@@ -109,7 +109,9 @@ void Device::DdkRelease() {
 }
 
 void Device::DdkSuspend(ddk::SuspendTxn txn) {
+  BRCMF_INFO("Shutdown requested");
   Shutdown();
+  BRCMF_INFO("Shutdown completed");
   txn.Reply(ZX_OK, txn.requested_state());
 }
 
