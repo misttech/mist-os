@@ -481,8 +481,6 @@ def _fuchsia_product_bundle_impl(ctx):
         "mkdir -p $FFX_ISOLATE_DIR",
         " ".join(ffx_invocation),
     ]
-    if ctx.attr.repository_keys != None:
-        script_lines.append("cp -r $REPOKEYS $OUTDIR")
 
     script_lines.append("cp $BOOTSERVER $OUTDIR")
     env["BOOTSERVER"] = fuchsia_toolchain.bootserver.path
