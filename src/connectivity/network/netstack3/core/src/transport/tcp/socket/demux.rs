@@ -5,7 +5,6 @@
 //! Defines the entry point of TCP packets, by directing them into the correct
 //! state machine.
 
-use alloc::vec::Vec;
 use assert_matches::assert_matches;
 use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16, ops::ControlFlow};
 use tracing::trace;
@@ -14,7 +13,7 @@ use net_types::{
     ip::{Ip, IpAddress, IpVersionMarker},
     SpecifiedAddr,
 };
-use packet::{Buf, BufferMut, Serializer};
+use packet::{BufferMut, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
     ip::IpProto,
     tcp::{
@@ -159,7 +158,7 @@ fn handle_incoming_packet<I, B, C, SC>(
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
     let any_usable_conn = match addrs_to_search.try_fold(None, |tw_reuse, addr| {
         match addr {
@@ -298,7 +297,7 @@ where
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
     let (conn, _, addr) = sockets
         .socketmap
@@ -480,7 +479,7 @@ where
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
     let socketmap = &mut sockets.socketmap;
     let (maybe_listener, sharing, listener_addr) =
@@ -680,7 +679,7 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
 pub(super) fn tcp_serialize_segment<'a, S, A>(
     segment: S,
     conn_addr: ConnIpAddr<A, NonZeroU16, NonZeroU16>,
-) -> impl Serializer<Buffer = Buf<Vec<u8>>> + Debug + 'a
+) -> impl Serializer<Buffer = EmptyBuf> + Debug + 'a
 where
     S: Into<Segment<SendPayload<'a>>>,
     A: IpAddress,
@@ -702,7 +701,7 @@ where
         Some(Control::FIN) => builder.fin(true),
         Some(Control::RST) => builder.rst(true),
     }
-    contents.data().encapsulate(
+    (*contents.data()).into_serializer().encapsulate(
         TcpSegmentBuilderWithOptions::new(builder, options.iter()).unwrap_or_else(
             |TcpOptionsTooLongError| {
                 panic!("Too many TCP options");
@@ -771,7 +770,7 @@ mod test {
             },
         );
 
-        let mut serialized = serializer.serialize_vec_outer().unwrap().into_inner();
+        let mut serialized = serializer.serialize_vec_outer().unwrap().unwrap_b();
         let parsed_segment = serialized
             .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
                 *I::FAKE_CONFIG.remote_ip,

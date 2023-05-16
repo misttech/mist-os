@@ -41,7 +41,7 @@ use net_types::{
     AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
 use nonzero_ext::nonzero;
-use packet::Buf;
+use packet::EmptyBuf;
 use packet_formats::ip::IpProto;
 use rand::RngCore;
 use smallvec::{smallvec, SmallVec};
@@ -172,7 +172,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     type IpTransportCtx<'a>: BufferTransportIpContext<
             I,
             C,
-            Buf<Vec<u8>>,
+            EmptyBuf,
             DeviceId = Self::DeviceId,
             WeakDeviceId = Self::WeakDeviceId,
         > + DeviceIpSocketHandler<I, C>;
@@ -2019,7 +2019,7 @@ fn do_send_inner<I, SC, C>(
 ) where
     I: IpExt,
     C: NonSyncContext,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf>,
 {
     while let Some(seg) = conn.state.poll_send(u32::MAX, ctx.now(), &conn.socket_options) {
         let ser = tcp_serialize_segment(seg, addr.ip.clone());
@@ -2551,7 +2551,7 @@ fn connect_inner<I, SC, C>(
 where
     I: IpLayerIpExt,
     C: NonSyncContext,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf>,
 {
     let isn = isn.generate(
         ctx.now(),
@@ -3149,7 +3149,7 @@ mod tests {
         ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
         AddrAndZone, LinkLocalAddr, Witness,
     };
-    use packet::ParseBuffer as _;
+    use packet::{Buf, ParseBuffer as _};
     use packet_formats::{
         icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
         tcp::{TcpParseArgs, TcpSegment},
