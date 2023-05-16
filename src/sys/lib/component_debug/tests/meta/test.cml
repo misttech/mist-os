@@ -20,6 +20,12 @@
             url: "#meta/echo_server.cm",
         },
     ],
+    collections: [
+        {
+            name: "for_manifest_resolution",
+            durability: "transient",
+        },
+    ],
     capabilities: [
         {
             directory: "data",

@@ -7,9 +7,10 @@ use {
     component_debug::{
         capability,
         cli::*,
+        realm::{get_manifest, resolve_declaration},
         route::{DeclType, RouteReport},
     },
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
 };
@@ -213,4 +214,50 @@ async fn route() {
     // fuchsia.test.Suite
     // data
     assert_eq!(reports.len(), 6 + 3);
+}
+
+async fn expected_foo_manifest() -> cm_rust::ComponentDecl {
+    use cm_rust::FidlIntoNative;
+    let foo_cm = fuchsia_fs::file::open_in_namespace(
+        "/pkg/meta/foo.cm",
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .unwrap();
+    fuchsia_fs::file::read_fidl::<fdecl::Component>(&foo_cm).await.unwrap().fidl_into_native()
+}
+
+#[fuchsia::test]
+async fn get_manifest_static_instance() {
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let manifest =
+        get_manifest(&AbsoluteMoniker::parse_str("/foo").unwrap(), &realm_query).await.unwrap();
+    assert_eq!(manifest, expected_foo_manifest().await);
+}
+
+#[fuchsia::test]
+async fn get_manifest_potential_dynamic_instance_relative_url() {
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let manifest = resolve_declaration(
+        &realm_query,
+        &AbsoluteMoniker::parse_str("/").unwrap(),
+        &fsys::ChildLocation::Collection("for_manifest_resolution".to_string()),
+        "#meta/foo.cm",
+    )
+    .await
+    .unwrap();
+    assert_eq!(manifest, expected_foo_manifest().await);
+}
+
+#[fuchsia::test]
+async fn get_manifest_potential_dynamic_instance_absolute_url() {
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let manifest = resolve_declaration(
+        &realm_query,
+        &AbsoluteMoniker::parse_str("/").unwrap(),
+        &fsys::ChildLocation::Collection("for_manifest_resolution".to_string()),
+        "fuchsia-pkg://fuchsia.com/component_debug_integration_tests#meta/foo.cm",
+    )
+    .await
+    .unwrap();
+    assert_eq!(manifest, expected_foo_manifest().await);
 }

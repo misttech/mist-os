@@ -1342,6 +1342,13 @@ impl ResolvedInstanceState {
         &self.execution_scope
     }
 
+    pub fn address_for_relative_url(
+        &self,
+        fragment: &str,
+    ) -> Result<ComponentAddress, ::routing::resolving::ResolverError> {
+        self.address.clone_with_new_resource(fragment.strip_prefix("#"))
+    }
+
     /// Returns an iterator over all children.
     pub fn children(&self) -> impl Iterator<Item = (&ChildMoniker, &Arc<ComponentInstance>)> {
         self.children.iter().map(|(k, v)| (k, v))
@@ -1438,6 +1445,14 @@ impl ResolvedInstanceState {
             Some(c) => c.environment.as_ref(),
             None => child.environment.as_ref(),
         };
+        self.get_environment(component, environment_name)
+    }
+
+    fn get_environment(
+        &self,
+        component: &Arc<ComponentInstance>,
+        environment_name: Option<&String>,
+    ) -> Arc<Environment> {
         if let Some(environment_name) = environment_name {
             Arc::clone(
                 self.environments
@@ -1448,6 +1463,14 @@ impl ResolvedInstanceState {
             // Auto-inherit the environment from this component instance.
             Arc::new(Environment::new_inheriting(component))
         }
+    }
+
+    pub fn environment_for_collection(
+        &self,
+        component: &Arc<ComponentInstance>,
+        collection: &CollectionDecl,
+    ) -> Arc<Environment> {
+        self.get_environment(component, collection.environment.as_ref())
     }
 
     /// Adds a new child of this instance for the given `ChildDecl`. Returns a

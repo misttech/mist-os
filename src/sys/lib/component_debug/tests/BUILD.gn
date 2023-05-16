@@ -10,9 +10,12 @@ rustc_test("integration_test_bin") {
   name = "component_debug_integration_test"
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//src/sys/lib/cm_rust",
     "//src/sys/lib/component_debug",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:assert_matches",

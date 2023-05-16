@@ -419,6 +419,11 @@ mod tests {
                         target_name: Some("fuchsia.bar.baz".to_string()),
                         ..Default::default()
                     })]),
+                    capabilities: Some(vec![fdecl::Capability::Protocol(fdecl::Protocol {
+                        name: Some("fuchsia.bar.baz".to_string()),
+                        source_path: Some("/svc/fuchsia.bar.baz".to_string()),
+                        ..Default::default()
+                    })]),
                     collections: Some(vec![fdecl::Collection {
                         name: Some("my-collection".to_string()),
                         durability: Some(fdecl::Durability::Transient),

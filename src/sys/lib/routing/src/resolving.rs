@@ -387,7 +387,10 @@ impl ComponentAddress {
 
     /// Creates a new `ComponentAddress` from `self` by replacing only the
     /// component URL resource.
-    fn clone_with_new_resource(&self, some_resource: Option<&str>) -> Result<Self, ResolverError> {
+    pub fn clone_with_new_resource(
+        &self,
+        some_resource: Option<&str>,
+    ) -> Result<Self, ResolverError> {
         let mut url = match &self {
             Self::Absolute { url } => url.clone(),
             Self::RelativePath { url, .. } => url.clone(),

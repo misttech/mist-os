@@ -94,6 +94,7 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use cm_rust::*;
+    use fidl_fuchsia_component_decl as fdecl;
     use std::collections::HashMap;
 
     fn create_realm_query() -> fsys::RealmQueryProxy {
@@ -112,6 +113,14 @@ mod tests {
             HashMap::from([(
                 "./my_foo".to_string(),
                 ComponentDecl {
+                    children: vec![ChildDecl {
+                        name: "my_bar".to_string(),
+                        url: "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm".to_string(),
+                        startup: fdecl::StartupMode::Lazy,
+                        environment: None,
+                        config_overrides: None,
+                        on_terminate: None,
+                    }],
                     uses: vec![UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "fuchsia.foo.bar".into(),

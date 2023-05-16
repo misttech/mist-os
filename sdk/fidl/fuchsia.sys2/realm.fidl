@@ -42,6 +42,14 @@ type GetManifestError = flexible enum {
 
     /// The component manifest could not be encoded into its persistable format.
     ENCODE_FAILED = 4;
+
+    /// The specified collection was not found in the specified component.
+    @available(added=12)
+    BAD_CHILD_LOCATION = 5;
+
+    /// The specified URL could not be parsed.
+    @available(added=12)
+    BAD_URL = 6;
 };
 
 /// Errors that can be returned by the GetStructuredConfig call.
@@ -176,6 +184,13 @@ type OpenDirType = flexible enum {
     NAMESPACE_DIR = 5;
 };
 
+/// Locations from which a child could be resolved under a given parent.
+type ChildLocation = flexible union {
+    1: collection string:fuchsia.component.MAX_NAME_LENGTH;
+
+    // TODO(https://fxbug.dev/127338) support static children
+};
+
 /// Offers detailed introspection into component instances under a realm.
 @discoverable
 protocol RealmQuery {
@@ -196,6 +211,22 @@ protocol RealmQuery {
     @available(added=11)
     GetManifest(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (resource struct {
+        iterator client_end:ManifestBytesIterator;
+    }) error GetManifestError;
+
+    /// Gets the manifest of a component URL as if it were a child of the specified parent
+    /// without actually creating or starting that component.
+    ///
+    /// The manifest is encoded in its standalone persistable format per RFC-0120 and
+    /// is sent across using an iterator. Some manifests are too large to send over a
+    /// Zircon channel and we can't use a VMO because we need an approach that is
+    /// compatible with overnet.
+    @available(added=12)
+    ResolveDeclaration(struct {
+        parent string:fuchsia.component.MAX_MONIKER_LENGTH;
+        child_location ChildLocation;
+        url fuchsia.url.Url;
     }) -> (resource struct {
         iterator client_end:ManifestBytesIterator;
     }) error GetManifestError;

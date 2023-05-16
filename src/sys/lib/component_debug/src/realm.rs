@@ -133,6 +133,15 @@ pub enum GetManifestError {
     #[error("component manager failed to encode the manifest")]
     EncodeFailed,
 
+    #[error("component does not have {_0:?} as a valid location for a child")]
+    BadChildLocation(fsys::ChildLocation),
+
+    #[error("could not resolve component from URL {_0}")]
+    BadUrl(String),
+
+    #[error("component manifest could not be validated")]
+    InvalidManifest(#[from] cm_fidl_validator::error::ErrorList),
+
     #[error("component manager responded with an unknown error code")]
     UnknownError,
 }
@@ -374,7 +383,15 @@ pub async fn get_manifest(
         Err(_) => Err(GetManifestError::UnknownError),
     }?;
 
-    let iterator = iterator.into_proxy().unwrap();
+    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
+    let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
+    let manifest = manifest.fidl_into_native();
+    Ok(manifest)
+}
+
+async fn drain_manifest_bytes_iterator(
+    iterator: fsys::ManifestBytesIteratorProxy,
+) -> Result<Vec<u8>, fidl::Error> {
     let mut bytes = vec![];
 
     loop {
@@ -385,7 +402,37 @@ pub async fn get_manifest(
         bytes.append(&mut batch);
     }
 
+    Ok(bytes)
+}
+
+pub async fn resolve_declaration(
+    realm_query: &fsys::RealmQueryProxy,
+    parent: &AbsoluteMoniker,
+    child_location: &fsys::ChildLocation,
+    url: &str,
+) -> Result<ComponentDecl, GetManifestError> {
+    let iterator = realm_query
+        .resolve_declaration(&format!(".{}", parent), child_location, url)
+        .await?
+        .map_err(|e| match e {
+            fsys::GetManifestError::InstanceNotFound => {
+                GetManifestError::InstanceNotFound(parent.clone())
+            }
+            fsys::GetManifestError::InstanceNotResolved => {
+                GetManifestError::InstanceNotResolved(parent.clone())
+            }
+            fsys::GetManifestError::BadMoniker => GetManifestError::BadMoniker(parent.clone()),
+            fsys::GetManifestError::EncodeFailed => GetManifestError::EncodeFailed,
+            fsys::GetManifestError::BadChildLocation => {
+                GetManifestError::BadChildLocation(child_location.to_owned())
+            }
+            fsys::GetManifestError::BadUrl => GetManifestError::BadUrl(url.to_owned()),
+            _ => GetManifestError::UnknownError,
+        })?;
+
+    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
     let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
+    cm_fidl_validator::validate(&manifest)?;
     let manifest = manifest.fidl_into_native();
     Ok(manifest)
 }
@@ -622,6 +669,11 @@ mod tests {
                         source_name: Some("fuchsia.bar.baz".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
                         target_name: Some("fuchsia.bar.baz".to_string()),
+                        ..Default::default()
+                    })]),
+                    capabilities: Some(vec![fdecl::Capability::Protocol(fdecl::Protocol {
+                        name: Some("fuchsia.bar.baz".to_string()),
+                        source_path: Some("/svc/fuchsia.bar.baz".to_string()),
                         ..Default::default()
                     })]),
                     ..Default::default()
