@@ -22,6 +22,21 @@ your development setup, consider the following guides:
   base, you may want to exclude some directories from being watched for file
   changes.
 
+### fuchsia.code-workspace
+
+This file in the root directory of fuchsia.git contains recommended configuration
+defaults for using VS Code on Fuchsia. If you use this workspace file (either
+with `File > Open Workspace from File` or opening the file in an editor pane
+and clicking the `Open Workspace` button that pops up) it will prompt you to
+install some recommended extensions if you don't already have them, and it
+will set configuration options that are useful or necessary to use those
+extensions on Fuchsia.
+
+Note that these settings override ones in your user configuration, if you'd
+like to edit the values set in `fuchsia.code-workpace` you'll have to put them
+in the [workspace-folder settings][settings-precedence] in
+`fuchsia/.vscode/settings.json`.
+
 ### Extensions
 
 VS Code supports a large amount of extensions which can help you customize
@@ -77,6 +92,7 @@ For installation and usage information see
 [Kakoune for Fuchsia development][#kakoune].
 
 [vs-code-download]: https://code.visualstudio.com/docs/setup/setup-overview
+[settings-precedence]: https://code.visualstudio.com/docs/getstarted/settings#_settings-precedence
 [remote-workspaces]: /docs/reference/tools/editors/vscode/remote-workspaces.md
 [file-reloading]: /docs/reference/tools/editors/vscode/file-reloading.md
 [sdk-fundamentals]: /docs/get-started/sdk/learn/README.md

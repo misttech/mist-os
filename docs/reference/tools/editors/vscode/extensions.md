@@ -133,16 +133,10 @@ To use `rust-analyzer` with VS Code, Fuchsia recommends:
 
 ##### Configure workflow {#rust-configure-workflow}
 
-After installing `rust-analyzer`, modify your
-VS Code's `settings.json` file:
-
-1. Press `CMD/CTRL + SHIFT + P` to open **Command Palette**.
-1. Type `settings` in the search field.
-1. Click **Preferences: Open Settings (JSON)**.
-1. In `settings.json`, paste the following snippets:
-
-Note: If you use VS Code's [remote workspaces][vscode-remote-workspaces], use the `settings.json`
-for your remote environment.
+Using the [`fuchsia.code-workspace` configuration file][code-workspace]
+will set recommended defaults for using rust-analyzer on Fuchsia. If you
+aren't using the workspace file, here are some settings you may want to add
+to your `settings.json`:
 
 ```json
 
@@ -221,3 +215,4 @@ directly from VS Code.
 [structured-config-json5]: /docs/development/components/configuration/structured_config.md
 [bazel-vscode-ext]: https://marketplace.visualstudio.com/items?itemName=BazelBuild.vscode-bazel
 [sdk-get-started]: /docs/get-started/sdk/index.md?ide=vscode
+[code-workspace]: /docs/reference/tools/editors#fuchsia.code-workspace
