@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/watcher.h>
 
@@ -38,11 +39,15 @@ struct App;
 
 class Rule {
  public:
-  using Func = zx_status_t (*)(const App& app, const char* arg, int fd);
+  using Func = zx_status_t (*)(const App& app, const char* arg,
+                               fidl::UnownedClientEnd<fuchsia_io::Directory> dir, const char* name);
 
   Rule(const char* arg, Func func) : func_(func), arg_(arg) {}
 
-  zx_status_t CallWithFd(const App& app, int fd) const { return func_(app, arg_, fd); }
+  zx_status_t Call(const App& app, fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                   const char* name) const {
+    return func_(app, arg_, dir, name);
+  }
 
  private:
   Func func_;
@@ -70,15 +75,9 @@ zx_status_t watchcb(int dirfd, int event, const char* fn, void* cookie) {
   if (app.verbose) {
     fprintf(stderr, "waitfor: device='/dev/class/%s/%s'\n", app.devclass, fn);
   }
-  const fbl::unique_fd fd(openat(dirfd, fn, O_RDONLY));
-  if (!fd.is_valid()) {
-    fprintf(stderr, "waitfor: warning: failed to open '/dev/class/%s/%s': %s\n", app.devclass, fn,
-            strerror(errno));
-    return ZX_OK;
-  }
-
+  const fdio_cpp::UnownedFdioCaller caller(dirfd);
   for (const Rule& r : app.rules) {
-    switch (const zx_status_t status = r.CallWithFd(app, fd.get()); status) {
+    switch (const zx_status_t status = r.Call(app, caller.directory(), fn); status) {
       case ZX_OK:
         // rule matched
         continue;
@@ -106,13 +105,20 @@ zx_status_t watchcb(int dirfd, int event, const char* fn, void* cookie) {
 // Expression evaluators return OK on match, NEXT on no-match
 // any other error is fatal
 
-zx_status_t expr_topo(const App& app, const char* arg, int fd) {
-  const fdio_cpp::UnownedFdioCaller caller(fd);
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->GetTopologicalPath();
+zx_status_t expr_topo(const App& app, const char* arg,
+                      fidl::UnownedClientEnd<fuchsia_io::Directory> dir, const char* name) {
+  std::string controller_path = std::string(name) + "/device_controller";
+  zx::result controller =
+      component::ConnectAt<fuchsia_device::Controller>(dir, controller_path.c_str());
+  if (controller.is_error()) {
+    fprintf(stderr, "waitfor: warning: failed to open: '%s' :%s \n", name,
+            controller.status_string());
+    return controller.error_value();
+  }
+  const fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
   if (!result.ok()) {
-    fprintf(stderr, "waitfor: warning: cannot request topological path: %s\n",
-            result.FormatDescription().c_str());
+    fprintf(stderr, "waitfor: warning: cannot request topological path: '%s': %s\n",
+            controller_path.c_str(), result.FormatDescription().c_str());
     return result.status();
   }
   const auto* res = result.Unwrap();
@@ -134,11 +140,17 @@ zx_status_t expr_topo(const App& app, const char* arg, int fd) {
   return ZX_ERR_NEXT;
 }
 
-zx_status_t expr_part_guid(const App& app, const char* arg, int fd) {
-  const fdio_cpp::UnownedFdioCaller caller(fd);
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block_partition::Partition>())
-          ->GetInstanceGuid();
+zx_status_t expr_part_guid(const App& app, const char* arg,
+                           fidl::UnownedClientEnd<fuchsia_io::Directory> dir, const char* name) {
+  zx::result partition =
+      component::ConnectAt<fuchsia_hardware_block_partition::Partition>(dir, name);
+  if (partition.is_error()) {
+    fprintf(stderr, "waitfor: warning: failed to open: '%s :%s \n", name,
+            partition.status_string());
+    return partition.error_value();
+  }
+
+  const fidl::WireResult result = fidl::WireCall(partition.value())->GetInstanceGuid();
   if (!result.ok()) {
     fprintf(stderr, "waitfor: warning: cannot request instance guid: %s\n",
             result.FormatDescription().c_str());
@@ -162,11 +174,18 @@ zx_status_t expr_part_guid(const App& app, const char* arg, int fd) {
   return ZX_ERR_NEXT;
 }
 
-zx_status_t expr_part_type_guid(const App& app, const char* arg, int fd) {
-  const fdio_cpp::UnownedFdioCaller caller(fd);
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block_partition::Partition>())
-          ->GetTypeGuid();
+zx_status_t expr_part_type_guid(const App& app, const char* arg,
+                                fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                                const char* name) {
+  zx::result partition =
+      component::ConnectAt<fuchsia_hardware_block_partition::Partition>(dir, name);
+  if (partition.is_error()) {
+    fprintf(stderr, "waitfor: warning: failed to open: '%s' :%s \n", name,
+            partition.status_string());
+    return partition.error_value();
+  }
+
+  const fidl::WireResult result = fidl::WireCall(partition.value())->GetTypeGuid();
   if (!result.ok()) {
     fprintf(stderr, "waitfor: warning: cannot request type guid: %s\n",
             result.FormatDescription().c_str());
@@ -189,10 +208,17 @@ zx_status_t expr_part_type_guid(const App& app, const char* arg, int fd) {
   return ZX_ERR_NEXT;
 }
 
-zx_status_t expr_part_name(const App& app, const char* arg, int fd) {
-  const fdio_cpp::UnownedFdioCaller caller(fd);
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block_partition::Partition>())->GetName();
+zx_status_t expr_part_name(const App& app, const char* arg,
+                           fidl::UnownedClientEnd<fuchsia_io::Directory> dir, const char* name) {
+  zx::result partition =
+      component::ConnectAt<fuchsia_hardware_block_partition::Partition>(dir, name);
+  if (partition.is_error()) {
+    fprintf(stderr, "waitfor: warning: failed to open: '%s' :%s \n", name,
+            partition.status_string());
+    return partition.error_value();
+  }
+
+  const fidl::WireResult result = fidl::WireCall(partition.value())->GetName();
   if (!result.ok()) {
     fprintf(stderr, "waitfor: warning: cannot request partition name: %s\n",
             result.FormatDescription().c_str());
@@ -203,11 +229,11 @@ zx_status_t expr_part_name(const App& app, const char* arg, int fd) {
     fprintf(stderr, "waitfor: warning: cannot get type guid: %s\n", zx_status_get_string(status));
     return result.status();
   }
-  const std::string name(response.name.get());
+  const std::string partition_name(response.name.get());
   if (app.verbose) {
-    fprintf(stderr, "waitfor: part.name='%s'\n", name.c_str());
+    fprintf(stderr, "waitfor: part.name='%s'\n", partition_name.c_str());
   }
-  if (strcmp(arg, name.c_str()) == 0) {
+  if (strcmp(arg, partition_name.c_str()) == 0) {
     return ZX_OK;
   }
   return ZX_ERR_NEXT;

@@ -9,6 +9,7 @@ executable("waitfor") {
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/uuid",
     "//zircon/system/ulib/fbl",
