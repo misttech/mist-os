@@ -948,16 +948,8 @@ group("toml_edit") {
   public_deps = [ ":toml_edit-v0_2_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("tracing") {
-    public_deps = [ ":tracing-v0_1_34" ]
-  }
-}
-
-if (current_os == "fuchsia") {
-  group("tracing") {
-    public_deps = [ ":tracing-v0_1_34" ]
-  }
+group("tracing") {
+  public_deps = [ ":tracing-v0_1_34" ]
 }
 
 group("tracing-core") {
