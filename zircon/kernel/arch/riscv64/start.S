@@ -141,13 +141,16 @@ PhysbootHandoff = _start
     j       .
 END_FUNCTION(_start)
 
-FUNCTION(_secondary_start)
+// Entry point for secondary cpus when started from SBI
+FUNCTION(riscv64_secondary_entry_asm)
     // Enable the MMU with the ASID 0, prefilled by _start
-    lla     t0, riscv64_kernel_translation_table
-    srli    t1, t0, 12
+    lla     t0, riscv64_kernel_bootstrap_translation_table
+    srli    t1, t0, PAGE_SIZE_SHIFT
     li      t2, (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT)
     or      t1, t1, t2
     csrw    satp, t1
+
+    // global tlb fence
     sfence.vma  zero, zero
 
     // Compute the relocation offset
@@ -165,7 +168,14 @@ FUNCTION(_secondary_start)
     // SBI is kind enough to give us a private parameter in a1, we fill it with
     // the stack pointer for this hart
     mv      sp, a1
+
+    // Read  the cpu number off of the stack
     ld      a1, -8(sp)
+
+    // Set up the shadow call stack
+#if __has_feature(shadow_call_stack)
+    ld      shadow_call_sp, -16(sp)
+#endif
 
     // The identity mapping is still there, we can jump to C.
     // The hart id is already in a0.
@@ -173,7 +183,7 @@ FUNCTION(_secondary_start)
 
     // should never return here
     j       .
-END_FUNCTION(_secondary_start)
+END_FUNCTION(riscv64_secondary_entry_asm)
 
 
 .bss

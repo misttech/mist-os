@@ -132,6 +132,10 @@ inline void arch_set_restricted_flag(bool restricted) {
   WRITE_PERCPU_FIELD32(in_restricted_mode, restricted ? 1 : 0);
 }
 
+uint32_t riscv64_boot_hart_id();
+zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id);
+extern "C" void riscv64_secondary_entry_asm();
+
 #endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_

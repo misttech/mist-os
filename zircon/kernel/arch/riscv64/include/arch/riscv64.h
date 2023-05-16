@@ -183,15 +183,7 @@ extern void riscv64_software_exception();
 
 void platform_irq(iframe_t* frame);
 
-/*
- * Creates a stack and sets the stack pointer for the specified secondary CPU.
- */
-zx_status_t riscv64_create_secondary_stack(cpu_num_t cpu_num, vaddr_t* sp);
-
-/*
- * Frees a stack created by |riscv64_create_secondary_stack|.
- */
-zx_status_t riscv64_free_secondary_stack(cpu_num_t cpu_num);
+void riscv64_init_percpu();
 
 #endif  // __ASSEMBLER__
 

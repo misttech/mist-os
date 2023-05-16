@@ -14,9 +14,14 @@
 
 #include <arch/mp.h>
 #include <arch/ops.h>
+#include <arch/riscv64.h>
+#include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <dev/interrupt.h>
 #include <kernel/event.h>
+#include <lk/init.h>
+#include <lk/main.h>
+#include <vm/vm.h>
 
 #define LOCAL_TRACE 0
 
@@ -42,6 +47,9 @@ void for_every_hart_in_cpu_mask(cpu_mask_t cmask, Callback callback) {
     }
   }
 }
+
+// one for each secondary CPU, indexed by (cpu_num - 1).
+Thread _init_thread[SMP_MAX_CPUS - 1];
 
 }  // anonymous namespace
 
@@ -181,4 +189,98 @@ void arch_setup_percpu(cpu_num_t cpu_num, struct percpu* percpu) {
   riscv64_percpu* arch_percpu = &riscv64_percpu_array[cpu_num];
   DEBUG_ASSERT(arch_percpu->high_level_percpu == nullptr);
   arch_percpu->high_level_percpu = percpu;
+}
+
+uint32_t riscv64_boot_hart_id() { return riscv64_percpu_array[0].hart_id; }
+
+// Routines dealing with starting secondary cpus.
+
+namespace {
+
+zx_status_t riscv64_create_secondary_stack(cpu_num_t cpu_num, vaddr_t* sp) {
+  DEBUG_ASSERT_MSG(cpu_num > 0 && cpu_num < SMP_MAX_CPUS, "cpu_num: %u", cpu_num);
+
+  // Allocate stack(s) for the per cpu init thread.
+  KernelStack* stack = &_init_thread[cpu_num - 1].stack();
+  DEBUG_ASSERT(stack->base() == 0);
+
+  zx_status_t status = stack->Init();
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // Store cpu_num on the main stack.
+  uint64_t* stack_top = reinterpret_cast<uint64_t*>(stack->top());
+  stack_top[-1] = cpu_num;
+
+  // Store the shadow call stack base on the stack
+#if __has_feature(shadow_call_stack)
+  stack_top[-2] = stack->shadow_call_base();
+#endif
+
+  // Return the stack pointer to our caller.
+  *sp = stack->top();
+
+  return ZX_OK;
+}
+
+zx_status_t riscv64_free_secondary_stack(cpu_num_t cpu_num) {
+  DEBUG_ASSERT(cpu_num > 0 && cpu_num < SMP_MAX_CPUS);
+  return _init_thread[cpu_num - 1].stack().Teardown();
+}
+
+}  // anonymous namespace
+
+// Called from secondary cpu assembly trampoline.
+extern "C" void riscv64_secondary_entry(uint32_t hart_id, uint cpu_num) {
+  riscv64_init_percpu();
+  riscv64_mp_early_init_percpu(hart_id, cpu_num);
+  riscv64_mmu_early_init_percpu();
+
+  _init_thread[cpu_num - 1].SecondaryCpuInitEarly();
+  // Run early secondary cpu init routines up to the threading level.
+  lk_init_level(LK_INIT_FLAG_SECONDARY_CPUS, LK_INIT_LEVEL_EARLIEST, LK_INIT_LEVEL_THREADING - 1);
+
+  arch_mp_init_percpu();
+
+  dprintf(INFO, "RISCV: secondary cpu %u coming up\n", cpu_num);
+
+  lk_secondary_cpu_entry();
+}
+
+zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id) {
+  LTRACEF("cpu %u, hart %u\n", cpu_num, hart_id);
+
+  DEBUG_ASSERT(cpu_num > 0 && cpu_num < SMP_MAX_CPUS && hart_id != riscv64_boot_hart_id());
+
+  vaddr_t sp = 0;
+  zx_status_t status = riscv64_create_secondary_stack(cpu_num, &sp);
+  if (status != ZX_OK) {
+    return status;
+  }
+  DEBUG_ASSERT(is_kernel_address(sp));
+
+  // Issue memory barrier before starting to ensure previous stores will be visible to new cpu.
+  arch::ThreadMemoryBarrier();
+
+  // Compute the entry point in physical address.
+  uintptr_t kernel_secondary_entry_paddr =
+      reinterpret_cast<uintptr_t>(&riscv64_secondary_entry_asm);
+  kernel_secondary_entry_paddr +=
+      get_kernel_base_phys() - reinterpret_cast<uintptr_t>(__executable_start);
+
+  LTRACEF("physical address of entry point at %p is %#lx\n", &riscv64_secondary_entry_asm,
+          kernel_secondary_entry_paddr);
+
+  // Tell SBI to start the secondary cpu.
+  dprintf(INFO, "RISCV: Starting cpu %u, hart id %u\n", cpu_num, hart_id);
+  arch::RiscvSbiError ret = sbi_hart_start(hart_id, kernel_secondary_entry_paddr, sp).error;
+  if (ret != arch::RiscvSbiError::kSuccess) {
+    // start failed, free the stack
+    KERNEL_OOPS("RISCV: failed to start secondary cpu, SBI error %ld\n", ret);
+    status = riscv64_free_secondary_stack(cpu_num);
+    DEBUG_ASSERT(status == ZX_OK);
+    return ZX_ERR_INTERNAL;
+  }
+  return ZX_OK;
 }
