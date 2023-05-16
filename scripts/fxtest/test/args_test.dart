@@ -346,15 +346,6 @@ void main() {
       expect(testsConfig.flags.shouldRebuild, true);
     });
 
-    test('--realm is deprecated', () {
-      expect(
-          () => TestsConfig.fromRawArgs(
-                rawArgs: ['--realm=foo'],
-                fxEnv: FakeFxEnv.shared,
-              ),
-          throwsA(isA<InvalidOption>()));
-    });
-
     test('with no --restrict-logs', () {
       var testsConfig = TestsConfig.fromRawArgs(
         rawArgs: [],

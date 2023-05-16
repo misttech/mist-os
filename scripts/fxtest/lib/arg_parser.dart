@@ -115,11 +115,6 @@ takes longer than N seconds to execute
 
 Note: This has no impact if the -o flag is also set.
 Note: The -s flag used to be an abbreviation for --simple.''')
-  ..addOption('realm',
-      abbr: 'R',
-      defaultsTo: null,
-      help: '''unused. This flag was relevant for components v1 tests and is
-now a no-op. It will soon be removed.''')
   ..addMultiOption('min-severity-logs',
       help: '''set the minimum log severity printed.
 This modifies the minimum log severity level emitted by components during the test execution.

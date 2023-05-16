@@ -100,10 +100,6 @@ class Flags {
     int.parse(argResults['timeout'] ?? '0');
     int.parse(argResults['parallel'] ?? '0');
 
-    if (argResults['realm'] != null) {
-      throw InvalidOption('--realm is a no-op and will soon be removed.\n'
-          'Please remove it from your invocation');
-    }
     return Flags(
         allOutput: argResults['output'],
         dryRun: argResults['info'] || argResults['dry'],
