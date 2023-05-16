@@ -239,6 +239,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/socket/socket_unix.rs",
     "fs/socket/socket_vsock.rs",
     "fs/socket/syscalls.rs",
+    "fs/splice.rs",
     "fs/static_directory.rs",
     "fs/symlink_node.rs",
     "fs/syscalls.rs",

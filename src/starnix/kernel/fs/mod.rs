@@ -19,6 +19,7 @@ mod inotify;
 mod namespace;
 mod record_locks;
 mod simple_file;
+mod splice;
 mod static_directory;
 mod symlink_node;
 mod vec_directory;
