@@ -20,9 +20,9 @@
 #define ARCH_SPIN_LOCK_INITIAL_VALUE \
   (arch_spin_lock_t) { 0 }
 
-typedef struct TA_CAP("mutex") arch_spin_lock {
+struct TA_CAP("mutex") arch_spin_lock_t {
   unsigned long value;
-} arch_spin_lock_t;
+};
 
 // Note: trylock operations are not permitted to fail spuriously, even on
 // architectures with weak memory ordering.  If a trylock operation fails, it
