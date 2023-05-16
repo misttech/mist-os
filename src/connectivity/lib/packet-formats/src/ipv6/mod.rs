@@ -1603,7 +1603,6 @@ mod tests {
 
     #[test]
     fn test_partial_parse() {
-        #![allow(suspicious_double_ref_op)] // TODO(fxbug.dev/126727)
         use core::convert::TryInto as _;
         use core::ops::Deref as _;
 
@@ -1642,7 +1641,7 @@ mod tests {
         let Ipv6PacketRaw { fixed_hdr, extension_hdrs, body_proto } = &partial;
         assert_eq!(fixed_hdr.deref(), &make_fixed_hdr());
         assert_eq!(
-            extension_hdrs.as_ref().incomplete().unwrap().deref(),
+            *extension_hdrs.as_ref().incomplete().unwrap(),
             [IpProto::Tcp.into(), MALFORMED_BYTE]
         );
         assert_eq!(body_proto, &Err(ExtHdrParseError));
