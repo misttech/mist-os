@@ -115,26 +115,23 @@ pub mod route {
 
     impl NetlinkRouteClient {
         /// Adds the given multicast group membership.
-        pub fn add_membership(
-            NetlinkRouteClient(client): &Self,
-            group: ModernGroup,
-        ) -> Result<(), InvalidModernGroupError> {
+        pub fn add_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
+            let NetlinkRouteClient(client) = self;
             client.add_membership(group)
         }
 
         /// Deletes the given multicast group membership.
-        pub fn del_membership(
-            NetlinkRouteClient(client): &Self,
-            group: ModernGroup,
-        ) -> Result<(), InvalidModernGroupError> {
+        pub fn del_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
+            let NetlinkRouteClient(client) = self;
             client.del_membership(group)
         }
 
         /// Sets the legacy multicast group memberships.
         pub fn set_legacy_memberships(
-            NetlinkRouteClient(client): &Self,
+            &self,
             legacy_memberships: LegacyGroups,
         ) -> Result<(), InvalidLegacyGroupsError> {
+            let NetlinkRouteClient(client) = self;
             client.set_legacy_memberships(legacy_memberships)
         }
     }
