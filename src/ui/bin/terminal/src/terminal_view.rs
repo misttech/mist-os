@@ -649,9 +649,6 @@ impl ViewAssistant for TerminalViewAssistant {
         );
         fuchsia_inspect::component::inspector().root().record_string("grid", txt.trim());
 
-        #[allow(clippy::drop_ref)] // TODO(fxbug.dev/95065)
-        drop(grid);
-
         scene_details.scene.render(render_context, ready_event, context)?;
         self.scene_details = Some(scene_details);
 

@@ -512,8 +512,6 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         // Before we await, drop these borrowed refs so that other async tasks can borrow
         // the conn while we're waiting.
         std::mem::drop(packet);
-        #[allow(clippy::drop_ref)] // TODO(fxbug.dev/95075)
-        std::mem::drop(conn);
         std::mem::drop(conn_option);
 
         // Before we await, release the sequencer lock so that other packets can be processed
@@ -718,8 +716,6 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
 
         // Before we await, drop these borrowed refs so that other async tasks can borrow
         // the conn while we're waiting.
-        #[allow(clippy::drop_ref)] // TODO(fxbug.dev/95075)
-        std::mem::drop(conn);
         std::mem::drop(inner_option);
 
         // Wait until capture starts or the connection closes.
@@ -812,8 +808,6 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
 
         // Before we await, drop these borrowed refs so that other async tasks can borrow
         // the conn while we're waiting.
-        #[allow(clippy::drop_ref)] // TODO(fxbug.dev/95075)
-        std::mem::drop(conn);
         std::mem::drop(inner_option);
 
         // We need to send CaptureAt requests in order, then process those replies in
