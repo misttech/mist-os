@@ -698,7 +698,7 @@ impl IntoErrno for ConnectError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             ConnectError::NoRoute => fposix::Errno::Enetunreach,
-            ConnectError::NoPort => fposix::Errno::Eaddrnotavail,
+            ConnectError::NoPort | ConnectError::ConnectionExists => fposix::Errno::Eaddrnotavail,
             ConnectError::Zone(z) => z.into_errno(),
         }
     }

@@ -684,12 +684,21 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
 {
     fn check_insert_conflicts(
         _sharing: &SharingState,
-        _addr: &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
-        _socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,
+        addr: &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
+        socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,
     ) -> Result<(), InsertError> {
-        // Connections don't conflict with existing listeners. If there
-        // are connections with the same local and remote address, it
-        // will be decided by the socket sharing options.
+        // We need to make sure there are no present sockets that have the same
+        // 4-tuple with the to-be-added socket.
+        let addr = AddrVec::Conn(ConnAddr { device: None, ..*addr });
+        if let Some(_) = socketmap.get(&addr) {
+            return Err(InsertError::Exists);
+        }
+        // No shadower exists, i.e., no sockets with the same 4-tuple but with
+        // a device bound.
+        if socketmap.descendant_counts(&addr).len() > 0 {
+            return Err(InsertError::ShadowerExists);
+        }
+        // Otherwise, connections don't conflict with existing listeners.
         Ok(())
     }
 }
@@ -2446,6 +2455,7 @@ where
 
 /// Possible errors when connecting a socket.
 #[derive(Debug, Error, GenericOverIp)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ConnectError {
     /// Cannot allocate a local port for the connection.
     #[error("Unable to allocate a port")]
@@ -2456,6 +2466,9 @@ pub enum ConnectError {
     /// There was a problem with the provided address relating to its zone.
     #[error("{}", _0)]
     Zone(#[from] ZonedAddressError),
+    /// There is an existing connection with the same 4-tuple.
+    #[error("There is already a connection at the address requested")]
+    ConnectionExists,
 }
 
 /// Connects a socket that has been bound locally.
@@ -2591,7 +2604,15 @@ where
             },
             sharing,
         )
-        .expect("failed to insert connection")
+        .map_err(|(err, _conn, _sharing)| match err {
+            // The connection will conflict with an existing one.
+            InsertError::Exists | InsertError::ShadowerExists => ConnectError::ConnectionExists,
+            // Connections don't conflict with listeners, and we should not
+            // observe the following errors.
+            InsertError::ShadowAddrExists | InsertError::IndirectConflict => {
+                panic!("failed to insert connection: {:?}", err)
+            }
+        })?
         .id();
 
     ip_transport_ctx
@@ -5863,6 +5884,41 @@ mod tests {
                 non_sync_ctx.take_tcp_events(),
                 &[NonSyncEvent::ListenerConnectionCount(listener.into(), 1)]
             );
+        });
+    }
+
+    #[ip_test]
+    fn conn_addr_not_available<I: Ip + TcpTestIpExt + IcmpIpExt>() {
+        set_logger_for_test();
+        let (mut net, _local, _local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { bind_client: true, client_reuse_addr: true },
+            0,
+            0.0,
+        );
+        // Now we are using the same 4-tuple again to try to create a new
+        // connection, this should fail.
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
+            let bound = SocketHandler::bind(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                Some(PORT_1),
+            )
+            .expect("failed to bind");
+            assert_eq!(
+                SocketHandler::connect_bound(
+                    sync_ctx,
+                    non_sync_ctx,
+                    bound,
+                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
+                    Default::default(),
+                ),
+                Err(ConnectError::ConnectionExists),
+            )
         });
     }
 }
