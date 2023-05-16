@@ -549,10 +549,7 @@ pub async fn make_way_for_output(local_dir: &Path, force: bool) -> Result<()> {
         !local_dir.exists(),
         "The local_dir exists in make_way_for_output, please report this as a bug."
     );
-    async_fs::create_dir_all(&local_dir)
-        .await
-        .with_context(|| format!("creating directory {:?}", local_dir))?;
-    tracing::debug!("local_dir dir ready.");
+    tracing::debug!("local_dir dir clear.");
     Ok(())
 }
 
