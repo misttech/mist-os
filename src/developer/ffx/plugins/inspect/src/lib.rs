@@ -41,7 +41,7 @@ impl FfxMain for InspectTool {
         let Self { rcs, archive_accessor, cmd } = self;
         let (Ok(rcs), Ok(archive_accessor)) =
             futures::future::join(rcs, archive_accessor).await else {
-                ffx_bail!("Failed to connect to necessary emote Control protocols")
+                ffx_bail!("Failed to connect to necessary Remote Control protocols")
             };
         match cmd.sub_command {
             InspectSubCommand::ApplySelectors(cmd) => {
