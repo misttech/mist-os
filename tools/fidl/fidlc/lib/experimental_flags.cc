@@ -40,7 +40,6 @@ std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlag
     {"output_index_json", Flag::kOutputIndexJson},
     {"zx_c_types", Flag::kZxCTypes},
     {"simple_empty_response_syntax", Flag::kSimpleEmptyResponseSyntax},
-    {"zx_select_case_sensitivity", Flag::kZxSelectCaseSensitivity},
 };
 
 }  // namespace fidl
