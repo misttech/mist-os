@@ -32,3 +32,46 @@ pub type RwLock<T> = tracing_mutex::parkinglot::TracingRwLock<T>;
 pub type RwLockReadGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockReadGuard<'a, T>;
 #[cfg(any(test, debug_assertions))]
 pub type RwLockWriteGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockWriteGuard<'a, T>;
+
+/// Lock `m1` and `m2` in a consistent order (using the memory address of m1 and m2 and returns the
+/// associated guard. This ensure that `ordered_lock(m1, m2)` and `ordered_lock(m2, m1)` will not
+/// deadlock.
+#[cfg(test)]
+pub fn ordered_lock<'a, T>(
+    m1: &'a Mutex<T>,
+    m2: &'a Mutex<T>,
+) -> (MutexGuard<'a, T>, MutexGuard<'a, T>) {
+    let ptr1: *const Mutex<T> = m1;
+    let ptr2: *const Mutex<T> = m2;
+    if ptr1 < ptr2 {
+        let g1 = m1.lock();
+        let g2 = m2.lock();
+        (g1, g2)
+    } else {
+        let g2 = m2.lock();
+        let g1 = m1.lock();
+        (g1, g2)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[::fuchsia::test]
+    fn test_lock_ordering() {
+        let l1 = Mutex::new(1);
+        let l2 = Mutex::new(2);
+
+        {
+            let (g1, g2) = ordered_lock(&l1, &l2);
+            assert_eq!(*g1, 1);
+            assert_eq!(*g2, 2);
+        }
+        {
+            let (g2, g1) = ordered_lock(&l2, &l1);
+            assert_eq!(*g1, 1);
+            assert_eq!(*g2, 2);
+        }
+    }
+}
