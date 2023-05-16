@@ -138,6 +138,12 @@ size_checker_input = {
       creep_limit = 49152  # 48.0 KiB
     },
     {
+      component = "Fonts"
+      src = [ "packages/base/fonts" ]
+      limit = 10485760  # 10.000 MiB
+      creep_limit = 2097152  # 200.000 KiB
+    },
+    {
       component = "Graphics"
       src = [
         "packages/base/vulkan_loader",
@@ -243,7 +249,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       src = []
-      limit = 5111867142
+      limit = 5101381382
       creep_limit = 0
     },
   ]
