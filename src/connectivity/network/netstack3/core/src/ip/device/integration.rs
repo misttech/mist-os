@@ -34,7 +34,7 @@ use crate::{
         self,
         device::{
             self, add_ipv6_addr_subnet_with_config,
-            dad::{DadAddressStateRef, DadContext, DadHandler, DadStateRef},
+            dad::{DadAddressContext, DadAddressStateRef, DadContext, DadHandler, DadStateRef},
             del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
             is_ip_forwarding_enabled,
             nud::NudIpHandler,
@@ -666,9 +666,29 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContex
     }
 }
 
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
+    DadAddressContext<C> for Locked<&SyncCtx<C>, L>
+{
+    fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
+        &mut self,
+        _: &Self::DeviceId,
+        addr: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let mut entry = Locked::<_, L>::new_locked(addr.deref());
+        let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+        let Ipv6AddressState { flags: Ipv6AddressFlags { deprecated: _, assigned }, config: _ } =
+            &mut *state;
+
+        cb(assigned)
+    }
+}
+
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<C>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
 {
+    type DadAddressCtx<'b> = Locked<&'b SyncCtx<C>, crate::lock_ordering::Ipv6DeviceAddressDad>;
+
     fn get_address_id(
         &mut self,
         device_id: &Self::DeviceId,
@@ -682,7 +702,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
         .expect("DAD address must always exist")
     }
 
-    fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
@@ -696,17 +716,23 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
             // Get a `Locked` at the same lock-level of our `sync_ctx`. We show
             // add an empty assignment here for readability to make it clear that
             // we are operating at the same lock-level.
-            let _: &mut Locked<_, crate::lock_ordering::IpDeviceConfiguration<Ipv6>> = sync_ctx;
-            Locked::<_, crate::lock_ordering::IpDeviceConfiguration<Ipv6>>::new_locked(addr.deref())
+            type CurrentLockLevel = crate::lock_ordering::IpDeviceConfiguration<Ipv6>;
+            let _: &mut Locked<_, CurrentLockLevel> = sync_ctx;
+            Locked::<_, CurrentLockLevel>::new_locked(addr.deref())
         };
 
-        let (mut dad_state, mut entry) =
-            entry.lock_and::<crate::lock_ordering::Ipv6DeviceAddressDad>();
-        let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+        let (mut dad_state, mut sync_ctx) = {
+            // The type/lock-levevel is specified when `Self::DadAddressCtx<'_>` is
+            // impl-ed but we explicitly specify it here as well to audit this in
+            // the event of a lock-level change.
+            type AcquireLockLevel = crate::lock_ordering::Ipv6DeviceAddressDad;
+            (entry.lock::<AcquireLockLevel>(), sync_ctx.cast_locked::<AcquireLockLevel>())
+        };
+
         cb(DadStateRef {
             state: Some(DadAddressStateRef {
                 dad_state: dad_state.deref_mut(),
-                assigned: &mut state.flags.assigned,
+                sync_ctx: &mut sync_ctx,
             }),
             retrans_timer: &retrans_timer,
             max_dad_transmits: &Borrow::borrow(&*config).dad_transmits,
