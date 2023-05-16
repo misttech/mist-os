@@ -2068,18 +2068,6 @@ impl StatsLogger {
             }
         }
 
-        // Cobalt STRING metrics don't have AT_LEAST_ONCE local aggregation. So in order to
-        // imitate the metric "how many devices connect to APs from an OUI", we build a set
-        // seen OUIs and make sure we only log them once each day.
-        // TODO(fxbug.dev/98997): Remove these lines after verifying the UNIQUE_DEVICE_STRING_COUNTS report.
-        for oui in &self.last_1d_detailed_stats.connected_ouis {
-            metric_events.push(MetricEvent {
-                metric_id: metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID,
-                event_codes: vec![],
-                payload: MetricEventPayload::StringValue(oui.clone()),
-            });
-        }
-
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
             &metric_events,
@@ -2676,12 +2664,6 @@ impl StatsLogger {
             &mut metric_events,
             ap_state.tracked.channel.primary,
         );
-
-        // Cobalt STRING metrics don't have AT_LEAST_ONCE local aggregation. So in order to
-        // imitate the metric "how many devices connect to APs from an OUI", we build a set
-        // seen OUIs now and then make sure we only log them once each day.
-        // TODO(fxbug.dev/98997): Remove this line after verifying the UNIQUE_DEVICE_STRING_COUNTS report.
-        let _new = self.last_1d_detailed_stats.connected_ouis.insert(oui);
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
@@ -3292,7 +3274,6 @@ struct DailyDetailedStats {
         HashMap<metrics::ConnectivityWlanMetricDimensionRssiBucket, ConnectAttemptsCounter>,
     connect_per_snr_bucket:
         HashMap<metrics::ConnectivityWlanMetricDimensionSnrBucket, ConnectAttemptsCounter>,
-    connected_ouis: HashSet<String>,
 }
 
 impl DailyDetailedStats {
@@ -3305,7 +3286,6 @@ impl DailyDetailedStats {
             connect_per_channel_band: HashMap::new(),
             connect_per_rssi_bucket: HashMap::new(),
             connect_per_snr_bucket: HashMap::new(),
-            connected_ouis: HashSet::new(),
         }
     }
 }
@@ -6431,79 +6411,6 @@ mod tests {
             ]
         );
         assert_eq!(breakdown_by_channel_band[0].payload, MetricEventPayload::Count(1));
-    }
-
-    // TODO(fxbug.dev/98997): Remove this test after verifying the UNIQUE_DEVICE_STRING_COUNTS report.
-    #[fuchsia::test]
-    fn test_log_device_connected_to_ap_oui_cobalt_metrics() {
-        let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.send_connected_event(
-            random_bss_description!(Wpa2, bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05]),
-        );
-        test_helper.send_connected_event(
-            random_bss_description!(Wpa2, bssid: [0x33, 0xf1, 0xed, 0x02, 0x03, 0x04]),
-        );
-        test_helper.advance_by(24.hours(), test_fut.as_mut());
-
-        let metrics = test_helper.get_logged_metrics(metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID);
-        assert_eq_cobalt_events(
-            metrics,
-            vec![
-                MetricEvent {
-                    metric_id: metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::StringValue("00F620".to_string()),
-                },
-                MetricEvent {
-                    metric_id: metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::StringValue("33F1ED".to_string()),
-                },
-            ],
-        )
-    }
-
-    // TODO(fxbug.dev/98997): Remove this test after verifying the UNIQUE_DEVICE_STRING_COUNTS report.
-    #[fuchsia::test]
-    fn test_log_device_connected_to_ap_oui_cobalt_metrics_periodically() {
-        let (mut test_helper, mut test_fut) = setup_test();
-
-        test_helper.send_connected_event(
-            random_bss_description!(Wpa2, bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05]),
-        );
-        test_helper.drain_cobalt_events(&mut test_fut);
-        test_helper.cobalt_events.clear();
-
-        test_helper.advance_by(24.hours(), test_fut.as_mut());
-
-        // Verify that after 24 hours has passed, device connected to AP OUI metric
-        // is logged once.
-        let metrics = test_helper.get_logged_metrics(metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].payload, MetricEventPayload::StringValue("00F620".to_string()));
-
-        test_helper.cobalt_events.clear();
-
-        // Device disconnects on the second day, but metric is still logged because
-        // it was connected to this OUI during this day, even though the connection
-        // was established on a previous day.
-        test_helper.advance_by(2.hours(), test_fut.as_mut());
-        let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
-        test_helper.advance_by(22.hours(), test_fut.as_mut());
-
-        let metrics = test_helper.get_logged_metrics(metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].payload, MetricEventPayload::StringValue("00F620".to_string()));
-
-        test_helper.cobalt_events.clear();
-
-        // On the third day, device connected OUI metric should no longer be logged.
-        test_helper.advance_by(24.hours(), test_fut.as_mut());
-        let metrics = test_helper.get_logged_metrics(metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID);
-        assert_eq!(metrics.len(), 0);
     }
 
     #[fuchsia::test]
