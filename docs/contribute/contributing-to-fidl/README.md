@@ -578,7 +578,7 @@ This runs benchmarks the same way they are run on CQ.
 SL4F requires the `terminal.x64` product. Use `fx set` to switch products:
 
 ```
-fx set terminal.x64
+fx set terminal.x64 --with //bundles/buildbot/terminal
 ```
 
 To run all FIDL tests, use:

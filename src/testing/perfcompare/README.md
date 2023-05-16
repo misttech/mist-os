@@ -51,7 +51,8 @@ The following commands would gather a dataset of perf test results for
 
 ```sh
 git checkout BEFORE_VERSION
-fx set terminal.x64  # covers dependencies of rust_inspect_benchmarks_test
+# Covers dependencies of rust_inspect_benchmarks_test.
+fx set terminal.x64 --with //bundles/buildbot/terminal
 fx build
 fx update
 python src/testing/perfcompare/perfcompare.py run_local \

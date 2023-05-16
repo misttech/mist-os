@@ -11,7 +11,7 @@ points involves the following:
     Fuchsia Infra in CI and CQ.  Example:
 
     ```
-    fx set terminal.x64-reduced-perf-variation
+    fx set terminal.x64-reduced-perf-variation --with //bundles/buildbot/terminal
     fx build
     ```
 
