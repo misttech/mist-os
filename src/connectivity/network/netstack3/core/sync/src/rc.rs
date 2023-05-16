@@ -290,7 +290,7 @@ impl<T> Drop for Primary<T> {
 
         assert_eq!(was_marked, false, "Must not be marked for destruction yet");
 
-        // Make sure that this `Killable` is the last thing to hold a strong
+        // Make sure that this `Primary` is the last thing to hold a strong
         // reference to the underlying data when it is being dropped.
         //
         // Note that this family of reference counted pointers is always used
