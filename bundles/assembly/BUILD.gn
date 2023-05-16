@@ -1388,3 +1388,7 @@ group("third_party_sbase_for_transition") {
 icu_assembly_input_bundle("intl_services") {
   icu_base_packages = [ "//src/intl/intl_services:pkg" ]
 }
+
+assembly_input_bundle("fonts") {
+  base_packages = [ "//src/fonts:pkg" ]
+}

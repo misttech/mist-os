@@ -8,9 +8,14 @@ assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
+# LINT.IfChange
 product_assembly_configuration("minimal") {
   platform = {
     build_type = "user"
+    fonts = {
+      # minimal is headless, so ostensibly does not need fonts.
+      enabled = false
+    }
     input = {
       supported_input_devices = [
         "button",
@@ -25,3 +30,4 @@ product_assembly_configuration("minimal") {
   product = {
   }
 }
+# LINT.ThenChange(//build/bazel/assembly/product_configurations/BUILD.bazel)

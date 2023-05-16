@@ -29,11 +29,15 @@ fuchsia_product_configuration(
     },
 )
 
+# LINT.IfChange
 fuchsia_product_configuration(
     name = "minimal",
     json_config = {
         "platform": {
             "build_type": BUILD_TYPES.USER,
+            "fonts": {
+                "enabled": False,
+            },
             "input": {
                 "supported_input_devices": [
                     INPUT_DEVICE_TYPE.BUTTON,
@@ -47,12 +51,17 @@ fuchsia_product_configuration(
         },
     },
 )
+# LINT.ThenChange(//products/minimal/BUILD.gn)
 
+# LINT.IfChange
 fuchsia_product_configuration(
     name = "core",
     json_config = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
+            "fonts": {
+                "enabled": True,
+            },
             "input": {
                 "supported_input_devices": [
                     INPUT_DEVICE_TYPE.BUTTON,
@@ -64,6 +73,7 @@ fuchsia_product_configuration(
 
     # TODO(https://fxbug.dev/103248): Add driver packages when they are available in Bazel.
 )
+# LINT.ThenChange(//products/core/BUILD.gn)
 
 fuchsia_product_configuration(
     name = "workstation_eng",

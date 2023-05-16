@@ -12,14 +12,15 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
         fonts_config: &FontsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        builder.package("fonts").component("meta/fonts.cm")?.field(
-            "verbose_logging",
-            // XXX(fmil): I don't know what I'm doing here. Why do I need a
-            // config item if the config is fully determined by the build type?
-            // Should I be setting a default?
-            matches!(context.build_type, BuildType::Eng | BuildType::UserDebug)
-                || fonts_config.verbose_logging,
-        )?;
+        // Adding the platform bundle conditionally allows us to soft-migrate
+        // products that use the packages from the `fonts` bundle.
+        if *context.feature_set_level == FeatureSupportLevel::Minimal && fonts_config.enabled {
+            builder.platform_bundle("fonts");
+            builder.package("fonts").component("meta/fonts.cm")?.field(
+                "verbose_logging",
+                matches!(context.build_type, BuildType::Eng | BuildType::UserDebug),
+            )?;
+        }
 
         Ok(())
     }

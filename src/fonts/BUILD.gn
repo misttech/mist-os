@@ -17,7 +17,9 @@ declare_args() {
 
 group("fonts") {
   public_deps = [
-    ":pkg",
+    # XXX: looks like all external deps no longer use //fonts, and the inclusion
+    # of the fonts package is now due to assembly.
+    # ":pkg",
     # XXX: external dependencies on //src/fonts are intending just to get the
     # package, but that layout does not follow the convention of directory
     # targets including all their tests and buildable artifacts. For now these

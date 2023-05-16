@@ -27,6 +27,7 @@ _base_driver_packages = [
   },
 ]
 
+# LINT.IfChange
 product_assembly_configuration("core") {
   testonly = true
   platform = {
@@ -46,12 +47,18 @@ product_assembly_configuration("core") {
         force_netstack3 = use_netstack3
       }
     }
+
+    fonts = {
+      enabled = true
+    }
   }
   product = {
   }
 
   base_driver_packages = _base_driver_packages
 }
+
+# LINT.ThenChange(//build/bazel/assembly/product_configurations/BUILD.bazel)
 
 product_assembly_configuration("core_with_netstack3") {
   testonly = true
