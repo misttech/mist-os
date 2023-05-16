@@ -7,10 +7,13 @@
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
+#include <lib/ddk/debug.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/timer.h>
 #include <threads.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -60,7 +63,10 @@ class Fusb302 : public DeviceType {
   Fusb302& operator=(const Fusb302&) = delete;
 
   ~Fusb302() override {
-    irq_.destroy();
+    const zx_status_t status = irq_.destroy();
+    if (status != ZX_OK) {
+      zxlogf(WARNING, "zx::interrupt::destroy() failed: %s", zx_status_get_string(status));
+    }
     if (is_thread_running_) {
       thrd_join(irq_thread_, nullptr);
       is_thread_running_ = false;
@@ -85,6 +91,8 @@ class Fusb302 : public DeviceType {
   Fusb302Sensors& sensors() { return sensors_; }
   Fusb302Protocol& protocol() { return protocol_; }
   Fusb302Controls& controls() { return controls_; }
+
+  inspect::Inspector& InspectorForTesting() { return inspect_; }
 
   // Asynchronously waits for a timer to be signaled once.
   //

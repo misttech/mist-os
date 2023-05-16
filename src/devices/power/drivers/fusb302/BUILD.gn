@@ -85,6 +85,7 @@ test("fusb302-test-bin") {
     "fusb302-sensors.cc",
     "fusb302-signals-test.cc",
     "fusb302-signals.cc",
+    "fusb302-test.cc",
     "fusb302.cc",
     "pd-sink-state-machine.cc",
     "registers-test.cc",
