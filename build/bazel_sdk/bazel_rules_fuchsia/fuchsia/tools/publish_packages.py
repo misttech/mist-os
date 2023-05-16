@@ -61,6 +61,13 @@ class FuchsiaTaskPublish(FuchsiaTask):
             scope=ArgumentScope.GLOBAL,
         )
 
+        parser.add_argument(
+            '--publish_only',
+            help=
+            'Only publish packages to an existing repo, not modifying device state',
+            action='store_true',
+            required=False)
+
         # Private arguments.
         # Whether to make the repo default.
         parser.add_argument(
@@ -77,6 +84,8 @@ class FuchsiaTaskPublish(FuchsiaTask):
         return parser.parse_args()
 
     def enable_ffx_repository(self, args):
+        if args.publish_only:
+            return
         if run(args.ffx, 'config', 'get',
                'repository.server.enabled') != 'true':
             print(
@@ -84,11 +93,15 @@ class FuchsiaTaskPublish(FuchsiaTask):
             run(args.ffx, 'repository', 'server', 'start')
 
     def ensure_target_device(self, args):
+        if args.publish_only:
+            return
         args.target = args.target or run(args.ffx, 'target', 'default', 'get')
         print(f'Waiting for {args.target} to come online (60s)')
         run(args.ffx, '--target', args.target, 'target', 'wait', '-t', '60')
 
     def resolve_repo(self, args):
+        if args.publish_only:
+            return
         # Determine the repo name we want to use, in this order:
         # 1. User specified argument.
         def user_specified_repo_name():
@@ -145,6 +158,8 @@ class FuchsiaTaskPublish(FuchsiaTask):
         args.repo_path = existing_repo_path or Path(tempfile.mkdtemp())
 
     def ensure_repo(self, args):
+        if args.publish_only:
+            return
         # Ensure repository.
         if (args.repo_path / 'repository').is_dir():
             print(f'Using existing repo: {args.repo_path}')
@@ -192,6 +207,8 @@ class FuchsiaTaskPublish(FuchsiaTask):
             )
 
     def publish_packages(self, args):
+        if args.publish_only:
+            return
         # TODO(fxbug.dev/110617): Publish all packages with 1 command invocation.
         print(f'Publishing packages: {args.packages}')
         for package in args.packages:
@@ -208,6 +225,8 @@ class FuchsiaTaskPublish(FuchsiaTask):
         print(f'Published {len(args.packages)} packages')
 
     def teardown(self, args):
+        if args.publish_only:
+            return
         if self.prompt_repo_cleanup:
             input('Press enter to delete this repository, or ^C to quit.')
 
