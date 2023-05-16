@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [
+        // Tests can produce trace.
+        "trace/client.shard.cml",
+    ],
     collections: [
         {
             name: "devices-tests",
@@ -17,9 +21,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
-
-                // Tests can produce trace.
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
