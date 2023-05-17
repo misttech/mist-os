@@ -238,6 +238,58 @@ mod test {
     }
 
     #[::fuchsia::test]
+    async fn test_mutex_high_concurrency() {
+        let (kernel, task) = create_kernel_and_task();
+        let value = Arc::new(InterruptibleMutex::new(0));
+        let threads = (0..50)
+            .map(|i| {
+                let kernel = kernel.clone();
+                let value = value.clone();
+                std::thread::spawn(move || {
+                    let task = create_task(&kernel, "concurrent_task");
+                    if i % 2 == 0 {
+                        let v = *value.lock(&task).expect("lock");
+                        assert!(v >= 0);
+                        assert!(v <= 25);
+                    } else {
+                        *value.lock(&task).expect("lock") += 1;
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for t in threads {
+            t.join().expect("join");
+        }
+        assert_eq!(*value.lock(&task).expect("lock"), 25);
+    }
+
+    #[::fuchsia::test]
+    async fn test_rwlock_high_concurrency() {
+        let (kernel, task) = create_kernel_and_task();
+        let value = Arc::new(InterruptibleRwLock::new(0));
+        let threads = (0..50)
+            .map(|i| {
+                let kernel = kernel.clone();
+                let value = value.clone();
+                std::thread::spawn(move || {
+                    let task = create_task(&kernel, "concurrent_task");
+                    if i % 2 == 0 {
+                        let v = *value.read(&task).expect("lock");
+                        assert!(v >= 0);
+                        assert!(v <= 25);
+                    } else {
+                        *value.write(&task).expect("lock") += 1;
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for t in threads {
+            t.join().expect("join");
+        }
+        assert_eq!(*value.read(&task).expect("lock"), 25);
+    }
+
+    #[::fuchsia::test]
     async fn test_interrupt() {
         let (kernel, task) = create_kernel_and_task();
         let (sender, receiver) = sync_channel::<pid_t>(1);
