@@ -187,6 +187,26 @@ where
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
+
+    /// Attempts to decode the body of `buf` into a `Packet`.
+    /// `optional_data_length` specifies the expected length of the packet data and can be 0.
+    fn decode_body(buf: &[u8], code: T, optional_data_length: usize) -> Result<Self, PacketError> {
+        // Potentially decode the optional request data.
+        let (headers_idx, data) = if optional_data_length != 0 {
+            if buf.len() < optional_data_length {
+                return Err(PacketError::BufferTooSmall);
+            }
+            let mut data = vec![0u8; optional_data_length];
+            data.copy_from_slice(&buf[..optional_data_length]);
+            (optional_data_length, data)
+        } else {
+            (0, vec![])
+        };
+
+        // Decode the headers.
+        let headers = HeaderSet::decode(&buf[headers_idx..])?;
+        Ok(Self::new(code, data, headers))
+    }
 }
 
 impl<T> Encodable for Packet<T>
@@ -275,23 +295,8 @@ impl Decodable for RequestPacket {
         if buf.len() < packet_length.into() {
             return Err(PacketError::BufferTooSmall);
         }
-
-        // Potentially decode the optional request data.
-        let expected_request_data_length = code.request_data_length();
-        let (headers_idx, data) = if expected_request_data_length != 0 {
-            let end_idx = Self::MIN_PACKET_SIZE + expected_request_data_length;
-            if buf.len() < end_idx {
-                return Err(PacketError::BufferTooSmall);
-            }
-            let mut data = vec![0u8; expected_request_data_length];
-            data.copy_from_slice(&buf[Self::MIN_PACKET_SIZE..end_idx]);
-            (end_idx, data)
-        } else {
-            (Self::MIN_PACKET_SIZE, vec![])
-        };
-
-        let headers = HeaderSet::decode(&buf[headers_idx..])?;
-        Ok(Self::new(code, data, headers))
+        // Decode the optional response data and headers.
+        Self::decode_body(&buf[Self::MIN_PACKET_SIZE..], code, code.request_data_length())
     }
 }
 
@@ -375,23 +380,8 @@ impl ResponsePacket {
         if buf.len() < packet_length.into() {
             return Err(PacketError::BufferTooSmall);
         }
-
-        // Potentially decode the optional response data.
-        let expected_response_data_length = request.response_data_length();
-        let (headers_idx, data) = if expected_response_data_length != 0 {
-            let end_idx = Self::MIN_PACKET_SIZE + expected_response_data_length;
-            if buf.len() < end_idx {
-                return Err(PacketError::BufferTooSmall);
-            }
-            let mut data = vec![0u8; expected_response_data_length];
-            data.copy_from_slice(&buf[Self::MIN_PACKET_SIZE..end_idx]);
-            (end_idx, data)
-        } else {
-            (Self::MIN_PACKET_SIZE, vec![])
-        };
-
-        let headers = HeaderSet::decode(&buf[headers_idx..])?;
-        Ok(Self::new(code, data, headers))
+        // Decode the optional response data and headers.
+        Self::decode_body(&buf[Self::MIN_PACKET_SIZE..], code, request.response_data_length())
     }
 }
 
