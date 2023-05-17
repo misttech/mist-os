@@ -24,6 +24,7 @@ phys_executable("riscv64-qemu-boot-shim") {
   sources = [ "riscv64-qemu-boot-shim.cc" ]
   deps = [
     "..:linuxboot",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/devicetree",
     "//zircon/kernel/lib/ktl",

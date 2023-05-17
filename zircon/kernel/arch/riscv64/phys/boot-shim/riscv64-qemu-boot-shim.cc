@@ -14,8 +14,10 @@
 #include <lib/memalloc/pool.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/qemu.h>
+#include <lib/zbi-format/board.h>
 #include <lib/zbi-format/zbi.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/main.h>
@@ -33,11 +35,13 @@ using PlicItem = boot_shim::SingleOptionalItem<zbi_dcfg_riscv_plic_driver_t, ZBI
 using TimerItem =
     boot_shim::SingleOptionalItem<zbi_dcfg_riscv_generic_timer_driver_t, ZBI_TYPE_KERNEL_DRIVER,
                                   ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER>;
+using PlatformIdItem = boot_shim::SingleOptionalItem<zbi_platform_id_t, ZBI_TYPE_PLATFORM_ID>;
+using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_DRV_BOARD_INFO>;
 
 using Shim = boot_shim::BootShim<boot_shim::PoolMemConfigItem,     //
                                  boot_shim::UartItem,              //
                                  boot_shim::TestSerialNumberItem,  //
-                                 PlicItem, TimerItem, DtbItem>;
+                                 PlicItem, TimerItem, DtbItem, PlatformIdItem, BoardInfoItem>;
 
 void InitMemory(const devicetree::Devicetree& dt, Shim::ByteView zbi) {
   // For now hard-wire a configuration matching what QEMU does with `-m 8192`.
@@ -183,6 +187,14 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
       .freq_hz = 10000000,
   };
   shim.Get<TimerItem>().set_payload(kTimerItem);
+  shim.Get<PlatformIdItem>().set_payload(zbi_platform_id_t{
+      .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_QEMU,
+      .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_QEMU,
+      .board_name = "qemu",
+  });
+  shim.Get<BoardInfoItem>().set_payload(zbi_board_info_t{
+      .revision = 0x1,
+  });
 
   BootZbi boot;
   if (shim.Check("Not a bootable ZBI", boot.Init(Shim::InputZbi{zbi})) &&
