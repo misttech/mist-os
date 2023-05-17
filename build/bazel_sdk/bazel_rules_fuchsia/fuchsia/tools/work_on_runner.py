@@ -22,7 +22,7 @@ class FfxRunner():
         print(self.ffx)
         self.cwd = cwd
 
-    def run(self, *args):
+    def run(self, *args, verbose_exception=True):
         try:
             cmd = [self.ffx] + list(args)
             return subprocess.check_output(
@@ -30,7 +30,8 @@ class FfxRunner():
                 text=True,
             ).strip()
         except subprocess.CalledProcessError as e:
-            print(e.stdout)
+            if verbose_exception:
+                print(e.stdout)
             raise e
 
 
@@ -90,10 +91,18 @@ class Startup(Step):
 
 class SetDefaults(Step):
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.original_config_entries = {}
+        self.config_keys = [
+            "product.experimental", "ffx-repo-add", "ffx_repository"
+        ]
+
     def run(self, ctx):
-        keys = ["product.experimental", "ffx-repo-add"]
-        ctx.log(f"Setting ffx configs to true {keys}.")
-        for key in keys:
+        ctx.log(f"Setting ffx configs to true {self.config_keys}.")
+        for key in self.config_keys:
+            self.original_config_entries[key] = ctx.ffx().run(
+                "config", "get", key)
             ctx.ffx().run("config", "set", key, "true")
 
         ctx.log(f"Setting {ctx.target} as default target")
@@ -104,6 +113,9 @@ class SetDefaults(Step):
         ctx.ffx().run("repository", "default", "set", "devhost.fuchsia.com")
 
     def cleanup(self, ctx):
+        ctx.log("Setting ffx config values back to original values")
+        for key, value in self.original_config_entries.items():
+            ctx.ffx().run("config", "set", key, value)
         ctx.log("Unsetting default target")
         ctx.ffx().run("target", "default", "unset")
 
