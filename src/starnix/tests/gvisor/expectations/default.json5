@@ -863,10 +863,7 @@
                 // splice_test, splice() isn't implemented: fxbug.dev/119324
                 "SpliceTest.FromPipeMaxFileSize",
                 "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
-                "SpliceTest.PipeOffsets",
-                "SpliceTest.SamePipe",
                 "SpliceTest.ToPipeEOF",
-                "SpliceTest.NegativeOffset",
                 "SpliceTest.FromPipeMultiple",
                 "SpliceTest.FromPipe",
                 "SpliceTest.TwoPipesPartialRead",

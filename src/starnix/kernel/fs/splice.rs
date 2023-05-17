@@ -7,12 +7,12 @@ use {
         fs::{
             buffers::{InputBuffer, InputBufferCallback},
             pipe::PipeFileObject,
-            FdNumber,
+            FdNumber, FileHandle, SeekOrigin,
         },
-        logging::not_implemented,
-        mm::{ProtectionFlags, PAGE_SIZE},
+        logging::{log_warn, not_implemented},
+        mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
         task::CurrentTask,
-        types::{errno, error, off_t, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
+        types::{errno, error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
     },
     fuchsia_zircon as zx,
     std::{sync::Arc, usize},
@@ -131,22 +131,68 @@ pub fn sendfile(
     Ok(num_bytes_written)
 }
 
+struct SplicedFile {
+    file: FileHandle,
+    is_pipe: bool,
+}
+
+impl SplicedFile {
+    fn new(
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        offset_ref: UserRef<off_t>,
+    ) -> Result<Self, Errno> {
+        let file = current_task.files.get(fd)?;
+        let seekable = file.seek(current_task, 0, SeekOrigin::Cur).is_ok();
+        let _offset = if offset_ref.is_null() {
+            None
+        } else {
+            if !seekable {
+                return error!(ESPIPE);
+            }
+            let offset = current_task.mm.read_object(offset_ref)?;
+            if offset < 0 {
+                return error!(EINVAL);
+            } else {
+                Some(offset as usize)
+            }
+        };
+        let is_pipe = file.downcast_file::<PipeFileObject>().is_some();
+        Ok(Self { file, is_pipe })
+    }
+}
+
 pub fn splice(
     current_task: &CurrentTask,
     fd_in: FdNumber,
-    _off_in: UserRef<off_t>,
+    off_in: UserRef<off_t>,
     fd_out: FdNumber,
-    _off_out: UserRef<off_t>,
+    off_out: UserRef<off_t>,
     _len: usize,
-    _flags: u32,
+    flags: u32,
 ) -> Result<usize, Errno> {
-    let in_file = current_task.files.get(fd_in)?;
-    let out_file = current_task.files.get(fd_out)?;
+    const KNOWN_FLAGS: u32 =
+        uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
+    if flags & !KNOWN_FLAGS != 0 {
+        log_warn!("Unexpected flag for splice: {:#x}", flags & !KNOWN_FLAGS);
+        return error!(EINVAL);
+    }
+
+    let file_in = SplicedFile::new(current_task, fd_in, off_in)?;
+    let file_out = SplicedFile::new(current_task, fd_out, off_out)?;
+
+    // out_fd has the O_APPEND flag set. This is not supported by splice().
+    if file_out.file.flags().contains(OpenFlags::APPEND) {
+        return error!(EINVAL);
+    }
 
     // Splice can only be used when one of the files is a pipe.
-    if in_file.downcast_file::<PipeFileObject>().is_none()
-        && out_file.downcast_file::<PipeFileObject>().is_none()
-    {
+    if !file_in.is_pipe && !file_out.is_pipe {
+        return error!(EINVAL);
+    }
+
+    // The 2 fds cannot refer to the same pipe.
+    if Arc::ptr_eq(&file_in.file.name.entry.node, &file_out.file.name.entry.node) {
         return error!(EINVAL);
     }
 
