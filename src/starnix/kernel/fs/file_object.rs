@@ -260,9 +260,9 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     fn to_handle(
         &self,
         file: &FileHandle,
-        kernel: &Arc<Kernel>,
+        current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        serve_file(kernel, file).map(|c| Some(c.into_handle()))
+        serve_file(current_task, file).map(|c| Some(c.into_handle()))
     }
 }
 
@@ -965,8 +965,11 @@ impl FileObject {
         self.node().fallocate(offset, length)
     }
 
-    pub fn to_handle(self: &Arc<Self>, kernel: &Arc<Kernel>) -> Result<Option<zx::Handle>, Errno> {
-        self.ops().to_handle(self, kernel)
+    pub fn to_handle(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        self.ops().to_handle(self, current_task)
     }
 
     pub fn update_file_flags(&self, value: OpenFlags, mask: OpenFlags) {

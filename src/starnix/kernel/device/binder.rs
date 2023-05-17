@@ -2416,7 +2416,8 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(&self.kernel)?;
+        let system_task = self.kernel.kthreads.system_task();
+        let handle = file.to_handle(system_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..Default::default()

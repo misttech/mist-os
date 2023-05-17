@@ -534,7 +534,7 @@ impl FileOps for RemoteDirectoryObject {
     fn to_handle(
         &self,
         _file: &FileHandle,
-        _kernel: &Arc<Kernel>,
+        _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
             .clone()
@@ -614,7 +614,7 @@ impl FileOps for RemoteFileObject {
     fn to_handle(
         &self,
         _file: &FileHandle,
-        _kernel: &Arc<Kernel>,
+        _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
             .as_ref()
@@ -687,7 +687,7 @@ impl FileOps for RemotePipeObject {
     fn to_handle(
         &self,
         _file: &FileHandle,
-        _kernel: &Arc<Kernel>,
+        _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
             .as_ref()
@@ -813,7 +813,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_directory() {
-        let (kernel, _current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let pkg_channel: zx::Channel = directory::open_in_namespace(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -826,12 +826,12 @@ mod test {
         let fd =
             new_remote_file(&kernel, pkg_channel.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(fd.node().is_dir());
-        assert!(fd.to_handle(&kernel).expect("to_handle").is_some());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_file() {
-        let (kernel, _current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let content_channel: zx::Channel =
             file::open_in_namespace("/pkg/meta/contents", fio::OpenFlags::RIGHT_READABLE)
                 .expect("failed to open /pkg/meta/contents")
@@ -842,16 +842,16 @@ mod test {
         let fd = new_remote_file(&kernel, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
-        assert!(fd.to_handle(&kernel).expect("to_handle").is_some());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test]
     async fn test_new_remote_vmo() {
-        let (kernel, _current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
         let fd = new_remote_file(&kernel, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(!fd.node().is_dir());
-        assert!(fd.to_handle(&kernel).expect("to_handle").is_some());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test(threads = 2)]

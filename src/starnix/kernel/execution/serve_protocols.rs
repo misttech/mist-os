@@ -32,7 +32,7 @@ use super::*;
 pub fn expose_root(container: &Arc<Container>) -> Result<fio::DirectoryProxy, Error> {
     let system_task = container.kernel.kthreads.system_task();
     let root_file = system_task.open_file(b"/", OpenFlags::RDONLY)?;
-    let client = serve_file(&container.kernel, &root_file)?;
+    let client = serve_file(system_task, &root_file)?;
     Ok(fio::DirectoryProxy::new(AsyncChannel::from_channel(client.into_channel())?))
 }
 

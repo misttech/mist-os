@@ -9,7 +9,7 @@ use crate::fs::{
     SeekOrigin, UnlinkKind,
 };
 use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, Kernel, Task};
+use crate::task::CurrentTask;
 use crate::types::{errno, error, ino_t, off_t, DeviceType, Errno, FileMode, OpenFlags};
 use async_trait::async_trait;
 use fidl::endpoints::{ClientEnd, ServerEnd};
@@ -17,25 +17,23 @@ use fidl::HandleBased;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use std::ffi::CString;
 use std::sync::Arc;
 use vfs::{directory, execution_scope, file, path, ProtocolsExt, ToObjectRequest};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(
-    kernel: &Arc<Kernel>,
+    current_task: &CurrentTask,
     file: &FileHandle,
 ) -> Result<ClientEnd<fio::NodeMarker>, Errno> {
-    // Create a task to serve the file. Fow now, this will be a root task, rooted on init.
-    let task =
-        Task::create_init_child_process(kernel, &CString::new("kthread".to_string()).unwrap())
-            .map(Arc::new)?;
-
     // Reopen file object to not share state with the given FileObject.
-    let file = file.name.open(&task, file.flags(), false)?;
+    let file = file.name.open(current_task, file.flags(), false)?;
     let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     let open_flags = file.flags();
-    let starnix_file = StarnixNodeConnection::new(task, file);
+    let kernel = current_task.kernel();
+    // TODO(security): Switching to the `system_task` here loses track of the credentials from
+    //                 `current_task`. Do we need to retain these credentials?
+    let system_task = kernel.kthreads.system_task();
+    let starnix_file = StarnixNodeConnection::new(system_task.clone(), file);
     fasync::Task::spawn_on(&kernel.kthreads.ehandle, async move {
         let scope = execution_scope::ExecutionScope::new();
         directory::entry::DirectoryEntry::open(
@@ -556,14 +554,16 @@ mod tests {
 
     #[::fuchsia::test]
     async fn access_file_system() {
-        let (kernel, _current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
 
         fasync::unblock(move || {
             let fs = TmpFs::new_fs(&kernel);
 
-            let root_handle =
-                serve_file(&kernel, &fs.root().open_anonymous(OpenFlags::RDWR).expect("open"))
-                    .expect("serve");
+            let root_handle = serve_file(
+                &current_task,
+                &fs.root().open_anonymous(OpenFlags::RDWR).expect("open"),
+            )
+            .expect("serve");
 
             let root_zxio = Zxio::create(root_handle.into_handle()).expect("create");
 

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, cprng_draw};
-use std::sync::Arc;
 
 use crate::auth::FsCred;
 use crate::device::DeviceOps;
@@ -69,7 +68,7 @@ impl FileOps for DevNull {
     fn to_handle(
         &self,
         _file: &FileHandle,
-        _kernel: &Arc<Kernel>,
+        _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         Ok(None)
     }
