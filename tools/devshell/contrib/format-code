@@ -284,8 +284,10 @@ if [[ -n "${VERBOSE}" ]]; then
   printf "Files to be formatted:\n%s\n" "${FILES[@]}"
 fi
 
-PY_TOOL="${FUCHSIA_DIR}/prebuilt/third_party/vpython/vpython3"
+PY_TOOL="fuchsia-vendored-python"
 declare -r PY_TOOL
+VPYTHON_TOOL="${FUCHSIA_DIR}/prebuilt/third_party/vpython/vpython3"
+declare -r VPYTHON_TOOL
 readonly BAZEL_FORMAT_CMD="${PREBUILT_BUILDIFIER} -lint=warn"
 readonly CLANG_CMD="${PREBUILT_CLANG_DIR}/bin/clang-format -style=file -fallback-style=Google -sort-includes -i"
 readonly CMC_TOOL="$( fx-command-run list-build-artifacts --expect-one --name cmc tools )"
@@ -304,7 +306,7 @@ readonly JSON_FMT_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/json-fmt.py --no-
 readonly JSON5_FMT_CMD="${HOST_OUT_DIR}/formatjson5 --replace"
 readonly MARKDOWN_FMT_TOOL="$(fx-command-run list-build-artifacts --expect-one --name doc-checker tools)"
 readonly MARKDOWN_FMT_TOOL_ABS="${FUCHSIA_BUILD_DIR}/${MARKDOWN_FMT_TOOL}"
-readonly PY_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/yapf --in-place"
+readonly PY_CMD="${VPYTHON_TOOL} ${FUCHSIA_DIR}/scripts/yapf --in-place"
 readonly RUST_ENTRY_POINT_FMT_CMD="${PREBUILT_RUST_DIR}/bin/rustfmt --config-path=${FUCHSIA_DIR}/rustfmt.toml"
 readonly RUST_FMT_CMD="${PREBUILT_RUST_DIR}/bin/rustfmt --config-path=${FUCHSIA_DIR}/rustfmt.toml --unstable-features --skip-children"
 
