@@ -59,13 +59,13 @@ func (ad *addressDispatcher) OnChanged(lifetimes stack.AddressLifetimes, state s
 }
 
 func (ad *addressDispatcher) OnRemoved(reason stack.AddressRemovalReason) {
-	ad.watcherDisp.OnRemoved(reason)
-
 	ad.mu.Lock()
 	if ad.mu.aspImpl != nil {
 		ad.mu.aspImpl.OnRemoved(reason)
 	}
 	ad.mu.Unlock()
+
+	ad.watcherDisp.OnRemoved(reason)
 }
 
 var _ admin.AddressStateProviderWithCtx = (*adminAddressStateProviderImpl)(nil)
