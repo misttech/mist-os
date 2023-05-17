@@ -14,6 +14,7 @@
 #include <sys/param.h>
 #include <zircon/compiler.h>
 
+#include <cstddef>
 #include <memory>
 #include <utility>
 
@@ -50,7 +51,7 @@ void BlockDevice::BlockImplQuery(block_info_t* info, size_t* bopsz) {
   memset(info, 0, sizeof(*info));
   info->block_size = GetBlockSize();
   info->block_count = GetBlockCount();
-  info->max_transfer_size = (uint32_t)(kPageSize * (ring_size - 2));
+  info->max_transfer_size = static_cast<uint32_t>(kPageSize * (ring_size - 2));
 
   // Limit max transfer to our worst case scatter list size.
   if (info->max_transfer_size > kMaxMaxXfer) {
@@ -87,8 +88,6 @@ BlockDevice::BlockDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<B
 }
 
 zx_status_t BlockDevice::Init() {
-  LTRACE_ENTRY;
-
   DeviceReset();
   CopyDeviceConfig(&config_, sizeof(config_));
 
@@ -100,10 +99,10 @@ zx_status_t BlockDevice::Init() {
   if (config_.blk_size == 0)
     config_.blk_size = 512;
 
-  LTRACEF("capacity %#" PRIx64 "\n", config_.capacity);
-  LTRACEF("size_max %#x\n", config_.size_max);
-  LTRACEF("seg_max  %#x\n", config_.seg_max);
-  LTRACEF("blk_size %#x\n", config_.blk_size);
+  zxlogf(DEBUG, "capacity %#" PRIx64 "", config_.capacity);
+  zxlogf(DEBUG, "size_max %#x", config_.size_max);
+  zxlogf(DEBUG, "seg_max  %#x", config_.seg_max);
+  zxlogf(DEBUG, "blk_size %#x", config_.blk_size);
 
   DriverStatusAck();
 
@@ -122,20 +121,22 @@ zx_status_t BlockDevice::Init() {
   zx_status_t status =
       io_buffer_init(&blk_req_buf_, bti_.get(), size, IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot alloc blk_req buffers %d", status);
+    zxlogf(ERROR, "cannot alloc blk_req buffers: %s", zx_status_get_string(status));
     return status;
   }
   auto cleanup = fit::defer([this]() { io_buffer_release(&blk_req_buf_); });
   blk_req_ = static_cast<virtio_blk_req_t*>(io_buffer_virt(&blk_req_buf_));
 
-  LTRACEF("allocated blk request at %p, physical address %#" PRIxPTR "\n", blk_req_,
-          io_buffer_phys(&blk_req_buf_));
+  zxlogf(TRACE, "allocated blk request at %p, physical address %#" PRIxPTR "", blk_req_,
+         io_buffer_phys(&blk_req_buf_));
 
   // Responses are 32 words at the end of the allocated block.
   blk_res_pa_ = io_buffer_phys(&blk_req_buf_) + sizeof(virtio_blk_req_t) * blk_req_count;
-  blk_res_ = (uint8_t*)((uintptr_t)blk_req_ + sizeof(virtio_blk_req_t) * blk_req_count);
+  blk_res_ = reinterpret_cast<uint8_t*>(
+      (reinterpret_cast<uintptr_t>(blk_req_) + sizeof(virtio_blk_req_t) * blk_req_count));
 
-  LTRACEF("allocated blk responses at %p, physical address %#" PRIxPTR "\n", blk_res_, blk_res_pa_);
+  zxlogf(TRACE, "allocated blk responses at %p, physical address %#" PRIxPTR "", blk_res_,
+         blk_res_pa_);
 
   StartIrqThread();
   DriverStatusOk();
@@ -154,7 +155,7 @@ zx_status_t BlockDevice::Init() {
   status = DdkAdd("virtio-block");
   device_ = zxdev();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to run DdkAdd");
+    zxlogf(ERROR, "failed to run DdkAdd: %s", zx_status_get_string(status));
     device_ = nullptr;
     return status;
   }
@@ -177,18 +178,18 @@ void BlockDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void BlockDevice::IrqRingUpdate() {
-  LTRACE_ENTRY;
-
   // Parse our descriptor chain and add back to the free queue.
   auto free_chain = [this](vring_used_elem* used_elem) {
-    uint32_t i = (uint16_t)used_elem->id;
-    struct vring_desc* desc = vring_.DescFromIndex((uint16_t)i);
+    uint32_t i = static_cast<uint16_t>(used_elem->id);
+    struct vring_desc* desc = vring_.DescFromIndex(static_cast<uint16_t>(i));
     auto head_desc = desc;  // Save the first element.
     {
       fbl::AutoLock lock(&ring_lock_);
       for (;;) {
         int next;
-        LTRACE_DO(virtio_dump_desc(desc));
+        if (zxlog_level_enabled(TRACE)) {
+          virtio_dump_desc(desc);
+        }
         if (desc->flags & VRING_DESC_F_NEXT) {
           next = desc->next;
         } else {
@@ -196,12 +197,12 @@ void BlockDevice::IrqRingUpdate() {
           next = -1;
         }
 
-        vring_.FreeDesc((uint16_t)i);
+        vring_.FreeDesc(static_cast<uint16_t>(i));
 
         if (next < 0)
           break;
         i = next;
-        desc = vring_.DescFromIndex((uint16_t)i);
+        desc = vring_.DescFromIndex(static_cast<uint16_t>(i));
       }
     }
 
@@ -213,7 +214,7 @@ void BlockDevice::IrqRingUpdate() {
       // Search our pending txn list to see if this completes it.
       list_for_every_entry (&pending_txn_list_, txn, block_txn_t, node) {
         if (txn->desc == head_desc) {
-          LTRACEF("completes txn %p\n", txn);
+          zxlogf(TRACE, "completes txn %p", txn);
           status = blk_res_[txn->index];
 
           free_blk_req(txn->index);
@@ -244,7 +245,7 @@ void BlockDevice::IrqRingUpdate() {
   vring_.IrqRingUpdate(free_chain);
 }
 
-void BlockDevice::IrqConfigChange() { LTRACE_ENTRY; }
+void BlockDevice::IrqConfigChange() {}
 
 zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes, zx_paddr_t* pages,
                                   size_t pagecount, uint16_t* idx) {
@@ -253,7 +254,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     fbl::AutoLock lock(&txn_lock_);
     index = alloc_blk_req();
     if (index >= blk_req_count) {
-      LTRACEF("too many block requests queued (%zu)!\n", index);
+      zxlogf(ERROR, "too many block requests queued (%zu)!", index);
       return ZX_ERR_NO_RESOURCES;
     }
   }
@@ -266,28 +267,29 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   } else {
     req->sector = txn->op.rw.offset_dev;
   }
-  LTRACEF("blk_req type %u ioprio %u sector %" PRIu64 "\n", req->type, req->ioprio, req->sector);
+  zxlogf(TRACE, "blk_req type %u ioprio %u sector %" PRIu64 "", req->type, req->ioprio,
+         req->sector);
 
   // Save the request index so we can free it when we complete the transfer.
   txn->index = index;
 
-  LTRACEF("page count %lu\n", pagecount);
+  zxlogf(TRACE, "page count %lu", pagecount);
 
   // Put together a transfer.
   uint16_t i;
   vring_desc* desc;
   {
     fbl::AutoLock lock(&ring_lock_);
-    desc = vring_.AllocDescChain((uint16_t)(2u + pagecount), &i);
+    desc = vring_.AllocDescChain(static_cast<uint16_t>(2u + pagecount), &i);
   }
   if (!desc) {
-    LTRACEF("failed to allocate descriptor chain of length %zu\n", 2u + pagecount);
+    zxlogf(ERROR, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
     fbl::AutoLock lock(&txn_lock_);
     free_blk_req(index);
     return ZX_ERR_NO_RESOURCES;
   }
 
-  LTRACEF("after alloc chain desc %p, i %u\n", desc, i);
+  zxlogf(TRACE, "after alloc chain desc %p, i %u", desc, i);
 
   // Point the txn at this head descriptor.
   txn->desc = desc;
@@ -296,12 +298,14 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   desc->addr = io_buffer_phys(&blk_req_buf_) + index * sizeof(virtio_blk_req_t);
   desc->len = sizeof(virtio_blk_req_t);
   desc->flags = VRING_DESC_F_NEXT;
-  LTRACE_DO(virtio_dump_desc(desc));
+  if (zxlog_level_enabled(TRACE)) {
+    virtio_dump_desc(desc);
+  }
 
   for (size_t n = 0; n < pagecount; n++) {
     desc = vring_.DescFromIndex(desc->next);
     desc->addr = pages[n];
-    desc->len = (uint32_t)((bytes > kPageSize) ? kPageSize : bytes);
+    desc->len = static_cast<uint32_t>((bytes > kPageSize) ? kPageSize : bytes);
     if (n == 0) {
       // First entry may not be page aligned.
       size_t page0_offset = txn->op.rw.offset_vmo & kPageMask;
@@ -312,11 +316,11 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
       // Trim length if necessary.
       size_t max = kPageSize - page0_offset;
       if (desc->len > max) {
-        desc->len = (uint32_t)max;
+        desc->len = static_cast<uint32_t>(max);
       }
     }
     desc->flags = VRING_DESC_F_NEXT;
-    LTRACEF("pa %#lx, len %#x\n", desc->addr, desc->len);
+    zxlogf(TRACE, "pa %#lx, len %#x", desc->addr, desc->len);
 
     // Mark buffer as write-only if its a block read.
     if (type == VIRTIO_BLK_T_IN) {
@@ -325,7 +329,9 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
     bytes -= desc->len;
   }
-  LTRACE_DO(virtio_dump_desc(desc));
+  if (zxlog_level_enabled(TRACE)) {
+    virtio_dump_desc(desc);
+  }
   assert(bytes == 0);
 
   // Set up the descriptor pointing to the response.
@@ -333,12 +339,15 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   desc->addr = blk_res_pa_ + index;
   desc->len = 1;
   desc->flags = VRING_DESC_F_WRITE;
-  LTRACE_DO(virtio_dump_desc(desc));
+  if (zxlog_level_enabled(TRACE)) {
+    virtio_dump_desc(desc);
+  }
 
   *idx = i;
   return ZX_OK;
 }
 
+namespace {
 static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx_paddr_t* pages,
                              size_t* num_pages) {
   uint64_t suboffset = txn->op.rw.offset_vmo & kPageMask;
@@ -346,21 +355,22 @@ static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx
   size_t pin_size = ZX_ROUNDUP(suboffset + bytes, kPageSize);
   *num_pages = pin_size / kPageSize;
   if (*num_pages > MAX_SCATTER) {
-    TRACEF("virtio: transaction too large\n");
+    zxlogf(ERROR, "transaction too large");
     return ZX_ERR_INVALID_ARGS;
   }
 
   zx_handle_t vmo = txn->op.rw.vmo;
-  zx_status_t status;
-  if ((status = zx_bti_pin(bti, ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, aligned_offset, pin_size,
-                           pages, *num_pages, &txn->pmt)) != ZX_OK) {
-    TRACEF("virtio: could not pin pages %d\n", status);
+  zx_status_t status = zx_bti_pin(bti, ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, aligned_offset,
+                                  pin_size, pages, *num_pages, &txn->pmt);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "could not pin pages: %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
 
   pages[0] += suboffset;
   return ZX_OK;
 }
+}  // namespace
 
 void BlockDevice::SignalWorker(block_txn_t* txn) {
   switch (txn->op.command & BLOCK_OP_MASK) {
@@ -374,10 +384,10 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
         txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
         return;
       }
-      LTRACEF("txn %p, command %#x\n", txn, txn->op.command);
+      zxlogf(TRACE, "txn %p, command %#x", txn, txn->op.command);
       break;
     case BLOCK_OP_FLUSH:
-      LTRACEF("txn %p, command FLUSH\n", txn);
+      zxlogf(TRACE, "txn %p, command FLUSH", txn);
       break;
     default:
       txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
@@ -412,7 +422,7 @@ void BlockDevice::WorkerThread() {
       continue;
     }
 
-    LTRACEF("WorkerThread handling txn %p\n", txn);
+    zxlogf(TRACE, "WorkerThread handling txn %p", txn);
 
     uint32_t type;
     bool do_flush = false;
@@ -433,7 +443,7 @@ void BlockDevice::WorkerThread() {
         type = VIRTIO_BLK_T_IN;
       }
       txn->op.rw.offset_vmo *= config_.blk_size;
-      bytes = txn->op.rw.length * config_.blk_size;
+      bytes = static_cast<size_t>(txn->op.rw.length) * config_.blk_size;
       status = pin_pages(bti_.get(), txn, bytes, pages, &num_pages);
     }
 
@@ -461,12 +471,12 @@ void BlockDevice::WorkerThread() {
         list_add_tail(&pending_txn_list_, &txn->node);
         vring_.SubmitChain(idx);
         vring_.Kick();
-        LTRACEF("WorkerThread submitted txn %p\n", txn);
+        zxlogf(TRACE, "WorkerThread submitted txn %p", txn);
         break;
       }
 
       if (cannot_fail) {
-        TRACEF("virtio-block: failed to queue txn to hw: %d\n", status);
+        zxlogf(ERROR, "failed to queue txn to hw: %s", zx_status_get_string(status));
         {
           fbl::AutoLock lock(&txn_lock_);
           free_blk_req(txn->index);
