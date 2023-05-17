@@ -7,12 +7,14 @@ use {
     component_debug::{
         capability,
         cli::*,
+        config::{resolve_raw_config_overrides, RawConfigOverride},
         realm::{get_manifest, resolve_declaration},
         route::{DeclType, RouteReport},
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    std::str::FromStr,
 };
 
 #[fuchsia::test]
@@ -260,4 +262,36 @@ async fn get_manifest_potential_dynamic_instance_absolute_url() {
     .await
     .unwrap();
     assert_eq!(manifest, expected_foo_manifest().await);
+}
+
+#[fuchsia::test]
+async fn resolve_raw_foo_config_override() {
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let raw_overrides = &[
+        RawConfigOverride::from_str("my_uint8=5").unwrap(),
+        RawConfigOverride::from_str("my_string=\"should be a valid override\"").unwrap(),
+    ];
+    let expected_typed_overrides = &[
+        fdecl::ConfigOverride {
+            key: Some("my_uint8".to_string()),
+            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint8(5))),
+            ..fdecl::ConfigOverride::default()
+        },
+        fdecl::ConfigOverride {
+            key: Some("my_string".to_string()),
+            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(
+                "should be a valid override".to_string(),
+            ))),
+            ..fdecl::ConfigOverride::default()
+        },
+    ];
+    let resolved_overrides = resolve_raw_config_overrides(
+        &realm_query,
+        &AbsoluteMoniker::parse_str("/for_manifest_resolution:foo").unwrap(),
+        "#meta/foo.cm",
+        raw_overrides,
+    )
+    .await
+    .unwrap();
+    assert_eq!(resolved_overrides, expected_typed_overrides);
 }

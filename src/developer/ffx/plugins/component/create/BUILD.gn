@@ -6,21 +6,39 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("../../../build/ffx_plugin.gni")
 
-ffx_plugin("ffx_component_create") {
-  version = "0.1.0"
-  edition = "2021"
-  deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/plugins/component/common:ffx_component",
-    "//src/sys/lib/component_debug",
-  ]
+if (is_host) {
+  ffx_plugin("ffx_component_create") {
+    version = "0.1.0"
+    edition = "2021"
+    deps = [
+      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+      "//src/developer/ffx/lib/errors:lib",
+      "//src/developer/ffx/plugins/component/common:ffx_component",
+      "//src/sys/lib/component_debug",
+    ]
 
-  args_sources = [ "src/args.rs" ]
-  args_deps = [
-    "//src/lib/fuchsia-url",
-    "//src/sys/lib/moniker",
-  ]
+    args_sources = [ "src/args.rs" ]
+    args_deps = [
+      "//src/lib/fuchsia-url",
+      "//src/sys/lib/component_debug",
+      "//src/sys/lib/moniker",
+    ]
 
-  sources = [ "src/lib.rs" ]
+    sources = [ "src/lib.rs" ]
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [
+      ":ffx_component_create_tests",
+      "tests:host_tests",
+    ]
+  }
+}
+
+if (is_fuchsia) {
+  group("package_deps_for_host_tests") {
+    testonly = true
+    deps = [ "tests:package_deps_for_host_tests" ]
+  }
 }

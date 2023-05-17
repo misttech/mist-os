@@ -14,8 +14,8 @@ use {
     },
     anyhow::{bail, format_err, Result},
     fidl::HandleBased,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
     futures::AsyncReadExt,
     moniker::{
@@ -114,6 +114,7 @@ pub async fn run_cmd<W: std::io::Write>(
     url: AbsoluteComponentUrl,
     recreate: bool,
     connect_stdio: bool,
+    config_overrides: Vec<fdecl::ConfigOverride>,
     lifecycle_controller: fsys::LifecycleControllerProxy,
     mut writer: W,
 ) -> Result<()> {
@@ -176,6 +177,7 @@ pub async fn run_cmd<W: std::io::Write>(
         collection,
         child_name,
         &url,
+        config_overrides,
         child_args,
     )
     .await;
@@ -420,6 +422,7 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             true,
             false,
+            vec![],
             lifecycle_controller,
             &mut output,
         )
@@ -444,6 +447,7 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             false,
             false,
+            vec![],
             lifecycle_controller,
             &mut output,
         )
@@ -466,6 +470,7 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             true,
             false,
+            vec![],
             lifecycle_controller,
             &mut output,
         )
@@ -489,6 +494,7 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             true,
             false,
+            vec![],
             lifecycle_controller,
             &mut output,
         )

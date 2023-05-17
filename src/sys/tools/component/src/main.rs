@@ -7,6 +7,7 @@ mod args;
 use crate::args::*;
 use anyhow::Result;
 use component_debug::cli::*;
+use component_debug::config::resolve_raw_config_overrides;
 use component_debug::copy::copy_cmd;
 use component_debug::explore::Stdout;
 use fidl_fuchsia_dash as fdash;
@@ -29,7 +30,14 @@ pub async fn exec() -> Result<()> {
     match args.subcommand {
         ComponentSubcommand::Show(args) => show_cmd_print(args.query, realm_query, writer).await,
         ComponentSubcommand::Create(args) => {
-            create_cmd(args.url, args.moniker, lifecycle_controller, writer).await
+            let config_overrides = resolve_raw_config_overrides(
+                &realm_query,
+                &args.moniker,
+                &args.url.to_string(),
+                &args.config,
+            )
+            .await?;
+            create_cmd(args.url, args.moniker, config_overrides, lifecycle_controller, writer).await
         }
         ComponentSubcommand::Destroy(args) => {
             destroy_cmd(args.query, lifecycle_controller, realm_query, writer).await
@@ -77,11 +85,19 @@ pub async fn exec() -> Result<()> {
             graph_cmd(args.filter, args.orientation, realm_query, writer).await
         }
         ComponentSubcommand::Run(args) => {
+            let config_overrides = resolve_raw_config_overrides(
+                &realm_query,
+                &args.moniker,
+                &args.url.to_string(),
+                &args.config,
+            )
+            .await?;
             run_cmd(
                 args.moniker,
                 args.url,
                 args.recreate,
                 args.connect_stdio,
+                config_overrides,
                 lifecycle_controller,
                 writer,
             )

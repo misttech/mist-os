@@ -5,7 +5,7 @@
 use {
     crate::{cli::format::format_create_error, lifecycle::create_instance_in_collection},
     anyhow::{format_err, Result},
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
     moniker::{
         AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, RelativeMoniker,
@@ -16,6 +16,7 @@ use {
 pub async fn create_cmd<W: std::io::Write>(
     url: AbsoluteComponentUrl,
     moniker: AbsoluteMoniker,
+    config_overrides: Vec<fdecl::ConfigOverride>,
     lifecycle_controller: fsys::LifecycleControllerProxy,
     mut writer: W,
 ) -> Result<()> {
@@ -44,6 +45,7 @@ pub async fn create_cmd<W: std::io::Write>(
         collection,
         child_name,
         &url,
+        config_overrides,
         None,
     )
     .await
@@ -100,6 +102,7 @@ mod test {
         let response = create_cmd(
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             "/core/ffx-laboratory:test".try_into().unwrap(),
+            vec![],
             lifecycle_controller,
             &mut output,
         )

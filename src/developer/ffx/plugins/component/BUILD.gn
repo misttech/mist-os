@@ -5,41 +5,43 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-ffx_plugin("ffx_component") {
-  version = "0.1.0"
-  edition = "2021"
-  plugin_deps = [
-    "capability:ffx_component_capability",
-    "collection:ffx_component_collection",
-    "copy:ffx_component_copy",
-    "create:ffx_component_create",
-    "destroy:ffx_component_destroy",
-    "doctor:ffx_component_doctor",
-    "explore:ffx_component_explore",
-    "graph:ffx_component_graph",
-    "list:ffx_component_list",
-    "reload:ffx_component_reload",
-    "resolve:ffx_component_resolve",
-    "route:ffx_component_route",
-    "run:ffx_component_run",
-    "run-legacy:ffx_component_run_legacy",
-    "show:ffx_component_show",
-    "start:ffx_component_start",
-    "stop:ffx_component_stop",
-    "storage:ffx_component_storage",
-  ]
+if (is_host) {
+  ffx_plugin("ffx_component") {
+    version = "0.1.0"
+    edition = "2021"
+    plugin_deps = [
+      "capability:ffx_component_capability",
+      "collection:ffx_component_collection",
+      "copy:ffx_component_copy",
+      "create:ffx_component_create",
+      "destroy:ffx_component_destroy",
+      "doctor:ffx_component_doctor",
+      "explore:ffx_component_explore",
+      "graph:ffx_component_graph",
+      "list:ffx_component_list",
+      "reload:ffx_component_reload",
+      "resolve:ffx_component_resolve",
+      "route:ffx_component_route",
+      "run:ffx_component_run",
+      "run-legacy:ffx_component_run_legacy",
+      "show:ffx_component_show",
+      "start:ffx_component_start",
+      "stop:ffx_component_stop",
+      "storage:ffx_component_storage",
+    ]
 
-  args_sources = [ "src/args.rs" ]
-}
+    args_sources = [ "src/args.rs" ]
+  }
 
-ffx_tool("ffx_component_tool") {
-  edition = "2021"
-  output_name = "ffx-component"
-  deps = [
-    ":ffx_component_suite",
-    "//src/lib/fuchsia-async",
-  ]
-  sources = [ "src/main.rs" ]
+  ffx_tool("ffx_component_tool") {
+    edition = "2021"
+    output_name = "ffx-component"
+    deps = [
+      ":ffx_component_suite",
+      "//src/lib/fuchsia-async",
+    ]
+    sources = [ "src/main.rs" ]
+  }
 }
 
 group("tests") {
@@ -53,10 +55,29 @@ group("tests") {
     "reload:ffx_component_reload_tests",
     "resolve:ffx_component_resolve_tests",
     "route:ffx_component_route_tests",
-    "run:ffx_component_run_tests",
     "run-legacy:ffx_component_run_legacy_tests",
     "show:ffx_component_show_tests",
     "start:ffx_component_start_tests",
     "stop:ffx_component_stop_tests",
   ]
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [
+      "create:host_tests",
+      "run:host_tests",
+    ]
+  }
+}
+
+if (is_fuchsia) {
+  group("package_deps_for_host_tests") {
+    testonly = true
+    deps = [
+      "create:package_deps_for_host_tests",
+      "run:package_deps_for_host_tests",
+    ]
+  }
 }

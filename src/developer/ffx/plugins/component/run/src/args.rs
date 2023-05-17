@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
+use component_debug::config::RawConfigOverride;
 use ffx_core::ffx_command;
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::AbsoluteMoniker;
@@ -47,4 +48,11 @@ pub struct RunComponentCommand {
     /// connect stdin, stdout, and stderr to the component (requires component
     /// to be in a collection with single_run durability)
     pub connect_stdio: bool,
+
+    #[argh(option)]
+    /// provide a configuration override to the component being run. Requires
+    /// `mutability: [ "parent" ]` on the configuration field. Specified in the format
+    /// `KEY=VALUE` where `VALUE` is a JSON string which can be resolved as the correct type of
+    /// configuration value.
+    pub config: Vec<RawConfigOverride>,
 }

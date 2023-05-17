@@ -31,10 +31,12 @@ rustc_library("component_debug") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:prettytable-rs",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:termion",
     "//third_party/rust_crates:textwrap",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:url",
+    "//tools/lib/config_value_file",
   ]
 
   # Some host tools use serde to serialize/deserialize types. This
@@ -78,6 +80,7 @@ rustc_library("component_debug") {
     "src/cli/stop.rs",
     "src/cli/storage.rs",
     "src/cmx.rs",
+    "src/config.rs",
     "src/copy.rs",
     "src/dirs.rs",
     "src/doctor.rs",

@@ -5,6 +5,7 @@
 use argh::FromArgs;
 use component_debug::{
     cli::{GraphFilter, GraphOrientation, ListFilter},
+    config::RawConfigOverride,
     explore::DashNamespaceLayout,
 };
 use fuchsia_url::AbsoluteComponentUrl;
@@ -57,6 +58,13 @@ pub struct CreateArgs {
 
     #[argh(positional)]
     pub url: AbsoluteComponentUrl,
+
+    #[argh(option)]
+    /// provide a configuration override to the component being run. Requires
+    /// `mutability: [ "parent" ]` on the configuration field. Specified in the format
+    /// `KEY=VALUE` where `VALUE` is a JSON string which can be resolved as the correct type of
+    /// configuration value.
+    pub config: Vec<RawConfigOverride>,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -156,6 +164,13 @@ pub struct RunArgs {
     /// connect stdin, stdout, and stderr to the component (requires component
     /// to be in a collection with single_run durability)
     pub connect_stdio: bool,
+
+    #[argh(option)]
+    /// provide a configuration override to the component being run. Requires
+    /// `mutability: [ "parent" ]` on the configuration field. Specified in the format
+    /// `KEY=VALUE` where `VALUE` is a JSON string which can be resolved as the correct type of
+    /// configuration value.
+    pub config: Vec<RawConfigOverride>,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]

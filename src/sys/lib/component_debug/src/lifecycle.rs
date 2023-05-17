@@ -74,6 +74,7 @@ pub async fn create_instance_in_collection(
     collection: &str,
     child_name: &str,
     url: &AbsoluteComponentUrl,
+    config_overrides: Vec<fdecl::ConfigOverride>,
     child_args: Option<fcomponent::CreateChildArgs>,
 ) -> Result<(), CreateError> {
     let collection_ref = fdecl::CollectionRef { name: collection.to_string() };
@@ -82,6 +83,7 @@ pub async fn create_instance_in_collection(
         url: Some(url.to_string()),
         startup: Some(fdecl::StartupMode::Lazy),
         environment: None,
+        config_overrides: Some(config_overrides),
         ..Default::default()
     };
 
@@ -417,7 +419,9 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
             0,
         );
-        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, None).await.unwrap();
+        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, vec![], None)
+            .await
+            .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -440,7 +444,7 @@ mod test {
             ]),
             ..Default::default()
         };
-        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, Some(child_args))
+        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, vec![], Some(child_args))
             .await
             .unwrap();
     }
@@ -451,7 +455,7 @@ mod test {
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_fail(fsys::CreateError::InstanceAlreadyExists);
-        let err = create_instance_in_collection(&lc, &parent, "foo", "bar", &url, None)
+        let err = create_instance_in_collection(&lc, &parent, "foo", "bar", &url, vec![], None)
             .await
             .unwrap_err();
         assert_matches!(err, CreateError::InstanceAlreadyExists);

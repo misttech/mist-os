@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
-use component_debug::cli::run_cmd;
-use ffx_component::rcs::connect_to_lifecycle_controller;
+use anyhow::{anyhow, Context as _, Result};
+use component_debug::{cli::run_cmd, config::resolve_raw_config_overrides};
+use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_run_args::RunComponentCommand;
 use ffx_core::{ffx_plugin, macro_deps::errors::FfxError};
 use ffx_log::{error::LogError, log_impl, LogOpts};
@@ -24,6 +24,16 @@ async fn cmd_impl(
         .identify_host()
         .await?
         .map_err(|err| anyhow!("Error identifying host: {:?}", err))?;
+    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
+
+    let config_overrides = resolve_raw_config_overrides(
+        &realm_query,
+        &args.moniker,
+        &args.url.to_string(),
+        &args.config,
+    )
+    .await
+    .context("resolving config overridese")?;
 
     // All errors from component_debug library are user-visible.
     run_cmd(
@@ -31,6 +41,7 @@ async fn cmd_impl(
         args.url,
         args.recreate,
         args.connect_stdio,
+        config_overrides,
         lifecycle_controller,
         std::io::stdout(),
     )
