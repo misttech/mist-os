@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ffx_config_domain::ConfigDomain;
 use std::{fmt, path::PathBuf};
 
 /// The type of environment we're running in, along with relevant information about
 /// that environment.
 #[derive(Clone, Debug, PartialEq)]
 pub enum EnvironmentKind {
+    /// In a project with a fuchsia_env file at its root with config domain info
+    /// in it.
+    ConfigDomain(ConfigDomain),
     /// In a fuchsia.git build tree with a jiri root and possibly a build directory.
     InTree { tree_root: PathBuf, build_dir: Option<PathBuf> },
     /// Isolated within a particular directory for testing or consistency purposes
@@ -21,6 +25,9 @@ impl std::fmt::Display for EnvironmentKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use EnvironmentKind::*;
         match self {
+            ConfigDomain(domain) => {
+                write!(f, "Fuchsia Project Rooted at {}", domain.root(),)
+            }
             InTree { tree_root, build_dir: Some(build_dir) } => write!(
                 f,
                 "Fuchsia.git In-Tree Rooted at {root}, with default build directory of {build}",

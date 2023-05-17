@@ -4,6 +4,7 @@
 
 use crate::{environment::EnvironmentKind, EnvironmentContext};
 use anyhow::{anyhow, Context, Result};
+use camino::Utf8Path;
 use std::path::Path;
 use std::{fs::create_dir_all, path::PathBuf};
 
@@ -33,6 +34,15 @@ impl EnvironmentContext {
         let mut filename = build_dir.file_name().context("build dir filename")?.to_owned();
         filename.push(".json");
         Ok(build_dir.with_file_name(&filename))
+    }
+
+    /// If this environment context has an explicitly set build config path,
+    /// return it. Otherwise None.
+    pub fn get_build_config_file(&self) -> Option<&Utf8Path> {
+        match self.env_kind() {
+            EnvironmentKind::ConfigDomain(domain) => domain.get_build_config_file(),
+            _ => None,
+        }
     }
 
     pub fn get_default_ascendd_path(&self) -> Result<PathBuf> {

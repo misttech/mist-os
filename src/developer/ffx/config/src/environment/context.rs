@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use errors::ffx_error;
+use ffx_config_domain::ConfigDomain;
 use sdk::{Sdk, SdkRoot};
 use std::{
     collections::HashMap,
@@ -58,6 +59,10 @@ impl std::cmp::PartialEq for EnvironmentContext {
 pub enum EnvironmentDetectError {
     #[error("Error reading metadata or data from the filesystem")]
     FileSystem(#[from] std::io::Error),
+    #[error("Invalid path, not utf8-safe")]
+    Path(#[from] camino::FromPathError),
+    #[error("Error in config domain environment file")]
+    ConfigDomain(#[from] ffx_config_domain::FileError),
 }
 
 impl EnvironmentContext {
@@ -71,6 +76,16 @@ impl EnvironmentContext {
     ) -> Self {
         let cache = Arc::default();
         Self { kind, exe_kind, env_vars, runtime_args, env_file_path, cache }
+    }
+
+    /// Initialize an environment type for a config domain context, with a
+    /// `fuchsia_env` file at its root.
+    pub fn config_domain(
+        exe_kind: ExecutableKind,
+        env_file: ConfigDomain,
+        runtime_args: ConfigMap,
+    ) -> Self {
+        Self::new(EnvironmentKind::ConfigDomain(env_file), exe_kind, None, runtime_args, None)
     }
 
     /// Initialize an environment type for an in tree context, rooted at `tree_root` and if
@@ -129,8 +144,12 @@ impl EnvironmentContext {
         env_file_path: Option<PathBuf>,
     ) -> Result<Self, EnvironmentDetectError> {
         // strong signals that we're running...
-        // - in-tree: we found a jiri root, and...
-        if let Some(tree_root) = Self::find_jiri_root(current_dir)? {
+        if let Some(env_file_path) = ConfigDomain::find_root(current_dir.try_into()?) {
+            // - a config-domain: we found a fuchsia-env file
+            let env_file = ConfigDomain::load_from(&env_file_path)?;
+            Ok(Self::config_domain(exe_kind, env_file, runtime_args))
+        } else if let Some(tree_root) = Self::find_jiri_root(current_dir)? {
+            // - in-tree: we found a jiri root, and...
             // look for a .fx-build-dir file and use that instead.
             let build_dir = Self::load_fx_build_dir(&tree_root)?;
 
@@ -166,6 +185,7 @@ impl EnvironmentContext {
     pub fn build_dir(&self) -> Option<&Path> {
         match &self.kind {
             EnvironmentKind::InTree { build_dir, .. } => build_dir.as_deref(),
+            EnvironmentKind::ConfigDomain(domain) => Some(domain.get_build_dir()?.as_std_path()),
             _ => None,
         }
     }
@@ -255,6 +275,9 @@ impl EnvironmentContext {
             self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().await.ok();
 
         match (&self.kind, runtime_root) {
+            (EnvironmentKind::ConfigDomain(domain), None) => {
+                self.sdk_from_config(domain.get_explicit_sdk_root().map(|p| p.as_std_path())).await
+            }
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
                 let manifest = build_dir.clone();
                 let module = self.query("sdk.module").get().await.ok();
@@ -308,7 +331,6 @@ impl EnvironmentContext {
 
         let mut cmd = Command::new(&ffx_path);
         match &self.kind {
-            EnvironmentKind::InTree { .. } | EnvironmentKind::NoContext => {}
             EnvironmentKind::Isolated { isolate_root } => {
                 cmd.arg("--isolate-dir").arg(isolate_root);
 
@@ -324,6 +346,7 @@ impl EnvironmentContext {
                     }
                 }
             }
+            _ => {}
         }
         cmd.env(Self::FFX_BIN_ENV, &ffx_path);
         cmd.arg("--config").arg(serde_json::to_string(&self.runtime_args)?);

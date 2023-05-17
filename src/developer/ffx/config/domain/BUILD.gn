@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//build/testing/host_test_data.gni")
 
 rustc_library("lib") {
   name = "ffx_config_domain"
@@ -11,6 +12,7 @@ rustc_library("lib") {
   with_unit_tests = true
 
   sources = [
+    "src/config_domain.rs",
     "src/fuchsia_env.rs",
     "src/lib.rs",
   ]
@@ -22,6 +24,24 @@ rustc_library("lib") {
     "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:toml",
+  ]
+
+  test_deps = [
+    ":test_data",
+    "//third_party/rust_crates:assert_matches",
+  ]
+
+  _test_data_path = rebase_path("//src/developer/ffx/config/domain/test_data",
+                                "$root_out_dir/..")
+  rustenv = [ "TEST_DATA_PATH=$_test_data_path" ]
+}
+
+host_test_data("test_data") {
+  sources = [
+    "test_data/basic_example/fuchsia_env.toml",
+    "test_data/basic_example/stuff/keep-me.txt",
+    "test_data/conflicting_files/fuchsia_env.json5",
+    "test_data/conflicting_files/fuchsia_env.toml",
   ]
 }
 

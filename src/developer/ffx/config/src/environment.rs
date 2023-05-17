@@ -170,12 +170,16 @@ impl Environment {
     }
 
     pub fn get_build(&self) -> Option<PathBuf> {
-        let dir = self.build_dir()?;
-        self.files
-            .build
-            .as_ref()
-            .and_then(|dirs| dirs.get(dir).cloned())
-            .or_else(|| self.context.get_default_build_dir_config_path(dir).ok())
+        if let Some(build_config_path) = self.context.get_build_config_file() {
+            Some(build_config_path.into())
+        } else {
+            let dir = self.build_dir()?;
+            self.files
+                .build
+                .as_ref()
+                .and_then(|dirs| dirs.get(dir).cloned())
+                .or_else(|| self.context.get_default_build_dir_config_path(dir).ok())
+        }
     }
 
     pub fn set_build(
