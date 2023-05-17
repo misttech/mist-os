@@ -64,7 +64,7 @@ zx_status_t TransferBuffer::Init(const zx::bti& bti, size_t count, uint32_t chun
 
   zx_status_t status = io_buffer_init(&buf_, bti.get(), size_, IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate transfer buffers (%d)", status);
+    zxlogf(ERROR, "Failed to allocate transfer buffers: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -119,10 +119,10 @@ ConsoleDevice::~ConsoleDevice() = default;
 
 // We don't need to hold request_lock_ during initialization
 zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
-  zxlogf(TRACE, "%s: entry", __func__);
+  zxlogf(TRACE, "entry");
 
   if (zx_status_t status = zx::eventpair::create(0, &event_, &event_remote_); status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to create event pair (%d)", tag(), status);
+    zxlogf(ERROR, "Failed to create event pair: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -131,24 +131,24 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
   DeviceReset();
   DriverStatusAck();
   if (!DeviceFeatureSupported(VIRTIO_F_VERSION_1)) {
-    zxlogf(ERROR, "%s: Legacy virtio interface is not supported by this driver", tag());
+    zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }
   DriverFeatureAck(VIRTIO_F_VERSION_1);
 
   if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
-    zxlogf(ERROR, "%s: Feature negotiation failed (%d)", tag(), status);
+    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
     return status;
   }
 
   if (zx_status_t status = port0_receive_queue_.Init(0, kDescriptors); status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to initialize receive queue (%d)", tag(), status);
+    zxlogf(ERROR, "Failed to initialize receive queue: %s", zx_status_get_string(status));
     return status;
   }
 
   if (zx_status_t status = port0_receive_buffer_.Init(bti_, kDescriptors, kChunkSize);
       status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to allocate buffers for receive queue (%d)", tag(), status);
+    zxlogf(ERROR, "Failed to allocate buffers for receive queue: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -162,13 +162,14 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
   port0_receive_queue_.Kick();
 
   if (zx_status_t status = port0_transmit_queue_.Init(1, kDescriptors); status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to initialize transmit queue (%d)", tag(), status);
+    zxlogf(ERROR, "Failed to initialize transmit queue: %s", zx_status_get_string(status));
     return status;
   }
 
   if (zx_status_t status = port0_transmit_buffer_.Init(bti_, kDescriptors, kChunkSize);
       status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to allocate buffers for transmit queue (%d)", tag(), status);
+    zxlogf(ERROR, "Failed to allocate buffers for transmit queue: %s",
+           zx_status_get_string(status));
     return status;
   }
 
@@ -183,7 +184,7 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
     zx_status_t status = DdkAdd("virtio-console");
     device_ = zxdev();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to register device (%d)", tag(), status);
+      zxlogf(ERROR, "Failed to register device: %s", zx_status_get_string(status));
       device_ = nullptr;
       return status;
     }
@@ -192,7 +193,7 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
   StartIrqThread();
   DriverStatusOk();
 
-  zxlogf(TRACE, "%s: exit", __func__);
+  zxlogf(TRACE, "exit");
   return ZX_OK;
 }
 
@@ -208,7 +209,7 @@ void ConsoleDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void ConsoleDevice::IrqRingUpdate() {
-  zxlogf(TRACE, "%s: entry", __func__);
+  zxlogf(TRACE, "entry");
 
   fbl::AutoLock a(&request_lock_);
 
@@ -260,7 +261,7 @@ void ConsoleDevice::IrqRingUpdate() {
     }
     event_.signal_peer(0, DEV_STATE_WRITABLE);
   });
-  zxlogf(TRACE, "%s: exit", __func__);
+  zxlogf(TRACE, "exit");
 }
 
 void ConsoleDevice::AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device> server_end) {
@@ -286,7 +287,7 @@ void ConsoleDevice::Query(QueryCompleter::Sync& completer) {
 }
 
 void ConsoleDevice::Read(ReadRequestView request, ReadCompleter::Sync& completer) {
-  zxlogf(TRACE, "%s: entry", __func__);
+  zxlogf(TRACE, "entry");
 
   fbl::AutoLock a(&request_lock_);
 
@@ -313,12 +314,12 @@ void ConsoleDevice::Read(ReadRequestView request, ReadCompleter::Sync& completer
     port0_receive_queue_.Kick();
   }
 
-  zxlogf(TRACE, "%s: exit", __func__);
+  zxlogf(TRACE, "exit");
   completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(buf, len));
 }
 
 void ConsoleDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
-  zxlogf(TRACE, "%s: entry", __func__);
+  zxlogf(TRACE, "entry");
 
   uint64_t count = request->data.count();
   if (count > UINT32_MAX)
@@ -339,7 +340,7 @@ void ConsoleDevice::Write(WriteRequestView request, WriteCompleter::Sync& comple
   QueueTransfer(&port0_transmit_queue_, desc->phys, desc->used_len, /*write*/ true);
   port0_transmit_queue_.Kick();
 
-  zxlogf(TRACE, "%s: exit", __func__);
+  zxlogf(TRACE, "exit");
   completer.ReplySuccess(len);
 }
 
