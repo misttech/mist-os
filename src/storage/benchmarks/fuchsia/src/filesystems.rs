@@ -72,6 +72,8 @@ impl FsmFilesystem {
         if as_blob {
             // `create_volume` returns the opened volume but doesn't allow for opening the volume as
             // a blob volume. Calling `clear_cache` re-opens the volume in blob mode.
+            // TODO(https://fxbug.dev/126745) Create the volume in blob mode directly once it's
+            // supported.
             fs.clear_cache().await
         }
         fs
