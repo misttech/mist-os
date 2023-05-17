@@ -254,8 +254,9 @@ impl Representation for Connection {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, zx::Status> {
-        Ok(fio::Representation::File(fio::FileInfo {
+        Ok(fio::Representation::Symlink(fio::SymlinkInfo {
             attributes: Some(self.symlink.get_attributes(requested_attributes).await?),
+            target: Some(self.symlink.read_target().await?),
             ..Default::default()
         }))
     }

@@ -28,6 +28,7 @@ GENERATED_FILE_HEADER = """// Copyright %d The Fuchsia Authors. All rights reser
 
 
 class Bindgen:
+
     def __init__(self):
         self.clang_target = 'x86_64-pc-linux-gnu'
         self.c_types_prefix = ''
@@ -79,6 +80,7 @@ class Bindgen:
             '-target',
             self.clang_target,
             '-nostdlibinc',
+            '-D__Fuchsia_API_level__=4294967295',
         ]
         for i in self.include_dirs:
             args += ['-I', i]
@@ -88,11 +90,11 @@ class Bindgen:
         env['PATH'] = '%s:%s' % (os.path.abspath(RUST_DIR), env['PATH'])
         subprocess.check_call(args, env=env)
 
-
     def get_auto_derive_traits(self, line):
         """Returns true if the given line defines a Rust structure with a name
         matching any of the types we need to add FromBytes."""
-        if not (line.startswith("pub struct ") or line.startswith("pub union ")):
+        if not (line.startswith("pub struct ") or
+                line.startswith("pub union ")):
             return None
 
         # The third word (after the "pub struct") is the type name.
@@ -106,22 +108,24 @@ class Bindgen:
                 return traits
         return None
 
-
     def post_process_rust_file(self, rust_file_name):
         with open(rust_file_name, 'r+') as source_file:
             input_lines = source_file.readlines()
             output_lines = []
             for line in input_lines:
-                extra_traits = self. get_auto_derive_traits(line)
+                extra_traits = self.get_auto_derive_traits(line)
                 if extra_traits:
                     # Parse existing traits, if any.
-                    if len(output_lines) > 0 and output_lines[-1].startswith('#[derive('):
+                    if len(output_lines) > 0 and output_lines[-1].startswith(
+                            '#[derive('):
                         traits = output_lines[-1][9:-3].split(', ')
-                        traits.extend(x for x in extra_traits if x not in traits)
-                        output_lines.pop();
+                        traits.extend(
+                            x for x in extra_traits if x not in traits)
+                        output_lines.pop()
                     else:
                         traits = extra_traits
-                    output_lines.append('#[derive(' + ', '.join(traits) + ')]\n')
+                    output_lines.append(
+                        '#[derive(' + ', '.join(traits) + ')]\n')
                 output_lines.append(line)
 
             text = "".join(output_lines)
@@ -131,13 +135,10 @@ class Bindgen:
             source_file.seek(0)
             source_file.write(text)
 
-
     def run(self, input_file, rust_file):
         os.chdir(ROOT_PATH)
 
         self.run_bindgen(input_file, rust_file)
         self.post_process_rust_file(rust_file)
 
-        subprocess.check_call(
-            [FX_PATH, 'format-code', '--files=' + rust_file])
-
+        subprocess.check_call([FX_PATH, 'format-code', '--files=' + rust_file])

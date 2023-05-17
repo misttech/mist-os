@@ -27,6 +27,7 @@
 		zxio_link;
 		zxio_listen;
 		zxio_open;
+		zxio_open2;
 		zxio_open_async;
 		zxio_read;
 		zxio_read_at;

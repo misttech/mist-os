@@ -112,6 +112,9 @@ typedef struct zxio_ops {
   zx_status_t (*xattr_set)(zxio_t* io, const uint8_t* name, size_t name_len, const uint8_t* value,
                            size_t value_len);
   zx_status_t (*xattr_remove)(zxio_t* io, const uint8_t* name, size_t name_len);
+  zx_status_t (*open2)(zxio_t* directory, const char* path, size_t path_len,
+                       const zxio_open_options_t* options, zxio_node_attributes_t* inout_attr,
+                       zxio_storage_t* storage);
 } zxio_ops_t;
 
 // Initialize a |zxio_t| object with the given |ops| table.

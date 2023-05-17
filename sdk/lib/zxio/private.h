@@ -182,6 +182,10 @@ zx_status_t zxio_create_with_nodeinfo(fidl::ClientEnd<fuchsia_io::Node> node,
                                       fuchsia_io::wire::NodeInfoDeprecated& node_info,
                                       zxio_storage_t* storage);
 
+zx_status_t zxio_create_with_representation(fidl::ClientEnd<fuchsia_io::Node> node,
+                                            fuchsia_io::wire::Representation& reresentation,
+                                            zxio_node_attributes_t* attr, zxio_storage_t* storage);
+
 zx::result<zxio_object_type_t> zxio_get_object_type(
     const fidl::ClientEnd<fuchsia_unknown::Queryable>& queryable);
 

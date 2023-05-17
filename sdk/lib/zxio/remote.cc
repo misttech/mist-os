@@ -417,6 +417,9 @@ class Remote : public HasIo {
 
   zx_status_t Open(uint32_t flags, const char* path, size_t path_len, zxio_storage_t* storage);
 
+  zx_status_t Open2(const char* path, size_t path_len, const zxio_open_options_t* options,
+                    zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
+
   zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request);
 
   zx_status_t Unlink(const char* name, size_t name_len, int flags);
@@ -913,6 +916,176 @@ zx_status_t Remote<Protocol>::Open(uint32_t flags, const char* path, size_t path
     return result.status();
   }
   return zxio_create_with_on_open(client_end.TakeChannel().release(), storage);
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
+                                    const zxio_open_options_t* options,
+                                    zxio_node_attributes_t* inout_attr, zxio_storage_t* storage) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  zx::channel client_end, server_end;
+  if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
+    return status;
+  }
+
+  fio::wire::ConnectorFlags connector_flags;
+  fio::Operations maximum_rights;
+  fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions> directory_options_frame;
+  fio::wire::DirectoryProtocolOptions directory_options;
+  fio::wire::FileProtocolFlags file_flags;
+  fio::wire::SymlinkProtocolFlags symlink_flags;
+  fidl::WireTableFrame<fio::wire::NodeProtocols> node_protocols_frame;
+  fio::wire::NodeProtocols node_protocols;
+  fio::Operations rights(options->rights);
+  fio::NodeAttributesQuery attributes;
+  fidl::WireTableFrame<fio::wire::MutableNodeAttributes> create_attributes_frame;
+  fio::wire::MutableNodeAttributes create_attributes;
+  fidl::WireTableFrame<fio::wire::NodeOptions> node_options_frame;
+  fio::wire::NodeOptions node_options;
+  fio::wire::ConnectionProtocols protocols;
+
+  if (options->protocols & ZXIO_NODE_PROTOCOL_CONNECTOR) {
+    if (options->protocols != ZXIO_NODE_PROTOCOL_CONNECTOR) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    protocols = fio::wire::ConnectionProtocols::WithConnector(
+        fidl::ObjectView<fio::wire::ConnectorFlags>::FromExternal(&connector_flags));
+  } else {
+    auto node_options_builder =
+        fio::wire::NodeOptions::ExternalBuilder(
+            fidl::ObjectView<fidl::WireTableFrame<fio::wire::NodeOptions>>::FromExternal(
+                &node_options_frame))
+            .flags(fidl::ObjectView<fio::wire::NodeFlags>::FromExternal(
+                const_cast<fio::wire::NodeFlags*>(&fio::wire::NodeFlags::kGetRepresentation)));
+
+    // -- protocols --
+    auto node_protocols_builder = fio::wire::NodeProtocols::ExternalBuilder(
+        fidl::ObjectView<fidl::WireTableFrame<fio::wire::NodeProtocols>>::FromExternal(
+            &node_protocols_frame));
+
+    if (options->protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
+      auto directory_options_builder = fio::wire::DirectoryProtocolOptions::ExternalBuilder(
+          fidl::ObjectView<fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions>>::FromExternal(
+              &directory_options_frame));
+      if (options->maximum_rights != 0) {
+        maximum_rights = fio::Operations(options->maximum_rights);
+        directory_options_builder.maximum_rights(
+            fidl::ObjectView<fio::wire::Operations>::FromExternal(&maximum_rights));
+      }
+      directory_options = directory_options_builder.Build();
+
+      node_protocols_builder.directory(
+          fidl::ObjectView<fio::wire::DirectoryProtocolOptions>::FromExternal(&directory_options));
+    }
+    if (options->protocols & ZXIO_NODE_PROTOCOL_FILE) {
+      file_flags = fio::FileProtocolFlags(options->file_flags);
+      node_protocols_builder.file(
+          fidl::ObjectView<fio::wire::FileProtocolFlags>::FromExternal(&file_flags));
+    }
+    if (options->protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
+      node_protocols_builder.symlink(
+          fidl::ObjectView<fio::wire::SymlinkProtocolFlags>::FromExternal(&symlink_flags));
+    }
+    node_protocols = node_protocols_builder.Build();
+    node_options_builder.protocols(
+        fidl::ObjectView<fio::wire::NodeProtocols>::FromExternal(&node_protocols));
+
+    // -- mode --
+    node_options_builder.mode(fio::wire::OpenMode(options->mode));
+
+    // -- rights --
+    if (rights != fio::Operations(0)) {
+      node_options_builder.rights(fidl::ObjectView<fio::wire::Operations>::FromExternal(&rights));
+    }
+
+    // -- attributes --
+    if (inout_attr) {
+      if (inout_attr->has.protocols)
+        attributes |= fio::NodeAttributesQuery::kProtocols;
+      if (inout_attr->has.abilities)
+        attributes |= fio::NodeAttributesQuery::kAbilities;
+      if (inout_attr->has.content_size)
+        attributes |= fio::NodeAttributesQuery::kContentSize;
+      if (inout_attr->has.storage_size)
+        attributes |= fio::NodeAttributesQuery::kStorageSize;
+      if (inout_attr->has.link_count)
+        attributes |= fio::NodeAttributesQuery::kLinkCount;
+      if (inout_attr->has.id)
+        attributes |= fio::NodeAttributesQuery::kId;
+      if (inout_attr->has.creation_time)
+        attributes |= fio::NodeAttributesQuery::kCreationTime;
+      if (inout_attr->has.modification_time)
+        attributes |= fio::NodeAttributesQuery::kModificationTime;
+      if (inout_attr->has.mode)
+        attributes |= fio::NodeAttributesQuery::kMode;
+      if (inout_attr->has.uid)
+        attributes |= fio::NodeAttributesQuery::kUid;
+      if (inout_attr->has.gid)
+        attributes |= fio::NodeAttributesQuery::kGid;
+      if (inout_attr->has.rdev)
+        attributes |= fio::NodeAttributesQuery::kRdev;
+
+      if (attributes) {
+        node_options_builder.attributes(
+            fidl::ObjectView<fio::wire::NodeAttributesQuery>::FromExternal(&attributes));
+      } else {
+        inout_attr = nullptr;
+      }
+    }
+
+    // -- create_attributes --
+    if (options->create_attr) {
+      auto builder = fio::wire::MutableNodeAttributes::ExternalBuilder(
+          fidl::ObjectView<fidl::WireTableFrame<fio::wire::MutableNodeAttributes>>::FromExternal(
+              &create_attributes_frame));
+
+      if (options->create_attr->has.protocols || options->create_attr->has.abilities ||
+          options->create_attr->has.id || options->create_attr->has.content_size ||
+          options->create_attr->has.storage_size || options->create_attr->has.link_count) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+
+      if (options->create_attr->has.creation_time) {
+        builder.creation_time(fidl::ObjectView<uint64_t>::FromExternal(
+            const_cast<uint64_t*>(&options->create_attr->creation_time)));
+      }
+      if (options->create_attr->has.modification_time) {
+        builder.modification_time(fidl::ObjectView<uint64_t>::FromExternal(
+            const_cast<uint64_t*>(&options->create_attr->modification_time)));
+      }
+      if (options->create_attr->has.mode) {
+        builder.mode(options->create_attr->mode);
+      }
+      if (options->create_attr->has.uid) {
+        builder.uid(options->create_attr->uid);
+      }
+      if (options->create_attr->has.gid) {
+        builder.gid(options->create_attr->gid);
+      }
+      if (options->create_attr->has.rdev) {
+        builder.rdev(fidl::ObjectView<uint64_t>::FromExternal(
+            const_cast<uint64_t*>(&options->create_attr->rdev)));
+      }
+
+      create_attributes = builder.Build();
+      node_options_builder.create_attributes(
+          fidl::ObjectView<fio::wire::MutableNodeAttributes>::FromExternal(&create_attributes));
+    }
+
+    node_options = node_options_builder.Build();
+    protocols = fio::wire::ConnectionProtocols::WithNode(
+        fidl::ObjectView<fio::wire::NodeOptions>::FromExternal(&node_options));
+  }
+
+  const fidl::Status result = client()->Open2(fidl::StringView::FromExternal(path, path_len),
+                                              protocols, std::move(server_end));
+  if (!result.ok()) {
+    return result.status();
+  }
+  return zxio_create_with_on_representation(client_end.release(), inout_attr, storage);
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
 }
 
 template <typename Protocol>
@@ -1416,6 +1589,7 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   ops.readv_at = Adaptor::From<&Directory::ReadvAt>;
 
   ops.open = Adaptor::From<&Directory::Open>;
+  ops.open2 = Adaptor::From<&Directory::Open2>;
   ops.open_async = Adaptor::From<&Directory::OpenAsync>;
   ops.unlink = Adaptor::From<&Directory::Unlink>;
   ops.token_get = Adaptor::From<&Directory::TokenGet>;

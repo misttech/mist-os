@@ -103,6 +103,9 @@ zx_status_t zxio_default_xattr_get(zxio_t* io, const uint8_t* name, size_t name_
 zx_status_t zxio_default_xattr_set(zxio_t* io, const uint8_t* name, size_t name_len,
                                    const uint8_t* value, size_t value_len);
 zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len);
+zx_status_t zxio_default_open2(zxio_t* directory, const char* path, size_t path_len,
+                               const zxio_open_options_t* options,
+                               zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
 
 // An ops table filled with the default implementations.
 //
@@ -163,6 +166,7 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .xattr_get = zxio_default_xattr_get,
     .xattr_set = zxio_default_xattr_set,
     .xattr_remove = zxio_default_xattr_remove,
+    .open2 = zxio_default_open2,
 };
 
 // Default implementations of the ZXIO operations.

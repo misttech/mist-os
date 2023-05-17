@@ -54,6 +54,7 @@ impl Symlink for FxSymlink {
                 content_size: props.data_attribute_size,
                 storage_size: props.allocated_size,
                 link_count: props.refs,
+                id: self.object_id,
             }
         ))
     }

@@ -530,7 +530,13 @@ pub struct zxio_node_attr {
     pub link_count: u64,
     pub creation_time: u64,
     pub modification_time: u64,
+    pub mode: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub rdev: u64,
     pub has: zxio_node_attr_zxio_node_attr_has_t,
+    pub __bindgen_padding_1: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -543,6 +549,10 @@ pub struct zxio_node_attr_zxio_node_attr_has_t {
     pub link_count: bool,
     pub creation_time: bool,
     pub modification_time: bool,
+    pub mode: bool,
+    pub uid: bool,
+    pub gid: bool,
+    pub rdev: bool,
 }
 pub type zxio_node_attributes_t = zxio_node_attr;
 pub type zxio_seek_origin_t = u32;
@@ -591,6 +601,27 @@ impl Default for zxio_dirent {
 }
 pub type zxio_dirent_t = zxio_dirent;
 pub type zxio_shutdown_options_t = u32;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct zxio_open_options {
+    pub protocols: zxio_node_protocols_t,
+    pub maximum_rights: u64,
+    pub file_flags: u64,
+    pub mode: u32,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub rights: u64,
+    pub create_attr: *const zxio_node_attributes_t,
+}
+impl Default for zxio_open_options {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type zxio_open_options_t = zxio_open_options;
 pub type va_list = __builtin_va_list;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -609,6 +640,13 @@ extern "C" {
 extern "C" {
     pub fn zxio_create_with_on_open(
         handle: zx_handle_t,
+        storage: *mut zxio_storage_t,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn zxio_create_with_on_representation(
+        raw_handle: zx_handle_t,
+        attr: *mut zxio_node_attributes_t,
         storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }
@@ -807,6 +845,16 @@ extern "C" {
         flags: u32,
         path: *const ::std::os::raw::c_char,
         path_len: usize,
+        storage: *mut zxio_storage_t,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn zxio_open2(
+        directory: *mut zxio_t,
+        path: *const ::std::os::raw::c_char,
+        path_len: usize,
+        options: *const zxio_open_options_t,
+        inout_attr: *mut zxio_node_attributes_t,
         storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }
@@ -1195,6 +1243,7 @@ pub const ZXIO_NODE_PROTOCOL_NONE: zxio_node_protocols_t = 0;
 pub const ZXIO_NODE_PROTOCOL_CONNECTOR: zxio_node_protocols_t = 1;
 pub const ZXIO_NODE_PROTOCOL_DIRECTORY: zxio_node_protocols_t = 2;
 pub const ZXIO_NODE_PROTOCOL_FILE: zxio_node_protocols_t = 4;
+pub const ZXIO_NODE_PROTOCOL_SYMLINK: zxio_node_protocols_t = 8;
 pub const ZXIO_SEEK_ORIGIN_START: zxio_seek_origin_t = 0;
 pub const ZXIO_SEEK_ORIGIN_CURRENT: zxio_seek_origin_t = 1;
 pub const ZXIO_SEEK_ORIGIN_END: zxio_seek_origin_t = 2;

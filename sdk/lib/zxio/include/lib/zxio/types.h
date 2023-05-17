@@ -228,6 +228,12 @@ typedef struct zxio_node_attr {
   // Time of last modification in ns since Unix epoch, UTC.
   uint64_t modification_time;
 
+  // POSIX attributes.
+  uint32_t mode;
+  uint32_t uid;
+  uint32_t gid;
+  uint64_t rdev;
+
   // Presence indicator for these fields.
   //
   // If a particular field is absent, it should be set to zero/none,
@@ -243,13 +249,18 @@ typedef struct zxio_node_attr {
     bool link_count;
     bool creation_time;
     bool modification_time;
+    bool mode;
+    bool uid;
+    bool gid;
+    bool rdev;
 
 #ifdef __cplusplus
     constexpr bool operator==(const zxio_node_attr_has_t& other) const {
       return protocols == other.protocols && abilities == other.abilities && id == other.id &&
              content_size == other.content_size && storage_size == other.storage_size &&
              link_count == other.link_count && creation_time == other.creation_time &&
-             modification_time == other.modification_time;
+             modification_time == other.modification_time && mode == other.mode &&
+             uid == other.uid && gid == other.gid && rdev == other.rdev;
     }
     constexpr bool operator!=(const zxio_node_attr_has_t& other) const { return !(*this == other); }
 #endif  // _cplusplus
@@ -282,6 +293,18 @@ typedef struct zxio_node_attr {
       return false;
     }
     if (has.modification_time && (modification_time != other.modification_time)) {
+      return false;
+    }
+    if (has.mode && (mode != other.mode)) {
+      return false;
+    }
+    if (has.uid && (uid != other.uid)) {
+      return false;
+    }
+    if (has.gid && (gid != other.gid)) {
+      return false;
+    }
+    if (has.rdev && (rdev != other.rdev)) {
       return false;
     }
     return true;
@@ -398,6 +421,36 @@ typedef uint32_t zxio_watch_directory_event_t;
 
 typedef zx_status_t (*zxio_watch_directory_cb)(zxio_watch_directory_event_t event, const char* name,
                                                void* context) ZX_AVAILABLE_SINCE(7);
+
+// For mode below.
+#define ZXIO_OPEN_EXISTING 0x1
+#define ZXIO_MAYBE_CREATE 0x2,
+#define ZXIO_ALWAYS_CREATE 0x3,
+
+// See fuchsia.io for detailed semantics.
+typedef struct zxio_open_options {
+  // Which protocols to accept.
+  zxio_node_protocols_t protocols;
+
+  // Directory options
+  // If zero, then this will translate to the field not being present in fuchsia.io.
+  uint64_t maximum_rights;
+
+  // File options
+  uint64_t file_flags;
+
+  // Specifies behaviour with respect to existence. See fuchia.io's OpenMode, and use constants
+  // defined above.
+  uint32_t mode;
+
+  // Requested rights for the connection. If zero, this will mean inherit the rights of the
+  // connection that handles the open.
+  uint64_t rights;
+
+  // Attributes to be set if creating an object. Not all servers support setting
+  // all attributes.
+  const zxio_node_attributes_t* create_attr;
+} zxio_open_options_t;
 
 __END_CDECLS
 

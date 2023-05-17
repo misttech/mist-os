@@ -60,6 +60,22 @@ ZXIO_EXPORT zx_status_t zxio_create(zx_handle_t handle, zxio_storage_t* storage)
 // Always consumes |handle|. |handle| must refer to a channel object.
 ZXIO_EXPORT zx_status_t zxio_create_with_on_open(zx_handle_t handle, zxio_storage_t* storage);
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+// Like zxio_create for channel objects expecting an incoming
+// fuchsia.io.Node/OnRepresentation event.
+//
+// |inout_attr|, if specified, will be populated with attributes requested and
+// returned in the OnRepresentation event. Any attributes marked present in
+// |inout_attr| must exist within the OnRepresentation event or the function
+// will fail with ZX_ERR_INVALID_ARGS. There should be at least one attribute
+// marked; otherwise pass nullptr for |inout_attr|.
+//
+// Always consumes |handle|. |handle| must refer to a channel object.
+ZXIO_EXPORT zx_status_t zxio_create_with_on_representation(zx_handle_t handle,
+                                                           zxio_node_attributes_t* inout_attr,
+                                                           zxio_storage_t* storage);
+#endif
+
 // Like zxio_create but the caller provides information about the handle.
 ZXIO_EXPORT zx_status_t zxio_create_with_info(zx_handle_t handle,
                                               const zx_info_handle_basic_t* handle_info,
@@ -402,6 +418,19 @@ ZXIO_EXPORT zx_status_t zxio_shutdown(zxio_t* io, zxio_shutdown_options_t option
 // See fuchsia.io for the available |flags| and |mode|.
 ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, const char* path,
                                   size_t path_len, zxio_storage_t* storage);
+
+// EXPERIMENTAL: This is not widely supported.
+//
+// Open a new zxio object relative to the given |directory| and initialize it
+// into |storage|.
+//
+// This call blocks on the remote server.
+//
+// See fuchsia.io for precise semantics. |inout_attr| if specified, indicates
+// attributes to be returned upon successful open.
+ZXIO_EXPORT zx_status_t zxio_open2(zxio_t* directory, const char* path, size_t path_len,
+                                   const zxio_open_options_t* options,
+                                   zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
 
 // Open a new object relative to the given |directory|.
 //

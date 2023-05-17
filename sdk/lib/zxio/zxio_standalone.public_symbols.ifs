@@ -29,6 +29,7 @@ Symbols:
   - { Name: zxio_link, Type: Func }
   - { Name: zxio_listen, Type: Func }
   - { Name: zxio_open, Type: Func }
+  - { Name: zxio_open2, Type: Func }
   - { Name: zxio_open_async, Type: Func }
   - { Name: zxio_read, Type: Func }
   - { Name: zxio_read_at, Type: Func }
