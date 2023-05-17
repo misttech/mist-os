@@ -395,6 +395,50 @@ TEST(Sdio, AlignSize) {
 }
 
 /*
+ * A minimially initialized `struct brcmf_sdio` instance.
+ *
+ * This is contained in a class because `struct brcmf_sdio` holds pointers to various other structs.
+ * To ensure memory is valid during usage, we package all of them together in this class.
+ */
+struct MinimalBrcmfSdio {
+  MinimalBrcmfSdio(enum brcmf_sdiod_state sdiod_state, zx_duration_t ctl_done_timeout,
+                   const char* workqueue_name, void (*work_item_handler)(WorkItem* work))
+      : wq(workqueue_name),
+        loop(std::make_unique<::async::Loop>(&kAsyncLoopConfigNeverAttachToThread)),
+        timer(std::make_unique<Timer>(
+            loop->dispatcher(), []() {}, false)) {
+    sdio_dev = {.ctl_done_timeout = ctl_done_timeout, .state = sdiod_state};
+
+    pthread_mutex_init(&func1.lock, nullptr);
+    sdio_dev.func1 = &func1;
+
+    bus_if.bus_priv.sdio = &sdio_dev;
+    sdio_dev.bus_if = &bus_if;
+
+    sdio_dev.bus = &bus;
+    bus.sdiodev = &sdio_dev;
+
+    bus.timer = timer.get();
+
+    // Prepare a WorkQueue with a single WorkItem to run the work_item_handler.
+    bus.brcmf_wq = &wq;
+    bus.datawork = WorkItem(work_item_handler);
+    bus.dpc_triggered.store(false);
+  }
+
+  brcmf_sdio_dev sdio_dev{};
+  sdio_func func1{};
+  sdio_func func2{};
+  struct brcmf_bus bus_if {};
+  struct brcmf_sdio bus {};
+  WorkQueue wq;
+
+  // Fake loop and timer that do nothing. These need to exist for ResetClearsTxGlom test.
+  std::unique_ptr<async::Loop> loop;
+  std::unique_ptr<Timer> timer;
+};
+
+/*
  * The sdio_bus_txctl_test() test helper calls brcmf_sdio_bus_txctl() by mocking the state around
  * the call using the function arguments. This helper returns the status returned by the
  * brcmf_sdio_bus_txctl() call.
@@ -412,36 +456,15 @@ static zx_status_t sdio_bus_txctl_test(enum brcmf_sdiod_state sdiod_state,
                                        zx_duration_t ctl_done_timeout, const char* workqueue_name,
                                        void (*work_item_handler)(WorkItem* work),
                                        ulong expected_tx_ctlpkts, ulong expected_tx_ctlerrs) {
-  // Minimal initialization of brcmf_sdio_dev, brcmf_bus, and brcmf_sdio required to call
-  // brcmf_sdio_bus_txctl().
-  brcmf_sdio_dev sdio_dev = {.ctl_done_timeout = ctl_done_timeout, .state = sdiod_state};
-
-  sdio_func func1 = {};
-  pthread_mutex_init(&func1.lock, nullptr);
-  sdio_dev.func1 = &func1;
-
-  struct brcmf_bus bus_if = {};
-  bus_if.bus_priv.sdio = &sdio_dev;
-  sdio_dev.bus_if = &bus_if;
-
-  struct brcmf_sdio bus = {};
-  sdio_dev.bus = &bus;
-  bus.sdiodev = &sdio_dev;
-
-  // Prepare a WorkQueue with a single WorkItem to run the work_item_handler when
-  // brcmf_sdio_bus_txctl is called.
-  WorkQueue wq = WorkQueue(workqueue_name);
-  bus.brcmf_wq = &wq;
-  bus.datawork = WorkItem(work_item_handler);
-  bus.dpc_triggered.store(false);
+  MinimalBrcmfSdio b(sdiod_state, ctl_done_timeout, workqueue_name, work_item_handler);
 
   // Call brcmf_sdio_bus_txctl() with a blank message. Message processing is not mocked,
   // so this call purely tests
   unsigned char msg[] = "";
   const uint msglen = 0;
-  zx_status_t status = brcmf_sdio_bus_txctl(&bus_if, msg, msglen);
-  EXPECT_EQ(bus.sdcnt.tx_ctlpkts, expected_tx_ctlpkts);
-  EXPECT_EQ(bus.sdcnt.tx_ctlerrs, expected_tx_ctlerrs);
+  zx_status_t status = brcmf_sdio_bus_txctl(&b.bus_if, msg, msglen);
+  EXPECT_EQ(b.bus.sdcnt.tx_ctlpkts, expected_tx_ctlpkts);
+  EXPECT_EQ(b.bus.sdcnt.tx_ctlerrs, expected_tx_ctlerrs);
 
   return status;
 }
@@ -530,4 +553,11 @@ TEST(Sdio, SdioDeviceMultipleShutdowns) {
   child->ReleaseOp();
 }
 
+TEST(Sdio, ResetClearsTxGlom) {
+  MinimalBrcmfSdio b(BRCMF_SDIOD_DATA, ZX_MSEC(1), "brcmf_wq/reset_clears_txglom",
+                     [](WorkItem*) {});
+  b.bus.txglom = true;
+  brcmf_sdio_reset(&b.bus);
+  ASSERT_FALSE(b.bus.txglom);
+}
 }  // namespace
