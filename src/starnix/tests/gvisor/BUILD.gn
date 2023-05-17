@@ -32,8 +32,6 @@ gvisor_tests = [
   "brk_test",
   "chdir_test",
   "chmod_test",
-  "chown_test",
-  "chroot_test",
   "clock_getres_test",
   "clock_gettime_test",
   "clock_nanosleep_test",
@@ -46,20 +44,17 @@ gvisor_tests = [
   "eventfd_test",
   "exceptions_test",
   "exec_binary_test",
-  "exec_test",
   "exit_test",
   "fadvise64_test",
   "fallocate_test",
   "fault_test",
   "fchdir_test",
-  "fcntl_test",
   "fifo_test",
   "flock_test",
   "fork_test",
   "fpsig_fork_test",
   "fpsig_nested_test",
   "fsync_test",
-  "fuse_test",
   "futex_test",
   "getcpu_host_test",
   "getcpu_test",
@@ -68,12 +63,8 @@ gvisor_tests = [
   "getrusage_test",
   "inotify_test",
   "ioctl_test",
-  "ip6tables_test",
-  "iptables_test",
   "itimer_test",
-  "kcov_test",
   "kill_test",
-  "link_test",
   "lseek_test",
   "madvise_test",
   "membarrier_test",
@@ -85,53 +76,40 @@ gvisor_tests = [
   "mknod_test",
   "mlock_test",
   "mmap_test",
-  "mount_test",
   "mremap_test",
   "msgqueue_test",
   "msync_test",
   "munmap_test",
-  "network_namespace_test",
   "open_create_test",
   "open_test",
   "packet_socket_dgram_test",
-  "packet_socket_raw_test",
   "packet_socket_test",
   "partial_bad_buffer_test",
   "pause_test",
   "ping_socket_test",
   "pipe_test",
-  "pivot_root_test",
   "poll_test",
   "ppoll_test",
   "prctl_setuid_test",
   "prctl_test",
   "pread64_test",
-  "preadv2_test",
-  "preadv_test",
-  "priority_test",
-  "processes_test",
   "proc_isolated_test",
   "proc_net_tcp_test",
-  "proc_net_test",
   "proc_net_udp_test",
   "proc_net_unix_test",
   "proc_pid_oomscore_test",
   "proc_pid_smaps_test",
   "proc_pid_uid_gid_map_test",
-  "proc_test",
   "pselect_test",
   "pty_root_test",
   "pty_test",
   "pwrite64_test",
   "pwritev2_test",
-  "raw_socket_icmp_test",
-  "raw_socket_test",
   "readahead_test",
   "read_test",
   "readv_socket_test",
   "readv_test",
   "rename_test",
-  "rlimits_test",
   "rtsignal_test",
   "sched_test",
   "sched_yield_test",
@@ -140,7 +118,6 @@ gvisor_tests = [
   "semaphore_test",
   "sendfile_test",
   "sendfile_socket_test",
-  "setgid_test",
   "sigaction_test",
   "sigaltstack_test",
   "signalfd_test",
@@ -149,9 +126,6 @@ gvisor_tests = [
   "sigtimedwait_test",
   "socket_abstract_non_blocking_test",
   "socket_abstract_test",
-  "socket_bind_to_device_distribution_test",
-  "socket_bind_to_device_sequence_test",
-  "socket_bind_to_device_test",
   "socket_blocking_ip_test",
   "socket_blocking_local_test",
   "socket_capability_test",
@@ -166,9 +140,7 @@ gvisor_tests = [
   "socket_ip_tcp_udp_generic_loopback_test",
   "socket_ip_udp_loopback_non_blocking_test",
   "socket_ip_udp_loopback_test",
-  "socket_ip_unbound_netlink_test",
   "socket_ip_unbound_test",
-  "socket_ipv4_datagram_based_socket_unbound_loopback_test",
   "socket_ipv4_udp_unbound_external_networking_test",
   "socket_ipv4_udp_unbound_loopback_netlink_test",
   "socket_ipv4_udp_unbound_loopback_nogotsan_test",
@@ -178,7 +150,6 @@ gvisor_tests = [
   "socket_ipv6_udp_unbound_loopback_test",
   "socket_ipv6_unbound_test",
   "socket_netdevice_test",
-  "socket_netlink_route_test",
   "socket_netlink_test",
   "socket_netlink_uevent_test",
   "socket_non_stream_blocking_local_test",
@@ -203,7 +174,6 @@ gvisor_tests = [
   "statfs_test",
   "stat_test",
   "stat_times_test",
-  "sticky_test",
   "symlink_test",
   "sync_file_range_test",
   "sync_test",
@@ -218,10 +188,7 @@ gvisor_tests = [
   "tkill_test",
   "truncate_test",
   "tuntap_hostinet_test",
-  "tuntap_test",
   "udp_bind_test",
-  "uidgid_test",
-  "uname_test",
   "unlink_test",
   "unshare_test",
   "utimes_test",
@@ -232,6 +199,45 @@ gvisor_tests = [
   "wait_test",
   "write_test",
   "xattr_test",
+]
+
+gvisor_tests_run_as_root = [
+  "chown_test",
+  "chroot_test",
+  "fcntl_test",
+  "fuse_test",
+  "ip6tables_test",
+  "iptables_test",
+  "kcov_test",
+  "link_test",
+  "mount_test",
+  "network_namespace_test",
+  "packet_socket_raw_test",
+  "pivot_root_test",
+  "preadv2_test",
+  "preadv_test",
+  "priority_test",
+  "proc_net_test",
+  "proc_test",
+  "processes_test",
+  "raw_socket_icmp_test",
+  "raw_socket_test",
+  "rlimits_test",
+  "socket_bind_to_device_distribution_test",
+  "socket_bind_to_device_sequence_test",
+  "socket_bind_to_device_test",
+  "socket_ip_unbound_netlink_test",
+  "socket_ipv4_datagram_based_socket_unbound_loopback_test",
+  "socket_netlink_route_test",
+  "sticky_test",
+  "tuntap_test",
+  "uidgid_test",
+  "uname_test",
+]
+
+gvisor_tests_custom_manifest = [
+  "exec_test",
+  "setgid_test",
 ]
 
 gvisor_benchmarks = [
@@ -263,14 +269,14 @@ gvisor_benchmarks = [
 
 expect_includes("gvisor_benchmark") {
   includes = [
-    "meta/gvisor_benchmark.shard.cml",
+    "//src/starnix/tests/starnix_test.shard.cml",
     "meta/gvisor_container.shard.cml",
   ]
 }
 
 expect_includes("gvisor_test_with_expectations") {
   includes = [
-    "meta/gvisor_with_expectations.shard.cml",
+    "//src/starnix/tests/starnix_test_with_expectations.shard.cml",
     "meta/gvisor_container.shard.cml",
   ]
 }
@@ -294,11 +300,38 @@ group("container_resources") {
   }
 }
 
+# Creates a fuchsia_test_component for a gVisor binary.
+#
+# Parameters
+#
+#   use_gen_manifest (optional)
+#     If true, uses the generated manifest at `$target_gen_dir/${test_name}_manifest.cml.
+#     Use with `gvisor_generate_manifest()`.
+#     If false, uses the component manifest at `meta/test_name.cml`.
+#     Default: true
+#   use_persistent_storage (optional)
+#     If true, includes dependencies for persistent storage.
+#     Default: false
+#   use_expectations (optional)
+#     If true, includes dependencies for gVisor tests with expectations.
+#     Default: false
+#   run_as_root (optional)
+#     If true, sets `uid` to `0` in manifest.
+#     Default: false
 template("gvisor_test_component") {
   test_name = target_name
 
   _storage_shard = "meta/gvisor_use_tmp_storage.shard.cml"
   _manifest_label = "${test_name}.cml"
+
+  deps = []
+  use_gen_manifest = true
+  _manifest_path = "$target_gen_dir/${test_name}_manifest.cml"
+  if (defined(invoker.use_gen_manifest) && !invoker.use_gen_manifest) {
+    use_gen_manifest = false
+    _manifest_path = "meta/${test_name}.cml"
+  }
+
   component_name = target_name
   if (defined(invoker.use_persistent_storage) &&
       invoker.use_persistent_storage) {
@@ -306,11 +339,24 @@ template("gvisor_test_component") {
     _manifest_label = "${test_name}_use_persistent_storage.cml"
     component_name = "${target_name}_use_persistent_storage"
   }
+
+  use_expectations = false
+  if (defined(invoker.use_expectations)) {
+    use_expectations = invoker.use_expectations
+  }
+
   cmc_merge(_manifest_label) {
     sources = [
-      "meta/${test_name}.cml",
+      _manifest_path,
       _storage_shard,
     ]
+
+    if (defined(invoker.run_as_root) && invoker.run_as_root) {
+      sources += [ "meta/gvisor_run_as_root.shard.cml" ]
+    }
+    if (use_gen_manifest) {
+      deps = [ ":${test_name}_manifest" ]
+    }
   }
   _outputs = get_target_outputs(":${_manifest_label}")
   _manifest_file = _outputs[0]
@@ -322,11 +368,6 @@ template("gvisor_test_component") {
     check_references = false
 
     manifest = _manifest_file
-
-    use_expectations = false
-    if (defined(invoker.use_expectations)) {
-      use_expectations = invoker.use_expectations
-    }
 
     if (use_expectations) {
       deps = [ ":gvisor_test_with_expectations" ]
@@ -341,29 +382,100 @@ template("gvisor_test_component") {
   }
 }
 
-# gVisor tests currently run either on tmpfs (default) or Fxfs. This will create
-# two versions of the test components for testing.
-foreach(test_name, gvisor_tests) {
+# Generates a manifest for
+#   use_expectations (optional)
+#     If true, includes runner shard for gVisor tests with expectations.
+#     Default: false
+template("gvisor_generate_manifest") {
+  test_name = target_name
+
+  use_expectations = false
+  if (defined(invoker.use_expectations) && invoker.use_expectations) {
+    use_expectations = true
+  }
+
+  _includes = []
+  if (use_expectations) {
+    _includes +=
+        [ "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml" ]
+  } else {
+    _includes +=
+        [ "//src/starnix/tests/gvisor/meta/gvisor_benchmark.shard.cml" ]
+  }
+
   resource("${test_name}_bin") {
     sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
     outputs = [ "data/tests/${test_name}" ]
   }
-  gvisor_test_component(test_name) {
-    use_expectations = true
+
+  generated_file("${test_name}_manifest") {
+    outputs = [ "$target_gen_dir/${test_name}_manifest.cml" ]
+    output_conversion = "json"
+
+    contents = {
+      include = _includes
+      program = {
+        binary = "data/tests/$test_name"
+      }
+    }
+  }
+}
+
+# gVisor tests currently run either on tmpfs (default) or Fxfs. This will create
+# two versions of the test components for testing.
+template("gvisor_tmpfs_and_fxfs_components") {
+  gvisor_test_component(target_name) {
+    forward_variables_from(invoker, "*")
     use_persistent_storage = false
   }
-  gvisor_test_component(test_name) {
-    use_expectations = true
+  gvisor_test_component(target_name) {
+    forward_variables_from(invoker, "*")
     use_persistent_storage = true
   }
 }
 
+foreach(test_name, gvisor_tests) {
+  gvisor_generate_manifest(test_name) {
+    use_expectations = true
+  }
+  gvisor_tmpfs_and_fxfs_components(test_name) {
+    use_gen_manifest = true
+    use_expectations = true
+    run_as_root = false
+  }
+}
+
+foreach(test_name, gvisor_tests_run_as_root) {
+  gvisor_generate_manifest(test_name) {
+    use_expectations = true
+  }
+  gvisor_tmpfs_and_fxfs_components(test_name) {
+    use_gen_manifest = true
+    use_expectations = true
+    run_as_root = true
+  }
+}
+
+foreach(test_name, gvisor_tests_custom_manifest) {
+  resource("${test_name}_bin") {
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
+    outputs = [ "data/tests/${test_name}" ]
+  }
+  gvisor_tmpfs_and_fxfs_components(test_name) {
+    use_gen_manifest = false
+    use_expectations = true
+    run_as_root = false
+  }
+}
+
 foreach(benchmark_name, gvisor_benchmarks) {
-  resource("${benchmark_name}_bin") {
-    sources = [ "${gvisor_prebuilt_directory}/stripped/${benchmark_name}" ]
-    outputs = [ "data/tests/${benchmark_name}" ]
+  gvisor_generate_manifest(benchmark_name) {
+    use_expectations = false
   }
   gvisor_test_component(benchmark_name) {
+    use_gen_manifest = true
+    use_expectations = false
+    run_as_root = false
   }
 }
 
@@ -392,6 +504,12 @@ gvisor_with_expectations_test_package("starnix_gvisor_tests") {
   foreach(test_name, gvisor_tests) {
     test_components += [ ":${test_name}" ]
   }
+  foreach(test_name, gvisor_tests_run_as_root) {
+    test_components += [ ":${test_name}" ]
+  }
+  foreach(test_name, gvisor_tests_custom_manifest) {
+    test_components += [ ":${test_name}" ]
+  }
 }
 
 # Thesse tests assume the data filesystem uses Fxfs.
@@ -399,6 +517,12 @@ gvisor_with_expectations_test_package("starnix_gvisor_tests_on_fxfs") {
   expectations = "expectations/using_fxfs_test.json5"
   test_components = []
   foreach(test_name, gvisor_tests) {
+    test_components += [ ":${test_name}_use_persistent_storage" ]
+  }
+  foreach(test_name, gvisor_tests_run_as_root) {
+    test_components += [ ":${test_name}_use_persistent_storage" ]
+  }
+  foreach(test_name, gvisor_tests_custom_manifest) {
     test_components += [ ":${test_name}_use_persistent_storage" ]
   }
 }
