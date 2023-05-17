@@ -8,41 +8,70 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
+from typing import Sequence
 
-from typing import AbstractSet, Any, Callable, Collection, FrozenSet, Iterable, Optional, Sequence, TextIO, Tuple
+
+def depfile_quote(path: str) -> str:
+    """Quote a path properly for depfiles, if necessary.
+
+    shlex.quote() does not work because paths with spaces
+    are simply encased in single-quotes, while the Ninja
+    depfile parser only supports escaping single chars
+    (e.g. ' ' -> '\ ').
+
+    Args:
+       path: input file path.
+    Returns:
+       The input file path with proper quoting to be included
+       directly in a depfile.
+    """
+    return path.replace("\\", "\\\\").replace(" ", "\\ ")
+
+
+def depfile_list(paths: Sequence[str]) -> str:
+    """Create a string that contains a list of paths, quoted for depfiles.
+
+    Args:
+       paths: List of input path strings
+    Returns:
+       A string containing a space-separated list of paths, properly
+       quoted to be written into a depfile.
+    """
+    return " ".join(depfile_quote(p) for p in paths)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--hermetic-inputs-file',
+        "--hermetic-inputs-file",
+        type=argparse.FileType("r"),
         required=True,
-        help="Path to input hermetic inputs file")
+        help="Path to input hermetic inputs file",
+    )
     parser.add_argument(
-        '--outputs',
+        "--outputs",
         required=True,
-        nargs='*',
-        help='Action outputs, to be listed in generated depfile')
-    parser.add_argument(
-        '--depfile', required=True, help='Path to output depfile')
-    parser.add_argument(
-        'command', nargs=argparse.REMAINDER, help='Action command')
+        nargs="*",
+        help="Action outputs, to be listed in generated depfile",
+    )
+    parser.add_argument("--depfile", required=True, help="Path to output depfile")
+    parser.add_argument("command", nargs=argparse.REMAINDER, help="Action command")
 
     args = parser.parse_args()
 
     # Read implicit inputs from file.
-    with open(args.hermetic_inputs_file) as f:
-        implicit_inputs = [l.rstrip() for l in f.readlines()]
+    implicit_inputs = [l.rstrip() for l in args.hermetic_inputs_file.readlines()]
 
     # Read command, and remove initial -- if it is found.
     cmd_args = args.command
-    if cmd_args[0] == '--':
+    if cmd_args[0] == "--":
         cmd_args = cmd_args[1:]
 
     # If command is a Python script, invoke it through the same interpreter.
     tool = cmd_args[0]
-    if tool.endswith(('.py', '.pyz')):
-        cmd_args = [sys.executable, '-S'] + cmd_args
+    if tool.endswith((".py", ".pyz")):
+        cmd_args = [sys.executable, "-S"] + cmd_args
 
     # Run the command.
     try:
@@ -54,9 +83,12 @@ def main():
         return exc.returncode
 
     # Generate the depfile.
-    with open(args.depfile, 'w') as f:
+    depfile = Path(args.depfile)
+    depfile.parent.mkdir(exist_ok=True, parents=True)
+    with depfile.open("w") as f:
         f.write(
-            '%s: %s\n' % (' '.join(args.outputs), ' '.join(implicit_inputs)))
+            "%s: %s\n" % (depfile_list(args.outputs), depfile_list(implicit_inputs))
+        )
 
     return 0
 
