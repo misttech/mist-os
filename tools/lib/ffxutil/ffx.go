@@ -204,7 +204,7 @@ func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 // Stop stops the daemon.
 func (f *FFXInstance) Stop() error {
 	// Use a new context for Stop() to give it time to complete.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// Wait up to 4000ms for daemon to shut down.
 	return f.Run(ctx, "daemon", "stop", "-t", "4000")
