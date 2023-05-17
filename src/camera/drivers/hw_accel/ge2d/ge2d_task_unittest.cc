@@ -11,6 +11,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/syslog/global.h>
 #include <lib/zbi-format/graphics.h>
+#include <lib/zbitl/items/graphics.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <zircon/syscalls.h>
@@ -815,7 +816,7 @@ TEST_F(TaskTest, NonContigVmoTest) {
   ASSERT_OK(status);
 
   uint32_t watermark_size =
-      (kWidth / 4) * (kHeight / 4) * ZBI_PIXEL_FORMAT_BYTES(ZBI_PIXEL_FORMAT_ARGB_8888);
+      (kWidth / 4) * (kHeight / 4) * zbitl::BytesPerPixel(ZBI_PIXEL_FORMAT_ARGB_8888);
   status = zx::vmo::create_contiguous(bti_handle, watermark_size, 0, &watermark_vmo);
   ASSERT_OK(status);
   auto task = std::make_unique<Ge2dTask>();
@@ -859,7 +860,7 @@ TEST_F(TaskTest, InvalidBufferCollectionTest) {
   ASSERT_OK(fake_bti_create(bti_handle.reset_and_get_address()));
 
   uint32_t watermark_size =
-      (kWidth / 4) * (kHeight / 4) * ZBI_PIXEL_FORMAT_BYTES(ZBI_PIXEL_FORMAT_ARGB_8888);
+      (kWidth / 4) * (kHeight / 4) * zbitl::BytesPerPixel(ZBI_PIXEL_FORMAT_ARGB_8888);
   zx_status_t status = zx::vmo::create_contiguous(bti_handle, watermark_size, 0, &watermark_vmo);
   ASSERT_OK(status);
   auto task = std::make_unique<Ge2dTask>();

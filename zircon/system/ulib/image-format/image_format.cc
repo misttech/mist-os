@@ -1332,7 +1332,7 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
       return fpromise::ok(PixelFormat::kRgb2220);
     case ZBI_PIXEL_FORMAT_ARGB_8888:
       // Switching to using alpha.
-    case ZBI_PIXEL_FORMAT_RGB_x888:
+    case ZBI_PIXEL_FORMAT_RGB_X888:
       return fpromise::ok(PixelFormat::kBgra32);
     case ZBI_PIXEL_FORMAT_MONO_8:
       return fpromise::ok(PixelFormat::kL8);
@@ -1344,7 +1344,7 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
       return fpromise::ok(PixelFormat::kBgr24);
     case ZBI_PIXEL_FORMAT_ABGR_8888:
       // Switching to using alpha.
-    case ZBI_PIXEL_FORMAT_BGR_888x:
+    case ZBI_PIXEL_FORMAT_BGR_888_X:
       return fpromise::ok(PixelFormat::kR8G8B8A8);
     case ZBI_PIXEL_FORMAT_ARGB_2_10_10_10:
       return fpromise::ok(PixelFormat::kA2R10G10B10);

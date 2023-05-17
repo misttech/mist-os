@@ -24,6 +24,7 @@ test("sysmem") {
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",
     "//src/lib/ddk",
+    "//src/lib/zbitl",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",

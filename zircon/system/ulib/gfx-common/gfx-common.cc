@@ -418,8 +418,8 @@ void gfx_blend(struct gfx_surface* target, struct gfx_surface* source, uint32_t 
       dest += dest_stride_diff;
       src += source_stride_diff;
     }
-  } else if (source->format == ZBI_PIXEL_FORMAT_RGB_x888 &&
-             target->format == ZBI_PIXEL_FORMAT_RGB_x888) {
+  } else if (source->format == ZBI_PIXEL_FORMAT_RGB_X888 &&
+             target->format == ZBI_PIXEL_FORMAT_RGB_X888) {
     // both are 32 bit modes, no alpha
     const uint32_t* src = static_cast<uint32_t*>(source->ptr) + (srcx + srcy * source->stride);
     uint32_t* dest = static_cast<uint32_t*>(target->ptr) + (destx + desty * target->stride);
@@ -462,7 +462,7 @@ void gfx_blend(struct gfx_surface* target, struct gfx_surface* source, uint32_t 
       dest += dest_stride_diff;
       src += source_stride_diff;
     }
-  } else if (source->format == ZBI_PIXEL_FORMAT_RGB_x888 &&
+  } else if (source->format == ZBI_PIXEL_FORMAT_RGB_X888 &&
              target->format == ZBI_PIXEL_FORMAT_RGB_888) {
     // 32 bit to 24 bit modes, no alpha
     const uint32_t* src = static_cast<uint32_t*>(source->ptr) + (srcx + srcy * source->stride);
@@ -649,7 +649,7 @@ zx_status_t gfx_init_surface(gfx_surface* surface, void* ptr, uint32_t width, ui
       surface->pixelsize = 3;
       surface->len = (surface->height * surface->stride * surface->pixelsize);
       break;
-    case ZBI_PIXEL_FORMAT_RGB_x888:
+    case ZBI_PIXEL_FORMAT_RGB_X888:
     case ZBI_PIXEL_FORMAT_ARGB_8888:
       surface->translate_color = NULL;
       surface->copyrect = &copyrect<uint32_t>;

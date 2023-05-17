@@ -278,7 +278,7 @@ INSTANTIATE_TEST_SUITE_P(
         {
             .test_name = "RGB_x888",
             .mask = {.RedMask = 0xFF0000, .GreenMask = 0xFF00, .BlueMask = 0xFF},
-            .expected_format = ZBI_PIXEL_FORMAT_RGB_x888,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_X888,
         },
         {
             .test_name = "RGB_332",
@@ -303,7 +303,7 @@ INSTANTIATE_TEST_SUITE_P(
         {
             .test_name = "no_mask",
             .format = PixelBlueGreenRedReserved8BitPerColor,
-            .expected_format = ZBI_PIXEL_FORMAT_RGB_x888,
+            .expected_format = ZBI_PIXEL_FORMAT_RGB_X888,
         },
     }),
     [](testing::TestParamInfo<PixelFormatTest::ParamType> const &info) {

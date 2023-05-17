@@ -64,6 +64,7 @@ source_set("common_srcs") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fsl",
+    "//src/lib/zbitl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",

@@ -83,7 +83,7 @@ uint32_t FixPixelFormat(uint32_t format) {
     case 4:
       return ZBI_PIXEL_FORMAT_ARGB_8888;
     case 5:
-      return ZBI_PIXEL_FORMAT_RGB_x888;
+      return ZBI_PIXEL_FORMAT_RGB_X888;
     default:
       return format;
   }

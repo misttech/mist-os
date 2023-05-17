@@ -223,19 +223,13 @@ TEST(ImageFormat, ZbiPixelFormatV2) {
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
-        ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_x888);
+        ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_X888);
     ASSERT_TRUE(convert_result.is_ok());
     EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgra32);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_MONO_8);
-    ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kL8);
-  }
-  {
-    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
-        ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_GRAY_8);
     ASSERT_TRUE(convert_result.is_ok());
     EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kL8);
   }
@@ -265,7 +259,7 @@ TEST(ImageFormat, ZbiPixelFormatV2) {
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
-        ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_BGR_888x);
+        ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_BGR_888_X);
     ASSERT_TRUE(convert_result.is_ok());
     EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kR8G8B8A8);
   }

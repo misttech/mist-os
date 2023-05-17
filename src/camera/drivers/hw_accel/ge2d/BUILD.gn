@@ -119,6 +119,7 @@ executable("ge2d_task_unittest_bin") {
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/fsl",
+    "//src/lib/zbitl",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",

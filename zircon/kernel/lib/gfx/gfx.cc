@@ -68,7 +68,7 @@ zx_status_t gfx_init_surface_from_display(gfx_surface* surface, struct display_i
     case ZBI_PIXEL_FORMAT_RGB_332:
     case ZBI_PIXEL_FORMAT_RGB_2220:
     case ZBI_PIXEL_FORMAT_ARGB_8888:
-    case ZBI_PIXEL_FORMAT_RGB_x888:
+    case ZBI_PIXEL_FORMAT_RGB_X888:
     case ZBI_PIXEL_FORMAT_MONO_8:
       // supported formats
       break;

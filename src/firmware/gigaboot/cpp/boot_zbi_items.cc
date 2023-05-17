@@ -125,7 +125,7 @@ zbi_pixel_format_t PixelFormatFromBitmask(const efi_pixel_bitmask& bitmask) {
   // Ignore reserved field
   constexpr entry entries[] = {
       {.mask = {.RedMask = 0xFF0000, .GreenMask = 0xFF00, .BlueMask = 0xFF},
-       .pixel_format = ZBI_PIXEL_FORMAT_RGB_x888},
+       .pixel_format = ZBI_PIXEL_FORMAT_RGB_X888},
       {.mask = {.RedMask = 0xE0, .GreenMask = 0x1C, .BlueMask = 0x3},
        .pixel_format = ZBI_PIXEL_FORMAT_RGB_332},
       {.mask = {.RedMask = 0xF800, .GreenMask = 0x7E0, .BlueMask = 0x1F},
@@ -154,7 +154,7 @@ uint32_t GetZbiPixelFormat(efi_graphics_output_mode_information* info) {
   efi_graphics_pixel_format efi_fmt = info->PixelFormat;
   switch (efi_fmt) {
     case PixelBlueGreenRedReserved8BitPerColor:
-      return ZBI_PIXEL_FORMAT_RGB_x888;
+      return ZBI_PIXEL_FORMAT_RGB_X888;
     case PixelBitMask:
       return PixelFormatFromBitmask(info->PixelInformation);
     default:
