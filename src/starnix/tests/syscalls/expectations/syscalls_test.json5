@@ -26,6 +26,9 @@
                 // TODO(https://fxbug.dev/121778)
                 "MMapProcTest.AdjacentFileMappings",
 
+                // TODO(https://fxbug.dev/127336)
+                "Shared/MMapProcStatmTest.RssAfterUnmap/0",
+
                 // TODO(https://fxbug.dev/125496)
                 "FuseTest.Mount",
             ],

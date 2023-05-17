@@ -310,6 +310,84 @@ TEST_F(MMapProcTest, AdjacentFileMappings) {
   unlink(path.c_str());
 }
 
+class MMapProcStatmTest : public ProcTestBase, public testing::WithParamInterface<int> {
+ protected:
+  void ReadStatm(size_t* vm_size_out, size_t* rss_size_out) {
+    std::string statm;
+    ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/statm", &statm));
+
+    auto parts = SplitString(statm, " ", fxl::kTrimWhitespace, fxl::kSplitWantAll);
+    EXPECT_EQ(parts.size(), 7U) << statm;
+
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    if (vm_size_out) {
+      size_t vm_size_pages = 0;
+      EXPECT_TRUE(fxl::StringToNumberWithError(parts[0], &vm_size_pages)) << parts[0];
+      *vm_size_out = vm_size_pages * page_size;
+    }
+
+    if (rss_size_out) {
+      size_t rss_size_pages = 0;
+      EXPECT_TRUE(fxl::StringToNumberWithError(parts[1], &rss_size_pages)) << parts[1];
+      *rss_size_out = rss_size_pages * page_size;
+    }
+  }
+};
+
+TEST_P(MMapProcStatmTest, RssAfterUnmap) {
+  const size_t kSize = 4 * 1024 * 1024;
+
+  size_t vm_size_base;
+  size_t rss_base;
+  ASSERT_NO_FATAL_FAILURE(ReadStatm(&vm_size_base, &rss_base));
+
+  int flags = MAP_ANON | GetParam();
+  void* mapped = mmap(nullptr, kSize, PROT_READ | PROT_WRITE, flags, -1, 0);
+  ASSERT_NE(mapped, nullptr) << "errno=" << errno << ", " << strerror(errno);
+
+  size_t vm_size_mapped;
+  size_t rss_mapped;
+  ReadStatm(&vm_size_mapped, &rss_mapped);
+  EXPECT_GT(vm_size_mapped, vm_size_base);
+  EXPECT_GE(rss_mapped, rss_base);
+
+  // Commit the allocated pages by writing some data.
+  volatile char* data = reinterpret_cast<char*>(mapped);
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  for (size_t i = 0; i < kSize; i += page_size) {
+    data[i] = 42;
+  }
+
+  size_t vm_size_committed;
+  size_t rss_committed;
+  ReadStatm(&vm_size_committed, &rss_committed);
+  EXPECT_GT(vm_size_committed, vm_size_base);
+  EXPECT_GT(rss_committed, rss_base);
+  EXPECT_GT(rss_committed, rss_mapped);
+
+  // Unmap half of the allocation.
+  SAFE_SYSCALL(munmap(mapped, kSize / 2));
+
+  size_t vm_size_unmapped_half;
+  size_t rss_unmapped_half;
+  ReadStatm(&vm_size_unmapped_half, &rss_unmapped_half);
+  EXPECT_GT(vm_size_unmapped_half, vm_size_base);
+  EXPECT_LT(vm_size_unmapped_half, vm_size_mapped);
+  EXPECT_GT(rss_unmapped_half, rss_mapped);
+  EXPECT_LT(rss_unmapped_half, rss_committed);
+
+  // Unmap the rest of the allocation
+  SAFE_SYSCALL(munmap(reinterpret_cast<char*>(mapped) + kSize / 2, kSize / 2));
+  size_t vm_size_unmapped_all;
+  size_t rss_unmapped_all;
+  ReadStatm(&vm_size_unmapped_all, &rss_unmapped_all);
+  EXPECT_LT(vm_size_unmapped_all, vm_size_unmapped_half);
+  EXPECT_LT(rss_unmapped_all, rss_unmapped_half);
+}
+
+INSTANTIATE_TEST_SUITE_P(Private, MMapProcStatmTest, testing::Values(MAP_PRIVATE));
+INSTANTIATE_TEST_SUITE_P(Shared, MMapProcStatmTest, testing::Values(MAP_SHARED));
+
 // This variable is accessed from within a signal handler and thus must be declared volatile.
 volatile void* expected_fault_address;
 
