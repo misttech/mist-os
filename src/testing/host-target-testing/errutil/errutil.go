@@ -146,7 +146,7 @@ func printNetstackGoroutines(ctx context.Context, serial net.Conn) error {
 	// Print out the netstack goroutines while only using shell-builtin commands to avoid hitting the package resolver.
 	const shellFmtStr = `(export PATH=;
 		echo '%s --- netstack goroutine traces ---';
-		export P="$(echo hub-v2/children/core/children/network/children/netstack/exec/out/debug/goroutines)" &&
+		export P="$(component explore /core/network/netstack -c \"cat out/debug/goroutines\")" &&
 		test -e "$P" && while IFS='' read line; do echo "$line"; done < "$P";
 		echo '------------------------------------') &
 `
