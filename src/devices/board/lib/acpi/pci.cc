@@ -125,7 +125,7 @@ static acpi::status<> resource_report_callback(ACPI_RESOURCE* res, ResourceConte
   if (add_range && is_mmio && base < MB(1)) {
     // The PC platform defines many legacy regions below 1MB that we do not
     // want PCIe to try to map onto.
-    zxlogf(INFO, "Skipping adding MMIO range due to being below 1MB");
+    zxlogf(DEBUG, "Skipping adding MMIO range due to being below 1MB");
     return acpi::ok();
   }
 
