@@ -17,7 +17,7 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
         "name": "Platform version map",
         "type": "version_history",
         "api_levels": {
-            "3" : {
+            "1" : {
                 "abi_revision": "0x1",
                 "status": "current"
             }

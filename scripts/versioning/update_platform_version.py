@@ -107,8 +107,7 @@ def update_version_history(fuchsia_api_level, version_history_path):
 
             abi_revision = generate_random_abi_revision()
             versions[str(fuchsia_api_level)] = {
-                'abi_revision': abi_revision
-            }, {
+                'abi_revision': abi_revision,
                 'status': 'in-development'
             }
             f.seek(0)
