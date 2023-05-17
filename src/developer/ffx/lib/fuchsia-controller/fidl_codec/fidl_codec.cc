@@ -8,6 +8,7 @@
 #include <fstream>
 #include <string>
 
+#include "decode.h"
 #include "encode.h"
 #include "ir.h"
 #include "mod.h"
@@ -22,9 +23,9 @@ namespace {
 constexpr PyMethodDef SENTINEL = {nullptr, nullptr, 0, nullptr};
 
 PyMethodDef FidlCodecMethods[] = {
-    encode::encode_fidl_message_py_def,
-    ir::add_ir_path_py_def,
-    SENTINEL,
+    encode::encode_fidl_message_py_def,  ir::add_ir_path_py_def,
+    decode::decode_fidl_response_py_def, decode::decode_fidl_request_py_def,
+    ir::get_method_ordinal_py_def,       SENTINEL,
 };
 
 int FidlCodecModule_clear(PyObject *m) {

@@ -8,9 +8,9 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <string>
 
 #include "mod.h"
+#include "pyerrors.h"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 
@@ -18,7 +18,55 @@ namespace ir {
 
 PyMethodDef add_ir_path_py_def = {
     "add_ir_path", reinterpret_cast<PyCFunction>(add_ir_path), METH_O,
-    "Adds the FIDL IR path to the module for use in encoding/decoding. Throws an exception if the file cannot be parsed, or if the file does not exist."};
+    "Adds the FIDL IR path to the module for use in encoding/decoding. Throws an exception if the "
+    "file cannot be parsed, or if the file does not exist."};
+
+PyMethodDef get_method_ordinal_py_def = {
+    "method_ordinal", reinterpret_cast<PyCFunction>(get_method_ordinal),
+    METH_VARARGS | METH_KEYWORDS,
+    "Gets the method ordinal number for the specified method. Method is intended to be a string "
+    "formatted as a FIDL fully qualified name, e.g. '<library>/<declaration>.<member>'. For "
+    "example: 'fuchsia.developer.ffx/EchoString'. More details can be found at "
+    "https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0043_documentation_comment_format#fully-qualified-names"};
+
+PyObject *get_method_ordinal(PyObject *self, PyObject *args, PyObject *kwds) {  // NOLINT
+  static const char *kwlist[] = {"protocol", "method", nullptr};
+  const char *c_protocol;
+  const char *c_method;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "ss", const_cast<char **>(kwlist), &c_protocol,
+                                   &c_method)) {
+    return nullptr;
+  }
+  std::string_view protocol(c_protocol);
+  auto const idx = protocol.find('/');
+  if (idx == std::string::npos) {
+    PyErr_SetString(PyExc_ValueError,
+                    "protocol not formatted properly, expected {library}/{protocol}");
+    return nullptr;
+  }
+  const std::string library(c_protocol, idx);
+  std::string_view method(c_method);
+  auto lib = mod::get_ir_library(library);
+  if (lib == nullptr) {
+    return nullptr;
+  }
+  fidl_codec::Protocol *codec_protocol;
+  if (!lib->GetProtocolByName(protocol, &codec_protocol)) {
+    std::stringstream ss;
+    ss << "Unable to find protocol " << protocol << " under library " << library;
+    PyErr_SetString(PyExc_RuntimeError, ss.str().c_str());
+    return nullptr;
+  }
+  auto codec_method = codec_protocol->GetMethodByName(method);
+  if (codec_method == nullptr) {
+    std::stringstream ss;
+    ss << "Unable to find method " << method << " under protocol " << protocol << " in library "
+       << library;
+    PyErr_SetString(PyExc_RuntimeError, ss.str().c_str());
+    return nullptr;
+  }
+  return PyLong_FromUnsignedLongLong(codec_method->ordinal());
+}
 
 PyObject *add_ir_path(PyObject *self, PyObject *path_obj) {  // NOLINT
   const char *c_path = PyUnicode_AsUTF8(path_obj);

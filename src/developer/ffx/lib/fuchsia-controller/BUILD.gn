@@ -51,6 +51,8 @@ python_c_extension("fidl_codec") {
   sources = [
     "abi/convert.h",
     "abi/macros.h",
+    "fidl_codec/decode.cc",
+    "fidl_codec/decode.h",
     "fidl_codec/encode.cc",
     "fidl_codec/encode.h",
     "fidl_codec/fidl_codec.cc",
@@ -60,6 +62,7 @@ python_c_extension("fidl_codec") {
     "fidl_codec/mod.h",
     "fidl_codec/object_converter.cc",
     "fidl_codec/object_converter.h",
+    "fidl_codec/python_dict_visitor.h",
   ]
 
   deps = [
@@ -93,6 +96,7 @@ python_c_extension("fuchsia_controller_py") {
 python_binary("example") {
   main_source = "python/example.py"
   deps = [
+    ":fidl_codec",
     ":fuchsia_controller_py",
     "//src/developer/ffx:ffx_tool",
   ]

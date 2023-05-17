@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from fidl_codec import encode_fidl_message, add_ir_path
+from fidl_codec import encode_fidl_message, add_ir_path, method_ordinal, decode_fidl_request
 import common
 import unittest
 
@@ -91,6 +91,35 @@ class Encode(common.FuchsiaControllerTest):
         self.assertEqual(b, EXPECTED)
         self.assertEqual(h, [])
 
+    def test_encode_decode_table_and_union(self):
+        obj = EncodeObj()
+        setattr(obj, "tab", EncodeObj())
+        setattr(obj.tab, "dub", 2.0)
+        setattr(obj.tab, "str", "foobar")
+        setattr(obj.tab, "union_field", EncodeObj())
+        setattr(obj.tab.union_field, "union_int", 5)
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoTableNoopRequest",
+            txid=5,
+            ordinal=method_ordinal(
+                protocol="fuchsia.controller.test/Noop", method="DoTableNoop"))
+
+        self.assertEqual(h, [])
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(
+            msg, {
+                "tab":
+                    {
+                        "dub": 2.0,
+                        "str": "foobar",
+                        "union_field": {
+                            "union_int": 5,
+                        }
+                    }
+            })
+
     def test_encode_handle(self):
         EXPECTED = bytearray.fromhex(
             "7b000000020000010f27000000000000ffffffff00000000")
@@ -105,6 +134,20 @@ class Encode(common.FuchsiaControllerTest):
         )
         self.assertEqual(b, EXPECTED)
         self.assertEqual(h, [5])
+
+    def test_encode_decode_handle(self):
+        obj = EncodeObj()
+        setattr(obj, "server_end", 10)
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoHandleNoopRequest",
+            txid=22,
+            ordinal=method_ordinal(
+                protocol="fuchsia.controller.test/Noop", method="DoHandleNoop"),
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"server_end": 10})
 
     def test_encode_string_vector(self):
         EXPECTED = bytearray.fromhex(
@@ -155,3 +198,47 @@ class Encode(common.FuchsiaControllerTest):
     def test_encode_method_call_no_args(self):
         (b, h) = encode_fidl_message(
             object=None, library=None, type_name=None, txid=123, ordinal=345)
+
+    def test_encode_decode_string_vector(self):
+        obj = Encode()
+        setattr(obj, "v", ["foo", "bar", "baz", "qux"])
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoVectorNoopRequest",
+            txid=12345,
+            ordinal=method_ordinal(
+                protocol="fuchsia.controller.test/Noop", method="DoVectorNoop"),
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"v": ["foo", "bar", "baz", "qux"]})
+
+    def test_encode_decode_string(self):
+        obj = EncodeObj()
+        setattr(obj, "value", "foobar")
+        ordinal = method_ordinal(
+            protocol="fuchsia.controller.test/Noop", method="DoStringNoop")
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoStringNoopRequest",
+            txid=3,
+            ordinal=ordinal,
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"value": "foobar"})
+
+    def test_encode_decode_int(self):
+        obj = EncodeObj()
+        setattr(obj, "value", 2)
+        ordinal = method_ordinal(
+            protocol="fuchsia.controller.test/Noop", method="DoIntNoop")
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoIntNoopRequest",
+            txid=3,
+            ordinal=ordinal,
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"value": 2})
