@@ -48,6 +48,13 @@ group("tests") {
   }
 }
 
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [ "e2e_emu:host_tests" ]
+  }
+}
+
 group("lib") {
   testonly = true
 

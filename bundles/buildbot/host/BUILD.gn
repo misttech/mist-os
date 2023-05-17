@@ -13,7 +13,13 @@ group("host") {
   # tools.
   assert_no_deps = [ "//bundles/platform/*" ]
 
-  deps = [ ":no_e2e" ]
+  deps = [
+    ":no_e2e",
+
+    # These tests depend on the system assembly and can't be included in the same groups that get
+    # added to the build graph through //src's groups because that would create dep cycles.
+    "//src/developer/ffx:host_tests($host_toolchain)",
+  ]
 
   if (is_linux) {
     deps += [

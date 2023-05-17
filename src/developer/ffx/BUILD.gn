@@ -3,17 +3,19 @@
 # found in the LICENSE file.
 
 import("//build/host.gni")
+import("//build/product.gni")
 import("//build/sdk/sdk_host_tool.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/tools/json_merge/json_merge.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("config.gni")
 
 group("ffx") {
   testonly = true
 
   public_deps = [
-    ":ffx-defaults.json",
+    ":ffx-defaults.json($host_toolchain)",
     ":ffx_tool",
     ":tests",
     "lib($host_toolchain)",
@@ -66,35 +68,35 @@ if (is_host) {
       public_deps += dual_mode_subtool_test_data
     }
   }
-}
 
-json_merge("ffx-defaults.json") {
-  # the "DEFAULT" config level will be made up of a json merge of the following
-  # source json, some of which may be generated. Anything that's part of an
-  # ffx_plugin() definition included under the main ffx binary will automatically
-  # be merged in by that machinery, but if it comes from an external subtool or a library
-  # it has to be manually added to this list.
-  sources = [
-    rebase_path("//src/developer/ffx/data/config.json"),
-    rebase_path("//src/developer/ffx/daemon/data/config.json"),
-    rebase_path("//src/developer/ffx/lib/pbms/data/config.json"),
-  ]
+  json_merge("ffx-defaults.json") {
+    # the "DEFAULT" config level will be made up of a json merge of the following
+    # source json, some of which may be generated. Anything that's part of an
+    # ffx_plugin() definition included under the main ffx binary will automatically
+    # be merged in by that machinery, but if it comes from an external subtool or a library
+    # it has to be manually added to this list.
+    sources = [
+      rebase_path("//src/developer/ffx/data/config.json"),
+      rebase_path("//src/developer/ffx/daemon/data/config.json"),
+      rebase_path("//src/developer/ffx/lib/pbms/data/config.json"),
+    ]
 
-  # Add in the 'dual-mode' config default files if we're doing dual mode
-  if (ffx_build_dual_mode_plugins_as_subtools) {
-    foreach(config, dual_mode_defaults) {
-      sources += [ rebase_path(config) ]
+    # Add in the 'dual-mode' config default files if we're doing dual mode
+    if (ffx_build_dual_mode_plugins_as_subtools) {
+      foreach(config, dual_mode_defaults) {
+        sources += [ rebase_path(config) ]
+      }
     }
-  }
 
-  # Add any dynamically generated config.json files (ie. from ffx plugin roots) here.
-  deps = [
-    # This will bring in all built-in subtool config.json files.
-    "//src/developer/ffx/frontends/ffx:config.json($host_toolchain)",
-  ]
+    # Add any dynamically generated config.json files (ie. from ffx plugin roots) here.
+    deps = [
+      # This will bring in all built-in subtool config.json files.
+      "//src/developer/ffx/frontends/ffx:config.json($host_toolchain)",
+    ]
 
-  foreach(dep, deps) {
-    sources += [ get_label_info(dep, "target_out_dir") + "/config.json" ]
+    foreach(dep, deps) {
+      sources += [ get_label_info(dep, "target_out_dir") + "/config.json" ]
+    }
   }
 }
 
@@ -117,4 +119,21 @@ group("tests") {
     "plugins/package:tests($host_toolchain)",
     "tests($host_toolchain)",
   ]
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = []
+
+    # ffx e2e host tests have a few constraints:
+    #
+    # 1. the assembly targets don't build correctly on mac bots
+    # 2. bringup bots can't depend on the main assembly that's used for ffx e2e tests
+    # 3. the minfs-no_hardware bot doesn't launch the emulator correctly
+    if (is_linux && !use_bringup_assembly &&
+        data_filesystem_format != "minfs") {
+      deps += [ "lib:host_tests" ]
+    }
+  }
 }
