@@ -19,6 +19,7 @@ if (is_host) {
       "//src/lib/fuchsia-url",
       "//src/lib/gcs",
       "//src/lib/http-sse:http_sse",
+      "//src/lib/mundane:mundane",
       "//src/sys/lib/fidl-fuchsia-pkg-ext",
       "//src/sys/lib/notify-batch-watcher",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",

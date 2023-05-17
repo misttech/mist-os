@@ -4,10 +4,13 @@
 
 use {
     data_encoding::HEXLOWER,
-    serde::{Deserialize, Deserializer},
-    std::{fmt, fs::File, io, path::Path},
+    mundane::public::ed25519 as mundane_ed25519,
+    serde::{Deserialize, Deserializer, Serialize, Serializer},
+    std::{fmt, fs::File, io, io::Write, path::Path},
     tuf::crypto::{Ed25519PrivateKey, KeyType, PrivateKey, PublicKey, SignatureScheme},
 };
+
+const DEFAULT_KEYTYPE_GENERATION: &KeyType = &KeyType::Ed25519;
 
 /// Errors returned by parsing keys.
 #[derive(Debug, thiserror::Error)]
@@ -31,6 +34,10 @@ pub enum ParseError {
     /// The key type and signature scheme is unsupported.
     #[error("unsupported key type {keytype:?} and signature scheme {scheme:?}")]
     UnsupportedKeyTypeAndScheme { keytype: KeyType, scheme: SignatureScheme },
+
+    /// The key type and signature scheme is unsupported.
+    #[error("unsupported generation for key type {keytype:?}")]
+    UnsupportedKeyTypeGeneration { keytype: KeyType },
 }
 
 /// Hold all the private keys for a repository.
@@ -62,6 +69,106 @@ impl fmt::Debug for RepoKeys {
 }
 
 impl RepoKeys {
+    /// Generates a set of [RoleKeys], writing the following files to the passed `dir`:
+    /// * root.json
+    /// * targets.json
+    /// * snapshot.json
+    /// * timestamp.json
+    ///
+    /// Returns the generated [RepoKeys] struct.
+    pub fn generate(dir: &Path) -> Result<Self, ParseError> {
+        /// Generates a [KeyVal] in format specified by `keytype`.
+        /// * For the Ed25519 format, a tuf private key is generated using the `mundane`
+        ///   crate.
+        fn generate_tuf_keyval(keytype: &KeyType) -> Result<KeyVal, ParseError> {
+            match keytype {
+                &KeyType::Ed25519 => {
+                    let private_key = mundane_ed25519::Ed25519PrivKey::generate();
+                    let private_key_bytes = *private_key.bytes();
+                    let mut public_key_bytes = [0u8; 32];
+                    public_key_bytes[..].copy_from_slice(&private_key_bytes[32..]);
+
+                    Ok(KeyVal {
+                        public: public_key_bytes.to_vec(),
+                        private: private_key_bytes.to_vec(),
+                    })
+                }
+                _ => Err(ParseError::UnsupportedKeyTypeGeneration { keytype: keytype.clone() }),
+            }
+        }
+
+        /// Generates a [RoleKey] in format specified by `keytype`.
+        fn generate_rolekey(keytype: &KeyType) -> Result<RoleKey, ParseError> {
+            match keytype {
+                &KeyType::Ed25519 => Ok(RoleKey {
+                    keytype: KeyType::Ed25519,
+                    scheme: SignatureScheme::Ed25519,
+                    keyid_hash_algorithms: None,
+                    keyval: generate_tuf_keyval(keytype).unwrap(),
+                }),
+                _ => Err(ParseError::UnsupportedKeyTypeGeneration { keytype: keytype.clone() }),
+            }
+        }
+
+        /// Takes the input [RoleKey], and generates a [Vec<Box<dyn PrivateKey>>]
+        /// struct.
+        fn generate_rolekey_collection(
+            keytype: &KeyType,
+            role_key: &RoleKey,
+        ) -> Result<Vec<Box<dyn PrivateKey>>, ParseError> {
+            let mut keys = Vec::new();
+            match keytype {
+                &KeyType::Ed25519 => {
+                    keys.push(Box::new(Ed25519PrivateKey::from_ed25519(&role_key.keyval.private)?)
+                        as Box<_>);
+                }
+                _ => {
+                    return Err(ParseError::UnsupportedKeyTypeGeneration {
+                        keytype: keytype.clone(),
+                    })
+                }
+            }
+            Ok(keys)
+        }
+
+        /// Writes the `keyname` file to the specified directory.
+        fn write_rolekeys(
+            dir: &Path,
+            rolekeys_filename: &str,
+            rolekeys: RoleKeys,
+        ) -> Result<(), ParseError> {
+            let mut rolekeys_file = File::create(dir.join(rolekeys_filename))?;
+            let rolekeys_string = serde_json::to_string(&rolekeys).unwrap();
+            rolekeys_file.write_all(rolekeys_string.as_bytes())?;
+            rolekeys_file.sync_all()?;
+            Ok(())
+        }
+
+        let root_key = generate_rolekey(DEFAULT_KEYTYPE_GENERATION).unwrap();
+        let targets_key = generate_rolekey(DEFAULT_KEYTYPE_GENERATION).unwrap();
+        let snapshot_key = generate_rolekey(DEFAULT_KEYTYPE_GENERATION).unwrap();
+        let timestamp_key = generate_rolekey(DEFAULT_KEYTYPE_GENERATION).unwrap();
+
+        for (rolekeys_filename, rolekeys) in [
+            ("root.json", RoleKeys { data: vec![root_key.clone()] }),
+            ("targets.json", RoleKeys { data: vec![targets_key.clone()] }),
+            ("snapshot.json", RoleKeys { data: vec![snapshot_key.clone()] }),
+            ("timestamp.json", RoleKeys { data: vec![timestamp_key.clone()] }),
+        ] {
+            write_rolekeys(dir, rolekeys_filename, rolekeys)?;
+        }
+
+        Ok(Self {
+            root_keys: generate_rolekey_collection(DEFAULT_KEYTYPE_GENERATION, &root_key)?,
+            targets_keys: generate_rolekey_collection(DEFAULT_KEYTYPE_GENERATION, &targets_key)?,
+            snapshot_keys: generate_rolekey_collection(DEFAULT_KEYTYPE_GENERATION, &snapshot_key)?,
+            timestamp_keys: generate_rolekey_collection(
+                DEFAULT_KEYTYPE_GENERATION,
+                &timestamp_key,
+            )?,
+        })
+    }
+
     /// Return a [RepoKeysBuilder].
     pub fn builder() -> RepoKeysBuilder {
         RepoKeysBuilder::new()
@@ -234,12 +341,12 @@ fn parse_keys(f: File) -> Result<Vec<Box<dyn PrivateKey>>, ParseError> {
     Ok(keys)
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct RoleKeys {
     data: Vec<RoleKey>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct RoleKey {
     keytype: KeyType,
     scheme: SignatureScheme,
@@ -253,12 +360,19 @@ struct RoleKey {
     keyval: KeyVal,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct KeyVal {
-    #[serde(deserialize_with = "deserialize_hex")]
+    #[serde(serialize_with = "serialize_hex", deserialize_with = "deserialize_hex")]
     public: Vec<u8>,
-    #[serde(deserialize_with = "deserialize_hex")]
+    #[serde(serialize_with = "serialize_hex", deserialize_with = "deserialize_hex")]
     private: Vec<u8>,
+}
+
+fn serialize_hex<S>(key: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&HEXLOWER.encode(key))
 }
 
 fn deserialize_hex<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -273,7 +387,7 @@ where
 mod tests {
     use {
         super::*, crate::test_utils, assert_matches::assert_matches, camino::Utf8Path,
-        serde_json::json, std::io::Write as _,
+        serde_json::json,
     };
 
     macro_rules! assert_keys {
@@ -475,6 +589,29 @@ mod tests {
         assert_keys!(keys.targets_keys(), &[]);
         assert_keys!(keys.snapshot_keys(), &[]);
         assert_keys!(keys.timestamp_keys(), &[]);
+    }
+
+    #[test]
+    fn test_from_dir_generated_keys() {
+        macro_rules! assert_repo_keys {
+            ($generated:expr, $parsed:expr) => {
+                let generated: Vec<&PublicKey> =
+                    $generated.iter().map(|key| key.public()).collect::<_>();
+                let parsed: Vec<&PublicKey> = $parsed.iter().map(|key| key.public()).collect::<_>();
+                assert_eq!(generated, parsed);
+                assert_ne!(generated, Vec::<&PublicKey>::new());
+            };
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+
+        let generated_keys = RepoKeys::generate(tmp.path()).unwrap();
+        let parsed_keys = RepoKeys::from_dir(tmp.path()).unwrap();
+
+        assert_repo_keys!(generated_keys.root_keys(), parsed_keys.root_keys());
+        assert_repo_keys!(generated_keys.targets_keys(), parsed_keys.targets_keys());
+        assert_repo_keys!(generated_keys.snapshot_keys(), parsed_keys.snapshot_keys());
+        assert_repo_keys!(generated_keys.timestamp_keys(), parsed_keys.timestamp_keys());
     }
 
     #[test]
