@@ -53,6 +53,10 @@ redirects:
 - from: /docs/go/components/...
   to: /docs/concepts/components/v2/README.md
 
+# Rustdoc
+- from: /docs/go/rustdoc
+  to: https://fuchsia-docs.firebaseapp.com/rust/
+
 # Hardware links
 - from: /fuchsia-src/go/intree-drivers
   to: /fuchsia-src/reference/hardware/drivers
