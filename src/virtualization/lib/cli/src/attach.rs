@@ -131,7 +131,7 @@ mod test {
                 .into_get_console()
                 .expect("Unexpected call to Guest Proxy");
             console_responder
-                .send(&mut Err(GuestError::DeviceNotPresent))
+                .send(Err(GuestError::DeviceNotPresent))
                 .expect("Failed to send response to proxy");
         };
 

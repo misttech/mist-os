@@ -786,7 +786,7 @@ mod tests {
                     x => panic!("Expected L2cap connection, got {:?}", x),
                 };
                 let channel = transport.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("responder sends");
+                responder.send(Ok(channel)).expect("responder sends");
             }
             x => panic!("Should have sent a connect request, but got {:?}", x),
         };

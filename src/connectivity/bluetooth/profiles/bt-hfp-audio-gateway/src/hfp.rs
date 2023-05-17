@@ -693,10 +693,10 @@ mod tests {
                         ..Default::default()
                     };
 
-                    responder.send(&mut Ok(chan)).expect("successfully send connection response");
+                    responder.send(Ok(chan)).expect("successfully send connection response");
                 } else {
                     responder
-                        .send(&mut Err(fidl_fuchsia_bluetooth::ErrorCode::Failed))
+                        .send(Err(fidl_fuchsia_bluetooth::ErrorCode::Failed))
                         .expect("successfully send connection failure");
                 }
             }

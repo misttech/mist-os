@@ -133,10 +133,10 @@ impl MockPiconetServer {
                 self.new_advertisement(id, services, proxy, responder);
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
-                let mut channel = self
+                let channel = self
                     .new_connection(id, peer_id.into(), connection)
                     .map_err(|_| ErrorCode::Failed);
-                let _ = responder.send(&mut channel);
+                let _ = responder.send(channel);
             }
             bredr::ProfileRequest::Search { service_uuid, attr_ids, results, .. } => {
                 let proxy = results.into_proxy().expect("couldn't get connection receiver");

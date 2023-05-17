@@ -123,15 +123,14 @@ impl BuiltinCapability for RealmBuilderResolver {
         while let Some(request) = stream.try_next().await? {
             match request {
                 fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                    responder.send(&mut self.resolve_async(&component_url, None).await)?;
+                    responder.send(self.resolve_async(&component_url, None).await)?;
                 }
                 fresolution::ResolverRequest::ResolveWithContext {
                     component_url,
                     context,
                     responder,
                 } => {
-                    responder
-                        .send(&mut self.resolve_async(&component_url, Some(&context)).await)?;
+                    responder.send(self.resolve_async(&component_url, Some(&context)).await)?;
                 }
             }
         }

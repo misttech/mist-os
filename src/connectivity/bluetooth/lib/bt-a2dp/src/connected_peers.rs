@@ -1121,12 +1121,12 @@ mod tests {
         let _ = first_result.expect_err("Should have an error from first attempt");
 
         // Responding on the first connect shouldn't do anything at this point.
-        responder.send(&mut Err(fidl_fuchsia_bluetooth::ErrorCode::Failed)).unwrap();
+        responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::Failed)).unwrap();
 
         exec.run_until_stalled(&mut connect_again_fut).expect_pending("shouldn't finish");
 
         let (_remote, local) = Channel::create();
-        responder_two.send(&mut Ok(local.try_into().unwrap())).unwrap();
+        responder_two.send(Ok(local.try_into().unwrap())).unwrap();
 
         let second_result = exec.run_singlethreaded(&mut connect_again_fut);
         let _ = second_result.expect("should receive the channel");

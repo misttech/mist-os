@@ -38,7 +38,7 @@ pub async fn run_diagnostics_streaming(
                         // daemon and bridge.
                         let data = serde_json::to_string(&entry)?;
                         if data.len() <= fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES as usize {
-                            responder.send(&mut Ok(vec![ArchiveIteratorEntry {
+                            responder.send(Ok(vec![ArchiveIteratorEntry {
                                 diagnostics_data: Some(DiagnosticsData::Inline(InlineData {
                                     data,
                                     truncated_chars: 0,
@@ -56,7 +56,7 @@ pub async fn run_diagnostics_streaming(
                                 diagnostics_data: Some(DiagnosticsData::Socket(socket)),
                                 ..Default::default()
                             }];
-                            responder.send(&mut Ok(response))?;
+                            responder.send(Ok(response))?;
                             // We write all the data to the other end of the
                             // socket.
                             tx_socket.write_all(data.as_bytes()).await?;
@@ -64,10 +64,10 @@ pub async fn run_diagnostics_streaming(
                     }
                     Some(Err(e)) => {
                         tracing::warn!("got error streaming diagnostics: {}", e);
-                        responder.send(&mut Err(ArchiveIteratorError::DataReadFailed))?;
+                        responder.send(Err(ArchiveIteratorError::DataReadFailed))?;
                     }
                     None => {
-                        responder.send(&mut Ok(vec![]))?;
+                        responder.send(Ok(vec![]))?;
                         break;
                     }
                 }

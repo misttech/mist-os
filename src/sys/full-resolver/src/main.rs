@@ -45,26 +45,25 @@ async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result
     {
         match request {
             fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                let mut result =
-                    resolve_component_without_context(&component_url, &package_resolver)
-                        .await
-                        .map_err(|err| {
-                            let fidl_err = (&err).into();
-                            warn!(
-                                "failed to resolve component URL {}: {:#}",
-                                component_url,
-                                anyhow!(err)
-                            );
-                            fidl_err
-                        });
-                responder.send(&mut result).context("failed sending response")?;
+                let result = resolve_component_without_context(&component_url, &package_resolver)
+                    .await
+                    .map_err(|err| {
+                        let fidl_err = (&err).into();
+                        warn!(
+                            "failed to resolve component URL {}: {:#}",
+                            component_url,
+                            anyhow!(err)
+                        );
+                        fidl_err
+                    });
+                responder.send(result).context("failed sending response")?;
             }
             fresolution::ResolverRequest::ResolveWithContext {
                 component_url,
                 context,
                 responder,
             } => {
-                let mut result =
+                let result =
                     resolve_component_with_context(&component_url, &context, &package_resolver)
                         .await
                         .map_err(|err| {
@@ -77,7 +76,7 @@ async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result
                             );
                             fidl_err
                         });
-                responder.send(&mut result).context("failed sending response")?;
+                responder.send(result).context("failed sending response")?;
             }
         }
     }

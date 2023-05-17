@@ -652,7 +652,7 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
                 let (client_socket, device_socket) = fidl::Socket::create_stream();
                 let client_socket = fasync::Socket::from_socket(client_socket)?;
 
-                responder.send(&mut Ok(device_socket))
+                responder.send(Ok(device_socket))
                     .map_err(|err| anyhow!("failed to send response to device: {}", err))?;
 
                 if let Some(_) = active_connections.insert(src_port, client_socket) {

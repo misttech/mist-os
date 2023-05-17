@@ -307,13 +307,12 @@ impl Suite {
             while let Some(responder) = events_responder_recv.next().await {
                 let next_chunk_results: Vec<Result<_, _>> =
                     event_chunks.next().await.unwrap_or_default();
-                let mut next_chunk_result: Result<Vec<_>, _> =
-                    next_chunk_results.into_iter().collect();
+                let next_chunk_result: Result<Vec<_>, _> = next_chunk_results.into_iter().collect();
                 let done = match &next_chunk_result {
                     Ok(events) => events.is_empty(),
                     Err(_) => true,
                 };
-                responder.send(&mut next_chunk_result)?;
+                responder.send(next_chunk_result)?;
                 if done {
                     break;
                 }

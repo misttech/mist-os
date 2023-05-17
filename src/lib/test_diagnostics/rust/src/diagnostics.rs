@@ -275,11 +275,11 @@ mod tests {
             {
                 match values.next() {
                     None => {
-                        responder.send(&mut Ok(vec![])).expect("send empty response");
+                        responder.send(Ok(vec![])).expect("send empty response");
                     }
                     Some(value) => {
                         if opts.with_error {
-                            responder.send(&mut Err(ReaderError::Io)).expect("send error");
+                            responder.send(Err(ReaderError::Io)).expect("send error");
                             continue;
                         }
                         let content = get_json_data(value);
@@ -287,7 +287,7 @@ mod tests {
                         let vmo = zx::Vmo::create(size).expect("create vmo");
                         vmo.write(content.as_bytes(), 0).expect("write vmo");
                         let result = FormattedContent::Json(fmem::Buffer { vmo, size });
-                        responder.send(&mut Ok(vec![result])).expect("send response");
+                        responder.send(Ok(vec![result])).expect("send response");
                     }
                 }
             }
@@ -358,7 +358,7 @@ mod tests {
             {
                 match values.next() {
                     None => {
-                        let result = responder.send(&mut Ok(vec![]));
+                        let result = responder.send(Ok(vec![]));
                         // Because of pipelining, there are cases where it's okay for the
                         // response to fail with a channel closed error
                         match empty_response_sent || with_error {
@@ -373,7 +373,7 @@ mod tests {
                         if with_error {
                             // Because of pipelining, the channel may be open or closed
                             // depending on timing, so ignore any errors.
-                            let _ = responder.send(&mut Err(ArchiveIteratorError::DataReadFailed));
+                            let _ = responder.send(Err(ArchiveIteratorError::DataReadFailed));
                             continue;
                         }
                         let json_data = get_json_data(value);
@@ -386,7 +386,7 @@ mod tests {
                                     })),
                                     ..Default::default()
                                 };
-                                responder.send(&mut Ok(vec![result])).expect("send response");
+                                responder.send(Ok(vec![result])).expect("send response");
                             }
                             true => {
                                 let (socket, tx_socket) = fidl::Socket::create_stream();
@@ -396,7 +396,7 @@ mod tests {
                                     diagnostics_data: Some(DiagnosticsData::Socket(socket)),
                                     ..Default::default()
                                 };
-                                responder.send(&mut Ok(vec![response])).expect("send response");
+                                responder.send(Ok(vec![response])).expect("send response");
                                 tx_socket
                                     .write_all(json_data.as_bytes())
                                     .await
@@ -471,7 +471,7 @@ mod tests {
             // Verify that a log sent as a response to the first request is received.
             let responder = active_requests.pop_front().unwrap().unwrap().into_get_next().unwrap();
             responder
-                .send(&mut Ok(vec![ArchiveIteratorEntry {
+                .send(Ok(vec![ArchiveIteratorEntry {
                     diagnostics_data: Some(DiagnosticsData::Inline(InlineData {
                         data: "data".to_string(),
                         truncated_chars: 0,
@@ -481,7 +481,7 @@ mod tests {
                 .unwrap();
             // Send an empty response, which shuts down the pending task.
             let responder = active_requests.pop_front().unwrap().unwrap().into_get_next().unwrap();
-            responder.send(&mut Ok(vec![])).unwrap();
+            responder.send(Ok(vec![])).unwrap();
             drop(request_stream);
             task.await;
             assert_eq!(receiver.collect::<Vec<_>>().await.len(), 1);

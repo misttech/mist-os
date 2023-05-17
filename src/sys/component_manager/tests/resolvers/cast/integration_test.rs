@@ -83,7 +83,7 @@ async fn resolver_component(
                 match req {
                     fresolution::ResolverRequest::Resolve { component_url, responder } => {
                         assert_eq!(component_url, CAST_URL);
-                        responder.send(&mut Ok(new_fresolution_component())).unwrap();
+                        responder.send(Ok(new_fresolution_component())).unwrap();
                         success_sender.send(()).await.expect("failed to send results");
                     }
                     fresolution::ResolverRequest::ResolveWithContext {
@@ -92,7 +92,7 @@ async fn resolver_component(
                         responder,
                     } => {
                         assert_eq!(component_url, CAST_URL);
-                        responder.send(&mut Ok(new_fresolution_component())).unwrap();
+                        responder.send(Ok(new_fresolution_component())).unwrap();
                         success_sender.send(()).await.expect("failed to send results");
                     }
                 }

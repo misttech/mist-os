@@ -190,9 +190,9 @@ impl Registry {
         while let Some(req) = stream.try_next().await? {
             match req {
                 fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                    let mut resolve_result = self.resolve(&component_url).await;
-                    responder.send(&mut resolve_result).map_err(|err| {
-                        warn!("FIDL error {err:?} responding to resolve request for component URL '{component_url} with ':\n{resolve_result:#?}");
+                    let resolve_result = self.resolve(&component_url).await;
+                    responder.send(resolve_result).map_err(|err| {
+                        warn!("FIDL error {err:?} responding to resolve request for component URL '{component_url}'");
                         err
                     })?;
                 }
@@ -202,7 +202,7 @@ impl Registry {
                     responder,
                 } => {
                     warn!("The RealmBuilder resolver does not resolve relative path component URLs with a context. Cannot resolve {} with context {:?}.", component_url, context);
-                    responder.send(&mut Err(fresolution::ResolverError::InvalidArgs))?;
+                    responder.send(Err(fresolution::ResolverError::InvalidArgs))?;
                 }
             }
         }

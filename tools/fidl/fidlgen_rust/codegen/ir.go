@@ -971,7 +971,7 @@ func convertResultToEncodeExpr(v string, t Type, p Payload) string {
 				transform = true
 			}
 			if t.IsResourceType() {
-				expr = convertMutRefOwnedToEncodeExpr(param.Name, t)
+				expr = convertMutRefParamToEncodeExpr(param.Name, t)
 			} else {
 				expr = "*" + expr
 			}
@@ -1023,6 +1023,27 @@ func convertMutRefResultToEncodeExpr(v string, t Type, p Payload) string {
 	default:
 		panic(fmt.Sprintf("unexpected decl type %s", t.DeclType))
 	}
+}
+
+// convertMutRefOwnedToEncodeExpr returns an expression that converts a variable
+// v from &mut t.Param to a type implementing fidl::encoding::Encode<t.Fidl>.
+//
+// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
+// complete. This is only needed for convertResultToEncodeExpr.
+func convertMutRefParamToEncodeExpr(v string, t Type) string {
+	switch t.Kind {
+	case fidlgen.IdentifierType:
+		switch t.DeclType {
+		case fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
+			if t.Nullable {
+				if t.IsResourceType() {
+					return v + ".as_mut()"
+				}
+				return v + ".as_ref()"
+			}
+		}
+	}
+	return convertMutRefOwnedToEncodeExpr(v, t)
 }
 
 // convertMutRefOwnedToEncodeExpr returns an expression that converts a variable
@@ -1311,9 +1332,9 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		p.TupleType = c.compileCamelCompoundIdentifier(m.ResultType.Identifier)
 		p.TupleTypeAliasRhs = fmt.Sprintf("Result<%s, %s>", inner.TupleType, errType.Owned)
 		// TODO(fxbug.dev/54368): Complete migration from `&mut Result<Owned, Err>` to `Result<Param, Err>`.
-		migrate := innerType.Kind == fidlgen.IdentifierType &&
-			(innerType.DeclType == fidlgen.TableDeclType ||
-				innerType.DeclType == fidlgen.UnionDeclType)
+		migrate := innerType.DeclType == fidlgen.TableDeclType ||
+			innerType.DeclType == fidlgen.UnionDeclType ||
+			innerType.IsResourceType()
 		if migrate {
 			okParamType := "()"
 			if len(inner.Parameters) > 0 {

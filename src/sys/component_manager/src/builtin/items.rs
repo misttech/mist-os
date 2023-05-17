@@ -105,7 +105,7 @@ impl BuiltinCapability for Items {
                 }
                 fboot::ItemsRequest::Get2 { type_, extra, responder } => {
                     let extra = if let Some(extra) = extra { Some((*extra).n) } else { None };
-                    let mut item_vec = match self.zbi_parser.try_get_item(type_, extra) {
+                    let item_vec = match self.zbi_parser.try_get_item(type_, extra) {
                         Ok(vec) => vec
                             .iter()
                             .map(|result| -> Result<fboot::RetrievedItems, Error> {
@@ -133,7 +133,7 @@ impl BuiltinCapability for Items {
                         }
                     };
 
-                    responder.send(&mut item_vec)?
+                    responder.send(item_vec)?
                 }
                 fboot::ItemsRequest::GetBootloaderFile { filename, responder } => {
                     match self.bootloader_files.get(&filename) {

@@ -97,7 +97,7 @@ pub(crate) async fn serve(
                         request_stream,
                     ))
                     .detach();
-                    responder_send!(responder, &mut Ok(client));
+                    responder_send!(responder, Ok(client));
                 }
             }
             Ok(())

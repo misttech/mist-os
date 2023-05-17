@@ -527,7 +527,7 @@ mod test {
             r => panic!("Expected GetEvents request but got {:?}", r),
         };
 
-        responder.send(&mut Ok(events)).expect("send events");
+        responder.send(Ok(events)).expect("send events");
     }
 
     /// Serves all events to completion.

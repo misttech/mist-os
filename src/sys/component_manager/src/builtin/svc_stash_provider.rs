@@ -39,8 +39,8 @@ impl BuiltinCapability for SvcStashCapability {
             // If the channel is valid return it, if not ZX_ERR_NO_UNAVAILABLE.
             let channel = self.channel.lock().take();
             match channel {
-                Some(channel) => responder.send(&mut Ok(channel))?,
-                None => responder.send(&mut Err(fuchsia_zircon::Status::UNAVAILABLE.into_raw()))?,
+                Some(channel) => responder.send(Ok(channel))?,
+                None => responder.send(Err(fuchsia_zircon::Status::UNAVAILABLE.into_raw()))?,
             }
         }
         Ok(())

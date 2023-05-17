@@ -127,7 +127,7 @@ async fn local_resolver_impl(
                         }
                         // This isn't a real resolver so return an Internal error
                         responder
-                            .send(&mut Err(fcresolution::ResolverError::Internal))
+                            .send(Err(fcresolution::ResolverError::Internal))
                             .context("failed sending response")
                             .unwrap()
                     }
@@ -138,7 +138,7 @@ async fn local_resolver_impl(
                     } => {
                         error!("ResolveWithContext not implemented in this test");
                         responder
-                            .send(&mut Err(fcresolution::ResolverError::Internal))
+                            .send(Err(fcresolution::ResolverError::Internal))
                             .context("failed sending response")
                             .unwrap()
                     }

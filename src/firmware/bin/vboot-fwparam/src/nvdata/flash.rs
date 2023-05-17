@@ -147,7 +147,7 @@ pub mod tests {
                             vmo.write(data.as_slice(), 0).unwrap();
                             let range =
                                 fidl_fuchsia_mem::Range { vmo, size: size as u64, offset: 0 };
-                            responder.send(&mut Ok(range)).unwrap();
+                            responder.send(Ok(range)).unwrap();
                         }
                         FlashmapRequest::Write { name, offset, data: to_write, responder } => {
                             assert_eq!(&name, NVRAM_AREA_NAME);

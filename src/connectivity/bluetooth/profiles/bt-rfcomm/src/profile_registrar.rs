@@ -209,25 +209,25 @@ impl ProfileRegistrar {
         // Otherwise, route to the RFCOMM server.
         match &connection {
             bredr::ConnectParameters::L2cap { .. } => {
-                let mut result = self
+                let result = self
                     .profile_upstream
                     .connect(&peer_id.into(), &connection)
                     .await
                     .unwrap_or_else(|_fidl_error| Err(ErrorCode::Failed));
-                let _ = responder.send(&mut result);
+                let _ = responder.send(result);
             }
             bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters { channel, .. }) => {
                 let server_channel = match channel.map(ServerChannel::try_from) {
                     Some(Ok(sc)) => sc,
                     _ => {
-                        let _ = responder.send(&mut Err(ErrorCode::InvalidArguments));
+                        let _ = responder.send(Err(ErrorCode::InvalidArguments));
                         return Ok(());
                     }
                 };
 
                 // Ensure there is an RFCOMM Session between us and the peer.
                 if let Err(e) = self.ensure_service_connection(peer_id).await {
-                    let _ = responder.send(&mut Err(e));
+                    let _ = responder.send(Err(e));
                     return Ok(());
                 }
                 // Open the RFCOMM channel.
@@ -811,7 +811,7 @@ mod tests {
         let woke_count_before = fut_wake_count.get();
 
         // Send a response from the upstream Profile request
-        connect_responder.send(&mut Err(ErrorCode::TimedOut)).expect("upstream connect response");
+        connect_responder.send(Err(ErrorCode::TimedOut)).expect("upstream connect response");
 
         // Run all the other background tasks that got awoke.
         // This signals counting_ctx's waker because the advertising task is woken bv the send,

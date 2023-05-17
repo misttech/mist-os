@@ -367,7 +367,7 @@ impl BuiltinCapability for FuchsiaBootResolver {
         while let Some(request) = stream.try_next().await? {
             match request {
                 fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                    responder.send(&mut self.resolve_async(&component_url).await)?;
+                    responder.send(self.resolve_async(&component_url).await)?;
                 }
                 fresolution::ResolverRequest::ResolveWithContext {
                     component_url,
@@ -376,7 +376,7 @@ impl BuiltinCapability for FuchsiaBootResolver {
                 } => {
                     // FuchsiaBootResolver ResolveWithContext currently ignores
                     // context, but should still resolve absolute URLs.
-                    responder.send(&mut self.resolve_async(&component_url).await)?;
+                    responder.send(self.resolve_async(&component_url).await)?;
                 }
             }
         }

@@ -113,14 +113,14 @@ async fn handle_socat_listen(
         .ok_or(SocatError::InternalFailure("unexpected message on stream".to_string()))?;
 
     if port != host_port {
-        responder.send(&mut Err(zx_status::Status::CONNECTION_REFUSED.into_raw()))?;
+        responder.send(Err(zx_status::Status::CONNECTION_REFUSED.into_raw()))?;
         return Err(SocatError::InternalFailure(
             "connection attempt on unexpected port".to_string(),
         ));
     }
 
     let (socket, remote_socket) = fidl::Socket::create_stream();
-    responder.send(&mut Ok(remote_socket))?;
+    responder.send(Ok(remote_socket))?;
 
     let (input, output) = duplicate_socket(socket)?;
 

@@ -421,7 +421,7 @@ async fn serve_suite_controller(
             match request {
                 SuiteControllerRequest::GetEvents { responder } => {
                     let mut payload_receiver = payload_receiver_rc.borrow_mut();
-                    let mut response = match launch_error {
+                    let response = match launch_error {
                         Some(e) => Err(e),
                         None => {
                             let mut payloads = Vec::new();
@@ -445,7 +445,7 @@ async fn serve_suite_controller(
                         }
                     };
                     // It's okay for the unit test to give up before reading a response.
-                    match responder.send(&mut response) {
+                    match responder.send(response) {
                         Err(fidl::Error::ServerResponseWrite(status))
                             if killable && status == zx::Status::PEER_CLOSED =>
                         {
@@ -560,8 +560,7 @@ async fn serve_batch_iterator(
                         buf.vmo.write(msg.as_bytes(), 0).context("failed to write to VMO")?;
                         batch.push(fdiagnostics::FormattedContent::Text(buf));
                     }
-                    let mut response = Ok(batch);
-                    match responder.send(&mut response) {
+                    match responder.send(Ok(batch)) {
                         Err(fidl::Error::ServerResponseWrite(status))
                             if killable && status == zx::Status::PEER_CLOSED =>
                         {

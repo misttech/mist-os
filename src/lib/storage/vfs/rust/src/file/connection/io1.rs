@@ -859,7 +859,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::GetBackingMemory { flags, responder } => {
                 fuchsia_trace::duration!("storage", "File::GetBackingMemory");
                 let result = self.handle_get_backing_memory(flags).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::AdvisoryLock { request: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::AdvisoryLock");

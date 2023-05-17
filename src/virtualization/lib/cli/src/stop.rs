@@ -236,7 +236,7 @@ mod test {
             .expect("received unexpected request on stream");
 
         let (client, device) = Socket::create_stream();
-        responder.send(&mut Ok(client)).expect("failed to send response");
+        responder.send(Ok(client)).expect("failed to send response");
 
         assert!(executor.run_until_stalled(&mut fut).is_pending());
 

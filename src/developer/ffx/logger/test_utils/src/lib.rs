@@ -65,12 +65,12 @@ pub fn setup_fake_archive_iterator(
                         should_fidl_error,
                     }) => {
                         if let Some(err) = iterator_error {
-                            responder.send(&mut Err(*err)).unwrap();
+                            responder.send(Err(*err)).unwrap();
                         } else if *should_fidl_error {
                             responder.control_handle().shutdown();
                         } else {
                             responder
-                                .send(&mut Ok(values
+                                .send(Ok(values
                                     .into_iter()
                                     .map(|s| {
                                         if parameters.legacy_format {

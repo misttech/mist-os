@@ -78,7 +78,7 @@ pub enum WatchResponder {
 impl WatchResponder {
     fn send(
         self,
-        response: &mut Result<Vec<felement::Annotation>, felement::WatchAnnotationsError>,
+        response: Result<Vec<felement::Annotation>, felement::WatchAnnotationsError>,
     ) -> bool {
         // Ignore if the receiver half has dropped
         let _ = match self {
@@ -193,11 +193,11 @@ impl AnnotationHolder {
     pub fn new() -> AnnotationHolder {
         let notify_fn: WatchResponderNotifyFn = Box::new(|result, responder| {
             // Create a copy of the result that can be sent to the responder.
-            let mut result = match result {
+            let result = match result {
                 Ok(v) => clone_annotation_vec(&v),
                 Err(e) => Err(*e),
             };
-            responder.send(&mut result)
+            responder.send(result)
         });
 
         // Create a hanging get controller and initialize its copy of the annotations to an empty vector.
@@ -336,8 +336,8 @@ fn handle_annotation_controller_request(
         felement::AnnotationControllerRequest::GetAnnotations { responder } => {
             let result = annotations.get_annotations();
             match result {
-                Ok(annotation_vec) => responder.send(&mut Ok(annotation_vec)),
-                Err(AnnotationError::Get(e)) => responder.send(&mut Err(e)),
+                Ok(annotation_vec) => responder.send(Ok(annotation_vec)),
+                Err(AnnotationError::Get(e)) => responder.send(Err(e)),
                 Err(_) => unreachable!(),
             }
             .ok();

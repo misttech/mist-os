@@ -42,10 +42,10 @@ impl AccessorServer {
         if let Some(res) = self.requests.next().await {
             let BatchIteratorRequest::GetNext { responder } = res?;
             let response = self.build_vmo(data)?;
-            responder.send(&mut Ok(response))?;
+            responder.send(Ok(response))?;
             if let Some(res) = self.requests.next().await {
                 let BatchIteratorRequest::GetNext { responder } = res?;
-                responder.send(&mut Ok(vec![]))?;
+                responder.send(Ok(vec![]))?;
             } else {
                 return Err(ServerError::TooFewBatchRequests);
             }

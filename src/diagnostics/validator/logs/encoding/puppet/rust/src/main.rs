@@ -28,10 +28,10 @@ async fn run_encoding_service(mut stream: EncodingPuppetRequestStream) -> Result
                 let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
                 let vmo = Vmo::create(BUFFER_SIZE as u64)?;
                 vmo.write(&encoded, 0)?;
-                responder.send(&mut Ok(Buffer { vmo, size: encoded.len() as u64 }))?;
+                responder.send(Ok(Buffer { vmo, size: encoded.len() as u64 }))?;
             }
             Err(EncodingError::Unsupported) => {
-                responder.send(&mut Err(PuppetError::UnsupportedRecord))?
+                responder.send(Err(PuppetError::UnsupportedRecord))?
             }
             Err(e) => {
                 return Err(format_err!("Error parsing record: {:?}", e));

@@ -58,7 +58,7 @@ where
                 }
                 fbedrock::DictRequest::Remove { key, responder } => {
                     let cap = self.entries.remove(&key);
-                    let mut result = match cap {
+                    let result = match cap {
                         Some(cap) => {
                             let (handle, fut) = cap.to_zx_handle();
                             if let Some(fut) = fut {
@@ -68,7 +68,7 @@ where
                         }
                         None => Err(fbedrock::DictError::NotFound),
                     };
-                    responder.send(&mut result).context("failed to send response")?;
+                    responder.send(result).context("failed to send response")?;
                 }
             }
         }

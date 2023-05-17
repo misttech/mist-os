@@ -520,8 +520,8 @@ async fn handle_element_controller_stream(
                 felement::ControllerRequest::GetAnnotations { responder } => {
                     let result = annotation_holder.lock().await.get_annotations();
                     match result {
-                        Ok(annotation_vec) => responder.send(&mut Ok(annotation_vec)),
-                        Err(AnnotationError::Get(e)) => responder.send(&mut Err(e)),
+                        Ok(annotation_vec) => responder.send(Ok(annotation_vec)),
+                        Err(AnnotationError::Get(e)) => responder.send(Err(e)),
                         Err(_) => unreachable!(),
                     }
                     .ok();

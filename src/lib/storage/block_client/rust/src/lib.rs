@@ -1089,8 +1089,8 @@ mod tests {
                                         match request {
                                             block::SessionRequest::GetFifo { responder } => {
                                                 match maybe_server_fifo.lock().unwrap().take() {
-                                                    Some(fifo) => responder.send(&mut Ok(fifo)),
-                                                    None => responder.send(&mut Err(
+                                                    Some(fifo) => responder.send(Ok(fifo)),
+                                                    None => responder.send(Err(
                                                         zx::Status::NO_RESOURCES.into_raw(),
                                                     )),
                                                 }

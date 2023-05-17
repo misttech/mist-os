@@ -278,7 +278,7 @@ impl MockRealmQuery {
                     })
                     .detach();
 
-                    responder.send(&mut Ok(client_end)).unwrap();
+                    responder.send(Ok(client_end)).unwrap();
                 }
                 fsys2::RealmQueryRequest::GetAllInstances { responder } => {
                     let instances: Vec<fsys2::Instance> =
@@ -298,7 +298,7 @@ impl MockRealmQuery {
                     })
                     .detach();
 
-                    responder.send(&mut Ok(client_end)).unwrap();
+                    responder.send(Ok(client_end)).unwrap();
                 }
                 _ => unreachable!("request {:?}", request),
             }

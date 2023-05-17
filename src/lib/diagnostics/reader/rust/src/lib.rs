@@ -759,9 +759,7 @@ mod tests {
                                 match req {
                                     fdiagnostics::BatchIteratorRequest::GetNext { responder } => {
                                         if called {
-                                            responder
-                                                .send(&mut Ok(Vec::new()))
-                                                .expect("send response");
+                                            responder.send(Ok(Vec::new())).expect("send response");
                                             continue;
                                         }
                                         called = true;
@@ -774,9 +772,9 @@ mod tests {
                                         let buffer =
                                             fidl_fuchsia_mem::Buffer { vmo, size: vmo_size };
                                         responder
-                                            .send(&mut Ok(vec![
-                                                fdiagnostics::FormattedContent::Json(buffer),
-                                            ]))
+                                            .send(Ok(vec![fdiagnostics::FormattedContent::Json(
+                                                buffer,
+                                            )]))
                                             .expect("send response");
                                     }
                                 }

@@ -470,7 +470,7 @@ mod tests {
                     Some(Ok(bredr::ProfileRequest::Connect { responder, .. })) => {
                         let (left, right) = Channel::create();
                         let _ = responder
-                            .send(&mut left.try_into().map_err(|_e| ErrorCode::Failed))
+                            .send(left.try_into().map_err(|_e| ErrorCode::Failed))
                             .unwrap();
                         right
                     }

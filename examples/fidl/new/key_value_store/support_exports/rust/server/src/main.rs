@@ -117,7 +117,7 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                     println!("Export request received");
 
                     responder
-                        .send(&mut export(&mut store.borrow_mut(), empty))
+                        .send(export(&mut store.borrow_mut(), empty))
                         .context("error sending reply")?;
                     println!("Export response sent");
                 } //

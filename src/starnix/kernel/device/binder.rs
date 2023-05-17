@@ -6701,7 +6701,7 @@ pub mod tests {
                     };
                     vmo.write(buffer, 0)?;
                     vmo.set_content_size(&length)?;
-                    responder.send(&mut Ok(vmo))?;
+                    responder.send(Ok(vmo))?;
                 }
                 fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
                     let mut response = fbinder::FileResponse::default();

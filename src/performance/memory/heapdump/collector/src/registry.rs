@@ -74,7 +74,7 @@ impl Registry {
                                 let (proxy, stream) =
                                     create_proxy::<fheapdump_client::SnapshotReceiverMarker>()
                                         .expect("failed to create snapshot receiver channel");
-                                responder.send(&mut Ok(stream))?;
+                                responder.send(Ok(stream))?;
 
                                 if let Err(error) = snapshot.write_to(proxy).await {
                                     warn!(?error, "Error while streaming snapshot");
@@ -82,10 +82,10 @@ impl Registry {
                             }
                             Err(error) => {
                                 warn!(?error, "Error while taking live snapshot");
-                                responder.send(&mut Err(CollectorError::LiveSnapshotFailed))?;
+                                responder.send(Err(CollectorError::LiveSnapshotFailed))?;
                             }
                         },
-                        Err(e) => responder.send(&mut Err(e))?,
+                        Err(e) => responder.send(Err(e))?,
                     };
                 }
             }

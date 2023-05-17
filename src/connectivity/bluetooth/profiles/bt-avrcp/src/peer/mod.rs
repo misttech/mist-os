@@ -917,7 +917,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, connection, .. }))) => {
                 let channel = channel.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
                 // The connect request should be for the PSM advertised by the remote peer.
                 match connection {
                     ConnectParameters::L2cap(L2capParameters { psm: Some(v), .. }) => {
@@ -980,7 +980,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1001,7 +1001,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, connection, .. }))) => {
                 let channel = channel2.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
                 // The connect request should be for the PSM advertised by the remote peer.
                 match connection {
                     ConnectParameters::L2cap(L2capParameters {
@@ -1061,7 +1061,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, connection, .. }))) => {
                 let channel = channel.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
                 match connection {
                     ConnectParameters::L2cap(L2capParameters { psm: Some(v), .. }) => {
                         assert_eq!(v, u16::from(peer_psm));
@@ -1133,7 +1133,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1176,7 +1176,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel3.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1221,7 +1221,7 @@ mod tests {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 // Trigger connection failure.
                 responder
-                    .send(&mut Err(fidl_fuchsia_bluetooth::ErrorCode::Failed))
+                    .send(Err(fidl_fuchsia_bluetooth::ErrorCode::Failed))
                     .expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
@@ -1262,7 +1262,7 @@ mod tests {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { connection, responder, .. }))) => {
                 // Trigger failure.
                 responder
-                    .send(&mut Err(fidl_fuchsia_bluetooth::ErrorCode::Failed))
+                    .send(Err(fidl_fuchsia_bluetooth::ErrorCode::Failed))
                     .expect("FIDL response should work");
 
                 // Verify that request is for browse.
@@ -1332,7 +1332,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1352,7 +1352,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel2.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1397,7 +1397,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel4.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1444,7 +1444,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1465,7 +1465,7 @@ mod tests {
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
                 let channel = channel2.try_into().unwrap();
-                responder.send(&mut Ok(channel)).expect("FIDL response should work");
+                responder.send(Ok(channel)).expect("FIDL response should work");
             }
             x => panic!("Expected Profile connection request to be ready, got {:?} instead.", x),
         };
@@ -1647,7 +1647,7 @@ mod tests {
         // We expect to initiate an outbound connection through the profile server. Simulate error.
         match exec.run_until_stalled(&mut next_request_fut) {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { responder, .. }))) => {
-                responder.send(&mut Err(ErrorCode::Failed)).expect("Fidl response should be ok");
+                responder.send(Err(ErrorCode::Failed)).expect("Fidl response should be ok");
             }
             x => panic!("Expected ready profile connection, but got: {:?}", x),
         };

@@ -141,11 +141,11 @@ impl KeyManager {
             }),
             KeyManagerRequest::SealData { plain_text, responder } => self
                 .with_provider(self.provider, |provider| {
-                    responder.send(&mut self.seal_data(plain_text, provider.unwrap()))
+                    responder.send(self.seal_data(plain_text, provider.unwrap()))
                 }),
             KeyManagerRequest::UnsealData { cipher_text, responder } => self
                 .with_provider(self.provider, |provider| {
-                    responder.send(&mut self.unseal_data(cipher_text, provider.unwrap()))
+                    responder.send(self.unseal_data(cipher_text, provider.unwrap()))
                 }),
             KeyManagerRequest::DeleteKey { key_name, responder } => {
                 responder.send(&mut self.delete_key(&key_name))

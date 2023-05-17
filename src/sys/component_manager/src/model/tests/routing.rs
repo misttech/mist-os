@@ -2213,7 +2213,7 @@ async fn use_resolver_from_parent_environment() {
                     fresolution::ResolverRequest::Resolve { component_url, responder } => {
                         assert_eq!(component_url, "base://b");
                         responder
-                            .send(&mut Ok(fresolution::Component {
+                            .send(Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes(
                                     fidl::persist(&default_component_decl().native_into_fidl())
@@ -2239,7 +2239,7 @@ async fn use_resolver_from_parent_environment() {
                             component_url, context
                         );
                         responder
-                            .send(&mut Err(fresolution::ResolverError::Internal))
+                            .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
                     }
                 }
@@ -2318,7 +2318,7 @@ async fn use_resolver_from_grandparent_environment() {
                     fresolution::ResolverRequest::Resolve { component_url, responder } => {
                         assert_eq!(component_url, "base://c");
                         responder
-                            .send(&mut Ok(fresolution::Component {
+                            .send(Ok(fresolution::Component {
                                 url: Some("test://c".into()),
                                 decl: Some(fmem::Data::Bytes(
                                     fidl::persist(&default_component_decl().native_into_fidl())
@@ -2344,7 +2344,7 @@ async fn use_resolver_from_grandparent_environment() {
                             component_url, context
                         );
                         responder
-                            .send(&mut Err(fresolution::ResolverError::Internal))
+                            .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
                     }
                 }
@@ -2422,7 +2422,7 @@ async fn resolver_is_not_available() {
                     fresolution::ResolverRequest::Resolve { component_url, responder } => {
                         assert_eq!(component_url, "base://b");
                         responder
-                            .send(&mut Ok(fresolution::Component {
+                            .send(Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes(
                                     fidl::persist(&default_component_decl().native_into_fidl())
@@ -2448,7 +2448,7 @@ async fn resolver_is_not_available() {
                             component_url, context
                         );
                         responder
-                            .send(&mut Err(fresolution::ResolverError::Internal))
+                            .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
                     }
                 }
@@ -2524,7 +2524,7 @@ async fn resolver_component_decl_is_validated() {
                     fresolution::ResolverRequest::Resolve { component_url, responder } => {
                         assert_eq!(component_url, "base://b");
                         responder
-                            .send(&mut Ok(fresolution::Component {
+                            .send(Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes({
                                     let fidl = fdecl::Component {
@@ -2558,7 +2558,7 @@ async fn resolver_component_decl_is_validated() {
                             component_url, context
                         );
                         responder
-                            .send(&mut Err(fresolution::ResolverError::Internal))
+                            .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
                     }
                 }

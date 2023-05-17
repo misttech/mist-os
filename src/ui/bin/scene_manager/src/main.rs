@@ -562,12 +562,12 @@ pub async fn handle_scene_manager_request_stream(
             SceneManagerRequest::SetRootView { view_provider, responder } => {
                 if let Ok(proxy) = view_provider.into_proxy() {
                     let mut scene_manager = scene_manager.lock().await;
-                    let mut set_root_view_result =
+                    let set_root_view_result =
                         scene_manager.set_root_view_deprecated(proxy).await.map_err(|e| {
                             error!("Failed to obtain ViewRef from SetRootView(): {}", e);
                             PresentRootViewError::InternalError
                         });
-                    if let Err(e) = responder.send(&mut set_root_view_result) {
+                    if let Err(e) = responder.send(set_root_view_result) {
                         error!("Error responding to SetRootView(): {}", e);
                     }
                 }

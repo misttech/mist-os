@@ -319,9 +319,10 @@ impl BlockServer {
                         let () = match request {
                             block::SessionRequest::GetFifo { responder } => {
                                 match self.maybe_server_fifo.lock().unwrap().take() {
-                                    Some(fifo) => responder.send(&mut Ok(fifo))?,
-                                    None => responder
-                                        .send(&mut Err(zx::Status::NO_RESOURCES.into_raw()))?,
+                                    Some(fifo) => responder.send(Ok(fifo))?,
+                                    None => {
+                                        responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?
+                                    }
                                 }
                             }
                             block::SessionRequest::AttachVmo { vmo, responder } => {

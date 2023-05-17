@@ -1687,7 +1687,7 @@ mod tests {
                 assert_eq!(sc, u8::from(random_channel_number));
                 let (local, remote) = Channel::create();
                 let local = local.try_into().unwrap();
-                responder.send(&mut Ok(local)).unwrap();
+                responder.send(Ok(local)).unwrap();
 
                 remote
             }

@@ -87,7 +87,7 @@ async fn run_boot_items(mut stream: fboot::ItemsRequestStream, vmo: Option<Arc<z
             fboot::ItemsRequest::Get2 { type_, extra, responder } => {
                 assert_eq!(type_, ZBI_TYPE_STORAGE_RAMDISK);
                 assert_eq!((*extra.unwrap()).n, 0);
-                responder.send(&mut Ok(Vec::new())).unwrap();
+                responder.send(Ok(Vec::new())).unwrap();
             }
             fboot::ItemsRequest::GetBootloaderFile { .. } => {
                 panic!(

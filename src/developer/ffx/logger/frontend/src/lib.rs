@@ -425,7 +425,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
             let mode = self.connection_state.lock().await.mode.clone();
             let out_vec = match (decoder.decode().await, mode) {
                 (Err(error), Some(StreamMode::SnapshotAll)) => {
-                    responder.send(&mut Ok(vec![ArchiveIteratorEntry {
+                    responder.send(Ok(vec![ArchiveIteratorEntry {
                         end_of_stream: Some(true),
                         ..Default::default()
                     }]))?;
@@ -445,7 +445,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                 truncated_chars: None,
                 ..Default::default()
             }];
-            responder.send(&mut Ok(results))?;
+            responder.send(Ok(results))?;
             local.write_all(serde_json::to_string(&out_vec)?.as_bytes()).await?;
         }
         Ok(())
@@ -489,7 +489,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                 })),
                 ..Default::default()
             };
-            responder.send(&mut Ok(vec![translated]))?;
+            responder.send(Ok(vec![translated]))?;
             return Ok(None);
         }
     }

@@ -93,18 +93,28 @@ impl Cr50 {
                     )
                     .context("Replying to request")?,
                 Cr50Request::CcdOpen { password, responder } => responder
-                    .send(&mut Self::make_response(
-                        "CcdOpen",
-                        self.handle_open_or_unlock(CcdCommand::Open, password).await.map(Some),
-                        None,
-                    ))
+                    .send(
+                        match Self::make_response(
+                            "CcdOpen",
+                            self.handle_open_or_unlock(CcdCommand::Open, password).await.map(Some),
+                            None,
+                        ) {
+                            Ok((ref rc, presence_checker)) => Ok((rc, presence_checker)),
+                            Err(e) => Err(e),
+                        },
+                    )
                     .context("Replying to request")?,
                 Cr50Request::CcdUnlock { password, responder } => responder
-                    .send(&mut Self::make_response(
-                        "CcdUnlock",
-                        self.handle_open_or_unlock(CcdCommand::Open, password).await.map(Some),
-                        None,
-                    ))
+                    .send(
+                        match Self::make_response(
+                            "CcdUnlock",
+                            self.handle_open_or_unlock(CcdCommand::Open, password).await.map(Some),
+                            None,
+                        ) {
+                            Ok((ref rc, presence_checker)) => Ok((rc, presence_checker)),
+                            Err(e) => Err(e),
+                        },
+                    )
                     .context("Replying to request")?,
             };
         }

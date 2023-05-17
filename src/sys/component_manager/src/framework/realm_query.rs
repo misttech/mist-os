@@ -124,8 +124,8 @@ impl RealmQuery {
                     responder.send(&mut result)
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
-                    let mut result = get_manifest(&self.model, &scope_moniker, &moniker).await;
-                    responder.send(&mut result)
+                    let result = get_manifest(&self.model, &scope_moniker, &moniker).await;
+                    responder.send(result)
                 }
                 fsys::RealmQueryRequest::ResolveDeclaration {
                     parent,
@@ -133,7 +133,7 @@ impl RealmQuery {
                     url,
                     responder,
                 } => {
-                    let mut result = resolve_declaration(
+                    let result = resolve_declaration(
                         &self.model,
                         &scope_moniker,
                         &parent,
@@ -141,7 +141,7 @@ impl RealmQuery {
                         &url,
                     )
                     .await;
-                    responder.send(&mut result)
+                    responder.send(result)
                 }
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
                     let mut result =
@@ -149,13 +149,12 @@ impl RealmQuery {
                     responder.send(&mut result)
                 }
                 fsys::RealmQueryRequest::GetAllInstances { responder } => {
-                    let mut result = get_all_instances(&self.model, &scope_moniker).await;
-                    responder.send(&mut result)
+                    let result = get_all_instances(&self.model, &scope_moniker).await;
+                    responder.send(result)
                 }
                 fsys::RealmQueryRequest::ConstructNamespace { moniker, responder } => {
-                    let mut result =
-                        construct_namespace(&self.model, &scope_moniker, &moniker).await;
-                    responder.send(&mut result)
+                    let result = construct_namespace(&self.model, &scope_moniker, &moniker).await;
+                    responder.send(result)
                 }
                 fsys::RealmQueryRequest::Open {
                     moniker,

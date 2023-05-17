@@ -162,7 +162,7 @@ mod tests {
                     vmo.write(b"hello, world!", 0).unwrap();
                     match request {
                         fio::FileRequest::GetBackingMemory { flags: _, responder } => {
-                            responder.send(&mut Ok(vmo)).unwrap()
+                            responder.send(Ok(vmo)).unwrap()
                         }
                         unexpected => unimplemented!("{:#?}", unexpected),
                     }
@@ -206,7 +206,7 @@ mod tests {
                 while let Some(Ok(request)) = file_requests.next().await {
                     match request {
                         fio::FileRequest::GetBackingMemory { flags: _, responder } => {
-                            responder.send(&mut Err(zxs::Status::NOT_SUPPORTED.into_raw())).unwrap()
+                            responder.send(Err(zxs::Status::NOT_SUPPORTED.into_raw())).unwrap()
                         }
                         fio::FileRequest::Read { count: _, responder } => {
                             let to_send = if !have_sent_bytes {

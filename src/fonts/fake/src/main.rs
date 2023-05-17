@@ -82,9 +82,7 @@ async fn handle_stream_experimental(
         tracing::debug!("request: {}", request.method_name());
         match request {
             GetTypefaceById { id: _, responder } => {
-                responder
-                    .send(&mut Err(fonts_exp::Error::NotFound))
-                    .context("send GetTypefaceById")?;
+                responder.send(Err(fonts_exp::Error::NotFound)).context("send GetTypefaceById")?;
             }
             ListTypefaces { request: _, iterator: _, responder } => {
                 responder

@@ -637,8 +637,7 @@ async fn error_syntax_receiver_thread(server_end: Channel) {
         .for_each(|request| {
             match request {
                 Ok(ErrorSyntaxProtocolRequest::TestErrorSyntax { responder }) => {
-                    let h = Event::create();
-                    responder.send(&mut Ok(h)).unwrap();
+                    responder.send(Ok(Event::create())).unwrap();
                 }
                 Err(_) => panic!("unexpected err"),
             }

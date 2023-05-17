@@ -554,7 +554,7 @@ mod tests {
         if let Poll::Ready(val) = executor.run_until_stalled(&mut stream.try_next()) {
             let (_, _, _, responder) =
                 val.unwrap().unwrap().into_accept().expect("received unexpected message on stream");
-            responder.send(&mut Ok(device_socket)).expect("failed to send response");
+            responder.send(Ok(device_socket)).expect("failed to send response");
         } else {
             panic!("Expected future to be ready");
         };

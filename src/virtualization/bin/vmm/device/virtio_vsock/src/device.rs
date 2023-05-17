@@ -377,7 +377,7 @@ impl VsockDevice {
                 tracing::error!(
                     "Exhausted all ephemeral ports when handling a client initiated connection"
                 );
-                return responder.send(&mut Err(err.into_raw()));
+                return responder.send(Err(err.into_raw()));
             }
 
             let key =
@@ -1051,7 +1051,7 @@ mod tests {
         assert_eq!(port, host_port);
 
         let (_client_socket, device_socket) = zx::Socket::create_stream();
-        responder.send(&mut Ok(device_socket)).expect("failed to send response to device");
+        responder.send(Ok(device_socket)).expect("failed to send response to device");
 
         // The device sent a reply to the guest.
         let mem = IdentityDriverMem::new();

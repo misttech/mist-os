@@ -412,8 +412,7 @@ impl SoftPcm {
             } => {
                 let (fps, format, channels) = match &self.current_format {
                     None => {
-                        let mut error = Err(GetVmoError::InternalError);
-                        if let Err(e) = responder.send(&mut error) {
+                        if let Err(e) = responder.send(Err(GetVmoError::InternalError)) {
                             warn!("Error on get vmo error send: {:?}", e);
                         }
                         return Ok(());
@@ -433,12 +432,10 @@ impl SoftPcm {
                 ) {
                     Err(e) => {
                         warn!(?e, "Error on vmo set format");
-                        let mut error = Err(GetVmoError::InternalError);
-                        responder.send(&mut error)?;
+                        responder.send(Err(GetVmoError::InternalError))?;
                     }
                     Ok(vmo_handle) => {
-                        let mut result = Ok((min_frames, vmo_handle.into()));
-                        responder.send(&mut result)?;
+                        responder.send(Ok((min_frames, vmo_handle)))?;
                     }
                 }
             }

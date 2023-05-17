@@ -520,7 +520,7 @@ mod test {
                                 responder, ..
                             } => {
                                 let send_events = maybe_events.take().unwrap_or(vec![]);
-                                let _ = responder.send(&mut Ok(send_events));
+                                let _ = responder.send(Ok(send_events));
                             }
                             _ => {
                                 // ignore all other requests

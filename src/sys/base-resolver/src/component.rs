@@ -27,7 +27,7 @@ pub(crate) async fn serve_request_stream(
             fcomponent_resolution::ResolverRequest::Resolve { component_url, responder } => {
                 let () = responder
                     .send(
-                        &mut resolve(&component_url, base_packages, authenticator.clone(), blobfs)
+                        resolve(&component_url, base_packages, authenticator.clone(), blobfs)
                             .await
                             .map_err(|e| {
                                 let fidl_err = (&e).into();
@@ -48,7 +48,7 @@ pub(crate) async fn serve_request_stream(
             } => {
                 let () = responder
                     .send(
-                        &mut resolve_with_context(
+                        resolve_with_context(
                             &component_url,
                             context,
                             base_packages,

@@ -497,10 +497,10 @@ where
 
         match request {
             GetTypefaceById { id, responder } => {
-                let mut response = self
+                let response = self
                     .get_typeface_by_id(AssetId(id), CacheMissPolicy::BlockUntilDownloaded)
                     .await;
-                Ok(responder.send(&mut response)?)
+                Ok(responder.send(response)?)
             }
             GetTypefacesByFamily { family, responder } => {
                 let mut response = self.get_typefaces_by_family(family);

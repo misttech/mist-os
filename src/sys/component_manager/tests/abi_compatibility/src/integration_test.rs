@@ -83,7 +83,7 @@ impl ComponentResolver {
                 while let Some(req) = stream.try_next().await.expect("failed to serve resolver") {
                     match req {
                         fresolution::ResolverRequest::Resolve { component_url: _, responder } => {
-                            responder.send(&mut Ok(self.mock_component())).unwrap();
+                            responder.send(Ok(self.mock_component())).unwrap();
                             test_channel
                                 .send(self.mock_component())
                                 .await
@@ -94,7 +94,7 @@ impl ComponentResolver {
                             context: _,
                             responder,
                         } => {
-                            responder.send(&mut Ok(self.mock_component())).unwrap();
+                            responder.send(Ok(self.mock_component())).unwrap();
                             test_channel
                                 .send(self.mock_component())
                                 .await

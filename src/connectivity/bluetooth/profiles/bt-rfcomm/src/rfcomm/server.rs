@@ -198,14 +198,14 @@ impl RfcommServer {
         match self.sessions.get(&id).and_then(|s| s.upgrade()) {
             None => {
                 // Peer either disconnected or doesn't exist.
-                let _ = responder.send(&mut Err(ErrorCode::Failed));
+                let _ = responder.send(Err(ErrorCode::Failed));
                 Err(format_err!("Invalid peer ID {id}"))
             }
             Some(session) => {
                 let channel_opened_callback =
                     Box::new(move |channel: Result<Channel, ErrorCode>| {
-                        let mut channel = channel.map(|c| bredr::Channel::try_from(c).unwrap());
-                        responder.send(&mut channel).map_err(|e| format_err!("{e:?}"))
+                        let channel = channel.map(|c| bredr::Channel::try_from(c).unwrap());
+                        responder.send(channel).map_err(|e| format_err!("{e:?}"))
                     });
                 session.open_rfcomm_channel(server_channel, channel_opened_callback).await;
                 Ok(())

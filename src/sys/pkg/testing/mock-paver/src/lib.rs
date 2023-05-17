@@ -221,7 +221,7 @@ pub mod hooks {
                         responder.send(&paver::WriteFirmwareResult::Status(status.into_raw()))
                     }
                     paver::DataSinkRequest::ReadAsset { responder, .. } => {
-                        responder.send(&mut Err(status.into_raw()))
+                        responder.send(Err(status.into_raw()))
                     }
                     paver::DataSinkRequest::WriteAsset { responder, .. } => {
                         responder.send(status.into_raw())
@@ -336,11 +336,11 @@ pub mod hooks {
         ) -> Option<paver::DataSinkRequest> {
             match request {
                 paver::DataSinkRequest::ReadFirmware { configuration, type_, responder } => {
-                    let mut result = (self.0)(configuration, type_)
+                    let result = (self.0)(configuration, type_)
                         .map(write_mem_buffer)
                         .map_err(Status::into_raw);
                     // Ignore errors from peers closing the channel early
-                    let _ = responder.send(&mut result);
+                    let _ = responder.send(result);
                     None
                 }
                 request => Some(request),
@@ -369,11 +369,11 @@ pub mod hooks {
         ) -> Option<paver::DataSinkRequest> {
             match request {
                 paver::DataSinkRequest::ReadAsset { configuration, asset, responder } => {
-                    let mut result = (self.0)(configuration, asset)
+                    let result = (self.0)(configuration, asset)
                         .map(write_mem_buffer)
                         .map_err(Status::into_raw);
                     // Ignore errors from peers closing the channel early
-                    let _ = responder.send(&mut result);
+                    let _ = responder.send(result);
                     None
                 }
                 request => Some(request),
@@ -595,10 +595,10 @@ impl MockPaverService {
                     responder.send(Status::OK.into_raw())
                 }
                 paver::DataSinkRequest::ReadAsset { responder, .. } => {
-                    responder.send(&mut Ok(write_mem_buffer(vec![])))
+                    responder.send(Ok(write_mem_buffer(vec![])))
                 }
                 paver::DataSinkRequest::ReadFirmware { responder, .. } => {
-                    responder.send(&mut Ok(write_mem_buffer(vec![])))
+                    responder.send(Ok(write_mem_buffer(vec![])))
                 }
                 request => panic!("Unhandled method Paver::{}", request.method_name()),
             };

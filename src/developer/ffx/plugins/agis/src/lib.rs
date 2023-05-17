@@ -200,7 +200,7 @@ mod test {
                 ComponentRegistryRequest::GetVulkanSocket { responder, .. } => {
                     // Create an arbitrary, valid socket to test as a return value.
                     let (s, _) = fidl::Socket::create_stream();
-                    responder.send(&mut Ok(Some(s))).unwrap();
+                    responder.send(Ok(Some(s))).unwrap();
                 }
                 ComponentRegistryRequest::Unregister { responder, .. } => {
                     responder.send(&mut Ok(())).unwrap();
@@ -221,8 +221,7 @@ mod test {
                         process_name: Some(PROCESS_NAME.to_string()),
                         ..Default::default()
                     });
-                    let mut result = Ok(vtcs);
-                    responder.send(&mut result).unwrap();
+                    responder.send(Ok(vtcs)).unwrap();
                 }
             };
         };

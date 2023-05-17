@@ -320,7 +320,7 @@ mod tests {
                     };
                     assert_eq!(request, expected_request);
 
-                    responder.send(&mut Ok(buf)).unwrap()
+                    responder.send(Ok(buf)).unwrap()
                 }
                 req => panic!("unexpected request: {:?}", req),
             })

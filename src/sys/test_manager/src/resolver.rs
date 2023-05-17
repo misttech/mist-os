@@ -85,7 +85,7 @@ async fn serve_resolver(
     while let Some(request) = stream.try_next().await.expect("failed to serve component resolver") {
         match request {
             fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                let mut result = if let Err(err) = validate_hermetic_package(
+                let result = if let Err(err) = validate_hermetic_package(
                     &component_url,
                     subscriber.clone(),
                     &hermetic_test_package_name,
@@ -103,7 +103,7 @@ async fn serve_resolver(
                         Err(fresolution::ResolverError::Internal)
                     })
                 };
-                if let Err(e) = responder.send(&mut result) {
+                if let Err(e) = responder.send(result) {
                     warn!("Failed sending load response for {}: {}", component_url, e);
                 }
             }
@@ -114,7 +114,7 @@ async fn serve_resolver(
             } => {
                 // We don't need to worry about validating context because it should have
                 // been produced by Resolve call above.
-                let mut result = if let Err(err) = validate_hermetic_package(
+                let result = if let Err(err) = validate_hermetic_package(
                     &component_url,
                     subscriber.clone(),
                     &hermetic_test_package_name,
@@ -138,7 +138,7 @@ async fn serve_resolver(
                             Err(fresolution::ResolverError::Internal)
                         })
                 };
-                if let Err(e) = responder.send(&mut result) {
+                if let Err(e) = responder.send(result) {
                     warn!("Failed sending load response for {}: {}", component_url, e);
                 }
             }
@@ -265,11 +265,12 @@ mod tests {
                         "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm"
                         | "fuchsia-pkg://fuchsia.com/package-three#meta/comp.cm"
                         | "fuchsia-pkg://fuchsia.com/package-four#meta/comp.cm" => {
-                            responder.send(&mut Ok(fresolution::Component::default()))
+                            responder.send(Ok(fresolution::Component::default()))
                         }
-                        "fuchsia-pkg://fuchsia.com/package-two#meta/comp.cm" => responder
-                            .send(&mut Err(fresolution::ResolverError::ResourceUnavailable)),
-                        _ => responder.send(&mut Err(fresolution::ResolverError::Internal)),
+                        "fuchsia-pkg://fuchsia.com/package-two#meta/comp.cm" => {
+                            responder.send(Err(fresolution::ResolverError::ResourceUnavailable))
+                        }
+                        _ => responder.send(Err(fresolution::ResolverError::Internal)),
                     }
                     .expect("failed sending response");
                 }
@@ -280,9 +281,9 @@ mod tests {
                 } => {
                     match component_url.as_str() {
                         "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm" | "name#resource" => {
-                            responder.send(&mut Ok(fresolution::Component::default()))
+                            responder.send(Ok(fresolution::Component::default()))
                         }
-                        _ => responder.send(&mut Err(fresolution::ResolverError::PackageNotFound)),
+                        _ => responder.send(Err(fresolution::ResolverError::PackageNotFound)),
                     }
                     .expect("failed sending response");
                 }

@@ -136,7 +136,7 @@ async fn handle_provider_request(
             let (client_end, request_stream) =
                 fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
                     .context("create request stream")?;
-            responder.send(&mut Ok(client_end)).context("send StreamSocket response")?;
+            responder.send(Ok(client_end)).context("send StreamSocket response")?;
             let socket = Rc::new(RefCell::new(StreamSocket::new(
                 proto,
                 domain,
@@ -710,11 +710,10 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
             responder
-                .send(
-                    &mut socket.borrow_mut().accept().map(|(addr, client_end)| {
-                        (want_addr.then(move || Box::new(addr)), client_end)
-                    }),
-                )
+                .send(match socket.borrow_mut().accept() {
+                    Ok((ref addr, client)) => Ok((want_addr.then_some(addr), client)),
+                    Err(e) => Err(e),
+                })
                 .context("send Accept response")?;
         }
         fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {

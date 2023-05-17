@@ -210,7 +210,7 @@ impl ClientInitiated {
                     // TODO(fxbug.dev/110903): Remove once flake is resolved.
                     tracing::info!("Sending socket to client for {:?}", self.key);
 
-                    self.responder.take().unwrap().send(&mut Ok(client))?;
+                    self.responder.take().unwrap().send(Ok(client))?;
                     Ok(local_async)
                 };
 
@@ -267,11 +267,8 @@ impl ClientInitiated {
 impl Drop for ClientInitiated {
     fn drop(&mut self) {
         if self.responder.is_some() {
-            if let Err(err) = self
-                .responder
-                .take()
-                .unwrap()
-                .send(&mut Err(zx::Status::CONNECTION_REFUSED.into_raw()))
+            if let Err(err) =
+                self.responder.take().unwrap().send(Err(zx::Status::CONNECTION_REFUSED.into_raw()))
             {
                 tracing::error!(%err,"Connection failed to send closing message");
             }
@@ -1396,7 +1393,7 @@ mod tests {
             let (_, _, _, responder) =
                 val.unwrap().unwrap().into_accept().expect("received unexpected message on stream");
             responder
-                .send(&mut Err(zx::Status::CONNECTION_REFUSED.into_raw()))
+                .send(Err(zx::Status::CONNECTION_REFUSED.into_raw()))
                 .expect("failed to send response");
         } else {
             panic!("Expected future to be ready");
@@ -1431,7 +1428,7 @@ mod tests {
         if let Poll::Ready(val) = executor.run_until_stalled(&mut stream.try_next()) {
             let (_, _, _, responder) =
                 val.unwrap().unwrap().into_accept().expect("received unexpected message on stream");
-            responder.send(&mut Ok(device_socket)).expect("failed to send response");
+            responder.send(Ok(device_socket)).expect("failed to send response");
         } else {
             panic!("Expected future to be ready");
         };

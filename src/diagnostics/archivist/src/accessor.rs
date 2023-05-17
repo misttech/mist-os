@@ -391,7 +391,7 @@ impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
         let Some(Ok(BatchIteratorRequest::GetNext { responder })) = __self.next().await else {
             return Err(IteratorError::PeerClosed);
         };
-        responder.send(&mut Ok(data))?;
+        responder.send(Ok(data))?;
         Ok(())
     }
     async fn wait_for_buffer(&mut self) -> anyhow::Result<()> {

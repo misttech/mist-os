@@ -54,7 +54,7 @@ pub trait ArchiveReaderManager {
         while let Some(request) = iter_stream.next().await {
             let ArchiveIteratorRequest::GetNext { responder } = request?;
             if is_sent {
-                responder.send(&mut Ok(vec![]))?;
+                responder.send(Ok(vec![]))?;
                 continue;
             }
             is_sent = true;
@@ -67,7 +67,7 @@ pub trait ArchiveReaderManager {
                     })),
                     ..Default::default()
                 }];
-                responder.send(&mut Ok(response))?;
+                responder.send(Ok(response))?;
             } else {
                 let (socket, tx_socket) = fuchsia_zircon::Socket::create_stream();
                 let mut tx_socket = fasync::Socket::from_socket(tx_socket)?;
@@ -75,7 +75,7 @@ pub trait ArchiveReaderManager {
                     diagnostics_data: Some(DiagnosticsData::Socket(socket)),
                     ..Default::default()
                 }];
-                responder.send(&mut Ok(response))?;
+                responder.send(Ok(response))?;
                 tx_socket.write_all(data.as_bytes()).await?;
             }
         }
@@ -111,7 +111,7 @@ pub trait ArchiveReaderManager {
                                 match result {
                                     Err(err) => {
                                         warn!(?err, "Data read error");
-                                        responder.send(&mut Err(
+                                        responder.send( Err(
                                             ArchiveIteratorError::DataReadFailed))?;
                                         continue;
                                     }
@@ -120,7 +120,7 @@ pub trait ArchiveReaderManager {
                             }
 
                             complete => {
-                                responder.send(&mut Ok(vec![]))?;
+                                responder.send(Ok(vec![]))?;
                                 break;
                             }
                         };
@@ -136,7 +136,7 @@ pub trait ArchiveReaderManager {
                                 })),
                                 ..Default::default()
                             }];
-                            responder.send(&mut Ok(response))?;
+                            responder.send(Ok(response))?;
                         } else {
                             // Long data => create a socket, send the socket in the message, then
                             // write all the data on the other side of the socket.
@@ -146,7 +146,7 @@ pub trait ArchiveReaderManager {
                                 diagnostics_data: Some(DiagnosticsData::Socket(socket)),
                                 ..Default::default()
                             }];
-                            responder.send(&mut Ok(response))?;
+                            responder.send(Ok(response))?;
                             tx_socket.write_all(data.as_bytes()).await?;
                         }
                     }

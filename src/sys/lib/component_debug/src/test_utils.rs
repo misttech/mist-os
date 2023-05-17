@@ -92,9 +92,9 @@ pub fn serve_realm_query(
                     eprintln!("GetManifest call for {}", moniker);
                     if let Some(manifest) = manifests.get(&moniker) {
                         let iterator = serve_manifest_bytes_iterator(manifest.clone());
-                        responder.send(&mut Ok(iterator)).unwrap();
+                        responder.send(Ok(iterator)).unwrap();
                     } else {
-                        responder.send(&mut Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
+                        responder.send(Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
                     }
                 }
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
@@ -111,7 +111,7 @@ pub fn serve_realm_query(
                     eprintln!("GetAllInstances call");
                     let instances = instance_map.values().cloned().collect();
                     let iterator = serve_instance_iterator(instances);
-                    responder.send(&mut Ok(iterator)).unwrap();
+                    responder.send(Ok(iterator)).unwrap();
                 }
                 fsys::RealmQueryRequest::Open {
                     moniker,

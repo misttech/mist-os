@@ -32,7 +32,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                         server.into_channel(),
                     )
                     .context("failed to open /pkg")?;
-                    responder.send(&mut Ok(fresolution::Component {
+                    responder.send( Ok(fresolution::Component {
                         url: Some("fuchsia-pkg://fuchsia.com/component-manager-test-resolver#meta/component.cm".to_string()),
                         decl: Some(build_decl()),
                         package: Some(fresolution::Package {
@@ -47,7 +47,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                     })).with_context(|| format!("failed to send response to resolve request for component URL {}", component_url))?;
                 } else {
                     responder
-                        .send(&mut Err(fresolution::ResolverError::ManifestNotFound))
+                        .send(Err(fresolution::ResolverError::ManifestNotFound))
                         .with_context(|| {
                             format!(
                                 "failed to send response to resolve request for component URL {}",
@@ -65,7 +65,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                     url=?component_url, ?context,
                     "custom resolver does not support ResolveWithContext, and could not resolve",
                 );
-                responder.send(&mut Err(fresolution::ResolverError::InvalidArgs)).with_context(
+                responder.send(Err(fresolution::ResolverError::InvalidArgs)).with_context(
                     || {
                         format!(
                             "failed to send response to resolve request for component URL {}",

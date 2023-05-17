@@ -9539,7 +9539,41 @@ impl ProtocolErrorResourceResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut result: &mut ProtocolErrorResourceResult) -> Result<(), fidl::Error> {
+    pub fn send(
+        self,
+        mut result: Result<
+            (
+                fidl::Handle,
+                fidl::Vmo,
+                fidl::endpoints::ClientEnd<ProtocolMarker>,
+                fidl::endpoints::ServerEnd<ProtocolMarker>,
+                ResourceStruct,
+                ResourceTable,
+                ResourceUnion,
+                Option<fidl::Handle>,
+                Option<fidl::Vmo>,
+                Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                Option<ResourceStruct>,
+                Option<ResourceUnion>,
+                [fidl::Handle; 5],
+                [fidl::Vmo; 5],
+                [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+                [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+                [ResourceStruct; 5],
+                [ResourceTable; 5],
+                [ResourceUnion; 5],
+                Vec<fidl::Handle>,
+                Vec<fidl::Vmo>,
+                Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                Vec<ResourceStruct>,
+                Vec<ResourceTable>,
+                Vec<ResourceUnion>,
+            ),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -9552,14 +9586,79 @@ impl ProtocolErrorResourceResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorResourceResult,
+        mut result: Result<
+            (
+                fidl::Handle,
+                fidl::Vmo,
+                fidl::endpoints::ClientEnd<ProtocolMarker>,
+                fidl::endpoints::ServerEnd<ProtocolMarker>,
+                ResourceStruct,
+                ResourceTable,
+                ResourceUnion,
+                Option<fidl::Handle>,
+                Option<fidl::Vmo>,
+                Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                Option<ResourceStruct>,
+                Option<ResourceUnion>,
+                [fidl::Handle; 5],
+                [fidl::Vmo; 5],
+                [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+                [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+                [ResourceStruct; 5],
+                [ResourceTable; 5],
+                [ResourceUnion; 5],
+                Vec<fidl::Handle>,
+                Vec<fidl::Vmo>,
+                Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                Vec<ResourceStruct>,
+                Vec<ResourceTable>,
+                Vec<ResourceUnion>,
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut result: &mut ProtocolErrorResourceResult) -> Result<(), fidl::Error> {
+    fn send_raw(
+        &self,
+        mut result: Result<
+            (
+                fidl::Handle,
+                fidl::Vmo,
+                fidl::endpoints::ClientEnd<ProtocolMarker>,
+                fidl::endpoints::ServerEnd<ProtocolMarker>,
+                ResourceStruct,
+                ResourceTable,
+                ResourceUnion,
+                Option<fidl::Handle>,
+                Option<fidl::Vmo>,
+                Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                Option<ResourceStruct>,
+                Option<ResourceUnion>,
+                [fidl::Handle; 5],
+                [fidl::Vmo; 5],
+                [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+                [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+                [ResourceStruct; 5],
+                [ResourceTable; 5],
+                [ResourceUnion; 5],
+                Vec<fidl::Handle>,
+                Vec<fidl::Vmo>,
+                Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                Vec<ResourceStruct>,
+                Vec<ResourceTable>,
+                Vec<ResourceUnion>,
+            ),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
@@ -9616,8 +9715,8 @@ impl ProtocolErrorResourceResponder {
                         opt_server_end
                             .as_mut()
                             .map(|x| std::mem::replace(x, fidl::Handle::invalid().into())),
-                        opt_struct.as_deref_mut(),
-                        opt_union.as_deref_mut(),
+                        opt_struct.as_mut(),
+                        opt_union.as_mut(),
                         array_handle,
                         array_vmo,
                         array_client_end,

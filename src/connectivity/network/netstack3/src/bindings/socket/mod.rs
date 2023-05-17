@@ -94,10 +94,10 @@ pub(crate) async fn serve(
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
                     stream::spawn_worker(domain, proto, ctx.clone(), request_stream);
-                    responder_send!(responder, &mut Ok(client));
+                    responder_send!(responder, Ok(client));
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
-                    let mut response = (|| {
+                    let response = (|| {
                         let (client, request_stream) = create_request_stream();
                         let () = datagram::spawn_worker(
                             domain,
@@ -108,7 +108,7 @@ pub(crate) async fn serve(
                         )?;
                         Ok(client)
                     })();
-                    responder_send!(responder, &mut response);
+                    responder_send!(responder, response);
                 }
                 psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
                     let response = (|| {

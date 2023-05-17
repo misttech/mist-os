@@ -966,7 +966,7 @@ where
         self,
         want_addr: bool,
     ) -> Result<
-        (Option<Box<fnet::SocketAddress>>, ClientEnd<fposix_socket::StreamSocketMarker>),
+        (Option<fnet::SocketAddress>, ClientEnd<fposix_socket::StreamSocketMarker>),
         fposix::Errno,
     > {
         let Self { data: BindingData { id, peer: _ }, ctx: ns_ctx } = self;
@@ -980,12 +980,13 @@ where
                     .register_connection(accepted, ConnectionStatus::Connected { reported: true });
                 let addr = addr
                     .try_into_fidl_with_ctx(&non_sync_ctx)
-                    .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"));
+                    .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
+                    .into_sock_addr();
                 let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
                 let (client, request_stream) = crate::bindings::socket::create_request_stream();
                 spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, accepted);
                 spawn_connected_socket_task(ns_ctx.clone(), accepted, peer, request_stream);
-                Ok((want_addr.then(|| Box::new(addr.into_sock_addr())), client))
+                Ok((want_addr.then_some(addr), client))
             }
             SocketId::Unbound(_, _) | SocketId::Connection(_) | SocketId::Bound(_, _) => {
                 Err(fposix::Errno::Einval)
@@ -1219,7 +1220,13 @@ where
                 responder_send!(responder, &mut self.listen(backlog));
             }
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
-                responder_send!(responder, &mut self.accept(want_addr));
+                responder_send!(
+                    responder,
+                    match self.accept(want_addr) {
+                        Ok((ref addr, client)) => Ok((addr.as_ref(), client)),
+                        Err(e) => Err(e),
+                    }
+                );
             }
             fposix_socket::StreamSocketRequest::Close { responder } => {
                 // We don't just close the socket because this socket worker is
