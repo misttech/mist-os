@@ -58,7 +58,10 @@ type DashNamespaceLayout = strict enum {
 
 @discoverable
 protocol Launcher {
-    /// Launch a dash process scoped to the given moniker, forwarding the given stdio PTY.
+    /// Launch a dash process scoped to the component with the given moniker, forwarding the given
+    /// stdio PTY.
+    // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverPty`. Remove it once
+    // no ffx binaries depend on it.
     LaunchWithPty(resource struct {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
@@ -67,16 +70,35 @@ protocol Launcher {
         /// A list of package URLs whose directories will also be loaded into the dash namespace.
         /// The path preference is determined by the order of this vector.
         tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
-        /// A optional inline command to run
+        /// An optional inline command to run
         command string:<MAX, optional>;
         /// The namespace layout to create for the dash process
         ns_layout DashNamespaceLayout;
     }) -> () error LauncherError;
 
-    /// Launch a dash process scoped to the given moniker, forwarding the given stdio socket.
+    /// Launch a dash process scoped to the component with the given moniker, forwarding the given
+    /// stdio PTY.
+    ExploreComponentOverPty(resource struct {
+        /// The moniker of the component that dash should be scoped to
+        moniker string:MAX;
+        /// The PTY device that should be forwarded to the dash process
+        pty client_end:fuchsia.hardware.pty.Device;
+        /// A list of package URLs whose directories will also be loaded into the dash namespace.
+        /// The path preference is determined by the order of this vector.
+        tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
+        /// An optional inline command to run
+        command string:<MAX, optional>;
+        /// The namespace layout to create for the dash process
+        ns_layout DashNamespaceLayout;
+    }) -> () error LauncherError;
+
+    /// Launch a dash process scoped to the component with the given moniker, forwarding the given
+    /// stdio socket.
     ///
     /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
     /// the socket.
+    // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverSocket`. Remove it once
+    // no ffx binaries depend on it.
     LaunchWithSocket(resource struct {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
@@ -85,7 +107,26 @@ protocol Launcher {
         /// A list of package URLs whose directories will also be loaded into the dash namespace.
         /// The path preference is determined by the order of this vector.
         tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
-        /// A optional inline command to run
+        /// An optional inline command to run
+        command string:<MAX, optional>;
+        /// The namespace layout to create for the dash process
+        ns_layout DashNamespaceLayout;
+    }) -> () error LauncherError;
+
+    /// Launch a dash process scoped to the component with the given moniker, forwarding the given
+    /// stdio socket.
+    ///
+    /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
+    /// the socket.
+    ExploreComponentOverSocket(resource struct {
+        /// The moniker of the component that dash should be scoped to
+        moniker string:MAX;
+        /// The raw socket to connect to the dash process
+        socket zx.Handle:SOCKET;
+        /// A list of package URLs whose directories will also be loaded into the dash namespace.
+        /// The path preference is determined by the order of this vector.
+        tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
+        /// An optional inline command to run
         command string:<MAX, optional>;
         /// The namespace layout to create for the dash process
         ns_layout DashNamespaceLayout;

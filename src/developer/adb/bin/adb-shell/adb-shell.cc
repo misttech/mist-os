@@ -109,17 +109,17 @@ zx_status_t AdbShellImpl::Start(zx::socket shell_server, std::string moniker,
 
   FX_LOGS(DEBUG) << "Calling Launch Socket with moniker " << moniker;
 
-  auto result = dash_client_.sync()->LaunchWithSocket(
+  auto result = dash_client_.sync()->ExploreComponentOverSocket(
       fidl::StringView::FromExternal(moniker), std::move(shell_server), {}, cmd,
       fuchsia_dash::DashNamespaceLayout::kInstanceNamespaceIsRoot);
 
   if (!result.ok()) {
-    FX_LOGS(ERROR) << "FIDL call to LaunchWithSocket failed" << result.status();
+    FX_LOGS(ERROR) << "FIDL call to ExploreComponentOverSocket failed" << result.status();
     return result.status();
   }
 
   if (result->is_error()) {
-    FX_LOGS(ERROR) << "LaunchWithSocket failed "
+    FX_LOGS(ERROR) << "ExploreComponentOverSocket failed "
                    << static_cast<uint32_t>(result.value().error_value());
     return static_cast<zx_status_t>(result->error_value());
   }

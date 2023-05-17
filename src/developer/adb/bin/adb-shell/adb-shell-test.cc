@@ -31,8 +31,9 @@ class FakeDashLauncher : public fidl::testing::WireTestBase<fuchsia_dash::Launch
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void LaunchWithSocket(::fuchsia_dash::wire::LauncherLaunchWithSocketRequest* request,
-                        LaunchWithSocketCompleter::Sync& completer) override {
+  void ExploreComponentOverSocket(
+      ::fuchsia_dash::wire::LauncherExploreComponentOverSocketRequest* request,
+      ExploreComponentOverSocketCompleter::Sync& completer) override {
     command_ = request->command.get();
     socket_ = std::move(request->socket);
     completer.ReplySuccess();

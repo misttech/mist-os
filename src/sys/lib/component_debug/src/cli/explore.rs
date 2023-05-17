@@ -28,7 +28,7 @@ pub async fn explore_cmd(
 
     let (client, server) = fidl::Socket::create_stream();
 
-    launch_with_socket(relative_moniker, server, tools_urls, command, ns_layout, &dash_launcher)
+    explore_over_socket(relative_moniker, server, tools_urls, command, ns_layout, &dash_launcher)
         .await?;
 
     connect_socket_to_stdio(client, stdout).await?;

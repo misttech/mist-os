@@ -11,7 +11,7 @@ use {
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    launch::{launch_with_pty, launch_with_socket},
+    launch::{explore_component_over_pty, explore_component_over_socket},
     std::convert::TryInto,
     tracing::*,
 };
@@ -44,6 +44,8 @@ async fn main() -> Result<(), anyhow::Error> {
         .for_each_concurrent(None, |IncomingRequest::Launcher(mut stream)| async move {
             while let Some(Ok(request)) = stream.next().await {
                 match request {
+                    // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverPty`.
+                    // Remove it once no ffx binaries depend on it.
                     LauncherRequest::LaunchWithPty {
                         moniker,
                         pty,
@@ -52,15 +54,36 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result =
-                            launch_with_pty(&moniker, pty, tool_urls, command, ns_layout)
-                                .await
-                                .map(|p| {
-                                    info!("launched Dash for instance {}", moniker);
-                                    notify_on_process_exit(p, responder.control_handle().clone());
-                                });
+                        let mut result = explore_component_over_pty(
+                            &moniker, pty, tool_urls, command, ns_layout,
+                        )
+                        .await
+                        .map(|p| {
+                            info!("launched Dash for instance {}", moniker);
+                            notify_on_process_exit(p, responder.control_handle().clone());
+                        });
                         let _ = responder.send(&mut result);
                     }
+                    LauncherRequest::ExploreComponentOverPty {
+                        moniker,
+                        pty,
+                        tool_urls,
+                        command,
+                        ns_layout,
+                        responder,
+                    } => {
+                        let mut result = explore_component_over_pty(
+                            &moniker, pty, tool_urls, command, ns_layout,
+                        )
+                        .await
+                        .map(|p| {
+                            info!("launched Dash for instance {}", moniker);
+                            notify_on_process_exit(p, responder.control_handle().clone());
+                        });
+                        let _ = responder.send(&mut result);
+                    }
+                    // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverSocket`.
+                    // Remove it once no ffx binaries depend on it.
                     LauncherRequest::LaunchWithSocket {
                         moniker,
                         socket,
@@ -69,13 +92,32 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result =
-                            launch_with_socket(&moniker, socket, tool_urls, command, ns_layout)
-                                .await
-                                .map(|p| {
-                                    info!("launched Dash for instance {}", moniker);
-                                    notify_on_process_exit(p, responder.control_handle().clone());
-                                });
+                        let mut result = explore_component_over_socket(
+                            &moniker, socket, tool_urls, command, ns_layout,
+                        )
+                        .await
+                        .map(|p| {
+                            info!("launched Dash for instance {}", moniker);
+                            notify_on_process_exit(p, responder.control_handle().clone());
+                        });
+                        let _ = responder.send(&mut result);
+                    }
+                    LauncherRequest::ExploreComponentOverSocket {
+                        moniker,
+                        socket,
+                        tool_urls,
+                        command,
+                        ns_layout,
+                        responder,
+                    } => {
+                        let mut result = explore_component_over_socket(
+                            &moniker, socket, tool_urls, command, ns_layout,
+                        )
+                        .await
+                        .map(|p| {
+                            info!("launched Dash for instance {}", moniker);
+                            notify_on_process_exit(p, responder.control_handle().clone());
+                        });
                         let _ = responder.send(&mut result);
                     }
                 }

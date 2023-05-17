@@ -14,7 +14,7 @@ pub async fn unknown_tools_package() {
 
     let urls = &["fuchsia-pkg://fuchsia.com/bar".to_string()];
     let err = launcher
-        .launch_with_socket(
+        .explore_component_over_socket(
             ".",
             stdio_server,
             urls,
@@ -36,7 +36,7 @@ pub async fn bad_moniker() {
 
     // Give a string that won't parse correctly as a moniker.
     let err = launcher
-        .launch_with_socket(
+        .explore_component_over_socket(
             "!@#$%^&*(",
             stdio_server,
             &[],
@@ -57,7 +57,7 @@ pub async fn instance_not_found() {
 
     // Give a moniker to an instance that does not exist.
     let err = launcher
-        .launch_with_socket(
+        .explore_component_over_socket(
             "./does_not_exist",
             stdio_server,
             &[],
@@ -78,7 +78,7 @@ pub async fn bad_url() {
 
     let urls = &["fuchsia-pkg://fuchsia.com/!@#$%^&*(".to_string()];
     let err = launcher
-        .launch_with_socket(
+        .explore_component_over_socket(
             ".",
             stdio_server,
             urls,

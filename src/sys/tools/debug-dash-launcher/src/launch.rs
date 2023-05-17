@@ -29,7 +29,7 @@ const DASH_ARGS_FOR_INTERACTIVE: [&[u8]; 2] = ["-i".as_bytes(), "-s".as_bytes()]
 // given, else it errors with `Can't open <cmd>`. -c: execute command
 const DASH_ARGS_FOR_COMMAND: [&[u8]; 2] = ["-v".as_bytes(), "-c".as_bytes()];
 
-pub async fn launch_with_socket(
+pub async fn explore_component_over_socket(
     moniker: &str,
     socket: zx::Socket,
     tool_urls: Vec<String>,
@@ -37,10 +37,10 @@ pub async fn launch_with_socket(
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
     let pty = socket::spawn_pty_forwarder(socket).await?;
-    launch_with_pty(moniker, pty, tool_urls, command, ns_layout).await
+    explore_component_over_pty(moniker, pty, tool_urls, command, ns_layout).await
 }
 
-pub async fn launch_with_pty(
+pub async fn explore_component_over_pty(
     moniker: &str,
     pty: ClientEnd<pty::DeviceMarker>,
     tool_urls: Vec<String>,
@@ -48,10 +48,11 @@ pub async fn launch_with_pty(
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
     let (stdin, stdout, stderr) = split_pty_into_handles(pty)?;
-    launch_with_handles(moniker, stdin, stdout, stderr, tool_urls, command, ns_layout).await
+    explore_component_over_handles(moniker, stdin, stdout, stderr, tool_urls, command, ns_layout)
+        .await
 }
 
-pub async fn launch_with_handles(
+pub async fn explore_component_over_handles(
     moniker: &str,
     stdin: zx::Handle,
     stdout: zx::Handle,
