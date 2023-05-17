@@ -279,10 +279,7 @@
         {
             directory: "hub",
             from: "framework",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: [ "#core" ],
         },
         {
             protocol: "fuchsia.sys2.RealmExplorer",

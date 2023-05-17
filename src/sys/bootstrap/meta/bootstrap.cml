@@ -830,11 +830,6 @@
             ],
         },
         {
-            directory: "hub",
-            from: "parent",
-            to: "#console-launcher",
-        },
-        {
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "#sysinfo",
             to: [

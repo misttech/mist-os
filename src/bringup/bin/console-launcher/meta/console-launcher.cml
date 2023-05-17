@@ -43,19 +43,6 @@
             path: "/dev",
         },
         {
-            directory: "hub",
-            rights: [ "rw*" ],
-            path: "/hub-v2",
-        },
-        {
-            directory: "hub",
-            rights: [ "rw*" ],
-            path: "/hub",
-
-            // TODO(fxbug.dev/107482): stop using v1 hub
-            subdir: "children/core/children/appmgr/exec/out/hub",
-        },
-        {
             directory: "pkgfs",
             rights: [ "rx*" ],
             path: "/pkgfs",
