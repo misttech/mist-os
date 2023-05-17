@@ -41,7 +41,7 @@ var diagnosticCmds = []Command{
 	{[]string{"iquery", "show", "bootstrap/driver_manager"}, 10 * time.Second},
 	// Print netstack goroutines while only using shell-builtin commands to
 	// avoid hitting the package resolver.
-	{[]string{`(export PATH=; export P="$(echo hub-v2/children/core/children/network/children/netstack/exec/out/debug/goroutines)" && test -e "$P" && while IFS='' read line; do echo "$line"; done < "$P";) &`}, 1 * time.Minute},
+	{[]string{`(export PATH=; export P="$(component explore /core/network/netstack -c \"cat out/debug/goroutines\")" && test -e "$P" && while IFS='' read line; do echo "$line"; done < "$P";) &`}, 1 * time.Minute},
 }
 
 type SerialSocket struct {
