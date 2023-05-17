@@ -55,6 +55,12 @@ impl From<u64> for AbiRevision {
     }
 }
 
+impl From<&u64> for AbiRevision {
+    fn from(abi_revision: &u64) -> AbiRevision {
+        AbiRevision(*abi_revision)
+    }
+}
+
 impl From<AbiRevision> for u64 {
     fn from(abi_revision: AbiRevision) -> u64 {
         abi_revision.0

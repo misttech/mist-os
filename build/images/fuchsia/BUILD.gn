@@ -26,6 +26,12 @@ declare_args() {
   # ends up being a blocking step in the build, so only enable this if we know
   # that we want the legacy AIB packaged and archived for a given product:
   create_legacy_aib_archive = false
+
+  # Packages to exclude from validation during assembly.  This is a list of
+  # package names.
+  #
+  # This exists to enable the transition to validating all packages.
+  disable_package_validation = []
 }
 
 if (is_host) {
@@ -154,6 +160,8 @@ if (is_fuchsia) {
 
     # Use the GN arg for including shell commands.
     include_shell_commands = include_shell_commands_package
+
+    disable_package_validation = disable_package_validation
 
     # Use the GN arg for skipping the fshost configuration in GN
     use_assembly_fshost = assembly_fshost

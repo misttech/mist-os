@@ -32,7 +32,7 @@ pub use {
         meta_package::MetaPackage,
         meta_subpackages::MetaSubpackages,
         package_build_manifest::PackageBuildManifest,
-        package_builder::PackageBuilder,
+        package_builder::{PackageBuilder, ABI_REVISION_FILE_PATH},
         package_directory::{
             LoadAbiRevisionError, LoadMetaContentsError, OpenRights, PackageDirectory,
             ReadHashError,

@@ -15,6 +15,7 @@ rustc_library("validate_product") {
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/structured_config",
     "//src/lib/assembly/validate_util",
+    "//src/lib/versioning/version-history/rust:version-history",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",

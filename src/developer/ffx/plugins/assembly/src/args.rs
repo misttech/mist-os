@@ -311,4 +311,8 @@ pub struct ProductArgs {
     /// to include which are not in the assembly input bundle
     #[argh(option)]
     pub additional_packages_path: Option<Utf8PathBuf>,
+
+    /// disable validation of the assembly's packages
+    #[argh(option)]
+    pub disable_package_validation: Vec<String>,
 }

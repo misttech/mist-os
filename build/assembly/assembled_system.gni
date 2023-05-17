@@ -80,11 +80,16 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [boolean] If true, allow the 'userdebug' platform bundles to be used by
 #     the assembled system.  (this is only a check made by GN, assembly itself
 #     may still access them)
-
+#
 #   allow_eng_platform_bundle_use (optional; default=false)
 #     [boolean] If true, allow the 'eng' platform bundles to be used by the
 #     assembled system.  (this is only a check made by GN, assembly itself may
 #     still access them)
+#
+#  disable_package_validation (optional; default=[])
+#     [list of package names] Any package validation errors found in packages
+#     that have their name in this list will not cause a build failure, just a
+#     warning to be printed by product assembly.
 #
 #   base_packages (required)
 #     [list of labels] The packages to include in the base package set.
@@ -939,6 +944,16 @@ template("assembled_system") {
       "--outdir",
       rebase_path(files.outdir, root_build_dir),
     ]
+
+    if (defined(invoker.disable_package_validation)) {
+      # pass these package names to assembly
+      foreach(package_name, invoker.disable_package_validation) {
+        args += [
+          "--disable-package-validation",
+          package_name,
+        ]
+      }
+    }
 
     if (board_information_for_assembly != false) {
       args += [

@@ -22,6 +22,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         input_bundles_dir,
         legacy_bundle,
         additional_packages_path,
+        disable_package_validation,
     } = args;
 
     info!("Loading configuration files.");
@@ -105,7 +106,9 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Do the actual building of everything for the Image Assembly config.
     let image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
-    assembly_validate_product::validate_product(&image_assembly)?;
+
+    // Validate the built product assembly.
+    assembly_validate_product::validate_product(&image_assembly, &disable_package_validation)?;
 
     // Serialize out the Image Assembly configuration.
     let image_assembly_path = outdir.join("image_assembly.json");

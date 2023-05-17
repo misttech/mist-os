@@ -9,21 +9,61 @@ use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{collections::BTreeMap, fmt, fs::File, path::PathBuf};
+use version_history::{self, AbiRevision};
 
 /// Validate a product config.
-pub fn validate_product(product: &ImageAssemblyConfig) -> Result<(), ProductValidationError> {
+pub fn validate_product(
+    product: &ImageAssemblyConfig,
+    disable_package_validation: &Vec<String>,
+) -> Result<(), ProductValidationError> {
     // validate the packages in the system/base/cache package sets
     let manifests = product.system.iter().chain(product.base.iter()).chain(product.cache.iter());
     let packages: BTreeMap<_, _> = manifests
         .par_bridge()
-        .filter_map(|package| {
-            if let Err(e) = PackageManifest::try_load_from(&package)
-                .map_err(PackageValidationError::LoadPackageManifest)
-                .and_then(|m| validate_package(&m))
-            {
-                Some((package.to_owned(), e))
-            } else {
-                None
+        .filter_map(|package_manifest_path| {
+            match PackageManifest::try_load_from(&package_manifest_path) {
+                Ok(manifest) => {
+                    // After loading the manifest, validate it
+                    if let Err(e) = validate_package(&manifest) {
+                        // If there was a validation error, but the package is
+                        // named in the allowlist for validation errors, then
+                        // print a warning only.
+                        if disable_package_validation.contains(&manifest.name().to_string()) {
+                            println!("WARNING: The package named '{}', with manifest at {} failed validation but is allowlisted:\n{}", manifest.name(), package_manifest_path, e);
+                            None
+                        } else {
+                            // This is very temporary, while OOT products are updated to populate
+                            // their allowlist as a soft-transition.
+                            // Only the default case will be included after the transition is complete.
+                            match e {
+                                e @ PackageValidationError::MissingAbiRevisionFile(_) => {
+                                    println!("WARNING: The package named '{}', with manifest at {} failed validation but is NOT allowlisted:\n{}", manifest.name(), package_manifest_path, e);
+                                    None
+                                }
+                                e @ PackageValidationError::InvalidAbiRevisionFile(_) => {
+                                    println!("WARNING: The package named '{}', with manifest at {} failed validation but is NOT allowlisted:\n{}", manifest.name(), package_manifest_path, e);
+                                    None
+
+                                }
+                                e @ PackageValidationError::UnsupportedAbiRevision { found: _, supported: _ } => {
+                                    println!("WARNING: The package named '{}', with manifest at {} failed validation but is NOT allowlisted:\n{}", manifest.name(), package_manifest_path, e);
+                                    None
+                                }
+                                e @ _ =>{
+                                    // otherwise, return the error along with the path
+                                    // to the package manifest.
+                                    Some((package_manifest_path.to_owned(), e))
+                                 }
+                            }
+                        }
+                    } else {
+                        None
+                    }
+
+                }
+                // Convert any error loading the manifest into the appropriate
+                // error type.
+                Err(e) => Some((package_manifest_path.to_owned(), PackageValidationError::LoadPackageManifest(e)))
             }
         })
         .collect();
@@ -88,6 +128,22 @@ pub fn validate_package(manifest: &PackageManifest) -> Result<(), PackageValidat
     }
     if !errors.is_empty() {
         return Err(PackageValidationError::InvalidComponents(errors));
+    }
+
+    // validate the abi_revision of the package
+    let raw_abi_revision = reader
+        .read_file(fuchsia_pkg::ABI_REVISION_FILE_PATH)
+        .map_err(|e| PackageValidationError::MissingAbiRevisionFile(e))?;
+    let abi_revision = AbiRevision::try_from(raw_abi_revision.as_slice())
+        .map_err(|e| PackageValidationError::InvalidAbiRevisionFile(e))?;
+    if !version_history::is_supported_abi_revision(abi_revision) {
+        return Err(PackageValidationError::UnsupportedAbiRevision {
+            found: abi_revision,
+            supported: version_history::get_supported_abi_revisions()
+                .iter()
+                .map(AbiRevision::from)
+                .collect(),
+        });
     }
 
     Ok(())
@@ -169,6 +225,9 @@ pub enum PackageValidationError {
     MissingMetaFar,
     ReadArchive(fuchsia_archive::Error),
     InvalidComponents(BTreeMap<String, anyhow::Error>),
+    MissingAbiRevisionFile(fuchsia_archive::Error),
+    InvalidAbiRevisionFile(std::array::TryFromSliceError),
+    UnsupportedAbiRevision { found: AbiRevision, supported: Vec<AbiRevision> },
 }
 
 impl fmt::Display for PackageValidationError {
@@ -189,6 +248,27 @@ impl fmt::Display for PackageValidationError {
                         write!(f, "\n    └── {}", s)?;
                         source = s.source();
                     }
+                }
+                Ok(())
+            }
+            MissingAbiRevisionFile(cause) => {
+                write!(
+                    f,
+                    "The package seems to be missing an abi revision file:  {}",
+                    fuchsia_pkg::ABI_REVISION_FILE_PATH
+                )?;
+                write!(f, "\n└── {}", cause)?;
+                Ok(())
+            }
+            InvalidAbiRevisionFile(cause) => {
+                write!(f, "The package abi revision file was not valid")?;
+                write!(f, "\n└── {cause}")?;
+                Ok(())
+            }
+            UnsupportedAbiRevision { found, supported } => {
+                write!(f, "The package abi revision ({found}) is not supported")?;
+                for revision in supported {
+                    write!(f, "\n└── {revision}")?;
                 }
                 Ok(())
             }
