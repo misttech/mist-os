@@ -16,11 +16,14 @@
 #include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <string.h>
+#include <zircon/assert.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 
 #include <fbl/algorithm.h>
@@ -436,8 +439,10 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
         unsigned hdr_offset = kAfbcBytesPerBlockHeader * (j * width_in_tiles + i);
         uint8_t* hdr_ptr = reinterpret_cast<uint8_t*>(buf_) + hdr_offset;
         // Store offset of uncompressed tile memory in byte 0-3.
-        uint32_t body_offset = body - reinterpret_cast<uint8_t*>(buf_);
-        *(reinterpret_cast<uint32_t*>(hdr_ptr)) = body_offset + offset;
+        const ptrdiff_t body_offset = body - reinterpret_cast<uint8_t*>(buf_);
+        ZX_ASSERT(body_offset >= 0);
+        ZX_ASSERT(body_offset <= std::numeric_limits<uint32_t>::max());
+        *(reinterpret_cast<uint32_t*>(hdr_ptr)) = static_cast<uint32_t>(body_offset) + offset;
         // Set byte 4-15 to disable compression for tile memory.
         hdr_ptr[4] = hdr_ptr[7] = hdr_ptr[10] = hdr_ptr[13] = 0x41;
         hdr_ptr[5] = hdr_ptr[8] = hdr_ptr[11] = hdr_ptr[14] = 0x10;
