@@ -49,12 +49,14 @@ fn create_kernel_and_task_with_fs(
     let kernel =
         Kernel::new(b"test-kernel", &[], &Vec::new(), None).expect("failed to create kernel");
 
+    let fs = FsContext::new(create_fs(&kernel));
     let task = Task::create_process_without_parent(
         &kernel,
         CString::new("test-task").unwrap(),
-        Some(FsContext::new(create_fs(&kernel))),
+        Some(fs.clone()),
     )
     .expect("failed to create first task");
+    kernel.kthreads.init(&kernel, fs).expect("failed to initialize kthreads");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

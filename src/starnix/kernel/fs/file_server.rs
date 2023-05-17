@@ -36,7 +36,7 @@ pub fn serve_file(
     let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     let open_flags = file.flags();
     let starnix_file = StarnixNodeConnection::new(task, file);
-    fasync::Task::spawn_on(&kernel.ehandle, async move {
+    fasync::Task::spawn_on(&kernel.kthreads.ehandle, async move {
         let scope = execution_scope::ExecutionScope::new();
         directory::entry::DirectoryEntry::open(
             starnix_file,
@@ -440,7 +440,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         Ok(self
             .task
             .kernel()
-            .thread_pool
+            .kthreads
+            .pool
             .dispatch_and_get_result(move || -> Result<Vec<u8>, Errno> {
                 let mut data = VecOutputBuffer::new(count as usize);
                 file.read(&task, &mut data)?;
@@ -455,7 +456,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         Ok(self
             .task
             .kernel()
-            .thread_pool
+            .kthreads
+            .pool
             .dispatch_and_get_result(move || -> Result<Vec<u8>, Errno> {
                 let mut data = VecOutputBuffer::new(count as usize);
                 file.read_at(&task, offset as usize, &mut data)?;
@@ -471,7 +473,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let written = self
             .task
             .kernel()
-            .thread_pool
+            .kthreads
+            .pool
             .dispatch_and_get_result(move || -> Result<usize, Errno> {
                 file.write(&task, &mut data)
             })
@@ -485,7 +488,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let written = self
             .task
             .kernel()
-            .thread_pool
+            .kthreads
+            .pool
             .dispatch_and_get_result(move || -> Result<usize, Errno> {
                 file.write_at(&task, offset as usize, &mut data)
             })

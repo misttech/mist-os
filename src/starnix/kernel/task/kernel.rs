@@ -4,8 +4,7 @@
 
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, Process};
+use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
@@ -14,7 +13,6 @@ use std::sync::Arc;
 use crate::device::framebuffer::Framebuffer;
 use crate::device::input::InputFile;
 use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
-use crate::dynamic_thread_pool::DynamicThreadPool;
 use crate::fs::socket::SocketAddress;
 use crate::fs::{FileOps, FileSystemHandle, FsNode};
 use crate::lock::RwLock;
@@ -29,16 +27,8 @@ pub struct Kernel {
     /// The Zircon job object that holds the processes running in this kernel.
     pub job: zx::Job,
 
-    /// The main starnix process. This process is used to create new processes when using the
-    /// restricted executor.
-    pub starnix_process: Process,
-
-    /// A handle to the async executor running in `starnix_process`.
-    ///
-    /// You can spawn tasks on this executor using `fasync::Task::spawn_on`.
-    /// However, those task must not block. If you need to block, you can dispatch to
-    /// a worker thread using `thread_pool`.
-    pub ehandle: fasync::EHandle,
+    /// The kernel threads running on behalf of this kernel.
+    pub kthreads: KernelThreads,
 
     /// The processes and threads running in this kernel, organized by pid_t.
     pub pids: RwLock<PidTable>,
@@ -109,9 +99,6 @@ pub struct Kernel {
     /// The futexes shared across processes.
     pub shared_futexes: FutexTable,
 
-    /// The thread pool to dispatch blocking calls to.
-    pub thread_pool: DynamicThreadPool,
-
     /// The default UTS namespace for all tasks.
     ///
     /// Because each task can have its own UTS namespace, you probably want to use
@@ -136,10 +123,7 @@ impl Kernel {
 
         Ok(Arc::new(Kernel {
             job,
-            starnix_process: fuchsia_runtime::process_self()
-                .duplicate(zx::Rights::SAME_RIGHTS)
-                .expect("Failed to duplicate process self"),
-            ehandle: fasync::EHandle::local(),
+            kthreads: KernelThreads::default(),
             pids: RwLock::new(PidTable::new()),
             default_abstract_socket_namespace: AbstractUnixSocketNamespace::new(unix_address_maker),
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(
@@ -162,7 +146,6 @@ impl Kernel {
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),
-            thread_pool: DynamicThreadPool::new(2),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: load_vdso_from_file().expect("Couldn't read vDSO from disk"),
         }))

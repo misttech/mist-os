@@ -1820,12 +1820,14 @@ mod test {
 
         assert_eq!(current_task.get_tid(), 1);
         let another_current = create_task(&kernel, "another-task");
-        assert_eq!(another_current.get_tid(), 2);
+        // tid 2 gets assigned to kthreadd.
+        assert_eq!(another_current.get_tid(), 3);
 
         let pids = kernel.pids.read();
         assert_eq!(pids.get_task(1).unwrap().get_tid(), 1);
         assert_eq!(pids.get_task(2).unwrap().get_tid(), 2);
-        assert!(pids.get_task(3).is_none());
+        assert_eq!(pids.get_task(3).unwrap().get_tid(), 3);
+        assert!(pids.get_task(4).is_none());
     }
 
     #[::fuchsia::test]

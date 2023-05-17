@@ -30,8 +30,9 @@ use super::*;
 
 /// Returns a DirectoryProxy to the root of the initial namespace of the container.
 pub fn expose_root(container: &Arc<Container>) -> Result<fio::DirectoryProxy, Error> {
-    let dir_fd = container.root_fs.root().open(&container.system_task, OpenFlags::RDWR, false)?;
-    let client = serve_file(&container.kernel, &dir_fd)?;
+    let system_task = container.kernel.kthreads.system_task();
+    let root_file = system_task.open_file(b"/", OpenFlags::RDONLY)?;
+    let client = serve_file(&container.kernel, &root_file)?;
     Ok(fio::DirectoryProxy::new(AsyncChannel::from_channel(client.into_channel())?))
 }
 
@@ -139,7 +140,8 @@ pub async fn serve_dev_binder(
                         payload.process_accessor.ok_or_else(|| errno!(EINVAL))?;
                     let process = payload.process;
                     let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
-                    let node = container.system_task.lookup_path_from_root(&path)?;
+                    let node =
+                        container.kernel.kthreads.system_task().lookup_path_from_root(&path)?;
                     let device_type = node.entry.node.info().rdev;
                     let binder_driver = container
                         .kernel
@@ -178,14 +180,12 @@ async fn connect_to_vsock(
         fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
     };
 
-    let pipe = create_fuchsia_pipe(
-        &container.system_task,
-        bridge_socket,
-        OpenFlags::RDWR | OpenFlags::NONBLOCK,
-    )?;
+    let system_task = container.kernel.kthreads.system_task();
+    let pipe =
+        create_fuchsia_pipe(system_task, bridge_socket, OpenFlags::RDWR | OpenFlags::NONBLOCK)?;
     socket.downcast_socket::<VsockSocket>().unwrap().remote_connection(
         &socket,
-        &container.system_task,
+        system_task,
         pipe,
     )?;
 
@@ -217,12 +217,13 @@ fn forward_to_pty(
 ) -> Result<(), Error> {
     // Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
     const BUFFER_CAPACITY: usize = 8192;
+    let system_task = container.kernel.kthreads.system_task();
 
     let (mut rx, mut tx) = fuchsia_async::Socket::from_socket(console)?.split();
     let kernel = &container.kernel;
-    let current_task = container.system_task.clone();
+    let current_task = system_task.clone();
     let pty_sink = pty.clone();
-    kernel.thread_pool.dispatch(move || {
+    kernel.kthreads.pool.dispatch(move || {
         let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
             let mut buffer = vec![0u8; BUFFER_CAPACITY];
             loop {
@@ -232,9 +233,9 @@ fn forward_to_pty(
         });
     });
 
-    let current_task = container.system_task.clone();
+    let current_task = system_task.clone();
     let pty_source = pty;
-    kernel.thread_pool.dispatch(move || {
+    kernel.kthreads.pool.dispatch(move || {
         let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
             let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
             loop {

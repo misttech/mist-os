@@ -244,7 +244,7 @@ pub fn create_zircon_process(
     name: &[u8],
 ) -> Result<TaskInfo, Errno> {
     let (process, root_vmar) =
-        create_shared(&kernel.starnix_process, zx::ProcessOptions::empty(), name)
+        create_shared(&kernel.kthreads.starnix_process, zx::ProcessOptions::empty(), name)
             .map_err(|status| from_status_like_fdio!(status))?;
 
     let memory_manager =

@@ -170,8 +170,9 @@ pub async fn start_component(
 
 /// Returns /container/component/{random} that doesn't already exist
 fn generate_component_path(container: &Container) -> Result<String, Error> {
+    let system_task = container.kernel.kthreads.system_task();
     // Checking container directory already exists
-    let mount_point = container.system_task.lookup_path_from_root(b"/container/component/")?;
+    let mount_point = system_task.lookup_path_from_root(b"/container/component/")?;
 
     // Find /container/component/{random} that doesn't already exist
     let component_path = loop {
@@ -181,7 +182,7 @@ fn generate_component_path(container: &Container) -> Result<String, Error> {
         // This returns EEXIST if /container/component/{random} already exists.
         // If so, try again with another {random} string.
         match mount_point.create_node(
-            &container.system_task,
+            system_task,
             random_string.as_bytes(),
             mode!(IFDIR, 0o755),
             DeviceType::NONE,
@@ -222,10 +223,11 @@ impl MountRecord {
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
     ) -> Result<(), Error> {
+        let system_task = container.kernel.kthreads.system_task();
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
-        let mut current_node = container.system_task.lookup_path_from_root(b".")?;
+        let mut current_node = system_task.lookup_path_from_root(b".")?;
         let mut context = LookupContext::default();
 
         // Extract each component using Path::new(path).components(). For example,
@@ -237,14 +239,14 @@ impl MountRecord {
             let sub_dir = sub_dir.as_os_str().as_bytes();
 
             current_node = match current_node.create_node(
-                &container.system_task,
+                system_task,
                 sub_dir,
                 mode!(IFDIR, 0o755),
                 DeviceType::NONE,
             ) {
                 Ok(node) => node,
                 Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(&container.system_task, &mut context, sub_dir)?
+                    current_node.lookup_child(system_task, &mut context, sub_dir)?
                 }
                 Err(e) => bail!(e),
             };

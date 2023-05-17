@@ -2651,7 +2651,7 @@ impl BinderDriver {
 
                             let connection = connection.clone();
 
-                            kernel.thread_pool.dispatch(move || {
+                            kernel.kthreads.pool.dispatch(move || {
                                 let mut result = connection
                                     .ioctl(&current_task, request, parameter.into())
                                     .map_err(|e| {

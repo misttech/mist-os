@@ -149,12 +149,6 @@ pub struct Container {
     /// The `Kernel` object that is associated with the container.
     pub kernel: Arc<Kernel>,
 
-    /// The root filesystem context for the container.
-    pub root_fs: Arc<FsContext>,
-
-    /// The system task to execute action as the system.
-    pub system_task: Arc<CurrentTask>,
-
     /// Inspect node holding information about the state of the container.
     _node: inspect::Node,
 }
@@ -194,23 +188,18 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
     let mut init_task = create_init_task(&kernel, &config)?;
     let fs_context = create_fs_context(&init_task, &config, &pkg_dir_proxy)?;
     init_task.set_fs(fs_context.clone());
+    kernel.kthreads.init(&kernel, fs_context)?;
+    let system_task = kernel.kthreads.system_task();
 
-    let system_task = Task::create_kernel_task(&kernel, to_cstr("kthread"), fs_context)?;
-    system_task.set_creds(Credentials::root());
-    let system_task = Arc::new(system_task);
-
-    mount_filesystems(&system_task, &config, &pkg_dir_proxy)?;
+    mount_filesystems(system_task, &config, &pkg_dir_proxy)?;
 
     // Hack to allow mounting apexes before apexd is working.
     // TODO(tbodt): Remove once apexd works.
-    mount_apexes(&system_task, &config)?;
+    mount_apexes(system_task, &config)?;
 
     // Run all common features that were specified in the .cml.
-    run_features(&config.features, &system_task)
+    run_features(&config.features, system_task)
         .map_err(|e| anyhow!("Failed to initialize features: {:?}", e))?;
-    // TODO: This should probably be part of the "feature" config.
-    let kernel = init_task.kernel().clone();
-    let root_fs = init_task.fs().fork();
 
     let startup_file_path = if config.startup_file_path.is_empty() {
         None
@@ -237,10 +226,10 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
         fruntime::job_default().kill().expect("Failed to kill job");
     });
     if let Some(startup_file_path) = startup_file_path {
-        wait_for_init_file(&startup_file_path, &system_task).await?;
+        wait_for_init_file(&startup_file_path, system_task).await?;
     };
 
-    let container = Arc::new(Container { kernel, root_fs, system_task, _node: node });
+    let container = Arc::new(Container { kernel, _node: node });
 
     let serve_binder = config.features.contains(&"binder".to_string());
     if let Some(outgoing_dir_channel) = config.outgoing_dir.take() {
