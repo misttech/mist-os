@@ -125,7 +125,8 @@ fuchsia_component("autoconnect-idle-iface") {
   deps = [ "autoconnect_idle_iface" ]
 }
 shared_deps_without_wlandevicemonitor = [
-  "//sdk/lib/driver_test_realm/simple",
+  "//sdk/lib/driver_test_realm",
+  "//src/devices/misc/drivers/test-parent",
   "//src/connectivity/location/regulatory_region:regulatory_region_component",
   "//src/connectivity/wlan/testing:wlan_test_driver_deps",
   "//src/connectivity/wlan/wlancfg:service",

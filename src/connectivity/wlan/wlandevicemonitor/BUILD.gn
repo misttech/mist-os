@@ -56,11 +56,13 @@ wlandevicemonitor_srcs = [
 ]
 
 wlandevicemonitor_test_deps = [
+  "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
   "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
   "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
   "//src/connectivity/wlan/lib/common/rust/:wlan-common",
   "//src/connectivity/wlan/lib/ieee80211",
   "//src/connectivity/wlan/testing/wlantap-client",
+  "//src/lib/fuchsia-component",
   "//third_party/rust_crates:test-case",
   "//third_party/rust_crates:zerocopy",
 ]
@@ -129,11 +131,9 @@ fuchsia_component("wlandevicemonitor-test-component") {
   testonly = true
   deps = [
     ":bin_test",
-
-    # TODO(fxbug.dev/113869): Replace this dependency with a call
-    # to DriverTestRealm.Start() in the tests themselves.
-    "//sdk/lib/driver_test_realm/simple",
+    "//sdk/lib/driver_test_realm",
     "//src/connectivity/wlan/testing:wlan_test_driver_deps",
+    "//src/devices/misc/drivers/test-parent",
   ]
   manifest = "meta/wlandevicemonitor_bin_test.cml"
 }

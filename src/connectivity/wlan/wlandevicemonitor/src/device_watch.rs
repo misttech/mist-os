@@ -84,10 +84,11 @@ mod tests {
     use {
         super::*,
         crate::PHY_PATH,
-        fidl_fuchsia_wlan_common as fidl_wlan_common,
+        fidl_fuchsia_driver_test as fdt, fidl_fuchsia_wlan_common as fidl_wlan_common,
         fidl_fuchsia_wlan_device::{self as fidl_wlan_dev},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as fidl_wlantap,
         fuchsia_async as fasync,
+        fuchsia_component::client::connect_to_protocol,
         fuchsia_zircon::DurationNum as _,
         futures::{pin_mut, poll, stream::StreamExt as _, task::Poll},
         std::convert::TryInto as _,
@@ -98,6 +99,15 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn watch_phys() {
+        // Connect to and start driver test realm
+        let driver_test_realm_proxy = connect_to_protocol::<fdt::RealmMarker>()
+            .expect("Failed to connect to driver test realm");
+
+        let _ = driver_test_realm_proxy
+            .start(fdt::RealmArgs::default())
+            .await
+            .expect("FIDL error when starting driver test realm");
+
         let phy_watcher = watch_phy_devices(PHY_PATH).expect("Failed to create phy_watcher");
         pin_mut!(phy_watcher);
 

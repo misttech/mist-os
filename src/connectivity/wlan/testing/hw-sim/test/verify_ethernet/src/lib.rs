@@ -15,6 +15,9 @@ use {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn verify_ethernet() {
     init_syslog();
+    test_utils::TestHelper::start_driver_test_realm()
+        .await
+        .expect("Failed to start driver test realm");
 
     // Make sure there is no existing ethernet device.
     let client = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
