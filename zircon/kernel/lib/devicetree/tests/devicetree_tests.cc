@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/devicetree/devicetree.h>
+#include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/result.h>
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/source_location.h>
@@ -18,11 +19,9 @@
 
 #include <zxtest/zxtest.h>
 
-#include "test_helper.h"
-
 namespace {
 
-constexpr size_t kMaxSize = 1024;
+using devicetree::testing::LoadDtb;
 
 TEST(DevicetreeTest, SplitNodeName) {
   {
@@ -48,9 +47,9 @@ TEST(DevicetreeTest, SplitNodeName) {
 }
 
 TEST(DevicetreeTest, EmptyTree) {
-  uint8_t fdt[kMaxSize];
-  ReadTestData("empty.dtb", fdt);
-  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+  auto loaded_dtb = LoadDtb("empty.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+  devicetree::Devicetree dt = loaded_dtb->fdt();
 
   size_t seen = 0;
   auto walker = [&seen](const devicetree::NodePath& path, const devicetree::PropertyDecoder&) {
@@ -134,9 +133,9 @@ TEST(DevicetreeTest, NodesAreVisitedDepthFirst) {
           /
          H
   */
-  uint8_t fdt[kMaxSize];
-  ReadTestData("complex_no_properties.dtb", fdt);
-  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+  auto loaded_dtb = LoadDtb("complex_no_properties.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+  devicetree::Devicetree dt = loaded_dtb->fdt();
 
   constexpr auto nodes = cpp20::to_array<Node>({
       {.name = "", .size = 1},
@@ -170,9 +169,9 @@ TEST(DevicetreeTest, SubtreesArePruned) {
 
    ^ = root of pruned subtree
   */
-  uint8_t fdt[kMaxSize];
-  ReadTestData("complex_no_properties.dtb", fdt);
-  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+  auto loaded_dtb = LoadDtb("complex_no_properties.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+  devicetree::Devicetree dt = loaded_dtb->fdt();
 
   constexpr auto nodes = cpp20::to_array<Node>({
       {.name = "", .size = 1},
@@ -203,9 +202,9 @@ TEST(DevicetreeTest, WholeTreeIsPruned) {
      ^ = root of pruned subtree
     */
 
-  uint8_t fdt[kMaxSize];
-  ReadTestData("complex_no_properties.dtb", fdt);
-  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+  auto loaded_dtb = LoadDtb("complex_no_properties.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+  devicetree::Devicetree dt = loaded_dtb->fdt();
 
   constexpr auto nodes = cpp20::to_array<Node>({
       {.name = "", .size = 1, .prune = true},
@@ -217,12 +216,12 @@ TEST(DevicetreeTest, WholeTreeIsPruned) {
 }
 
 TEST(DevicetreeTest, AliaesNodeIsKept) {
-  uint8_t fdt[kMaxSize];
-  ReadTestData("complex_with_alias_first.dtb", fdt);
+  auto loaded_dtb = LoadDtb("complex_with_alias_first.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
   // aliases:
   // foo = "/A/C";
   // bar = "/E/F";
-  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+  devicetree::Devicetree dt = loaded_dtb->fdt();
 
   std::optional<devicetree::ResolvedPath> resolved;
   dt.Walk([&resolved](const auto& path, const auto& decoder) {
@@ -249,10 +248,9 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
       /     \
      B       D
   */
-  uint8_t fdt[kMaxSize];
-  ReadTestData("simple_with_properties.dtb", fdt);
-  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
-
+  auto loaded_dtb = LoadDtb("simple_with_properties.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+  devicetree::Devicetree dt = loaded_dtb->fdt();
   size_t seen = 0;
   auto walker = [&seen](const devicetree::NodePath& path,
                         const devicetree::PropertyDecoder& decoder) {
@@ -349,9 +347,9 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
 }
 
 TEST(DevicetreeTest, MemoryReservations) {
-  uint8_t fdt[kMaxSize];
-  ReadTestData("memory_reservations.dtb", fdt);
-  const devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+  auto loaded_dtb = LoadDtb("memory_reservations.dtb");
+  ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+  devicetree::Devicetree dt = loaded_dtb->fdt();
 
   unsigned int i = 0;
   for (auto [start, size] : dt.memory_reservations()) {

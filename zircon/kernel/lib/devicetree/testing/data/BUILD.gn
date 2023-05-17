@@ -1,0 +1,60 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/components.gni")
+import("//build/testing/host_test_data.gni")
+
+# Real device produced device tree binary format files. These files are the blobs obtained from such devices.
+# Reconstructed 'dts' files live along the 'dtb' files but are not exported.
+#
+# NOTE: Do NOT regenerate 'dtb' files from the dts file, this might change the structure of the blob obtained
+# from the device.
+#
+# Synthetic devicetree blobs meant for testing, they are not required to reflect any real node.
+dtbs_all = [
+  "qemu-gic2.dtb",
+  "qemu-gic3.dtb",
+  "synthetic/complex_no_properties.dtb",
+  "synthetic/complex_with_alias.dtb",
+  "synthetic/complex_with_alias_first.dtb",
+  "synthetic/empty.dtb",
+  "synthetic/memory_reservations.dtb",
+  "synthetic/simple_with_properties.dtb",
+]
+
+# Check for no overlapping files, so we guarantee that they all fit in the same subdirectory.
+filenames = []
+foreach(dtb, dtbs_all) {
+  curr = [ get_path_info(dtb, "file") ]
+  assert(filenames + curr - curr == filenames,
+         "dtb_all file names must be unique. '${curr[0]}' is duplicated.")
+  filenames += curr
+  curr = []
+}
+
+if (is_host) {
+  runtime_path = "test_data/devicetree"
+} else {
+  runtime_path = "data"
+}
+
+# Provides relative path from the executable to the repository directory.
+# The expected path is platform specific.
+config("data_path") {
+  defines = [ "LIB_DEVICETREE_DATA=\"$runtime_path\"" ]
+}
+
+if (is_host) {
+  host_test_data("data") {
+    sources = dtbs_all
+    outputs = [ "$root_out_dir/$runtime_path/{{source_file_part}}" ]
+  }
+} else {
+  resource("data") {
+    sources = dtbs_all
+    outputs = [ "$runtime_path/{{source_file_part}}" ]
+  }
+}

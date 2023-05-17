@@ -7,16 +7,18 @@
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
 #include <lib/devicetree/path.h>
+#include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/function.h>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
 #include <zxtest/zxtest.h>
 
-#include "test_helper.h"
-
 namespace {
+
+using devicetree::testing::LoadedDtb;
 
 // Invalid matcher detection by traits.
 
@@ -111,14 +113,19 @@ struct SingleNodeMatcher {
   fit::function<void()> walk;
 };
 
-constexpr size_t kMaxSize = 1024;
-
 class MatchTest : public zxtest::Test {
  public:
   static void SetUpTestSuite() {
-    ASSERT_NO_FATAL_FAILURE(ReadTestData("complex_no_properties.dtb", fdt_no_props));
-    ASSERT_NO_FATAL_FAILURE(ReadTestData("complex_with_alias.dtb", fdt_no_props_with_alias));
+    auto loaded_dtb = devicetree::testing::LoadDtb("complex_no_properties.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    fdt_no_props_ = *loaded_dtb;
+
+    loaded_dtb = devicetree::testing::LoadDtb("complex_with_alias.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    fdt_no_props_with_alias_ = *loaded_dtb;
   }
+
+  static void TearDownTestuite() { fdt_no_props_ = std::nullopt; }
 
   /*
          *
@@ -131,9 +138,7 @@ class MatchTest : public zxtest::Test {
           /
          H
   */
-  devicetree::Devicetree no_prop_tree() {
-    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_no_props}));
-  }
+  devicetree::Devicetree no_prop_tree() { return fdt_no_props_->fdt(); }
 
   /*
     Same as |no_prop_tree| but with the following aliases:
@@ -141,17 +146,15 @@ class MatchTest : public zxtest::Test {
       * bar = "/E/F"
     In this tree, the aliases node is the last one of the root's offspring.
   */
-  devicetree::Devicetree no_prop_tree_with_alias() {
-    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_no_props_with_alias}));
-  }
+  devicetree::Devicetree no_prop_tree_with_alias() { return fdt_no_props_with_alias_->fdt(); }
 
  private:
-  static std::array<uint8_t, kMaxSize> fdt_no_props;
-  static std::array<uint8_t, kMaxSize> fdt_no_props_with_alias;
+  static std::optional<devicetree::testing::LoadedDtb> fdt_no_props_;
+  static std::optional<devicetree::testing::LoadedDtb> fdt_no_props_with_alias_;
 };
 
-std::array<uint8_t, kMaxSize> MatchTest::fdt_no_props = {};
-std::array<uint8_t, kMaxSize> MatchTest::fdt_no_props_with_alias = {};
+std::optional<devicetree::testing::LoadedDtb> MatchTest::fdt_no_props_ = {};
+std::optional<devicetree::testing::LoadedDtb> MatchTest::fdt_no_props_with_alias_ = {};
 
 TEST_F(MatchTest, EarlyCompletion) {
   size_t seen = 0;

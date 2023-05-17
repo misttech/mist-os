@@ -114,19 +114,12 @@ if (!is_kernel) {
       ":boot-shim-test",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/acpi_lite",
-      "//zircon/kernel/lib/devicetree/tests:test_helper",
       "//zircon/kernel/phys/lib/memalloc",
       "//zircon/system/ulib/zxtest",
     ]
-    if (is_host) {
-      deps += [ "//zircon/kernel/lib/devicetree/tests:host-test-data" ]
-    }
   }
 
   fuchsia_unittest_package("boot-shim-tests") {
-    deps = [
-      ":boot-shim-unittests",
-      "//zircon/kernel/lib/devicetree/tests:dtb_resources",
-    ]
+    deps = [ ":boot-shim-unittests" ]
   }
 }

@@ -18,13 +18,6 @@ group("tests") {
   ]
 }
 
-source_set("test_helper") {
-  sources = [ "test_helper.cc" ]
-  public = [ "test_helper.h" ]
-  public_deps = [ "//sdk/lib/stdcompat" ]
-  deps = [ "//zircon/system/ulib/zxtest" ]
-}
-
 test("devicetree-tests") {
   sources = [
     "devicetree_tests.cc",
@@ -32,13 +25,11 @@ test("devicetree-tests") {
     "path_tests.cc",
   ]
   deps = [
-    ":test_helper",
     "//zircon/kernel/lib/devicetree",
+    "//zircon/kernel/lib/devicetree/testing",
     "//zircon/system/ulib/zxtest",
   ]
-  if (is_host) {
-    data_deps = [ ":host-test-data" ]
-  } else if (is_fuchsia && current_cpu == "arm64") {
+  if (is_fuchsia && current_cpu == "arm64") {
     # Only arm64 emulation uses a devicetree-based boot shim.
     sources += [ "zbi-item-test.cc" ]
     deps += [
@@ -51,33 +42,11 @@ test("devicetree-tests") {
   }
 }
 
-# The binary, flattened devicetrees files created by data/update.sh.
-dtb_sources = [
-  "data/complex_no_properties.dtb",
-  "data/complex_with_alias.dtb",
-  "data/complex_with_alias_first.dtb",
-  "data/empty.dtb",
-  "data/memory_reservations.dtb",
-  "data/simple_with_properties.dtb",
-]
-
-if (is_host) {
-  host_test_data("host-test-data") {
-    sources = dtb_sources
-    outputs = [ "$root_out_dir/test_data/devicetree/{{source_file_part}}" ]
-  }
-}
-
-resource("dtb_resources") {
-  sources = dtb_sources
-  outputs = [ "data/{{source_file_part}}" ]
-}
-
 fuchsia_unittest_package("devicetree-test-package") {
   package_name = "devicetree-test"
   deps = [
     ":devicetree-tests",
-    ":dtb_resources",
+    "//zircon/kernel/lib/devicetree/testing",
   ]
   manifest = "meta/devicetree-tests.cml"
   test_specs = {
