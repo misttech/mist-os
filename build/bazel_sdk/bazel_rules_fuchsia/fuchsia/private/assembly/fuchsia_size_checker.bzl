@@ -67,8 +67,8 @@ def fuchsia_size_checker(
     fuchsia_size_report_aggregator(
         name = name + "_aggregator",
         size_reports = [
-            ":" + name + "_product",
             ":" + name + "_package_blobfs",
             ":" + name + "_package_non_blobfs",
+            ":" + name + "_product",
         ],
     )

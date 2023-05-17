@@ -45,10 +45,10 @@ def main():
             verbose_output_table.update(json.load(f))
 
     with open(args.merged_size_reports, "w") as f:
-        json.dump(size_report_table, f, indent=2)
+        json.dump(size_report_table, f, indent=4)
 
     with open(args.merged_verbose_outputs, "w") as f:
-        json.dump(verbose_output_table, f, indent=2)
+        json.dump(verbose_output_table, f, indent=4)
 
 
 if __name__ == '__main__':
