@@ -342,7 +342,7 @@ The `environments` section declares environments as described in
     following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name identifies this
     environment when used in a [reference](#references).
 - `extends`: (_optional `string`_) How the environment should extend this realm's environment.
-    - `realm`: Inherit all properties from this compenent's environment.
+    - `realm`: Inherit all properties from this component's environment.
     - `none`: Start with an empty environment, do not inherit anything.
 - `runners`: (_optional array of `object`_) The runners registered in the environment. An array of objects
     with the following properties:
@@ -378,7 +378,7 @@ The `environments` section declares environments as described in
     - `as`: (_optional `string`_) If specified, the name that the capability in `protocol` should be made
         available as to clients. Disallowed if `protocol` is an array.
 
-- `stop_timeout_ms`: (_optional `number`_) The number of milliseconds to wait, after notifying a component in this environment that it
+- `__stop_timeout_ms`: (_optional `number`_) The number of milliseconds to wait, after notifying a component in this environment that it
     should terminate, before forcibly killing it.
 
 Example:

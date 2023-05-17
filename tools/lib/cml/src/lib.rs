@@ -1675,7 +1675,7 @@ pub struct Environment {
     pub name: Name,
 
     /// How the environment should extend this realm's environment.
-    /// - `realm`: Inherit all properties from this compenent's environment.
+    /// - `realm`: Inherit all properties from this component's environment.
     /// - `none`: Start with an empty environment, do not inherit anything.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extends: Option<EnvironmentExtends>,
@@ -1701,7 +1701,7 @@ pub struct Environment {
     /// The number of milliseconds to wait, after notifying a component in this environment that it
     /// should terminate, before forcibly killing it.
     #[serde(rename = "__stop_timeout_ms")]
-    #[reference_doc(json_type = "number")]
+    #[reference_doc(json_type = "number", rename = "__stop_timeout_ms")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_timeout_ms: Option<StopTimeoutMs>,
 }

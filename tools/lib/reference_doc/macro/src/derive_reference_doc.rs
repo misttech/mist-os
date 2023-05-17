@@ -78,7 +78,7 @@ pub fn impl_derive_reference_doc(ast: syn::DeriveInput) -> Result<TokenStream2, 
 
     impl ToTokens for ReferenceDocFieldAttributes {
         fn to_tokens(&self, tokens: &mut TokenStream2) {
-            let name = get_ident_name(&self.ident);
+            let name = self.rename.clone().unwrap_or_else(|| get_ident_name(&self.ident));
             let indent_headers = self.indent_headers.unwrap_or(0);
             let mut rust_ty_path = expect_typepath(&self.ty);
             let mut is_optional = false;
@@ -243,6 +243,11 @@ struct ReferenceDocFieldAttributes {
     ///   default -> string
     #[darling(default)]
     json_type: Option<String>,
+
+    /// If specified, the name of the field as rendered in documentation
+    /// instead of one that is determined from `ident`.
+    #[darling(default)]
+    rename: Option<String>,
 
     /// Instructs the doc generator to retrieve markdown by calling
     /// `get_reference_doc_markdown()` on the inner type of the field.
