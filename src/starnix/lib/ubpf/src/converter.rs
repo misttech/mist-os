@@ -46,6 +46,11 @@ fn bpf_src(filter: &sock_filter) -> u32 {
     (filter.code & 0x08).into()
 }
 
+/// Similar to bpf_src, but also allows BPF_A - used for RET.
+fn bpf_rval(filter: &sock_filter) -> u32 {
+    (filter.code & 0x18).into()
+}
+
 // For details on this function, see to_be_patched in the cbpf_to_ebpf converter.
 fn prep_patch(to_be_patched: &mut HashMap<i16, Vec<usize>>, cbpf_target: i16, ebpf_source: usize) {
     to_be_patched.entry(cbpf_target).or_insert_with(std::vec::Vec::new);
@@ -55,7 +60,8 @@ fn prep_patch(to_be_patched: &mut HashMap<i16, Vec<usize>>, cbpf_target: i16, eb
 /// Transforms a program in classic BPF (cbpf, as stored in struct
 /// sock_filter) to extended BPF (as stored in struct bpf_insn).
 /// The bpf_code parameter is kept as an array for easy transfer
-/// via FFI.
+/// via FFI.  This currently only allows the subset of BPF permitted
+/// by seccomp(2).
 pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, UbpfError> {
     // There are only two BPF registers, A and X. There are 10
     // EBPF registers, numbered 0-9.  We map between the two as
@@ -89,6 +95,36 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
     let mut ebpf_code: Vec<bpf_insn> = vec![];
     for (i, bpf_instruction) in bpf_code.iter().enumerate() {
         match bpf_class(bpf_instruction) {
+            BPF_ALU => match bpf_op(bpf_instruction) {
+                BPF_ADD | BPF_SUB | BPF_MUL | BPF_DIV | BPF_AND | BPF_OR | BPF_XOR | BPF_LSH
+                | BPF_RSH => {
+                    let mut e_instr = bpf_insn {
+                        code: (BPF_ALU | bpf_op(bpf_instruction) | bpf_src(bpf_instruction)) as u8,
+                        ..Default::default()
+                    };
+                    e_instr.set_dst_reg(REG_A);
+                    if bpf_src(bpf_instruction) == BPF_K {
+                        e_instr.imm = bpf_instruction.k as i32;
+                    } else {
+                        e_instr.set_src_reg(REG_X);
+                    }
+                    ebpf_code.push(e_instr);
+                }
+                BPF_NEG => {
+                    let mut e_instr =
+                        bpf_insn { code: (BPF_ALU | BPF_NEG) as u8, ..Default::default() };
+                    e_instr.set_src_reg(REG_A);
+                    e_instr.set_dst_reg(REG_A);
+                    ebpf_code.push(e_instr);
+                }
+                _ => {
+                    return Err(UnrecognizedCbpfError {
+                        element_type: "op".to_string(),
+                        value: format!("{}", bpf_op(bpf_instruction)),
+                        op: "alu".to_string(),
+                    });
+                }
+            },
             BPF_LD => {
                 match bpf_addressing_mode(bpf_instruction) {
                     BPF_ABS => {
@@ -128,7 +164,8 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
                             ..Default::default()
                         };
                         e_instr.set_dst_reg(REG_A);
-                        e_instr.set_src_reg((bpf_instruction.k + 7) as u8); // See comment on reg 7 above.
+                        // See comment on reg 7 above.
+                        e_instr.set_src_reg((bpf_instruction.k + 7) as u8);
                         ebpf_code.push(e_instr);
                     }
                     _ => {
@@ -188,6 +225,30 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
                     }
                 }
             }
+            BPF_MISC => {
+                let mut e_instr =
+                    bpf_insn { code: (BPF_ALU | BPF_MOV | BPF_X) as u8, ..Default::default() };
+
+                match bpf_op(bpf_instruction) {
+                    BPF_TAX => {
+                        e_instr.set_src_reg(REG_A);
+                        e_instr.set_dst_reg(REG_X);
+                    }
+                    BPF_TXA => {
+                        e_instr.set_src_reg(REG_X);
+                        e_instr.set_dst_reg(REG_A);
+                    }
+                    _ => {
+                        return Err(UnrecognizedCbpfError {
+                            element_type: "op".to_string(),
+                            value: format!("{}", bpf_op(bpf_instruction)),
+                            op: "misc".to_string(),
+                        });
+                    }
+                }
+                ebpf_code.push(e_instr);
+            }
+
             BPF_ST => {
                 match bpf_addressing_mode(bpf_instruction) {
                     BPF_IMM => {
@@ -213,7 +274,14 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
                 }
             }
             BPF_RET => {
-                if bpf_addressing_mode(bpf_instruction) == BPF_K {
+                if bpf_rval(bpf_instruction) != BPF_K && bpf_rval(bpf_instruction) != BPF_A {
+                    return Err(UnrecognizedCbpfError {
+                        element_type: "mode".to_string(),
+                        value: format!("{}", bpf_addressing_mode(bpf_instruction)),
+                        op: "ret".to_string(),
+                    });
+                }
+                if bpf_rval(bpf_instruction) == BPF_K {
                     // We're returning a particular value instead of the contents
                     // of the return register, so load that value into the return
                     // register
@@ -233,6 +301,7 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
                     let dummy_instr: bpf_insn = Default::default();
                     ebpf_code.push(dummy_instr);
                 }
+
                 let ret_instr = bpf_insn { code: (BPF_JMP | BPF_EXIT) as u8, ..Default::default() };
 
                 ebpf_code.push(ret_instr);

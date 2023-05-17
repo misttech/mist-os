@@ -150,12 +150,26 @@ mod test {
     use crate::EbpfProgram;
     use linux_uapi::*;
 
-    const BPF_RET_K: u16 = (BPF_RET | BPF_K) as u16;
+    const BPF_ALU_ADD_K: u16 = (BPF_ALU | BPF_ADD | BPF_K) as u16;
+    const BPF_ALU_SUB_K: u16 = (BPF_ALU | BPF_SUB | BPF_K) as u16;
+    const BPF_ALU_MUL_K: u16 = (BPF_ALU | BPF_MUL | BPF_K) as u16;
+    const BPF_ALU_DIV_K: u16 = (BPF_ALU | BPF_DIV | BPF_K) as u16;
+    const BPF_ALU_AND_K: u16 = (BPF_ALU | BPF_AND | BPF_K) as u16;
+    const BPF_ALU_OR_K: u16 = (BPF_ALU | BPF_OR | BPF_K) as u16;
+    const BPF_ALU_XOR_K: u16 = (BPF_ALU | BPF_XOR | BPF_K) as u16;
+    const BPF_ALU_LSH_K: u16 = (BPF_ALU | BPF_LSH | BPF_K) as u16;
+    const BPF_ALU_RSH_K: u16 = (BPF_ALU | BPF_RSH | BPF_K) as u16;
+
+    const BPF_ALU_OR_X: u16 = (BPF_ALU | BPF_OR | BPF_X) as u16;
+
     const BPF_LD_W_ABS: u16 = (BPF_LD | BPF_ABS | BPF_W) as u16;
-    const BPF_JEQ_K: u16 = (BPF_JMP | BPF_JEQ | BPF_K) as u16;
-    const BPF_ST_REG: u16 = BPF_ST as u16;
     const BPF_LD_W_MEM: u16 = (BPF_LD | BPF_MEM | BPF_W) as u16;
+    const BPF_JEQ_K: u16 = (BPF_JMP | BPF_JEQ | BPF_K) as u16;
     const BPF_JSET_K: u16 = (BPF_JMP | BPF_JSET | BPF_K) as u16;
+    const BPF_RET_K: u16 = (BPF_RET | BPF_K) as u16;
+    const BPF_RET_A: u16 = (BPF_RET | BPF_A) as u16;
+    const BPF_ST_REG: u16 = BPF_ST as u16;
+    const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
 
     fn with_prg_assert_result(prg: &EbpfProgram, mut data: seccomp_data, result: u32, msg: &str) {
         let res1 = prg.run(&mut data);
@@ -256,5 +270,73 @@ mod test {
             SECCOMP_RET_ALLOW,
             "Did not correctly accept load of second 32 bits",
         );
+    }
+
+    #[test]
+    fn test_alu_insns() {
+        {
+            let test_prg = [
+                // Load data.nr (the syscall number)
+                sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 }, // = 1, 11
+                // Do some math.
+                sock_filter { code: BPF_ALU_ADD_K, jt: 0, jf: 0, k: 3 }, // = 4, 14
+                sock_filter { code: BPF_ALU_SUB_K, jt: 0, jf: 0, k: 2 }, // = 2, 12
+                sock_filter { code: BPF_MISC_TAX, jt: 0, jf: 0, k: 0 },  // 2, 12 -> X
+                sock_filter { code: BPF_ALU_MUL_K, jt: 0, jf: 0, k: 8 }, // = 16, 96
+                sock_filter { code: BPF_ALU_DIV_K, jt: 0, jf: 0, k: 2 }, // = 8, 48
+                sock_filter { code: BPF_ALU_AND_K, jt: 0, jf: 0, k: 15 }, // = 8, 0
+                sock_filter { code: BPF_ALU_OR_K, jt: 0, jf: 0, k: 16 }, // = 24, 16
+                sock_filter { code: BPF_ALU_XOR_K, jt: 0, jf: 0, k: 7 }, // = 31, 23
+                sock_filter { code: BPF_ALU_LSH_K, jt: 0, jf: 0, k: 2 }, // = 124, 92
+                sock_filter { code: BPF_ALU_OR_X, jt: 0, jf: 0, k: 1 },  // = 127, 92
+                sock_filter { code: BPF_ALU_RSH_K, jt: 0, jf: 0, k: 1 }, // = 63, 46
+                sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
+            ];
+
+            let prg_result = EbpfProgram::from_cbpf(&test_prg);
+            match &prg_result {
+                Ok(_) => (),
+                Err(x) => assert!(false, "Error \"{}\" from parsing program", x),
+            };
+            let prg = prg_result.unwrap();
+
+            with_prg_assert_result(
+                &prg,
+                seccomp_data { nr: 1, ..Default::default() },
+                63,
+                "BPF math does not work",
+            );
+
+            with_prg_assert_result(
+                &prg,
+                seccomp_data { nr: 11, ..Default::default() },
+                46,
+                "BPF math does not work",
+            );
+        }
+
+        {
+            // Negative numbers simple check
+            let test_prg = [
+                // Load data.nr (the syscall number)
+                sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 }, // = -1
+                sock_filter { code: BPF_ALU_SUB_K, jt: 0, jf: 0, k: 2 }, // = -3
+                sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
+            ];
+
+            let prg_result = EbpfProgram::from_cbpf(&test_prg);
+            match &prg_result {
+                Ok(_) => (),
+                Err(x) => assert!(false, "Error \"{}\" from parsing program", x),
+            };
+            let prg = prg_result.unwrap();
+
+            with_prg_assert_result(
+                &prg,
+                seccomp_data { nr: -1, ..Default::default() },
+                u32::MAX - 2,
+                "BPF math does not work",
+            );
+        }
     }
 }
