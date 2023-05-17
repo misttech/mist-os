@@ -19,8 +19,8 @@ group("tests") {
 
   # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
   # ASAN.
-  if (target_cpu == "x64" && !is_asan) {
-    if (host_os == "linux" && host_cpu == "x64" && !is_asan) {
+  if (!is_asan) {
+    if (target_cpu == "x64" && host_os == "linux" && host_cpu == "x64") {
       deps += [ ":starnix_user_tests" ]
     }
 
@@ -58,35 +58,34 @@ if (host_os == "linux" && host_cpu == "x64") {
   }
 }
 
-if (target_cpu == "x64") {
-  starnix_linux_test_component("virtmagma_conformance_tests") {
-    test_label =
-        "//src/graphics/lib/magma/tests/integration:virtmagma_conformance_tests"
-  }
+starnix_linux_test_component("virtmagma_conformance_tests") {
+  test_label =
+      "//src/graphics/lib/magma/tests/integration:virtmagma_conformance_tests"
+}
 
-  starnix_linux_test_component("virtmagma_image_tests") {
-    test_label =
-        "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_image_tests"
-  }
+starnix_linux_test_component("virtmagma_image_tests") {
+  test_label =
+      "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_image_tests"
+}
 
-  fuchsia_test_package("starnix_magma_tests") {
-    test_components = [
-      ":virtmagma_conformance_tests",
-      # TODO(fxbug.dev/104611) - enable this when all tests passing
-      #":virtmagma_image_tests",
-    ]
+fuchsia_test_package("starnix_magma_tests") {
+  test_components = [
+    ":virtmagma_conformance_tests",
+    # TODO(fxbug.dev/104611) - enable this when all tests passing
+    #":virtmagma_image_tests",
+  ]
 
-    deps = [ ":container_resources" ]
-    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  deps = [ ":container_resources" ]
+  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 
-    test_specs = {
-      log_settings = {
-        max_severity = "ERROR"
-      }
-      environments = [
-        atlas_env,
-        nuc_env,
-      ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
     }
+    environments = [
+      atlas_env,
+      nuc_env,
+      vim3_env,
+    ]
   }
 }
