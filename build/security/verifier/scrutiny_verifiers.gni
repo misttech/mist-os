@@ -131,7 +131,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                            ])
     product_assembly_config_file =
         get_label_info(invoker.product_assembly_config_label,
@@ -148,7 +148,7 @@ template("scrutiny_verifiers") {
                            [
                              "deps",
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -167,7 +167,7 @@ template("scrutiny_verifiers") {
                            [
                              "deps",
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -183,7 +183,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -196,7 +196,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -208,7 +208,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -222,7 +222,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -235,7 +235,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
@@ -248,7 +248,7 @@ template("scrutiny_verifiers") {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "visiblity",
+                             "visibility",
                              "recovery",
                            ])
     product_bundle_path = pb_dir
