@@ -198,16 +198,15 @@ pub async fn load_driver(
 
     let bind_path = get_rules_string_value(&component, "bind")
         .ok_or(anyhow!("{}: Missing bind path", component_url.as_str()))?;
-    let bind = fuchsia_fs::directory::open_file_no_describe(
-        &dir,
-        &bind_path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .with_context(|| format!("{}: Failed to open bind", component_url.as_str()))?;
-
-    let bind = fuchsia_fs::file::read(&bind)
+    let bind = fuchsia_fs::directory::open_file(&dir, &bind_path, fio::OpenFlags::RIGHT_READABLE)
         .await
-        .with_context(|| format!("{}: Failed to read bind", component_url.as_str()))?;
+        .with_context(|| {
+            format!("{}: Failed to open bind file '{}'", component_url.as_str(), bind_path)
+        })?;
+
+    let bind = fuchsia_fs::file::read(&bind).await.with_context(|| {
+        format!("{}: Failed to read bind file '{}'", component_url.as_str(), bind_path)
+    })?;
     let bind_rules = DecodedRules::new(bind.clone())
         .with_context(|| format!("{}: Failed to parse bind", component_url.as_str()))?;
 
