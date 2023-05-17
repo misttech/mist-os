@@ -17,6 +17,8 @@ different digests).
 
 import argparse
 import dataclasses
+import itertools
+import multiprocessing
 import os
 import sys
 
@@ -59,10 +61,32 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         required=True,
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Limit number of root causes to display (0=unlimited).",
+        metavar="LIMIT",
+    )
     return parser
 
 
 _MAIN_ARG_PARSER = _main_arg_parser()
+
+
+@dataclasses.dataclass
+class RootCause(object):
+    path: Path
+    explanation: Sequence[str]
+
+    def __str__(self) -> str:
+        return "\n  ".join([f"path: {self.path}"] + self.explanation)
+
+
+def verbose_root_cause(path: Path, explanation: Sequence[str], indent: str):
+    for line in explanation:
+        print(f"{indent}{line}")
+    return RootCause(path=path, explanation=explanation)
 
 
 class ActionDiffer(object):
@@ -86,7 +110,7 @@ class ActionDiffer(object):
     def reproxy_cfg(self) -> Dict[str, str]:
         return self._reproxy_cfg
 
-    def trace(self, filepath: Path, level: int = 0):
+    def trace(self, filepath: Path) -> Iterable[RootCause]:
         """Recursively finds action and output differences.
 
         Prints findings to stdout.
@@ -95,21 +119,52 @@ class ActionDiffer(object):
           filepath: output file to compare, relative to the working dir.
               There should be a unique LogRecord of a remote action in both the
               left and right records that names this file as an output.
+
+        Yields:
+          reasons for differences.
+        """
+        visited = set()  # cache already visited paths
+        yield from self._trace(filepath, visited, 0)
+
+    def _trace(self, filepath: Path, visited: AbstractSet[Path],
+               level: int) -> Iterable[RootCause]:
+        """Recursively finds action and output differences.
+
+        Prints findings to stdout.
+
+        Args:
+          filepath: output file to compare, relative to the working dir.
+              There should be a unique LogRecord of a remote action in both the
+              left and right records that names this file as an output.
+          visited: set of outputs already queried (modify-by-reference).
           level: recursion level, used for formatting output.
         """
-        # TODO: maintain a cache of already visited nodes to avoid
-        # revisiting the same paths.
         indent = '  ' * level
+        print(f"{indent}-------- Examining {filepath} --------")
+
+        # Avoid re-visiting the same intermediate.
+        if filepath in visited:
+            print(f"{indent}(already visited earlier)")
+            return
+        else:
+            visited.add(filepath)
+
+        def root_cause(explanation: Sequence[str]) -> RootCause:
+            return verbose_root_cause(filepath, explanation, indent)
+
         left_record = self.left.records_by_output_file.get(filepath, None)
         right_record = self.right.records_by_output_file.get(filepath, None)
         if left_record is None:
-            print(
-                f"{indent}File not found among left log's outputs: {filepath}")
+            yield root_cause(
+                [f"File not found among left log's action outputs: {filepath}"])
             return
         if right_record is None:
-            print(
-                f"{indent}File not found among right log's outputs: {filepath}")
+            yield root_cause(
+                [
+                    f"File not found among right log's action outputs: {filepath}"
+                ])
             return
+        # TODO: fetch and report differences between inputs
 
         left_entry = left_record.remote_metadata.output_file_digests
         left_file_digest = left_entry[str(filepath)]
@@ -128,20 +183,23 @@ class ActionDiffer(object):
         #   * file is a source input
         #   * file was produced by a local action (possibly from racing)
         if not left_action_digest:
-            print(
-                f"{indent}Could not find an action from the left log that produced {filepath}"
-            )
+            yield root_cause(
+                [
+                    f"Could not find an action from the left log that produced {filepath}"
+                ])
             return
 
         print(f"{indent}left action digest of {filepath}: {left_action_digest}")
 
         if not right_action_digest:
-            print(
-                f"{indent}Could not find an action from the right log that produced {filepath}"
-            )
+            yield root_cause(
+                [
+                    f"Could not find an action from the right log that produced {filepath}"
+                ])
             return
 
-        print(f"{indent}right action digest of {filepath}: {right_action_digest}")
+        print(
+            f"{indent}right action digest of {filepath}: {right_action_digest}")
 
         # Run remotetool on each action digest.
         left_action = remotetool.show_action(
@@ -154,25 +212,23 @@ class ActionDiffer(object):
         if diff.command_unified_diffs:
             # If the commands are different, we've found one root cause
             # difference, and there is not need to analyze any further.
-            print(
-                f"{indent}Actions {left_action_digest} and {right_action_digest} have different commands:"
-            )
-            for line in diff.command_unified_diffs:
-                print(indent + line)
+            yield root_cause(
+                [
+                    f"Actions {left_action_digest} and {right_action_digest} have different remote commands:"
+                ] + diff.command_unified_diffs)
             have_root_cause = True
 
         platform_diffs = list(diff.platform_diffs.report())
         if platform_diffs:
-            print(f"{indent}Found differences in platform:")
-            for line in platform_diffs:
-                print(indent + line)
+            yield root_cause(
+                [f"Found differences in remote action platform:"] +
+                platform_diffs)
             have_root_cause = True
 
         if diff.input_diffs.left_only or diff.input_diffs.right_only:
-            print(f"{indent}Input sets are not identical:")
-            input_diffs_report = list(diff.input_diffs.report())
-            for line in input_diffs_report:
-                print(indent + line)
+            yield root_cause(
+                [f"{indent}Input sets are not identical:"] +
+                list(diff.input_diffs.report()))
             have_root_cause = True
 
         if have_root_cause:
@@ -180,6 +236,7 @@ class ActionDiffer(object):
             return
 
         # Recursively query common inputs that are different.
+        # Note: iteration ordering of dictionary can be nondeterministic.
         for path, (left_digest,
                    right_digest) in diff.input_diffs.value_diffs.items():
             # Determine whether or not path refers to an input or
@@ -187,10 +244,12 @@ class ActionDiffer(object):
             remote_working_dir = Path(
                 left_record.command.remote_working_directory)
             if not remote_working_dir in path.parents:
-                print(
-                    f"{indent}Input {path} does not come from a remote action.")
-                print(f"{indent}Digests: {left_digest}")
-                print(f"{indent}     vs. {right_digest}")
+                yield root_cause(
+                    [
+                        f"Input {path} does not come from a remote action.",
+                        f"Digests: {left_digest}",
+                        f"     vs. {right_digest}",
+                    ])
                 continue  # This is a root-cause.
 
             # This is an intermediate output.
@@ -201,28 +260,41 @@ class ActionDiffer(object):
             print(f"{indent}Digests: {left_digest}")
             print(f"{indent}     vs. {right_digest}")
             print(f"{indent}[{level}](")
-            self.trace(output_relpath, level + 1)
+            yield from self._trace(output_relpath, visited, level + 1)
             print(f"{indent})[{level}]")
+
+
+# Defined at the module level for multiprocessing to be able to serialize.
+def _process_log(d: Path) -> reproxy_logs.ReproxyLog:
+    return reproxy_logs.ReproxyLog(
+        reproxy_logs.convert_reproxy_actions_log(
+            reproxy_logdir=d,
+            reclient_bindir=fuchsia.RECLIENT_BINDIR,
+            verbose=True,
+        ))
 
 
 def main(argv: Sequence[str]) -> int:
     main_args = _MAIN_ARG_PARSER.parse_args(argv)
-    # TODO: parallelize
-    logs = [
-        reproxy_logs.ReproxyLog(
-            reproxy_logs.convert_reproxy_actions_log(
-                reproxy_logdir=d,
-                reclient_bindir=fuchsia.RECLIENT_BINDIR,
-            )) for d in main_args.reproxy_logdirs
-    ]
+
+    with multiprocessing.Pool() as pool:
+        logs = pool.map(_process_log, main_args.reproxy_logdirs)
     # len(logs) == 2, enforced by _MAIN_ARG_PARSER.
 
     with open(remotetool._REPROXY_CFG) as cfg:
         reproxy_cfg = remotetool.read_config_file_lines(cfg.readlines())
 
     differ = ActionDiffer(*logs, reproxy_cfg=reproxy_cfg)
-    differ.trace(main_args.output_file)
+    root_causes_iter = differ.trace(main_args.output_file)
+    if main_args.limit == 0:
+        root_causes = list(root_causes_iter)
+    else:
+        root_causes = list(
+            itertools.islice(root_causes_iter, 0, main_args.limit))
 
+    print("======== Summary of root causes of differences ========")
+    for i, c in enumerate(root_causes):
+        print(f'{i}: {c}\n')
     return 0
 
 

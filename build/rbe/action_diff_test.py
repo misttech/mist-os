@@ -44,9 +44,15 @@ class ActionDifferTests(unittest.TestCase):
         path = Path('does/not/exist.txt')
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            diff.trace(path)
-        self.assertIn('File not found', out.getvalue())
+            root_causes = list(diff.trace(path))
+
+        check_message = 'File not found'
+        self.assertIn(check_message, out.getvalue())
         self.assertIn(str(path), out.getvalue())
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, path)
+        self.assertTrue(
+            any(check_message in line for line in root_causes[0].explanation))
 
     def test_trace_output_already_matches(self):
         path = Path('obj/foo.o')
@@ -64,8 +70,11 @@ class ActionDifferTests(unittest.TestCase):
 
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            diff.trace(path)
-        self.assertIn(f'Digest of {path} already matches', out.getvalue())
+            root_causes = list(diff.trace(path))
+
+        check_message = f'Digest of {path} already matches'
+        self.assertIn(check_message, out.getvalue())
+        self.assertEqual(len(root_causes), 0)
 
     def test_trace_output_to_originating_action_with_command_diff(self):
         path = Path('obj/foo.o')
@@ -100,8 +109,14 @@ class ActionDifferTests(unittest.TestCase):
             with mock.patch.object(remotetool, 'show_action',
                                    side_effect=[left_action, right_action
                                                ]) as mock_show_action:
-                diff.trace(path)
-        self.assertIn(f'have different commands', out.getvalue())
+                root_causes = list(diff.trace(path))
+
+        check_message = f'have different remote commands'
+        self.assertIn(check_message, out.getvalue())
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, path)
+        self.assertTrue(
+            any(check_message in line for line in root_causes[0].explanation))
 
     def test_trace_output_to_action_with_platform_diff(self):
         path = Path('obj/foo.o')
@@ -136,8 +151,14 @@ class ActionDifferTests(unittest.TestCase):
             with mock.patch.object(remotetool, 'show_action',
                                    side_effect=[left_action, right_action
                                                ]) as mock_show_action:
-                diff.trace(path)
-        self.assertIn(f'differences in platform', out.getvalue())
+                root_causes = list(diff.trace(path))
+
+        check_message = f'differences in remote action platform'
+        self.assertIn(check_message, out.getvalue())
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, path)
+        self.assertTrue(
+            any(check_message in line for line in root_causes[0].explanation))
 
     def test_trace_output_to_action_with_extra_input(self):
         path = Path('obj/foo.o')
@@ -172,8 +193,14 @@ class ActionDifferTests(unittest.TestCase):
             with mock.patch.object(remotetool, 'show_action',
                                    side_effect=[left_action, right_action
                                                ]) as mock_show_action:
-                diff.trace(path)
-        self.assertIn(f'Input sets are not identical', out.getvalue())
+                root_causes = list(diff.trace(path))
+
+        check_message = f'Input sets are not identical'
+        self.assertIn(check_message, out.getvalue())
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, path)
+        self.assertTrue(
+            any(check_message in line for line in root_causes[0].explanation))
 
     def test_trace_output_to_action_with_different_source_input(self):
         path = Path('obj/foo.o')
@@ -211,8 +238,14 @@ class ActionDifferTests(unittest.TestCase):
             with mock.patch.object(remotetool, 'show_action',
                                    side_effect=[left_action, right_action
                                                ]) as mock_show_action:
-                diff.trace(path)
-        self.assertIn(f'does not come from a remote action', out.getvalue())
+                root_causes = list(diff.trace(path))
+
+        check_message = f'does not come from a remote action'
+        self.assertIn(check_message, out.getvalue())
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, path)
+        self.assertTrue(
+            any(check_message in line for line in root_causes[0].explanation))
 
     def test_trace_output_to_action_with_intermediate_input_not_in_record(self):
         path = Path('obj/foo.o')
@@ -255,14 +288,24 @@ class ActionDifferTests(unittest.TestCase):
                     outer_left_action,
                     outer_right_action,
             ]) as mock_show_action:
-                diff.trace(path)
+                root_causes = list(diff.trace(path))
         # outer level of trace()
-        self.assertIn(
-            f'Intermediate output file {intermediate} differs', out.getvalue())
-        # inner level of trace()
-        self.assertIn(
-            f'File not found among left log\'s outputs: {intermediate}',
-            out.getvalue())
+        check_messages = [
+            # outer level of trace()
+            f'Remote output file {intermediate} differs',
+            # inner level of trace() -- the root cause
+            f'File not found among left log\'s action outputs: {intermediate}',
+        ]
+
+        for m in check_messages:
+            self.assertIn(m, out.getvalue())
+
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, intermediate)
+        self.assertTrue(
+            any(
+                check_messages[1] in line
+                for line in root_causes[0].explanation))
 
     def test_trace_output_to_action_with_different_intermediate_input(self):
         path = Path('obj/foo.o')
@@ -337,14 +380,24 @@ class ActionDifferTests(unittest.TestCase):
                     inner_left_action,
                     inner_right_action,
             ]) as mock_show_action:
-                diff.trace(path)
-        # outer level of trace()
-        self.assertIn(
-            f'Intermediate output file {intermediate} differs', out.getvalue())
-        # inner level of trace()
-        self.assertIn(
+                root_causes = list(diff.trace(path))
+
+        check_messages = [
+            # outer level of trace()
+            f'Remote output file {intermediate} differs',
+            # inner level of trace() -- root cause
             f'Input {source} does not come from a remote action',
-            out.getvalue())
+        ]
+
+        for m in check_messages:
+            self.assertIn(m, out.getvalue())
+
+        self.assertEqual(len(root_causes), 1)
+        self.assertEqual(root_causes[0].path, intermediate)
+        self.assertTrue(
+            any(
+                check_messages[1] in line
+                for line in root_causes[0].explanation))
 
 
 if __name__ == '__main__':

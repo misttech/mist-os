@@ -13,6 +13,12 @@ from api.proxy import log_pb2
 from pathlib import Path
 from typing import Dict
 
+_SCRIPT_BASENAME = Path(__file__).name
+
+def msg(text: str):
+    print(f'[{_SCRIPT_BASENAME}] {text}')
+
+
 class ReproxyLog(object):
   """Contains a LogDump proto and indexes information internally.
 
@@ -41,7 +47,7 @@ class ReproxyLog(object):
       return self._records_by_output_file
 
 def convert_reproxy_actions_log(
-        reproxy_logdir: Path, reclient_bindir: Path) -> log_pb2.LogDump:
+    reproxy_logdir: Path, reclient_bindir: Path, verbose: bool = False) -> log_pb2.LogDump:
     log_pb_file = reproxy_logdir / "reproxy_log.pb"
 
     if not log_pb_file.exists():
@@ -53,8 +59,14 @@ def convert_reproxy_actions_log(
             "--output_dir",
             str(reproxy_logdir),  # Use same log dir, must be writeable.
         ]
+        if verbose:
+            msg(f"Ingesting logs from {reproxy_logdir}.")
+        # logdump could take a few minutes on large reproxy logs.
         subprocess.check_call(logdump_cmd)
         # Produces "reproxy_log.pb" in args.reproxy_logdir.
+
+    if verbose:
+        msg(f"Loading log records from {log_pb_file}.")
 
     log_dump = log_pb2.LogDump()
     with open(log_pb_file, mode='rb') as logf:
