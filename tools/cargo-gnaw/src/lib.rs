@@ -620,11 +620,13 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                     anyhow::bail!(
                         "Add this to your Cargo.toml located at {}:\n\
                         [gn.package.{}.\"{}\"]\n\
-                        rustflags = [{}]",
+                        rustflags = [{}]\n\
+                        rustenv = [{}]",
                         manifest_path.display(),
                         target.name(),
                         target.version(),
-                        rules.cfgs.join(", ")
+                        rules.rustflags.join(", "),
+                        rules.rustenv.join(", ")
                     );
                 }
                 Err(err) => anyhow::bail!(

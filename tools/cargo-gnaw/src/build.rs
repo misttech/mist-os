@@ -5,43 +5,73 @@
 use {
     crate::target::GnTarget,
     anyhow::{anyhow, Result},
-    std::fs::File,
-    std::io::Read,
     std::process::Command,
     std::{path::PathBuf, str::FromStr},
 };
 
 pub struct BuildScriptOutput {
-    pub cfgs: Vec<String>,
+    pub rustflags: Vec<String>,
+    pub rustenv: Vec<String>,
 }
 
 impl BuildScriptOutput {
     pub fn parse_from_file(file: PathBuf) -> Result<Self> {
-        let mut file = File::open(file)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
+        let contents = std::fs::read_to_string(file)?;
         let configs: Vec<&str> = contents.split('\n').collect();
-        Self::parse(configs)
+        Ok(Self::parse(configs))
     }
 
-    pub fn parse(lines: Vec<&str>) -> Result<Self> {
-        let mut bs = BuildScriptOutput { cfgs: vec![] };
-
-        let rustc_cfg = "cargo:rustc-cfg=";
-        let rustc_rerun = "cargo:rerun-if-changed=";
+    pub fn parse(lines: Vec<&str>) -> Self {
+        let mut bs = BuildScriptOutput { rustflags: vec![], rustenv: vec![] };
 
         for line in lines {
             if line.is_empty() {
                 continue;
-            } else if line.starts_with(rustc_cfg) {
-                bs.cfgs.push(format!("\"--cfg={}\"", line.split_at(rustc_cfg.len()).1));
-            } else if line.starts_with(rustc_rerun) {
-                // Ignored because these are always vendored
-            } else {
-                return Err(anyhow!("Don't know how to parse: {}", line));
+            }
+
+            let keyval = line.strip_prefix("cargo:");
+            if keyval.is_none() {
+                eprintln!("warning: build script output includes non-cargo lines: {}", line);
+                continue;
+            }
+
+            // More information on the available cargo instructions is here:
+            // https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
+            //
+            // The following cases are currently unsupported. They all have to do with specific
+            // artifact type link arguments. The more general cargo:rustc-link-arg is covered.
+            //
+            // cargo:rustc-link-arg-bin=BIN=FLAG — Passes custom flags to a linker for the
+            // binary BIN.
+            //
+            // cargo:rustc-link-arg-bins=FLAG — Passes custom flags to a linker for binaries.
+            //
+            // cargo:rustc-link-arg-tests=FLAG — Passes custom flags to a linker for tests.
+            //
+            // cargo:rustc-link-arg-examples=FLAG — Passes custom flags to a linker for
+            // examples.
+            //
+            // cargo:rustc-link-arg-benches=FLAG — Passes custom flags to a linker for
+            // benchmarks.
+            //
+            // cargo:rustc-cdylib-link-arg=FLAG — Passes custom flags to a linker for cdylib crates.
+
+            let (key, value) = keyval.unwrap().split_once('=').unwrap();
+            match key {
+                "rerun-if-changed" => continue, // ignored because these are always vendored
+                "rerun-if-env-changed" => continue, // ignored because these are always vendored
+                "rustc-cfg" => bs.rustflags.push(format!("\"--cfg={}\"", value)),
+                "rustc-env" => bs.rustenv.push(format!("\"{}\"", value.to_string())),
+                "rustc-flags" => bs.rustflags.push(format!("\"{}\"", value.to_string())),
+                "rustc-link-arg" => bs.rustflags.push(format!("\"-C link-arg={}\"", value)),
+                "rustc-link-lib" => bs.rustflags.push(format!("\"-l {}\"", value)),
+                // "rustc-link-search" => bs.rustflags.push(format!("-L {}", value)),
+                "warning" => eprintln!("warning: {}", value),
+                &_ => eprintln!("warning: unable to parse build script output: {}", value),
             }
         }
-        Ok(bs)
+
+        bs
     }
 }
 
