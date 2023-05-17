@@ -1,6 +1,9 @@
-# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
+# TODO(fxbug.dev/127211): Remove this file after migrating all clients to the
+# targets in //src/graphics/display/testing.
 
 import("//build/components.gni")
 
@@ -12,16 +15,9 @@ group("hardware_display_controller_provider") {
   ]
 }
 
-group("tests") {
+group("fake-hardware-display-controller-provider-cmv2-component") {
   testonly = true
-  public_deps = [ "fake/tests" ]
-}
-
-fuchsia_component("fake-hardware-display-controller-provider-cmv2-component") {
-  testonly = true
-  manifest = "meta/fake_hdcp.cml"
-  component_name = "hdcp"
-  deps = [ "fake:bin" ]
+  deps = [ "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component" ]
 }
 
 fuchsia_package("fake-hardware-display-controller-provider") {
@@ -29,10 +25,8 @@ fuchsia_package("fake-hardware-display-controller-provider") {
   deps = [ ":fake-hardware-display-controller-provider-cmv2-component" ]
 }
 
-fuchsia_component("hardware-display-controller-provider-cmv2-component") {
-  manifest = "meta/real_hdcp.cml"
-  component_name = "hdcp"
-  deps = [ "real:bin" ]
+group("hardware-display-controller-provider-cmv2-component") {
+  deps = [ "//src/graphics/display/testing/coordinator-provider:display-coordinator-provider-component" ]
 }
 
 fuchsia_package("hardware-display-controller-provider") {

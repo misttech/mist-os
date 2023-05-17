@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_BIN_HARDWARE_DISPLAY_CONTROLLER_PROVIDER_FAKE_SERVICE_H_
-#define SRC_UI_BIN_HARDWARE_DISPLAY_CONTROLLER_PROVIDER_FAKE_SERVICE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_PROVIDER_FAKE_SERVICE_H_
+#define SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_PROVIDER_FAKE_SERVICE_H_
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -81,4 +81,4 @@ class ProviderService : public fuchsia::hardware::display::Provider {
 
 }  // namespace fake_display
 
-#endif  // SRC_UI_BIN_HARDWARE_DISPLAY_CONTROLLER_PROVIDER_FAKE_SERVICE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_TESTING_COORDINATOR_PROVIDER_FAKE_SERVICE_H_

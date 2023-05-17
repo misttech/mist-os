@@ -10,8 +10,8 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/graphics/display/testing/coordinator-provider/fake/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/bin/hardware_display_controller_provider/fake/service.h"
 
 namespace {
 

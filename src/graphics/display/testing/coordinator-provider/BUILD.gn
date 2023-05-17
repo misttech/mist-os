@@ -1,0 +1,42 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+group("coordinator-provider") {
+  testonly = true
+  public_deps = [
+    ":display-coordinator-provider",
+    ":fake-display-coordinator-provider",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ "fake/tests" ]
+}
+
+fuchsia_component("fake-display-coordinator-provider-component") {
+  testonly = true
+  manifest = "meta/fake_hdcp.cml"
+  component_name = "hdcp"
+  deps = [ "fake:bin" ]
+}
+
+fuchsia_package("fake-display-coordinator-provider") {
+  testonly = true
+  package_name = "fake-display-coordinator-provider"
+  deps = [ ":fake-display-coordinator-provider-component" ]
+}
+
+fuchsia_component("display-coordinator-provider-component") {
+  manifest = "meta/real_hdcp.cml"
+  component_name = "hdcp"
+  deps = [ "real:bin" ]
+}
+
+fuchsia_package("display-coordinator-provider") {
+  package_name = "display-coordinator-provider"
+  deps = [ ":display-coordinator-provider-component" ]
+}

@@ -9,7 +9,7 @@
 #include <lib/trace-provider/provider.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/ui/bin/hardware_display_controller_provider/fake/service.h"
+#include "src/graphics/display/testing/coordinator-provider/fake/service.h"
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
