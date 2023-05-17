@@ -9,10 +9,6 @@
 
 namespace scenic_impl {
 
-namespace display {
-class Display;
-}
-
 namespace gfx {
 
 class DisplaySwapchain;
