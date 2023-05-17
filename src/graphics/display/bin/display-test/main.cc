@@ -31,9 +31,9 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/testing/display.h"
-#include "src/graphics/display/testing/utils.h"
-#include "src/graphics/display/testing/virtual-layer.h"
+#include "src/graphics/display/testing/client-utils/display.h"
+#include "src/graphics/display/testing/client-utils/utils.h"
+#include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace sysmem = fuchsia_sysmem;

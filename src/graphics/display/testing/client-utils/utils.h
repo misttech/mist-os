@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_TESTING_UTILS_H_
-#define SRC_GRAPHICS_DISPLAY_TESTING_UTILS_H_
+#ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_UTILS_H_
+#define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_UTILS_H_
 
 #include <inttypes.h>
 
@@ -26,4 +26,4 @@ static inline void generate_gamma_table(float gamma, float* v) {
   }
 }
 
-#endif  // SRC_GRAPHICS_DISPLAY_TESTING_UTILS_H_
+#endif  // SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_UTILS_H_

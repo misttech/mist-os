@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_TESTING_DISPLAY_H_
-#define SRC_GRAPHICS_DISPLAY_TESTING_DISPLAY_H_
+#ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_DISPLAY_H_
+#define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
@@ -75,4 +75,4 @@ class Display {
 }  // namespace display
 }  // namespace testing
 
-#endif  // SRC_GRAPHICS_DISPLAY_TESTING_DISPLAY_H_
+#endif  // SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_DISPLAY_H_

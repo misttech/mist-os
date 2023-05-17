@@ -19,7 +19,6 @@ executable("display_detect") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
-    "//src/graphics/display/testing",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zircon-internal",
