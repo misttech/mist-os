@@ -13,7 +13,7 @@ function msg() {
 
 # project_root is the same as the remote execution 'exec_root',
 # which typically points to a source checkout.
-project_root="$(readlink -f "$script_dir"/../..)"
+project_root="$(realpath "$script_dir"/../..)"
 
 function usage() {
 cat <<EOF

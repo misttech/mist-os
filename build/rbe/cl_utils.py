@@ -51,6 +51,7 @@ def bool_golang_flag(value: str) -> bool:
     }[value.lower()]
 
 
+# TODO: move this to library for abstract data operations
 def partition_sequence(seq: Sequence[Any],
                        sep: Any) -> Tuple[Sequence[Any], Any, Sequence[Any]]:
     """Similar to string.partition, but for arbitrary sequences.
@@ -76,6 +77,7 @@ def partition_sequence(seq: Sequence[Any],
     return left, sep, remainder
 
 
+# TODO: move this to library for abstract data operations
 def split_into_subsequences(seq: Iterable[Any],
                             sep: Any) -> Iterable[Sequence[Any]]:
     """Similar to string.split, but for arbitrary sequences.
@@ -98,20 +100,21 @@ def split_into_subsequences(seq: Iterable[Any],
     yield subseq
 
 
+# TODO: move this to library for abstract data operations
 def match_prefix_transform_suffix(
         text: str, prefix: str, transform: Callable[[str],
                                                     str]) -> Optional[str]:
     """If text matches prefix, transform the text after the prefix.
 
-	This can be useful for transforming command flags.
+    This can be useful for transforming command flags.
 
-	Args:
+    Args:
        text: string to match and possibly transform.
        prefix: check if text starts with this string
        transform: function to apply to remainder of text after the
           matched prefix.
 
-	Returns:
+    Returns:
       Transformed text if prefix was matched, else None.
     """
     if not text.startswith(prefix):

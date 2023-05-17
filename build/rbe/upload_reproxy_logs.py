@@ -17,9 +17,11 @@ import tempfile
 import uuid
 
 import pb_message_util
+import reproxy_logs
 from api.proxy import log_pb2
 from api.stats import stats_pb2
 import rbe_metrics_pb2
+from pathlib import Path
 from typing import Any, Callable, Dict, Sequence, Tuple
 
 _SCRIPT_BASENAME = os.path.basename(__file__)
@@ -53,10 +55,11 @@ def table_arg(value: str) -> str:
     return value
 
 
-def dir_arg(value: str) -> str:
-    if not os.path.isdir(value):
+def dir_arg(value: str) -> Path:
+    p = Path(value)
+    if not p.is_dir():
         raise argparse.ArgumentTypeError("Argument must be a directory.")
-    return value
+    return p
 
 
 def main_arg_parser() -> argparse.ArgumentParser:
@@ -125,34 +128,14 @@ def main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "reproxy_logdirs",
         nargs="*",
+        type=Path,
         help="The reproxy log dirs to upload",
     )
 
     return parser
 
 
-def convert_reproxy_actions_log(
-        reproxy_logdir: str, reclient_bindir: str) -> log_pb2.LogDump:
-    # Convert reproxy text logs to binary proto.
-    logdump_cmd = [
-        os.path.join(reclient_bindir, "logdump"),
-        "--proxy_log_dir",
-        reproxy_logdir,
-        "--output_dir",
-        reproxy_logdir,  # Use same log dir, must be writeable.
-    ]
-    subprocess.check_call(logdump_cmd)
-    # Produces "reproxy_log.pb" in args.reproxy_logdir.
-
-    log_dump = log_pb2.LogDump()
-    with open(os.path.join(reproxy_logdir, "reproxy_log.pb"),
-              mode='rb') as logf:
-        log_dump.ParseFromString(logf.read())
-
-    return log_dump
-
-
-def read_reproxy_metrics_proto(metrics_file: str) -> stats_pb2.Stats:
+def read_reproxy_metrics_proto(metrics_file: Path) -> stats_pb2.Stats:
     stats = stats_pb2.Stats()
     with open(metrics_file, mode='rb') as f:
         stats.ParseFromString(f.read())
@@ -198,7 +181,7 @@ def bq_upload_metrics(
 
 def main_upload_metrics(
     uuid: str,
-    reproxy_logdir: str,
+    reproxy_logdir: Path,
     bq_metrics_table: str,
     dry_run: bool = False,
     verbose: bool = False,
@@ -206,7 +189,7 @@ def main_upload_metrics(
     if verbose:
         msg(f"Ingesting reproxy metrics from {reproxy_logdir}")
 
-    metrics_file = os.path.join(reproxy_logdir, "rbe_metrics.pb")
+    metrics_file = reproxy_logdir / "rbe_metrics.pb"
     stats = read_reproxy_metrics_proto(metrics_file=metrics_file)
 
     if len(stats.stats) == 0:
@@ -243,8 +226,8 @@ def main_upload_metrics(
 
 def main_upload_logs(
     uuid: str,
-    reproxy_logdir: str,
-    reclient_bindir: str,
+    reproxy_logdir: Path,
+    reclient_bindir: Path,
     bq_logs_table: str,
     upload_batch_size: int,
     dry_run: bool = False,
@@ -253,7 +236,7 @@ def main_upload_logs(
 ) -> int:
     if verbose:
         msg(f"Ingesting reproxy action logs from {reproxy_logdir}")
-    log_dump = convert_reproxy_actions_log(
+    log_dump = reproxy_logs.convert_reproxy_actions_log(
         reproxy_logdir=reproxy_logdir,
         reclient_bindir=reclient_bindir,
     )
@@ -300,8 +283,8 @@ def main_upload_logs(
 
 
 def main_single_logdir(
-    reproxy_logdir: str,
-    reclient_bindir: str,
+    reproxy_logdir: Path,
+    reclient_bindir: Path,
     metrics_table: str,
     logs_table: str,
     uuid_flag: str,
@@ -313,19 +296,19 @@ def main_single_logdir(
 
     # The rbe_metrics.pb file is a sign that a build finished.
     # Skip over unfinished builds.
-    metrics_file = os.path.join(reproxy_logdir, "rbe_metrics.pb")
-    if not os.path.isfile(metrics_file):
+    metrics_file = reproxy_logdir / "rbe_metrics.pb"
+    if not metrics_file.is_file():
         if verbose:
             msg(
                 f"Metrics file {metrics_file} not found.  Assuming build is not finished and skipping {reproxy_logdir}."
             )
         return 0
 
-    build_id_file = os.path.join(reproxy_logdir, "build_id")
+    build_id_file = reproxy_logdir / "build_id"
 
     # Use a stamp-file to know whether or not this directory has been uploaded.
-    upload_stamp_file = os.path.join(reproxy_logdir, "upload_stamp")
-    if not dry_run and os.path.exists(upload_stamp_file):
+    upload_stamp_file = reproxy_logdir / "upload_stamp"
+    if not dry_run and upload_stamp_file.exists():
         # An uploaded log dir already has a build_id.
         with open(build_id_file) as f:
             build_id = f.read().strip(" \n")
@@ -338,7 +321,7 @@ def main_single_logdir(
     # "build_id" comes from build/rbe/fuchsia-reproxy-wrap.sh.
     if uuid_flag:
         build_id = uuid_flag
-    elif os.path.isfile(build_id_file):
+    elif build_id_file.is_file():
         with open(build_id_file) as f:
             build_id = f.read().strip(" \n")
     else:

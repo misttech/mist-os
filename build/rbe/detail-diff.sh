@@ -11,7 +11,7 @@ script_dir="$(dirname "$script")"
 
 source "$script_dir"/common-setup.sh
 
-project_root="$(readlink -f "$script_dir"/../..)"
+project_root="$(realpath "$script_dir"/../..)"
 project_root_rel="$(relpath . "$project_root")"
 
 diff_limit=25

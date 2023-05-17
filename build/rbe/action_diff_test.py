@@ -1,0 +1,351 @@
+#!/usr/bin/env fuchsia-vendored-python
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import io
+import contextlib
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from api.proxy import log_pb2
+from typing import Dict
+
+import action_diff
+import reproxy_logs
+import remotetool
+
+
+def add_output_file_digests_to_record(
+        log_record: log_pb2.LogRecord, digests: Dict[Path, str]):
+    log_record.command.output.output_files.extend(digests.keys())
+    for k, v in digests.items():
+        log_record.remote_metadata.output_file_digests[str(k)] = v
+
+
+class ActionDifferTests(unittest.TestCase):
+
+    def test_construction_only(self):
+        left_log_dump = log_pb2.LogDump()
+        right_log_dump = log_pb2.LogDump()
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+    def test_trace_output_not_in_record(self):
+        left_log_dump = log_pb2.LogDump()
+        right_log_dump = log_pb2.LogDump()
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+        path = Path('does/not/exist.txt')
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            diff.trace(path)
+        self.assertIn('File not found', out.getvalue())
+        self.assertIn(str(path), out.getvalue())
+
+    def test_trace_output_already_matches(self):
+        path = Path('obj/foo.o')
+        left_record = log_pb2.LogRecord()
+        right_record = log_pb2.LogRecord()
+        digests = {str(path): 'abcdef/234'}
+        add_output_file_digests_to_record(left_record, digests)
+        add_output_file_digests_to_record(right_record, digests)
+        left_log_dump = log_pb2.LogDump(records=[left_record])
+        right_log_dump = log_pb2.LogDump(records=[right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            diff.trace(path)
+        self.assertIn(f'Digest of {path} already matches', out.getvalue())
+
+    def test_trace_output_to_originating_action_with_command_diff(self):
+        path = Path('obj/foo.o')
+        left_record = log_pb2.LogRecord()
+        left_record.remote_metadata.action_digest = "18723601ce7d/145"
+        right_record = log_pb2.LogRecord()
+        right_record.remote_metadata.action_digest = "73733ba65ade/145"
+        left_digest = {str(path): 'abcdef/234'}
+        right_digest = {str(path): '987654/234'}
+        add_output_file_digests_to_record(left_record, left_digest)
+        add_output_file_digests_to_record(right_record, right_digest)
+        left_log_dump = log_pb2.LogDump(records=[left_record])
+        right_log_dump = log_pb2.LogDump(records=[right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        left_action = remotetool.ShowActionResult(
+            command=['twiddle', 'dum'],
+            inputs=dict(),
+            platform=dict(),
+            output_files=left_digest)
+        right_action = remotetool.ShowActionResult(
+            command=['twiddle', 'dee'],  # different
+            inputs=dict(),
+            platform=dict(),
+            output_files=right_digest)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with mock.patch.object(remotetool, 'show_action',
+                                   side_effect=[left_action, right_action
+                                               ]) as mock_show_action:
+                diff.trace(path)
+        self.assertIn(f'have different commands', out.getvalue())
+
+    def test_trace_output_to_action_with_platform_diff(self):
+        path = Path('obj/foo.o')
+        left_record = log_pb2.LogRecord()
+        left_record.remote_metadata.action_digest = "18723601ce7d/145"
+        right_record = log_pb2.LogRecord()
+        right_record.remote_metadata.action_digest = "73733ba65ade/145"
+        left_digest = {str(path): 'abcdef/234'}
+        right_digest = {str(path): '987654/234'}
+        add_output_file_digests_to_record(left_record, left_digest)
+        add_output_file_digests_to_record(right_record, right_digest)
+        left_log_dump = log_pb2.LogDump(records=[left_record])
+        right_log_dump = log_pb2.LogDump(records=[right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        left_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs=dict(),
+            platform={'key': 'value-A'},
+            output_files=left_digest)
+        right_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs=dict(),
+            platform={'key': 'value-B'},  # different
+            output_files=right_digest)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with mock.patch.object(remotetool, 'show_action',
+                                   side_effect=[left_action, right_action
+                                               ]) as mock_show_action:
+                diff.trace(path)
+        self.assertIn(f'differences in platform', out.getvalue())
+
+    def test_trace_output_to_action_with_extra_input(self):
+        path = Path('obj/foo.o')
+        left_record = log_pb2.LogRecord()
+        left_record.remote_metadata.action_digest = "18723601ce7d/145"
+        right_record = log_pb2.LogRecord()
+        right_record.remote_metadata.action_digest = "73733ba65ade/145"
+        left_digest = {str(path): 'abcdef/234'}
+        right_digest = {str(path): '987654/234'}
+        add_output_file_digests_to_record(left_record, left_digest)
+        add_output_file_digests_to_record(right_record, right_digest)
+        left_log_dump = log_pb2.LogDump(records=[left_record])
+        right_log_dump = log_pb2.LogDump(records=[right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        left_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs=dict(),
+            platform=dict(),
+            output_files=left_digest)
+        right_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={Path("include/header.h"): "bb987aaad663fd/282"},  # extra
+            platform=dict(),
+            output_files=right_digest)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with mock.patch.object(remotetool, 'show_action',
+                                   side_effect=[left_action, right_action
+                                               ]) as mock_show_action:
+                diff.trace(path)
+        self.assertIn(f'Input sets are not identical', out.getvalue())
+
+    def test_trace_output_to_action_with_different_source_input(self):
+        path = Path('obj/foo.o')
+        left_record = log_pb2.LogRecord()
+        left_record.remote_metadata.action_digest = "18723601ce7d/145"
+        left_record.command.remote_working_directory = "build/here"
+        right_record = log_pb2.LogRecord()
+        right_record.remote_metadata.action_digest = "73733ba65ade/145"
+        right_record.command.remote_working_directory = "build/here"
+        left_digest = {str(path): 'abcdef/234'}
+        right_digest = {str(path): '987654/234'}
+        add_output_file_digests_to_record(left_record, left_digest)
+        add_output_file_digests_to_record(right_record, right_digest)
+        left_log_dump = log_pb2.LogDump(records=[left_record])
+        right_log_dump = log_pb2.LogDump(records=[right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        left_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={Path("include/header.h"): "55773311bb987a/282"},
+            platform=dict(),
+            output_files={Path(k): v for k, v in left_digest.items()})
+        right_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={Path("include/header.h"): "bb987aaad663fd/282"
+                   },  # different
+            platform=dict(),
+            output_files={Path(k): v for k, v in right_digest.items()})
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with mock.patch.object(remotetool, 'show_action',
+                                   side_effect=[left_action, right_action
+                                               ]) as mock_show_action:
+                diff.trace(path)
+        self.assertIn(f'does not come from a remote action', out.getvalue())
+
+    def test_trace_output_to_action_with_intermediate_input_not_in_record(self):
+        path = Path('obj/foo.o')
+        intermediate = Path("gen/include/header.h")
+        remote_working_dir = Path("build/here")
+        left_record = log_pb2.LogRecord()
+        left_record.remote_metadata.action_digest = "18723601ce7d/145"
+        left_record.command.remote_working_directory = str(remote_working_dir)
+        right_record = log_pb2.LogRecord()
+        right_record.remote_metadata.action_digest = "73733ba65ade/145"
+        right_record.command.remote_working_directory = str(remote_working_dir)
+        left_digest = {str(path): 'abcdef/234'}  # is an intermediate output
+        right_digest = {str(path): '987654/234'}
+        add_output_file_digests_to_record(left_record, left_digest)
+        add_output_file_digests_to_record(right_record, right_digest)
+
+        left_log_dump = log_pb2.LogDump(records=[left_record])
+        right_log_dump = log_pb2.LogDump(records=[right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        # actions for the outer call to trace()
+        outer_left_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={remote_working_dir / intermediate: "55773311bb987a/282"},
+            platform=dict(),
+            output_files={Path(k): v for k, v in left_digest.items()})
+        outer_right_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={remote_working_dir / intermediate: "bb987aaad663fd/282"
+                   },  # different
+            platform=dict(),
+            output_files={Path(k): v for k, v in right_digest.items()})
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with mock.patch.object(remotetool, 'show_action', side_effect=[
+                    outer_left_action,
+                    outer_right_action,
+            ]) as mock_show_action:
+                diff.trace(path)
+        # outer level of trace()
+        self.assertIn(
+            f'Intermediate output file {intermediate} differs', out.getvalue())
+        # inner level of trace()
+        self.assertIn(
+            f'File not found among left log\'s outputs: {intermediate}',
+            out.getvalue())
+
+    def test_trace_output_to_action_with_different_intermediate_input(self):
+        path = Path('obj/foo.o')
+        intermediate = Path("gen/include/header.h")
+        source = Path("lib/api.h")
+        remote_working_dir = Path("build/here")
+        left_record = log_pb2.LogRecord()
+        left_record.remote_metadata.action_digest = "18723601ce7d/145"
+        left_record.command.remote_working_directory = str(remote_working_dir)
+        right_record = log_pb2.LogRecord()
+        right_record.remote_metadata.action_digest = "73733ba65ade/145"
+        right_record.command.remote_working_directory = str(remote_working_dir)
+        left_digest = {str(path): 'abcdef/234'}  # is an intermediate output
+        right_digest = {str(path): '987654/234'}
+        add_output_file_digests_to_record(left_record, left_digest)
+        add_output_file_digests_to_record(right_record, right_digest)
+
+        inner_left_record = log_pb2.LogRecord()
+        inner_left_record.remote_metadata.action_digest = "22233342341/45"
+        inner_left_record.command.remote_working_directory = str(
+            remote_working_dir)
+        inner_right_record = log_pb2.LogRecord()
+        inner_right_record.remote_metadata.action_digest = "777889112ef/45"
+        inner_right_record.command.remote_working_directory = str(
+            remote_working_dir)
+        inner_left_digest = {
+            str(intermediate): '00abcdef/34'
+        }  # is an intermediate output
+        inner_right_digest = {str(intermediate): '00987654/34'}
+        add_output_file_digests_to_record(inner_left_record, inner_left_digest)
+        add_output_file_digests_to_record(
+            inner_right_record, inner_right_digest)
+
+        left_log_dump = log_pb2.LogDump(
+            records=[left_record, inner_left_record])
+        right_log_dump = log_pb2.LogDump(
+            records=[inner_right_record, right_record])
+        left = reproxy_logs.ReproxyLog(left_log_dump)
+        right = reproxy_logs.ReproxyLog(right_log_dump)
+        cfg = dict()
+        diff = action_diff.ActionDiffer(left, right, cfg)
+
+        # actions for the outer call to trace()
+        outer_left_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={remote_working_dir / intermediate: "55773311bb987a/282"},
+            platform=dict(),
+            output_files={Path(k): v for k, v in left_digest.items()})
+        outer_right_action = remotetool.ShowActionResult(
+            command=['twiddle'],
+            inputs={remote_working_dir / intermediate: "bb987aaad663fd/282"
+                   },  # different
+            platform=dict(),
+            output_files={Path(k): v for k, v in right_digest.items()})
+
+        # actions for the inner call to trace()
+        inner_left_action = remotetool.ShowActionResult(
+            command=['fiddle'],
+            inputs={source: "aa81557311b987a/189"},
+            platform=dict(),
+            output_files={Path(k): v for k, v in left_digest.items()})
+        inner_right_action = remotetool.ShowActionResult(
+            command=['fiddle'],
+            inputs={source: "87be001aa4efbfd/182"},  # different
+            platform=dict(),
+            output_files={Path(k): v for k, v in right_digest.items()})
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with mock.patch.object(remotetool, 'show_action', side_effect=[
+                    outer_left_action,
+                    outer_right_action,
+                    inner_left_action,
+                    inner_right_action,
+            ]) as mock_show_action:
+                diff.trace(path)
+        # outer level of trace()
+        self.assertIn(
+            f'Intermediate output file {intermediate} differs', out.getvalue())
+        # inner level of trace()
+        self.assertIn(
+            f'Input {source} does not come from a remote action',
+            out.getvalue())
+
+
+if __name__ == '__main__':
+    unittest.main()

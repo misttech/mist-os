@@ -14,6 +14,9 @@ from api.proxy import log_pb2
 from api.stats import stats_pb2
 
 import upload_reproxy_logs
+import reproxy_logs
+
+from pathlib import Path
 
 # Most tests here are testing for python syntax/semantic errors.
 
@@ -21,7 +24,7 @@ import upload_reproxy_logs
 class ReproxyLogdirTestHarness(unittest.TestCase):
 
     def setUp(self):
-        self._reproxy_logdir = tempfile.mkdtemp()
+        self._reproxy_logdir = Path(tempfile.mkdtemp())
         # The majority of tests expect the metrics file to be present
         # as a sign that a build is done.
         self.touch_metrics_file()
@@ -129,12 +132,12 @@ class MainUploadLogsTest(unittest.TestCase):
 
     def test_dry_run(self):
         with mock.patch.object(
-                upload_reproxy_logs, "convert_reproxy_actions_log",
+                reproxy_logs, "convert_reproxy_actions_log",
                 return_value=self.fake_log()) as mock_convert_log:
             exit_code = upload_reproxy_logs.main_upload_logs(
                 uuid="feed-f00d-feed-f00d",
-                reproxy_logdir="/tmp/reproxy.log.dir",
-                reclient_bindir="/usr/local/reclient/bin",
+                reproxy_logdir=Path("/tmp/reproxy.log.dir"),
+                reclient_bindir=Path("/usr/local/reclient/bin"),
                 bq_logs_table="project.dataset.reproxy_logs",
                 upload_batch_size=100,
                 dry_run=True,
@@ -146,15 +149,15 @@ class MainUploadLogsTest(unittest.TestCase):
 
     def test_mocked_upload(self):
         with mock.patch.object(
-                upload_reproxy_logs, "convert_reproxy_actions_log",
+                reproxy_logs, "convert_reproxy_actions_log",
                 return_value=self.fake_log()) as mock_convert_log:
             with mock.patch.object(upload_reproxy_logs,
                                    "bq_upload_remote_action_logs",
                                    return_value=0) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_logs(
                     uuid="feed-f00d-feed-f00d",
-                    reproxy_logdir="/tmp/reproxy.log.dir",
-                    reclient_bindir="/usr/local/reclient/bin",
+                    reproxy_logdir=Path("/tmp/reproxy.log.dir"),
+                    reclient_bindir=Path("/usr/local/reclient/bin"),
                     bq_logs_table="project.dataset.reproxy_logs",
                     upload_batch_size=100,
                     dry_run=False,
@@ -167,15 +170,15 @@ class MainUploadLogsTest(unittest.TestCase):
 
     def test_mocked_upload_failure(self):
         with mock.patch.object(
-                upload_reproxy_logs, "convert_reproxy_actions_log",
+                reproxy_logs, "convert_reproxy_actions_log",
                 return_value=self.fake_log()) as mock_convert_log:
             with mock.patch.object(upload_reproxy_logs,
                                    "bq_upload_remote_action_logs",
                                    return_value=1) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_logs(
                     uuid="feed-f00d-feed-f00d",
-                    reproxy_logdir="/tmp/reproxy.log.dir",
-                    reclient_bindir="/usr/local/reclient/bin",
+                    reproxy_logdir=Path("/tmp/reproxy.log.dir"),
+                    reclient_bindir=Path("/usr/local/reclient/bin"),
                     bq_logs_table="project.dataset.reproxy_logs",
                     upload_batch_size=100,
                     dry_run=False,
@@ -188,15 +191,15 @@ class MainUploadLogsTest(unittest.TestCase):
 
     def test_empty_records(self):
         with mock.patch.object(
-                upload_reproxy_logs, "convert_reproxy_actions_log",
+                reproxy_logs, "convert_reproxy_actions_log",
                 return_value=log_pb2.LogDump()) as mock_convert_log:
             with mock.patch.object(upload_reproxy_logs,
                                    "bq_upload_remote_action_logs",
                                    return_value=0) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_logs(
                     uuid="feed-f00d-feed-f00d",
-                    reproxy_logdir="/tmp/reproxy.log.dir",
-                    reclient_bindir="/usr/local/reclient/bin",
+                    reproxy_logdir=Path("/tmp/reproxy.log.dir"),
+                    reclient_bindir=Path("/usr/local/reclient/bin"),
                     bq_logs_table="project.dataset.reproxy_logs",
                     upload_batch_size=100,
                     dry_run=False,
@@ -208,24 +211,6 @@ class MainUploadLogsTest(unittest.TestCase):
         self.assertEqual(exit_code, 0)
 
 
-class ConvertReproxyActionsLogTest(unittest.TestCase):
-
-    def test_basic(self):
-
-        with mock.patch.object(subprocess, "check_call") as mock_process_call:
-            with mock.patch.object(__builtins__, "open") as mock_open:
-                with mock.patch.object(log_pb2.LogDump,
-                                       "ParseFromString") as mock_parse:
-                    log_dump = upload_reproxy_logs.convert_reproxy_actions_log(
-                        reproxy_logdir="/tmp/reproxy.log.dir",
-                        reclient_bindir="/usr/local/reclient/bin",
-                    )
-        mock_process_call.assert_called_once()
-        mock_open.assert_called_once()
-        mock_parse.assert_called_once()
-        self.assertEqual(log_dump, log_pb2.LogDump())
-
-
 class ReadReproxyMetricsProto(unittest.TestCase):
 
     def test_basic(self):
@@ -233,7 +218,7 @@ class ReadReproxyMetricsProto(unittest.TestCase):
             with mock.patch.object(stats_pb2.Stats,
                                    "ParseFromString") as mock_parse:
                 stats = upload_reproxy_logs.read_reproxy_metrics_proto(
-                    metrics_file="/tmp/reproxy.log.dir/rbe_metrics.pb",
+                    metrics_file=Path("/tmp/reproxy.log.dir/rbe_metrics.pb"),
                 )
         mock_open.assert_called_once()
         mock_parse.assert_called_once()
@@ -285,7 +270,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                    "main_upload_logs") as mock_upload_logs:
                 exit_code = upload_reproxy_logs.main_single_logdir(
                     reproxy_logdir=self._reproxy_logdir,
-                    reclient_bindir="/re-client/tools",
+                    reclient_bindir=Path("/re-client/tools"),
                     metrics_table="project:metrics.metrics_table",
                     logs_table="project:metrics.logs_table",
                     uuid_flag="feed-face",
@@ -308,7 +293,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                    "main_upload_logs") as mock_upload_logs:
                 upload_reproxy_logs.main_single_logdir(
                     reproxy_logdir=self._reproxy_logdir,
-                    reclient_bindir="/re-client/tools",
+                    reclient_bindir=Path("/re-client/tools"),
                     metrics_table="project:metrics.metrics_table",
                     logs_table="project:metrics.logs_table",
                     uuid_flag="feed-face",
@@ -327,7 +312,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                    return_value=0) as mock_upload_logs:
                 exit_code = upload_reproxy_logs.main_single_logdir(
                     reproxy_logdir=self._reproxy_logdir,
-                    reclient_bindir="/re-client/tools",
+                    reclient_bindir=Path("/re-client/tools"),
                     metrics_table="project:metrics.metrics_table",
                     logs_table="project:metrics.logs_table",
                     uuid_flag="feed-face",
@@ -349,7 +334,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                    return_value=0) as mock_upload_logs:
                 exit_code = upload_reproxy_logs.main_single_logdir(
                     reproxy_logdir=self._reproxy_logdir,
-                    reclient_bindir="/re-client/tools",
+                    reclient_bindir=Path("/re-client/tools"),
                     metrics_table="project:metrics.metrics_table",
                     logs_table="project:metrics.logs_table",
                     uuid_flag="",
@@ -370,7 +355,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                    return_value=0) as mock_upload_logs:
                 upload_reproxy_logs.main_single_logdir(
                     reproxy_logdir=self._reproxy_logdir,
-                    reclient_bindir="/re-client/tools",
+                    reclient_bindir=Path("/re-client/tools"),
                     metrics_table="project:metrics.metrics_table",
                     logs_table="project:metrics.logs_table",
                     uuid_flag="",
@@ -391,7 +376,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                return_value=1) as mock_upload_metrics:
             exit_code = upload_reproxy_logs.main_single_logdir(
                 reproxy_logdir=self._reproxy_logdir,
-                reclient_bindir="/re-client/tools",
+                reclient_bindir=Path("/re-client/tools"),
                 metrics_table="project:metrics.metrics_table",
                 logs_table="project:metrics.logs_table",
                 uuid_flag="",
@@ -412,7 +397,7 @@ class MainSingleLogdirTest(ReproxyLogdirTestHarness):
                                    return_value=0) as mock_upload_metrics:
                 exit_code = upload_reproxy_logs.main_single_logdir(
                     reproxy_logdir=self._reproxy_logdir,
-                    reclient_bindir="/re-client/tools",
+                    reclient_bindir=Path("/re-client/tools"),
                     metrics_table="project:metrics.metrics_table",
                     logs_table="project:metrics.logs_table",
                     uuid_flag="",

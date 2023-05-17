@@ -48,7 +48,7 @@ function timetrace() {
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
-readonly default_project_root="$(readlink -f "$script_dir"/../..)"
+readonly default_project_root="$(realpath "$script_dir"/../..)"
 
 # OS/Arch detection logic can also be found in 'tools/devshell/lib/platform.sh'
 [[ -n "${_FUCHSIA_RBE_CACHE_VAR_host_os+x}" ]] || {
