@@ -13,6 +13,8 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+
 namespace {
 
 namespace fio = fuchsia_io;
@@ -180,6 +182,83 @@ TEST(Devfs, Export_DropDevfs) {
   out.clear();
 
   ASSERT_FALSE(lookup(root_node, "one").has_value());
+}
+
+TEST(Devfs, PassthroughTarget) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  fs::SynchronousVfs vfs(loop.dispatcher());
+
+  std::optional<Devnode> root_slot;
+  Devfs devfs(root_slot);
+  ASSERT_TRUE(root_slot.has_value());
+  Devnode::PassThrough::ConnectionType connection_type;
+  Devnode::PassThrough passthrough({
+      [&loop, &connection_type](zx::channel server, Devnode::PassThrough::ConnectionType type) {
+        connection_type = type;
+        loop.Quit();
+        return ZX_OK;
+      },
+  });
+
+  DevfsDevice device;
+  ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough.Clone(), device));
+  device.publish();
+
+  zx::result devfs_client = devfs.Connect(vfs);
+  ASSERT_OK(devfs_client);
+
+  struct TestRun {
+    const char* file_name;
+    Devnode::PassThrough::ConnectionType expected;
+  };
+
+  const TestRun tests[] = {
+      {
+          .file_name = "test",
+          .expected =
+              {
+                  .include_node = false,
+                  .include_controller = false,
+                  .include_device = true,
+              },
+      },
+      {
+          .file_name = "test/device_controller",
+          .expected =
+              {
+                  .include_node = false,
+                  .include_controller = true,
+                  .include_device = false,
+              },
+      },
+      {
+          .file_name = "test/device_protocol",
+          .expected =
+              {
+                  .include_node = false,
+                  .include_controller = false,
+                  .include_device = true,
+              },
+      },
+  };
+
+  for (const TestRun& test : tests) {
+    SCOPED_TRACE(test.file_name);
+    zx::result file_endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+    ASSERT_OK(file_endpoints);
+
+    ASSERT_OK(fidl::WireCall(devfs_client.value())
+                  ->Open(fuchsia_io::wire::OpenFlags(), fuchsia_io::wire::ModeType(),
+                         fidl::StringView::FromExternal(test.file_name),
+                         std::move(file_endpoints->server))
+                  .status());
+    loop.Run();
+    loop.ResetQuit();
+
+    ASSERT_EQ(connection_type.include_device, test.expected.include_device);
+    ASSERT_EQ(connection_type.include_controller, test.expected.include_controller);
+    ASSERT_EQ(connection_type.include_node, test.expected.include_node);
+  }
 }
 
 }  // namespace
