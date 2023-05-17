@@ -60,9 +60,10 @@ def main():
     clang_prefix = buildtools_dir / "clang" / HOST_PLATFORM / "bin"
     clang = str(clang_prefix / "clang")
     shared_libs_root = ROOT_PATH / build_dir
-    sysroot = (
+    fuchsia_sysroot = (
         ROOT_PATH / build_dir /
         "zircon_toolchain/obj/zircon/public/sysroot/sysroot")
+    sysroot = buildtools_dir / "sysroot" / "linux"
 
     env = os.environ.copy()
 
@@ -74,7 +75,9 @@ def main():
     ):
         env[f"CARGO_TARGET_{target}_LINKER"] = clang
         if "FUCHSIA" in target:
-            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = f"-Clink-arg=--sysroot={sysroot} -Lnative={shared_libs_root}"
+            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = f"-Clink-arg=--sysroot={fuchsia_sysroot} -Lnative={shared_libs_root}"
+        if "LINUX" in target:
+            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = f"-Clink-arg=--sysroot={sysroot}"
     env["CC"] = clang
     env["CXX"] = str(clang_prefix / "clang++")
     env["AR"] = str(clang_prefix / "llvm-ar")
