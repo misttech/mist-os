@@ -1701,13 +1701,11 @@ impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> Serializer for InnerSe
 
         let pb = InnerPacketBuilderWrapper(self.inner);
         debug_assert_eq!(self.buffer.len(), 0);
-        match self.buffer.encapsulate(&pb).serialize(outer, provider) {
-            Ok(buf) => Ok(buf),
-            Err((err, buffer)) => {
-                let buffer = buffer.into_inner();
-                Err((err, InnerSerializer { inner: pb.0, buffer }))
-            }
-        }
+        self.buffer.encapsulate(pb).serialize(outer, provider).map_err(
+            |(err, Nested { inner: buffer, outer: pb })| {
+                (err, InnerSerializer { inner: pb.0, buffer })
+            },
+        )
     }
 }
 
@@ -1862,13 +1860,12 @@ impl<I: Serializer, O: NestedPacketBuilder> Serializer for Nested<I, O> {
         // doesn't consume `self.outer` by value. If it did, we'd have to way of
         // getting it back in the event of an error (when we need to reconstruct
         // `self` to return).
-        match self.inner.serialize(
-            NestedPacketBuilder::encapsulate(RefNestedPacketBuilder(&self.outer), outer),
-            provider,
-        ) {
-            Ok(buf) => Ok(buf),
-            Err((err, inner)) => Err((err, inner.encapsulate(self.outer))),
-        }
+        self.inner
+            .serialize(
+                NestedPacketBuilder::encapsulate(RefNestedPacketBuilder(&self.outer), outer),
+                provider,
+            )
+            .map_err(|(err, inner)| (err, inner.encapsulate(self.outer)))
     }
 }
 
@@ -1987,15 +1984,14 @@ mod tests {
 
             // How long is the packet if we serialize it without the outer
             // PacketBuilder?
-            let inner_len = match self.clone().ser.serialize_vec_outer() {
-                Ok(buf) => buf.len(),
-                Err((err, ser)) => {
+            let inner_len = self.clone().ser.serialize_vec_outer().map(|buf| buf.len()).map_err(
+                |(err, ser)| {
                     // If serialization fails, the original Serializer should be
                     // unmodified.
                     assert_eq!(ser, orig);
-                    return Err((err.into(), ser.into_verifying(self.truncating)));
-                }
-            };
+                    (err.into(), ser.into_verifying(self.truncating))
+                },
+            )?;
             let outer_constraints = outer.try_constraints();
             let should_exceed_size_limit = outer_constraints
                 .map(|c| c.max_body_len() < inner_len && !self.truncating)
