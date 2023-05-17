@@ -290,7 +290,7 @@
 
             // Virtualization is not present in all configurations.
             // See: fxbug.dev/103301
-            source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: [

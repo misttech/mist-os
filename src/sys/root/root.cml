@@ -261,7 +261,7 @@
             from: "#core",
             to: "#bootstrap",
             dependency: "weak",
-            source_availability: "unknown",
+            availability: "optional",
         },
 
         // The source of this protocol, debug-dash-launcher,
