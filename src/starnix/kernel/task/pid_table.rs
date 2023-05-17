@@ -105,6 +105,10 @@ impl PidTable {
         self.table.iter().flat_map(|(pid, entry)| entry.group.as_ref().and(Some(*pid))).collect()
     }
 
+    pub fn last_pid(&self) -> pid_t {
+        self.last_pid
+    }
+
     pub fn len(&self) -> usize {
         self.table.len()
     }

@@ -516,8 +516,6 @@
                 "ProcMeminfo.ContainsBasicFields",
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",
-                "ProcLoadavg.EndsWithNewline",
-                "ProcLoadavg.Fields",
                 "ProcPidStatusTest.StateSleeping",
                 "ProcPidStatusTest.Threads",
                 "ProcPidCmdline.SubprocessSeekCmdline",

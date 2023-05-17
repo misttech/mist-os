@@ -64,6 +64,8 @@ impl ProcDirectory {
             &b"net"[..] => net_directory(fs),
             &b"uptime"[..] =>
                 fs.create_node(UptimeFile::new_node(&kernel_stats), mode!(IFREG, 0o444), FsCred::root()),
+            &b"loadavg"[..] =>
+                fs.create_node(LoadavgFile::new_node(&kernel), mode!(IFREG, 0o444), FsCred::root()),
         };
 
         Arc::new(ProcDirectory { kernel, nodes })
@@ -463,6 +465,26 @@ impl DynamicFileSource for StatFile {
         let boot_time_epoch = epoch_time - uptime;
         writeln!(sink, "btime {}", boot_time_epoch.into_seconds())?;
 
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct LoadavgFile(Weak<Kernel>);
+impl LoadavgFile {
+    pub fn new_node(kernel: &Weak<Kernel>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(kernel.clone()))
+    }
+}
+impl DynamicFileSource for LoadavgFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let (num_tasks, last_pid) = {
+            let kernel = self.0.upgrade().ok_or(errno!(EIO))?;
+            let pids = kernel.pids.read();
+            (pids.len(), pids.last_pid())
+        };
+        // TODO: Collect and report load stats.
+        writeln!(sink, "0.50 0.50 0.50 1/{} {}", num_tasks, last_pid)?;
         Ok(())
     }
 }
