@@ -69,3 +69,16 @@ Example output (astro):
     BenchmarkWritePacket/checksumOffloadEnabled/len(payload)=4-4                      487836              2923 ns/op             112 B/op          3 allocs/op
     BenchmarkWritePacket/checksumOffloadEnabled/len(payload)=2-4                      434959              2658 ns/op             112 B/op          3 allocs/op
     BenchmarkWritePacket/checksumOffloadEnabled/len(payload)=1-4                      490470              3010 ns/op             112 B/op          3 allocs/op
+
+## Cobalt Stats
+
+Netstack uses [Sampler] to forward [Inspect] diagnostics data to the [Cobalt]
+telemetry system. See the [Sampler configuration] for how Inspect counters map
+to Cobalt metrics and how often Inspect is polled; and the [Cobalt configuration]
+for the reports defined for each metric.
+
+[Sampler]: https://fuchsia.dev/fuchsia-src/development/diagnostics/analytics/sampler
+[Inspect]: ./INSPECT.md
+[Cobalt]: https://fuchsia.googlesource.com/cobalt/+/refs/heads/main/README.md
+[Sampler configuration]: /src/diagnostics/config/sampler/netstack.json
+[Cobalt configuration]: https://fuchsia.googlesource.com/cobalt-registry/+/refs/heads/main/fuchsia/networking/metrics.yaml

@@ -34,10 +34,22 @@ socket identifier,  e.g.:
     "BindAddress": "",
     "BindNICID": "5",
     "RegisterNICID": "5",
-    "Stats": { ... }
+    "Stats": { ... },
+    "Socket Option Stats": {
+      "AddIpMembership": 0,
+      ...
+    },
   }
 }
 ```
+
+The `Socket Option Stats` section is keyed on each socket option operation
+(either set or get, but note that some socket options only have one but not
+the other), with the value indicating how many times the operation has been
+performed. Note that there are socket options that only apply to certain
+kinds of sockets, so the list of socket option operations differs between
+the different socket types. The maximum across all sockets is also exposed,
+see the [Networking Stat Counters](#networking-stat-counters) section.
 
 To retrieve all sockets from inspect data use:
 ```
@@ -79,28 +91,40 @@ fx jq '.[] | select(.moniker == "core/network/netstack") | .payload."NICs" | .[]
 To look at a single NIC with `id` or `name` simply append `| select(.NICID ==
 "id")` or `| select(.Name == "name")`, respectively.
 
-### Networking Stat Counters
+### Networking Stat Counters {#networking-stat-counters}
 `Networking Stat Counters` contain stack-global counters for traffic and errors,
 e.g.:
 ```json
 {
-  "UnknownProtocolRcvdPackets": 0,
-  "MalformedRcvdPackets": 0,
   "DroppedPackets": 0,
-  "UDP": {
-    "PacketsReceived": 51551,
-    "UnknownPortErrors": 30509,
-    ...
-  },
+  "SocketCount": 12,
+  "SocketsCreated": 1016568,
+  "SocketsDestroyed": 1016559,
+  "ARP": { ... },
+  "DHCPv6": { ... },
+  "ICMP": { ... },
+  "IGMP": { ... },
+  "IP": { ... },
+  "IPv6AddressConfig": { ... },
+  "MaxSocketOptionStats": { ... },
+  "NICs": { ... },
   "TCP": {
     "ActiveConnectionOpenings": 4443,
     "PassiveConnectionOpenings": 53,
     ...
   },
-  "IP": {...},
-  "ICMP": {...}
+  "UDP": {
+    "PacketsReceived": 51551,
+    "UnknownPortErrors": 30509,
+    ...
+  },
 }
 ```
+
+`MaxSocketOptionStats` is a map from each socket option operation to the
+maximum number of times the operation has been called on a single socket in the
+current boot. The max could come from a socket that's been closed, or is
+currently open at the time inspect was queried.
 
 To get counters use:
 ```
