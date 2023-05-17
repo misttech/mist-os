@@ -223,10 +223,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/graphics/display/testing",
-
-    #------------------
-    #------------------
     "//src/graphics/drivers/aml-gpu:aml-gpu-test-bin",
 
     #------------------
