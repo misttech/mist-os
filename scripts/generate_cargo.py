@@ -328,8 +328,22 @@ def write_toml_file(
             fout.write(" }\n")
         fout.write("\n")
 
+    def expand_and_deduplicate(deps, visited=None):
+      if visited is None:
+        visited = set()
+      for dep in deps:
+        if dep in visited:
+          continue
+        visited.add(dep)
+        expanded = project.expand_source_set_or_group(dep)
+        if expanded:
+          for exp in expand_and_deduplicate(expanded, visited):
+            yield exp
+        else:
+          yield dep
+
     # collect all dependencies
-    deps = metadata["deps"][:]
+    deps = list(expand_and_deduplicate(metadata["deps"]))
 
     dep_crate_names = set()
 
