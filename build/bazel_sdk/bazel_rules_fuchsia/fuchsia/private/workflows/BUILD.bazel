@@ -2,6 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("//fuchsia/private/workflows:fuchsia_work_on_runner.bzl", "fuchsia_work_on_runner")
+
+# Add the work_on runner as a public rule which can be accessed in external repos. This
+# tool is experimental so we are not adding it to the public API to limit its reach.
+fuchsia_work_on_runner(
+    name = "work_on",
+    visibility = ["//visibility:public"],
+)
+
 exports_files(
     glob([
         "*.bzl",
