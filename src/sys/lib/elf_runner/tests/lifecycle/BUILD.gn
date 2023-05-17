@@ -83,6 +83,7 @@ rustc_test("lifecycle_timeout") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/sys/lib/component-events",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "lifecycle_timeout.rs" ]

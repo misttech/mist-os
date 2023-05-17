@@ -9,6 +9,7 @@ use {
         sequence::{EventSequence, Ordering},
     },
     fuchsia_component_test::ScopedInstance,
+    tracing::info,
 };
 
 /// Test that a component tree which contains a root component with no program
@@ -61,6 +62,8 @@ async fn test_stop_timeouts() {
         (root_moniker, custom_timeout_child, inherited_timeout_child)
     };
 
+    info!("All components started");
+
     // We expect three components to stop: the root component and its two children.
     EventSequence::new()
         .has_subset(
@@ -76,6 +79,8 @@ async fn test_stop_timeouts() {
         .await
         .unwrap();
 
+    info!("Custom timeout child exited");
+
     EventSequence::new()
         .has_subset(
             vec![
@@ -90,6 +95,8 @@ async fn test_stop_timeouts() {
         .await
         .unwrap();
 
+    info!("Inherited timeout child exited");
+
     EventSequence::new()
         .has_subset(
             vec![
@@ -101,4 +108,6 @@ async fn test_stop_timeouts() {
         .expect(event_stream_3)
         .await
         .unwrap();
+
+    info!("Parent exited");
 }
