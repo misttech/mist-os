@@ -1172,7 +1172,17 @@ impl MemoryManager {
         let info = root_vmar.info()?;
         let user_vmar = create_user_vmar(&root_vmar, &info)?;
         let user_vmar_info = user_vmar.info()?;
-        Ok(MemoryManager {
+        Ok(Self::from_vmar(root_vmar, user_vmar, user_vmar_info))
+    }
+
+    pub fn new_empty() -> Self {
+        let root_vmar = zx::Vmar::from(zx::Handle::invalid());
+        let user_vmar = zx::Vmar::from(zx::Handle::invalid());
+        Self::from_vmar(root_vmar, user_vmar, Default::default())
+    }
+
+    fn from_vmar(root_vmar: zx::Vmar, user_vmar: zx::Vmar, user_vmar_info: zx::VmarInfo) -> Self {
+        MemoryManager {
             root_vmar,
             base_addr: UserAddress::from_ptr(user_vmar_info.base),
             futex: FutexTable::default(),
@@ -1198,7 +1208,7 @@ impl MemoryManager {
             maximum_valid_user_address: UserAddress::from_ptr(
                 user_vmar_info.base + user_vmar_info.len,
             ),
-        })
+        }
     }
 
     pub fn set_brk(

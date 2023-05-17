@@ -498,27 +498,67 @@ impl Task {
     /// This function creates an underlying Zircon process to host the new
     /// task.
     ///
-    /// root_fs should only be None for the init task, and set_fs should be called as soon as the
+    /// `fs` should only be None for the init task, and set_fs should be called as soon as the
     /// FsContext is build.
     pub fn create_process_without_parent(
         kernel: &Arc<Kernel>,
         initial_name: CString,
-        root_fs: Option<Arc<FsContext>>,
+        fs: Option<Arc<FsContext>>,
     ) -> Result<CurrentTask, Errno> {
+        let initial_name_bytes = initial_name.as_bytes().to_owned();
+        Self::create_task(kernel, initial_name, fs, |pid, process_group| {
+            create_zircon_process(
+                kernel,
+                None,
+                pid,
+                process_group,
+                SignalActions::default(),
+                &initial_name_bytes,
+            )
+        })
+    }
+
+    /// Create a task that runs inside the kernel.
+    ///
+    /// There is no underlying Zircon process to host the task.
+    pub fn create_kernel_task(
+        kernel: &Arc<Kernel>,
+        initial_name: CString,
+        fs: Arc<FsContext>,
+    ) -> Result<CurrentTask, Errno> {
+        Self::create_task(kernel, initial_name, Some(fs), |pid, process_group| {
+            let process = zx::Process::from(zx::Handle::invalid());
+            let memory_manager = Arc::new(MemoryManager::new_empty());
+            let thread_group = ThreadGroup::new(
+                kernel.clone(),
+                process,
+                None,
+                pid,
+                process_group,
+                SignalActions::default(),
+            );
+            Ok(TaskInfo { thread: None, thread_group, memory_manager })
+        })
+    }
+
+    fn create_task<F>(
+        kernel: &Arc<Kernel>,
+        initial_name: CString,
+        root_fs: Option<Arc<FsContext>>,
+        task_info_factory: F,
+    ) -> Result<CurrentTask, Errno>
+    where
+        F: FnOnce(i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+    {
         let mut pids = kernel.pids.write();
         let pid = pids.allocate_pid();
 
         let process_group = ProcessGroup::new(pid, None);
         pids.add_process_group(&process_group);
 
-        let TaskInfo { thread, thread_group, memory_manager } = create_zircon_process(
-            kernel,
-            None,
-            pid,
-            process_group.clone(),
-            SignalActions::default(),
-            initial_name.as_bytes(),
-        )?;
+        let TaskInfo { thread, thread_group, memory_manager } =
+            task_info_factory(pid, process_group.clone())?;
+
         process_group.insert(&thread_group);
 
         let current_task = CurrentTask::new(Self::new(

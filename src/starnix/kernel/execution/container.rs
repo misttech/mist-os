@@ -194,8 +194,10 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
     let mut init_task = create_init_task(&kernel, &config)?;
     let fs_context = create_fs_context(&init_task, &config, &pkg_dir_proxy)?;
     init_task.set_fs(fs_context.clone());
-    let system_task =
-        Arc::new(create_task(&kernel, Some(fs_context), "kthread", Credentials::root())?);
+
+    let system_task = Task::create_kernel_task(&kernel, to_cstr("kthread"), fs_context)?;
+    system_task.set_creds(Credentials::root());
+    let system_task = Arc::new(system_task);
 
     mount_filesystems(&system_task, &config, &pkg_dir_proxy)?;
 
@@ -362,21 +364,16 @@ fn mount_apexes(init_task: &CurrentTask, config: &ConfigWrapper) -> Result<(), E
     Ok(())
 }
 
-fn create_task(
-    kernel: &Arc<Kernel>,
-    fs: Option<Arc<FsContext>>,
-    name: &str,
-    credentials: Credentials,
-) -> Result<CurrentTask, Error> {
-    let task = Task::create_process_without_parent(kernel, to_cstr(name), fs)?;
-    task.set_creds(credentials);
-    Ok(task)
-}
-
 fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<CurrentTask, Error> {
     let credentials = Credentials::root();
-    let name = if config.init.is_empty() { "" } else { &config.init[0] };
-    create_task(kernel, None, name, credentials)
+    let initial_name = if config.init.is_empty() {
+        CString::default()
+    } else {
+        CString::new(config.init[0].clone())?
+    };
+    let task = Task::create_process_without_parent(kernel, initial_name, None)?;
+    task.set_creds(credentials);
+    Ok(task)
 }
 
 fn mount_filesystems(
