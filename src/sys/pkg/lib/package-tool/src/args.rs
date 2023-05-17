@@ -11,55 +11,48 @@ use {
 };
 
 #[derive(Eq, FromArgs, PartialEq, Debug)]
-#[argh(
-    subcommand,
-    name = "create",
-    description = "create a package archive from a package_manifest.json"
-)]
+/// create a package archive from a package_manifest.json
+#[argh(subcommand, name = "create")]
 pub struct PackageArchiveCreateCommand {
-    #[argh(option, short = 'o', description = "output package archive")]
+    /// output package archive
+    #[argh(option, short = 'o')]
     pub out: PathBuf,
 
-    #[argh(
-        option,
-        short = 'r',
-        description = "root directory for paths in package_manifest.json",
-        default = "Utf8PathBuf::from(\".\")"
-    )]
+    /// root directory for paths in package_manifest.json
+    #[argh(option, short = 'r', default = "Utf8PathBuf::from(\".\")")]
     pub root_dir: Utf8PathBuf,
 
-    #[argh(option, description = "produce a depfile file at the provided path")]
+    /// produce a depfile file at the provided path
+    #[argh(option)]
     pub depfile: Option<Utf8PathBuf>,
 
-    #[argh(positional, description = "package_manifest.json to archive")]
+    /// package_manifest.json to archive
+    #[argh(positional)]
     pub package_manifest: Utf8PathBuf,
 }
 
 #[derive(Eq, FromArgs, PartialEq, Debug)]
-#[argh(
-    subcommand,
-    name = "extract",
-    description = "extract  the contents of <far_path> inside the Fuchia package archive file to the output directory"
-)]
+/// extract the contents of <far_path> inside the Fuchsia package archive file to the output directory
+#[argh(subcommand, name = "extract")]
 pub struct PackageArchiveExtractCommand {
-    #[argh(
-        option,
-        short = 'o',
-        description = "output directory for writing the extracted files. Defaults to the current directory.",
-        default = "Utf8PathBuf::from(\"./\")"
-    )]
+    /// output directory for writing the extracted files. Defaults to the current directory.
+    #[argh(option, short = 'o', default = "Utf8PathBuf::from(\"./\")")]
     pub out: Utf8PathBuf,
 
-    #[argh(option, description = "repository of the package")]
+    /// repository of the package
+    #[argh(option)]
     pub repository: Option<String>,
 
-    #[argh(switch, description = "produce a meta.far.merkle file")]
+    /// produce a meta.far.merkle file
+    #[argh(switch)]
     pub meta_far_merkle: bool,
 
-    #[argh(switch, description = "produce a blobs.json file")]
+    /// produce a blobs.json file
+    #[argh(switch)]
     pub blobs_json: bool,
 
-    #[argh(positional, description = "package archive")]
+    /// package archive
+    #[argh(positional)]
     pub archive: PathBuf,
 }
 
@@ -67,42 +60,48 @@ pub struct PackageArchiveExtractCommand {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "build")]
 pub struct PackageBuildCommand {
-    #[argh(
-        option,
-        short = 'o',
-        default = "Utf8PathBuf::from(\"./out\")",
-        description = "directory to save package artifacts"
-    )]
+    /// directory to save package artifacts
+    #[argh(option, short = 'o', default = "Utf8PathBuf::from(\"./out\")")]
     pub out: Utf8PathBuf,
 
-    #[argh(option, description = "package API level")]
+    /// package API level
+    #[argh(option)]
     pub api_level: Option<u64>,
 
-    #[argh(option, description = "package ABI revision")]
+    /// package ABI revision
+    #[argh(option)]
     pub abi_revision: Option<u64>,
 
-    #[argh(option, description = "name of the package")]
+    /// name of the package
+    #[argh(option)]
     pub published_name: Option<String>,
 
-    #[argh(option, description = "repository of the package")]
+    /// repository of the package
+    #[argh(option)]
     pub repository: Option<String>,
 
-    #[argh(switch, description = "produce a depfile file")]
+    /// produce a depfile file
+    #[argh(switch)]
     pub depfile: bool,
 
-    #[argh(switch, description = "produce a meta.far.merkle file")]
+    /// produce a meta.far.merkle file
+    #[argh(switch)]
     pub meta_far_merkle: bool,
 
-    #[argh(switch, description = "produce a blobs.json file")]
+    /// produce a blobs.json file
+    #[argh(switch)]
     pub blobs_json: bool,
 
-    #[argh(switch, description = "produce a blobs.manifest file")]
+    /// produce a blobs.manifest file
+    #[argh(switch)]
     pub blobs_manifest: bool,
 
-    #[argh(option, description = "path to the subpackages build manifest file")]
+    /// path to the subpackages build manifest file
+    #[argh(option)]
     pub subpackages_build_manifest_path: Option<Utf8PathBuf>,
 
-    #[argh(positional, description = "path to the package build manifest file")]
+    /// path to the package build manifest file
+    #[argh(positional)]
     pub package_build_manifest_path: Utf8PathBuf,
 }
 
@@ -110,16 +109,16 @@ pub struct PackageBuildCommand {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "create")]
 pub struct RepoCreateCommand {
-    #[argh(
-        switch,
-        description = "set repository version based on the current time rather than monotonically increasing version"
-    )]
+    /// set repository version based on the current time rather than monotonically increasing version
+    #[argh(switch)]
     pub time_versioning: bool,
 
-    #[argh(option, description = "path to the repository keys directory")]
-    pub keys: PathBuf,
+    /// path to the repository keys directory. Default to generate keys at 'repo_path'/keys.
+    #[argh(option)]
+    pub keys: Option<PathBuf>,
 
-    #[argh(positional, description = "path to the repository directory")]
+    /// path to the repository directory
+    #[argh(positional)]
     pub repo_path: Utf8PathBuf,
 }
 
