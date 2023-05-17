@@ -117,21 +117,22 @@ impl ProtocolsExt for fio::ConnectionProtocols {
                 return Err(zx::Status::WRONG_TYPE);
             }
         }
-        // TODO(fxbug.dev/77623): Add support for maximum rights.
-        if matches!(
-            self,
+        let optional_rights = match self {
             fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions { maximum_rights: Some(_), .. }),
-                    ..
-                }),
+                protocols:
+                    Some(fio::NodeProtocols {
+                        directory:
+                            Some(fio::DirectoryProtocolOptions {
+                                optional_rights: Some(rights), ..
+                            }),
+                        ..
+                    }),
                 ..
-            })
-        ) {
-            return Err(zx::Status::NOT_SUPPORTED);
-        }
+            }) => *rights,
+            _ => fio::Operations::empty(),
+        };
         // If is_dir_allowed() returned true, there must be rights.
-        Ok(DirectoryOptions { node: false, rights: self.rights().unwrap() })
+        Ok(DirectoryOptions { node: false, rights: self.rights().unwrap() | optional_rights })
     }
 
     fn to_file_options(&self) -> Result<FileOptions, zx::Status> {

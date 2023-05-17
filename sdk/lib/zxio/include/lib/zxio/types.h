@@ -434,7 +434,7 @@ typedef struct zxio_open_options {
 
   // Directory options
   // If zero, then this will translate to the field not being present in fuchsia.io.
-  uint64_t maximum_rights;
+  uint64_t optional_rights;
 
   // File options
   uint64_t file_flags;

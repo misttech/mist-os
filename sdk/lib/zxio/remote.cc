@@ -929,7 +929,7 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
   }
 
   fio::wire::ConnectorFlags connector_flags;
-  fio::Operations maximum_rights;
+  fio::Operations optional_rights;
   fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions> directory_options_frame;
   fio::wire::DirectoryProtocolOptions directory_options;
   fio::wire::FileProtocolFlags file_flags;
@@ -967,10 +967,10 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
       auto directory_options_builder = fio::wire::DirectoryProtocolOptions::ExternalBuilder(
           fidl::ObjectView<fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions>>::FromExternal(
               &directory_options_frame));
-      if (options->maximum_rights != 0) {
-        maximum_rights = fio::Operations(options->maximum_rights);
-        directory_options_builder.maximum_rights(
-            fidl::ObjectView<fio::wire::Operations>::FromExternal(&maximum_rights));
+      if (options->optional_rights != 0) {
+        optional_rights = fio::Operations(options->optional_rights);
+        directory_options_builder.optional_rights(
+            fidl::ObjectView<fio::wire::Operations>::FromExternal(&optional_rights));
       }
       directory_options = directory_options_builder.Build();
 

@@ -979,5 +979,43 @@ async fn open2_file_get_representation() {
     );
 }
 
+#[fuchsia::test]
+async fn open2_dir_optional_rights() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    test_dir
+        .open2(
+            ".",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions {
+                        optional_rights: Some(fio::Operations::WRITE_BYTES),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    assert_eq!(
+        proxy.get_connection_info().await.expect("get_connection_info failed").rights.unwrap(),
+        fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES,
+    );
+}
+
 // TODO(fxbug.dev/123390): Add open2 symlink tests.
 // TODO(fxbug.dev/77623): Add open2 connect tests.

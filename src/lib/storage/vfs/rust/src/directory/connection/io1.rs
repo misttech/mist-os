@@ -261,6 +261,23 @@ where
                         *rights = Some(self.options.rights);
                     }
                 }
+                // If optional_rights is set, remove any rights that are not present on the current
+                // connection.
+                if let fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols:
+                        Some(fio::NodeProtocols {
+                            directory:
+                                Some(fio::DirectoryProtocolOptions {
+                                    optional_rights: Some(rights),
+                                    ..
+                                }),
+                            ..
+                        }),
+                    ..
+                }) = &mut protocols
+                {
+                    *rights &= self.options.rights;
+                }
                 protocols
                     .to_object_request(object_request)
                     .handle(|req| self.handle_open2(path, protocols, req));

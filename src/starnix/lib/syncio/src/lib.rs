@@ -342,11 +342,11 @@ pub struct OpenOptions {
 
 impl OpenOptions {
     /// Returns options to open a directory.
-    pub fn directory(maximum_rights: Option<fio::Operations>) -> Self {
+    pub fn directory(optional_rights: Option<fio::Operations>) -> Self {
         Self {
             node_protocols: Some(fio::NodeProtocols {
                 directory: Some(fio::DirectoryProtocolOptions {
-                    maximum_rights,
+                    optional_rights,
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -535,8 +535,8 @@ impl Zxio {
         if let Some(p) = options.node_protocols {
             if let Some(dir_options) = p.directory {
                 open_options.protocols |= ZXIO_NODE_PROTOCOL_DIRECTORY;
-                open_options.maximum_rights =
-                    dir_options.maximum_rights.unwrap_or(fio::Operations::empty()).bits();
+                open_options.optional_rights =
+                    dir_options.optional_rights.unwrap_or(fio::Operations::empty()).bits();
             }
             if let Some(file_flags) = p.file {
                 open_options.protocols |= ZXIO_NODE_PROTOCOL_FILE;

@@ -445,8 +445,60 @@ async fn test_open2() {
             test_dir.open2("symlink", OpenOptions::default(), None).expect("open2 failed");
         assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
 
-        // Check rights
+        // Test file protocol flags.
         let test_file = test_dir
+            .open2("test_file", OpenOptions::file(fio::FileProtocolFlags::APPEND), None)
+            .expect("open2 failed");
+        const APPEND_CONTENT: &[u8] = b" there";
+        test_file.write(APPEND_CONTENT).expect("write failed");
+        test_file.seek(SeekOrigin::Start, 0).expect("seek failed");
+        let mut buf = [0; 20];
+        assert_eq!(
+            test_file.read(&mut buf).expect("read failed"),
+            CONTENT.len() + APPEND_CONTENT.len()
+        );
+        assert_eq!(&buf[..CONTENT.len()], CONTENT);
+        assert_eq!(&buf[CONTENT.len()..CONTENT.len() + APPEND_CONTENT.len()], APPEND_CONTENT);
+
+        // TODO(fxbug.dev/127341): Test create attributes.
+        // TODO(fxbug.dev/125830): Test for POSIX attributes.
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open2_rights() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        // Create and write to a file.
+        let test_file = dir_zxio
+            .open2(
+                "test_file",
+                OpenOptions {
+                    mode: fio::OpenMode::AlwaysCreate,
+                    ..OpenOptions::file(fio::FileProtocolFlags::empty())
+                },
+                None,
+            )
+            .expect("open2 failed");
+
+        // Write something to the file.
+        const CONTENT: &[u8] = b"hello";
+        test_file.write(CONTENT).expect("write failed");
+
+        // Check rights
+        let test_file = dir_zxio
             .open2(
                 "test_file",
                 OpenOptions { rights: fio::Operations::READ_BYTES, ..Default::default() },
@@ -460,23 +512,44 @@ async fn test_open2() {
         // Make sure we can't write to the file.
         assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
 
-        // Test file protocol flags.
-        let test_file = test_dir
-            .open2("test_file", OpenOptions::file(fio::FileProtocolFlags::APPEND), None)
+        // Check rights inherited from directory.
+        let dir = dir_zxio
+            .open2(
+                ".",
+                OpenOptions { rights: fio::Operations::READ_BYTES, ..Default::default() },
+                None,
+            )
             .expect("open2 failed");
-        const APPEND_CONTENT: &[u8] = b" there";
-        test_file.write(APPEND_CONTENT).expect("write failed");
-        test_file.seek(SeekOrigin::Start, 0).expect("seek failed");
-        assert_eq!(
-            test_file.read(&mut buf).expect("read failed"),
-            CONTENT.len() + APPEND_CONTENT.len()
-        );
-        assert_eq!(&buf[..CONTENT.len()], CONTENT);
-        assert_eq!(&buf[CONTENT.len()..CONTENT.len() + APPEND_CONTENT.len()], APPEND_CONTENT);
 
-        // TODO(fxbug.dev/127341): Test create attributes.
-        // TODO(fxbug.dev/77623): Test maximum_rights.
-        // TODO(fxbug.dev/125830): Test for POSIX attributes.
+        let test_file = dir.open2("test_file", OpenOptions::default(), None).expect("open2 failed");
+
+        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
+        assert_eq!(&buf[..CONTENT.len()], CONTENT);
+
+        // Make sure we can't write to the file.
+        assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
+
+        // Optional rights on directories.
+        let test_dir = dir_zxio
+            .open2(
+                ".",
+                OpenOptions {
+                    rights: fio::Operations::READ_BYTES,
+                    ..OpenOptions::directory(Some(fio::Operations::WRITE_BYTES))
+                },
+                None,
+            )
+            .expect("open2 failed");
+
+        // Now make sure we can open and write to the test file.
+        let test_file =
+            test_dir.open2("test_file", OpenOptions::default(), None).expect("open2 failed");
+
+        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
+        assert_eq!(&buf[..CONTENT.len()], CONTENT);
+
+        // This time we should be able to write to the file.
+        test_file.write(b"foo").expect("write failed");
     })
     .await;
 
