@@ -808,10 +808,13 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     if (args.devfs_args()->class_name().has_value()) {
       devfs_class_path = args.devfs_args()->class_name();
     }
-    devfs_target = Devnode::Connector{
-        .connector = fidl::WireSharedClient<fuchsia_device_fs::Connector>(
-            std::move(args.devfs_args().value().connector().value()), dispatcher_),
-    };
+    fidl::WireSharedClient<fuchsia_device_fs::Connector> connector(
+        std::move(args.devfs_args().value().connector().value()), dispatcher_);
+    devfs_target =
+        Devnode::PassThrough([connector = std::move(connector), name = child->name()](
+                                 zx::channel server, Devnode::PassThrough::ConnectionType type) {
+          return connector->Connect(std::move(server)).status();
+        });
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(

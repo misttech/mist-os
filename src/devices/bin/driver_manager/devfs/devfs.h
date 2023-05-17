@@ -29,14 +29,6 @@ std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id);
 class Devnode {
  public:
   struct NoRemote {};
-  struct Connector {
-    fidl::WireSharedClient<fuchsia_device_fs::Connector> connector;
-    Connector Clone() {
-      return Connector{
-          .connector = connector.Clone(),
-      };
-    }
-  };
   struct Remote {
     bool multiplex_node = true;
     bool multiplex_controller = true;
@@ -78,7 +70,7 @@ class Devnode {
     std::shared_ptr<ConnectCallback> connect;
   };
 
-  using Target = std::variant<NoRemote, Remote, Connector, PassThrough>;
+  using Target = std::variant<NoRemote, Remote, PassThrough>;
 
   // Constructs a root node.
   explicit Devnode(Devfs& devfs);

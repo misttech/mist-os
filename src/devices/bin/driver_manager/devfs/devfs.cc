@@ -60,18 +60,17 @@ constexpr ProtocolInfo proto_infos[] = {
 };
 
 Devnode::Target clone_target(Devnode::Target& target) {
-  return std::visit(overloaded{[](Devnode::NoRemote& no_remote) -> Devnode::Target {
-                                 return Devnode::Target(Devnode::NoRemote());
-                               },
-                               [](Devnode::Remote& remote) -> Devnode::Target {
-                                 return Devnode::Target(remote.Clone());
-                               },
-                               [](Devnode::PassThrough& passthrough) -> Devnode::Target {
-                                 return Devnode::Target(passthrough.Clone());
-                               },
-                               [](Devnode::Connector& connector) -> Devnode::Target {
-                                 return Devnode::Target(connector.Clone());
-                               }},
+  return std::visit(overloaded{
+                        [](Devnode::NoRemote& no_remote) -> Devnode::Target {
+                          return Devnode::Target(Devnode::NoRemote());
+                        },
+                        [](Devnode::Remote& remote) -> Devnode::Target {
+                          return Devnode::Target(remote.Clone());
+                        },
+                        [](Devnode::PassThrough& passthrough) -> Devnode::Target {
+                          return Devnode::Target(passthrough.Clone());
+                        },
+                    },
                     target);
 }
 
@@ -127,12 +126,10 @@ Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
     : holder_(holder), target_(std::move(target)) {}
 
 bool Devnode::VnodeImpl::IsDirectory() const {
-  return std::visit(
-      overloaded{[&](const NoRemote&) { return true; },
-                 [](const Devnode::PassThrough& passthrough) { return false; },
-                 [&](const Connector& connector) { return !connector.connector.is_valid(); },
-                 [&](const Remote& remote) { return !remote.connector.is_valid(); }},
-      target_);
+  return std::visit(overloaded{[&](const NoRemote&) { return true; },
+                               [](const Devnode::PassThrough& passthrough) { return false; },
+                               [&](const Remote& remote) { return !remote.connector.is_valid(); }},
+                    target_);
 }
 
 fs::VnodeProtocolSet Devnode::VnodeImpl::GetProtocols() const {
@@ -167,12 +164,6 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
                                  return (*passthrough.connect.get())(
                                      std::move(channel), passthrough.default_connection_type);
                                },
-                               [&](const Connector& connector) {
-                                 if (!connector.connector.is_valid()) {
-                                   return ZX_ERR_NOT_SUPPORTED;
-                                 }
-                                 return connector.connector->Connect(std::move(channel)).status();
-                               },
                                [&](const Remote& remote) {
                                  if (!remote.connector.is_valid()) {
                                    return ZX_ERR_NOT_SUPPORTED;
@@ -186,12 +177,10 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
 }
 
 bool Devnode::VnodeImpl::IsService() const {
-  return std::visit(
-      overloaded{[&](const NoRemote&) { return false; },
-                 [&](const PassThrough& passthrough) { return true; },
-                 [&](const Connector& connector) { return connector.connector.is_valid(); },
-                 [&](const Remote& remote) { return remote.connector.is_valid(); }},
-      target_);
+  return std::visit(overloaded{[&](const NoRemote&) { return false; },
+                               [&](const PassThrough& passthrough) { return true; },
+                               [&](const Remote& remote) { return remote.connector.is_valid(); }},
+                    target_);
 }
 
 zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
@@ -256,14 +245,6 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
                                                           .include_device = true,
                                                       });
                 });
-            return std::make_tuple(std::move(device_controller), std::move(device_protocol));
-          },
-          [](Connector& connector) {
-            auto device_controller = fbl::MakeRefCounted<fs::Service>(
-                [connector = connector.Clone()](zx::channel channel) {
-                  return connector.connector->Connect(std::move(channel)).status();
-                });
-            auto device_protocol = device_controller;
             return std::make_tuple(std::move(device_controller), std::move(device_protocol));
           },
           [](Remote& remote) {
