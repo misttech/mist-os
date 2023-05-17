@@ -84,7 +84,7 @@ impl From<OpenFlags> for fio::OpenFlags {
     fn from(flags: OpenFlags) -> fio::OpenFlags {
         let mut result = fio::OpenFlags::empty();
         if flags.can_read() {
-            result |= fio::OpenFlags::RIGHT_READABLE;
+            result |= fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE;
         }
         if flags.can_write() {
             result |= fio::OpenFlags::RIGHT_WRITABLE;
@@ -134,11 +134,16 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_conversion() {
-        assert_flags_equals(OpenFlags::RDONLY, fio::OpenFlags::RIGHT_READABLE);
+        assert_flags_equals(
+            OpenFlags::RDONLY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
+        );
         assert_flags_equals(OpenFlags::WRONLY, fio::OpenFlags::RIGHT_WRITABLE);
         assert_flags_equals(
             OpenFlags::RDWR,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::POSIX_WRITABLE,
         );
     }
 }
