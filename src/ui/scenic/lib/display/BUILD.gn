@@ -14,8 +14,6 @@ source_set("display") {
     "display_controller_listener.h",
     "display_manager.cc",
     "display_manager.h",
-    "display_manager2.cc",
-    "display_manager2.h",
     "display_power_manager.cc",
     "display_power_manager.h",
     "util.cc",
@@ -25,7 +23,6 @@ source_set("display") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display:fuchsia.ui.display_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.color:fuchsia.ui.display.color_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.internal:fuchsia.ui.display.internal_hlcpp",
     "//sdk/lib/fit",

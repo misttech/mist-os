@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/ui/scenic/lib/display/display_controller.h"
+
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/scenic/lib/display/display_manager2.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
 
 namespace scenic_impl {
