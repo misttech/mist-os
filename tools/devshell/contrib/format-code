@@ -64,7 +64,15 @@ function zap-commas() {
 function get-diff-base() {
   local upstream=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)
   if [[ -z "${upstream}" ]]; then
-    upstream="origin/main"
+    # Make sure upstream is always an ancestor commit.  Prefer origin/main, because it
+    # is always newer than JIRI_HEAD.
+    if git merge-base --is-ancestor origin/main HEAD; then
+      upstream="origin/main"
+    elif git merge-base --is-ancestor JIRI_HEAD HEAD; then
+      upstream="JIRI_HEAD"
+    else
+      upstream="HEAD"
+    fi
   fi
   local local_commit=$(git rev-list HEAD ^${upstream} --  2>/dev/null | tail -1)
   if [[ -z "${local_commit}" ]]; then
