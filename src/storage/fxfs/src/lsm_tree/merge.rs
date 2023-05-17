@@ -695,13 +695,20 @@ mod tests {
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
         },
+        fprint::TypeFingerprint,
         rand::Rng,
         std::ops::{Bound, Range},
-        type_hash::TypeHash,
     };
 
     #[derive(
-        Clone, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize, TypeHash, Versioned,
+        Clone,
+        Eq,
+        PartialEq,
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        TypeFingerprint,
+        Versioned,
     )]
     struct TestKey(Range<u64>);
 
@@ -1247,7 +1254,14 @@ mod tests {
     }
 
     #[derive(
-        Clone, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize, TypeHash, Versioned,
+        Clone,
+        Eq,
+        PartialEq,
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        TypeFingerprint,
+        Versioned,
     )]
     struct TestKeyWithDefaultNextKey(Range<u64>);
 

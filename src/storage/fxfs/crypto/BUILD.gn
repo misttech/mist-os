@@ -10,6 +10,7 @@ rustc_library("crypto") {
   name = "fxfs-crypto"
 
   deps = [
+    "//src/storage/type-fprint:fprint",
     "//third_party/rust_crates:aes",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

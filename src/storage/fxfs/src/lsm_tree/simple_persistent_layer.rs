@@ -53,6 +53,7 @@ use {
     anyhow::{bail, ensure, Context, Error},
     async_trait::async_trait,
     byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt},
+    fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
     static_assertions::const_assert,
     std::{
@@ -64,11 +65,10 @@ use {
         vec::Vec,
     },
     storage_device::buffer::Buffer,
-    type_hash::TypeHash,
 };
 
 // The first block of each layer contains metadata for the rest of the layer.
-#[derive(Debug, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 pub struct LayerInfo {
     /// The version of the key and value structs serialized in this layer.
     key_value_version: Version,
@@ -672,12 +672,12 @@ mod tests {
             },
             testing::fake_object::{FakeObject, FakeObjectHandle},
         },
+        fprint::TypeFingerprint,
         std::{
             fmt::Debug,
             ops::{Bound, Range},
             sync::Arc,
         },
-        type_hash::TypeHash,
     };
 
     impl DefaultOrdUpperBound for i32 {}
@@ -918,7 +918,14 @@ mod tests {
     }
 
     #[derive(
-        Clone, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize, TypeHash, Versioned,
+        Clone,
+        Eq,
+        PartialEq,
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        TypeFingerprint,
+        Versioned,
     )]
     struct TestKey(Range<u64>);
     versioned_type! { 1.. => TestKey }

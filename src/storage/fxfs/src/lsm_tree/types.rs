@@ -12,9 +12,9 @@ use {
     },
     anyhow::Error,
     async_trait::async_trait,
+    fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},
-    type_hash::TypeHash,
 };
 
 // Force keys to be sorted first by a u64, so that they can be located approximately based on only
@@ -94,7 +94,7 @@ impl<'a, K, V> Clone for ItemRef<'a, K, V> {
 impl<'a, K, V> Copy for ItemRef<'a, K, V> {}
 
 /// Item is a struct that combines a key and a value.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TypeHash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct Item<K, V> {
     pub key: K,
@@ -104,6 +104,17 @@ pub struct Item<K, V> {
     /// committing the transaction containing the Item.  Note that two or more Items may share the
     /// same |sequence|.
     pub sequence: u64,
+}
+
+// Nb: type-fprint doesn't support generics yet.
+impl<K: TypeFingerprint, V: TypeFingerprint> TypeFingerprint for Item<K, V> {
+    fn fingerprint() -> String {
+        "struct {key:".to_owned()
+            + &K::fingerprint()
+            + ",value:"
+            + &V::fingerprint()
+            + ",sequence:u64}"
+    }
 }
 
 impl From<Item<ObjectKeyV5, ObjectValueV5>> for Item<ObjectKey, ObjectValueV25> {

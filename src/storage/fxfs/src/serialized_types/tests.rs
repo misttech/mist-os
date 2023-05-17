@@ -4,10 +4,10 @@
 
 use {
     crate::serialized_types::{versioned_type, Version, Versioned, VersionedLatest},
+    fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
     std::convert::From,
     std::io::Cursor,
-    type_hash::TypeHash,
 };
 
 // Note we don't use the standard serialized_types::EARLIEST_SUPPORTED_VERSION for tests.
@@ -16,16 +16,16 @@ const EARLIEST_SUPPORTED_VERSION: Version = Version { major: 1, minor: 0 };
 // Note we don't use the standard serialized_types::LATEST_VERSION for tests.
 const LATEST_VERSION: Version = Version { major: 4, minor: 2 };
 
-#[derive(Debug, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 struct FooV1 {
     a: u32,
 }
-#[derive(Debug, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 struct FooV2 {
     a: u32,
     b: u8,
 }
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
 struct FooV3 {
     a: u32,
     c: u64,

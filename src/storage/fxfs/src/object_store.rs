@@ -59,6 +59,7 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     assert_matches::assert_matches,
     async_trait::async_trait,
+    fprint::TypeFingerprint,
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
     fxfs_crypto::{ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
@@ -75,7 +76,6 @@ use {
         },
     },
     storage_device::Device,
-    type_hash::TypeHash,
     uuid::Uuid,
 };
 
@@ -112,8 +112,7 @@ pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {
 
 // StoreInfo stores information about the object store.  This is stored within the parent object
 // store, and is used, for example, to get the persistent layer objects.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, TypeHash, Versioned)]
-//#[versioned(TypeHash = 0)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TypeFingerprint, Versioned)]
 pub struct StoreInfo {
     /// The globally unique identifier for the associated object store. If unset, will be all zero.
     guid: [u8; 16],
@@ -200,7 +199,7 @@ pub struct NewChildStoreOptions {
     pub object_id: u64,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize, TypeHash)]
+#[derive(Clone, Default, Deserialize, Serialize, TypeFingerprint)]
 pub struct EncryptedMutations {
     // Information about the mutations are held here, but the actual encrypted data is held within
     // data.  For each transaction, we record the checkpoint and the count of mutations within the

@@ -21,6 +21,7 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     either::{Either, Left, Right},
+    fprint::TypeFingerprint,
     futures::{future::poll_fn, pin_mut},
     fxfs_crypto::WrappedKey,
     scopeguard::ScopeGuard,
@@ -41,7 +42,6 @@ use {
         task::{Poll, Waker},
         vec::Vec,
     },
-    type_hash::TypeHash,
 };
 
 /// `Options` are provided to types that expose the `TransactionHandler` trait.
@@ -139,7 +139,7 @@ pub trait TransactionHandler: AsRef<LockManager> + Send + Sync {
 /// (and we require custom comparison functions below).  For example, we need to be able to find
 /// object size changes.
 #[derive(
-    Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash, Versioned,
+    Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum Mutation {
@@ -157,7 +157,7 @@ pub enum Mutation {
     UpdateMutationsKey(UpdateMutationsKey),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 pub enum MutationV25 {
     ObjectStore(ObjectStoreMutationV25),
     EncryptedObjectStore(Box<[u8]>),
@@ -169,7 +169,7 @@ pub enum MutationV25 {
     UpdateMutationsKey(UpdateMutationsKey),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(MutationV25)]
 pub enum MutationV20 {
     ObjectStore(ObjectStoreMutationV20),
@@ -217,21 +217,21 @@ impl Mutation {
 // value that would be used by default so that we can deduplicate and find mutations (see
 // get_object_mutation below).
 
-#[derive(Clone, Debug, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ObjectStoreMutation {
     pub item: ObjectItem,
     pub op: Operation,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize)]
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
 pub struct ObjectStoreMutationV25 {
     item: ObjectItemV25,
     op: Operation,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize)]
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
 #[migrate_to_version(ObjectStoreMutationV25)]
 pub struct ObjectStoreMutationV20 {
@@ -240,7 +240,7 @@ pub struct ObjectStoreMutationV20 {
 }
 
 // The different LSM tree operations that can be performed as part of a mutation.
-#[derive(Clone, Debug, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum Operation {
     Insert,
@@ -282,7 +282,7 @@ impl PartialOrd for AllocatorItem {
 
 /// Same as std::ops::Range but with Ord and PartialOrd support, sorted first by start of the range,
 /// then by the end.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct DeviceRange(pub Range<u64>);
 
@@ -324,7 +324,7 @@ impl PartialOrd for DeviceRange {
     }
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum AllocatorMutation {
     Allocate {
@@ -347,7 +347,7 @@ pub enum AllocatorMutation {
     MarkForDeletion(u64),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
 pub struct UpdateMutationsKey(pub WrappedKey);
 
 #[cfg(fuzz)]

@@ -659,6 +659,7 @@ mod tests {
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
         },
+        fprint::TypeFingerprint,
         fuchsia_async as fasync,
         futures::{channel::oneshot::channel, future::join_all, join},
         std::{
@@ -666,7 +667,6 @@ mod tests {
             sync::Mutex,
             time::{Duration, Instant},
         },
-        type_hash::TypeHash,
     };
 
     #[derive(
@@ -678,7 +678,7 @@ mod tests {
         Debug,
         serde::Serialize,
         serde::Deserialize,
-        TypeHash,
+        TypeFingerprint,
         Versioned,
     )]
     struct TestKey(u64);

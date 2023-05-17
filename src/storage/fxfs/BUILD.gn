@@ -24,6 +24,7 @@ fxfs_deps = [
   "//src/lib/storage/storage_device",
   "//src/storage/fxfs/crypto",
   "//src/storage/lib/interval_tree",
+  "//src/storage/type-fprint:fprint",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:async-trait",
@@ -42,7 +43,6 @@ fxfs_deps = [
   "//third_party/rust_crates:static_assertions",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
-  "//third_party/rust_crates:type_hash",
   "//third_party/rust_crates:uuid",
 ]
 

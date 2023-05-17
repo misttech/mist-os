@@ -10,6 +10,7 @@ use {
     anyhow::{anyhow, Error},
     async_trait::async_trait,
     chacha20::{ChaCha20, Key},
+    fprint::TypeFingerprint,
     serde::{
         de::{Error as SerdeError, Visitor},
         Deserialize, Deserializer, Serialize, Serializer,
@@ -77,6 +78,12 @@ impl TypeHash for WrappedKeyBytes {
     }
 }
 
+impl TypeFingerprint for WrappedKeyBytes {
+    fn fingerprint() -> String {
+        "WrappedKeyBytes".to_owned()
+    }
+}
+
 impl std::ops::Deref for WrappedKeyBytes {
     type Target = [u8; WRAPPED_KEY_SIZE];
     fn deref(&self) -> &Self::Target {
@@ -136,7 +143,7 @@ impl<'de> Deserialize<'de> for WrappedKeyBytes {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, TypeHash, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, TypeHash, TypeFingerprint, PartialEq)]
 pub struct WrappedKey {
     /// The identifier of the wrapping key.  The identifier has meaning to whatever is doing the
     /// unwrapping.
@@ -151,7 +158,7 @@ pub struct WrappedKey {
 
 /// To support key rolling and clones, a file can have more than one key.  Each key has an ID that
 /// unique to the file.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash, TypeFingerprint)]
 pub struct WrappedKeys(pub Vec<(u64, WrappedKey)>);
 
 impl std::ops::Deref for WrappedKeys {

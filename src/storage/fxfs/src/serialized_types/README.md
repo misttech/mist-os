@@ -4,8 +4,8 @@ All "top level" data structures in Fxfs are prefixed with a version number when
 stored on disk. This includes the superblock, journal, and layer files as well
 as metadata about the allocator and object stores.
 
-This directory contains the code to deserialize older versions of structures and
-upgrade those structures to the latest versions.
+This directory contains the code to deserialize both current and older versions of
+structures and upgrade older structures to the latest version.
 
 Our versioning is based on a single Fxfs-wide version number stored in
 `LATEST_VERSION` consisting of a 24-bit major and 8-bit minor version.
@@ -58,20 +58,34 @@ from a previous storage format version to the latest storage format version.
    Note that the version and the type name suffix don't need to correspond. In
    the above example, it is invalid to decode FooV1 (or Foo) at Fxfs version 1.
 
-### TypeHash
+### TypeFingerprint
 
-   The latest version of any "`versioned_type`" must also implement the `TypeHash`
-   trait and an entry should be included in the `type_hash` test in `types.rs`.
+Due to nesting, we have found that structural changes can accidentally creep in.
+To mitigate this risk we use the TypeFingerprint trait.
 
-   This trait is only used in the `type_hash` test and has no impact on
-   production code. It ensures that any structural changes to a versioned type or one
-   of its sub-types (e.g. DeviceRange) will be noticed, providing an additional layer
-   of checking above and beyond our golden image tests.
+Th trait here is only used in the `type_fprint` tests and has no impact on
+production code. It ensures that any structural changes to a versioned type or one
+of its sub-types (e.g. DeviceRange) will be noticed, providing an additional layer
+of checking above and beyond our golden image tests. The fingerprint generated
+is a string designed to capture field names and types, but excludes type names
+in the case of structs and enums, which allows us to rename `Foo` to `FooV1`
+without triggering a fingerprint change. This aligns with our aims of ensuring
+we don't break deserialization without being overly strict and triggering on
+superficial renames.
 
-   A failure of this test serves as reminder that the version must be bumped.
+All supported major version of any "`versioned_type`" must implement the
+`TypeFingerprint` trait. When adding a new version, copy the
+`type_fprint_latest_version` test and rename it `type_fprint_vXX`.
+You will have to rename the types within the test as well but the fingerprints
+should not change. This is intended to be relatively painless but we can revise
+if it becomes problematic or overly verbose.
 
-   To derive the initial value, add a zero entry to the test in `types.rs` and run
-   `fx test`. The failed test will then provide the expected value.
+A failure of this test serves as reminder that the version must be bumped and
+the string diff should give a rough idea as to what part of a nested type
+actually changed.
+
+To derive the initial value, add a zero entry to the test in `types.rs` and run
+`fx test`. The failed test will then provide the expected value.
 
 #### Examples of struct converters
 

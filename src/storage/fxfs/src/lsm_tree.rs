@@ -370,13 +370,20 @@ mod tests {
             },
             testing::fake_object::{FakeObject, FakeObjectHandle},
         },
+        fprint::TypeFingerprint,
         rand::{seq::SliceRandom, thread_rng},
         std::{ops::Bound, sync::Arc},
-        type_hash::TypeHash,
     };
 
     #[derive(
-        Clone, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize, TypeHash, Versioned,
+        Clone,
+        Eq,
+        PartialEq,
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        TypeFingerprint,
+        Versioned,
     )]
     struct TestKey(std::ops::Range<u64>);
 
@@ -578,8 +585,8 @@ mod fuzz {
             },
         },
         arbitrary::Arbitrary,
+        fprint::TypeFingerprint,
         fuzz::fuzz,
-        type_hash::TypeHash,
     };
 
     #[derive(
@@ -590,7 +597,7 @@ mod fuzz {
         Debug,
         serde::Serialize,
         serde::Deserialize,
-        TypeHash,
+        TypeFingerprint,
         Versioned,
     )]
     struct TestKey(std::ops::Range<u64>);

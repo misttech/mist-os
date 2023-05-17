@@ -50,6 +50,7 @@ use {
         },
     },
     anyhow::{bail, ensure, Context, Error},
+    fprint::TypeFingerprint,
     fuchsia_inspect::{Property as _, UintProperty},
     serde::{Deserialize, Serialize},
     std::{
@@ -62,7 +63,6 @@ use {
         time::SystemTime,
     },
     storage_device::Device,
-    type_hash::TypeHash,
     uuid::Uuid,
 };
 
@@ -115,7 +115,9 @@ impl SuperBlockInstance {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(
+    Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned,
+)]
 pub struct SuperBlockHeader {
     /// The globally unique identifier for the filesystem.
     guid: UuidWrapper,
@@ -176,9 +178,9 @@ impl fmt::Debug for UuidWrapper {
     }
 }
 
-impl type_hash::TypeHash for UuidWrapper {
-    fn write_hash(hasher: &mut impl std::hash::Hasher) {
-        <[u8; 16]>::write_hash(hasher);
+impl TypeFingerprint for UuidWrapper {
+    fn fingerprint() -> String {
+        "<[u8;16]>".to_owned()
     }
 }
 
@@ -196,7 +198,7 @@ impl<'de> Deserialize<'de> for UuidWrapper {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 pub enum SuperBlockRecord {
     // When reading the super-block we know the initial extent, but not subsequent extents, so these
     // records need to exist to allow us to completely read the super-block.
@@ -210,14 +212,14 @@ pub enum SuperBlockRecord {
     End,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 pub enum SuperBlockRecordV25 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV25),
     End,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(SuperBlockRecordV25)]
 pub enum SuperBlockRecordV5 {
     Extent(Range<u64>),

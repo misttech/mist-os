@@ -11,16 +11,16 @@ use {
         object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
     },
+    fprint::TypeFingerprint,
     fxfs_crypto::WrappedKeys,
     serde::{Deserialize, Serialize},
     std::convert::From,
     std::default::Default,
     std::time::{Duration, SystemTime, UNIX_EPOCH},
-    type_hash::TypeHash,
 };
 
 /// ObjectDescriptor is the set of possible records in the object store.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ObjectDescriptor {
     /// A file (in the generic sense; i.e. an object with some attributes).
@@ -34,7 +34,7 @@ pub enum ObjectDescriptor {
 }
 
 /// For specifying what property of the project is being addressed.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ProjectProperty {
     /// The configured limit for the project.
@@ -43,7 +43,7 @@ pub enum ProjectProperty {
     Usage,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ObjectKeyData {
     /// A generic, untyped object.  This must come first and sort before all other keys for a given
@@ -64,7 +64,7 @@ pub enum ObjectKeyData {
     Project { project_id: u64, property: ProjectProperty },
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize)]
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 pub enum ObjectKeyDataV5 {
     Object,
     Keys,
@@ -73,7 +73,7 @@ pub enum ObjectKeyDataV5 {
     GraveyardEntry { object_id: u64 },
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum AttributeKey {
     // Order here is important: code expects Attribute to precede Extent.
@@ -83,7 +83,7 @@ pub enum AttributeKey {
 
 /// ObjectKey is a key in the object store.
 #[derive(
-    Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash, Versioned,
+    Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ObjectKey {
@@ -93,7 +93,7 @@ pub struct ObjectKey {
     pub data: ObjectKeyData,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_nodefault]
 pub struct ObjectKeyV5 {
     pub object_id: u64,
@@ -263,7 +263,17 @@ impl RangeKey for ObjectKey {
 
 /// UNIX epoch based timestamp in the UTC timezone.
 #[derive(
-    Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, TypeHash,
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct Timestamp {
@@ -307,7 +317,7 @@ impl From<Timestamp> for std::time::Duration {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ObjectKind {
     File {
@@ -330,7 +340,7 @@ pub enum ObjectKind {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 pub enum EncryptionKeys {
     AES256XTS(WrappedKeys),
 }
@@ -358,7 +368,7 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
 }
 /// This consists of POSIX attributes that are not used in Fxfs but it may be meaningful to some
 /// clients to have the ability to to set and retrieve these values.
-#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct PosixAttributes {
     /// The mode bits associated with this object
@@ -374,7 +384,7 @@ pub struct PosixAttributes {
 /// Object-level attributes.  Note that these are not the same as "attributes" in the
 /// ObjectValue::Attribute sense, which refers to an arbitrary data payload associated with an
 /// object.  This naming collision is unfortunate.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ObjectAttributes {
     /// The timestamp at which the object was created (i.e. crtime).
@@ -387,14 +397,14 @@ pub struct ObjectAttributes {
     pub posix_attributes: Option<PosixAttributes>,
 }
 
-#[derive(Debug, Default, Deserialize, Migrate, Serialize)]
+#[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
 pub struct ObjectAttributesV25 {
     creation_time: Timestamp,
     modification_time: Timestamp,
     project_id: u64,
 }
 
-#[derive(Debug, Default, Deserialize, Migrate, Serialize)]
+#[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_to_version(ObjectAttributesV25)]
 pub struct ObjectAttributesV5 {
     creation_time: Timestamp,
@@ -404,7 +414,7 @@ pub struct ObjectAttributesV5 {
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash, Versioned)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ObjectValue {
     /// Some keys have no value (this often indicates a tombstone of some sort).  Records with this
@@ -433,7 +443,7 @@ pub enum ObjectValue {
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 pub enum ObjectValueV25 {
     None,
     Some,
@@ -446,7 +456,7 @@ pub enum ObjectValueV25 {
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
 
-#[derive(Debug, Deserialize, Serialize, Migrate, Versioned)]
+#[derive(Debug, Deserialize, Serialize, Migrate, Versioned, TypeFingerprint)]
 #[migrate_to_version(ObjectValueV25)]
 pub enum ObjectValueV5 {
     None,

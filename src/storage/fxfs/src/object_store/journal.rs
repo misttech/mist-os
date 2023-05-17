@@ -57,6 +57,7 @@ use {
     },
     anyhow::{anyhow, bail, Context, Error},
     event_listener::Event,
+    fprint::TypeFingerprint,
     futures::{self, future::poll_fn, FutureExt},
     once_cell::sync::OnceCell,
     rand::Rng,
@@ -75,7 +76,6 @@ use {
         vec::Vec,
     },
     storage_device::buffer::Buffer,
-    type_hash::TypeHash,
 };
 
 // Exposed for serialized_types.
@@ -107,7 +107,7 @@ const RESET_XOR: u64 = 0xffffffffffffffff;
 // To keep track of offsets within a journal file, we need both the file offset and the check-sum of
 // the preceding block, since the check-sum of the preceding block is an input to the check-sum of
 // every block.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TypeHash)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TypeFingerprint)]
 pub struct JournalCheckpoint {
     pub file_offset: u64,
 
@@ -121,7 +121,7 @@ pub struct JournalCheckpoint {
     pub version: Version,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, TypeHash, Versioned)]
+#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum JournalRecord {
     // Indicates no more records in this block.
@@ -145,7 +145,7 @@ pub enum JournalRecord {
     DidFlushDevice(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 pub enum JournalRecordV25 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV25 },
@@ -154,7 +154,7 @@ pub enum JournalRecordV25 {
     DidFlushDevice(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(JournalRecordV25)]
 pub enum JournalRecordV20 {
     EndBlock,
