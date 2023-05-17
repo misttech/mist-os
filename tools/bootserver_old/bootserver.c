@@ -923,7 +923,7 @@ int main(int argc, char** argv) {
     }
     for (size_t i = 0; i < num_fvms; i++) {
       if (status == 0 && fvm_images[i]) {
-        status = xfer(&ra, fvm_images[i], NETBOOT_FVM_FILENAME);
+        status = xfer(&ra, fvm_images[i], NETBOOT_FVM_SPARSE_FILENAME);
       }
     }
     if (status == 0 && fxfs_image) {
