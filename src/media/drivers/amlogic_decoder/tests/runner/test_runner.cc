@@ -48,8 +48,9 @@ class TestDeviceBase {
           auto& [out, suffix] = *static_cast<std::add_pointer<decltype(pair)>::type>(cookie);
 
           fdio_cpp::UnownedFdioCaller caller(dirfd);
-          zx::result client_end =
-              component::ConnectAt<fuchsia_device::Controller>(caller.directory(), fn);
+          std::string controller_path = std::string(fn).append("/device_controller");
+          zx::result client_end = component::ConnectAt<fuchsia_device::Controller>(
+              caller.directory(), controller_path.c_str());
           if (client_end.is_error()) {
             return client_end.error_value();
           }

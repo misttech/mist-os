@@ -10,14 +10,9 @@ bool AllowMultiplexingController(std::string_view class_name) {
   // TODO(https://fxbug.dev/112484): Remove entries from this list.
   static const std::unordered_set<std::string_view> classes_that_include_controller({
       "block",
-      "acpi",
-      "media-codec",
       "thermal",
       "nand",
       "skip-block",
-      "rtc",
-      "tdh",
-      "cpu-ctrl",
       "network",
       "temperature",
   });
