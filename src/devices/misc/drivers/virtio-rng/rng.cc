@@ -34,18 +34,18 @@ zx_status_t RngDevice::Init() {
   DriverStatusAck();
 
   // allocate the main vring
-  auto err = vring_.Init(kRingIndex, kRingSize);
-  if (err < 0) {
+  zx_status_t status = vring_.Init(kRingIndex, kRingSize);
+  if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to allocate vring", tag());
-    return err;
+    return status;
   }
 
   // allocate the entropy buffer
   assert(kBufferSize <= zx_system_get_page_size());
-  zx_status_t rc = io_buffer_init(&buf_, bti_.get(), kBufferSize, IO_BUFFER_RO | IO_BUFFER_CONTIG);
-  if (rc != ZX_OK) {
-    zxlogf(ERROR, "%s: cannot allocate entropy buffer: %d", tag(), rc);
-    return rc;
+  status = io_buffer_init(&buf_, bti_.get(), kBufferSize, IO_BUFFER_RO | IO_BUFFER_CONTIG);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: cannot allocate entropy buffer: %d", tag(), status);
+    return status;
   }
 
   zxlogf(TRACE, "%s: allocated entropy buffer at %p, physical address %#" PRIxPTR "", tag(),
@@ -57,7 +57,7 @@ zx_status_t RngDevice::Init() {
   // set DRIVER_OK
   DriverStatusOk();
 
-  zx_status_t status = DdkAdd("virtio-rng");
+  status = DdkAdd("virtio-rng");
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to add device: %s", tag(), zx_status_get_string(status));
     return status;
@@ -80,8 +80,8 @@ void RngDevice::IrqRingUpdate() {
 
   // parse our descriptor chain, add back to the free queue
   auto free_chain = [this](vring_used_elem* used_elem) {
-    uint32_t i = (uint16_t)used_elem->id;
-    struct vring_desc* desc = vring_.DescFromIndex((uint16_t)i);
+    uint32_t i = static_cast<uint16_t>(used_elem->id);
+    struct vring_desc* desc = vring_.DescFromIndex(static_cast<uint16_t>(i));
 
     if (desc->addr != io_buffer_phys(&buf_) || desc->len != kBufferSize) {
       zxlogf(ERROR, "%s: entropy response with unexpected buffer", tag());
@@ -93,7 +93,7 @@ void RngDevice::IrqRingUpdate() {
       }
     }
 
-    vring_.FreeDesc((uint16_t)i);
+    vring_.FreeDesc(static_cast<uint16_t>(i));
   };
 
   // tell the ring to find free chains and hand it back to our lambda
