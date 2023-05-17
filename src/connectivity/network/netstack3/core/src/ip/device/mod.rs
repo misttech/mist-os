@@ -1456,22 +1456,6 @@ fn add_ipv6_addr_subnet_with_config<
     let addr_id = sync_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
     assert_eq!(addr_id.addr(), addr_sub.addr().into_specified());
 
-    // As per RFC 4861 section 5.6.2,
-    //
-    //   Before sending a Neighbor Solicitation, an interface MUST join
-    //   the all-nodes multicast address and the solicited-node
-    //   multicast address of the tentative address.
-    //
-    // Note that we join the all-nodes multicast address on interface
-    // enable.
-    join_ip_multicast_with_config(
-        sync_ctx,
-        ctx,
-        device_id,
-        addr_sub.addr().to_solicited_node_address(),
-        device_config,
-    );
-
     let Ipv6DeviceConfiguration {
         dad_transmits: _,
         max_router_solicitations: _,
@@ -1533,7 +1517,7 @@ fn del_ipv6_addr_with_config<
     device_id: &SC::DeviceId,
     addr: DelIpv6Addr<SC::AddressId>,
     reason: RemovedReason,
-    config: &Ipv6DeviceConfiguration,
+    _config: &Ipv6DeviceConfiguration,
 ) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, AddrConfig<C::Instant>), NotFoundError> {
     let addr_id = match addr {
         DelIpv6Addr::SpecifiedAddr(addr) => sync_ctx.get_address_id(device_id, addr)?,
@@ -1543,14 +1527,6 @@ fn del_ipv6_addr_with_config<
     DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, &addr_id);
     let (addr_sub, addr_config) = sync_ctx.remove_ip_address(device_id, addr_id);
     let addr = addr_sub.addr();
-
-    leave_ip_multicast_with_config(
-        sync_ctx,
-        ctx,
-        device_id,
-        addr.to_solicited_node_address(),
-        config,
-    );
 
     ctx.on_event(IpDeviceEvent::AddressRemoved {
         device: device_id.clone(),

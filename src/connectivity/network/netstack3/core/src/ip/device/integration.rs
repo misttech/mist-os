@@ -36,7 +36,8 @@ use crate::{
             self, add_ipv6_addr_subnet_with_config,
             dad::{DadAddressContext, DadAddressStateRef, DadContext, DadHandler, DadStateRef},
             del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
-            is_ip_forwarding_enabled,
+            is_ip_forwarding_enabled, join_ip_multicast_with_config,
+            leave_ip_multicast_with_config,
             nud::NudIpHandler,
             route_discovery::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
@@ -70,11 +71,16 @@ use crate::{
 };
 
 pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
-    pub(crate) sync_ctx: SyncCtxWithIpDeviceConfiguration<'a, &'a Ipv6DeviceConfiguration, Ipv6, C>,
+    pub(crate) sync_ctx: SyncCtxWithIpDeviceConfiguration<
+        'a,
+        &'a Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >,
     pub(crate) device_id: <SyncCtxWithIpDeviceConfiguration<
         'a,
         &'a Ipv6DeviceConfiguration,
-        Ipv6,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
         C,
     > as DeviceIdContext<AnyDevice>>::DeviceId,
     pub(crate) config: &'a Ipv6DeviceConfiguration,
@@ -544,21 +550,30 @@ impl<
     }
 }
 
-pub(crate) struct SyncCtxWithIpDeviceConfiguration<'a, Config, I: IpDeviceIpExt, C: NonSyncContext>
-{
+pub(crate) struct SyncCtxWithIpDeviceConfiguration<'a, Config, L, C: NonSyncContext> {
     pub config: Config,
-    pub sync_ctx: Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>,
+    pub sync_ctx: Locked<&'a SyncCtx<C>, L>,
 }
 
 impl<'a, I: gmp::IpExt + IpDeviceIpExt, C: NonSyncContext>
     device::WithIpDeviceConfigurationMutInner<I, C>
-    for SyncCtxWithIpDeviceConfiguration<'a, &mut I::Configuration, I, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        &mut I::Configuration,
+        crate::lock_ordering::IpDeviceConfiguration<I>,
+        C,
+    >
 where
-    for<'s> SyncCtxWithIpDeviceConfiguration<'s, &'s I::Configuration, I, C>: IpDeviceStateContext<I, C, DeviceId = Self::DeviceId>
+    for<'s> SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s I::Configuration,
+        crate::lock_ordering::IpDeviceConfiguration<I>,
+        C,
+    >: IpDeviceStateContext<I, C, DeviceId = Self::DeviceId>
         + GmpHandler<I, C>
         + NudIpHandler<I, C>,
 {
-    type IpDeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<'s, &'s I::Configuration, I, C> where Self: 's;
+    type IpDeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<'s, &'s I::Configuration, crate::lock_ordering::IpDeviceConfiguration<I>, C> where Self: 's;
 
     fn ip_device_configuration_and_ctx(
         &mut self,
@@ -575,16 +590,25 @@ where
 }
 
 impl<'a, C: NonSyncContext> device::WithIpv6DeviceConfigurationMutInner<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, &mut Ipv6DeviceConfiguration, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        &mut Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >
 where
-    for<'s> SyncCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, Ipv6, C>:
-        IpDeviceStateContext<Ipv6, C, DeviceId = Self::DeviceId>
-            + GmpHandler<Ipv6, C>
-            + NudIpHandler<Ipv6, C>
-            + DadHandler<C>
-            + RsHandler<C>,
+    for<'s> SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >: IpDeviceStateContext<Ipv6, C, DeviceId = Self::DeviceId>
+        + GmpHandler<Ipv6, C>
+        + NudIpHandler<Ipv6, C>
+        + DadHandler<C>
+        + RsHandler<C>,
 {
-    type Ipv6DeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, Ipv6, C> where Self: 's;
+    type Ipv6DeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration,crate::lock_ordering::IpDeviceConfiguration<Ipv6>, C> where Self: 's;
 
     fn ipv6_device_configuration_and_ctx(
         &mut self,
@@ -595,15 +619,17 @@ where
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> DeviceIdContext<AnyDevice>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
+impl<'a, Config, C: NonSyncContext, L> DeviceIdContext<AnyDevice>
+    for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 {
-    type DeviceId = <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as DeviceIdContext<AnyDevice>>::DeviceId;
-    type WeakDeviceId = <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
+    type DeviceId = <Locked<&'a SyncCtx<C>, L> as DeviceIdContext<AnyDevice>>::DeviceId;
+    type WeakDeviceId = <Locked<&'a SyncCtx<C>, L> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
 
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
         let Self { config: _, sync_ctx } = self;
-        <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as DeviceIdContext<AnyDevice>>::downgrade_device_id(sync_ctx, device_id)
+        <Locked<&'a SyncCtx<C>, L> as DeviceIdContext<AnyDevice>>::downgrade_device_id(
+            sync_ctx, device_id,
+        )
     }
 
     fn upgrade_weak_device_id(
@@ -611,17 +637,27 @@ impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> DeviceIdContext<AnyDevice>
         weak_device_id: &Self::WeakDeviceId,
     ) -> Option<Self::DeviceId> {
         let Self { config: _, sync_ctx } = self;
-        <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as DeviceIdContext<AnyDevice>>::upgrade_weak_device_id(sync_ctx, weak_device_id)
+        <Locked<&'a SyncCtx<C>, L> as DeviceIdContext<AnyDevice>>::upgrade_weak_device_id(
+            sync_ctx,
+            weak_device_id,
+        )
     }
 
     fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
         let Self { config: _, sync_ctx } = self;
-        <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as DeviceIdContext<AnyDevice>>::is_device_installed(sync_ctx, device_id)
+        <Locked<&'a SyncCtx<C>, L> as DeviceIdContext<AnyDevice>>::is_device_installed(
+            sync_ctx, device_id,
+        )
     }
 }
 
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >
 {
     type SlaacAddrs<'s> = SlaacAddrs<'s, C>;
 
@@ -666,8 +702,8 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContex
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
-    DadAddressContext<C> for Locked<&SyncCtx<C>, L>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> DadAddressContext<C>
+    for SyncCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, C>
 {
     fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
         &mut self,
@@ -682,12 +718,56 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressSta
 
         cb(assigned)
     }
+
+    fn join_multicast_group(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        multicast_addr: MulticastAddr<Ipv6Addr>,
+    ) {
+        let Self { config, sync_ctx } = self;
+        let config = Borrow::borrow(&*config);
+        join_ip_multicast_with_config(
+            &mut SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|s| s) },
+            ctx,
+            device_id,
+            multicast_addr,
+            config,
+        )
+    }
+
+    fn leave_multicast_group(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        multicast_addr: MulticastAddr<Ipv6Addr>,
+    ) {
+        let Self { config, sync_ctx } = self;
+        let config = Borrow::borrow(&*config);
+        leave_ip_multicast_with_config(
+            &mut SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|s| s) },
+            ctx,
+            device_id,
+            multicast_addr,
+            config,
+        )
+    }
 }
 
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >
 {
-    type DadAddressCtx<'b> = Locked<&'b SyncCtx<C>, crate::lock_ordering::Ipv6DeviceAddressDad>;
+    type DadAddressCtx<'b> = SyncCtxWithIpDeviceConfiguration<
+        'b,
+        &'b Ipv6DeviceConfiguration,
+        crate::lock_ordering::Ipv6DeviceAddressDad,
+        C,
+    >;
 
     fn get_address_id(
         &mut self,
@@ -721,12 +801,20 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
             Locked::<_, CurrentLockLevel>::new_locked(addr.deref())
         };
 
+        let config = Borrow::borrow(&*config);
+
         let (mut dad_state, mut sync_ctx) = {
             // The type/lock-levevel is specified when `Self::DadAddressCtx<'_>` is
             // impl-ed but we explicitly specify it here as well to audit this in
             // the event of a lock-level change.
             type AcquireLockLevel = crate::lock_ordering::Ipv6DeviceAddressDad;
-            (entry.lock::<AcquireLockLevel>(), sync_ctx.cast_locked::<AcquireLockLevel>())
+            (
+                entry.lock::<AcquireLockLevel>(),
+                SyncCtxWithIpDeviceConfiguration {
+                    config,
+                    sync_ctx: sync_ctx.cast_locked::<AcquireLockLevel>(),
+                },
+            )
         };
 
         cb(DadStateRef {
@@ -735,7 +823,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
                 sync_ctx: &mut sync_ctx,
             }),
             retrans_timer: &retrans_timer,
-            max_dad_transmits: &Borrow::borrow(&*config).dad_transmits,
+            max_dad_transmits: &config.dad_transmits,
         })
     }
 
@@ -762,7 +850,12 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
 }
 
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> RsContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >
 {
     type LinkLayerAddr = <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<Ipv6>> as device::Ipv6DeviceContext<C>>::LinkLayerAddr;
 
@@ -889,7 +982,12 @@ impl<C: NonSyncContext> Ipv6DiscoveredRoutesContext<C>
 }
 
 impl<'a, Config, C: NonSyncContext> Ipv6RouteDiscoveryContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >
 {
     type WithDiscoveredRoutesMutCtx<'b> =
         Locked<&'b SyncCtx<C>, crate::lock_ordering::Ipv6DeviceRouteDiscovery>;
@@ -930,7 +1028,12 @@ impl<'a, Config, C: NonSyncContext> Ipv6RouteDiscoveryContext<C>
 }
 
 impl<'a, Config, C: NonSyncContext> device::Ipv6DeviceContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        C,
+    >
 {
     type LinkLayerAddr = <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<Ipv6>> as device::Ipv6DeviceContext<C>>::LinkLayerAddr;
 
@@ -971,20 +1074,18 @@ impl<'a, Config, C: NonSyncContext> device::Ipv6DeviceContext<C>
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> device::IpDeviceAddressIdContext<I>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
+impl<'a, Config, I: IpDeviceIpExt, L, C: NonSyncContext> device::IpDeviceAddressIdContext<I>
+    for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 where
-    Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
-        device::IpDeviceAddressIdContext<I>,
+    Locked<&'a SyncCtx<C>, L>: device::IpDeviceAddressIdContext<I>,
 {
-    type AddressId = <Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>> as device::IpDeviceAddressIdContext<I>>::AddressId;
+    type AddressId = <Locked<&'a SyncCtx<C>, L> as device::IpDeviceAddressIdContext<I>>::AddressId;
 }
 
-impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> device::IpDeviceAddressContext<I, C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
+impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext, L> device::IpDeviceAddressContext<I, C>
+    for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 where
-    Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
-        device::IpDeviceAddressContext<I, C>,
+    Locked<&'a SyncCtx<C>, L>: device::IpDeviceAddressContext<I, C>,
 {
     fn with_ip_address_state<O, F: FnOnce(&I::AddressState<C::Instant>) -> O>(
         &mut self,
@@ -999,16 +1100,13 @@ where
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> device::IpDeviceStateContext<I, C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
+impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext, L> device::IpDeviceStateContext<I, C>
+    for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 where
-    Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
-        device::IpDeviceStateContext<I, C>,
+    Locked<&'a SyncCtx<C>, L>: device::IpDeviceStateContext<I, C>,
 {
-    type IpDeviceAddressCtx<'b> = <Locked<
-        &'a SyncCtx<C>,
-        crate::lock_ordering::IpDeviceConfiguration<I>,
-    > as device::IpDeviceStateContext<I, C>>::IpDeviceAddressCtx<'b>;
+    type IpDeviceAddressCtx<'b> =
+        <Locked<&'a SyncCtx<C>, L> as device::IpDeviceStateContext<I, C>>::IpDeviceAddressCtx<'b>;
 
     fn add_ip_address(
         &mut self,
@@ -1103,7 +1201,12 @@ where
 }
 
 impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, C: NonSyncContext> IgmpContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv4, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        C,
+    >
 {
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
@@ -1138,7 +1241,13 @@ impl<'a, Config, C: NonSyncContext>
         C,
         EmptyBuf,
         IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-    > for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv4, C>
+    >
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        C,
+    >
 {
     fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
         &mut self,
@@ -1157,8 +1266,12 @@ impl<'a, Config, C: NonSyncContext>
     }
 }
 
-impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> MldContext<C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+impl<
+        'a,
+        Config: Borrow<Ipv6DeviceConfiguration>,
+        C: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
+    > MldContext<C> for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 {
     fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
         &mut self,
@@ -1211,9 +1324,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> MldContext<
     }
 }
 
-impl<'a, Config, C: NonSyncContext>
+impl<'a, Config, C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     SendFrameContext<C, EmptyBuf, MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
+    for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 {
     fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
         &mut self,
@@ -1233,7 +1346,12 @@ impl<'a, Config, C: NonSyncContext>
 }
 
 impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext> NudIpHandler<I, C>
-    for SyncCtxWithIpDeviceConfiguration<'a, Config, I, C>
+    for SyncCtxWithIpDeviceConfiguration<
+        'a,
+        Config,
+        crate::lock_ordering::IpDeviceConfiguration<I>,
+        C,
+    >
 where
     Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>: NudIpHandler<I, C>,
 {

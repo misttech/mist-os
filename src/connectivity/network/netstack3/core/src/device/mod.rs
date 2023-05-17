@@ -445,10 +445,18 @@ impl<
     > IpDeviceConfigurationContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx>;
-    type WithIpDeviceConfigurationInnerCtx<'s> =
-        SyncCtxWithIpDeviceConfiguration<'s, &'s Ipv4DeviceConfiguration, Ipv4, NonSyncCtx>;
-    type WithIpDeviceConfigurationMutInner<'s> =
-        SyncCtxWithIpDeviceConfiguration<'s, &'s mut Ipv4DeviceConfiguration, Ipv4, NonSyncCtx>;
+    type WithIpDeviceConfigurationInnerCtx<'s> = SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s Ipv4DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        NonSyncCtx,
+    >;
+    type WithIpDeviceConfigurationMutInner<'s> = SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s mut Ipv4DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        NonSyncCtx,
+    >;
     type DeviceAddressAndGroupsAccessor<'s> =
         Locked<&'s SyncCtx<NonSyncCtx>, crate::lock_ordering::DeviceLayerState>;
 
@@ -779,10 +787,18 @@ impl<
         L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
     > Ipv6DeviceConfigurationContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    type Ipv6DeviceStateCtx<'s> =
-        SyncCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, Ipv6, NonSyncCtx>;
-    type WithIpv6DeviceConfigurationMutInner<'s> =
-        SyncCtxWithIpDeviceConfiguration<'s, &'s mut Ipv6DeviceConfiguration, Ipv6, NonSyncCtx>;
+    type Ipv6DeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        NonSyncCtx,
+    >;
+    type WithIpv6DeviceConfigurationMutInner<'s> = SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s mut Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        NonSyncCtx,
+    >;
 
     fn with_ipv6_device_configuration<
         O,
@@ -815,10 +831,18 @@ impl<
     > IpDeviceConfigurationContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx>;
-    type WithIpDeviceConfigurationInnerCtx<'s> =
-        SyncCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, Ipv6, NonSyncCtx>;
-    type WithIpDeviceConfigurationMutInner<'s> =
-        SyncCtxWithIpDeviceConfiguration<'s, &'s mut Ipv6DeviceConfiguration, Ipv6, NonSyncCtx>;
+    type WithIpDeviceConfigurationInnerCtx<'s> = SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        NonSyncCtx,
+    >;
+    type WithIpDeviceConfigurationMutInner<'s> = SyncCtxWithIpDeviceConfiguration<
+        's,
+        &'s mut Ipv6DeviceConfiguration,
+        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        NonSyncCtx,
+    >;
     type DeviceAddressAndGroupsAccessor<'s> =
         Locked<&'s SyncCtx<NonSyncCtx>, crate::lock_ordering::DeviceLayerState>;
 

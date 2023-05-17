@@ -510,10 +510,14 @@ mod tests {
             1
         );
 
-        // Let's make sure that our local node still can use that address.
+        // Let's make sure that only our local node still can use that address.
         assert_eq!(
             get_address_assigned(&&*net.sync_ctx("local"), &local_device_id, local_ip()),
             Some(true)
+        );
+        assert_eq!(
+            get_address_assigned(&&*net.sync_ctx("remote"), &remote_device_id, local_ip()),
+            None,
         );
 
         // Only local should be in the solicited node multicast group.
