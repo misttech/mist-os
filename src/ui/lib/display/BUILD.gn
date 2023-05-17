@@ -15,7 +15,7 @@ source_set("hdcp_service") {
     "hardware_display_controller_provider_impl.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.ui.display:fuchsia.ui.display_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
     "//src/lib/fsl",
@@ -24,7 +24,6 @@ source_set("hdcp_service") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/files",
     "//zircon/system/ulib/async:async-cpp",
