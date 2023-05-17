@@ -207,8 +207,6 @@ class FuchsiaTaskPublish(FuchsiaTask):
             )
 
     def publish_packages(self, args):
-        if args.publish_only:
-            return
         # TODO(fxbug.dev/110617): Publish all packages with 1 command invocation.
         print(f'Publishing packages: {args.packages}')
         for package in args.packages:
