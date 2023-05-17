@@ -216,6 +216,26 @@
             ],
         },
         {
+            // These protocols are not used in timekeeper, but end up in its
+            // manifest by way of it including realm_builder.shard.cml.
+            //
+            // Since we don't actually use them, we provide them from "void".
+            // This satisfies the route scrutiny, while also short-circuiting
+            // unused protocols.
+            protocol: [
+                "fuchsia.sys.Environment",
+                "fuchsia.sys.Loader",
+            ],
+            from: "void",
+            to: [ "#timekeeper" ],
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
+            from: "parent",
+            to: [ "#timekeeper" ],
+        },
+        {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
