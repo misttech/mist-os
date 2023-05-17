@@ -40,6 +40,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   VIRTUAL_AUDIO = 0x2F,
   BT_HCI_EMULATOR = 0x30,
   POWER_CORE = 0x31,
+  DEVICETREE = 0x32,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
