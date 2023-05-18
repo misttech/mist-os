@@ -471,6 +471,16 @@ int MsdVsiDevice::InterruptThreadLoop() {
 magma::Status MsdVsiDevice::ProcessInterrupt() {
   CHECK_THREAD_IS_CURRENT(device_thread_id_);
 
+  // In the field (b/280363833) we observe a crash here while reading from IrqAck,
+  // which indicates the hardware is suspended. This should not be possible
+  // because we should not be suspending the hardware while there is work in
+  // in progress. To prevent the crash we do PowerOn() here as a temporary measure
+  // to reduce the impact of having the driver crash in the field.
+  if (power_state() != PowerState::kOn) {
+    MAGMA_LOG(ERROR, "Processing Interrupt with power state 0x%x", power_state());
+    PowerOn();
+  }
+
   auto irq_status = registers::IrqAck::Get().ReadFrom(register_io_.get());
   auto mmu_exception = irq_status.mmu_exception();
   auto bus_error = irq_status.bus_error();
