@@ -28,8 +28,6 @@ std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id);
 
 class Devnode {
  public:
-  struct NoRemote {};
-
   // This class represents a device in devfs. It is called "passthrough" because it sends
   // the channel and the connection type to a callback function.
   struct PassThrough {
@@ -57,7 +55,7 @@ class Devnode {
     std::shared_ptr<ConnectCallback> connect;
   };
 
-  using Target = std::variant<NoRemote, PassThrough>;
+  using Target = std::optional<PassThrough>;
 
   // Constructs a root node.
   explicit Devnode(Devfs& devfs);

@@ -59,17 +59,7 @@ constexpr ProtocolInfo proto_infos[] = {
 #include <lib/ddk/protodefs.h>
 };
 
-Devnode::Target clone_target(Devnode::Target& target) {
-  return std::visit(overloaded{
-                        [](Devnode::NoRemote& no_remote) -> Devnode::Target {
-                          return Devnode::Target(Devnode::NoRemote());
-                        },
-                        [](Devnode::PassThrough& passthrough) -> Devnode::Target {
-                          return Devnode::Target(passthrough.Clone());
-                        },
-                    },
-                    target);
-}
+Devnode::Target clone_target(Devnode::Target& target) { return target; }
 
 }  // namespace
 
@@ -122,13 +112,7 @@ void Devnode::advertise_modified() {
 Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
     : holder_(holder), target_(std::move(target)) {}
 
-bool Devnode::VnodeImpl::IsDirectory() const {
-  return std::visit(overloaded{
-                        [&](const NoRemote&) { return true; },
-                        [](const Devnode::PassThrough& passthrough) { return false; },
-                    },
-                    target_);
-}
+bool Devnode::VnodeImpl::IsDirectory() const { return !target_.has_value(); }
 
 fs::VnodeProtocolSet Devnode::VnodeImpl::GetProtocols() const {
   fs::VnodeProtocolSet protocols = fs::VnodeProtocol::kDirectory;
@@ -157,23 +141,13 @@ zx_status_t Devnode::VnodeImpl::GetNodeInfoForProtocol(fs::VnodeProtocol protoco
 }
 
 zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
-  return std::visit(overloaded{
-                        [&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
-                        [&](const PassThrough& passthrough) {
-                          return (*passthrough.connect.get())(std::move(channel),
-                                                              passthrough.default_connection_type);
-                        },
-                    },
-                    target_);
+  if (!target_.has_value()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return (*target_->connect.get())(std::move(channel), target_->default_connection_type);
 }
 
-bool Devnode::VnodeImpl::IsService() const {
-  return std::visit(overloaded{
-                        [&](const NoRemote&) { return false; },
-                        [&](const PassThrough& passthrough) { return true; },
-                    },
-                    target_);
-}
+bool Devnode::VnodeImpl::IsService() const { return target_.has_value(); }
 
 zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
   return children().GetAttributes(a);
@@ -206,7 +180,7 @@ void MustAddEntry(PseudoDir& parent, const std::string_view name,
 }  // namespace
 
 Devnode::Devnode(Devfs& devfs)
-    : devfs_(devfs), parent_(nullptr), node_(fbl::MakeRefCounted<VnodeImpl>(*this, NoRemote())) {}
+    : devfs_(devfs), parent_(nullptr), node_(fbl::MakeRefCounted<VnodeImpl>(*this, Target())) {}
 
 Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name)
     : devfs_(devfs),
@@ -217,30 +191,23 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
         ZX_ASSERT(inserted);
         return it->first;
       }()) {
-  auto [device_controller, device_protocol] = std::visit(
-      overloaded{
-          [](NoRemote&) {
-            return std::make_tuple(fbl::RefPtr<fs::Service>(), fbl::RefPtr<fs::Service>());
-          },
-          [](PassThrough& passthrough) {
-            auto device_controller = fbl::MakeRefCounted<fs::Service>(
-                [passthrough = passthrough.Clone()](zx::channel channel) {
-                  return (*passthrough.connect.get())(std::move(channel),
-                                                      PassThrough::ConnectionType{
-                                                          .include_controller = true,
-                                                      });
-                });
-            auto device_protocol = fbl::MakeRefCounted<fs::Service>(
-                [passthrough = passthrough.Clone()](zx::channel channel) {
-                  return (*passthrough.connect.get())(std::move(channel),
-                                                      PassThrough::ConnectionType{
-                                                          .include_device = true,
-                                                      });
-                });
-            return std::make_tuple(std::move(device_controller), std::move(device_protocol));
-          },
-      },
-      target);
+  fbl::RefPtr device_controller = fbl::RefPtr<fs::Service>();
+  fbl::RefPtr device_protocol = fbl::RefPtr<fs::Service>();
+  if (target.has_value()) {
+    device_controller =
+        fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
+          return (*passthrough.connect.get())(std::move(channel), PassThrough::ConnectionType{
+                                                                      .include_controller = true,
+                                                                  });
+        });
+    device_protocol =
+        fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
+          return (*passthrough.connect.get())(std::move(channel), PassThrough::ConnectionType{
+                                                                      .include_device = true,
+                                                                  });
+        });
+  }
+
   if (device_controller) {
     children().AddEntry(fuchsia_device_fs::wire::kDeviceControllerName,
                         std::move(device_controller));
@@ -388,15 +355,15 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
   }
 
   // Set the FIDL multiplexing of the node based on the class name.
-  if (Devnode::PassThrough* passthrough = std::get_if<Devnode::PassThrough>(&target); passthrough) {
+  if (target.has_value()) {
     if (class_name.has_value()) {
-      passthrough->default_connection_type.include_node = AllowMultiplexingNode(class_name.value());
-      passthrough->default_connection_type.include_controller =
+      target->default_connection_type.include_node = AllowMultiplexingNode(class_name.value());
+      target->default_connection_type.include_controller =
           AllowMultiplexingController(class_name.value());
     } else {
       // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
-      passthrough->default_connection_type.include_node = true;
-      passthrough->default_connection_type.include_controller = true;
+      target->default_connection_type.include_node = true;
+      target->default_connection_type.include_controller = true;
     }
   }
 
@@ -588,8 +555,7 @@ zx_status_t Devnode::export_topological_path(Devnode::Target target,
         continue;
       }
       PseudoDir& parent = dn->node().children();
-      Devnode& child =
-          *out.emplace_back(std::make_unique<Devnode>(devfs_, parent, NoRemote{}, name));
+      Devnode& child = *out.emplace_back(std::make_unique<Devnode>(devfs_, parent, Target{}, name));
       child.publish();
       dn = &child;
       continue;

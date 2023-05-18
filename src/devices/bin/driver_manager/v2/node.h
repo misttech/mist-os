@@ -185,7 +185,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // This is exposed for testing. Setup this node's devfs nodes.
   void AddToDevfsForTesting(Devnode& parent) {
-    parent.add_child(name_, std::nullopt, Devnode::NoRemote(), devfs_device_);
+    parent.add_child(name_, std::nullopt, Devnode::Target(), devfs_device_);
   }
 
   // Invoked when a bind sequence has been completed. It allows us to reply to outstanding bind

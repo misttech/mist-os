@@ -400,7 +400,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   ZX_ASSERT_MSG(primary->devfs_device_.topological_node().has_value(), "%s",
                 composite->MakeTopologicalPath().c_str());
   primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, Devnode::NoRemote(), composite->devfs_device_);
+      composite->name_, std::nullopt, Devnode::Target(), composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
 }
@@ -802,7 +802,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     }
   }
 
-  Devnode::Target devfs_target = Devnode::NoRemote();
+  Devnode::Target devfs_target = Devnode::Target();
   std::optional<std::string_view> devfs_class_path;
   if (args.devfs_args().has_value() && args.devfs_args()->connector().has_value()) {
     if (args.devfs_args()->class_name().has_value()) {
