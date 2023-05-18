@@ -756,7 +756,6 @@ config("Wno-conversion") {
     "//src/graphics/display/drivers/ssd1306:*",
     "//src/graphics/display/lib/designware:*",
     "//src/graphics/display/lib/designware/test:*",
-    "//src/graphics/display/testing:*",
     "//src/graphics/drivers/misc/goldfish:*",
     "//src/graphics/drivers/misc/goldfish_address_space:*",
     "//src/graphics/drivers/misc/goldfish_sync:*",
