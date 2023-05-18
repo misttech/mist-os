@@ -1382,8 +1382,8 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Allow,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
@@ -1403,8 +1403,8 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
@@ -1424,8 +1424,8 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
@@ -1463,8 +1463,8 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
@@ -1483,8 +1483,8 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
@@ -1503,8 +1503,8 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
@@ -1555,8 +1555,8 @@ impl<'a> ValidationContext<'a> {
         collection_source: CollectionSource,
         source: Option<&fdecl::Ref>,
         source_name: Option<&String>,
-        target_name: Option<&'a String>,
         target: Option<&fdecl::Ref>,
+        target_name: Option<&'a String>,
         availability: Option<&fdecl::Availability>,
         prev_child_target_ids: &mut HashMap<&'a str, AllowableIds>,
     ) {
@@ -1817,9 +1817,10 @@ impl<'a> ValidationContext<'a> {
             fdecl::Offer::Storage(o) => {
                 self.validate_storage_offer_fields(
                     "OfferStorage",
-                    o.source_name.as_ref(),
                     o.source.as_ref(),
+                    o.source_name.as_ref(),
                     o.target.as_ref(),
+                    o.target_name.as_ref(),
                     o.availability.as_ref(),
                     offer_type,
                 );
@@ -1912,53 +1913,16 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    /// Validates that the offer target is to a valid child or collection.
-    fn validate_offer_target(
-        &mut self,
-        target: &'a Option<fdecl::Ref>,
-        decl_type: &str,
-        field_name: &str,
-        offer_type: OfferType,
-    ) -> Option<TargetId<'a>> {
-        match target.as_ref() {
-            Some(fdecl::Ref::Child(child)) => {
-                if self.validate_child_ref(decl_type, field_name, &child, offer_type) {
-                    Some(TargetId::Component(
-                        &child.name,
-                        child.collection.as_ref().map(|s| s.as_str()),
-                    ))
-                } else {
-                    None
-                }
-            }
-            Some(fdecl::Ref::Collection(collection)) => {
-                if self.validate_collection_ref(decl_type, field_name, &collection) {
-                    Some(TargetId::Collection(&collection.name))
-                } else {
-                    None
-                }
-            }
-            Some(_) => {
-                self.errors.push(Error::invalid_field(decl_type, field_name));
-                None
-            }
-            None => {
-                self.errors.push(Error::missing_field(decl_type, field_name));
-                None
-            }
-        }
-    }
-
     fn validate_offer_fields(
         &mut self,
         decl: &str,
         allowable_names: AllowableIds,
         collection_source: CollectionSource,
-        source: Option<&fdecl::Ref>,
-        source_name: Option<&String>,
+        source: Option<&'a fdecl::Ref>,
+        source_name: Option<&'a String>,
         target: Option<&'a fdecl::Ref>,
         target_name: Option<&'a String>,
-        availability: Option<&fdecl::Availability>,
+        availability: Option<&'a fdecl::Availability>,
         dependency: Option<fdecl::DependencyType>,
         offer_type: OfferType,
     ) {
@@ -1979,43 +1943,28 @@ impl<'a> ValidationContext<'a> {
         }
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
         check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
-        match target {
-            Some(fdecl::Ref::Child(c)) => {
-                self.validate_target_child(
-                    decl,
-                    allowable_names,
-                    c,
-                    source,
-                    target_name,
-                    dependency,
-                    offer_type,
-                );
-            }
-            Some(fdecl::Ref::Collection(c)) => {
-                self.validate_target_collection(decl, allowable_names, c, target_name);
-            }
-            Some(_) => {
-                self.errors.push(Error::invalid_field(decl, "target"));
-            }
-            None => {
-                self.errors.push(Error::missing_field(decl, "target"));
-            }
-        }
+        self.validate_offer_target(
+            decl,
+            allowable_names,
+            source,
+            target,
+            target_name,
+            dependency,
+            offer_type,
+        );
         check_offer_name(target_name, decl, "target_name", offer_type, &mut self.errors);
     }
 
     fn validate_storage_offer_fields(
         &mut self,
         decl: &str,
-        source_name: Option<&'a String>,
         source: Option<&'a fdecl::Ref>,
+        source_name: Option<&'a String>,
         target: Option<&'a fdecl::Ref>,
+        target_name: Option<&'a String>,
         availability: Option<&fdecl::Availability>,
         offer_type: OfferType,
     ) {
-        if source_name.is_none() {
-            self.errors.push(Error::missing_field(decl, "source_name"));
-        }
         match source {
             Some(fdecl::Ref::Parent(_) | fdecl::Ref::VoidType(_)) => (),
             Some(fdecl::Ref::Self_(_)) => {
@@ -2029,7 +1978,17 @@ impl<'a> ValidationContext<'a> {
             }
         }
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
-        self.validate_storage_target(decl, target, offer_type);
+        check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
+        self.validate_offer_target(
+            decl,
+            AllowableIds::One,
+            source,
+            target,
+            target_name,
+            None,
+            offer_type,
+        );
+        check_offer_name(target_name, decl, "target_name", offer_type, &mut self.errors);
     }
 
     fn validate_event_stream_offer_fields(
@@ -2094,20 +2053,15 @@ impl<'a> ValidationContext<'a> {
             &mut self.errors,
         );
 
-        let target_id =
-            self.validate_offer_target(&event_stream.target, decl, "target", offer_type);
-        if let (Some(target_id), Some(target_name)) = (target_id, event_stream.target_name.as_ref())
-        {
-            // Assuming the target_name is valid, ensure the target_name isn't already used.
-            if let Some(_) = self
-                .target_ids
-                .entry(target_id)
-                .or_insert(HashMap::new())
-                .insert(target_name, AllowableIds::One)
-            {
-                self.errors.push(Error::duplicate_field(decl, "target_name", target_name as &str));
-            }
-        }
+        self.validate_offer_target(
+            decl,
+            AllowableIds::One,
+            event_stream.source.as_ref(),
+            event_stream.target.as_ref(),
+            event_stream.target_name.as_ref(),
+            None,
+            offer_type,
+        );
         check_name(event_stream.target_name.as_ref(), decl, "target_name", &mut self.errors);
     }
 
@@ -2212,6 +2166,40 @@ impl<'a> ValidationContext<'a> {
         true
     }
 
+    fn validate_offer_target(
+        &mut self,
+        decl: &str,
+        allowable_names: AllowableIds,
+        source: Option<&'a fdecl::Ref>,
+        target: Option<&'a fdecl::Ref>,
+        target_name: Option<&'a String>,
+        dependency: Option<fdecl::DependencyType>,
+        offer_type: OfferType,
+    ) {
+        match target {
+            Some(fdecl::Ref::Child(c)) => {
+                self.validate_target_child(
+                    decl,
+                    allowable_names,
+                    c,
+                    source,
+                    target_name,
+                    dependency,
+                    offer_type,
+                );
+            }
+            Some(fdecl::Ref::Collection(c)) => {
+                self.validate_target_collection(decl, allowable_names, c, target_name);
+            }
+            Some(_) => {
+                self.errors.push(Error::invalid_field(decl, "target"));
+            }
+            None => {
+                self.errors.push(Error::missing_field(decl, "target"));
+            }
+        }
+    }
+
     fn validate_target_child(
         &mut self,
         decl: &str,
@@ -2277,24 +2265,6 @@ impl<'a> ValidationContext<'a> {
                     ));
                 }
             }
-        }
-    }
-
-    fn validate_storage_target(
-        &mut self,
-        decl: &str,
-        target: Option<&'a fdecl::Ref>,
-        offer_type: OfferType,
-    ) {
-        match target {
-            Some(fdecl::Ref::Child(c)) => {
-                self.validate_child_ref(decl, "target", &c, offer_type);
-            }
-            Some(fdecl::Ref::Collection(c)) => {
-                self.validate_collection_ref(decl, "target", &c);
-            }
-            Some(_) => self.errors.push(Error::invalid_field(decl, "target")),
-            None => self.errors.push(Error::missing_field(decl, "target")),
         }
     }
 }
@@ -4052,55 +4022,6 @@ mod tests {
                 Error::MissingField(DeclField { decl: "OfferEventStream".to_string(), field: "source_name".to_string() }),
             ])),
         },
-        test_validate_event_stream_offer_duplicate_target => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.offers = Some(vec![
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("stopped".to_string()),
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef{})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("stopped".to_string()),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("started".to_string()),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("started".to_string()),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("started".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("started".to_string()),
-                        ..Default::default()
-                    }),
-                ]);
-                decl.children = Some(vec![fdecl::Child{
-                    name: Some("test".to_string()),
-                    url: Some("fuchsia-pkg://fuchsia.com/logger#meta/logger.cm".to_string()),
-                    startup: Some(fdecl::StartupMode::Lazy),
-                    on_terminate: None,
-                    environment: None,
-                    ..Default::default()
-                },
-                fdecl::Child{
-                    name: Some("test2".to_string()),
-                    url: Some("fuchsia-pkg://fuchsia.com/fake_component#meta/fake_component.cm".to_string()),
-                    startup: Some(fdecl::StartupMode::Lazy),
-                    on_terminate: None,
-                    environment: None,
-                    ..Default::default()
-                }
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::DuplicateField(DeclField { decl: "OfferEventStream".to_string(), field: "target_name".to_string() }, "started".to_string()),
-            ])),
-        },
         test_validate_event_stream_offer_invalid_source => {
             input = {
                 let mut decl = new_component_decl();
@@ -5505,9 +5426,10 @@ mod tests {
                 Error::missing_field("OfferDirectory", "target_name"),
                 Error::missing_field("OfferDirectory", "dependency_type"),
                 //Error::missing_field("OfferDirectory", "availability"),
-                Error::missing_field("OfferStorage", "source_name"),
                 Error::missing_field("OfferStorage", "source"),
+                Error::missing_field("OfferStorage", "source_name"),
                 Error::missing_field("OfferStorage", "target"),
+                Error::missing_field("OfferStorage", "target_name"),
                 //Error::missing_field("OfferStorage", "availability"),
                 Error::missing_field("OfferRunner", "source"),
                 Error::missing_field("OfferRunner", "source_name"),
@@ -6328,6 +6250,24 @@ mod tests {
                         dependency_type: Some(fdecl::DependencyType::Weak),
                         ..Default::default()
                     }),
+                    fdecl::Offer::Storage(fdecl::OfferStorage {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source_name: Some("data".to_string()),
+                        target: Some(fdecl::Ref::Collection(
+                        fdecl::CollectionRef { name: "modular".to_string() }
+                        )),
+                        target_name: Some("data".to_string()),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Storage(fdecl::OfferStorage {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source_name: Some("data".to_string()),
+                        target: Some(fdecl::Ref::Collection(
+                        fdecl::CollectionRef { name: "modular".to_string() }
+                        )),
+                        target_name: Some("data".to_string()),
+                        ..Default::default()
+                    }),
                     fdecl::Offer::Runner(fdecl::OfferRunner {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         source_name: Some("elf".to_string()),
@@ -6355,6 +6295,20 @@ mod tests {
                         target_name: Some("duplicated".to_string()),
                         ..Default::default()
                     }),
+                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
+                        source_name: Some("started".to_string()),
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "netstack".to_string(), collection: None})),
+                        target_name: Some("started".to_string()),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
+                        source_name: Some("started".to_string()),
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "netstack".to_string(), collection: None})),
+                        target_name: Some("started".to_string()),
+                        ..Default::default()
+                    }),
                 ]);
                 decl.children = Some(vec![
                     fdecl::Child{
@@ -6379,11 +6333,13 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                // Duplicate services are allowed.
+                // Duplicate services are allowed, for aggregation.
                 Error::duplicate_field("OfferProtocol", "target_name", "fuchsia.logger.LegacyLog"),
                 Error::duplicate_field("OfferDirectory", "target_name", "assets"),
+                Error::duplicate_field("OfferStorage", "target_name", "data"),
                 Error::duplicate_field("OfferRunner", "target_name", "duplicated"),
                 Error::duplicate_field("OfferResolver", "target_name", "duplicated"),
+                Error::duplicate_field("OfferEventStream", "target_name", "started"),
             ])),
         },
         test_validate_offers_target_invalid => {
@@ -9105,9 +9061,10 @@ mod tests {
                 Error::missing_field("OfferDirectory", "target"),
                 Error::missing_field("OfferDirectory", "target_name"),
                 Error::missing_field("OfferDirectory", "dependency_type"),
-                Error::missing_field("OfferStorage", "source_name"),
                 Error::missing_field("OfferStorage", "source"),
+                Error::missing_field("OfferStorage", "source_name"),
                 Error::missing_field("OfferStorage", "target"),
+                Error::missing_field("OfferStorage", "target_name"),
                 Error::missing_field("OfferRunner", "source"),
                 Error::missing_field("OfferRunner", "source_name"),
                 Error::missing_field("OfferRunner", "target"),
