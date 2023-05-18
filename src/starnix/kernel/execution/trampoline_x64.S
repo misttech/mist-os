@@ -50,3 +50,8 @@ restricted_return:
 
   // return back to whatever the address was on the stack
   ret
+
+.globl breakpoint_for_module_changes
+breakpoint_for_module_changes:
+  int3
+  ret

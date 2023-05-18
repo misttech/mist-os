@@ -13,12 +13,10 @@ use std::convert::TryFrom;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::arch::execution::generate_interrupt_instructions;
 use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
 use crate::fs::*;
 use crate::logging::log_trace;
-use crate::mm::{DesiredAddress, MappingOptions, PAGE_SIZE};
-use crate::mm::{MappingName, MemoryManager, ProtectionFlags};
+use crate::mm::MemoryManager;
 use crate::signals::dequeue_signal;
 use crate::syscalls::{
     decls::{Syscall, SyscallDecl},
@@ -26,7 +24,6 @@ use crate::syscalls::{
 };
 use crate::task::*;
 use crate::types::*;
-use crate::vmex_resource::VMEX_RESOURCE;
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -129,65 +126,6 @@ pub fn process_completed_syscall(
     block_while_stopped(current_task);
 
     Ok(None)
-}
-
-/// Notifies the debugger, if one is attached, that the module list might have been changed.
-///
-/// For more information about the debugger protocol, see:
-/// https://cs.opensource.google/fuchsia/fuchsia/+/master:src/developer/debug/debug_agent/process_handle.h;l=31
-///
-/// # Parameters:
-/// - `current_task`: The task to set the property for. The register's of this task, the instruction
-///                   pointer specifically, needs to be set to the value with which the task is
-///                   expected to resume.
-pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<(), Errno> {
-    let break_on_load = current_task
-        .thread_group
-        .process
-        .get_break_on_load()
-        .map_err(|err| from_status_like_fdio!(err))?;
-
-    // If break on load is 0, there is no debugger attached, so return before issuing the software
-    // breakpoint.
-    if break_on_load == 0 {
-        return Ok(());
-    }
-
-    // An executable VMO is mapped into the process, which does two things:
-    //   1. Issues a software interrupt caught by the debugger.
-    //   2. Jumps back to the current instruction pointer of the thread executed by an indirect
-    //      jump to the 64-bit address immediately following the jump instruction.
-    let instructions = generate_interrupt_instructions(current_task);
-    let vmo = Arc::new(
-        zx::Vmo::create(*PAGE_SIZE)
-            .and_then(|vmo| vmo.replace_as_executable(&VMEX_RESOURCE))
-            .map_err(|err| from_status_like_fdio!(err))?,
-    );
-    vmo.write(&instructions, 0).map_err(|e| from_status_like_fdio!(e))?;
-
-    let prot_flags = ProtectionFlags::EXEC | ProtectionFlags::READ;
-    let instruction_pointer = current_task.mm.map(
-        DesiredAddress::Hint(UserAddress::default()),
-        vmo,
-        0,
-        instructions.len(),
-        prot_flags,
-        prot_flags.to_vmar_flags(),
-        MappingOptions::empty(),
-        MappingName::None,
-    )?;
-
-    // Set the break on load value to point to the software breakpoint. This is how the debugger
-    // distinguishes the breakpoint from other software breakpoints.
-    current_task
-        .thread_group
-        .process
-        .set_break_on_load(&(instruction_pointer.ptr() as u64))
-        .map_err(|err| from_status_like_fdio!(err))?;
-
-    current_task.registers.set_instruction_pointer_register(instruction_pointer.ptr() as u64);
-
-    Ok(())
 }
 
 /// Creates a `StartupHandles` from the provided handles.

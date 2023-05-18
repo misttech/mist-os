@@ -64,3 +64,7 @@ restricted_return:
   str  x1, [x2]
   ret
 
+.globl breakpoint_for_module_changes
+breakpoint_for_module_changes:
+  brk #0
+  ret
