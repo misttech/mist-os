@@ -210,7 +210,6 @@ tracing-core = "0.1.21"
 tracing-log = "0.1.2"
 tracing-mutex = { version = "0.2.1", features = ["parkinglot"] }
 typed-builder = "0.10.0"
-type_hash = "0.3.0"
 unicase = "2.2.0"
 untrusted = "0.7.1"
 url = "2.3"
@@ -354,9 +353,6 @@ rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
-type_hash_core = { path = "forks/type_hash/core" }
-type_hash_macros = { path = "forks/type_hash/macros" }
-type_hash = { path = "forks/type_hash/type_hash" }
 valico = { path = "forks/valico" }
 zeroize = { path = "forks/zeroize" }
 zstd-sys = { path = "forks/zstd-sys" }

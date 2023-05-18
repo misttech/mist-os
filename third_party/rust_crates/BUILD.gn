@@ -990,10 +990,6 @@ group("tuf") {
   public_deps = [ ":tuf-v0_3_0-beta11" ]
 }
 
-group("type_hash") {
-  public_deps = [ ":type_hash-v0_3_0" ]
-}
-
 group("typed-builder") {
   public_deps = [ ":typed-builder-v0_10_0($host_toolchain)" ]
 }
@@ -11397,73 +11393,6 @@ rust_library("tuf-v0_3_0-beta11") {
     "-Cmetadata=626873d1c4c31241",
     "-Cextra-filename=-626873d1c4c31241",
     "--cfg=feature=\"hyper\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("type_hash-v0_3_0") {
-  crate_name = "type_hash"
-  crate_root = "//third_party/rust_crates/forks/type_hash/type_hash/src/lib.rs"
-  output_name = "type_hash-bd6fe0fb07664572"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":type_hash_core-v0_2_0" ]
-  deps += [ ":type_hash_macros-v0_3_0($host_toolchain)" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=bd6fe0fb07664572",
-    "-Cextra-filename=-bd6fe0fb07664572",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("type_hash_core-v0_2_0") {
-  crate_name = "type_hash_core"
-  crate_root = "//third_party/rust_crates/forks/type_hash/core/src/lib.rs"
-  output_name = "type_hash_core-23ddea752b0ad3e"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":fnv-v1_0_7" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=23ddea752b0ad3e",
-    "-Cextra-filename=-23ddea752b0ad3e",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_proc_macro("type_hash_macros-v0_3_0") {
-  crate_name = "type_hash_macros"
-  crate_root = "//third_party/rust_crates/forks/type_hash/macros/src/lib.rs"
-  output_name = "type_hash_macros-712b3e7f99087b23"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":either-v1_8_0" ]
-  deps += [ ":proc-macro2-v1_0_39" ]
-  deps += [ ":quote-v1_0_18" ]
-  deps += [ ":syn-v1_0_98" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=712b3e7f99087b23",
-    "-Cextra-filename=-712b3e7f99087b23",
   ]
 
   visibility = [ ":*" ]

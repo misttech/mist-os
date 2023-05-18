@@ -1431,7 +1431,6 @@ dependencies = [
  "trust-dns-resolver",
  "ttf-parser",
  "tuf",
- "type_hash",
  "typed-builder",
  "unic-char-range",
  "unic-ucd-block",
@@ -4420,31 +4419,6 @@ dependencies = [
  "thiserror",
  "untrusted",
  "url 2.3.1",
-]
-
-[[package]]
-name = "type_hash"
-version = "0.3.0"
-dependencies = [
- "type_hash_core",
- "type_hash_macros",
-]
-
-[[package]]
-name = "type_hash_core"
-version = "0.2.0"
-dependencies = [
- "fnv",
-]
-
-[[package]]
-name = "type_hash_macros"
-version = "0.3.0"
-dependencies = [
- "either",
- "proc-macro2 1.0.39",
- "quote 1.0.18",
- "syn 1.0.98",
 ]
 
 [[package]]
