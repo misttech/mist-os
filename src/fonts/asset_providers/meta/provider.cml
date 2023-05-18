@@ -1,0 +1,59 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "asset-provider",
+            url: "fuchsia-pkg://fuchsia.com/asset-provider#meta/asset-provider.cm",
+        },
+        {
+            name: "font-server",
+            url: "fuchsia-pkg://fuchsia.com/font-server#meta/font-server.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#font-server",
+        },
+        {
+            // Logging.
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#asset-provider",
+                "#font-server",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.pkg.FontResolver" ],
+            from: "parent",
+            to: "#font-server",
+            availability: "optional",
+        },
+
+        // Provide the resource directory from asset provider to font server.
+        {
+            directory: "fonts-data",
+            from: "#asset-provider",
+            to: "#font-server",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.fonts.experimental.Provider",
+                "fuchsia.fonts.Provider",
+            ],
+            from: "#font-server",
+        },
+        {
+            // Diagnostics.
+            directory: "diagnostics",
+            from: "#font-server",
+            to: "parent",
+        },
+    ],
+}

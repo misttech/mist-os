@@ -146,6 +146,11 @@ local_font_bundle("short-stack-local") {
 # `base_package_labels` or `cache_package_labels`.
 font_collection("open-fonts-collection") {
   product_config_path = "open-fonts-collection.fontcfg.json5"
+  generate_hermetic_assets = true
+
+  # Font manifest will refer to files at /fonts/data/assets/... instead of the
+  # default /pkg/data/assets/...
+  assets_root_dir = "/fonts"
   local_font_bundles = [
     ":alegreya-local",
     ":cutive-mono-local",
@@ -180,6 +185,8 @@ local_font_bundle("small-open-fonts-local") {
 font_collection("small-open-fonts-collection") {
   product_config_path = "small-open-fonts-collection.fontcfg.json5"
   local_font_bundles = [ ":small-open-fonts-local" ]
+  generate_hermetic_assets = true
+  assets_root_dir = "/fonts"
 }
 
 local_font_bundle("test-fonts-small-local") {

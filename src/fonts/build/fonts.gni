@@ -183,12 +183,20 @@ template("local_font_bundle") {
 #     the config-data assets.
 #     Default: false
 #     Type: boolean
+#
+#   assets_root_dir
+#     Optional: If set, this will be the prefix directory that the font manifest
+#     will place the resources by default.  Used only if
+#     generate_hermetic_assets == true.
+#     Default: "/pkg"
+#     Type: string
 template("font_collection") {
   forward_variables_from(invoker,
                          [
                            "font_packages",
                            "font_service_pkg",
                            "generate_hermetic_assets",
+                           "assets_root_dir",
                            "local_asset_names",
                            "local_font_bundles",
                            "manifest_prefix",
@@ -197,6 +205,10 @@ template("font_collection") {
 
   if (!defined(generate_hermetic_assets)) {
     generate_hermetic_assets = false
+  }
+
+  if (generate_hermetic_assets && !defined(assets_root_dir)) {
+    assets_root_dir = "/pkg"
   }
 
   if (!defined(font_packages)) {
@@ -362,7 +374,7 @@ template("font_collection") {
       ]
       output = asset_font_manifest_path
       pretty_print = is_debug
-      target_asset_dir = "/pkg/${_assets_relative_path}"
+      target_asset_dir = "${assets_root_dir}/${_assets_relative_path}"
     }
 
     font_assets_label = "${target_name}_font_assets"

@@ -1,0 +1,13 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/fonts/meta/fonts.cml" ],
+    use: [
+        {
+            directory: "fonts-data",
+            rights: [ "r*" ],
+            path: "/fonts/data",
+        },
+    ],
+}

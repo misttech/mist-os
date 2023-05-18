@@ -1,0 +1,62 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# See README.md for details.
+
+import("//build/components.gni")
+import("//src/fonts/build/font_asset_provider.gni")
+import("//src/fonts/build/fonts.gni")
+
+group("asset_providers") {
+  testonly = true
+  deps = [
+    ":open-fonts-collection",
+    ":small-open-fonts-collection",
+  ]
+}
+
+fuchsia_component_manifest("asset-provider.manifest") {
+  manifest = "meta/asset-provider.cml"
+  component_name = "asset-provider"
+}
+
+# Common font asset provider components.
+#
+# Used by font_asset_provider.gni.
+group("common") {
+  public_deps = [
+    ":asset-provider.manifest",
+
+    # The parts of the top level provider package.
+    ":provider.component",
+    ":provider.manifest",
+    ":provider.package",
+  ]
+}
+
+fuchsia_component_manifest("provider.manifest") {
+  manifest = "meta/provider.cml"
+  component_name = "fonts"
+}
+
+fuchsia_component("provider.component") {
+  cm_label = ":provider.manifest"
+  component_name = "fonts"
+}
+
+fuchsia_package("provider.package") {
+  package_name = "fonts"
+  deps = [ ":provider.component" ]
+}
+
+# Font asset provider definitions.
+#
+# Expect to have one for each font collection in //src/fonts/collections.
+font_asset_provider("open-fonts-collection") {
+  deps = [ "//src/fonts/collections:open-fonts-collection" ]
+}
+
+font_asset_provider("small-open-fonts-collection") {
+  deps = [ "//src/fonts/collections:small-open-fonts-collection" ]
+}
