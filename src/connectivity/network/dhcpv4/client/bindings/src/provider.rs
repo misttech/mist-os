@@ -119,6 +119,8 @@ pub(crate) async fn serve_client_provider(
                                             ClientExitReason::InvalidInterface
                                         }
                                         dhcp_client_core::deps::SocketError::FailedToOpen(_)
+                                        | dhcp_client_core::deps::SocketError::HostUnreachable
+                                        | dhcp_client_core::deps::SocketError::NetworkUnreachable
                                         | dhcp_client_core::deps::SocketError::Other(_) => {
                                             ClientExitReason::UnableToOpenSocket
                                         }

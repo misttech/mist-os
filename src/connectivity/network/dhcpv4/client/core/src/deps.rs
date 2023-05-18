@@ -48,6 +48,12 @@ pub enum SocketError {
     /// The hardware type of the interface is unsupported.
     #[error("unsupported hardware type")]
     UnsupportedHardwareType,
+    /// The host we are attempting to send to is unreachable.
+    #[error("host unreachable")]
+    HostUnreachable,
+    /// The network is unreachable.
+    #[error("network unreachable")]
+    NetworkUnreachable,
     /// Other IO errors observed on socket operations.
     #[error("socket error: {0}")]
     Other(std::io::Error),
@@ -86,6 +92,26 @@ pub trait PacketSocketProvider {
     /// protocol is being performed. The packet socket should already be bound
     /// to the appropriate device and protocol number.
     async fn get_packet_socket(&self) -> Result<Self::Sock, SocketError>;
+}
+
+// While #[async_trait] causes the Futures returned by the trait functions to be
+// heap-allocated, we accept this because we expect creating a socket to be an
+// infrequent operation, and because we expect async_fn_in_trait to be
+// stabilized in the relatively near future.
+// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
+// instead.
+#[async_trait(?Send)]
+/// Provides access to UDP sockets.
+pub trait UdpSocketProvider {
+    /// The type of sockets provided by this `UdpSocketProvider`.
+    type Sock: Socket<std::net::SocketAddr>;
+
+    /// Gets a UDP socket bound to the given address. The UDP socket should be
+    /// allowed to send broadcast packets.
+    async fn bind_new_udp_socket(
+        &self,
+        bound_addr: std::net::SocketAddr,
+    ) -> Result<Self::Sock, SocketError>;
 }
 
 /// A type representing an instant in time.
@@ -217,26 +243,57 @@ pub(crate) mod testutil {
         }
     }
 
-    /// Fake implementation of `PacketSocketProvider` that vends out copies of
+    /// Fake socket provider implementation that vends out copies of
     /// the same `FakeSocket`.
     ///
     /// These copies will compete to receive and send on the same underlying
     /// `mpsc` channels.
-    pub(crate) struct FakeSocketProvider<T> {
+    pub(crate) struct FakeSocketProvider<T, E> {
+        /// The socket being vended out.
         pub(crate) socket: Rc<FakeSocket<T>>,
+
+        /// If present, used to notify tests when the client binds new sockets.
+        pub(crate) bound_events: Option<mpsc::UnboundedSender<E>>,
     }
 
-    impl<T> FakeSocketProvider<T> {
+    impl<T, E> FakeSocketProvider<T, E> {
         pub(crate) fn new(socket: FakeSocket<T>) -> Self {
-            Self { socket: Rc::new(socket) }
+            Self { socket: Rc::new(socket), bound_events: None }
+        }
+
+        pub(crate) fn new_with_events(
+            socket: FakeSocket<T>,
+            bound_events: mpsc::UnboundedSender<E>,
+        ) -> Self {
+            Self { socket: Rc::new(socket), bound_events: Some(bound_events) }
         }
     }
 
     #[async_trait(?Send)]
-    impl PacketSocketProvider for FakeSocketProvider<net_types::ethernet::Mac> {
+    impl PacketSocketProvider for FakeSocketProvider<net_types::ethernet::Mac, ()> {
         type Sock = Rc<FakeSocket<net_types::ethernet::Mac>>;
         async fn get_packet_socket(&self) -> Result<Self::Sock, SocketError> {
-            let Self { socket } = self;
+            let Self { socket, bound_events } = self;
+            if let Some(bound_events) = bound_events {
+                bound_events.unbounded_send(()).expect("events receiver should not be dropped");
+            }
+            Ok(socket.clone())
+        }
+    }
+
+    #[async_trait(?Send)]
+    impl UdpSocketProvider for FakeSocketProvider<std::net::SocketAddr, std::net::SocketAddr> {
+        type Sock = Rc<FakeSocket<std::net::SocketAddr>>;
+        async fn bind_new_udp_socket(
+            &self,
+            bound_addr: std::net::SocketAddr,
+        ) -> Result<Self::Sock, SocketError> {
+            let Self { socket, bound_events } = self;
+            if let Some(bound_events) = bound_events {
+                bound_events
+                    .unbounded_send(bound_addr)
+                    .expect("events receiver should not be dropped");
+            }
             Ok(socket.clone())
         }
     }
@@ -340,7 +397,8 @@ mod test {
     use super::testutil::*;
     use super::*;
     use fuchsia_async as fasync;
-    use futures::{pin_mut, FutureExt};
+    use futures::{channel::mpsc, pin_mut, FutureExt, StreamExt};
+    use net_declare::std_socket_addr;
 
     #[test]
     fn test_rng() {
@@ -404,11 +462,64 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_socket_provider() {
+    async fn test_fake_udp_socket_provider() {
         let (a, b) = FakeSocket::new_pair();
-        let provider = FakeSocketProvider::new(b);
+        let (events_sender, mut events_receiver) = mpsc::unbounded();
+        let provider = FakeSocketProvider::new_with_events(b, events_sender);
+        const ADDR_1: std::net::SocketAddr = std_socket_addr!("1.1.1.1:11");
+        const ADDR_2: std::net::SocketAddr = std_socket_addr!("2.2.2.2:22");
+        const ADDR_3: std::net::SocketAddr = std_socket_addr!("3.3.3.3:33");
+        let b_1 = provider.bind_new_udp_socket(ADDR_1).await.expect("get packet socket");
+        assert_eq!(
+            events_receiver
+                .next()
+                .now_or_never()
+                .expect("should have received bound event")
+                .expect("stream should not have ended"),
+            ADDR_1
+        );
+
+        let b_2 = provider.bind_new_udp_socket(ADDR_2).await.expect("get packet socket");
+        assert_eq!(
+            events_receiver
+                .next()
+                .now_or_never()
+                .expect("should have received bound event")
+                .expect("stream should not have ended"),
+            ADDR_2
+        );
+
+        a.send_to(b"hello", ADDR_3).await.unwrap();
+        a.send_to(b"world", ADDR_3).await.unwrap();
+
+        let mut buf = [0u8; 5];
+        let DatagramInfo { length, address } = b_1.recv_from(&mut buf).await.unwrap();
+        assert_eq!(&buf[..length], b"hello");
+        assert_eq!(address, ADDR_3);
+
+        let DatagramInfo { length, address } = b_2.recv_from(&mut buf).await.unwrap();
+        assert_eq!(&buf[..length], b"world");
+        assert_eq!(address, ADDR_3);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_fake_packet_socket_provider() {
+        let (a, b) = FakeSocket::new_pair();
+        let (events_sender, mut events_receiver) = mpsc::unbounded();
+        let provider = FakeSocketProvider::new_with_events(b, events_sender);
         let b_1 = provider.get_packet_socket().await.expect("get packet socket");
+        events_receiver
+            .next()
+            .now_or_never()
+            .expect("should have received bound event")
+            .expect("stream should not have ended");
+
         let b_2 = provider.get_packet_socket().await.expect("get packet socket");
+        events_receiver
+            .next()
+            .now_or_never()
+            .expect("should have received bound event")
+            .expect("stream should not have ended");
 
         const ADDRESS: net_types::ethernet::Mac = net_declare::net_mac!("01:02:03:04:05:06");
 

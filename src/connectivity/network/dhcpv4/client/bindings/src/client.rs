@@ -47,8 +47,12 @@ impl Error {
                     tracing::error!("error while trying to open socket: {:?}", e);
                     Self::Exit(ClientExitReason::UnableToOpenSocket)
                 }
-                dhcp_client_core::deps::SocketError::Other(_) => {
+                dhcp_client_core::deps::SocketError::HostUnreachable
+                | dhcp_client_core::deps::SocketError::Other(_) => {
                     Self::Core(dhcp_client_core::client::Error::Socket(socket_error))
+                }
+                dhcp_client_core::deps::SocketError::NetworkUnreachable => {
+                    Self::Exit(ClientExitReason::NetworkUnreachable)
                 }
             },
         }

@@ -11,6 +11,7 @@
 mod client;
 mod packetsocket;
 mod provider;
+mod udpsocket;
 
 use fidl_fuchsia_net_dhcp::{ClientProviderMarker, ClientProviderRequestStream};
 use fidl_fuchsia_posix_socket_packet as fpacket;

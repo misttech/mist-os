@@ -15,12 +15,14 @@ rustc_binary("dhcp_client") {
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/dhcpv4/client/core",
     "//src/connectivity/network/dhcpv4/protocol",
     "//src/connectivity/network/lib/sockaddr",
+    "//src/connectivity/network/lib/todo_unused",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -50,6 +52,7 @@ rustc_binary("dhcp_client") {
     "src/main.rs",
     "src/packetsocket.rs",
     "src/provider.rs",
+    "src/udpsocket.rs",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
