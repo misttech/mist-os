@@ -53,7 +53,7 @@ To analyze a specific snapshot.zip file, use `--data`.
     `fx snapshot` and analyzes its files.
 
 ```shell
-$ fx triage --data my/foo/snapshot.zip
+fx triage --data my/foo/snapshot.zip
 ```
 
 To use a specific configuration file or all `*.triage` files in a specific
@@ -174,8 +174,8 @@ Put the above selectors into the "select" section of the rules.triage file.
 Entering selectors by hand is error-prone, so `fx triage --select` can be used
 to output valid selectors.
 
-```shell
-$ fx triage --data snapshot --select total_bytes
+```shell {:.devsite-disable-click-to-copy}
+fx triage --data snapshot --select total_bytes
 INSPECT:bootstrap/fshost:root/data_stats/stats:total_bytes
 ```
 
