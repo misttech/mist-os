@@ -513,7 +513,7 @@ mod tests {
                 bootfs.insert(
                     split_index_path[2..].join(""),
                     fidl::persist(
-                        &mut component_internal::ComponentIdIndex::try_from(component_id_index)
+                        &component_internal::ComponentIdIndex::try_from(component_id_index)
                             .expect("failed to convert component id index to fidl"),
                     )
                     .expect("failed to encode component id index as persistent fidl"),

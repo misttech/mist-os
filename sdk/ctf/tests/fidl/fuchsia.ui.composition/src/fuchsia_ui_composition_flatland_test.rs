@@ -42,7 +42,7 @@ async fn test_flatland_connection_is_ok() -> Result<(), Error> {
 
     context_proxy.connect_to_flatland(flatland_server_end).expect("connect to Flatland");
 
-    flatland_proxy.create_transform(&mut TRANSFORM_ID.clone()).expect("create transform");
+    flatland_proxy.create_transform(&TRANSFORM_ID).expect("create transform");
 
     flatland_proxy.present(PresentArgs::default()).expect("flatland present");
 

@@ -95,7 +95,10 @@ template("clippy") {
         "-Dclippy::missing_safety_doc",
       ]
     }
-    args += [ "-Wclippy::expect_fun_call" ]
+    args += [
+      "-Wclippy::expect_fun_call",
+      "-Wclippy::unnecessary_mut_passed",
+    ]
     args += invoker.rustflags
 
     if (invoker.clippy_crate_type == "proc-macro") {

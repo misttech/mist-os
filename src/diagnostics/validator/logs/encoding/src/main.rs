@@ -63,7 +63,7 @@ async fn serve_results(mut stream: ValidateResultsIteratorRequestStream) {
     while let Some(Ok(request)) = stream.next().await {
         match request {
             ValidateResultsIteratorRequest::GetNext { responder } => {
-                let (test_name, mut record_to_encode, expected) = {
+                let (test_name, record_to_encode, expected) = {
                     let Some(test_case) = test_cases.pop() else {
                         responder.send(ValidateResultsIteratorGetNextResponse::default()).ok();
                         continue;
@@ -71,7 +71,7 @@ async fn serve_results(mut stream: ValidateResultsIteratorRequestStream) {
                     test_case
                 };
                 let result = proxy
-                    .encode(&mut record_to_encode)
+                    .encode(&record_to_encode)
                     .await
                     .expect("encode")
                     .expect("Unable to get Record");

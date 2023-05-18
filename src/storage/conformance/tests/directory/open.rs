@@ -467,7 +467,7 @@ async fn open2_rights() {
     test_dir
         .open2(
             &TEST_FILE,
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(fio::Operations::WRITE_BYTES),
                 ..Default::default()
             }),
@@ -484,7 +484,7 @@ async fn open2_rights() {
     test_dir
         .open2(
             &TEST_FILE,
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
@@ -527,7 +527,7 @@ async fn open2_invalid() {
         test_dir
             .open2(
                 "file",
-                &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                &fio::ConnectionProtocols::Node(fio::NodeOptions {
                     protocols: Some(fio::NodeProtocols {
                         file: Some(fio::FileProtocolFlags::default()),
                         directory: Some(fio::DirectoryProtocolOptions::default()),
@@ -551,7 +551,7 @@ async fn open2_invalid() {
         test_dir
             .open2(
                 "file",
-                &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+                &fio::ConnectionProtocols::Node(fio::NodeOptions {
                     protocols: Some(fio::NodeProtocols {
                         file: Some(fio::FileProtocolFlags::default()),
                         ..Default::default()
@@ -590,7 +590,7 @@ async fn open2_create_dot_fails_with_already_exists() {
     test_dir
         .open2(
             ".",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
@@ -625,7 +625,7 @@ async fn open2_open_directory() {
     test_dir
         .open2(
             "dir",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
@@ -641,7 +641,7 @@ async fn open2_open_directory() {
     proxy
         .open2(
             ".",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
             server.into_channel(),
         )
         .unwrap();
@@ -652,7 +652,7 @@ async fn open2_open_directory() {
     test_dir
         .open2(
             "dir",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
             server.into_channel(),
         )
         .unwrap();
@@ -662,7 +662,7 @@ async fn open2_open_directory() {
     proxy
         .open2(
             ".",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
             server.into_channel(),
         )
         .unwrap();
@@ -673,7 +673,7 @@ async fn open2_open_directory() {
     test_dir
         .open2(
             "dir",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
@@ -693,7 +693,7 @@ async fn open2_open_directory() {
     test_dir
         .open2(
             "dir",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     symlink: Some(fio::SymlinkProtocolFlags::default()),
                     ..Default::default()
@@ -728,7 +728,7 @@ async fn open2_open_file() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
@@ -747,7 +747,7 @@ async fn open2_open_file() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
             server.into_channel(),
         )
         .unwrap();
@@ -760,7 +760,7 @@ async fn open2_open_file() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
@@ -780,7 +780,7 @@ async fn open2_open_file() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     symlink: Some(fio::SymlinkProtocolFlags::default()),
                     ..Default::default()
@@ -813,7 +813,7 @@ async fn open2_file_append() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::APPEND),
                     ..Default::default()
@@ -849,7 +849,7 @@ async fn open2_file_truncate() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::TRUNCATE),
                     ..Default::default()
@@ -877,7 +877,7 @@ async fn open2_directory_get_representation() {
     test_dir
         .open2(
             ".",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
@@ -931,7 +931,7 @@ async fn open2_file_get_representation() {
     test_dir
         .open2(
             "file",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::APPEND),
@@ -996,7 +996,7 @@ async fn open2_dir_optional_rights() {
     test_dir
         .open2(
             ".",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions {
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions {
                         optional_rights: Some(fio::Operations::WRITE_BYTES),
