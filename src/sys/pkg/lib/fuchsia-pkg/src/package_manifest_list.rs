@@ -9,7 +9,6 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         fs::{create_dir_all, File},
-        io::BufRead,
         iter::FromIterator,
         slice, vec,
     },
@@ -71,26 +70,9 @@ impl PackageManifestList {
 
     pub fn from_reader(
         manifest_list_path: &Utf8Path,
-        mut reader: impl std::io::Read,
+        reader: impl std::io::Read,
     ) -> anyhow::Result<Self> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes)?;
-
-        let versioned_list = if let Ok(value) = serde_json::from_slice(bytes.as_slice()) {
-            value
-        } else {
-            // Fallback to old version.
-            // TODO(fxbug.dev/126289): Remove once all users have migrated to the new format
-
-            let lines = bytes
-                .lines()
-                .map(|line| line.map(Utf8PathBuf::from))
-                .collect::<Result<Vec<_>, _>>()?;
-            VersionedPackageManifestList::Version1(PackageManifestListV1 {
-                manifests: lines,
-                paths_relative: RelativeTo::default(),
-            })
-        };
+        let versioned_list = serde_json::from_reader(reader)?;
 
         let versioned_list = match versioned_list {
             VersionedPackageManifestList::Version1(manifest_list) => {
@@ -106,7 +88,6 @@ impl PackageManifestList {
     pub fn write_with_relative_paths(self, path: &Utf8Path) -> anyhow::Result<Self> {
         let versioned = match &self.0 {
             VersionedPackageManifestList::Version1(package_manifest_list) => {
-                // TODO(fxbug.dev/126289): Remove once all users have migrated to the new format.
                 VersionedPackageManifestList::Version1(
                     package_manifest_list.clone().write_with_relative_paths(path)?,
                 )
@@ -117,24 +98,15 @@ impl PackageManifestList {
     }
 
     /// Write the package list manifest to this path.
-    pub fn to_writer(&self, mut writer: impl std::io::Write) -> Result<(), std::io::Error> {
-        match &self.0 {
-            VersionedPackageManifestList::Version1(package_manifest_list_v1) => {
-                // TODO(fxbug.dev/126289): Remove once all users have migrated to the new format.
-                for package_manifest_path in &package_manifest_list_v1.manifests {
-                    writeln!(writer, "{package_manifest_path}")?;
-                }
-                Ok(())
-            }
-        }
+    pub fn to_writer(&self, writer: impl std::io::Write) -> Result<(), std::io::Error> {
+        serde_json::to_writer(writer, &self.0).unwrap();
+        Ok(())
     }
 }
 
 impl PackageManifestListV1 {
-    pub fn write_with_relative_paths(
-        self,
-        manifest_list_path: &Utf8Path,
-    ) -> anyhow::Result<PackageManifestListV1> {
+    pub fn write_with_relative_paths(self, manifest_list_path: &Utf8Path) -> anyhow::Result<Self> {
+        // If necessary, adjust manifest files to relative paths
         let manifest_list = if let RelativeTo::WorkingDir = &self.paths_relative {
             let manifests = self
                 .manifests
@@ -271,49 +243,6 @@ mod tests {
     }
 
     #[test]
-    fn test_from_reader_list_file() {
-        let temp = TempDir::new().unwrap();
-        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
-
-        let manifest_dir = temp_dir.join("manifest_dir");
-        let manifest_path = manifest_dir.join("package_manifest_list.json");
-
-        std::fs::create_dir_all(&manifest_dir).unwrap();
-        let raw_package_manifest_list = r#"obj/build/images/config-data/package_manifest.json
-obj/build/images/shell-commands/package_manifest.json
-obj/src/sys/component_index/component_index/package_manifest.json
-obj/build/images/driver-manager-base-config/package_manifest.json"#;
-        std::fs::write(&manifest_path, raw_package_manifest_list).unwrap();
-
-        let package_manifest_list =
-            PackageManifestList::from_reader(&manifest_path, File::open(&manifest_path).unwrap())
-                .unwrap();
-
-        assert_eq!(
-            PackageManifestList(VersionedPackageManifestList::Version1(PackageManifestListV1 {
-                paths_relative: RelativeTo::WorkingDir,
-                manifests: vec![
-                    "obj/build/images/config-data/package_manifest.json".into(),
-                    "obj/build/images/shell-commands/package_manifest.json".into(),
-                    "obj/src/sys/component_index/component_index/package_manifest.json".into(),
-                    "obj/build/images/driver-manager-base-config/package_manifest.json".into(),
-                ]
-            })),
-            package_manifest_list
-        );
-
-        assert_eq!(
-            package_manifest_list.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-            vec![
-                "obj/build/images/config-data/package_manifest.json",
-                "obj/build/images/shell-commands/package_manifest.json",
-                "obj/src/sys/component_index/component_index/package_manifest.json",
-                "obj/build/images/driver-manager-base-config/package_manifest.json",
-            ]
-        );
-    }
-
-    #[test]
     fn test_iter_from_reader_json_v1() {
         let temp = TempDir::new().unwrap();
         let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
@@ -423,10 +352,17 @@ obj/build/images/driver-manager-base-config/package_manifest.json"#;
 
         assert_eq!(
             String::from_utf8(out).unwrap(),
-            "obj/build/images/config-data/package_manifest.json\n\
-            obj/build/images/shell-commands/package_manifest.json\n\
-            obj/src/sys/component_index/component_index/package_manifest.json\n\
-            obj/build/images/driver-manager-base-config/package_manifest.json\n"
+            "{\
+                \"version\":\"1\",\
+                \"content\":{\
+                    \"manifests\":[\
+                        \"obj/build/images/config-data/package_manifest.json\",\
+                        \"obj/build/images/shell-commands/package_manifest.json\",\
+                        \"obj/src/sys/component_index/component_index/package_manifest.json\",\
+                        \"obj/build/images/driver-manager-base-config/package_manifest.json\"\
+                    ]\
+                }\
+            }"
         );
     }
 
