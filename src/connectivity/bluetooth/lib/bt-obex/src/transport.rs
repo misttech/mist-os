@@ -128,18 +128,28 @@ pub(crate) mod test_utils {
         let _ = channel.as_ref().write(&response_buf[..]).expect("write to channel success");
     }
 
+    /// Expects a request packet on the `channel` and validates the contents with the provided
+    /// `expectation`. Sends a `response` back on the channel.
     #[track_caller]
-    pub fn expect_request_and_reply(
+    pub fn expect_request_and_reply<F>(
         exec: &mut fasync::TestExecutor,
         channel: &mut Channel,
-        expected_request: OpCode,
+        expectation: F,
         response: ResponsePacket,
-    ) {
+    ) where
+        F: FnOnce(RequestPacket),
+    {
         let request_raw = expect_stream_item(exec, channel).expect("request");
         let request = RequestPacket::decode(&request_raw[..]).expect("can decode request");
-        assert_eq!(*request.code(), expected_request);
-
+        expectation(request);
         reply(channel, response)
+    }
+
+    pub fn expect_code(code: OpCode) -> impl FnOnce(RequestPacket) {
+        let f = move |request: RequestPacket| {
+            assert_eq!(*request.code(), code);
+        };
+        f
     }
 }
 
@@ -155,7 +165,9 @@ mod tests {
 
     use crate::header::HeaderSet;
     use crate::operation::{RequestPacket, ResponseCode};
-    use crate::transport::test_utils::{expect_request_and_reply, new_manager, TestPacket};
+    use crate::transport::test_utils::{
+        expect_code, expect_request_and_reply, new_manager, TestPacket,
+    };
 
     #[fuchsia::test]
     fn transport_manager_new_operation() {
@@ -189,7 +201,12 @@ mod tests {
         // Remote end should receive it - send an example response back.
         let peer_response =
             ResponsePacket::new(ResponseCode::Ok, vec![0x10, 0x00, 0x00, 0xff], HeaderSet::new());
-        expect_request_and_reply(&mut exec, &mut remote, OpCode::Connect, peer_response);
+        expect_request_and_reply(
+            &mut exec,
+            &mut remote,
+            expect_code(OpCode::Connect),
+            peer_response,
+        );
         // Expect it on the ObexTransport
         let receive_fut = transport.receive_response(OpCode::Connect);
         pin_mut!(receive_fut);

@@ -8,8 +8,8 @@ use tracing::trace;
 use crate::error::Error;
 use crate::header::HeaderSet;
 use crate::operation::{
-    GetOperation, OpCode, RequestPacket, ResponseCode, ResponsePacket, MAX_PACKET_SIZE,
-    MIN_MAX_PACKET_SIZE,
+    GetOperation, OpCode, PutOperation, RequestPacket, ResponseCode, ResponsePacket,
+    MAX_PACKET_SIZE, MIN_MAX_PACKET_SIZE,
 };
 use crate::transport::ObexTransportManager;
 
@@ -99,6 +99,17 @@ impl ObexClient {
         let transport = self.transport.try_new_operation()?;
         Ok(GetOperation::new(headers, transport))
     }
+
+    pub fn put(&mut self) -> Result<PutOperation<'_>, Error> {
+        // A PUT can only be initiated after the OBEX session is connected.
+        if !self.connected {
+            return Err(Error::operation(OpCode::Put, "session not connected"));
+        }
+
+        // Only one operation can be active at a time.
+        let transport = self.transport.try_new_operation()?;
+        Ok(PutOperation::new(transport))
+    }
 }
 
 #[cfg(test)]
@@ -111,7 +122,7 @@ mod tests {
     use futures::pin_mut;
 
     use crate::header::Header;
-    use crate::transport::test_utils::expect_request_and_reply;
+    use crate::transport::test_utils::{expect_code, expect_request_and_reply};
 
     #[fuchsia::test]
     fn max_packet_size_calculation() {
@@ -159,7 +170,12 @@ mod tests {
                 vec![0x10, 0x00, 0xff, 0xff], // Version = 1.0, Flags = 0, Max packet = 0xffff
                 response_headers.clone(),
             );
-            expect_request_and_reply(&mut exec, &mut remote, OpCode::Connect, response);
+            expect_request_and_reply(
+                &mut exec,
+                &mut remote,
+                expect_code(OpCode::Connect),
+                response,
+            );
 
             let connect_result = exec
                 .run_until_stalled(&mut connect_fut)

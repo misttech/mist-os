@@ -43,6 +43,16 @@ impl HeaderSet {
         self.headers.iter().find(|(header_id, _)| header_id == id).is_some()
     }
 
+    #[cfg(test)]
+    pub fn contains_headers(&self, ids: &Vec<HeaderIdentifier>) -> bool {
+        for id in ids {
+            if !self.contains_header(id) {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn add(&mut self, header: Header) -> Result<(), Error> {
         let id = header.identifier();
         if self.contains_header(&id) {

@@ -8,7 +8,7 @@ use std::cmp::PartialEq;
 use tracing::trace;
 
 use crate::error::{Error, PacketError};
-use crate::header::HeaderSet;
+use crate::header::{Header, HeaderIdentifier, HeaderSet};
 use crate::transport::ObexTransport;
 
 /// The current OBEX Protocol version number is 1.0.
@@ -278,6 +278,14 @@ impl RequestPacket {
     pub fn new_get_final() -> Self {
         Self::new(OpCode::GetFinal, vec![], HeaderSet::new())
     }
+
+    pub fn new_put(headers: HeaderSet) -> Self {
+        Self::new(OpCode::Put, vec![], headers)
+    }
+
+    pub fn new_put_final(headers: HeaderSet) -> Self {
+        Self::new(OpCode::PutFinal, vec![], headers)
+    }
 }
 
 impl Decodable for RequestPacket {
@@ -513,6 +521,93 @@ impl<'a> GetOperation<'a> {
     }
 }
 
+/// Represents an in-progress PUT Operation.
+/// Defined in OBEX 1.5 Section 3.4.3.
+///
+/// Example Usage:
+/// ```
+/// let obex_client = ObexClient::new(..);
+/// let put_operation = obex_client.put()?;
+/// let user_data: Vec<u8> = vec![];
+/// for user_data_chunk in user_data.chunks(50) {
+///   let received_headers = put_operation.write(&user_data_chunk[..], HeaderSet::new()).await?;
+/// }
+/// // `PutOperation::write_final` must be called before it is dropped. An empty payload is OK.
+/// let final_headers = put_operation.write_final(&[], HeaderSet::new()).await?;
+/// // PUT operation is complete and `put_operation` is consumed.
+/// ```
+#[must_use]
+#[derive(Debug)]
+pub struct PutOperation<'a> {
+    /// The L2CAP or RFCOMM connection to the remote peer.
+    transport: ObexTransport<'a>,
+}
+
+impl<'a> PutOperation<'a> {
+    pub fn new(transport: ObexTransport<'a>) -> Self {
+        Self { transport }
+    }
+
+    /// Returns Error if the `headers` contain non-informational OBEX Headers.
+    fn validate_headers(headers: &HeaderSet) -> Result<(), Error> {
+        if headers.contains_header(&HeaderIdentifier::Body) {
+            return Err(Error::operation(OpCode::Put, "info headers can't contain body"));
+        }
+        if headers.contains_header(&HeaderIdentifier::EndOfBody) {
+            return Err(Error::operation(OpCode::Put, "info headers can't contain end of body"));
+        }
+        Ok(())
+    }
+
+    /// Attempts to initiate a PUT operation with the `final_` bit set.
+    /// Returns the peer response headers on success, Error otherwise.
+    async fn do_put(&mut self, final_: bool, headers: HeaderSet) -> Result<HeaderSet, Error> {
+        let (opcode, request, expected_response_code) = if final_ {
+            (OpCode::PutFinal, RequestPacket::new_put_final(headers), ResponseCode::Ok)
+        } else {
+            (OpCode::Put, RequestPacket::new_put(headers), ResponseCode::Continue)
+        };
+        trace!("Making outgoing PUT request: {request:?}");
+        self.transport.send(request)?;
+        trace!("Successfully made PUT request");
+        let response = self.transport.receive_response(opcode).await?;
+        response.expect_code(opcode, expected_response_code).map(Into::into)
+    }
+
+    /// Attempts to delete an object from the remote OBEX server specified by the provided
+    /// `headers`.
+    /// Returns the informational headers from the peer response on success, Error otherwise.
+    pub async fn delete(mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
+        Self::validate_headers(&headers)?;
+        // No Body or EndOfBody Headers are included in a delete request.
+        // See OBEX 1.5 Section 3.4.3.6.
+        self.do_put(true, headers).await
+    }
+
+    /// Attempts to write the `data` object to the remote OBEX server.
+    /// Returns the informational headers from the peer response on success, Error otherwise.
+    pub async fn write(&mut self, data: &[u8], mut headers: HeaderSet) -> Result<HeaderSet, Error> {
+        Self::validate_headers(&headers)?;
+        headers.add(Header::Body(data.to_vec()))?;
+        self.do_put(false, headers).await
+    }
+
+    /// Attempts to write the final `data` object to the remote OBEX server.
+    /// This _must_ be called before the PutOperation object is dropped.
+    /// Returns the informational headers from the peer response on success, Error otherwise.
+    ///
+    /// The PUT operation is considered complete after this.
+    pub async fn write_final(
+        mut self,
+        data: &[u8],
+        mut headers: HeaderSet,
+    ) -> Result<HeaderSet, Error> {
+        Self::validate_headers(&headers)?;
+        headers.add(Header::EndOfBody(data.to_vec()))?;
+        self.do_put(true, headers).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -524,7 +619,7 @@ mod tests {
     use futures::pin_mut;
 
     use crate::header::{Header, HeaderIdentifier};
-    use crate::transport::test_utils::{expect_request_and_reply, new_manager};
+    use crate::transport::test_utils::{expect_code, expect_request_and_reply, new_manager};
     use crate::transport::ObexTransportManager;
 
     #[fuchsia::test]
@@ -839,7 +934,7 @@ mod tests {
             pin_mut!(start_fut);
             exec.run_until_stalled(&mut start_fut).expect_pending("waiting for peer response");
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
-            expect_request_and_reply(exec, remote, OpCode::Get, response);
+            expect_request_and_reply(exec, remote, expect_code(OpCode::Get), response);
             exec.run_until_stalled(&mut start_fut)
                 .expect("response received")
                 .expect("valid response")
@@ -850,6 +945,11 @@ mod tests {
     fn setup_get_operation(mgr: &ObexTransportManager, initial: HeaderSet) -> GetOperation<'_> {
         let transport = mgr.try_new_operation().expect("can start operation");
         GetOperation::new(initial, transport)
+    }
+
+    fn setup_put_operation(mgr: &ObexTransportManager) -> PutOperation<'_> {
+        let transport = mgr.try_new_operation().expect("can start operation");
+        PutOperation::new(transport)
     }
 
     #[fuchsia::test]
@@ -878,7 +978,7 @@ mod tests {
             let response_headers =
                 HeaderSet::from_header(Header::Description("big file".into())).unwrap();
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
-            expect_request_and_reply(&mut exec, &mut remote, OpCode::Get, response);
+            expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Get), response);
             let received_headers = exec
                 .run_until_stalled(&mut info_fut)
                 .expect("response received")
@@ -894,13 +994,13 @@ mod tests {
         exec.run_until_stalled(&mut data_fut).expect_pending("waiting for peer response");
         let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3])).unwrap();
         let response1 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers1);
-        expect_request_and_reply(&mut exec, &mut remote, OpCode::GetFinal, response1);
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::GetFinal), response1);
         exec.run_until_stalled(&mut data_fut)
             .expect_pending("waiting for additional peer responses");
         // The OK response code indicates the last user data packet.
         let response_headers2 = HeaderSet::from_header(Header::EndOfBody(vec![4, 5, 6])).unwrap();
         let response2 = ResponsePacket::new_no_data(ResponseCode::Ok, response_headers2);
-        expect_request_and_reply(&mut exec, &mut remote, OpCode::GetFinal, response2);
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::GetFinal), response2);
         // All user data packets are received and the concatenated data object is returned.
         let user_data = exec
             .run_until_stalled(&mut data_fut)
@@ -1055,5 +1155,159 @@ mod tests {
             GetOperation::handle_get_final_response(response3),
             Err(Error::Packet(PacketError::Data(_)))
         );
+    }
+
+    #[fuchsia::test]
+    fn put_operation_single_chunk_is_ok() {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, mut remote) = new_manager();
+        let operation = setup_put_operation(&manager);
+
+        let payload = vec![5, 6, 7, 8, 9];
+        let headers = HeaderSet::from_headers(vec![
+            Header::Type("file".into()),
+            Header::Name("foobar.txt".into()),
+        ])
+        .unwrap();
+        let put_fut = operation.write_final(&payload[..], headers);
+        pin_mut!(put_fut);
+        let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
+        let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
+        let expectation = |request: RequestPacket| {
+            assert_eq!(*request.code(), OpCode::PutFinal);
+            let headers = HeaderSet::from(request);
+            assert!(!headers.contains_header(&HeaderIdentifier::Body));
+            assert!(headers.contains_headers(&vec![
+                HeaderIdentifier::EndOfBody,
+                HeaderIdentifier::Type,
+                HeaderIdentifier::Name
+            ]));
+        };
+        expect_request_and_reply(&mut exec, &mut remote, expectation, response);
+        let _received_headers = exec
+            .run_until_stalled(&mut put_fut)
+            .expect("response received")
+            .expect("valid response");
+    }
+
+    #[fuchsia::test]
+    fn put_operation_multiple_chunks_is_ok() {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, mut remote) = new_manager();
+        let mut operation = setup_put_operation(&manager);
+
+        let payload: Vec<u8> = (1..100).collect();
+        for chunk in payload.chunks(20) {
+            let put_fut = operation.write(&chunk[..], HeaderSet::new());
+            pin_mut!(put_fut);
+            let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
+            let response = ResponsePacket::new_no_data(ResponseCode::Continue, HeaderSet::new());
+            let expectation = |request: RequestPacket| {
+                assert_eq!(*request.code(), OpCode::Put);
+                let headers = HeaderSet::from(request);
+                assert!(headers.contains_header(&HeaderIdentifier::Body));
+            };
+            expect_request_and_reply(&mut exec, &mut remote, expectation, response);
+            let _received_headers = exec
+                .run_until_stalled(&mut put_fut)
+                .expect("response received")
+                .expect("valid response");
+        }
+
+        // Can send final response that is empty to complete the operation.
+        let put_final_fut = operation.write_final(&[], HeaderSet::new());
+        pin_mut!(put_final_fut);
+        let _ = exec.run_until_stalled(&mut put_final_fut).expect_pending("waiting for response");
+        let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
+        let expectation = |request: RequestPacket| {
+            assert_eq!(*request.code(), OpCode::PutFinal);
+            let headers = HeaderSet::from(request);
+            assert!(headers.contains_header(&HeaderIdentifier::EndOfBody));
+        };
+        expect_request_and_reply(&mut exec, &mut remote, expectation, response);
+        let _ = exec
+            .run_until_stalled(&mut put_final_fut)
+            .expect("response received")
+            .expect("valid response");
+    }
+
+    #[fuchsia::test]
+    fn put_operation_delete_is_ok() {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, mut remote) = new_manager();
+        let operation = setup_put_operation(&manager);
+
+        let headers = HeaderSet::from_headers(vec![
+            Header::Description("deleting file".into()),
+            Header::Name("foobar.txt".into()),
+        ])
+        .unwrap();
+        let put_fut = operation.delete(headers);
+        pin_mut!(put_fut);
+        let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
+        let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
+        let expectation = |request: RequestPacket| {
+            assert_eq!(*request.code(), OpCode::PutFinal);
+            let headers = HeaderSet::from(request);
+            assert!(!headers.contains_header(&HeaderIdentifier::Body));
+            assert!(!headers.contains_header(&HeaderIdentifier::EndOfBody));
+        };
+        expect_request_and_reply(&mut exec, &mut remote, expectation, response);
+        let _ = exec
+            .run_until_stalled(&mut put_fut)
+            .expect("response received")
+            .expect("valid response");
+    }
+
+    #[fuchsia::test]
+    async fn put_with_body_header_is_error() {
+        let (manager, _remote) = new_manager();
+        let mut operation = setup_put_operation(&manager);
+
+        let payload = vec![1, 2, 3];
+        // The payload should only be included as an argument. All other headers must be
+        // informational.
+        let body_headers = HeaderSet::from_headers(vec![
+            Header::Body(payload.clone()),
+            Header::Name("foobar.txt".into()),
+        ])
+        .unwrap();
+        let result = operation.write(&payload[..], body_headers.clone()).await;
+        assert_matches!(result, Err(Error::OperationError { .. }));
+
+        // EndOfBody header is also an Error.
+        let eob_headers = HeaderSet::from_headers(vec![
+            Header::EndOfBody(payload.clone()),
+            Header::Name("foobar1.txt".into()),
+        ])
+        .unwrap();
+        let result = operation.write(&payload[..], eob_headers.clone()).await;
+        assert_matches!(result, Err(Error::OperationError { .. }));
+    }
+
+    #[fuchsia::test]
+    async fn delete_with_body_header_is_error() {
+        let (manager, _remote) = new_manager();
+
+        let payload = vec![1, 2, 3];
+        // Body shouldn't be included in delete.
+        let operation = setup_put_operation(&manager);
+        let body_headers = HeaderSet::from_headers(vec![
+            Header::Body(payload.clone()),
+            Header::Name("foobar.txt".into()),
+        ])
+        .unwrap();
+        let result = operation.delete(body_headers).await;
+        assert_matches!(result, Err(Error::OperationError { .. }));
+
+        // EndOfBody shouldn't be included in delete.
+        let operation = setup_put_operation(&manager);
+        let eob_headers = HeaderSet::from_headers(vec![
+            Header::EndOfBody(payload.clone()),
+            Header::Name("foobar1.txt".into()),
+        ])
+        .unwrap();
+        let result = operation.delete(eob_headers).await;
+        assert_matches!(result, Err(Error::OperationError { .. }));
     }
 }
