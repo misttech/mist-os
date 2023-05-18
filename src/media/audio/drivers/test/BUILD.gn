@@ -23,8 +23,8 @@ fuchsia_unittest_package("audio_driver_tests") {
     "//src/connectivity/bluetooth/tests/audio-device-output-harness",
   ]
 
-  # This test is intended to be run on real hardware and on a virtualized Bluetooth a2dp driver.
-  # It does not autostart virtual_audio but will also run/pass there if VA is already running.
+  # This test is intended to be run on real hardware, and optionally on virtual_audio instances
+  # and a virtualized Bluetooth a2dp driver.
   test_specs = {
     environments = hardware_envs + basic_envs
   }
@@ -35,12 +35,15 @@ executable("audio_driver_tests_bin") {
   output_name = "audio_driver_tests"
 
   sources = [
+    "//src/media/audio/drivers/virtual_audio/virtual_audio.h",
     "admin_test.cc",
     "admin_test.h",
     "audio_device_enumerator_stub.cc",
     "audio_device_enumerator_stub.h",
     "basic_test.cc",
     "basic_test.h",
+    "device_host.cc",
+    "device_host.h",
     "main.cc",
     "position_test.cc",
     "position_test.h",
@@ -53,6 +56,7 @@ executable("audio_driver_tests_bin") {
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
+    "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_hlcpp",
     "//sdk/lib/media/cpp:no_converters",
     "//sdk/lib/sys/component/cpp/testing:cpp_library",
     "//sdk/lib/sys/cpp",
@@ -61,6 +65,8 @@ executable("audio_driver_tests_bin") {
     "//src/lib/fxl/test:test_settings",
     "//src/lib/testing/loop_fixture",
     "//src/media/audio/lib/test:test_fixture",
+    "//zircon/system/public",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
