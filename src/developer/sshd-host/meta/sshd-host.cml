@@ -78,11 +78,6 @@
             path: "/dev",
         },
         {
-            directory: "hub",
-            rights: [ "rw*" ],
-            path: "/hub-v2",
-        },
-        {
             directory: "mnt",
             rights: [ "rw*" ],
             path: "/mnt",

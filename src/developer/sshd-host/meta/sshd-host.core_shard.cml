@@ -73,7 +73,6 @@
                 "build-info",
                 "data",
                 "dev-topological",
-                "hub",
                 "pkgfs",
                 "root-ssl-certificates",
                 "system",

@@ -274,13 +274,6 @@
             dependency: "weak",
             availability: "optional",
         },
-
-        // RCS uses the root hub for service discovery.
-        {
-            directory: "hub",
-            from: "framework",
-            to: [ "#core" ],
-        },
         {
             protocol: "fuchsia.sys2.RealmExplorer",
             from: "framework",
