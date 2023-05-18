@@ -9,16 +9,22 @@
 //! protocol families each offering different functionality. This crate targets
 //! the implementation of families related to networking.
 
-#![deny(unused, missing_docs)]
+#![deny(missing_docs)]
 
 mod client;
 mod multicast_groups;
 pub mod protocol_family;
+mod routes;
 
-use futures::{
-    channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    future::Future,
-    StreamExt as _,
+use {
+    fuchsia_async as fasync,
+    futures::{
+        channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
+        future::Future,
+        StreamExt as _,
+    },
+    net_types::ip::{Ipv4, Ipv6},
+    routes::RoutesEventLoopError,
 };
 
 use crate::{
@@ -33,7 +39,7 @@ pub struct Netlink {
 }
 
 impl Netlink {
-    /// Returns a newly instantiated [`Netlink`] and it's associated event loop.
+    /// Returns a newly instantiated [`Netlink`] and its associated event loop.
     ///
     /// Callers are responsible for polling the event loop, which drives
     /// the Netlink implementation's asynchronous work. The event loop will
@@ -71,18 +77,34 @@ struct EventLoopParams {
 /// The event loop encompassing all asynchronous Netlink work.
 ///
 /// The event loop is never expected to complete.
-async fn run_event_loop(params: EventLoopParams) {
+async fn run_event_loop(params: EventLoopParams) -> () {
     let EventLoopParams { route_client_receiver } = params;
 
     // TODO(https://issuetracker.google.com/280483454): Notify route clients of
     // multicast group events.
     let _route_clients = route_client_receiver.collect::<Vec<_>>().await;
+
+    futures::join!(
+        fasync::Task::spawn(async {
+            match routes::EventLoop::new().run::<Ipv4>().await {
+                RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
+                    panic!("Ipv4 routes event loop error: {:?}", e)
+                }
+            }
+        }),
+        fasync::Task::spawn(async {
+            match routes::EventLoop::new().run::<Ipv6>().await {
+                RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
+                    panic!("Ipv6 routes event loop error: {:?}", e)
+                }
+            }
+        })
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use futures::FutureExt as _;
 
     // Placeholder test to ensure the build targets are setup properly.
