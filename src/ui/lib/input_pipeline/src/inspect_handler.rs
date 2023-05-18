@@ -5,8 +5,9 @@
 use crate::input_device::{Handled, InputDeviceEvent, InputEvent};
 use crate::input_handler::InputHandler;
 use async_trait::async_trait;
-use fuchsia_inspect::{self as inspect, NumericProperty, Property};
+use fuchsia_inspect::{self as inspect, Inspector, NumericProperty, Property};
 use fuchsia_zircon as zx;
+use futures::FutureExt;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -144,16 +145,28 @@ impl InspectHandler {
     /// Creates a new inspect handler instance.
     ///
     /// `node` is the inspect node that will receive the stats.
-    pub fn new(node: inspect::Node) -> Rc<Self> {
-        Self::new_with_now(node, zx::Time::get_monotonic)
+    pub fn new(node: inspect::Node, displays_recent_events: bool) -> Rc<Self> {
+        Self::new_with_now(node, zx::Time::get_monotonic, displays_recent_events)
     }
 
     /// Creates a new inspect handler instance, using `now` to supply the current timestamp.
     /// Expected to be useful in testing mainly.
-    fn new_with_now(node: inspect::Node, now: fn() -> zx::Time) -> Rc<Self> {
+    fn new_with_now(
+        node: inspect::Node,
+        now: fn() -> zx::Time,
+        displays_recent_events: bool,
+    ) -> Rc<Self> {
         let event_count = node.create_uint("events_count", 0);
         let last_seen_timestamp_ns = node.create_int("last_seen_timestamp_ns", 0);
         let last_generated_timestamp_ns = node.create_int("last_generated_timestamp_ns", 0);
+
+        let _recent_events_log = match displays_recent_events {
+            true => {
+                Self::record_lazy_recent_events(&node);
+                Some(())
+            }
+            false => None,
+        };
 
         let mut events_by_type = HashMap::new();
         EventCounters::add_new_into(&mut events_by_type, &node, EventType::Keyboard);
@@ -174,6 +187,16 @@ impl InspectHandler {
             events_by_type,
         })
     }
+
+    fn record_lazy_recent_events(node: &inspect::Node) {
+        node.record_lazy_child("recent_events_log", || {
+            async move {
+                let inspector = Inspector::default();
+                Ok(inspector)
+            }
+            .boxed()
+        });
+    }
 }
 
 #[cfg(test)]
@@ -188,12 +211,14 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn verify_inspect() {
+    async fn verify_inspect_no_recent_events_log() {
         let inspector = inspect::Inspector::default();
         let root = inspector.root();
         let test_node = root.create_child("test_node");
 
-        let handler = super::InspectHandler::new_with_now(test_node, fixed_now);
+        let handler = super::InspectHandler::new_with_now(
+            test_node, fixed_now, /* displays_recent_events = */ false,
+        );
         assert_data_tree!(inspector, root: {
             test_node: {
                 events_count: 0u64,
@@ -367,6 +392,238 @@ mod tests {
                 events_count: 3u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
+                consumer_controls: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                fake: {
+                     events_count: 3u64,
+                     handled_events_count: 1u64,
+                     last_generated_timestamp_ns: 44i64,
+                     last_seen_timestamp_ns: 42i64,
+                },
+                keyboard: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                light_sensor: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                mouse: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touch_screen: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touchpad: {
+                    events_count: 0u64,
+                    handled_events_count: 0u64,
+                    last_generated_timestamp_ns: 0i64,
+                    last_seen_timestamp_ns: 0i64,
+               },
+            }
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn verify_inspect_with_recent_events_log() {
+        let inspector = inspect::Inspector::default();
+        let root = inspector.root();
+        let test_node = root.create_child("test_node");
+
+        let handler = super::InspectHandler::new_with_now(
+            test_node, fixed_now, /* displays_recent_events = */ true,
+        );
+        assert_data_tree!(inspector, root: {
+            test_node: {
+                events_count: 0u64,
+                last_seen_timestamp_ns: 0i64,
+                last_generated_timestamp_ns: 0i64,
+                recent_events_log: {},
+                consumer_controls: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                fake: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                keyboard: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                light_sensor: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                mouse: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touch_screen: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touchpad: {
+                    events_count: 0u64,
+                    handled_events_count: 0u64,
+                    last_generated_timestamp_ns: 0i64,
+                    last_seen_timestamp_ns: 0i64,
+               },
+           }
+        });
+
+        handler
+            .clone()
+            .handle_input_event(testing_utilities::create_fake_input_event(zx::Time::from_nanos(
+                43i64,
+            )))
+            .await;
+        assert_data_tree!(inspector, root: {
+            test_node: {
+                events_count: 1u64,
+                last_seen_timestamp_ns: 42i64,
+                last_generated_timestamp_ns: 43i64,
+                recent_events_log: {},
+                consumer_controls: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                fake: {
+                     events_count: 1u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 43i64,
+                     last_seen_timestamp_ns: 42i64,
+                },
+                keyboard: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                light_sensor: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                mouse: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touch_screen: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touchpad: {
+                    events_count: 0u64,
+                    handled_events_count: 0u64,
+                    last_generated_timestamp_ns: 0i64,
+                    last_seen_timestamp_ns: 0i64,
+               },
+            }
+        });
+
+        handler
+            .clone()
+            .handle_input_event(testing_utilities::create_fake_input_event(zx::Time::from_nanos(
+                44i64,
+            )))
+            .await;
+        assert_data_tree!(inspector, root: {
+            test_node: {
+                events_count: 2u64,
+                last_seen_timestamp_ns: 42i64,
+                last_generated_timestamp_ns: 44i64,
+                recent_events_log: {},
+                consumer_controls: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                fake: {
+                     events_count: 2u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 44i64,
+                     last_seen_timestamp_ns: 42i64,
+                },
+                keyboard: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                light_sensor: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                mouse: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touch_screen: {
+                     events_count: 0u64,
+                     handled_events_count: 0u64,
+                     last_generated_timestamp_ns: 0i64,
+                     last_seen_timestamp_ns: 0i64,
+                },
+                touchpad: {
+                    events_count: 0u64,
+                    handled_events_count: 0u64,
+                    last_generated_timestamp_ns: 0i64,
+                    last_seen_timestamp_ns: 0i64,
+               },
+            }
+        });
+
+        handler
+            .clone()
+            .handle_input_event(testing_utilities::create_fake_handled_input_event(
+                zx::Time::from_nanos(44),
+            ))
+            .await;
+        assert_data_tree!(inspector, root: {
+            test_node: {
+                events_count: 3u64,
+                last_seen_timestamp_ns: 42i64,
+                last_generated_timestamp_ns: 44i64,
+                recent_events_log: {},
                 consumer_controls: {
                      events_count: 0u64,
                      handled_events_count: 0u64,

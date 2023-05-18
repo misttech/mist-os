@@ -471,7 +471,9 @@ fn add_inspect_handler(
     node: inspect::Node,
     assembly: InputPipelineAssembly,
 ) -> InputPipelineAssembly {
-    assembly.add_handler(input_pipeline::inspect_handler::InspectHandler::new(node))
+    assembly.add_handler(input_pipeline::inspect_handler::InspectHandler::new(
+        node, /* displays_recent_events = */ false,
+    ))
 }
 
 /// Hooks up the text settings handler.
