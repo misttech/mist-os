@@ -12,6 +12,8 @@ ffx_plugin("ffx_target_ssh") {
   args_with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/ssh:lib",
@@ -30,4 +32,23 @@ ffx_plugin("ffx_target_ssh") {
   args_sources = [ "src/args.rs" ]
 
   sources = [ "src/lib.rs" ]
+}
+
+if (is_host) {
+  rustc_test("ffx_target_ssh_e2e_tests") {
+    edition = "2021"
+    source_root = "tests/e2e.rs"
+    sources = [ source_root ]
+    deps = [
+      "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:pretty_assertions",
+    ]
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [ ":ffx_target_ssh_e2e_tests" ]
+  }
 }

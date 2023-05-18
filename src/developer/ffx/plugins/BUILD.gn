@@ -5,7 +5,10 @@
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ "component:host_tests" ]
+    deps = [
+      "component:host_tests",
+      "target:host_tests",
+    ]
   }
 }
 

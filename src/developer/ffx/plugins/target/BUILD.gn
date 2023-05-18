@@ -44,3 +44,10 @@ ffx_tool("ffx_target_tool") {
   ]
   sources = [ "src/main.rs" ]
 }
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [ "ssh:host_tests" ]
+  }
+}

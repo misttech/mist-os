@@ -143,6 +143,22 @@ impl IsolatedEmulator {
         Ok(output.stdout)
     }
 
+    fn make_ssh_args<'a>(command: &[&'a str]) -> Vec<&'a str> {
+        let mut args = vec!["target", "ssh", "--"];
+        args.extend(command);
+        args
+    }
+
+    /// Run an ssh command, logging stdout & stderr as INFO messages.
+    pub async fn ssh(&self, command: &[&str]) -> anyhow::Result<()> {
+        self.ffx(&Self::make_ssh_args(command)).await
+    }
+
+    /// Run an ssh command, returning stdout and logging stderr as an INFO message.
+    pub async fn ssh_output(&self, command: &[&str]) -> anyhow::Result<String> {
+        self.ffx_output(&Self::make_ssh_args(command)).await
+    }
+
     /// Collect the logs for a particular component.
     pub async fn logs_for_moniker(&self, moniker: &str) -> anyhow::Result<Vec<LogsData>> {
         /// ffx log wraps each line from archivist in its own JSON object, unwrap those here

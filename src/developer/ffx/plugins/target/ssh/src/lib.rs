@@ -5,10 +5,12 @@
 use addr::TargetAddr;
 use anyhow::Result;
 use async_trait::async_trait;
+use ffx_config::environment::EnvironmentKind;
 use ffx_ssh::ssh::get_ssh_key_paths;
 use ffx_target_ssh_args::SshCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::TargetProxy;
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIpPort, TargetProxy};
+use fidl_fuchsia_net::{IpAddress, Ipv4Address};
 use std::net::IpAddr;
 use std::process::Command;
 use std::time::Duration;
@@ -52,8 +54,7 @@ impl FfxMain for SshTool {
             .user_message("Timed out getting target ssh address")?
             .user_message("Failed to get target ssh address")?;
 
-        let addr = TargetAddr::from(&addr_info);
-
+        let addr = get_addr(&addr_info)?;
         let keys = get_ssh_key_paths().await?;
         let mut ssh_cmd = build_ssh_command(self.cmd, addr, keys)
             .await
@@ -65,6 +66,34 @@ impl FfxMain for SshTool {
 
         Ok(())
     }
+}
+
+/// If we're running in an isolated environment against an emulator with user networking,
+/// pretend we're connecting to localhost because user networking is implemented as a port on the
+/// host machine.
+// TODO(https://fxbug.dev/127174) this should not be required
+fn get_addr(addr_info: &TargetAddrInfo) -> fho::Result<TargetAddr> {
+    Ok(
+        match (
+            ffx_config::global_env_context()
+                .expect("ffx must run with a global env context")
+                .env_kind(),
+            addr_info,
+        ) {
+            // we only care about 10.* addresses if we're in an isolated environment
+            (
+                EnvironmentKind::Isolated { .. },
+                TargetAddrInfo::IpPort(TargetIpPort {
+                    ip: IpAddress::Ipv4(Ipv4Address { addr: [10, ..] }),
+                    port,
+                    ..
+                }),
+            ) => {
+                format!("127.0.0.1:{port}").parse().bug_context("Parsing localhost ssh address")?
+            }
+            _ => TargetAddr::from(addr_info),
+        },
+    )
 }
 
 async fn build_ssh_command(
