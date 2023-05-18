@@ -55,7 +55,11 @@ redirects:
 
 # Rustdoc
 - from: /docs/go/rustdoc
-  to: https://fuchsia-docs.firebaseapp.com/rust/
+  to: https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index
+- from: /docs/go/rustdoc/host
+  to: https://fuchsia-docs.firebaseapp.com/rust/host/rustdoc_index
+- from: /docs/go/rustdoc/...
+  to: https://fuchsia-docs.firebaseapp.com/rust/...
 
 # Hardware links
 - from: /fuchsia-src/go/intree-drivers
