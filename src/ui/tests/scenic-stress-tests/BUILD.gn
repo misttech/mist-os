@@ -84,8 +84,8 @@ fuchsia_unittest_package("scenic-stress-tests") {
   manifest = "meta/scenic_stressor.cml"
   deps = [
     ":scenic-stressor-bin",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
     "//src/ui/scenic:component_v2_with_supplied_display_provider",
   ]
 
@@ -114,8 +114,8 @@ fuchsia_unittest_package("scenic-stress-tests-short") {
   manifest = "meta/scenic_stressor_short.cml"
   deps = [
     ":scenic-stressor-bin",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
     "//src/ui/scenic:component_v2_with_supplied_display_provider",
   ]
 
@@ -143,8 +143,8 @@ fuchsia_unittest_package("scenic-stress-test-flatland") {
   manifest = "meta/scenic_stressor_flatland.cml"
   deps = [
     ":scenic-stressor-flatland-bin",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
     "//src/ui/scenic:component_v2_with_supplied_display_provider",
   ]
 

@@ -69,9 +69,9 @@ fuchsia_unittest_package("image-pipe-swapchain-hermetic-tests") {
   manifest = "meta/image-pipe-swapchain-test-hermetic.cml"
   deps = [
     ":test_image_pipe_swapchain_hermetic",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
   ]
   test_specs = {
     environments = vulkan_envs

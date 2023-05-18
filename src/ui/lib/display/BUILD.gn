@@ -94,7 +94,7 @@ fuchsia_unittest_package("inject_service_test") {
   package_name = "get_hardware_display_controller_inject_services_test"
   deps = [
     ":get_hardware_display_controller_inject_services_test",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
+    "//src/graphics/display/testing/coordinator-provider:display-coordinator-provider-component",
   ]
   manifest =
       "tests/meta/get_hardware_display_controller_inject_services_test.cml"
