@@ -308,39 +308,50 @@ TEST(SeccompTest, TsyncEsrch) {
     std::thread t([&m, &cv, &ready]() {
       // Step 1: Install filter that will prevent other thread from doing TSYNC
       install_filter_block(kFilteredSyscall, SECCOMP_RET_KILL);
-      ready++;
+      {
+        std::unique_lock l(m);
+        ready++;
+      }
       // Wake up other thread so it performs TSYNC
       cv.notify_all();
 
-      // Wait around until other thread tries to do TSYNC|TSYNC_ESRCH
-      std::unique_lock l(m);
-      cv.wait(l, [&ready] { return ready == 2; });
+      {
+        // Wait around until other thread tries to do TSYNC|TSYNC_ESRCH
+        std::unique_lock l(m);
+        cv.wait(l, [&ready] { return ready == 2; });
+      }
     });
 
     {
       std::unique_lock l(m);
-      cv.wait(l, [&ready] { return ready == 1; });
-
-      // Step 2: When t has installed its filter, try to do TSYNC|TSYNC_ESRCH
-      EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
-
-      sock_filter filter[] = {
-          // A = seccomp_data.nr
-          BPF_STMT(BPF_LD | BPF_ABS | BPF_W, offsetof(struct seccomp_data, nr)),
-          // if (A == sysno) goto kill
-          BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, kFilteredSyscall, 1, 0),
-          // allow: return SECCOMP_RET_ALLOW
-          BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-          // kill: return SECCOMP_RET_KILL
-          BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL),
-      };
-      sock_fprog prog = {.len = ARRAY_SIZE(filter), .filter = filter};
-      EXPECT_EQ(-1, syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER,
-                            SECCOMP_FILTER_FLAG_TSYNC | SECCOMP_FILTER_FLAG_TSYNC_ESRCH, &prog))
-          << "expected seccomp fail, but succeeded";
-      EXPECT_EQ(ESRCH, errno);
+      if (ready != 1) {
+        cv.wait(l, [&ready] { return ready == 1; });
+      }
     }
-    ready++;
+
+    // Step 2: When t has installed its filter, try to do TSYNC|TSYNC_ESRCH
+    EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+
+    sock_filter filter[] = {
+        // A = seccomp_data.nr
+        BPF_STMT(BPF_LD | BPF_ABS | BPF_W, offsetof(struct seccomp_data, nr)),
+        // if (A == sysno) goto kill
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, kFilteredSyscall, 1, 0),
+        // allow: return SECCOMP_RET_ALLOW
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+        // kill: return SECCOMP_RET_KILL
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL),
+    };
+    sock_fprog prog = {.len = ARRAY_SIZE(filter), .filter = filter};
+    EXPECT_EQ(-1, syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER,
+                          SECCOMP_FILTER_FLAG_TSYNC | SECCOMP_FILTER_FLAG_TSYNC_ESRCH, &prog))
+        << "expected seccomp fail, but succeeded";
+    EXPECT_EQ(ESRCH, errno);
+
+    {
+      std::unique_lock l(m);
+      ready++;
+    }
     cv.notify_all();
     t.join();
   });
