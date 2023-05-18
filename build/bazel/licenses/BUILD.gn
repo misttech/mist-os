@@ -24,7 +24,7 @@ group("all_bazel_inputs") {
   deps -= [ "//build/bazel/licenses:all_bazel_inputs_licenses_spdx" ]
 
   # Remove eng-only AIBs which are testonly.
-  deps -= eng_platform_aib_labels
+  deps -= eng_only_platform_aib_labels
 
   # See fxb/126949#c15. Zedboot is only used in eng builds and is testonly, so can't
   # be used in license calculations.

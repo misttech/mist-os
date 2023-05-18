@@ -130,27 +130,29 @@ userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
 
 # The names of all of the platform's Assembly Input Bundles.
 # LINT.IfChange
-_eng_aib_names = bootstrap_eng_platform_aib_names + [
-                   # the core realm additions for eng build-type assemblies
-                   "core_realm_eng",
+eng_only_platform_aib_names =
+    bootstrap_eng_platform_aib_names + [
+      # the core realm additions for eng build-type assemblies
+      "core_realm_eng",
 
-                   "common_minimal_eng",
+      "common_minimal_eng",
 
-                   # SWD (Software Delivery)
-                   "system_update_checker",
+      # SWD (Software Delivery)
+      "system_update_checker",
 
-                   # Testing Support
-                   "testing_support",
+      # Testing Support
+      "testing_support",
 
-                   # UI
-                   "ui_eng",
-                   "ui_package_eng",
-                   "ui_legacy_package_eng",
+      # UI
+      "ui_eng",
+      "ui_package_eng",
+      "ui_legacy_package_eng",
 
-                   # Example AIB
-                   "example_assembly_bundle",
-                 ]
-eng_platform_aib_names = userdebug_platform_aib_names + _eng_aib_names
+      # Example AIB
+      "example_assembly_bundle",
+    ]
+eng_platform_aib_names =
+    userdebug_platform_aib_names + eng_only_platform_aib_names
 
 # LINT.ThenChange(platform_aib_names.bzl)
 
@@ -196,5 +198,16 @@ foreach(name, eng_platform_aib_names) {
 
   eng_platform_aib_labels += [ label ]
   eng_platform_aib_files +=
+      [ "${_target_out_dir}/${name}/assembly_config.json" ]
+}
+
+eng_only_platform_aib_labels = []
+eng_only_platform_aib_files = []
+foreach(name, eng_only_platform_aib_names) {
+  label = "//bundles/assembly:${name}"
+  _target_out_dir = get_label_info(label, "target_out_dir")
+
+  eng_only_platform_aib_labels += [ label ]
+  eng_only_platform_aib_files +=
       [ "${_target_out_dir}/${name}/assembly_config.json" ]
 }
