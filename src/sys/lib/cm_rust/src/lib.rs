@@ -1757,6 +1757,14 @@ impl From<&String> for CapabilityName {
     }
 }
 
+impl FromStr for CapabilityName {
+    type Err = Error;
+
+    fn from_str(name: &str) -> Result<CapabilityName, Error> {
+        Ok(name.into())
+    }
+}
+
 impl From<cm_types::Name> for CapabilityName {
     fn from(name: cm_types::Name) -> CapabilityName {
         name.as_str().into()
