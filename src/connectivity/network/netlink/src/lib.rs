@@ -34,19 +34,22 @@ use crate::{
 
 /// The implementation of the Netlink protocol suite.
 pub struct Netlink {
-    /// Sender to attach new `NETLINK_ROUTE` clients to the event loop.
+    /// Sender to attach new `NETLINK_ROUTE` clients to the Netlink worker.
     route_client_sender: UnboundedSender<InternalClient<NetlinkRoute>>,
 }
 
 impl Netlink {
-    /// Returns a newly instantiated [`Netlink`] and its associated event loop.
+    /// Returns a newly instantiated [`Netlink`] and its asynchronous worker.
     ///
-    /// Callers are responsible for polling the event loop, which drives
-    /// the Netlink implementation's asynchronous work. The event loop will
-    /// never complete.
+    /// Callers are responsible for polling the worker [`Future`], which drives
+    /// the Netlink implementation's asynchronous work. The worker will never
+    /// complete.
     pub fn new() -> (Self, impl Future<Output = ()> + Send) {
         let (route_client_sender, route_client_receiver) = mpsc::unbounded();
-        (Netlink { route_client_sender }, run_event_loop(EventLoopParams { route_client_receiver }))
+        (
+            Netlink { route_client_sender },
+            run_netlink_worker(NetlinkWorkerParams { route_client_receiver }),
+        )
     }
 
     /// Creates a new client of the `NETLINK_ROUTE` protocol family.
@@ -63,22 +66,22 @@ impl Netlink {
 
 /// The possible error types when instantiating a new client.
 pub enum NewClientError {
-    /// The [`Netlink`] is disconnected from its associated event loop, perhaps
-    /// as a result of dropping the event loop.
+    /// The [`Netlink`] is disconnected from its associated worker, perhaps as a
+    /// result of dropping the worker.
     Disconnected,
 }
 
-/// Parameters used to start the event loop.
-struct EventLoopParams {
+/// Parameters used to start the Netlink asynchronous worker.
+struct NetlinkWorkerParams {
     /// Receiver of newly created `NETLINK_ROUTE` clients.
     route_client_receiver: UnboundedReceiver<InternalClient<NetlinkRoute>>,
 }
 
-/// The event loop encompassing all asynchronous Netlink work.
+/// The worker encompassing all asynchronous Netlink work.
 ///
-/// The event loop is never expected to complete.
-async fn run_event_loop(params: EventLoopParams) -> () {
-    let EventLoopParams { route_client_receiver } = params;
+/// The worker is never expected to complete.
+async fn run_netlink_worker(params: NetlinkWorkerParams) -> () {
+    let NetlinkWorkerParams { route_client_receiver } = params;
 
     // TODO(https://issuetracker.google.com/280483454): Notify route clients of
     // multicast group events.
@@ -109,8 +112,11 @@ mod tests {
 
     // Placeholder test to ensure the build targets are setup properly.
     #[test]
-    fn test_event_loop() {
+    fn test_netlink_worker() {
         let (_route_client_sender, route_client_receiver) = mpsc::unbounded();
-        assert_eq!(run_event_loop(EventLoopParams { route_client_receiver }).now_or_never(), None);
+        assert_eq!(
+            run_netlink_worker(NetlinkWorkerParams { route_client_receiver }).now_or_never(),
+            None
+        );
     }
 }
