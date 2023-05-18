@@ -79,8 +79,8 @@ Err SymbolServerImpl::HandleRequestResult(Curl::Error result, uint64_t response_
     // Fall through to retry.
   } else if (response_code == 401) {
     return Err("Authentication expired.");
-  } else if (response_code == 404 || response_code == 410) {
-    return Err("Server responded with code " + std::to_string(response_code));
+  } else if (response_code == 404) {
+    return Err(ErrType::kNotFound);
   } else {
     out_err = Err("Unexpected response: " + std::to_string(response_code));
     // Fall through to retry.

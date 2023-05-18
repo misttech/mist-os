@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <map>
+
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
 #include "src/developer/debug/zxdb/client/process.h"
@@ -64,7 +66,7 @@ class Download {
   size_t failed_server_count_ = 0;
   std::string build_id_;
   DebugSymbolFileType file_type_;
-  Err err_;
+  std::map<ErrType, Err> errors_;
   std::string path_;
   SymbolServer::FetchCallback result_cb_;
   std::vector<FetchFunction> server_fetches_;
@@ -75,10 +77,23 @@ void Download::Finish() {
   if (!result_cb_)
     return;
 
+  Err final_err;
+  if (errors_.size() == 1) {
+    final_err = errors_.begin()->second;
+  } else if (!errors_.empty()) {
+    final_err = Err("Multiple errors encountered while downloading build_id %s", build_id_.c_str());
+  }
+
+  // Specialize the error message if the build id was not found on any servers.
+  if (final_err.type() == ErrType::kNotFound) {
+    final_err =
+        Err("build_id %s not found on %zu servers\n", build_id_.c_str(), failed_server_count_);
+  }
+
   if (debug::MessageLoop::Current()) {
     debug::MessageLoop::Current()->PostTask(
-        FROM_HERE, [result_cb = std::move(result_cb_), err = std::move(err_),
-                    path = std::move(path_)]() mutable { result_cb(err, path); });
+        FROM_HERE, [result_cb = std::move(result_cb_), final_err,
+                    path = std::move(path_)]() mutable { result_cb(final_err, path); });
   }
 
   result_cb_ = nullptr;
@@ -121,12 +136,7 @@ void Download::Error(std::shared_ptr<Download> self, const Err& err) {
 
   self->failed_server_count_++;
 
-  if (!err_.has_error()) {
-    err_ = err;
-  } else if (err.has_error()) {
-    err_ = Err("Failed downloading build_id %s from %zu servers.\n", self->build_id_.c_str(),
-               self->failed_server_count_);
-  }
+  errors_[err.type()] = err;
 
   if (!trying_ && !server_fetches_.empty()) {
     RunFetch(self, server_fetches_.back());
@@ -144,7 +154,7 @@ void Download::RunFetch(std::shared_ptr<Download> self, FetchFunction& fetch) {
     if (path.empty()) {
       self->Error(self, err);
     } else {
-      self->err_ = err;
+      self->errors_.clear();
       self->path_ = path;
       self->Finish();
     }

@@ -814,6 +814,12 @@ void ConsoleContext::OnDownloadsStarted() { Console::get()->Output("Downloading 
 void ConsoleContext::OnDownloadsStopped(size_t success, size_t fail) {
   Console::get()->Output(
       fxl::StringPrintf("Symbol downloading complete. %zu succeeded, %zu failed.", success, fail));
+
+  if (fail > 0) {
+    Console::get()->Output(
+        "\nSome symbols failed to download. If you think this is in error, please file a bug:\n"
+        "https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=zxdb\n");
+  }
 }
 
 void ConsoleContext::OnBreakpointMatched(Breakpoint* breakpoint, bool user_requested) {
