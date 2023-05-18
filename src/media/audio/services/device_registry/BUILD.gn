@@ -116,6 +116,7 @@ source_set("device_registry_lib") {
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
+    "//src/media/audio/lib/clock",
     "//src/media/audio/services/common",
   ]
 
@@ -123,7 +124,6 @@ source_set("device_registry_lib") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
-    "//src/media/audio/lib/clock",
     "//zircon/system/public",
     "//zircon/system/ulib/zx",
   ]
