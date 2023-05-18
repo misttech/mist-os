@@ -62,9 +62,32 @@ impl FfxMain for SshTool {
 
         tracing::debug!("About to ssh with command: {:#?}", ssh_cmd);
         let mut ssh = ssh_cmd.spawn().user_message("Failed to run ssh command to target")?;
-        ssh.wait().user_message("Command 'ssh' exited with error.")?;
+        let status = ssh.wait().user_message("Command 'ssh' exited with error.")?;
 
-        Ok(())
+        // We want to give callers of this command a meaningful error code if it fails. First,
+        // check if it was terminated due to a signal and report that. If the process terminated
+        // normally, exit this process with its status code.
+        #[cfg(unix)]
+        {
+            use nix::sys::signal::Signal;
+            use std::os::unix::process::ExitStatusExt;
+            if let Some(signal) = status.signal() {
+                // ssh exited due to receiving a signal, try to parse it for pretty-printing
+                let signal = Signal::try_from(signal)
+                    .with_bug_context(|| format!("parsing raw ssh signal code {signal}"))?;
+                return Err(fho::Error::User(anyhow::format_err!(
+                    "ssh process received {signal} signal."
+                )));
+            }
+        }
+
+        if let Some(status) = status.code() {
+            std::process::exit(status);
+        } else {
+            return Err(fho::Error::Unexpected(anyhow::format_err!(
+                "ssh exited without an exit status or due to receiving a signal."
+            )));
+        }
     }
 }
 

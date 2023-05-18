@@ -14,3 +14,10 @@ async fn echo_hello_world() -> Result<()> {
     assert_eq!(message.trim(), expected_message);
     Ok(())
 }
+
+#[fuchsia::test]
+async fn failing_command_fails() -> Result<()> {
+    let emu = IsolatedEmulator::start("failing-command").await?;
+    emu.ssh(&["false"]).await.unwrap_err();
+    Ok(())
+}
