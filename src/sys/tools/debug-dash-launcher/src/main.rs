@@ -11,7 +11,6 @@ use {
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    launch::{explore_component_over_pty, explore_component_over_socket},
     std::convert::TryInto,
     tracing::*,
 };
@@ -54,7 +53,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = explore_component_over_pty(
+                        let mut result = crate::launch::component::explore_over_pty(
                             &moniker, pty, tool_urls, command, ns_layout,
                         )
                         .await
@@ -72,7 +71,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = explore_component_over_pty(
+                        let mut result = crate::launch::component::explore_over_pty(
                             &moniker, pty, tool_urls, command, ns_layout,
                         )
                         .await
@@ -92,7 +91,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = explore_component_over_socket(
+                        let mut result = crate::launch::component::explore_over_socket(
                             &moniker, socket, tool_urls, command, ns_layout,
                         )
                         .await
@@ -110,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = explore_component_over_socket(
+                        let mut result = crate::launch::component::explore_over_socket(
                             &moniker, socket, tool_urls, command, ns_layout,
                         )
                         .await

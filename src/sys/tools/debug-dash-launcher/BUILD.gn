@@ -49,6 +49,7 @@ rustc_binary("bin") {
 
   sources = [
     "src/launch.rs",
+    "src/launch/component.rs",
     "src/layout.rs",
     "src/main.rs",
     "src/socket.rs",

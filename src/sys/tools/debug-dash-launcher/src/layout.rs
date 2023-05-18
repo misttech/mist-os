@@ -29,7 +29,6 @@ pub fn nest_all_instance_dirs(
     svc_dir: fio::DirectoryProxy,
     out_dir: Option<fio::DirectoryProxy>,
     runtime_dir: Option<fio::DirectoryProxy>,
-    tools_pkg_dir: Option<fio::DirectoryProxy>,
 ) -> Vec<fproc::NameInfo> {
     let mut name_infos = vec![];
 
@@ -50,11 +49,16 @@ pub fn nest_all_instance_dirs(
         name_infos.push(to_name_info("/runtime", dir));
     }
 
-    if let Some(dir) = tools_pkg_dir {
+    name_infos
+}
+
+pub fn add_tools_to_name_infos(
+    tools: Option<fio::DirectoryProxy>,
+    name_infos: &mut Vec<fproc::NameInfo>,
+) {
+    if let Some(dir) = tools {
         name_infos.push(to_name_info("/.dash/tools", dir));
     }
-
-    name_infos
 }
 
 /// Returns directory handles + paths for a namespace layout using the given directories.
@@ -69,13 +73,8 @@ pub fn nest_all_instance_dirs(
 /// Also returns the corresponding PATH envvar that must be set for the dash shell.
 pub async fn instance_namespace_is_root(
     ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
-    tools_pkg_dir: Option<fio::DirectoryProxy>,
 ) -> Vec<fproc::NameInfo> {
     let mut name_infos = vec![];
-
-    if let Some(dir) = tools_pkg_dir {
-        name_infos.push(to_name_info("/.dash/tools", dir));
-    }
 
     for entry in ns_entries {
         let path = entry.path.unwrap();
@@ -208,7 +207,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn nest_all_instance_dirs_started_with_tools() {
-        let tools_dir = create_temp_dir("tools");
         let exposed_dir = create_temp_dir("exposed");
         let out_dir = create_temp_dir("out");
         let svc_dir = create_temp_dir("svc");
@@ -221,16 +219,12 @@ mod tests {
             svc_dir,
             Some(out_dir),
             Some(runtime_dir),
-            Some(tools_dir),
         );
-        assert_eq!(ns.len(), 6);
+        assert_eq!(ns.len(), 5);
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
         paths.sort();
-        assert_eq!(
-            paths,
-            vec!["/.dash/tools", "/exposed", "/ns/ns_subdir", "/out", "/runtime", "/svc"]
-        );
+        assert_eq!(paths, vec!["/exposed", "/ns/ns_subdir", "/out", "/runtime", "/svc"]);
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
@@ -264,7 +258,6 @@ mod tests {
             svc_dir,
             Some(out_dir),
             Some(runtime_dir),
-            None,
         );
         assert_eq!(ns.len(), 5);
 
@@ -296,7 +289,7 @@ mod tests {
         let svc_dir = create_temp_dir("svc");
         let ns_entries = create_ns_entries();
 
-        let ns = nest_all_instance_dirs(ns_entries, exposed_dir, svc_dir, None, None, None);
+        let ns = nest_all_instance_dirs(ns_entries, exposed_dir, svc_dir, None, None);
         assert_eq!(ns.len(), 3);
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
@@ -325,7 +318,7 @@ mod tests {
     async fn instance_namespace_is_root_resolved() {
         let ns_entries = create_ns_entries();
 
-        let ns = instance_namespace_is_root(ns_entries, None).await;
+        let ns = instance_namespace_is_root(ns_entries).await;
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
         paths.sort();
