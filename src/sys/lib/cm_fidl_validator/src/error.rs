@@ -52,9 +52,6 @@ pub enum Error {
     #[error("\"{1}\" is referenced in {0} but it does not appear in runners.")]
     InvalidRunner(DeclField, String),
 
-    #[error("\"{1}\" is referenced in {0} but there is no corresponding event provided to the component. Specifically, the event has to be `use`d.")]
-    EventStreamEventNotFound(DeclField, String),
-
     #[error("There are dependency cycle(s): {0}.")]
     DependencyCycle(String),
 
@@ -199,17 +196,6 @@ impl Error {
         Error::InvalidCapability(
             DeclField { decl: decl_type.into(), field: keyword.into() },
             capability.into(),
-        )
-    }
-
-    pub fn event_stream_event_not_found(
-        decl_type: impl Into<String>,
-        keyword: impl Into<String>,
-        event_name: impl Into<String>,
-    ) -> Self {
-        Error::EventStreamEventNotFound(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            event_name.into(),
         )
     }
 
