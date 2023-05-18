@@ -1358,7 +1358,7 @@ pub struct zx_restricted_syscall_t {
 #[repr(C)]
 #[derive(Copy, Clone)]
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "riscv64"))]
-pub struct zx_restricted_exception {
+pub struct zx_restricted_exception_t {
     pub state: zx_restricted_state_t,
     pub exception: zx_exception_report_t,
 }
