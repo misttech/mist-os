@@ -1378,6 +1378,11 @@
             ],
             resolvers: [
                 {
+                    resolver: "boot_resolver",
+                    from: "parent",
+                    scheme: "fuchsia-boot",
+                },
+                {
                     resolver: "base_resolver",
                     from: "#base_resolver",
                     scheme: "fuchsia-pkg",
@@ -1397,6 +1402,11 @@
                 },
             ],
             resolvers: [
+                {
+                    resolver: "boot_resolver",
+                    from: "parent",
+                    scheme: "fuchsia-boot",
+                },
                 {
                     resolver: "full-resolver",
                     from: "#full_resolver",
