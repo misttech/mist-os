@@ -44,7 +44,7 @@ def prepare_dirs(repo_dir):
 
 # `package-tool repository publish` expects the following inputs in its in/out directory:
 # - `keys/{snapshot|targets|timestamp}.json` containing private metadata keys;
-# - `repository/{{version-num}}.root.json` containing versioned root metadata;
+# - `repository/{{verion-num}}.root.json` containing versioned root metadata;
 # - `repository/root.json` containing default root metadata.
 def prepare_publish(args, dirs):
     for root_metadata_path in args.root_metadata:
@@ -119,7 +119,7 @@ if __name__ == '__main__':
         required=True)
     parser.add_argument(
         '--input',
-        help='path to `package-tool repository publish` file input',
+        help='path to `package-tool reposiotry publish` file input',
         required=True)
     parser.add_argument(
         '--delivery-blob-type', help='the type of delivery blob to generate')

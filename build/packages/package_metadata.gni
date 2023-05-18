@@ -6,9 +6,7 @@ import("//build/dist/generated_resource.gni")
 import("//build/group_with_inputs.gni")
 
 # Generate a list of package metadata exported from all packages in the
-# transitive closure of declared dependencies. This list is then used to form
-# a structured PackageManifestList object of format:
-# {'content': {'manifests': [<MANIFESTS FROM METADATA CRAWL>]}, 'version': '1'}
+# transitive closure of declared dependencies.
 #
 # Parameters
 #
@@ -50,46 +48,25 @@ import("//build/group_with_inputs.gni")
 #   visibility (optional)
 #     Same as for any GN `generated_file()` target.
 template("generate_package_metadata") {
-  _metadata_target = "${target_name}.package_metadata"
-  _metadata_output = "$target_gen_dir/${_metadata_target}"
-
-  generated_file(_metadata_target) {
+  generated_file(target_name) {
     forward_variables_from(invoker,
                            [
                              "data_deps",
                              "data_keys",
                              "deps",
                              "output_conversion",
+                             "outputs",
                              "public_deps",
                              "rebase",
                              "testonly",
                              "visibility",
                            ])
 
-    outputs = [ _metadata_output ]
-    walk_keys = [ "package_barrier" ]
-  }
-
-  action(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "outputs",
-                             "testonly",
-                             "visibility",
-                           ])
     if (!defined(outputs)) {
       outputs = [ target_gen_dir + "/" + target_name ]
     }
-    assert(outputs == [ outputs[0] ], "'outputs' must have a single value")
-    deps = [ ":${_metadata_target}" ]
-    inputs = [ _metadata_output ]
-    script = "//build/packages/generate_package_metadata.py"
-    args = [
-      "--input",
-      rebase_path(inputs[0], root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-    ]
+
+    walk_keys = [ "package_barrier" ]
   }
 }
 

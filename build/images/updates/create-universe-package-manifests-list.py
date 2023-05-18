@@ -5,20 +5,16 @@
 
 import argparse
 import json
-from json.decoder import JSONDecodeError
 import sys
 from collections import OrderedDict
 
 
 def read_manifest_list(manifest_list_file):
     manifest_list = OrderedDict()
-    contents = manifest_list_file.read()
-    if not contents:
-        # `manifest_list_file` can be an empty file...
-        return manifest_list
 
-    manifest_list_object = json.loads(contents)
-    for manifest_path in manifest_list_object['content']['manifests']:
+    for line in manifest_list_file:
+        manifest_path = line.rstrip()
+
         with open(manifest_path) as f:
             manifest = json.load(f)
             manifest_list[manifest['package']['name']] = manifest_path
@@ -59,15 +55,12 @@ def main():
                 file=sys.stderr)
             sys.exit(1)
 
-    out_package_manifest_list = {'content': {'manifests': []}, 'version': '1'}
-    for name, path in metadata_list.items():
-        if name in base_list or name in cache_list:
-            continue
-
-        out_package_manifest_list['content']['manifests'].append(path)
-
     with open(args.output, 'w') as f:
-        json.dump(out_package_manifest_list, f, indent=2, sort_keys=True)
+        for name, path in metadata_list.items():
+            if name in base_list or name in cache_list:
+                continue
+
+            print(path, file=f)
 
     if args.depfile:
         with open(args.depfile, 'w') as f:
