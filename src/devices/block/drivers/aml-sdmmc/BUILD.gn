@@ -23,10 +23,10 @@ fuchsia_driver("aml-sdmmc-driver") {
   sources = [ "aml-sdmmc.cc" ]
   deps = [
     ":aml-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/lib/fit",
     "//src/devices/block/lib/sdio",
     "//src/devices/block/lib/sdmmc",
@@ -60,9 +60,9 @@ test("aml-sdmmc-test-bin") {
   ]
   deps = [
     ":aml-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/block/lib/sdio",

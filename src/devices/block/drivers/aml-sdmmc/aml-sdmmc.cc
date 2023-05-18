@@ -4,7 +4,7 @@
 
 #include "aml-sdmmc.h"
 
-#include <fuchsia/hardware/clock/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
@@ -1214,10 +1214,25 @@ zx_status_t AmlSdmmc::Create(void* ctx, zx_device_t* parent) {
   // For AV400, the clock source was set to GP0_PLL(1152M) in bootloader,
   // We should change to xtal(24M), then can divide to 400k for initial stage.
   if (dev_info.pid == PDEV_PID_AMLOGIC_A5) {
-    ddk::ClockProtocolClient emmc_clk_sel(parent, "clk-emmc-sel");
-    if ((status = emmc_clk_sel.SetInput(AmlSdmmcClock::kCtsOscinClkSrc)) != ZX_OK) {
-      AML_SDMMC_ERROR("Could not SetInput clock for emmc: %d", status);
-      return status;
+    const char* CLK_EMMC_SEL_FRAG_NAME = "clk-emmc-sel";
+    zx::result clock_result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+            parent, CLK_EMMC_SEL_FRAG_NAME);
+    if (clock_result.is_error()) {
+      AML_SDMMC_ERROR("Failed to get clock protocol from fragment '%s': %s\n",
+                      CLK_EMMC_SEL_FRAG_NAME, clock_result.status_string());
+      return clock_result.status_value();
+    }
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> emmc_clk_sel{std::move(*clock_result)};
+    fidl::WireResult result = emmc_clk_sel->SetInput(AmlSdmmcClock::kCtsOscinClkSrc);
+    if (!result.ok()) {
+      AML_SDMMC_ERROR("Failed to send SetInput request to emmc clock: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      AML_SDMMC_ERROR("Failed to set input of emmc clock: %s",
+                      zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   } else if (dev_info.pid == PDEV_PID_AMLOGIC_A1) {
     zx::resource smc_handler;
@@ -1238,10 +1253,26 @@ zx_status_t AmlSdmmc::Create(void* ctx, zx_device_t* parent) {
     }
 
     // Clock source
-    ddk::ClockProtocolClient sdio_clk_gate(parent, "sdio-clk-gate");
-    if ((status = sdio_clk_gate.Enable()) != ZX_OK) {
-      AML_SDMMC_ERROR("Could not enable the clk for sdio: %s", zx_status_get_string(status));
-      return status;
+    const char* SDIO_CLK_GATE_FRAG_NAME = "sdio-clk-gate";
+    zx::result clock_result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+            parent, SDIO_CLK_GATE_FRAG_NAME);
+    if (clock_result.is_error()) {
+      AML_SDMMC_ERROR("Failed to get clock protocol from fragment '%s': %s\n",
+                      SDIO_CLK_GATE_FRAG_NAME, clock_result.status_string());
+      return clock_result.status_value();
+    }
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> sdio_clk_gate{std::move(*clock_result)};
+    fidl::WireResult enable_result = sdio_clk_gate->Enable();
+    if (!enable_result.ok()) {
+      AML_SDMMC_ERROR("Failed to send Enable request to clock for sdio: %s",
+                      enable_result.status_string());
+      return enable_result.status();
+    }
+    if (enable_result->is_error()) {
+      AML_SDMMC_ERROR("Failed to enable the clock for sdio: %s",
+                      zx_status_get_string(enable_result->error_value()));
+      return enable_result->error_value();
     }
   }
 

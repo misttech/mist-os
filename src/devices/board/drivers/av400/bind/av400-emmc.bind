@@ -25,7 +25,7 @@ node "gpio" {
 }
 
 node "clk-emmc-sel" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A5_CLK_ID.CLK_NAND_SEL;
 }
 
