@@ -63,6 +63,7 @@ executable("cpp_test") {
   testonly = true
   sources = [
     "tests/driver_base_test.cc",
+    "tests/driver_fidl_test.cc",
     "tests/logger_test.cc",
     "tests/namespace_test.cc",
     "tests/node_add_args_test.cc",
@@ -74,6 +75,8 @@ executable("cpp_test") {
   deps = [
     ":cpp",
     ":test_base",
+    "tests/fidl:fuchsia.driver.component.test_cpp_driver_wire",
+    "tests/fidl:fuchsia.driver.component.test_cpp_wire",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",

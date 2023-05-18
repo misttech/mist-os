@@ -9,6 +9,76 @@ zx::result<> TestDriver::Start() {
   return zx::ok();
 }
 
+zx::result<> TestDriver::ServeDriverService() {
+  zx::result result =
+      context().outgoing()->AddService<fuchsia_driver_component_test::DriverService>(
+          GetInstanceHandlerDriver());
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> TestDriver::ServeZirconService() {
+  zx::result result =
+      context().outgoing()->AddService<fuchsia_driver_component_test::ZirconService>(
+          GetInstanceHandlerZircon());
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> TestDriver::ValidateIncomingDriverService() {
+  zx::result driver_connect_result =
+      context().incoming()->Connect<fuchsia_driver_component_test::DriverService::Device>();
+  if (driver_connect_result.is_error()) {
+    FDF_LOG(ERROR, "Couldn't connect to DriverService.");
+    return driver_connect_result.take_error();
+  }
+
+  fdf::Arena arena('DRVR');
+  fdf::WireUnownedResult wire_result =
+      fdf::WireCall(driver_connect_result.value()).buffer(arena)->DriverMethod();
+  if (!wire_result.ok()) {
+    FDF_LOG(ERROR, "Failed to call DriverMethod %s", wire_result.status_string());
+    return zx::error(wire_result.status());
+  }
+
+  if (wire_result->is_error()) {
+    FDF_LOG(ERROR, "DriverMethod error %s",
+            zx_status_get_string(wire_result.value().error_value()));
+    return wire_result.value().take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> TestDriver::ValidateIncomingZirconService() {
+  zx::result zircon_connect_result =
+      context().incoming()->Connect<fuchsia_driver_component_test::ZirconService::Device>();
+  if (zircon_connect_result.is_error()) {
+    FDF_LOG(ERROR, "Couldn't connect to ZirconService.");
+    return zircon_connect_result.take_error();
+  }
+
+  fidl::WireResult wire_result = fidl::WireCall(zircon_connect_result.value())->ZirconMethod();
+  if (!wire_result.ok()) {
+    FDF_LOG(ERROR, "Failed to call ZirconMethod %s", wire_result.status_string());
+    return zx::error(wire_result.status());
+  }
+
+  if (wire_result->is_error()) {
+    FDF_LOG(ERROR, "ZirconMethod error %s",
+            zx_status_get_string(wire_result.value().error_value()));
+    return wire_result.value().take_error();
+  }
+
+  return zx::ok();
+}
+
 void TestDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
   // Delay the completion to simulate an async workload.
   async::PostDelayedTask(
