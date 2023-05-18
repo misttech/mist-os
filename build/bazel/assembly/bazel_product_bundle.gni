@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_action.gni")
 import("//build/images/args.gni")
+import("//build/images/vbmeta.gni")
 import("//build/sdk/product_bundle_transfer_manifest.gni")
 import("//bundles/assembly/platform_aibs.gni")
 import("//src/sys/pkg/bin/package-tool/package-tool.gni")
@@ -202,8 +203,7 @@ template("bazel_product_bundle") {
       _system_a_root = rebase_path(target_gen_dir, root_out_dir) +
                        "/${files.product_bundle_out_dir}/system_a"
 
-      # TODO(https://fxbug.dev/123576): Figure out how to handle conditional
-      # outputs (e.g. vbmeta).
+      # TODO(https://fxbug.dev/127440): Add metadata for recovery image as well.
       metadata = {
         images = [
           {
@@ -262,6 +262,27 @@ template("bazel_product_bundle") {
             bootserver_pave = []
           },
         ]
+
+        if (use_vbmeta) {
+          images += [
+            {
+              name = "zircon-a"
+              cpu = current_cpu
+              type = "vbmeta"
+              label = _full_label
+              path = "${_system_a_root}/fuchsia.vbmeta"
+              archive = true
+              bootserver_pave = [ "--vbmetaa" ]
+              fastboot_flash = []
+              if (vbmeta_a_partition != "") {
+                fastboot_flash += [ vbmeta_a_partition ]
+              }
+              if (vbmeta_b_partition != "") {
+                fastboot_flash += [ vbmeta_b_partition ]
+              }
+            },
+          ]
+        }
 
         product_bundles = [
           {
