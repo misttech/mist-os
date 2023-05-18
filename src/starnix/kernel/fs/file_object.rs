@@ -636,6 +636,38 @@ impl FileOps for OPathOps {
     }
 }
 
+#[derive(Debug, Default, Copy, Clone)]
+pub enum FileAsyncOwner {
+    #[default]
+    Unowned,
+    Thread(pid_t),
+    Process(pid_t),
+    ProcessGroup(pid_t),
+}
+
+impl FileAsyncOwner {
+    pub fn validate(self, current_task: &CurrentTask) -> Result<(), Errno> {
+        match self {
+            FileAsyncOwner::Unowned => (),
+            FileAsyncOwner::Thread(tid) => {
+                current_task.get_task(tid).ok_or_else(|| errno!(ESRCH))?;
+            }
+            FileAsyncOwner::Process(pid) => {
+                current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))?;
+            }
+            FileAsyncOwner::ProcessGroup(pgid) => {
+                current_task
+                    .kernel()
+                    .pids
+                    .read()
+                    .get_process_group(pgid)
+                    .ok_or_else(|| errno!(ESRCH))?;
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileObjectId(usize);
 
@@ -665,7 +697,7 @@ pub struct FileObject {
 
     flags: Mutex<OpenFlags>,
 
-    async_owner: Mutex<pid_t>,
+    async_owner: Mutex<FileAsyncOwner>,
 }
 
 pub type FileHandle = Arc<FileObject>;
@@ -699,7 +731,7 @@ impl FileObject {
             ops,
             offset: Mutex::new(0),
             flags: Mutex::new(flags - OpenFlags::CREAT),
-            async_owner: Mutex::new(0),
+            async_owner: Default::default(),
         })
     }
 
@@ -1003,14 +1035,14 @@ impl FileObject {
     /// Get the async owner of this file.
     ///
     /// See fcntl(F_GETOWN)
-    pub fn get_async_owner(&self) -> pid_t {
+    pub fn get_async_owner(&self) -> FileAsyncOwner {
         *self.async_owner.lock()
     }
 
     /// Set the async owner of this file.
     ///
     /// See fcntl(F_SETOWN)
-    pub fn set_async_owner(&self, owner: pid_t) {
+    pub fn set_async_owner(&self, owner: FileAsyncOwner) {
         *self.async_owner.lock() = owner;
     }
 

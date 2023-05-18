@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::sync::Arc;
 use std::usize;
@@ -115,18 +116,64 @@ pub fn sys_fcntl(
             Ok(newfd.into())
         }
         F_GETOWN => {
-            let file = current_task.files.get(fd)?;
-            Ok(file.get_async_owner().into())
+            let file = current_task.files.get_unless_opath(fd)?;
+            match file.get_async_owner() {
+                FileAsyncOwner::Unowned => Ok(0.into()),
+                FileAsyncOwner::Thread(tid) => Ok(tid.into()),
+                FileAsyncOwner::Process(pid) => Ok(pid.into()),
+                FileAsyncOwner::ProcessGroup(pgid) => Ok((-pgid).into()),
+            }
+        }
+        F_GETOWN_EX => {
+            let file = current_task.files.get_unless_opath(fd)?;
+            let maybe_owner = match file.get_async_owner() {
+                FileAsyncOwner::Unowned => None,
+                FileAsyncOwner::Thread(tid) => {
+                    Some(uapi::f_owner_ex { type_: F_OWNER_TID as i32, pid: tid })
+                }
+                FileAsyncOwner::Process(pid) => {
+                    Some(uapi::f_owner_ex { type_: F_OWNER_PID as i32, pid })
+                }
+                FileAsyncOwner::ProcessGroup(pgid) => {
+                    Some(uapi::f_owner_ex { type_: F_OWNER_PGRP as i32, pid: pgid })
+                }
+            };
+            if let Some(owner) = maybe_owner {
+                let user_owner: UserRef<f_owner_ex> =
+                    UserRef::<uapi::f_owner_ex>::new(UserAddress::from(arg));
+                current_task.mm.write_object(user_owner, &owner)?;
+            }
+            Ok(SUCCESS)
         }
         F_SETOWN => {
-            if arg > std::i32::MAX as u64 {
-                // Negative values are process groups.
-                not_implemented!("fcntl(F_SETOWN) does not support process groups");
-                return error!(EINVAL);
+            let file = current_task.files.get_unless_opath(fd)?;
+            let pid = (arg as u32) as i32;
+            let owner = match pid.cmp(&0) {
+                Ordering::Equal => FileAsyncOwner::Unowned,
+                Ordering::Greater => FileAsyncOwner::Process(pid),
+                Ordering::Less => {
+                    FileAsyncOwner::ProcessGroup(pid.checked_neg().ok_or_else(|| errno!(EINVAL))?)
+                }
+            };
+            owner.validate(current_task)?;
+            file.set_async_owner(owner);
+            Ok(SUCCESS)
+        }
+        F_SETOWN_EX => {
+            let file = current_task.files.get_unless_opath(fd)?;
+            let user_owner = UserRef::<uapi::f_owner_ex>::new(UserAddress::from(arg));
+            let requested_owner = current_task.mm.read_object(user_owner)?;
+            let mut owner = match requested_owner.type_ as u32 {
+                F_OWNER_TID => FileAsyncOwner::Thread(requested_owner.pid),
+                F_OWNER_PID => FileAsyncOwner::Process(requested_owner.pid),
+                F_OWNER_PGRP => FileAsyncOwner::ProcessGroup(requested_owner.pid),
+                _ => return error!(EINVAL),
+            };
+            if requested_owner.pid == 0 {
+                owner = FileAsyncOwner::Unowned;
             }
-            let file = current_task.files.get(fd)?;
-            let task = current_task.get_task(arg.try_into().map_err(|_| errno!(EINVAL))?);
-            file.set_async_owner(task.map_or(0, |task| task.id));
+            owner.validate(current_task)?;
+            file.set_async_owner(owner);
             Ok(SUCCESS)
         }
         F_GETFD => Ok(current_task.files.get_fd_flags(fd)?.into()),
@@ -144,7 +191,7 @@ pub fn sys_fcntl(
                 OpenFlags::APPEND | OpenFlags::DIRECT | OpenFlags::NOATIME | OpenFlags::NONBLOCK;
             let requested_flags =
                 OpenFlags::from_bits_truncate((arg as u32) & settable_flags.bits());
-            let file = current_task.files.get(fd)?;
+            let file = current_task.files.get_unless_opath(fd)?;
             file.update_file_flags(requested_flags, settable_flags);
             Ok(SUCCESS)
         }
