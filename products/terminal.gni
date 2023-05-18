@@ -47,7 +47,7 @@ legacy_cache_package_labels += [
   "//src/ui/bin/terminal",
 
   # Used to mock out display hardware in UI integration tests.
-  "//src/ui/bin/hardware_display_controller_provider",
+  "//src/graphics/display/testing/coordinator-provider",
 ]
 
 # End to end (E2E) `dart_inspect_benchmarks` test requires the dart runner.
