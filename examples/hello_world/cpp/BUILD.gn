@@ -21,9 +21,19 @@ executable("bin") {
 
 # [START fuchsia_component]
 fuchsia_component("hello-world-cpp-component") {
+  deps = [ ":bin" ]
+
+  # Defines the name given to the manifest when included in a fuchsia package.
+  # In this case: "hello-world-cpp.cm"
   component_name = "hello-world-cpp"
   manifest = "meta/hello_world_cpp.cml"
-  deps = [ ":bin" ]
+}
+
+fuchsia_package("hello-world-cpp") {
+  deps = [
+    # component-url: fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
+    ":hello-world-cpp-component",
+  ]
 }
 
 # [END fuchsia_component]

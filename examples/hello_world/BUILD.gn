@@ -7,8 +7,9 @@ import("//build/components.gni")
 group("hello_world") {
   testonly = true
   deps = [
-    ":hello-world",
     ":tests",
+    "cpp:hello-world-cpp",
+    "rust:hello-world-rust",
   ]
 }
 
@@ -17,15 +18,5 @@ group("tests") {
   deps = [
     "cpp:tests",
     "rust:tests",
-  ]
-}
-
-fuchsia_package("hello-world") {
-  deps = [
-    # component-url: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
-    "cpp:hello-world-cpp-component",
-
-    # component-url: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
-    "rust:hello-world-rust-component",
   ]
 }
