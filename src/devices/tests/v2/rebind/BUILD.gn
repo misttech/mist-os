@@ -57,6 +57,7 @@ fuchsia_driver("parent_driver") {
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/legacy-bind-constants",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
