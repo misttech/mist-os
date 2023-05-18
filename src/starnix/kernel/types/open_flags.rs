@@ -25,6 +25,7 @@ bitflags! {
       const APPEND = uapi::O_APPEND;
       const NONBLOCK = uapi::O_NONBLOCK;
       const DSYNC = uapi::O_DSYNC;
+      const ASYNC = uapi::FASYNC;
       const DIRECT = uapi::O_DIRECT;
       const LARGEFILE = uapi::O_LARGEFILE;
       const DIRECTORY = uapi::O_DIRECTORY;

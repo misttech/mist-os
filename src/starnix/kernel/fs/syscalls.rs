@@ -186,9 +186,11 @@ pub fn sys_fcntl(
             Ok(file.flags().into())
         }
         F_SETFL => {
-            // TODO: Add O_ASYNC once we have a decl for it.
-            let settable_flags =
-                OpenFlags::APPEND | OpenFlags::DIRECT | OpenFlags::NOATIME | OpenFlags::NONBLOCK;
+            let settable_flags = OpenFlags::APPEND
+                | OpenFlags::DIRECT
+                | OpenFlags::NOATIME
+                | OpenFlags::NONBLOCK
+                | OpenFlags::ASYNC;
             let requested_flags =
                 OpenFlags::from_bits_truncate((arg as u32) & settable_flags.bits());
             let file = current_task.files.get_unless_opath(fd)?;
