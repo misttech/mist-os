@@ -191,30 +191,21 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
         ZX_ASSERT(inserted);
         return it->first;
       }()) {
-  fbl::RefPtr device_controller = fbl::RefPtr<fs::Service>();
-  fbl::RefPtr device_protocol = fbl::RefPtr<fs::Service>();
   if (target.has_value()) {
-    device_controller =
+    children().AddEntry(
+        fuchsia_device_fs::wire::kDeviceControllerName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
           return (*passthrough.connect.get())(std::move(channel), PassThrough::ConnectionType{
                                                                       .include_controller = true,
                                                                   });
-        });
-    device_protocol =
+        }));
+    children().AddEntry(
+        fuchsia_device_fs::wire::kDeviceProtocolName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
           return (*passthrough.connect.get())(std::move(channel), PassThrough::ConnectionType{
                                                                       .include_device = true,
                                                                   });
-        });
-  }
-
-  if (device_controller) {
-    children().AddEntry(fuchsia_device_fs::wire::kDeviceControllerName,
-                        std::move(device_controller));
-  }
-
-  if (device_protocol) {
-    children().AddEntry(fuchsia_device_fs::wire::kDeviceProtocolName, std::move(device_protocol));
+        }));
   }
 }
 
