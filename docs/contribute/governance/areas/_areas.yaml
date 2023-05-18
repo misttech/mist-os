@@ -166,7 +166,7 @@
 
 - name: 'Graphics'
   api_primary: 'jbauman@google.com'
-  api_secondary: 'jaeheon@google.com'
+  api_secondary: 'dalesat@google.com'
   description: |
     The set of APIs that are used to transport and compose images on the system.
     It includes interfaces for communicating with graphics hardware, as well as
@@ -401,8 +401,8 @@
   api_secondary: ''
 
 - name: 'View System'
-  api_primary: 'jaeheon@google.com'
-  api_secondary: 'neelsa@google.com'
+  api_primary: 'neelsa@google.com'
+  api_secondary: 'quiche@google.com'
   description: |
     The set of APIs that need to reason about and interact with visual regions
     ("views") and their lifecycle. They generally are not tied to a particular
