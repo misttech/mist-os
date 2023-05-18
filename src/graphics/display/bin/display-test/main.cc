@@ -576,7 +576,7 @@ void capture_release() {
 void usage(void) {
   printf(
       "Usage: display-test [OPTIONS]\n\n"
-      "--controller N           : open coordinator N [/dev/class/display-controller/N]\n"
+      "--controller N           : open coordinator N [/dev/class/display-coordinator/N]\n"
       "--dump                   : print properties of attached display\n"
       "--mode-set D N           : Set Display D to mode N (use dump option for choices)\n"
       "--format-set D N         : Set Display D to format N (use dump option for choices)\n"
@@ -673,7 +673,7 @@ int main(int argc, const char* argv[]) {
   int32_t delay = 0;
   bool capture = false;
   bool verify_capture = false;
-  const char* coordinator = "/dev/class/display-controller/000";
+  const char* coordinator = "/dev/class/display-coordinator/000";
 
   platform = GetPlatform();
 

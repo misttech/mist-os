@@ -87,7 +87,7 @@ $ iquery list-files bootstrap/archivist bootstrap/driver_manager
 bootstrap/archivist
   fuchsia.inspect.Tree
 bootstrap/driver_manager
-  class/display-controller/000.inspect
+  class/display-coordinator/000.inspect
   class/input-report/000.inspect
   class/input-report/001.inspect
   class/misc/000.inspect

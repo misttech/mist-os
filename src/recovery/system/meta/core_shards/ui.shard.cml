@@ -11,9 +11,9 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-class-display-controller",
+            as: "dev-class-display-coordinator",
             to: "#system_recovery",
-            subdir: "display-controller",
+            subdir: "display-coordinator",
         },
         {
             directory: "dev-class",

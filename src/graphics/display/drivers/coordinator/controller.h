@@ -52,7 +52,7 @@ using DeviceType = ddk::Device<Controller, ddk::Unbindable,
 class Controller : public DeviceType,
                    public ddk::DisplayControllerInterfaceProtocol<Controller>,
                    public ddk::DisplayCaptureInterfaceProtocol<Controller>,
-                   public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_CONTROLLER> {
+                   public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
  public:
   explicit Controller(zx_device_t* parent);
 

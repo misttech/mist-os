@@ -36,9 +36,9 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-display-controller",
+            as: "dev-display-coordinator",
             to: "#escher-examples",
-            subdir: "display-controller",
+            subdir: "display-coordinator",
         },
         {
             directory: "dev-class",

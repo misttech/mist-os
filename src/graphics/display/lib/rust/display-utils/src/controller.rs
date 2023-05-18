@@ -25,7 +25,7 @@ use crate::{
     types::{CollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId},
 };
 
-const DEV_DIR_PATH: &str = "/dev/class/display-controller";
+const DEV_DIR_PATH: &str = "/dev/class/display-coordinator";
 const TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
 
 /// Client abstraction for the `fuchsia.hardware.display.Coordinator` protocol. Instances can be
@@ -61,19 +61,19 @@ pub struct VsyncEvent {
 }
 
 impl Coordinator {
-    /// Establishes a connection to the display-controller device and initialize a `Coordinator`
+    /// Establishes a connection to the display-coordinator device and initialize a `Coordinator`
     /// instance with the initial set of available displays. The returned `Coordinator` will
     /// maintain FIDL connection to the underlying device as long as it is alive or the connection
     /// is closed by the peer.
     ///
     /// Returns an error if
-    /// - No display-controller device is found within `TIMEOUT`.
+    /// - No display-coordinator device is found within `TIMEOUT`.
     /// - An initial OnDisplaysChanged event is not received from the display driver within
     ///   `TIMEOUT` seconds.
     ///
     /// Current limitations:
-    ///   - This function connects to the first display-controller device that it observes. It
-    ///   currently does not support selection of a specific device if multiple display-controller
+    ///   - This function connects to the first display-coordinator device that it observes. It
+    ///   currently does not support selection of a specific device if multiple display-coordinator
     ///   devices are present.
     // TODO(fxbug.dev/87469): This will currently result in an error if no displays are present on
     // the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary to rely on

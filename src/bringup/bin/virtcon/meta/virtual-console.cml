@@ -25,9 +25,9 @@
             path: "/dev/class/input-report",
         },
         {
-            directory: "display-controller",
+            directory: "display-coordinator",
             rights: [ "r*" ],
-            path: "/dev/class/display-controller",
+            path: "/dev/class/display-coordinator",
         },
         {
             protocol: [

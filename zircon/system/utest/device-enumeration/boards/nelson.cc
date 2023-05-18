@@ -72,7 +72,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
       "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
       "sys/platform/00:00:1e/dw-dsi",
-      "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-controller",
+      "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-73/ti-ina231-mlb/ti-ina231",
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-64/ti-ina231-speakers/ti-ina231",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-112/shtv3",

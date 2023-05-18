@@ -16,7 +16,7 @@
 
 namespace ui_display {
 
-static const std::string kDisplayDir = "/dev/class/display-controller";
+static const std::string kDisplayDir = "/dev/class/display-coordinator";
 
 HardwareDisplayCoordinatorProviderImpl::HardwareDisplayCoordinatorProviderImpl(
     sys::ComponentContext* app_context) {

@@ -5,9 +5,9 @@
     include: [ "//src/ui/scenic/bin/meta/scenic.shard.cml" ],
     use: [
         {
-            directory: "dev-display-controller",
+            directory: "dev-display-coordinator",
             rights: [ "r*" ],
-            path: "/dev/class/display-controller",
+            path: "/dev/class/display-coordinator",
         },
     ],
 }

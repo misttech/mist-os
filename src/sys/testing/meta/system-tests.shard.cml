@@ -169,7 +169,7 @@
 
         // Some non-hermetic tests require access to the real display controller.
         {
-            directory: "dev-display-controller",
+            directory: "dev-display-coordinator",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],

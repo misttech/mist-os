@@ -63,7 +63,7 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
 
   static const char* kDevicePaths[] = {
       "sys/platform/pt/PCI0/bus/00:02.0/00:02.0/intel_i915/intel-gpu-core",
-      "sys/platform/pt/PCI0/bus/00:02.0/00:02.0/intel_i915/intel-display-controller/display-controller",
+      "sys/platform/pt/PCI0/bus/00:02.0/00:02.0/intel_i915/intel-display-controller/display-coordinator",
       "sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb-bus",
       "sys/platform/pt/PCI0/bus/00:17.0/00:17.0/ahci",
       // TODO(fxbug.dev/84037): Temporarily removed.

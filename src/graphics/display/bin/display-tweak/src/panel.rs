@@ -18,7 +18,7 @@ fn open_display_provider() -> Result<display::ProviderProxy, Error> {
 
     let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>()
         .context("Failed to create fuchsia.hardware.display.Provider proxy")?;
-    fdio::service_connect("/dev/class/display-controller/000", server.into_channel())
+    fdio::service_connect("/dev/class/display-coordinator/000", server.into_channel())
         .context("Failed to connect to default display coordinator provider")?;
 
     Ok(proxy)

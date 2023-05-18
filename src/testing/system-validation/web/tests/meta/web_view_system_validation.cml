@@ -113,7 +113,7 @@
         },
         {
             directory: [
-                "dev-display-controller",
+                "dev-display-coordinator",
                 "dev-goldfish-address-space",
                 "dev-goldfish-control",
                 "dev-goldfish-pipe",

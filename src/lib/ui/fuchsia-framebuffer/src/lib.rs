@@ -648,13 +648,13 @@ impl FrameBuffer {
         sender: Option<futures::channel::mpsc::UnboundedSender<Message>>,
     ) -> Result<FrameBuffer, Error> {
         let device_path = if let Some(index) = display_index {
-            format!("/dev/class/display-controller/{:03}", index)
+            format!("/dev/class/display-coordinator/{:03}", index)
         } else {
             // If the caller did not supply a display index, we watch the
-            // display-controller directory and use the first coordinator
+            // display-coordinator directory and use the first coordinator
             // that appears.
             let dir = fuchsia_fs::directory::open_in_namespace(
-                "/dev/class/display-controller",
+                "/dev/class/display-coordinator",
                 fuchsia_fs::OpenFlags::RIGHT_READABLE,
             )?;
 
@@ -674,7 +674,7 @@ impl FrameBuffer {
             let filename =
                 filename.ok_or_else(|| format_err!("No display coordinator available"))?;
             let filename = filename?;
-            format!("/dev/class/display-controller/{}", filename.display())
+            format!("/dev/class/display-coordinator/{}", filename.display())
         };
 
         let (client_end, server_end) = zx::Channel::create();

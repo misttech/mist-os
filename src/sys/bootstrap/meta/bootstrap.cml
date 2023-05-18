@@ -754,9 +754,9 @@
         {
             directory: "dev-class",
             from: "#devfs-with-pkg",
-            as: "display-controller",
+            as: "display-coordinator",
             to: "#virtual_console",
-            subdir: "display-controller",
+            subdir: "display-coordinator",
         },
         {
             directory: [ "tmp" ],

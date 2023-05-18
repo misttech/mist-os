@@ -85,13 +85,13 @@
         },
 
         // NOTE:: spinning_square uses this capability, however if offered it'll switch to create views that
-        // directly runs on the display controller. For system validation testing, we want to run the app
+        // directly runs on the display coordinator. For system validation testing, we want to run the app
         // using views created by scenic.
         // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/ui/carnelian/src/app/strategies/base.rs;l=133
         //
         // TODO: Find a better way to force carnelian apps to use scenic.
         // {
-        //     directory: "dev-display-controller",
+        //     directory: "dev-display-coordinator",
         //     from: "parent",
         //     to: "#system-validation-tests",
         //     rights: [ "r*" ],

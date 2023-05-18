@@ -12,9 +12,9 @@
     },
     use: [
         {
-            directory: "dev-display-controller",
+            directory: "dev-display-coordinator",
             rights: [ "r*" ],
-            path: "/dev/class/display-controller",
+            path: "/dev/class/display-coordinator",
         },
         {
             protocol: [

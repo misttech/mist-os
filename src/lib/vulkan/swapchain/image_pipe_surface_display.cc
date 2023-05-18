@@ -78,11 +78,11 @@ bool ImagePipeSurfaceDisplay::Init() {
 
   display_coordinator_ = ConnectToCoordinatorFromService(loop_.dispatcher());
   if (!display_coordinator_) {
-    // Probe /dev/class/display-controller/ for a display controller name.
+    // Probe /dev/class/display-coordinator/ for a display coordinator name.
     // When the display driver restarts it comes up with a new one (e.g. '001'
     // instead of '000'). For now, simply take the first file found in the
     // directory.
-    const char kDir[] = "/dev/class/display-controller";
+    const char kDir[] = "/dev/class/display-coordinator";
     std::string filename;
 
     {

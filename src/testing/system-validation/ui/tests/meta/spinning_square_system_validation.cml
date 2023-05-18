@@ -40,7 +40,7 @@
         },
         {
             directory: [
-                "dev-display-controller",
+                "dev-display-coordinator",
                 "dev-input",
                 "dev-input-report",
             ],

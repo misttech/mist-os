@@ -418,11 +418,11 @@ class Flatland : public fuchsia::ui::composition::Flatland,
 
   // These images no longer exist in the Flatland session.  They will be released as soon as the
   // corresponding (internally generated) release fence is signaled, indicating that they are no
-  // longer in use by the compositor/display-controller.  Additionally, if the session is destroyed,
-  // this allows the images to be released without waiting for a release fence; see ~Flatland().
-  // The indirection through a shared_ptr is so this can be captured and used in a closure after
-  // this Flatland session is destroyed (this happens only in tests, at least when this code was
-  // written).
+  // longer in use by the compositor/display-coordinator.  Additionally, if the session is
+  // destroyed, this allows the images to be released without waiting for a release fence; see
+  // ~Flatland(). The indirection through a shared_ptr is so this can be captured and used in a
+  // closure after this Flatland session is destroyed (this happens only in tests, at least when
+  // this code was written).
   std::shared_ptr<std::unordered_set<allocation::GlobalImageId>> images_to_release_;
 
   // Callbacks for registering View-bound protocols.

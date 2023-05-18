@@ -14,7 +14,7 @@ use {
     serde_json::json,
 };
 
-const DEVICE_PATH: &'static str = "/dev/class/display-controller/000";
+const DEVICE_PATH: &'static str = "/dev/class/display-coordinator/000";
 
 fn convert_info(info: &Info) -> DisplayInfo {
     DisplayInfo {

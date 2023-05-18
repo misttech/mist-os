@@ -87,7 +87,7 @@ void CoreDisplayTest::SetUp() {
   ASSERT_TRUE(dc_endpoints.is_ok(), "%s", dc_endpoints.status_string());
 
   fbl::unique_fd fd;
-  ASSERT_TRUE(fd = fbl::unique_fd(open("/dev/class/display-controller/000", O_RDWR)), "%s",
+  ASSERT_TRUE(fd = fbl::unique_fd(open("/dev/class/display-coordinator/000", O_RDWR)), "%s",
               strerror(errno));
   caller_.reset(std::move(fd));
 

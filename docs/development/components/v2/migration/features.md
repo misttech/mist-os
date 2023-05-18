@@ -464,7 +464,7 @@ Capability                     | Description
 ------------------------------ | -----------------------------
 `dev-input`                    | Input
 `dev-input-report`             | Input method events
-`dev-display-controller`       | Graphical display controller
+`dev-display-coordinator`      | Graphical display coordinator
 `dev-goldfish-address-space`   | Goldfish address space device
 `dev-goldfish-control`         | Goldfish control device
 `dev-goldfish-pipe`            | Goldfish pipe device

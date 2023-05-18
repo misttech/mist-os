@@ -11,9 +11,9 @@
     ],
     use: [
         {
-            directory: "dev-class-display-controller",
+            directory: "dev-class-display-coordinator",
             rights: [ "r*" ],
-            path: "/dev/class/display-controller",
+            path: "/dev/class/display-coordinator",
         },
         {
             directory: "dev-class-input",

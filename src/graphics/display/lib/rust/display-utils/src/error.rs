@@ -17,8 +17,8 @@ use crate::{
 /// Library error type.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Error encountered while connecting to a display-controller device via devfs.
-    #[error("could not find a display-controller device")]
+    /// Error encountered while connecting to a display-coordinator device via devfs.
+    #[error("could not find a display-coordinator device")]
     DeviceNotFound,
 
     /// No displays were reported by the display driver when expected.

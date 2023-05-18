@@ -84,8 +84,8 @@ def main(argv):
                     'rights': ["w*"],
                 },
                 {
-                    'directory': "dev-display-controller",
-                    'path': "/dev/class/display-controller",
+                    'directory': "dev-display-coordinator",
+                    'path': "/dev/class/display-coordinator",
                     'rights': ["rw*"],
                 },
                 {

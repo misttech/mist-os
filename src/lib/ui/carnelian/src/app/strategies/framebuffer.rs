@@ -128,12 +128,12 @@ impl AutoRepeatTimer for AutoRepeatContext {
     }
 }
 
-const DISPLAY_CONTROLLER_PATH: &'static str = "/dev/class/display-controller";
+const DISPLAY_COORDINATOR_PATH: &'static str = "/dev/class/display-coordinator";
 
 pub type CoordinatorProxyPtr = Rc<CoordinatorProxy>;
 
 pub fn first_display_device_path() -> Option<PathBuf> {
-    let mut entries = fs::read_dir(DISPLAY_CONTROLLER_PATH).ok()?;
+    let mut entries = fs::read_dir(DISPLAY_COORDINATOR_PATH).ok()?;
     entries.next()?.ok().map(|entry| entry.path())
 }
 
@@ -186,7 +186,7 @@ impl DisplayCoordinator {
     }
 
     pub(crate) async fn watch_displays(app_sender: UnboundedSender<MessageInternal>) {
-        watch_directory_async(PathBuf::from(DISPLAY_CONTROLLER_PATH), app_sender)
+        watch_directory_async(PathBuf::from(DISPLAY_COORDINATOR_PATH), app_sender)
             .await
             .expect("watch_directory_async");
     }

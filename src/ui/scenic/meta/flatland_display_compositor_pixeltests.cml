@@ -26,7 +26,7 @@
     ],
     offer: [
         {
-            directory: "dev-display-controller",
+            directory: "dev-display-coordinator",
             from: "parent",
             to: "#display_provider",
         },

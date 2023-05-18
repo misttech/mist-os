@@ -22,8 +22,8 @@ communication from additional threads back to the main thread.
 ## Notes
 
 When starting up, Carnelian attempts to open the [display
-controller](./glossary.md#display-controller) to decide whether it should use the display
-controller or Scenic.
+coordinator](./glossary.md#display-coordinator) to decide whether it should use the display
+coordinator or Scenic.
 
 Support for the GFX flavor of Scenic should be removed as soon as possible.
 

@@ -4,7 +4,7 @@
 
 #![deny(missing_docs)]
 
-//! This crate provides utilities for the Fuchsia display-controller API.
+//! This crate provides utilities for the Fuchsia display-coordinator API.
 
 /// Custom error definitions for `fuchsia.hardware.display` and sysmem API functions.
 mod error;

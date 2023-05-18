@@ -161,15 +161,15 @@ two modes may be used together as follows:
 ```
 $ iquery list-files [component_moniker]
 bootstrap/driver_manager
-  class/display-controller/000.inspect
+  class/display-coordinator/000.inspect
   ... additional output
 
 
-$ iquery show --file 'class/display-controller/000.inspect'
+$ iquery show --file 'class/display-coordinator/000.inspect'
 ```
 
 In the example above, `iquery list-files` is ran to find a list of Inspect
-locations. Then, `iquery` is ran on one of the output to 
+locations. Then, `iquery` is ran on one of the output to
 recursively list data in the matching locations. You may instead write:
 
 ```

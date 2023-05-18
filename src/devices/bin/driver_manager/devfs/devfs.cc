@@ -505,7 +505,7 @@ Devfs::Devfs(std::optional<Devnode>& root,
       "cpu-ctrl",
 
       // TODO(https://fxbug.dev/113829): Remove.
-      "display-controller",
+      "display-coordinator",
 
       // TODO(https://fxbug.dev/113830): Remove.
       "goldfish-address-space",

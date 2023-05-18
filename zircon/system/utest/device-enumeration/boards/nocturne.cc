@@ -11,7 +11,7 @@ TEST_F(DeviceEnumerationTest, NocturneTest) {
       "sys/platform/pci/00:1f.3/intel-hda-000/input-stream-002",
       "sys/platform/pci/00:1f.3/intel-hda-000/output-stream-001",
       "sys/platform/pci/00:02.0/intel_i915/intel-gpu-core/msd-intel-gen",
-      "sys/platform/pci/00:02.0/intel_i915/display-controller",
+      "sys/platform/pci/00:02.0/intel_i915/display-coordinator",
       "sys/platform/pt/acpi/TSR0",
       "sys/platform/pt/acpi/TSR1",
       "sys/platform/pt/acpi/TSR2",

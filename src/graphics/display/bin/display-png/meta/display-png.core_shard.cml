@@ -19,9 +19,9 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-display-controller",
+            as: "dev-display-coordinator",
             to: [ "#display-png" ],
-            subdir: "display-controller",
+            subdir: "display-coordinator",
         },
         {
             protocol: "fuchsia.sysmem.Allocator",

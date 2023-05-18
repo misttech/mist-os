@@ -693,7 +693,7 @@ Directories:
 root-ssl-certificates
 config-data
 dev-input-report
-dev-display-controller
+dev-display-coordinator
 dev-goldfish-address-space
 dev-goldfish-control
 dev-goldfish-pipe

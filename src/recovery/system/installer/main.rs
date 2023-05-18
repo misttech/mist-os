@@ -740,10 +740,10 @@ async fn do_install(
 /// Wait for a display to become available.
 async fn wait_for_display() -> Result<(), Error> {
     let dir = fuchsia_fs::directory::open_in_namespace(
-        "/dev/class/display-controller",
+        "/dev/class/display-coordinator",
         fuchsia_fs::OpenFlags::empty(),
     )
-    .context("opening display controller dir")?;
+    .context("opening display coordinator dir")?;
     let mut watcher = Watcher::new(&dir).await.context("starting watch")?;
     while let Some(message) = watcher.next().await {
         let message = message.context("error on watcher channel")?;
