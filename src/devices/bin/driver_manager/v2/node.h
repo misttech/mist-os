@@ -127,7 +127,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       std::string_view node_name, std::vector<Node*> parents,
       std::vector<std::string> parents_names,
       std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
-      NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
+      NodeManager* driver_binder,
+      std::optional<Devnode::PassThrough::ConnectCallback> devnode_connect_callback,
+      async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
   void OnBind() const;
 
@@ -156,6 +158,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // difference being once the children are removed, and the driver stopped, we don't remove the
   // node from the topology but instead bind the node again.
   void RestartNode();
+  void RestartNode(std::optional<std::string> restart_driver_url_suffix,
+                   fit::callback<void(zx::result<>)> completer);
 
   void StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_info,
                    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
@@ -294,7 +298,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   NodeRemovalTracker* removal_tracker_ = nullptr;
   bool node_restarting_ = false;
   // An outstanding rebind request.
-  std::optional<RequestBindCompleter::Async> request_bind_completer_;
+  std::optional<fit::callback<void(zx::result<>)>> pending_bind_completer_;
 
   std::optional<std::string> restart_driver_url_suffix_;
 

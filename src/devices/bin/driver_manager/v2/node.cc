@@ -344,7 +344,9 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
     std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
-    NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
+    NodeManager* driver_binder,
+    std::optional<Devnode::PassThrough::ConnectCallback> devnode_connect_callback,
+    async_dispatcher_t* dispatcher, uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
   if (primary_index >= parents.size()) {
     LOGF(ERROR, "Primary node index is out of bounds");
@@ -399,17 +401,23 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   composite->AddToParents();
   ZX_ASSERT_MSG(primary->devfs_device_.topological_node().has_value(), "%s",
                 composite->MakeTopologicalPath().c_str());
+
+  Devnode::Target target;
+  if (devnode_connect_callback.has_value()) {
+    target = Devnode::PassThrough(std::move(devnode_connect_callback.value()));
+  }
+
   primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, Devnode::Target(), composite->devfs_device_);
+      composite->name_, std::nullopt, std::move(target), composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
 }
 
 Node::~Node() {
   CloseIfExists(controller_ref_);
-  if (request_bind_completer_.has_value()) {
-    request_bind_completer_.value().ReplyError(ZX_ERR_CANCELED);
-    request_bind_completer_.reset();
+  if (pending_bind_completer_.has_value()) {
+    pending_bind_completer_.value()(zx::error(ZX_ERR_CANCELED));
+    pending_bind_completer_.reset();
   }
 }
 
@@ -487,10 +495,10 @@ void Node::CompleteBind(zx::result<> result) {
   if (result.is_error()) {
     driver_component_.reset();
   }
-  auto completer = std::move(request_bind_completer_);
-  request_bind_completer_.reset();
-  if (completer) {
-    completer->Reply(result);
+  auto completer = std::move(pending_bind_completer_);
+  pending_bind_completer_.reset();
+  if (completer.has_value()) {
+    completer.value()(result);
   }
 }
 
@@ -692,6 +700,18 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
 void Node::RestartNode() {
   node_restarting_ = true;
   Remove(RemovalSet::kAll, nullptr);
+}
+
+void Node::RestartNode(std::optional<std::string> restart_driver_url_suffix,
+                       fit::callback<void(zx::result<>)> completer) {
+  if (pending_bind_completer_.has_value()) {
+    completer(zx::error(ZX_ERR_ALREADY_EXISTS));
+    return;
+  }
+
+  pending_bind_completer_ = std::move(completer);
+  restart_driver_url_suffix_ = restart_driver_url_suffix;
+  RestartNode();
 }
 
 std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
@@ -910,26 +930,36 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
     return;
   }
 
-  if (request_bind_completer_) {
+  if (pending_bind_completer_.has_value()) {
     completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
     return;
   }
 
-  std::string driver_url_suffix;
+  std::optional<std::string> driver_url_suffix;
   if (request->has_driver_url_suffix()) {
     driver_url_suffix = std::string(request->driver_url_suffix().get());
   }
 
-  request_bind_completer_ = completer.ToAsync();
+  auto completer_wrapper = [completer = completer.ToAsync()](zx::result<> result) mutable {
+    if (result.is_ok()) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(result.error_value());
+    }
+  };
 
   if (driver_component_.has_value()) {
-    restart_driver_url_suffix_ = driver_url_suffix;
-    RestartNode();
+    RestartNode(driver_url_suffix, std::move(completer_wrapper));
     return;
   }
 
+  pending_bind_completer_ = std::move(completer_wrapper);
   auto tracker = CreateBindResultTracker();
-  node_manager_.value()->BindToUrl(*this, driver_url_suffix, std::move(tracker));
+  if (driver_url_suffix.has_value()) {
+    node_manager_.value()->BindToUrl(*this, driver_url_suffix.value(), std::move(tracker));
+  } else {
+    node_manager_.value()->Bind(*this, std::move(tracker));
+  }
 }
 
 void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
