@@ -62,7 +62,7 @@ impl BatteryState {
                 value: Some(vec![level]),
                 ..Default::default()
             };
-            inner.service.send_on_notify_value(params)?;
+            inner.service.send_on_notify_value(&params)?;
         }
         inner.level = level;
         Ok(())
@@ -187,7 +187,7 @@ async fn main() -> Result<(), Error> {
 
     // Publish the local gatt service delegate with the gatt service.
     gatt_server
-        .publish_service(service_info, service_client)
+        .publish_service(&service_info, service_client)
         .await?
         .map_err(|e| format_err!("Failed to publish battery service to gatt server: {:?}", e))?;
     info!("Published Battery Service to local GATT database.");
