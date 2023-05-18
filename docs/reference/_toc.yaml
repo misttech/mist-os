@@ -27,6 +27,9 @@ toc:
 - title: "FIDL bindings"
   section:
   - include: /docs/reference/fidl/bindings/_toc.yaml
+- title: "Rust"
+  section:
+  - include: /docs/reference/rust/_toc.yaml
 - title: "Diagnostics"
   section:
   - include: /docs/reference/diagnostics/_toc.yaml

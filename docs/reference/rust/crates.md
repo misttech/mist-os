@@ -1,4 +1,4 @@
-# Fuchsia Rust Crates
+<<_common/_crates_header.md>>
 
 ## General
 
@@ -186,3 +186,4 @@
     A Rust crypto library backed by BoringSSL
 
 
+[rustdocs]: https://fuchsia-docs.firebaseapp.com/rust/

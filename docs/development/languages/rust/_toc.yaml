@@ -10,8 +10,6 @@ toc:
   path: /docs/development/languages/rust
 - title: "Learn Rust"
   path: /docs/development/languages/rust/learn_rust.md
-- title: "Fuchsia Rust crates"
-  path: /docs/development/languages/rust/crates.md
 - title: "FIDL Rust crates"
   path: /docs/development/languages/rust/fidl_crates.md
 - title: "Rust editor configurations"
