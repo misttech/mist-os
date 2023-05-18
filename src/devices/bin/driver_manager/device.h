@@ -134,6 +134,7 @@ class Device final
   std::string MakeTopologicalPath() const;
 
   zx_status_t InitializeToDevfs();
+  Devnode::Target MakeDevfsTarget();
 
   // Signal that this device is ready for bind to happen.  This should happen
   // either immediately after the device is created, if it's created visible,

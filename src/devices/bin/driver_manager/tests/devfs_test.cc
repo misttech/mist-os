@@ -217,8 +217,8 @@ TEST(Devfs, PassthroughTarget) {
           .file_name = "test",
           .expected =
               {
-                  .include_node = false,
-                  .include_controller = false,
+                  .include_node = true,
+                  .include_controller = true,
                   .include_device = true,
               },
       },

@@ -439,12 +439,8 @@ zx_status_t Device::InitializeToDevfs() {
     return ZX_ERR_INTERNAL;
   }
 
-  zx_status_t status =
-      parent.devfs.topological_node()->add_child(name_, ProtocolIdToClassName(protocol_id_),
-                                                 Devnode::Remote{
-                                                     .connector = device_controller_.Clone(),
-                                                 },
-                                                 devfs);
+  zx_status_t status = parent.devfs.topological_node()->add_child(
+      name_, ProtocolIdToClassName(protocol_id_), MakeDevfsTarget(), devfs);
   if (status != ZX_OK) {
     return status;
   }
@@ -452,6 +448,30 @@ zx_status_t Device::InitializeToDevfs() {
     devfs.publish();
   }
   return ZX_OK;
+}
+
+Devnode::Target Device::MakeDevfsTarget() {
+  if (!device_controller_.is_valid()) {
+    return Devnode::Target();
+  }
+  return Devnode::PassThrough([controller = device_controller_.Clone()](
+                                  zx::channel connection,
+                                  Devnode::PassThrough::ConnectionType type) {
+    if (!controller.is_valid()) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    if (type.include_controller && !type.include_device && !type.include_node) {
+      return controller
+          ->ConnectToController(fidl::ServerEnd<fuchsia_device::Controller>(std::move(connection)))
+          .status();
+    }
+    if (!type.include_controller && type.include_device && !type.include_node) {
+      return controller->ConnectToDeviceProtocol(std::move(connection)).status();
+    }
+    return controller
+        ->ConnectMultiplexed(std::move(connection), type.include_node, type.include_controller)
+        .status();
+  });
 }
 
 zx_status_t Device::SignalReadyForBind(zx::duration delay) {

@@ -341,12 +341,9 @@ void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
   root_device_->flags = DEV_CTX_IMMORTAL | DEV_CTX_MUST_ISOLATE;
 
   // Add root_device_ to devfs manually since it's the first device.
-  Devnode::Target target = Devnode::Remote{
-      .connector = root_device_->device_controller().Clone(),
-  };
-  zx_status_t status = root_devnode_->add_child(root_device_->name(),
-                                                ProtocolIdToClassName(root_device_->protocol_id()),
-                                                std::move(target), root_device_->devfs);
+  zx_status_t status = root_devnode_->add_child(
+      root_device_->name(), ProtocolIdToClassName(root_device_->protocol_id()),
+      root_device_->MakeDevfsTarget(), root_device_->devfs);
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to initialize the root device to devfs: %s",
                 zx_status_get_string(status));
   root_device_->devfs.publish();

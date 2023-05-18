@@ -64,9 +64,6 @@ Devnode::Target clone_target(Devnode::Target& target) {
                         [](Devnode::NoRemote& no_remote) -> Devnode::Target {
                           return Devnode::Target(Devnode::NoRemote());
                         },
-                        [](Devnode::Remote& remote) -> Devnode::Target {
-                          return Devnode::Target(remote.Clone());
-                        },
                         [](Devnode::PassThrough& passthrough) -> Devnode::Target {
                           return Devnode::Target(passthrough.Clone());
                         },
@@ -126,9 +123,10 @@ Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
     : holder_(holder), target_(std::move(target)) {}
 
 bool Devnode::VnodeImpl::IsDirectory() const {
-  return std::visit(overloaded{[&](const NoRemote&) { return true; },
-                               [](const Devnode::PassThrough& passthrough) { return false; },
-                               [&](const Remote& remote) { return !remote.connector.is_valid(); }},
+  return std::visit(overloaded{
+                        [&](const NoRemote&) { return true; },
+                        [](const Devnode::PassThrough& passthrough) { return false; },
+                    },
                     target_);
 }
 
@@ -159,27 +157,21 @@ zx_status_t Devnode::VnodeImpl::GetNodeInfoForProtocol(fs::VnodeProtocol protoco
 }
 
 zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
-  return std::visit(overloaded{[&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
-                               [&](const PassThrough& passthrough) {
-                                 return (*passthrough.connect.get())(
-                                     std::move(channel), passthrough.default_connection_type);
-                               },
-                               [&](const Remote& remote) {
-                                 if (!remote.connector.is_valid()) {
-                                   return ZX_ERR_NOT_SUPPORTED;
-                                 }
-                                 return remote.connector
-                                     ->ConnectMultiplexed(std::move(channel), remote.multiplex_node,
-                                                          remote.multiplex_controller)
-                                     .status();
-                               }},
+  return std::visit(overloaded{
+                        [&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
+                        [&](const PassThrough& passthrough) {
+                          return (*passthrough.connect.get())(std::move(channel),
+                                                              passthrough.default_connection_type);
+                        },
+                    },
                     target_);
 }
 
 bool Devnode::VnodeImpl::IsService() const {
-  return std::visit(overloaded{[&](const NoRemote&) { return false; },
-                               [&](const PassThrough& passthrough) { return true; },
-                               [&](const Remote& remote) { return remote.connector.is_valid(); }},
+  return std::visit(overloaded{
+                        [&](const NoRemote&) { return false; },
+                        [&](const PassThrough& passthrough) { return true; },
+                    },
                     target_);
 }
 
@@ -247,26 +239,7 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
                 });
             return std::make_tuple(std::move(device_controller), std::move(device_protocol));
           },
-          [](Remote& remote) {
-            auto device_controller =
-                fbl::MakeRefCounted<fs::Service>([remote = remote.Clone()](zx::channel channel) {
-                  if (!remote.connector) {
-                    return ZX_ERR_NOT_SUPPORTED;
-                  }
-                  return remote.connector
-                      ->ConnectToController(
-                          fidl::ServerEnd<fuchsia_device::Controller>(std::move(channel)))
-                      .status();
-                });
-            auto device_protocol =
-                fbl::MakeRefCounted<fs::Service>([remote = remote.Clone()](zx::channel channel) {
-                  if (!remote.connector) {
-                    return ZX_ERR_NOT_SUPPORTED;
-                  }
-                  return remote.connector->ConnectToDeviceProtocol(std::move(channel)).status();
-                });
-            return std::make_tuple(std::move(device_controller), std::move(device_protocol));
-          }},
+      },
       target);
   if (device_controller) {
     children().AddEntry(fuchsia_device_fs::wire::kDeviceControllerName,
@@ -415,13 +388,15 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
   }
 
   // Set the FIDL multiplexing of the node based on the class name.
-  if (Devnode::Remote* remote = std::get_if<Devnode::Remote>(&target); remote) {
+  if (Devnode::PassThrough* passthrough = std::get_if<Devnode::PassThrough>(&target); passthrough) {
     if (class_name.has_value()) {
-      remote->multiplex_node = AllowMultiplexingNode(class_name.value());
-      remote->multiplex_controller = AllowMultiplexingController(class_name.value());
+      passthrough->default_connection_type.include_node = AllowMultiplexingNode(class_name.value());
+      passthrough->default_connection_type.include_controller =
+          AllowMultiplexingController(class_name.value());
     } else {
       // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
-      remote->multiplex_node = true;
+      passthrough->default_connection_type.include_node = true;
+      passthrough->default_connection_type.include_controller = true;
     }
   }
 

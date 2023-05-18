@@ -29,19 +29,6 @@ std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id);
 class Devnode {
  public:
   struct NoRemote {};
-  struct Remote {
-    bool multiplex_node = true;
-    bool multiplex_controller = true;
-    fidl::WireSharedClient<fuchsia_device_manager::DeviceController> connector;
-
-    Remote Clone() {
-      return Remote{
-          .multiplex_node = multiplex_node,
-          .multiplex_controller = multiplex_controller,
-          .connector = connector.Clone(),
-      };
-    }
-  };
 
   // This class represents a device in devfs. It is called "passthrough" because it sends
   // the channel and the connection type to a callback function.
@@ -70,7 +57,7 @@ class Devnode {
     std::shared_ptr<ConnectCallback> connect;
   };
 
-  using Target = std::variant<NoRemote, Remote, PassThrough>;
+  using Target = std::variant<NoRemote, PassThrough>;
 
   // Constructs a root node.
   explicit Devnode(Devfs& devfs);
