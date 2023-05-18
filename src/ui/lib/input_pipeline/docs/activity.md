@@ -86,8 +86,7 @@ while let Some(Ok(state)) = watch_activity_state_stream.next().await {
 ## Configuring the idle transition threshold with product assembly
 
 The activity service uses structured configuration by declaring a `config`
-value in an input pipeline component manifest, such as in
-`//src/ui/bin/input-pipeline/meta/input-pipeline.cml` or
+value in a component manifest, such as in
 `//src/ui/bin/scene_manager/meta/scene_manager.cml`:
 
 ```

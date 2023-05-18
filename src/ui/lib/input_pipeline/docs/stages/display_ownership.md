@@ -37,8 +37,8 @@ types are handled as follows:
 * `ConsumerControls`: these events are always forwarded to clients of the
   input pipeline, as:
   * they [have no meaning to `virtcon`][virtcon-no-cc]
-  * although [the recovery UI uses these events][recovery-cc], input-pipeline
-    does not run alongside the recovery UI
+  * although [the recovery UI uses these events][recovery-cc], input pipeline
+    (via SceneManager) does not run alongside the recovery UI
 
 ## Limitations
 

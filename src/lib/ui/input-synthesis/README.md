@@ -2,9 +2,11 @@
 
 The input synthesis library supports input event injection for testing purposes.
 
-Injection is performed by creating and registering a synthetic input device compatible to a given
-`InputDeviceRegistry` FIDL protocol. It then uses that device to send `InputReports` to the input
-service, mimicking real user input on HID devices (e.g. touchscreens, media buttons, keyboards).
+Injection is performed by creating and registering a synthetic input device via the
+[`fuchsia.input.injection.InputDeviceRegistry`](/sdk/fidl/fuchsia.input.injection/input_device_registry.fidl)
+FIDL protocol served by the Scene Manager component via the Input Pipeline library. It then
+uses that device to send `InputReports` to the input service, mimicking real user input on HID
+devices (e.g. touchscreens, media buttons, keyboards).
 
 The library allows test code to send high-level commands that get converted into low-level input
 messages, without having to write the low-level commands directly. For example, it will convert a
@@ -12,12 +14,6 @@ command `Text.Send("hello")` into a sequence of presses and releases of the keys
 `h`, `e`, `l`, `l`, and `o` in a rapid succession. Fuchsia platform's input handlers, and
 downstream UI clients, cannot distinguish these fake key presses from those typed up on a real
 keyboard.
-
-The two supported protocols are the
-[`fuchsia.input.injection.InputDeviceRegistry`](/sdk/fidl/fuchsia.input.injection/input_device_registry.fidl)
-protocol served by the modern Input Pipeline component and the
-[`fuchsia.ui.input.InputDeviceRegistry`](/sdk/fidl/fuchsia.ui.input/input_device_registry.fidl)
-protocol served by the legacy Root Presenter component.
 
 ## Use the library in tests
 
@@ -127,8 +123,3 @@ makes use of the test FIDL.
 
 Note: Because this approach uses an implicit `InputDeviceRegistry`, it may be relevant to use the
 appropriate [build argument](#build-args) for your use case.
-
-## Planned work
-
-The legacy portion of the library is scheduled for removal along with the deprecation of Root
-Presenter's input logic.

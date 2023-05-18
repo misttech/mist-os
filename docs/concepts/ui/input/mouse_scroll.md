@@ -36,7 +36,7 @@ The driver packs this scroll data into
 
 ### Input pipeline
 
-The Input Pipeline component reads `scroll_v` and `scroll_h` data from the input
+The Input Pipeline library reads `scroll_v` and `scroll_h` data from the input
 driver's `MouseInputReport` and injects them into Scenic as a
 [`PointerSample`](https://fuchsia.dev/reference/fidl/fuchsia.ui.pointerinjector#PointerSample).
 

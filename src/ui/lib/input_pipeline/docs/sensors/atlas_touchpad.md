@@ -4,8 +4,7 @@
 
 ### Default (mouse mode)
 
-The Atlas touchpad operates in mouse mode at boot time. In this mode, the
-input-pipeline sees:
+The Atlas touchpad operates in mouse mode at boot time. In this mode, the input pipeline sees:
 
 * `movement_x` and `movement_y`: X and Y motion
   * motion is reported in "counts" (see below for translation from counts to
@@ -43,7 +42,7 @@ set to [the appropriate value][touch-configuration-input-mode].
 
 ### Touchpad mode
 
-In touchpad mode, the input-pipeline sees:
+In touchpad mode, the input_pipeline sees:
 
 * `contacts`: an array where every finger in contact with the touchpad is
   reported with
@@ -104,7 +103,7 @@ Notes
   `Unit (System: English Linear, Length: Centimeter)` is contradictory, since
   centimeters aren't a unit of measure in the English system.
 * The units and ranges in the HID descriptor differ from those seen by the
-  input-pipeline, because of translation done by the driver stack. See
+  input pipeline, because of translation done by the driver stack. See
   * [Unit translation for descriptors](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/input/lib/hid-input-report/axis.cc;l=16?q=hidunittollcppunit&ss=fuchsia%2Ffuchsia)
   * [Value translation for reports](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/hid-parser/units.cc;l=237?q=hid-parser%2Funits.cc&ss=fuchsia%2Ffuchsia)
 

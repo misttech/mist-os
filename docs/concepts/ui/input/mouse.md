@@ -51,7 +51,7 @@ over a Zircon channel. Each device is initially surfaced as a file in
 
 ### Input pipeline
 
-The Input Pipeline component attaches to a mouse device by discovery in the
+The Input Pipeline library attaches to a mouse device by discovery in the
 `/dev/class/input-report`
 [directory](/docs/concepts/components/v2/capabilities/directory.md). Only platform
 components have access to this sensitive capability.
