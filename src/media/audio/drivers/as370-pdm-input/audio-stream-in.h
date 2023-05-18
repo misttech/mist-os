@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AS370_PDM_INPUT_AUDIO_STREAM_IN_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AS370_PDM_INPUT_AUDIO_STREAM_IN_H_
 
-#include <fuchsia/hardware/clock/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -60,7 +60,7 @@ class As370AudioStreamIn : public SimpleAudioStream {
   ddk::PDevFidl pdev_ TA_GUARDED(domain_token());
   zx::vmo ring_buffer_vmo_ TA_GUARDED(domain_token());
   std::unique_ptr<SynAudioInDevice> lib_;
-  ddk::ClockProtocolClient clks_[kClockCount] TA_GUARDED(domain_token());
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clks_[kClockCount] TA_GUARDED(domain_token());
   zx::vmo dma_buffer_ TA_GUARDED(domain_token());
 };
 }  // namespace as370

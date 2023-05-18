@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/clock/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fuchsia/hardware/shareddma/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -75,28 +75,27 @@ class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, d
   shared_dma_protocol_t proto_;
 };
 
-class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_protocol> {
+class FakeClockDevice : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clock> {
  public:
-  FakeClockDevice() : proto_({&clock_protocol_ops_, this}) {}
-
-  zx_status_t ClockEnable() { return ZX_OK; }
-  zx_status_t ClockDisable() { return ZX_OK; }
-  zx_status_t ClockIsEnabled(bool* out_enabled) { return ZX_OK; }
-
-  zx_status_t ClockSetRate(uint64_t hz) { return ZX_OK; }
-  zx_status_t ClockQuerySupportedRate(uint64_t max_rate, uint64_t* out_max_supported_rate) {
-    return ZX_OK;
+  fuchsia_hardware_clock::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_clock::Service::InstanceHandler({
+        .clock = binding_group_.CreateHandler(this, async_get_default_dispatcher(),
+                                              fidl::kIgnoreBindingClosure),
+    });
   }
-  zx_status_t ClockGetRate(uint64_t* out_current_rate) { return ZX_OK; }
 
-  zx_status_t ClockSetInput(uint32_t idx) { return ZX_OK; }
-  zx_status_t ClockGetNumInputs(uint32_t* out) { return ZX_OK; }
-  zx_status_t ClockGetInput(uint32_t* out) { return ZX_OK; }
+  void Enable(EnableCompleter::Sync& completer) override { completer.ReplySuccess(); }
 
-  const clock_protocol_t* GetProto() const { return &proto_; }
+  void SetRate(SetRateRequestView request, SetRateCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
  private:
-  clock_protocol_t proto_;
+  fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> binding_group_;
 };
 
 class FakeMmio {
@@ -112,6 +111,7 @@ class FakeMmio {
 
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
+  FakeClockDevice clock_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -126,23 +126,28 @@ struct As370PdmInputTest : public zxtest::Test {
     ASSERT_OK(config.btis[0].duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     dma_.SetBti(std::move(dup));
 
-    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(outgoing_endpoints);
+    zx::result pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(pdev_endpoints);
+    zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(clock_endpoints);
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
-                           IncomingNamespace* infra) mutable {
-      infra->pdev_server.SetConfig(std::move(config));
-      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          infra->pdev_server.GetInstanceHandler()));
-
-      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
-    });
+    incoming_.SyncCall(
+        [config = std::move(config), pdev_server = std::move(pdev_endpoints->server),
+         clock_server = std::move(clock_endpoints->server)](IncomingNamespace* infra) mutable {
+          infra->pdev_server.SetConfig(std::move(config));
+          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+              infra->pdev_server.GetInstanceHandler()));
+          ASSERT_OK(infra->outgoing.Serve(std::move(pdev_server)));
+          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_clock::Service>(
+              infra->clock_server.GetInstanceHandler()));
+          ASSERT_OK(infra->outgoing.Serve(std::move(clock_server)));
+        });
     ASSERT_NO_FATAL_FAILURE();
     fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                                 std::move(outgoing_endpoints->client), "pdev");
+                                 std::move(pdev_endpoints->client), "pdev");
+    fake_parent_->AddFidlService(fuchsia_hardware_clock::Service::Name,
+                                 std::move(clock_endpoints->client), "clock");
 
-    fake_parent_->AddProtocol(ZX_PROTOCOL_CLOCK, clock_.GetProto()->ops, clock_.GetProto()->ctx,
-                              "clock");
     fake_parent_->AddProtocol(ZX_PROTOCOL_SHARED_DMA, dma_.GetProto()->ops, dma_.GetProto()->ctx,
                               "dma");
   }
@@ -155,7 +160,6 @@ struct As370PdmInputTest : public zxtest::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
-  FakeClockDevice clock_;
   FakeSharedDmaDevice dma_;
   FakeMmio mmio0_{::as370::kAudioGlobalSize}, mmio1_{::as370::kAudioI2sSize};
 };

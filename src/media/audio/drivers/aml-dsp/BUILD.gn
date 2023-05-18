@@ -24,7 +24,7 @@ fuchsia_driver("aml-dsp-driver") {
   sources = [ "aml-dsp.cc" ]
   deps = [
     ":aml_dsp_bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.dsp:fuchsia.hardware.dsp_cpp",
     "//sdk/fidl/fuchsia.hardware.mailbox:fuchsia.hardware.mailbox_cpp",
     "//sdk/lib/component/outgoing/cpp",

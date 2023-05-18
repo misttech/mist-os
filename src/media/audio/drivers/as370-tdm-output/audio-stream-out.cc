@@ -40,16 +40,37 @@ zx_status_t As370AudioStreamOut::InitPdev() {
     zxlogf(ERROR, "could not get pdev");
     return ZX_ERR_NO_RESOURCES;
   }
-  clks_[kAvpll0Clk] = ddk::ClockProtocolClient(parent(), "clock");
-  if (!clks_[kAvpll0Clk].is_valid()) {
-    zxlogf(ERROR, "GetClk failed");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result clock_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(parent(), "clock");
+  if (clock_client.is_error()) {
+    zxlogf(ERROR, "Failed to get clock protocol from fragment: %s\n", clock_client.status_string());
+    return clock_client.status_value();
   }
+  clks_[kAvpll0Clk].Bind(std::move(*clock_client));
+
   // PLL0 = 196.608MHz e.g.:
   // I2S 48K (FSYNC) x 64 (BCLK) x 8 (MCLK) x 8 (PRIAUD_CLK_DIV).
   // I2S 96K (FSYNC) x 64 (BCLK) x 8 (MCLK) x 4 (PRIAUD_CLK_DIV).
-  clks_[kAvpll0Clk].SetRate(196'608'000);
-  clks_[kAvpll0Clk].Enable();
+  fidl::WireResult set_rate_result = clks_[kAvpll0Clk]->SetRate(196'608'000);
+  if (!set_rate_result.ok()) {
+    zxlogf(ERROR, "Failed to send SetRate request to clock: %s\n", set_rate_result.status_string());
+    return set_rate_result.status();
+  }
+  if (set_rate_result->is_error()) {
+    zxlogf(ERROR, "Failed to set rate for clock: %s\n",
+           zx_status_get_string(set_rate_result->error_value()));
+    return set_rate_result->error_value();
+  }
+  fidl::WireResult enable_result = clks_[kAvpll0Clk]->Enable();
+  if (!enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send Enable request to clock: %s\n", enable_result.status_string());
+    return enable_result.status();
+  }
+  if (enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to enable clock: %s\n",
+           zx_status_get_string(enable_result->error_value()));
+    return enable_result->error_value();
+  }
 
   size_t actual = 0;
   zx_status_t status =

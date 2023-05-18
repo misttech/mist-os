@@ -5,9 +5,9 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AML_DSP_AML_DSP_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_DSP_AML_DSP_H_
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -35,13 +35,14 @@ using DeviceType = ddk::Device<AmlDsp, ddk::Unbindable, ddk::Suspendable, ddk::R
 class AmlDsp : public DeviceType {
  public:
   explicit AmlDsp(zx_device_t* parent, ddk::MmioBuffer dsp_addr, ddk::MmioBuffer dsp_sram_addr,
-                  const ddk::ClockProtocolClient& dsp_clk_sel,
-                  const ddk::ClockProtocolClient& dsp_clk_gate, async_dispatcher_t* dispatcher)
+                  fidl::ClientEnd<fuchsia_hardware_clock::Clock> dsp_clk_sel,
+                  fidl::ClientEnd<fuchsia_hardware_clock::Clock> dsp_clk_gate,
+                  async_dispatcher_t* dispatcher)
       : DeviceType(parent),
         dsp_addr_(std::move(dsp_addr)),
         dsp_sram_addr_(std::move(dsp_sram_addr)),
-        dsp_clk_sel_(dsp_clk_sel),
-        dsp_clk_gate_(dsp_clk_gate),
+        dsp_clk_sel_(std::move(dsp_clk_sel)),
+        dsp_clk_gate_(std::move(dsp_clk_gate)),
         outgoing_(dispatcher),
         dispatcher_(dispatcher) {}
 
@@ -84,8 +85,8 @@ class AmlDsp : public DeviceType {
   uint8_t power_dspa_;
   bool power_manage_support_ = false;
   zx::resource smc_resource_;
-  const ddk::ClockProtocolClient dsp_clk_sel_;
-  const ddk::ClockProtocolClient dsp_clk_gate_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> dsp_clk_sel_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> dsp_clk_gate_;
   fidl::WireSyncClient<fuchsia_hardware_mailbox::Device> dsp_mailbox_;
 
   // This is a helper class which we use to serve the outgoing directory.

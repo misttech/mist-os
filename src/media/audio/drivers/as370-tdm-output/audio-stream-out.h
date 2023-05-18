@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AS370_TDM_OUTPUT_AUDIO_STREAM_OUT_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AS370_TDM_OUTPUT_AUDIO_STREAM_OUT_H_
 
-#include <fuchsia/hardware/clock/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/ddk/io-buffer.h>
@@ -67,7 +67,7 @@ class As370AudioStreamOut : public SimpleAudioStream {
   ddk::PDevFidl pdev_ TA_GUARDED(domain_token());
   zx::vmo ring_buffer_vmo_ TA_GUARDED(domain_token());
   std::unique_ptr<SynAudioOutDevice> lib_;
-  ddk::ClockProtocolClient clks_[kClockCount] TA_GUARDED(domain_token());
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clks_[kClockCount] TA_GUARDED(domain_token());
   SimpleCodecClient codec_ TA_GUARDED(domain_token());
   metadata::As370Config metadata_ = {};
 };

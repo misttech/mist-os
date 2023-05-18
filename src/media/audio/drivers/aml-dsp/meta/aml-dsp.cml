@@ -15,11 +15,12 @@
         fallback: "false",
     },
     capabilities: [
-        { service: 'fuchsia.hardware.dsp.Service' },
+        { service: "fuchsia.hardware.dsp.Service" },
     ],
     use: [
         { service: "fuchsia.hardware.mailbox.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.clock.Service" },
     ],
     expose: [
         {

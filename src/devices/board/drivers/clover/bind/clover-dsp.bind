@@ -20,12 +20,12 @@ primary node "pdev" {
 }
 
 node "dsp-clk-sel" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A1_CLK_ID.CLK_DSPA_PRE_A_SEL;
 }
 
 node "dsp-clk-gate" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A1_CLK_ID.CLK_DSPA_PRE_A;
 }
 

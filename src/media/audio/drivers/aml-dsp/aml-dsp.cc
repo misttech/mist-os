@@ -157,7 +157,15 @@ void AmlDsp::DspSuspend() {
 
   if (ScpiSendData(reinterpret_cast<uint8_t*>(const_cast<char*>(message)), sizeof(message),
                    kScpiCmdHifisuspend) == ZX_OK) {
-    dsp_clk_sel_.SetInput(kDspSourceSelect24M); /* Adjust DSP clock to 24MHz */
+    fidl::WireResult result =
+        dsp_clk_sel_->SetInput(kDspSourceSelect24M); /* Adjust DSP clock to 24MHz */
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send SetInput request to dsp-clk-sel: %s", result.status_string());
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to set input for dsp-clk-sel: %s",
+             zx_status_get_string(result->error_value()));
+    }
   } else {
     zxlogf(ERROR, "Dsp suspend failed");
   }
@@ -168,7 +176,15 @@ void AmlDsp::DspResume() {
 
   if (ScpiSendData(reinterpret_cast<uint8_t*>(const_cast<char*>(message)), sizeof(message),
                    kScpiCmdHifiresume) == ZX_OK) {
-    dsp_clk_sel_.SetInput(kDspSourceSelect800M); /*switch dsp clk to normal*/
+    fidl::WireResult result =
+        dsp_clk_sel_->SetInput(kDspSourceSelect800M); /*switch dsp clk to normal*/
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send SetInput request to dsp-clk-sel: %s", result.status_string());
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to set input for dsp-clk-sel: %s",
+             zx_status_get_string(result->error_value()));
+    }
   } else {
     zxlogf(ERROR, "Dsp resume failed");
   }
@@ -240,7 +256,16 @@ zx_status_t AmlDsp::DspStop() {
       return status;
     }
 
-    dsp_clk_gate_.Disable();
+    fidl::WireResult result = dsp_clk_gate_->Disable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Disable request to dsp-clk-gate: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to disable dsp-clk-gate: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
     dsp_start_ = 0;
   } else {
     zxlogf(WARNING, "DSP is not started and cannot be stopped");
@@ -268,8 +293,29 @@ zx_status_t AmlDsp::DspStart() {
   }
 
   /* Configure DSP Clock */
-  dsp_clk_sel_.SetInput(kDspSourceSelect800M);
-  dsp_clk_gate_.Enable();
+  fidl::WireResult set_input_result = dsp_clk_sel_->SetInput(kDspSourceSelect800M);
+  if (!set_input_result.ok()) {
+    zxlogf(ERROR, "Failed to send Disable request to dsp-clk-gate: %s",
+           set_input_result.status_string());
+    return set_input_result.status();
+  }
+  if (set_input_result->is_error()) {
+    zxlogf(ERROR, "Failed to disable dsp-clk-gate: %s",
+           zx_status_get_string(set_input_result->error_value()));
+    return set_input_result->error_value();
+  }
+
+  fidl::WireResult enable_result = dsp_clk_gate_->Enable();
+  if (!enable_result.ok()) {
+    zxlogf(ERROR, "Failed to send Disable request to dsp-clk-gate: %s",
+           enable_result.status_string());
+    return enable_result.status();
+  }
+  if (enable_result->is_error()) {
+    zxlogf(ERROR, "Failed to disable dsp-clk-gate: %s",
+           zx_status_get_string(enable_result->error_value()));
+    return enable_result->error_value();
+  }
 
   uint32_t StatVectorSel = (hifi_base_ != kDspDefaultLoadAddress);
   uint32_t tmp = kDefaultTemp | StatVectorSel << kVectorOffset | kStrobe << kStrobeOffset;
@@ -396,20 +442,30 @@ zx_status_t AmlDsp::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  ddk::ClockProtocolClient dsp_clk_sel(parent, "dsp-clk-sel");
-  if (!dsp_clk_sel.is_valid()) {
-    zxlogf(ERROR, "Find dsp-clk-sel failed");
+  const char* DSP_CLK_SEL_FRAG_NAME = "dsp-clk-sel";
+  zx::result clock_result = DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+      parent, DSP_CLK_SEL_FRAG_NAME);
+  if (clock_result.is_error()) {
+    zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n", DSP_CLK_SEL_FRAG_NAME,
+           clock_result.status_string());
+    return clock_result.status_value();
   }
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> dsp_clk_sel{std::move(*clock_result)};
 
-  ddk::ClockProtocolClient dsp_clk_gate(parent, "dsp-clk-gate");
-  if (!dsp_clk_gate.is_valid()) {
-    zxlogf(ERROR, "Find dsp-clk-gate failed");
+  const char* DSP_CLK_GATE_FRAG_NAME = "dsp-clk-gate";
+  clock_result = DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+      parent, DSP_CLK_GATE_FRAG_NAME);
+  if (clock_result.is_error()) {
+    zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n", DSP_CLK_GATE_FRAG_NAME,
+           clock_result.status_string());
+    return clock_result.status_value();
   }
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> dsp_clk_gate{std::move(*clock_result)};
 
   async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   auto dev =
       fbl::make_unique_checked<AmlDsp>(&ac, parent, *std::move(dsp_addr), *std::move(dsp_sram_addr),
-                                       dsp_clk_sel, dsp_clk_gate, dispatcher);
+                                       std::move(dsp_clk_sel), std::move(dsp_clk_gate), dispatcher);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
