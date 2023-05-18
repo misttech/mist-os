@@ -617,24 +617,29 @@ impl FsNode {
         self.ops().as_any().downcast_ref::<T>()
     }
 
-    pub fn on_file_closed(&self) {
-        let mut flock_info = self.flock_info.lock();
-        flock_info.retain(|_| true);
+    pub fn on_file_closed(&self, file: &FileObject) {
+        {
+            let mut flock_info = self.flock_info.lock();
+            // This function will drop the flock from `file` because the `Weak<FileObject>` for
+            // `file` will no longer upgrade to an `Arc<FileObject>`.
+            flock_info.retain(|_| true);
+        }
+        self.record_lock_release(RecordLockOwner::FileObject(file.id()));
     }
 
     pub fn record_lock(
         &self,
         current_task: &CurrentTask,
         file: &FileObject,
-        cmd: u32,
+        cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
         self.record_locks.lock(current_task, file, cmd, flock)
     }
 
-    /// Release all record locks acquired by the given process.
-    pub fn record_lock_release(&self, fd_table_id: FdTableId) {
-        self.record_locks.release_locks(fd_table_id);
+    /// Release all record locks acquired by the given owner.
+    pub fn record_lock_release(&self, owner: RecordLockOwner) {
+        self.record_locks.release_locks(owner);
     }
 
     pub fn create_file_ops(&self, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {

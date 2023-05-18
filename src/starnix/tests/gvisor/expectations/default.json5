@@ -91,13 +91,6 @@
                 "AllocateTest.FallocateRlimit",
 
                 // fcntl_test
-                "FcntlLockTest.TestOFDBasicLock",
-                "FcntlLockTest.TestOFDNoUnlockOnClose",
-                "FcntlLockTest.TestOFDUnlocksOnLastClose",
-                "FcntlLockTest.TestOFDInheritsLockAfterDup",
-                "FcntlLockTest.TestOFDLocksHoldAfterExec",
-                "FcntlLockTest.TestOFDGetLkReturnsNegPID",
-                "FcntlLockTest.TestOFDCanUpgradeLock",
                 "FcntlTest.SetFileStatusFlagWithOpath",
                 "FcntlTest.BadFcntlsWithOpath",
                 "FcntlTest.SetFlO_ASYNC",

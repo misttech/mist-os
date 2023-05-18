@@ -520,9 +520,10 @@ pub fn default_fcntl(
     arg: u64,
 ) -> Result<SyscallResult, Errno> {
     match cmd {
-        F_SETLK | F_SETLKW | F_GETLK => {
+        F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
             let flock_ref = UserRef::<uapi::flock>::new(arg.into());
             let flock = current_task.mm.read_object(flock_ref)?;
+            let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
             if let Some(flock) = file.record_lock(current_task, cmd, flock)? {
                 current_task.mm.write_object(flock_ref, &flock)?;
             }
@@ -635,6 +636,15 @@ impl FileOps for OPathOps {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FileObjectId(usize);
+
+impl FileObjectId {
+    fn new(id: *const FileObject) -> Self {
+        Self(id as usize)
+    }
+}
+
 /// A session with a file object.
 ///
 /// Each time a client calls open(), we create a new FileObject from the
@@ -691,6 +701,13 @@ impl FileObject {
             flags: Mutex::new(flags - OpenFlags::CREAT),
             async_owner: Mutex::new(0),
         })
+    }
+
+    /// A unique identifier for this file object.
+    ///
+    /// Identifiers can be reused after the file object has been dropped.
+    pub fn id(&self) -> FileObjectId {
+        FileObjectId::new(self as *const FileObject)
     }
 
     /// The FsNode from which this FileObject was created.
@@ -1048,7 +1065,7 @@ impl FileObject {
     pub fn record_lock(
         &self,
         current_task: &CurrentTask,
-        cmd: u32,
+        cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
         self.name.entry.node.record_lock(current_task, self, cmd, flock)
@@ -1062,7 +1079,7 @@ impl FileObject {
 impl Drop for FileObject {
     fn drop(&mut self) {
         self.ops().close(self);
-        self.name.entry.node.on_file_closed();
+        self.name.entry.node.on_file_closed(self);
     }
 }
 

@@ -218,21 +218,33 @@ impl RecordLockType {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RecordLockOwner {
+    FdTable(FdTableId),
+    FileObject(FileObjectId),
+}
+
+impl RecordLockOwner {
+    fn new(current_task: &CurrentTask, cmd: RecordLockCommand, file: &FileObject) -> Self {
+        if cmd.is_ofd() {
+            RecordLockOwner::FileObject(file.id())
+        } else {
+            RecordLockOwner::FdTable(current_task.files.id())
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RecordLock {
-    pub fd_table_id: FdTableId,
+    pub owner: RecordLockOwner,
     pub range: RecordRange,
     pub lock_type: RecordLockType,
     pub process_id: pid_t,
 }
 
 impl RecordLock {
-    fn id(&self) -> FdTableId {
-        self.fd_table_id
-    }
-
-    fn as_tuple(&self) -> (FdTableId, &RecordRange, RecordLockType) {
-        (self.id(), &self.range, self.lock_type)
+    fn as_tuple(&self) -> (RecordLockOwner, &RecordRange, RecordLockType) {
+        (self.owner, &self.range, self.lock_type)
     }
 }
 
@@ -266,12 +278,12 @@ impl RecordLocksState {
     /// `fd_table`.
     fn get_conflicting_lock(
         &self,
-        fd_table: &FdTable,
+        owner: RecordLockOwner,
         lock_type: RecordLockType,
         range: &RecordRange,
     ) -> Option<uapi::flock> {
         for record in &self.locks {
-            if fd_table.id() == record.id() {
+            if owner == record.owner {
                 continue;
             }
             if lock_type.is_compatible(record.lock_type) {
@@ -294,21 +306,21 @@ impl RecordLocksState {
     fn apply_lock(
         &mut self,
         process_id: pid_t,
-        fd_table: &FdTable,
+        owner: RecordLockOwner,
         lock_type: RecordLockType,
         range: RecordRange,
     ) -> Result<(), Errno> {
-        let mut table_locks_in_range = Vec::new();
+        let mut owned_locks_in_range = Vec::new();
         for lock in self.locks.iter().filter(|record| range.intersects(&record.range)) {
-            if lock.id() == fd_table.id() {
-                table_locks_in_range.push(lock.clone());
+            if owner == lock.owner {
+                owned_locks_in_range.push(lock.clone());
             } else if !lock_type.is_compatible(lock.lock_type) {
                 // conflict
                 return error!(EAGAIN);
             }
         }
-        let mut new_lock = RecordLock { fd_table_id: fd_table.id(), range, lock_type, process_id };
-        for lock in table_locks_in_range {
+        let mut new_lock = RecordLock { owner, range, lock_type, process_id };
+        for lock in owned_locks_in_range {
             self.locks.remove(&lock);
             if lock.lock_type == lock_type {
                 let new_ranges = new_lock.range + lock.range;
@@ -327,11 +339,11 @@ impl RecordLocksState {
         Ok(())
     }
 
-    fn unlock(&mut self, fd_table: &FdTable, range: RecordRange) -> Result<(), Errno> {
+    fn unlock(&mut self, owner: RecordLockOwner, range: RecordRange) -> Result<(), Errno> {
         let intersection_locks: Vec<_> = self
             .locks
             .iter()
-            .filter(|record| fd_table.id() == record.id() && range.intersects(&record.range))
+            .filter(|record| owner == record.owner && range.intersects(&record.range))
             .cloned()
             .collect();
         for lock in intersection_locks {
@@ -346,9 +358,54 @@ impl RecordLocksState {
         Ok(())
     }
 
-    fn release_locks(&mut self, fd_table_id: FdTableId) {
-        self.locks.retain(|l| l.id() != fd_table_id);
+    fn release_locks(&mut self, owner: RecordLockOwner) {
+        self.locks.retain(|lock| lock.owner != owner);
         self.queue.notify_all();
+    }
+}
+
+#[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordLockCommand {
+    SETLK,
+    SETLKW,
+    GETLK,
+    OFD_GETLK,
+    OFD_SETLK,
+    OFD_SETLKW,
+}
+
+impl RecordLockCommand {
+    pub fn from_raw(cmd: u32) -> Option<Self> {
+        match cmd {
+            F_SETLK => Some(RecordLockCommand::SETLK),
+            F_SETLKW => Some(RecordLockCommand::SETLKW),
+            F_GETLK => Some(RecordLockCommand::GETLK),
+            F_OFD_GETLK => Some(RecordLockCommand::OFD_GETLK),
+            F_OFD_SETLK => Some(RecordLockCommand::OFD_SETLK),
+            F_OFD_SETLKW => Some(RecordLockCommand::OFD_SETLKW),
+            _ => None,
+        }
+    }
+
+    fn is_ofd(&self) -> bool {
+        match self {
+            RecordLockCommand::SETLK | RecordLockCommand::SETLKW | RecordLockCommand::GETLK => {
+                false
+            }
+            RecordLockCommand::OFD_GETLK
+            | RecordLockCommand::OFD_SETLK
+            | RecordLockCommand::OFD_SETLKW => true,
+        }
+    }
+
+    fn is_get(&self) -> bool {
+        *self == RecordLockCommand::GETLK || *self == RecordLockCommand::OFD_GETLK
+    }
+
+    fn is_blocking(&self) -> bool {
+        *self == RecordLockCommand::SETLKW || *self == RecordLockCommand::OFD_SETLKW
     }
 }
 
@@ -366,15 +423,18 @@ impl RecordLocks {
         &self,
         current_task: &CurrentTask,
         file: &FileObject,
-        cmd: u32,
+        cmd: RecordLockCommand,
         mut flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
-        let fd_table = &current_task.files;
+        if cmd.is_ofd() && flock.l_pid != 0 {
+            return error!(EINVAL);
+        }
+        let owner: RecordLockOwner = RecordLockOwner::new(current_task, cmd, file);
         let lock_type = RecordLockType::build(&flock)?;
         let range = RecordRange::build(&flock, file)?;
-        if cmd == F_GETLK {
+        if cmd.is_get() {
             let lock_type = lock_type.ok_or_else(|| errno!(EINVAL))?;
-            Ok(self.state.lock().get_conflicting_lock(fd_table, lock_type, &range).or_else(|| {
+            Ok(self.state.lock().get_conflicting_lock(owner, lock_type, &range).or_else(|| {
                 flock.l_type = F_UNLCK as c_short;
                 Some(flock)
             }))
@@ -384,7 +444,7 @@ impl RecordLocks {
                     if !lock_type.has_permission(file) {
                         return error!(EBADF);
                     }
-                    let blocking = cmd == F_SETLKW;
+                    let blocking = cmd.is_blocking();
                     loop {
                         let mut state = self.state.lock();
                         let waiter = blocking.then(|| {
@@ -392,12 +452,9 @@ impl RecordLocks {
                             state.queue.wait_async(&waiter);
                             waiter
                         });
-                        match state.apply_lock(
-                            current_task.thread_group.leader,
-                            fd_table,
-                            lock_type,
-                            range,
-                        ) {
+                        let process_id =
+                            if cmd.is_ofd() { -1 } else { current_task.thread_group.leader };
+                        match state.apply_lock(process_id, owner, lock_type, range) {
                             Err(errno) if blocking && errno == EAGAIN => {
                                 // TODO(qsr): Check deadlocks.
                                 if let Some(waiter) = waiter {
@@ -410,15 +467,15 @@ impl RecordLocks {
                     }
                 }
                 None => {
-                    self.state.lock().unlock(fd_table, range)?;
+                    self.state.lock().unlock(owner, range)?;
                 }
             }
             Ok(None)
         }
     }
 
-    pub fn release_locks(&self, fd_table_id: FdTableId) {
-        self.state.lock().release_locks(fd_table_id);
+    pub fn release_locks(&self, owner: RecordLockOwner) {
+        self.state.lock().release_locks(owner);
     }
 }
 

@@ -22,7 +22,7 @@ bitflags! {
 pub struct FdTableId(usize);
 
 impl FdTableId {
-    pub fn new(id: *const HashMap<FdNumber, FdTableEntry>) -> Self {
+    fn new(id: *const HashMap<FdNumber, FdTableEntry>) -> Self {
         Self(id as usize)
     }
 }
@@ -42,7 +42,7 @@ pub struct FdTableEntry {
 
 impl Drop for FdTableEntry {
     fn drop(&mut self) {
-        self.file.name.entry.node.record_lock_release(self.fd_table_id);
+        self.file.name.entry.node.record_lock_release(RecordLockOwner::FdTable(self.fd_table_id));
         self.file.flush();
     }
 }
