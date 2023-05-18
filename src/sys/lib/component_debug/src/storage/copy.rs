@@ -4,7 +4,7 @@
 
 use {
     crate::io::Directory,
-    crate::path::{normalize_destination, HostOrRemotePath, REMOTE_PATH_HELP},
+    crate::path::{add_source_filename_to_path_if_absent, HostOrRemotePath, REMOTE_PATH_HELP},
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
@@ -37,7 +37,7 @@ pub async fn copy(
                 .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
             let remote_source_path = source.relative_path.clone();
-            let host_destination_path = normalize_destination(
+            let host_destination_path = add_source_filename_to_path_if_absent(
                 &storage_dir,
                 HostOrRemotePath::Remote(source),
                 HostOrRemotePath::Host(destination),
@@ -57,7 +57,7 @@ pub async fn copy(
                 .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
             let host_source_path = source.clone();
-            let remote_destination_path = normalize_destination(
+            let remote_destination_path = add_source_filename_to_path_if_absent(
                 &storage_dir,
                 HostOrRemotePath::Host(source),
                 HostOrRemotePath::Remote(destination),

@@ -8,11 +8,12 @@ use {
     crate::{
         io::Directory,
         path::{
-            normalize_destination, HostOrRemotePath, NamespacedPath, RemotePath, REMOTE_PATH_HELP,
+            add_source_filename_to_path_if_absent, HostOrRemotePath, NamespacedPath, RemotePath,
+            REMOTE_PATH_HELP,
         },
     },
     anyhow::{bail, Result},
-    fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_fs::directory::DirentKind,
     regex::Regex,
@@ -69,10 +70,6 @@ pub enum CopyError {
     NamespaceFileNotFound { file: String },
 }
 
-// Constant used to compare the number of components within a path.
-// For example, the path data/nested contains 2 components.
-const NESTED_PATH_DEPTH: usize = 2;
-
 /// Transfer files between a component's namespace to/from the host machine.
 ///
 /// # Arguments
@@ -86,7 +83,7 @@ pub async fn copy_cmd(
 ) -> Result<()> {
     validate_paths(&paths)?;
 
-    let mut namespaces: HashMap<String, fio::DirectoryProxy> = HashMap::new();
+    let mut namespace_dir_cache: HashMap<String, fio::DirectoryProxy> = HashMap::new();
     // paths is safe to unwrap as validate_paths ensures that it is non-empty.
     let destination_path = paths.pop().unwrap();
 
@@ -96,20 +93,20 @@ pub async fn copy_cmd(
             HostOrRemotePath::parse(&destination_path),
         ) {
             (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination)) => {
-                let source_namespace = get_namespace_or_insert(
+                let source_dir = get_or_cache_namespace_dir_for_moniker(
                     &realm_query,
                     source.clone().remote_id,
-                    &mut namespaces,
+                    &mut namespace_dir_cache,
                 )
                 .await?;
 
-                let (paths, opened_namespace) =
-                    normalize_paths(source.clone(), &source_namespace).await?;
+                let dir = Directory::from_proxy(source_dir.to_owned());
+                let paths = maybe_expand_wildcards_remote(source.clone(), &dir).await?;
 
                 for remote_path in paths {
-                    if is_remote_file(remote_path.clone(), &opened_namespace).await? {
+                    if is_remote_file(remote_path.clone(), &dir).await? {
                         copy_remote_file_to_host(
-                            NamespacedPath { path: remote_path, ns: source_namespace.to_owned() },
+                            NamespacedPath { path: remote_path, ns: source_dir.to_owned() },
                             destination.clone(),
                         )
                         .await?;
@@ -121,7 +118,7 @@ pub async fn copy_cmd(
                             );
                         }
                     } else if verbose {
-                        //TODO(https://fxrev.dev/116065): add recursive flag for wildcards.
+                        // TODO(https://fxbug.dev/116065): add recursive flag for wildcards.
                         println!(
                             "Subdirectory \"{}\" ignored as recursive copying is currently not supported.",
                             remote_path.to_string()
@@ -132,30 +129,30 @@ pub async fn copy_cmd(
             }
 
             (HostOrRemotePath::Remote(source), HostOrRemotePath::Remote(destination)) => {
-                let source_namespace = get_namespace_or_insert(
+                let source_dir = get_or_cache_namespace_dir_for_moniker(
                     &realm_query,
                     source.clone().remote_id,
-                    &mut namespaces,
+                    &mut namespace_dir_cache,
                 )
                 .await?;
 
-                let destination_namespace = get_namespace_or_insert(
+                let destination_dir = get_or_cache_namespace_dir_for_moniker(
                     &realm_query,
                     destination.clone().remote_id,
-                    &mut namespaces,
+                    &mut namespace_dir_cache,
                 )
                 .await?;
 
-                let (paths, opened_source) =
-                    normalize_paths(source.clone(), &source_namespace).await?;
+                let dir = Directory::from_proxy(source_dir.to_owned());
+                let paths = maybe_expand_wildcards_remote(source.clone(), &dir).await?;
 
                 for remote_path in paths {
-                    if is_remote_file(remote_path.clone(), &opened_source).await? {
+                    if is_remote_file(remote_path.clone(), &dir).await? {
                         copy_remote_file_to_remote(
-                            NamespacedPath { path: remote_path, ns: source_namespace.to_owned() },
+                            NamespacedPath { path: remote_path, ns: source_dir.to_owned() },
                             NamespacedPath {
                                 path: destination.clone(),
-                                ns: destination_namespace.to_owned(),
+                                ns: destination_dir.to_owned(),
                             },
                         )
                         .await?;
@@ -179,16 +176,16 @@ pub async fn copy_cmd(
             }
 
             (HostOrRemotePath::Host(source), HostOrRemotePath::Remote(destination)) => {
-                let destination_namespace = get_namespace_or_insert(
+                let destination_dir = get_or_cache_namespace_dir_for_moniker(
                     &realm_query,
                     destination.clone().remote_id,
-                    &mut namespaces,
+                    &mut namespace_dir_cache,
                 )
                 .await?;
 
                 copy_host_file_to_remote(
                     source,
-                    NamespacedPath { path: destination, ns: destination_namespace.to_owned() },
+                    NamespacedPath { path: destination, ns: destination_dir.to_owned() },
                 )
                 .await?;
 
@@ -218,49 +215,53 @@ pub async fn copy_cmd(
     Ok(())
 }
 
-pub async fn is_remote_file(source_path: RemotePath, namespace: &Directory) -> Result<bool> {
-    let source_file = source_path.relative_path.file_name().map_or_else(
+pub async fn is_remote_file(path: RemotePath, dir: &Directory) -> Result<bool> {
+    let parent_dir = open_parent_subdir_readable(&path, dir)?;
+
+    let source_file = path.relative_path.file_name().map_or_else(
         || Err(CopyError::EmptyFileName),
         |file| Ok(file.to_string_lossy().to_string()),
     )?;
-    let remote_entry = namespace.entry_if_exists(&source_file).await?;
+    let remote_entry = parent_dir.entry_if_exists(&source_file).await?;
 
     match remote_entry {
-        Some(remote_destination) => {
-            match remote_destination.kind {
-                // TODO(https://fxrev.dev/745090): Update component_manager vfs to assign proper DirentKinds when installing the directory tree.
-                DirentKind::File => Ok(true),
-                _ => Ok(false),
-            }
-        }
+        Some(remote_destination) => match remote_destination.kind {
+            DirentKind::File => Ok(true),
+            _ => Ok(false),
+        },
         None => Err(CopyError::NamespaceFileNotFound { file: source_file }.into()),
     }
 }
 
-// Returns the normalized remote source path that may contain a wildcard, and
-// the directory of the source file of a component's namespace.
-// If the source contains a wildcard, the source is expanded to multiple paths.
-// # Arguments
-// * `source`: A wildcard path or path on a component's namespace.
-// * `namespace`: The source path's namespace directory.
-pub async fn normalize_paths(
-    source: RemotePath,
-    namespace: &fio::DirectoryProxy,
-) -> Result<(Vec<RemotePath>, Directory)> {
-    let directory = match &source.relative_path.parent() {
-        Some(directory) => PathBuf::from(directory),
-        None => {
-            return Err(CopyError::NoParentFolder { path: source.relative_path_string() }.into())
-        }
+/// Returns a readable `Directory` by opening the parent dir of `path`.
+///
+/// * `path`: The path from which to derive the parent
+/// * `dir`: Directory to on which to open a subdir.
+pub fn open_parent_subdir_readable(path: &RemotePath, dir: &Directory) -> Result<Directory> {
+    let parent_dir_path = match path.relative_path.parent() {
+        Some(parent) => PathBuf::from(parent),
+        None => return Err(CopyError::NoParentFolder { path: path.relative_path_string() }.into()),
     };
-    let namespace = Directory::from_proxy(namespace.to_owned())
-        .open_dir(&directory, fio::OpenFlags::RIGHT_READABLE)?;
+    dir.open_dir(&parent_dir_path, fio::OpenFlags::RIGHT_READABLE)
+}
 
-    if !&source.contains_wildcard() {
-        return Ok((vec![source], namespace));
+/// If `path` contains a wildcard, returns the expanded list of files. Otherwise,
+/// returns a list with a single entry.
+///
+/// # Arguments
+///
+/// * `path`: A path that may contain a wildcard.
+/// * `dir`: Directory proxy to query to expand wildcards.
+pub async fn maybe_expand_wildcards_remote(
+    path: RemotePath,
+    dir: &Directory,
+) -> Result<Vec<RemotePath>> {
+    if !&path.contains_wildcard() {
+        return Ok(vec![path]);
     }
+    let parent_dir = open_parent_subdir_readable(&path, dir)?;
 
-    let file_pattern = &source
+    let file_pattern = &path
         .relative_path
         .file_name()
         .map_or_else(
@@ -269,49 +270,55 @@ pub async fn normalize_paths(
         )?
         .replace("*", ".*"); // Regex syntax requires a . before wildcard.
 
-    let entries = get_matching_ns_entries(namespace.clone()?, file_pattern.clone()).await?;
+    let entries = get_dirents_matching_pattern(parent_dir.clone()?, file_pattern.clone()).await?;
 
     if entries.len() == 0 {
         return Err(CopyError::NoWildCardMatches { pattern: file_pattern.to_string() }.into());
     }
 
+    let parent_dir_path = path.relative_path.parent().unwrap();
     let paths = entries
         .iter()
         .map(|file| {
             RemotePath::parse(&format!(
                 "{}::/{}",
-                &source.remote_id,
-                directory.join(file).as_path().display().to_string()
+                &path.remote_id,
+                parent_dir_path.join(file).as_path().display().to_string()
             ))
         })
         .collect::<Result<Vec<RemotePath>>>()?;
 
-    Ok((paths, namespace))
+    Ok(paths)
 }
 
-// Checks whether the hashmap contains the existing moniker and creates a new (moniker, DirectoryProxy) pair if it doesn't exist.
-// # Arguments
-// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
-// * `moniker`: A moniker used to retrieve a namespace directory.
-// * `namespaces`: A table of monikers that map to namespace directories.
-pub async fn get_namespace_or_insert(
+/// Checks whether the hashmap contains the existing moniker and creates a new (moniker, DirectoryProxy) pair if it doesn't exist.
+///
+/// # Arguments
+///
+/// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
+/// * `moniker`: A moniker used to retrieve a namespace directory.
+/// * `namespace_dir_cache`: A table of monikers that map to namespace directories.
+pub async fn get_or_cache_namespace_dir_for_moniker(
     realm_query: &fsys::RealmQueryProxy,
     moniker: String,
-    namespaces: &mut HashMap<String, fio::DirectoryProxy>,
+    namespace_dir_cache: &mut HashMap<String, fio::DirectoryProxy>,
 ) -> Result<fio::DirectoryProxy> {
-    if !namespaces.contains_key(&moniker) {
-        let namespace = retrieve_namespace(&realm_query, &moniker).await?;
-        namespaces.insert(moniker.clone(), namespace);
+    if !namespace_dir_cache.contains_key(&moniker) {
+        let namespace = open_namespace_dir_for_moniker(&realm_query, &moniker).await?;
+        namespace_dir_cache.insert(moniker.clone(), namespace);
     }
 
-    Ok(namespaces.get(&moniker).unwrap().to_owned())
+    Ok(namespace_dir_cache.get(&moniker).unwrap().to_owned())
 }
 
-// Checks that the paths meet the following conditions:
-// Destination path does not contain a wildcard.
-// At least two paths are provided.
-// # Arguments
-// *`paths`: list of filepaths to be processed.
+/// Checks that the paths meet the following conditions:
+///
+/// * Destination path does not contain a wildcard.
+/// * At least two path segments are are provided.
+///
+/// # Arguments
+///
+/// *`paths`: list of filepaths to be processed.
 pub fn validate_paths(paths: &Vec<String>) -> Result<()> {
     if paths.len() < 2 {
         Err(CopyError::NotEnoughPaths.into())
@@ -326,7 +333,7 @@ pub fn validate_paths(paths: &Vec<String>) -> Result<()> {
 /// # Arguments
 /// * `realm_query`: |RealmQueryProxy| to retrieve a component instance.
 /// * `moniker`: Absolute moniker of a component instance.
-pub async fn retrieve_namespace(
+pub async fn open_namespace_dir_for_moniker(
     realm_query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<fio::DirectoryProxy> {
@@ -356,59 +363,60 @@ pub async fn retrieve_namespace(
     }
 }
 
-/// Normalizes all paths in the namespace such that the namespace is always opened
-/// at the parent of the provided path.
+/// Returns a `Directory` within the directory backed by `dir` that is the parent
+/// of the last path component. If:
 ///
-/// The namespace for paths with a depth of at least two will
-/// have the parent of the path opened. For example, the path "data/nested"
-/// will result in the "data" path to be opened already in the namespace.
+///   * `path` is "/", returns a `Directory` at the root of `dir`
+///   * `path` is "/foo", returns a `Directory` at "/foo"
+///   * `path` is "/foo/bar/baz", returns a `Directory` at "/foo/bar"
 ///
 /// # Arguments
-/// * `namespace`: A proxy to a namespace directory.
-/// * `path`: A path within a component's namespace.
-pub fn normalize_namespace(namespace: fio::DirectoryProxy, path: RemotePath) -> Result<Directory> {
-    if path.relative_path.components().count() >= NESTED_PATH_DEPTH {
-        let directory = path.relative_path.parent().unwrap();
-        Directory::from_proxy(namespace)
-            .open_dir(&directory, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
+/// * `dir`: A proxy to a directory.
+/// * `path`: A path within the directory backed by `dir`.
+pub fn open_parent_subdir_writable(
+    dir: fio::DirectoryProxy,
+    path: RemotePath,
+) -> Result<Directory> {
+    if path.relative_path.components().count() >= 2 {
+        let parent_path = path.relative_path.parent().unwrap();
+        Directory::from_proxy(dir)
+            .open_dir(&parent_path, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
     } else {
-        Ok(Directory::from_proxy(namespace))
+        Ok(Directory::from_proxy(dir))
     }
 }
 
-/// Writes file contents from a directory to a component's namespace.
+/// Writes file contents from a local directory to a remote directory.
 ///
 /// # Arguments
 /// * `source`: The host filepath.
-/// * `destination`: The path and proxy of a namespace directory.
+/// * `destination`: The remote directory and path within it.
 pub async fn copy_host_file_to_remote(source: PathBuf, destination: NamespacedPath) -> Result<()> {
-    let destination_namespace = Directory::from_proxy(destination.ns.to_owned());
-    let destination_path = normalize_destination(
-        &normalize_namespace(destination.ns, destination.path.clone())?,
+    let destination_dir = Directory::from_proxy(destination.ns.to_owned());
+    let destination_path = add_source_filename_to_path_if_absent(
+        &open_parent_subdir_writable(destination.ns, destination.path.clone())?,
         HostOrRemotePath::Host(source.clone()),
         HostOrRemotePath::Remote(destination.path.clone()),
     )
     .await?;
 
     let data = read(&source)?;
-    destination_namespace
-        .verify_directory_is_read_write(&destination_path.parent().unwrap())
-        .await?;
-    destination_namespace.create_file(destination_path, data.as_slice()).await?;
+    destination_dir.verify_directory_is_read_write(&destination_path.parent().unwrap()).await?;
+    destination_dir.create_file(destination_path, data.as_slice()).await?;
 
     Ok(())
 }
 
-/// Writes file contents to a directory from a component's namespace.
+/// Writes file contents from a remote directory to a local directory.
 ///
 /// # Arguments
-/// * `source`: The path and proxy of a namespace directory.
+/// * `source`: The remote directory and path within it.
 /// * `destination`: The host filepath.
 pub async fn copy_remote_file_to_host(source: NamespacedPath, destination: PathBuf) -> Result<()> {
     let file_path = &source.path.relative_path.clone();
-    let source_namespace = Directory::from_proxy(source.ns.to_owned());
-    let destination_path = normalize_destination(
-        &source_namespace,
+    let source_dir = Directory::from_proxy(source.ns.to_owned());
+    let destination_path = add_source_filename_to_path_if_absent(
+        &source_dir,
         HostOrRemotePath::Remote(source.path),
         HostOrRemotePath::Host(destination),
     )
@@ -416,48 +424,46 @@ pub async fn copy_remote_file_to_host(source: NamespacedPath, destination: PathB
 
     eprintln!("Normalized destination: {}", destination_path.display());
 
-    let data = source_namespace.read_file_bytes(file_path).await?;
+    let data = source_dir.read_file_bytes(file_path).await?;
     write(destination_path, data).map_err(|e| CopyError::FailedToWriteToHost { error: e })?;
 
     Ok(())
 }
 
-/// Writes file contents to a component's namespace from a component's namespace.
+/// Writes file contents between two remote directories.
 ///
 /// # Arguments
-/// * `source`: The path and proxy of a namespace directory.
-/// * `destination`: The path and proxy of a namespace directory.
+/// * `source`: The source remote directory and path within it.
+/// * `destination`: The target remote directory and path within it.
 pub async fn copy_remote_file_to_remote(
     source: NamespacedPath,
     destination: NamespacedPath,
 ) -> Result<()> {
-    let source_namespace = Directory::from_proxy(source.ns.to_owned());
-    let destination_namespace = Directory::from_proxy(destination.ns.to_owned());
-    let destination_path = normalize_destination(
-        &normalize_namespace(destination.ns, destination.path.clone())?,
+    let source_dir = Directory::from_proxy(source.ns.to_owned());
+    let destination_dir = Directory::from_proxy(destination.ns.to_owned());
+    let destination_path = add_source_filename_to_path_if_absent(
+        &open_parent_subdir_writable(destination.ns, destination.path.clone())?,
         HostOrRemotePath::Remote(source.path.clone()),
         HostOrRemotePath::Remote(destination.path),
     )
     .await?;
 
-    let data = source_namespace.read_file_bytes(&source.path.relative_path).await?;
-    destination_namespace
-        .verify_directory_is_read_write(&destination_path.parent().unwrap())
-        .await?;
-    destination_namespace.create_file(destination_path, data.as_slice()).await?;
+    let data = source_dir.read_file_bytes(&source.path.relative_path).await?;
+    destination_dir.verify_directory_is_read_write(&destination_path.parent().unwrap()).await?;
+    destination_dir.create_file(destination_path, data.as_slice()).await?;
     Ok(())
 }
 
-// Retrieves all entries within a directory in a namespace containing a file pattern.
+// Retrieves all entries within a remote directory containing a file pattern.
 ///
 /// # Arguments
-/// * `namespace`: A directory to a component's namespace.
-/// * `file_pattern`: A file pattern to match in a component's directory.
-pub async fn get_matching_ns_entries(
-    namespace: Directory,
+/// * `dir`: A directory.
+/// * `file_pattern`: A file pattern to match.
+pub async fn get_dirents_matching_pattern(
+    dir: Directory,
     file_pattern: String,
 ) -> Result<Vec<String>> {
-    let mut entries = namespace.entry_names().await?;
+    let mut entries = dir.entry_names().await?;
 
     let file_pattern = Regex::new(format!(r"^{}$", file_pattern).as_str()).map_err(|e| {
         CopyError::FailedToCreateRegex { pattern: file_pattern.to_string(), error: e }
@@ -466,18 +472,6 @@ pub async fn get_matching_ns_entries(
     entries.retain(|file_name| file_pattern.is_match(file_name.as_str()));
 
     Ok(entries)
-}
-
-// Duplicates the client end of a namespace directory.
-///
-/// # Arguments
-/// * `ns_dir`: A proxy to the component's namespace directory.
-pub fn duplicate_namespace_client(ns_dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy> {
-    let (client, server) = create_endpoints::<fio::NodeMarker>();
-    ns_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).unwrap();
-    let client =
-        ClientEnd::<fio::DirectoryMarker>::new(client.into_channel()).into_proxy().unwrap();
-    Ok(client)
 }
 
 #[cfg(test)]

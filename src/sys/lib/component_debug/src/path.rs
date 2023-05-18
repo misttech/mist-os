@@ -21,63 +21,62 @@ use {
 /// Otherwise, the destination path passed in will be returned.
 ///
 /// # Arguments
-/// * `source`:  source path of either a host filepath or a component namespace entry
-/// * `destination`: source path of either a host filepath or a component namespace entry
-/// * `storage_dir`: Directory proxy to help retrieve directory entries on device
+///
+/// * `destination_dir`: Directory proxy to help retrieve directory entries on device
+/// * `source_path`:  source path from which to
+/// * `path`: source path of either a host filepath or a component namespace entry
 ///
 /// # Error Conditions:
-/// * One path must be a host filepath and the other must be a component namespace path
-/// * File name for source could not be found
-/// * File already exist at destination
-/// * destination is not a directory
-pub async fn normalize_destination(
-    storage_dir: &Directory,
-    source: HostOrRemotePath,
-    destination: HostOrRemotePath,
+///
+/// * File name for `source_path` is empty
+/// * Communications error talking to remote endpoint
+pub async fn add_source_filename_to_path_if_absent(
+    destination_dir: &Directory,
+    source_path: HostOrRemotePath,
+    path: HostOrRemotePath,
 ) -> Result<PathBuf, Error> {
-    let source_file = match source {
-        HostOrRemotePath::Host(path) => path.file_name().map_or_else(
-            || Err(anyhow!("Source path was unexpectedly empty")),
-            |file| Ok(PathBuf::from(file)),
-        )?,
-        HostOrRemotePath::Remote(path) => path.relative_path.file_name().map_or_else(
-            || Err(anyhow!("Source path was unexpectedly empty")),
-            |file| Ok(PathBuf::from(file)),
-        )?,
+    let source_file = match source_path {
+        HostOrRemotePath::Host(path) => path
+            .file_name()
+            .map_or_else(|| Err(anyhow!("Source path is empty")), |file| Ok(PathBuf::from(file)))?,
+        HostOrRemotePath::Remote(path) => path
+            .relative_path
+            .file_name()
+            .map_or_else(|| Err(anyhow!("Source path is empty")), |file| Ok(PathBuf::from(file)))?,
     };
 
     let source_file_str = source_file.display().to_string();
-    // Checks to see if the destination is currently a directory. The source path file is appended to the destination if it is a directory.
-    match destination {
-        HostOrRemotePath::Host(mut destination_path) => {
-            let destination_file = destination_path.file_name();
+    // If the destination is a directory, append `source_file_str`.
+    match path {
+        HostOrRemotePath::Host(mut path) => {
+            let destination_file = path.file_name();
 
-            if destination_file.is_none() || destination_path.is_dir() {
-                destination_path.push(&source_file_str);
+            if destination_file.is_none() || path.is_dir() {
+                path.push(&source_file_str);
             }
 
-            Ok(destination_path)
+            Ok(path)
         }
-        HostOrRemotePath::Remote(destination_path) => {
-            let mut destination_path = destination_path.relative_path;
-            let destination_file = destination_path.file_name();
+        HostOrRemotePath::Remote(remote_path) => {
+            let mut path = remote_path.relative_path;
+            let destination_file = path.file_name();
             let remote_destination_entry = if destination_file.is_some() {
-                storage_dir
+                destination_dir
                     .entry_if_exists(
                         destination_file.unwrap_or_default().to_str().unwrap_or_default(),
                     )
                     .await?
             } else {
-                storage_dir.entry_if_exists(&source_file_str).await?
+                destination_dir.entry_if_exists(&source_file_str).await?
             };
 
             match (&remote_destination_entry, &destination_file) {
-                (Some(remote_destination), _) => {
-                    match remote_destination.kind {
+                (Some(entry), _) => {
+                    match entry.kind {
                         DirentKind::File => {}
-                        // TODO(https://fxrev.dev/745090): Update component_manager vfs to assign proper DirentKinds when installing the directory tree.
+                        // TODO(https://fxbug.dev/127335): Update component_manager vfs to assign proper DirentKinds when installing the directory tree.
                         DirentKind::Directory | DirentKind::Unknown => {
-                            destination_path.push(&source_file_str);
+                            path.push(&source_file_str);
                         }
                         _ => {
                             return Err(anyhow!(
@@ -86,12 +85,12 @@ pub async fn normalize_destination(
                             ));
                         }
                     }
-                    Ok(destination_path)
+                    Ok(path)
                 }
-                (None, Some(_)) => Ok(destination_path),
+                (None, Some(_)) => Ok(path),
                 (None, None) => {
-                    destination_path.push(&source_file_str);
-                    Ok(destination_path)
+                    path.push(&source_file_str);
+                    Ok(path)
                 }
             }
         }
