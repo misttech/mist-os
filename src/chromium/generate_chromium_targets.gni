@@ -301,7 +301,7 @@ if (is_host) {
     archive_dir = "${prebuilt_archive_root_path}/web_engine_tests${invoker.archive_path_suffix}/arch/${target_cpu}"
 
     # The specific tests binaries are specified by the "tests" target in
-    # https://source.chromium.org/chromium/chromium/src/+/main:fuchsia/cipd/BUILD.gn.
+    # https://source.chromium.org/chromium/chromium/src/+/main:build/fuchsia/cipd/BUILD.gn.
     prebuilt_test_manifest("chromium_common_tests") {
       manifest_name = "common_tests_manifest.json"
       environments = default_test_environments
