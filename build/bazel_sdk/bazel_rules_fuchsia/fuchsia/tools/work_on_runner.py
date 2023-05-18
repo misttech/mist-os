@@ -22,7 +22,7 @@ class FfxRunner():
         print(self.ffx)
         self.cwd = cwd
 
-    def run(self, *args, verbose_exception=True):
+    def run(self, *args):
         try:
             cmd = [self.ffx] + list(args)
             return subprocess.check_output(
@@ -30,8 +30,7 @@ class FfxRunner():
                 text=True,
             ).strip()
         except subprocess.CalledProcessError as e:
-            if verbose_exception:
-                print(e.stdout)
+            print(e.stdout)
             raise e
 
 
@@ -43,6 +42,29 @@ class Context():
         else:
             return ffx_runner.run("sdk", "version")
 
+    def get_target(args, ffx_runner):
+        # Attempt to figure out the target in the following order
+        # - explicitly passed in via args
+        # - ffx default target
+        # - ffx config get emu.name
+        # - "fuchsia-emulator"
+        def first_valid(cmds, default):
+            for cmd in cmds:
+                try:
+                    value = ffx_runner.run(*cmd)
+                    if value and len(value) > 0:
+                        return value
+                except:
+                    pass
+            return default
+
+        if args.target:
+            return args.target
+        else:
+            return first_valid(
+                [["target", "default", "get"], ["config", "get", "emu.name"]],
+                "fuchsia-emulator")
+
     def get_out_dir(args, cwd):
         if os.path.isabs(args.out):
             return args.out
@@ -52,13 +74,13 @@ class Context():
     def __init__(self, args):
         self.cwd = args.project_root
         self._ffx_runner = FfxRunner(args.ffx, cwd=self.cwd)
-        self.target = args.target
         self.out_dir = Context.get_out_dir(args, self.cwd)
         self.sdk_id = Context.get_sdk_id(args, self._ffx_runner)
         self.pb_name = args.product
         self.pb_path = os.path.join(
             self.out_dir, "product_bundles", f"{self.pb_name}.{self.sdk_id}")
         self.force_pb_download = args.force
+        self.target = Context.get_target(args, self._ffx_runner)
 
     def ffx(self):
         return self._ffx_runner
@@ -97,6 +119,7 @@ class SetDefaults(Step):
         self.config_keys = [
             "product.experimental", "ffx-repo-add", "ffx_repository"
         ]
+        self.original_target = None
 
     def run(self, ctx):
         ctx.log(f"Setting ffx configs to true {self.config_keys}.")
@@ -104,6 +127,11 @@ class SetDefaults(Step):
             self.original_config_entries[key] = ctx.ffx().run(
                 "config", "get", key)
             ctx.ffx().run("config", "set", key, "true")
+
+        try:
+            self.original_target = ctx.ffx().run("target", "default", "get")
+        except:
+            self.original_target = None
 
         ctx.log(f"Setting {ctx.target} as default target")
         ctx.ffx().run("target", "default", "set", ctx.target)
@@ -116,8 +144,13 @@ class SetDefaults(Step):
         ctx.log("Setting ffx config values back to original values")
         for key, value in self.original_config_entries.items():
             ctx.ffx().run("config", "set", key, value)
-        ctx.log("Unsetting default target")
-        ctx.ffx().run("target", "default", "unset")
+
+        if self.original_target and len(self.original_target) > 0:
+            ctx.log(f"Setting default target back to {self.original_target}")
+            ctx.ffx().run("target", "default", "set", self.original_target)
+        else:
+            ctx.log("Unsetting default target")
+            ctx.ffx().run("target", "default", "unset")
 
 
 class FetchProductBundle(Step):
@@ -233,9 +266,7 @@ def main():
     )
 
     parser.add_argument(
-        '--target',
-        help='The name of the target which you are working on.',
-        default='fuchsia-emulator')
+        '--target', help='The name of the target which you are working on.')
 
     parser.add_argument(
         '--out',
