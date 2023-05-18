@@ -10,12 +10,8 @@ namespace fuzzing {
 ZxResult<RunnerPtr> MakeRealmFuzzerRunnerPtr(ComponentContext& context) {
   auto runner = RealmFuzzerRunner::MakePtr(context.executor());
   auto runner_impl = std::static_pointer_cast<RealmFuzzerRunner>(runner);
-  runner_impl->SetTargetAdapterHandler(context.MakeRequestHandler<TargetAdapter>());
-  if (auto status = runner_impl->BindCoverageDataProvider(context.TakeChannel(1));
-      status != ZX_OK) {
-    FX_LOGS(FATAL) << "Failed to bind fuchsia.fuzzer.CoverageDataProvider: "
-                   << zx_status_get_string(status);
-  }
+  runner_impl->SetAdapterHandler(context.MakeRequestHandler<TargetAdapter>());
+  runner_impl->SetProviderHandler(context.MakeRequestHandler<CoverageDataProviderV2>());
   return fpromise::ok(std::move(runner));
 }
 

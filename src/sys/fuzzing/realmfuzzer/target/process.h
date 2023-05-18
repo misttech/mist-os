@@ -25,8 +25,8 @@
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::CoverageDataCollector;
-using ::fuchsia::fuzzer::CoverageDataCollectorPtr;
+using ::fuchsia::fuzzer::CoverageDataCollectorV2;
+using ::fuchsia::fuzzer::CoverageDataCollectorV2Ptr;
 
 // Reserved target IDs:
 //  * |kInvalidTargetId| is used when a target identifier has not been set or could be parsed.
@@ -78,7 +78,7 @@ class Process final {
   // promise does not return unless there is an error; instead, it |Run|s the fuzzed process and
   // continues to wait for any dynamically loaded modules. The given |eventpair| is signalled with
   // |kSync| after the initial set of modules have been published and acknowledged by the engine.
-  ZxPromise<> Connect(fidl::InterfaceHandle<CoverageDataCollector> collector,
+  ZxPromise<> Connect(fidl::InterfaceHandle<CoverageDataCollectorV2> collector,
                       zx::eventpair eventpair);
 
   // Adds the counters and PCs associated with modules for this process. Invoked via the
@@ -143,9 +143,8 @@ class Process final {
   static bool AcquireCrashState();
 
   ExecutorPtr executor_;
-  CoverageDataCollectorPtr collector_;
+  CoverageDataCollectorV2Ptr collector_;
   AsyncEventPair eventpair_;
-  uint64_t target_id_ = kInvalidTargetId;
 
   // Options provided by the engine.
   Options options_;

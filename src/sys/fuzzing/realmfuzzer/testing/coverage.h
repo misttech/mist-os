@@ -18,43 +18,51 @@
 #include "src/sys/fuzzing/common/async-deque.h"
 #include "src/sys/fuzzing/common/async-types.h"
 #include "src/sys/fuzzing/common/options.h"
-#include "src/sys/fuzzing/realmfuzzer/engine/coverage-data.h"
 
 namespace fuzzing {
 
-using fuchsia::debugdata::Publisher;
-using fuchsia::fuzzer::CoverageData;
-using fuchsia::fuzzer::CoverageDataCollector;
-using fuchsia::fuzzer::CoverageDataProvider;
-using fuchsia::fuzzer::InstrumentedProcess;
+using fuchsia::fuzzer::CoverageDataCollectorV2;
+using fuchsia::fuzzer::CoverageDataProviderV2;
+using fuchsia::fuzzer::CoverageDataV2;
 
 // This class represents a simplified fuzz coverage component. Unlike the real version (located at
 // src/sys/test_manager/fuzz_coverage), this version for testing accepts only a single collector
 // connection and a single provider connection, and does not use event streams.
-class FakeCoverage final : public CoverageDataCollector, CoverageDataProvider {
+class FakeCoverage final : public CoverageDataCollectorV2, CoverageDataProviderV2 {
  public:
   explicit FakeCoverage(ExecutorPtr executor);
   ~FakeCoverage() = default;
 
-  fidl::InterfaceRequestHandler<Publisher> GetPublisherHandler();
-  fidl::InterfaceRequestHandler<CoverageDataCollector> GetCollectorHandler();
-  fidl::InterfaceRequestHandler<CoverageDataProvider> GetProviderHandler();
+  OptionsPtr options() const { return options_; }
+
+  fidl::InterfaceRequestHandler<CoverageDataCollectorV2> GetCollectorHandler();
+  fidl::InterfaceRequestHandler<CoverageDataProviderV2> GetProviderHandler();
 
   // CoverageDataCollector FIDL methods.
-  void Initialize(InstrumentedProcess instrumented, InitializeCallback callback) override;
-  void AddLlvmModule(zx::vmo inline_8bit_counters, AddLlvmModuleCallback callback) override;
+  void Initialize(zx::eventpair eventpair, zx::process process,
+                  InitializeCallback callback) override;
+  void AddInline8bitCounters(zx::vmo inline_8bit_counters,
+                             AddInline8bitCountersCallback callback) override;
 
   // CoverageDataProvider FIDL method.
   void SetOptions(Options options) override;
-  void GetCoverageData(GetCoverageDataCallback callback) override;
+  void WatchCoverageData(WatchCoverageDataCallback callback) override;
+
+  // Additional methods that allow direct access to the underlying `AsyncDeque` for more flexible
+  // testing.
+  void Send(CoverageDataV2 coverage_data);
+  Result<CoverageDataV2> TryReceive();
+  Promise<CoverageDataV2> Receive();
 
  private:
-  fidl::Binding<CoverageDataCollector> collector_;
-  fidl::Binding<CoverageDataProvider> provider_;
+  fidl::Binding<CoverageDataCollectorV2> collector_;
+  fidl::Binding<CoverageDataProviderV2> provider_;
   ExecutorPtr executor_;
-  Options options_;
-  AsyncSender<CoverageData> sender_;
-  AsyncReceiver<CoverageData> receiver_;
+  OptionsPtr options_;
+  AsyncSender<CoverageDataV2> sender_;
+  AsyncReceiver<CoverageDataV2> receiver_;
+  bool first_ = false;
+  zx_koid_t target_id_ = ZX_KOID_INVALID;
   Scope scope_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(FakeCoverage);

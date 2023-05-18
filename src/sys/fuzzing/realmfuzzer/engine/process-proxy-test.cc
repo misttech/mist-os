@@ -36,8 +36,14 @@ std::unique_ptr<ProcessProxy> ProcessProxyTest::CreateAndConnectProxy(zx::proces
                                                                       zx::eventpair eventpair) {
   auto process_proxy = std::make_unique<ProcessProxy>(executor(), pool_);
   process_proxy->Configure(options);
-  InstrumentedProcess instrumented = {std::move(eventpair), std::move(process)};
-  EXPECT_EQ(process_proxy->Connect(instrumented), ZX_OK);
+  zx_info_handle_basic_t info;
+  auto status = process.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  FX_CHECK(status == ZX_OK) << zx_status_get_string(status);
+  InstrumentedProcessV2 instrumented = {
+      .eventpair = std::move(eventpair),
+      .process = std::move(process),
+  };
+  EXPECT_EQ(process_proxy->Connect(info.koid, instrumented), ZX_OK);
   return process_proxy;
 }
 

@@ -30,7 +30,7 @@ TEST_F(ProcessProxyTest, Connect) {
   EXPECT_EQ(process_proxy->target_id(), info.koid);
 }
 
-TEST_F(ProcessProxyTest, AddLlvmModule) {
+TEST_F(ProcessProxyTest, AddInline8bitCounters) {
   TestTarget target(executor());
   AsyncEventPair eventpair(executor());
   auto process_proxy = CreateAndConnectProxy(target.Launch(), eventpair.Create());
@@ -38,20 +38,19 @@ TEST_F(ProcessProxyTest, AddLlvmModule) {
   FakeRealmFuzzerModule module;
   zx::vmo inline_8bit_counters;
 
-  // Invalid id.
-  EXPECT_EQ(module.Share(0x1234, &inline_8bit_counters), ZX_OK);
-  const char* invalid_name = "invalid";
-  EXPECT_EQ(inline_8bit_counters.set_property(ZX_PROP_NAME, invalid_name, strlen(invalid_name)),
-            ZX_OK);
-  EXPECT_EQ(process_proxy->AddModule(inline_8bit_counters), ZX_ERR_INVALID_ARGS);
+  // Missing VMO name.
+  EXPECT_EQ(module.Share(&inline_8bit_counters), ZX_OK);
+  const char* empty = "";
+  EXPECT_EQ(inline_8bit_counters.set_property(ZX_PROP_NAME, empty, strlen(empty)), ZX_OK);
+  EXPECT_EQ(process_proxy->AddInline8bitCounters(inline_8bit_counters), ZX_ERR_INVALID_ARGS);
 
   // Valid.
-  EXPECT_EQ(module.Share(0x1234, &inline_8bit_counters), ZX_OK);
-  EXPECT_EQ(process_proxy->AddModule(inline_8bit_counters), ZX_OK);
+  EXPECT_EQ(module.Share(&inline_8bit_counters), ZX_OK);
+  EXPECT_EQ(process_proxy->AddInline8bitCounters(inline_8bit_counters), ZX_OK);
 
   // Adding a duplicate module fails.
-  EXPECT_EQ(module.Share(0x1234, &inline_8bit_counters), ZX_OK);
-  EXPECT_EQ(process_proxy->AddModule(inline_8bit_counters), ZX_ERR_ALREADY_BOUND);
+  EXPECT_EQ(module.Share(&inline_8bit_counters), ZX_OK);
+  EXPECT_EQ(process_proxy->AddInline8bitCounters(inline_8bit_counters), ZX_ERR_ALREADY_BOUND);
 
   // Coverage should be reflected in the pool.
   auto* module_impl = pool()->Get(module.id(), module.num_pcs());

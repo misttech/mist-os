@@ -15,7 +15,7 @@
         },
     ],
     use: [
-        { protocol: "fuchsia.debugdata.Publisher" },
+        { protocol: "fuchsia.fuzzer.CoverageDataCollectorV2" },
     ],
     expose: [
         {

@@ -11,18 +11,38 @@
     program: {
         binary: "test/realmfuzzer_integration_tests",
     },
+    children: [
+        {
+            name: "coverage",
+            url: "#meta/coverage.cm",
+        },
+        {
+            name: "engine",
+            url: "#meta/engine.cm",
+        },
+    ],
     use: [
+        {
+            protocol: "fuchsia.fuzzer.CoverageDataProvider",
+            from: "#coverage",
+        },
         { protocol: "fuchsia.fuzzer.CoverageDataProvider" },
         { protocol: "fuchsia.process.Launcher" },
+        { protocol: "fuchsia.process.LogSink" },
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.debugdata.Publisher",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "parent",
+            protocol: [ "fuchsia.fuzzer.CoverageDataCollector" ],
+            from: "#coverage",
             to: "#fuzzer",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [
+                "#coverage",
+                "#fuzzer",
+            ],
         },
     ],
 }

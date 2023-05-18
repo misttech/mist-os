@@ -24,14 +24,14 @@
 #include "src/sys/fuzzing/common/async-eventpair.h"
 #include "src/sys/fuzzing/common/options.h"
 #include "src/sys/fuzzing/common/testing/async-test.h"
-#include "src/sys/fuzzing/realmfuzzer/engine/coverage-data.h"
 #include "src/sys/fuzzing/realmfuzzer/engine/module-pool.h"
 #include "src/sys/fuzzing/realmfuzzer/testing/coverage.h"
 #include "src/sys/fuzzing/realmfuzzer/testing/module.h"
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::CoverageDataProviderPtr;
+using ::fuchsia::fuzzer::CoverageDataProviderV2Ptr;
+using ::fuchsia::fuzzer::Data;
 using ::fuchsia::fuzzer::Options;
 
 // Test fixtures.
@@ -43,9 +43,6 @@ class ProcessTest : public AsyncTest {
     coverage_ = std::make_unique<FakeCoverage>(executor());
     eventpair_ = std::make_shared<AsyncEventPair>(executor());
     pool_ = ModulePool::MakePtr();
-
-    auto provider_handler = coverage_->GetProviderHandler();
-    provider_handler(provider_.NewRequest(executor()->dispatcher()));
     Configure(DefaultOptions());
   }
 
@@ -66,16 +63,13 @@ class ProcessTest : public AsyncTest {
   }
 
   // Copies the given |options| to the watcher, to be given to new processes.
-  void Configure(OptionsPtr options) {
-    provider_->SetOptions(CopyOptions(*options));
-    RunOnce();
-  }
+  void Configure(OptionsPtr options) { coverage_->SetOptions(CopyOptions(*options)); }
 
   // Returns a promises to connect the given process to the fake "engine" provided by the test.
   // Tests typically need to call |WatchForProcess| and |WatchForModule| for this promise to
   // complete.
   ZxPromise<> Connect(Process* process) {
-    fidl::InterfaceHandle<CoverageDataCollector> collector;
+    fidl::InterfaceHandle<CoverageDataCollectorV2> collector;
     auto collector_handler = coverage_->GetCollectorHandler();
     collector_handler(collector.NewRequest());
     auto eventpair = std::make_shared<AsyncEventPair>(executor());
@@ -126,15 +120,13 @@ class ProcessTest : public AsyncTest {
   // Returns a promise to handle an expected coverage event from a new process. Completes
   // with an error if the next coverage event is for an LLVM module.
   Promise<> WatchForProcess() {
-    Bridge<CoverageData> bridge;
-    provider_->GetCoverageData(bridge.completer.bind());
-    return bridge.consumer.promise_or(fpromise::error())
-        .and_then([this](CoverageData& coverage_data) -> Result<> {
-          if (!coverage_data.is_instrumented()) {
+    return coverage_->Receive()
+        .and_then([this](CoverageDataV2& coverage) -> Result<> {
+          if (!coverage.data.is_instrumented()) {
             return fpromise::error();
           }
-          auto& instrumented = coverage_data.instrumented();
-          target_id_ = GetTargetId(instrumented.process);
+          target_id_ = coverage.target_id;
+          auto& instrumented = coverage.data.instrumented();
           eventpair_->Pair(std::move(instrumented.eventpair));
           return fpromise::ok();
         })
@@ -144,15 +136,25 @@ class ProcessTest : public AsyncTest {
   // Returns a promise to handle an expected coverage event from a new module. Completes
   // with an error if the next coverage event is for an instrumented process.
   Promise<> WatchForModule() {
-    Bridge<CoverageData> bridge;
-    provider_->GetCoverageData(bridge.completer.bind());
-    return bridge.consumer.promise_or(fpromise::error())
-        .and_then([this](CoverageData& coverage_data) -> Result<> {
-          if (!coverage_data.is_inline_8bit_counters()) {
+    return coverage_->Receive()
+        .and_then([this](CoverageDataV2& coverage) -> Result<> {
+          if (coverage.target_id != target_id_) {
+            FX_LOGS(WARNING) << "Target ID does not match: " << coverage.target_id << " vs. "
+                             << target_id_;
             return fpromise::error();
           }
-          auto& inline_8bit_counters = coverage_data.inline_8bit_counters();
-          auto module_id = GetModuleId(inline_8bit_counters);
+          if (!coverage.data.is_inline_8bit_counters()) {
+            FX_LOGS(WARNING) << "Invalid coverage data; expected a `fuchsia.fuzzer.LlvmModule`";
+            return fpromise::error();
+          }
+          auto& inline_8bit_counters = coverage.data.inline_8bit_counters();
+          char module_id[ZX_MAX_NAME_LEN];
+          if (auto status =
+                  inline_8bit_counters.get_property(ZX_PROP_NAME, module_id, sizeof(module_id));
+              status != ZX_OK) {
+            FX_LOGS(WARNING) << "Failed to get module id: " << zx_status_get_string(status);
+            return fpromise::error();
+          }
           SharedMemory counters;
           if (auto status = counters.Link(std::move(inline_8bit_counters)); status != ZX_OK) {
             return fpromise::error();
@@ -169,7 +171,7 @@ class ProcessTest : public AsyncTest {
   std::unique_ptr<FakeCoverage> coverage_;
   std::shared_ptr<AsyncEventPair> eventpair_;
   ModulePoolPtr pool_;
-  CoverageDataProviderPtr provider_;
+  CoverageDataProviderV2Ptr provider_;
   uint64_t target_id_ = kInvalidTargetId;
   std::unordered_map<std::string, FakeRealmFuzzerModule> modules_;
   std::vector<SharedMemory> added_;

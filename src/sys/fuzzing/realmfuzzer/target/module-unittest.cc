@@ -8,7 +8,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/sys/fuzzing/realmfuzzer/engine/coverage-data.h"
 #include "src/sys/fuzzing/realmfuzzer/testing/module.h"
 
 namespace fuzzing {
@@ -23,11 +22,11 @@ TEST(ModuleTest, Identifier) {
     pc_table1.emplace_back(0x1000 + i * 0x10, (i % 8) == 0);
   }
   FakeRealmFuzzerModule module1(std::move(pc_table1));
-  Identifier legacy_expected = {0x942bcbf83d06e325ULL, 0x9e6b80d9266e0505ULL};
-  // Compare with `echo $x | xxd -r -p | xxd -e -g8 | xxd -r | base64`, where $x is one of the hex
-  // values above. The multiple `xxd` are needed to perform the byte swap for endianness.
-  std::string expected = "JeMGPfjLKwBQVuJtmAaw";
-  EXPECT_EQ(module1.legacy_id(), legacy_expected);
+  // The fnv1a hash of `pc_table1` is 0x942bcbf83d06e325.
+  // The djb2a hash of `pc_table1` is 0x9e6b80d9266e0505.
+  // The base-64 value can be obtained using:
+  //    `echo 942bcbf83d06e3259e6b80d9266e0505 | xxd -r -p | xxd -e -g8 | xxd -r | base64`
+  std::string expected = "JeMGPfjLK5QFBW4m2YBrng==";
   EXPECT_EQ(module1.id(), expected);
 
   // Shifting all the PCs by a random basis does not affect the source ID, i.e., the ID is
@@ -52,12 +51,12 @@ TEST(ModuleTest, Identifier) {
 
   // Check the identifier gets written to the VMO.
   zx::vmo vmo;
-  EXPECT_EQ(module1.Share(0x1234, &vmo), ZX_OK);
+  EXPECT_EQ(module1.Share(&vmo), ZX_OK);
 
   char name[ZX_MAX_NAME_LEN];
+  memset(name, 0, sizeof(name));
   EXPECT_EQ(vmo.get_property(ZX_PROP_NAME, name, sizeof(name)), ZX_OK);
-  EXPECT_EQ(GetTargetId(name), 0x1234U);
-  EXPECT_EQ(GetModuleId(name), module1.id());
+  EXPECT_EQ(std::string(name), expected);
 }
 
 TEST(ModuleTest, UpdateAndClear) {
@@ -71,7 +70,7 @@ TEST(ModuleTest, UpdateAndClear) {
   std::vector<uint8_t> expected(module.counters(), module.counters_end());
 
   zx::vmo vmo;
-  EXPECT_EQ(module.Share(0x1234, &vmo), ZX_OK);
+  EXPECT_EQ(module.Share(&vmo), ZX_OK);
   SharedMemory shmem;
   EXPECT_EQ(shmem.Link(std::move(vmo)), ZX_OK);
   auto* data = shmem.data();

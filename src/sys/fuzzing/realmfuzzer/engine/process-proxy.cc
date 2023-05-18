@@ -11,7 +11,6 @@
 #include <inspector/inspector.h>
 
 #include "src/sys/fuzzing/common/status.h"
-#include "src/sys/fuzzing/realmfuzzer/engine/coverage-data.h"
 
 namespace fuzzing {
 
@@ -34,24 +33,17 @@ ProcessProxy::~ProcessProxy() {
 
 void ProcessProxy::Configure(const OptionsPtr& options) { options_ = options; }
 
-zx_status_t ProcessProxy::Connect(InstrumentedProcess& instrumented) {
+zx_status_t ProcessProxy::Connect(uint64_t target_id, InstrumentedProcessV2& instrumented) {
   if (target_id_ != kInvalidTargetId) {
     FX_LOGS(WARNING) << "Failed to connect process proxy: already connected.";
     return ZX_ERR_BAD_STATE;
   }
 
-  zx_info_handle_basic_t info;
-  if (auto status = instrumented.process.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info),
-                                                  nullptr, nullptr);
-      status != ZX_OK) {
-    FX_LOGS(WARNING) << " Failed to get target id for process: " << zx_status_get_string(status);
+  if (target_id == kInvalidTargetId || target_id == kTimeoutTargetId) {
+    FX_LOGS(WARNING) << "Received invalid target_id: " << target_id;
     return ZX_ERR_INVALID_ARGS;
   }
-  if (info.koid == kInvalidTargetId || info.koid == kTimeoutTargetId) {
-    FX_LOGS(WARNING) << "Received invalid target_id: " << info.koid;
-    return ZX_ERR_INVALID_ARGS;
-  }
-  target_id_ = info.koid;
+  target_id_ = target_id;
   process_ = std::move(instrumented.process);
 
   eventpair_.Pair(std::move(instrumented.eventpair));
@@ -85,16 +77,20 @@ zx_status_t ProcessProxy::Connect(InstrumentedProcess& instrumented) {
   return ZX_OK;
 }
 
-zx_status_t ProcessProxy::AddModule(zx::vmo& inline_8bit_counters) {
-  // Get the module identifer.
-  auto id = GetModuleId(inline_8bit_counters);
+zx_status_t ProcessProxy::AddInline8bitCounters(zx::vmo& vmo) {
+  char name[ZX_MAX_NAME_LEN];
+  if (auto status = vmo.get_property(ZX_PROP_NAME, name, sizeof(name)); status != ZX_OK) {
+    FX_LOGS(WARNING) << "Failed to get VMO name: " << zx_status_get_string(status);
+    return status;
+  }
+  std::string id(name);
   if (id.empty()) {
-    FX_LOGS(WARNING) << "Failed to get module ID (target_id=" << target_id_ << ")";
+    FX_LOGS(WARNING) << "Empty module ID (target_id=" << target_id_ << ")";
     return ZX_ERR_INVALID_ARGS;
   }
   // Link the shared memory and add it to the pool.
   SharedMemory counters;
-  if (auto status = counters.Link(std::move(inline_8bit_counters)); status != ZX_OK) {
+  if (auto status = counters.Link(std::move(vmo)); status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to link module: " << zx_status_get_string(status)
                      << " (target_id=" << target_id_ << ")";
     return status;

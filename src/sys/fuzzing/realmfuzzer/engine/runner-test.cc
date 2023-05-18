@@ -12,7 +12,6 @@
 #include <gtest/gtest.h>
 
 #include "src/sys/fuzzing/common/options.h"
-#include "src/sys/fuzzing/realmfuzzer/engine/coverage-data.h"
 
 namespace fuzzing {
 
@@ -20,14 +19,12 @@ void RealmFuzzerRunnerTest::SetUp() {
   RunnerTest::SetUp();
   runner_ = RealmFuzzerRunner::MakePtr(executor());
   auto runner_impl = std::static_pointer_cast<RealmFuzzerRunner>(runner_);
+
   target_adapter_ = std::make_unique<FakeTargetAdapter>(executor());
-  runner_impl->SetTargetAdapterHandler(target_adapter_->GetHandler());
+  runner_impl->SetAdapterHandler(target_adapter_->GetHandler());
 
   coverage_ = std::make_unique<FakeCoverage>(executor());
-  auto handler = coverage_->GetProviderHandler();
-  fidl::InterfaceHandle<CoverageDataProvider> provider;
-  handler(provider.NewRequest());
-  EXPECT_EQ(runner_impl->BindCoverageDataProvider(provider.TakeChannel()), ZX_OK);
+  runner_impl->SetProviderHandler(coverage_->GetProviderHandler());
 
   eventpair_ = std::make_unique<AsyncEventPair>(executor());
 
@@ -76,11 +73,7 @@ ZxPromise<> RealmFuzzerRunnerTest::PublishProcess() {
                // Connect and send the process.
                auto handler = coverage_->GetCollectorHandler();
                handler(collector_.NewRequest(executor()->dispatcher()));
-               InstrumentedProcess instrumented{
-                   .eventpair = eventpair_->Create(),
-                   .process = target_->Launch(),
-               };
-               collector_->Initialize(std::move(instrumented), completer.bind());
+               collector_->Initialize(eventpair_->Create(), target_->Launch(), completer.bind());
                return fpromise::ok();
              })
       .and_then([wait = Future<Options>(bridge.consumer.promise_or(fpromise::error()))](
@@ -97,15 +90,15 @@ ZxPromise<> RealmFuzzerRunnerTest::PublishProcess() {
 
 ZxPromise<> RealmFuzzerRunnerTest::PublishModule() {
   Bridge<> bridge;
-  return fpromise::make_promise([this,
-                                 completer = std::move(bridge.completer)]() mutable -> ZxResult<> {
-           zx::vmo inline_8bit_counters;
-           if (auto status = module_.Share(target_->id(), &inline_8bit_counters); status != ZX_OK) {
-             return fpromise::error(status);
-           }
-           collector_->AddLlvmModule(std::move(inline_8bit_counters), completer.bind());
-           return fpromise::ok();
-         })
+  return fpromise::make_promise(
+             [this, completer = std::move(bridge.completer)]() mutable -> ZxResult<> {
+               zx::vmo inline_8bit_counters;
+               if (auto status = module_.Share(&inline_8bit_counters); status != ZX_OK) {
+                 return fpromise::error(status);
+               }
+               collector_->AddInline8bitCounters(std::move(inline_8bit_counters), completer.bind());
+               return fpromise::ok();
+             })
       .and_then([this, wait = Future<>(bridge.consumer.promise_or(fpromise::error()))](
                     Context& context) mutable -> ZxResult<> {
         if (!wait(context)) {

@@ -13,11 +13,11 @@
 #include <deque>
 
 #include "src/lib/fxl/macros.h"
-#include "src/sys/fuzzing/realmfuzzer/engine/coverage-data.h"
 #include "src/sys/fuzzing/realmfuzzer/target/process.h"
 
 namespace fuzzing {
 
+using ::fuchsia::fuzzer::Data;
 using ::fuchsia::fuzzer::MAX_PROCESS_STATS;
 
 RunnerPtr RealmFuzzerRunner::MakePtr(ExecutorPtr executor) {
@@ -41,12 +41,12 @@ RealmFuzzerRunner::RealmFuzzerRunner(ExecutorPtr executor)
   pool_ = std::make_shared<ModulePool>();
 }
 
-void RealmFuzzerRunner::SetTargetAdapterHandler(TargetAdapterClient::RequestHandler handler) {
+void RealmFuzzerRunner::SetAdapterHandler(TargetAdapterClient::RequestHandler handler) {
   adapter_.set_handler(std::move(handler));
 }
 
-zx_status_t RealmFuzzerRunner::BindCoverageDataProvider(zx::channel provider) {
-  return provider_.Bind(std::move(provider));
+void RealmFuzzerRunner::SetProviderHandler(CoverageDataProviderClient::RequestHandler handler) {
+  provider_.Bind(std::move(handler));
 }
 
 ZxPromise<> RealmFuzzerRunner::Initialize(std::string pkg_dir, std::vector<std::string> args) {
@@ -438,29 +438,29 @@ void RealmFuzzerRunner::StartWorkflow(Scope& scope) {
   pulse_start_ = start_ + zx::sec(2);
   stopped_ = false;
   // Handle coverage data produced during the workflow.
-  auto task = fpromise::make_promise([this, get_coverage_data = Future<CoverageData>()](
+  auto task = fpromise::make_promise([this, fut = Future<CoverageDataV2>()](
                                          Context& context) mutable -> Result<> {
                 while (true) {
-                  if (!get_coverage_data) {
-                    get_coverage_data = provider_.GetCoverageData();
+                  if (!fut) {
+                    fut = provider_.GetCoverageData();
                   }
-                  if (!get_coverage_data(context)) {
+                  if (!fut(context)) {
                     return fpromise::pending();
                   }
-                  if (get_coverage_data.is_error()) {
+                  if (fut.is_error()) {
                     return fpromise::error();
                   }
-                  auto coverage_data = get_coverage_data.take_value();
-                  switch (coverage_data.Which()) {
-                    case CoverageData::Tag::kInstrumented:
-                      ConnectProcess(coverage_data.instrumented());
+                  auto coverage = fut.take_value();
+                  switch (coverage.data.Which()) {
+                    case Data::Tag::kInstrumented:
+                      ConnectProcess(std::move(coverage));
                       break;
-                    case CoverageData::Tag::kInline8bitCounters:
-                      AddLlvmModule(coverage_data.inline_8bit_counters());
+                    case Data::Tag::kInline8bitCounters:
+                      AddInline8bitCounters(std::move(coverage));
                       break;
                     default:
                       FX_LOGS(WARNING)
-                          << "Unrecgonized coverage data type: " << coverage_data.Which();
+                          << "Unrecgonized coverage data type: " << coverage.data.Which();
                       return fpromise::error();
                   }
                 }
@@ -879,10 +879,11 @@ Promise<bool, FuzzResult> RealmFuzzerRunner::RunOne(const Input& input) {
       .or_else([this](const uint64_t& target_id) { return GetFuzzResult(target_id); });
 }
 
-void RealmFuzzerRunner::ConnectProcess(InstrumentedProcess& instrumented) {
+void RealmFuzzerRunner::ConnectProcess(CoverageDataV2 coverage) {
   auto process_proxy = std::make_unique<ProcessProxy>(executor(), pool_);
   process_proxy->Configure(options());
-  if (auto status = process_proxy->Connect(instrumented); status != ZX_OK) {
+  if (auto status = process_proxy->Connect(coverage.target_id, coverage.data.instrumented());
+      status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to add process: " << zx_status_get_string(status);
     return;
   }
@@ -893,15 +894,15 @@ void RealmFuzzerRunner::ConnectProcess(InstrumentedProcess& instrumented) {
   suspended_.resume_task();
 }
 
-void RealmFuzzerRunner::AddLlvmModule(zx::vmo& inline_8bit_counters) {
-  auto target_id = GetTargetId(inline_8bit_counters);
-  auto iter = process_proxies_.find(target_id);
+void RealmFuzzerRunner::AddInline8bitCounters(CoverageDataV2 coverage) {
+  auto iter = process_proxies_.find(coverage.target_id);
   if (iter == process_proxies_.end()) {
-    FX_LOGS(WARNING) << "Failed to add module: no such target_id: " << target_id;
+    FX_LOGS(WARNING) << "Failed to add module: no such target_id: " << coverage.target_id;
     return;
   }
   auto& process_proxy = iter->second;
-  if (auto status = process_proxy->AddModule(inline_8bit_counters); status != ZX_OK) {
+  if (auto status = process_proxy->AddInline8bitCounters(coverage.data.inline_8bit_counters());
+      status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to add module: " << zx_status_get_string(status);
     return;
   }

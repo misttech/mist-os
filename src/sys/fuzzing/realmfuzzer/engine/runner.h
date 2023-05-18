@@ -28,6 +28,8 @@
 
 namespace fuzzing {
 
+using ::fuchsia::fuzzer::CoverageDataV2;
+
 // The concrete implementation of |Runner| for the realmfuzzer engine.
 class RealmFuzzerRunner final : public Runner {
  public:
@@ -37,11 +39,10 @@ class RealmFuzzerRunner final : public Runner {
   static RunnerPtr MakePtr(ExecutorPtr executor);
 
   // Sets the |handler| to use to (re)connect to the target adapter.
-  void SetTargetAdapterHandler(TargetAdapterClient::RequestHandler handler);
+  void SetAdapterHandler(TargetAdapterClient::RequestHandler handler);
 
-  // Takes a channel to a |fuchsia.fuzzer.CoverageDataProvider| implementation and uses it to watch
-  // for new coverage data produced by targets.
-  __WARN_UNUSED_RESULT zx_status_t BindCoverageDataProvider(zx::channel provider);
+  // Sets the |handler| to use to connect to the coverage data provider.
+  void SetProviderHandler(CoverageDataProviderClient::RequestHandler handler);
 
   // |Runner| method implementations.
   ZxPromise<> Initialize(std::string pkg_dir, std::vector<std::string> args) override;
@@ -164,11 +165,13 @@ class RealmFuzzerRunner final : public Runner {
   // |malloc|s than |free|s.
   Promise<bool, FuzzResult> RunOne(const Input& input);
 
-  // Adds a new process proxy for the given |instrumented| process.
-  void ConnectProcess(InstrumentedProcess& instrumented);
+  // Adds a new process proxy for the process represented by the given `coverage` data. The coverage
+  // data must be of the `instrumented` variant.
+  void ConnectProcess(CoverageDataV2 instrumented);
 
-  // Adds sanitizer coverage data for a new LLVM module from its |inline_8bit_counters|.
-  void AddLlvmModule(zx::vmo& inline_8bit_counters);
+  // Adds the given sanitizer `coverage` data. The coverage data must be of the
+  // `inline_8bit_counters` variant.
+  void AddInline8bitCounters(CoverageDataV2 inline_8bit_counters);
 
   // Returns a promise to determine the cause of an error in the target process identified by the
   // given |target_id|. In the case of multiple errors, only the first error is reported. However,

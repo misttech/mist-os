@@ -8,16 +8,16 @@
         binary: "bin/realmfuzzer_coverage",
     },
     capabilities: [
-        { protocol: "fuchsia.fuzzer.CoverageDataProvider2" },
-        { protocol: "fuchsia.fuzzer.CoverageDataCollector2" },
+        { protocol: "fuchsia.fuzzer.CoverageDataProviderV2" },
+        { protocol: "fuchsia.fuzzer.CoverageDataCollectorV2" },
     ],
     expose: [
         {
-            protocol: "fuchsia.fuzzer.CoverageDataProvider2",
+            protocol: "fuchsia.fuzzer.CoverageDataProviderV2",
             from: "self",
         },
         {
-            protocol: "fuchsia.fuzzer.CoverageDataCollector2",
+            protocol: "fuchsia.fuzzer.CoverageDataCollectorV2",
             from: "self",
         },
     ],

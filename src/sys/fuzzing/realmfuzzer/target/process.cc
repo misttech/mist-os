@@ -207,7 +207,7 @@ void Process::InstallHooks() {
   std::atexit([]() { ExitHook(); });
 }
 
-ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollector> collector,
+ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollectorV2> collector,
                              zx::eventpair eventpair) {
   Bridge<Options> bridge;
   return fpromise::make_promise([this, collector = std::move(collector)]() mutable -> ZxResult<> {
@@ -230,28 +230,10 @@ ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollector> collec
         }
         return fpromise::ok(std::move(process));
       })
-      .and_then([this](zx::process& process) -> ZxResult<zx::process> {
-        // Next, determine this process's target id, which is just its koid. The process will
-        // annotate all modules it shares with this id to allow the engine to clean up the module
-        // pool if this process exits.
-        zx_info_handle_basic_t info;
-        if (auto status =
-                process.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-            status != ZX_OK) {
-          FX_LOGS(WARNING) << "Failed to set target id: " << zx_status_get_string(status);
-          return fpromise::error(status);
-        }
-        target_id_ = info.koid;
-        return fpromise::ok(std::move(process));
-      })
       .and_then([this, completer = std::move(bridge.completer)](
                     zx::process& process) mutable -> ZxResult<> {
-        // Now create an |InstrumentedProcess| for this process and send it to the collector.
-        InstrumentedProcess instrumented{
-            .eventpair = eventpair_.Create(),
-            .process = std::move(process),
-        };
-        collector_->Initialize(std::move(instrumented), completer.bind());
+        // Now send process data to the collector.
+        collector_->Initialize(eventpair_.Create(), std::move(process), completer.bind());
         return fpromise::ok();
       })
       .and_then([this, connect = Future<Options>(bridge.consumer.promise_or(fpromise::error()))](
@@ -396,13 +378,13 @@ ZxPromise<> Process::AddModule() {
       .and_then(
           [this, completer = std::move(bridge.completer)](Module& module) mutable -> ZxResult<> {
             zx::vmo inline_8bit_counters;
-            if (auto status = module.Share(target_id_, &inline_8bit_counters); status != ZX_OK) {
+            if (auto status = module.Share(&inline_8bit_counters); status != ZX_OK) {
               FX_LOGS(WARNING) << "Failed to share inline 8-bit counters: "
                                << zx_status_get_string(status);
               return fpromise::error(status);
             }
             modules_.emplace_back(std::move(module));
-            collector_->AddLlvmModule(std::move(inline_8bit_counters), completer.bind());
+            collector_->AddInline8bitCounters(std::move(inline_8bit_counters), completer.bind());
             return fpromise::ok();
           })
       .and_then([this, wait = Future<>(bridge.consumer.promise_or(fpromise::error()))](

@@ -28,41 +28,40 @@ void CoverageDataProviderClient::Configure(const OptionsPtr& options) {
   }
 }
 
-zx_status_t CoverageDataProviderClient::Bind(zx::channel channel) {
+void CoverageDataProviderClient::Bind(RequestHandler handler) {
   FX_CHECK(!provider_.is_bound());
-  if (auto status = provider_.Bind(std::move(channel), executor_->dispatcher()); status != ZX_OK) {
-    FX_LOGS(WARNING) << "Failed to bind fuchsia.fuzzer.CoverageDataProviderClient proxy: "
-                     << zx_status_get_string(status);
-    return status;
-  }
+  handler(provider_.NewRequest(executor_->dispatcher()));
   provider_->SetOptions(CopyOptions(*options_));
-  // |GetCoverageData| futures may be abandoned. To prevent coverage data being dropped, a separate
-  // future, scoped to this object, should handle the FIDL requests and responses.
-  auto task = fpromise::make_promise([this, watch = Future<CoverageData>()](
+  // |WatchCoverageData| futures may be abandoned. To prevent coverage data being dropped, a
+  // separate future, scoped to this object, should handle the FIDL requests and responses.
+  auto task = fpromise::make_promise([this, fut = Future<std::vector<CoverageDataV2>>()](
                                          Context& context) mutable -> Result<> {
                 while (true) {
-                  if (!watch) {
-                    Bridge<CoverageData> bridge;
-                    provider_->GetCoverageData(bridge.completer.bind());
-                    watch = bridge.consumer.promise_or(fpromise::error());
+                  if (!fut) {
+                    Bridge<std::vector<CoverageDataV2>> bridge;
+                    provider_->WatchCoverageData(bridge.completer.bind());
+                    fut = bridge.consumer.promise_or(fpromise::error());
                   }
-                  if (!watch(context)) {
+                  if (!fut(context)) {
                     return fpromise::pending();
                   }
-                  if (watch.is_error()) {
+                  if (fut.is_error()) {
                     FX_LOGS(WARNING) << "Failed to receive coverage data.";
                     return fpromise::error();
                   }
-                  if (auto status = sender_.Send(watch.take_value()); status != ZX_OK) {
-                    FX_LOGS(WARNING) << "Failed to forward received coverage data: "
-                                     << zx_status_get_string(status);
+                  for (auto& coverage_data : fut.take_value()) {
+                    if (auto status = sender_.Send(std::move(coverage_data)); status != ZX_OK) {
+                      FX_LOGS(WARNING) << "Failed to forward received coverage data: "
+                                       << zx_status_get_string(status);
+                    }
                   }
                 }
               }).wrap_with(scope_);
   executor_->schedule_task(std::move(task));
-  return ZX_OK;
 }
 
-Promise<CoverageData> CoverageDataProviderClient::GetCoverageData() { return receiver_.Receive(); }
+Promise<CoverageDataV2> CoverageDataProviderClient::GetCoverageData() {
+  return receiver_.Receive();
+}
 
 }  // namespace fuzzing

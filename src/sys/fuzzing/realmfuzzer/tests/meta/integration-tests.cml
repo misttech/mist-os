@@ -5,6 +5,14 @@
 // This manifest corresponds to the root of the realm used for the integration
 // tests.
 {
+    include: [
+        "//sdk/lib/inspect/client.shard.cml",
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "test/realmfuzzer_integration_tests",
+    },
     children: [
         {
             name: "coverage",
@@ -14,34 +22,41 @@
             name: "engine",
             url: "#meta/engine.cm",
         },
+        {
+            name: "fuzzer",
+            url: "#meta/fuzzer.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.fuzzer.TargetAdapter",
+            from: "#fuzzer",
+        },
+        {
+            protocol: "fuchsia.fuzzer.CoverageDataProviderV2",
+            from: "#coverage",
+        },
+        {
+            protocol: [ "fuchsia.process.Launcher" ],
+            from: "parent",
+        },
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.debugdata.Publisher",
-                "fuchsia.fuzzer.CoverageDataProvider",
-            ],
+            protocol: "fuchsia.fuzzer.CoverageDataCollectorV2",
             from: "#coverage",
-            to: "#engine",
+            to: "#fuzzer",
         },
         {
-            protocol: "fuchsia.process.Launcher",
-            from: "parent",
-            to: "#engine",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.process.Launcher",
+            ],
             from: "parent",
             to: [
                 "#coverage",
-                "#engine",
+                "#fuzzer",
             ],
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.test.Suite",
-            from: "#engine",
         },
     ],
 }

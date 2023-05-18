@@ -38,35 +38,22 @@ zx_status_t Module::Import(uint8_t* counters, const uintptr_t* pcs, size_t num_p
     djb2a = ((djb2a << 5) + djb2a) ^ *u8;
     u8++;
   }
-  legacy_id_ = Identifier{fnv1a, djb2a};
-  // To squeeze as much data as possible into the null-terminated 32-character name limit, this
-  // omits the most significant byte of each hash and all padding characters. Thus, the 7 bytes
-  // hashes produce 10 characters each. Combined with 11 characters for the |target_id| (see |Share|
-  // below), this gives a total string length of 31.
-  char id[modp_b64_encode_len(sizeof(uint64_t) * 2)];
-  auto len1 = modp_b64_encode(&id[0], reinterpret_cast<char*>(&fnv1a), sizeof(uint64_t) - 1);
-  len1 -= 2;
-  FX_DCHECK(id[len1] == '=');
-  auto len2 = modp_b64_encode(&id[len1], reinterpret_cast<char*>(&djb2a), sizeof(uint64_t) - 1);
-  len2 += len1 - 2;
-  FX_DCHECK(id[len2] == '=');
-  id_ = std::string(id, len2);
+
+  // Encode using base-64.
+  uint64_t hex[2] = {fnv1a, djb2a};
+  char id[ZX_MAX_NAME_LEN];
+  FX_DCHECK(modp_b64_encode_len(sizeof(hex)) < sizeof(id));
+  auto len = modp_b64_encode(id, reinterpret_cast<char*>(hex), sizeof(hex));
+  id_ = std::string(id, len);
   return ZX_OK;
 }
 
-zx_status_t Module::Share(uint64_t target_id, zx::vmo* out) const {
+zx_status_t Module::Share(zx::vmo* out) const {
   if (auto status = counters_.Share(out); status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to share module: " << zx_status_get_string(status);
     return status;
   }
-  // As noted above, this trims the final padding character to fit the |target_id| into 11
-  // characters. Keep this in sync with the decoding routines in engine/coverage-data.cc!
-  char name[ZX_MAX_NAME_LEN];
-  auto len = modp_b64_encode(name, reinterpret_cast<char*>(&target_id), sizeof(uint64_t));
-  FX_CHECK(len != size_t(-1));
-  FX_CHECK(name[len - 1] == '=');
-  strncpy(&name[len - 1], id_.c_str(), sizeof(name) - (len - 1));
-  if (auto status = out->set_property(ZX_PROP_NAME, name, sizeof(name)); status != ZX_OK) {
+  if (auto status = out->set_property(ZX_PROP_NAME, id_.data(), id_.size()); status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to set module ID: " << zx_status_get_string(status);
     return status;
   }

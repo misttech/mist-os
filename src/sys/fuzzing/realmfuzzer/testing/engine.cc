@@ -26,8 +26,8 @@ class FuzzerTest : public AsyncTest {
     context_ = ComponentContextForTest::Create(executor());
     runner_ = RealmFuzzerRunner::MakePtr(context_->executor());
     auto runner_impl = std::static_pointer_cast<RealmFuzzerRunner>(runner_);
-    runner_impl->SetTargetAdapterHandler(context_->MakeRequestHandler<TargetAdapter>());
-    ASSERT_EQ(runner_impl->BindCoverageDataProvider(context_->TakeChannel(1)), ZX_OK);
+    runner_impl->SetAdapterHandler(context_->MakeRequestHandler<TargetAdapter>());
+    runner_impl->SetProviderHandler(context_->MakeRequestHandler<CoverageDataProviderV2>());
   }
 
   const RunnerPtr& runner() const { return runner_; }

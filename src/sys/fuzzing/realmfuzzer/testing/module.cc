@@ -28,8 +28,6 @@ FakeRealmFuzzerModule& FakeRealmFuzzerModule::operator=(FakeRealmFuzzerModule&& 
   return *this;
 }
 
-zx_status_t FakeRealmFuzzerModule::Share(uint64_t target_id, zx::vmo* out) const {
-  return module_->Share(target_id, out);
-}
+zx_status_t FakeRealmFuzzerModule::Share(zx::vmo* out) const { return module_->Share(out); }
 
 }  // namespace fuzzing

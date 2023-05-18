@@ -8,17 +8,10 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":fuzzer-test-integration-tests-pkg" ]
-
-  # Realm fuzzers are designed to be built with a dedicated toolchain variant and use
-  # `fuchsia.debugdata.Publisher` to transport code coverage via test_manager's fuzz_coverage
-  # component. The integration tests provide a fake fuzz_coverage component that is explicitly
-  # routed to fuzzers. Unfortunately, in 'coverage' builds the test realm prefers the route
-  # provided by the 'debug' field of test_manager's "test_env" environment over the explicit one. As
-  # a result, these integration tests are disabled under 'coverage' builds.
-  if (!is_coverage) {
-    deps += [ ":fuzzer-integration-tests-pkg" ]
-  }
+  deps = [
+    ":fuzzer-integration-tests-pkg",
+    ":fuzzer-test-integration-tests-pkg",
+  ]
 }
 
 # This package contains integration tests that use the "real" fuzzing engine, which generates inputs
@@ -54,30 +47,21 @@ test("integration-test-bin") {
   ]
 }
 
-fuchsia_test_component("engine") {
-  manifest = "meta/engine.cml"
+fuchsia_test_component("fuzzer-integration-tests") {
+  manifest = "meta/integration-tests.cml"
   deps = [
     ":integration-test-bin",
     "//src/sys/fuzzing/realmfuzzer/engine:engine-bin",
   ]
 }
 
-fuchsia_test_component("fuzzer-integration-tests") {
-  manifest = "meta/integration-tests.cml"
-  deps = [ ":engine" ]
-}
-
-# See the notes on ":tests" above. The fake fuzz_coverage component is not compatible with coverage
-# builds.
-if (!is_coverage) {
-  fuchsia_test_package("fuzzer-integration-tests-pkg") {
-    package_name = "realmfuzzer-integration-tests"
-    test_components = [ ":fuzzer-integration-tests" ]
-    deps = [
-      ":fuzzer",
-      "//src/sys/fuzzing/realmfuzzer/testing:coverage",
-    ]
-  }
+fuchsia_test_package("fuzzer-integration-tests-pkg") {
+  package_name = "realmfuzzer-integration-tests"
+  test_components = [ ":fuzzer-integration-tests" ]
+  deps = [
+    ":fuzzer",
+    "//src/sys/fuzzing/realmfuzzer/coverage",
+  ]
 }
 
 # This package contains integration tests that use a test "engine", which uses fixed inputs to drive
