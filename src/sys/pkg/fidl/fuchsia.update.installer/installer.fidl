@@ -78,6 +78,14 @@ closed protocol Installer {
     }) -> (struct {
         attached bool;
     });
+
+    /// Suspend a specific update attempt, if it exists.
+    ///
+    /// + request `attempt_id` UUID identifying the requested update attempt. If
+    ///     not given, suspend any active update attempt.
+    strict SuspendUpdate(resource struct {
+        attempt_id AttemptId:optional;
+    }) -> () error SuspendError;
 };
 
 /// Controls the timing of the reboot into the updated system.
@@ -150,4 +158,14 @@ type UpdateNotStartedReason = strict enum {
     /// There was already another update attempt in progress when this request was
     /// made.  A new update attempt will not be started.
     ALREADY_IN_PROGRESS = 1;
+};
+
+/// Why suspend failed.
+type SuspendError = strict enum {
+    /// There is no update attempt in progress.
+    NO_UPDATE_IN_PROGRESS = 1;
+    /// The current update attempt has reached its suspend limit.
+    SUSPEND_LIMIT_EXCEEDED = 2;
+    /// The given attempt id does not match the current update attempt.
+    ATTEMPT_ID_MISMATCH = 3;
 };

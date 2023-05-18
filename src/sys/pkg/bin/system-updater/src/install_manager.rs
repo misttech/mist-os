@@ -6,7 +6,7 @@ use {
     crate::update::{Config, EnvironmentConnector, RebootController, Updater},
     anyhow::anyhow,
     event_queue::{EventQueue, Notify},
-    fidl_fuchsia_update_installer::UpdateNotStartedReason,
+    fidl_fuchsia_update_installer::{SuspendError, UpdateNotStartedReason},
     fidl_fuchsia_update_installer_ext::State,
     fuchsia_async as fasync, fuchsia_inspect as inspect,
     fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _},
@@ -199,7 +199,7 @@ where
             ControlRequest::Monitor(MonitorRequestData { responder, .. }) => {
                 let _ = responder.send(false);
             }
-            ControlRequest::Suspend(responder) => {
+            ControlRequest::Suspend(SuspendRequestData { responder, .. }) => {
                 let _ = responder.send(Err(SuspendError::NoUpdateInProgress));
             }
             ControlRequest::Resume(responder) => {
@@ -251,10 +251,14 @@ async fn handle_active_control_request<N>(
             }
             suspend_state.resume();
         }
-        ControlRequest::Monitor(MonitorRequestData { attempt_id: id, monitor, responder }) => {
+        ControlRequest::Monitor(MonitorRequestData {
+            attempt_id: request_id,
+            monitor,
+            responder,
+        }) => {
             // If an attempt ID is provided, ensure it matches the current attempt.
-            if let Some(id) = id {
-                if id != attempt_id {
+            if let Some(request_id) = request_id {
+                if request_id != attempt_id {
                     let _ = responder.send(false);
                     return;
                 }
@@ -265,7 +269,15 @@ async fn handle_active_control_request<N>(
             }
             let _ = responder.send(true);
         }
-        ControlRequest::Suspend(responder) => {
+        ControlRequest::Suspend(SuspendRequestData { attempt_id: request_id, responder }) => {
+            // If an attempt ID is provided, ensure it matches the current attempt.
+            if let Some(request_id) = request_id {
+                if request_id != attempt_id {
+                    let _ = responder.send(Err(SuspendError::AttemptIdMismatch));
+                    return;
+                }
+            }
+
             if zx::Time::get_monotonic() > suspend_deadline {
                 let _ = responder.send(Err(SuspendError::SuspendLimitExceeded));
                 return;
@@ -348,11 +360,12 @@ where
     }
 
     /// Forward SuspendUpdate requests to the install manager task.
-    // TODO(fxbug.dev/125721): use this
-    #[allow(dead_code)]
-    pub async fn suspend_update(&mut self) -> Result<Result<(), SuspendError>, InstallManagerGone> {
+    pub async fn suspend_update(
+        &mut self,
+        attempt_id: Option<String>,
+    ) -> Result<Result<(), SuspendError>, InstallManagerGone> {
         let (responder, receive_response) = oneshot::channel();
-        self.0.send(ControlRequest::Suspend(responder)).await?;
+        self.0.send(ControlRequest::Suspend(SuspendRequestData { attempt_id, responder })).await?;
         Ok(receive_response.await?)
     }
 
@@ -382,7 +395,7 @@ where
 {
     Start(StartRequestData<N>),
     Monitor(MonitorRequestData<N>),
-    Suspend(oneshot::Sender<Result<(), SuspendError>>),
+    Suspend(SuspendRequestData),
     Resume(oneshot::Sender<Result<(), ResumeError>>),
     Cancel(oneshot::Sender<Result<(), CancelError>>),
 }
@@ -402,8 +415,11 @@ impl<N: Notify> ControlRequest<N> {
                     node.record_string("attempt id", attempt_id);
                 }
             }
-            Self::Suspend(_) => {
+            Self::Suspend(data) => {
                 node.record_string("request", "suspend");
+                if let Some(attempt_id) = &data.attempt_id {
+                    node.record_string("attempt id", attempt_id);
+                }
             }
             Self::Resume(_) => {
                 node.record_string("request", "resume");
@@ -434,12 +450,9 @@ where
     responder: oneshot::Sender<bool>,
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub enum SuspendError {
-    #[error("no update in progress")]
-    NoUpdateInProgress,
-    #[error("suspend time exceeded max limit")]
-    SuspendLimitExceeded,
+struct SuspendRequestData {
+    attempt_id: Option<String>,
+    responder: oneshot::Sender<Result<(), SuspendError>>,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -770,7 +783,10 @@ mod tests {
             let () = state_sender.send(State::Prepare).await.unwrap();
             assert_eq!(state_receiver.next().await, Some(State::Prepare));
 
-            assert_eq!(install_manager_ch.suspend_update().await, Ok(Ok(())));
+            assert_eq!(
+                install_manager_ch.suspend_update(Some("my-attempt".into())).await,
+                Ok(Ok(()))
+            );
         });
 
         // send and receive states are pending once suspended
@@ -800,6 +816,7 @@ mod tests {
                         },
                         "1": {
                             request: "suspend",
+                            "attempt id": "my-attempt",
                             time: AnyProperty,
                         },
                         "2": {
@@ -818,7 +835,7 @@ mod tests {
             start_install_manager_with_update_id("my-attempt").await;
 
         assert_eq!(
-            install_manager_ch.suspend_update().await,
+            install_manager_ch.suspend_update(None).await,
             Ok(Err(SuspendError::NoUpdateInProgress))
         );
 
@@ -837,7 +854,7 @@ mod tests {
 
         let () = state_sender.send(State::Prepare).await.unwrap();
 
-        assert_eq!(install_manager_ch.suspend_update().await, Ok(Ok(())));
+        assert_eq!(install_manager_ch.suspend_update(None).await, Ok(Ok(())));
         assert_eq!(install_manager_ch.resume_update().await, Ok(Ok(())));
 
         let () =
@@ -850,7 +867,7 @@ mod tests {
         );
 
         assert_eq!(
-            install_manager_ch.suspend_update().await,
+            install_manager_ch.suspend_update(None).await,
             Ok(Err(SuspendError::NoUpdateInProgress))
         );
 
@@ -878,7 +895,7 @@ mod tests {
             let () = state_sender.send(State::Prepare).await.unwrap();
             assert_eq!(state_receiver.next().await, Some(State::Prepare));
 
-            assert_eq!(install_manager_ch.suspend_update().await, Ok(Ok(())));
+            assert_eq!(install_manager_ch.suspend_update(None).await, Ok(Ok(())));
         });
 
         // send and receive states are pending once suspended
