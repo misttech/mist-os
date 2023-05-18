@@ -112,29 +112,31 @@ pub(crate) struct TransportLayerState<C: NonSyncContext> {
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv4>> for SyncCtx<C> {
-    type ReadData<'l> = RwLockReadGuard<'l,
+    type Data = udp::Sockets<Ipv4, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l,
         udp::Sockets<Ipv4, WeakDeviceId<C>>> where Self: 'l;
-    type WriteData<'l> = RwLockWriteGuard<'l,
+    type WriteGuard<'l> = RwLockWriteGuard<'l,
         udp::Sockets<Ipv4, WeakDeviceId<C>>> where Self: 'l;
 
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.state.transport.udpv4.sockets.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.state.transport.udpv4.sockets.write()
     }
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv6>> for SyncCtx<C> {
-    type ReadData<'l> = RwLockReadGuard<'l,
+    type Data = udp::Sockets<Ipv6, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l,
         udp::Sockets<Ipv6, WeakDeviceId<C>>> where Self: 'l;
-    type WriteData<'l> = RwLockWriteGuard<'l,
+    type WriteGuard<'l> = RwLockWriteGuard<'l,
         udp::Sockets<Ipv6, WeakDeviceId<C>>> where Self: 'l;
 
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.state.transport.udpv6.sockets.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.state.transport.udpv6.sockets.write()
     }
 }

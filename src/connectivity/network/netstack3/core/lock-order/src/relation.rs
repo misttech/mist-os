@@ -117,6 +117,7 @@ macro_rules! impl_lock_after {
 #[cfg(test)]
 mod test {
     use crate::{lock::LockFor, relation::LockAfter, Locked, Unlocked};
+    use std::sync::{Mutex, MutexGuard};
 
     extern crate self as lock_order;
 
@@ -130,35 +131,39 @@ mod test {
     impl LockAfter<Unlocked> for A {}
 
     struct FakeLocked {
-        a: u32,
-        c: char,
+        a: Mutex<u32>,
+        c: Mutex<char>,
     }
 
     impl LockFor<A> for FakeLocked {
-        type Data<'l> = &'l u32 where Self: 'l;
-        fn lock(&self) -> Self::Data<'_> {
-            &self.a
+        type Data = u32;
+        type Guard<'l> = MutexGuard<'l, u32> where Self: 'l;
+        fn lock(&self) -> Self::Guard<'_> {
+            self.a.lock().unwrap()
         }
     }
 
     impl LockFor<C> for FakeLocked {
-        type Data<'l> = &'l char where Self: 'l;
-        fn lock(&self) -> Self::Data<'_> {
-            &self.c
+        type Data = char;
+        type Guard<'l> = MutexGuard<'l, char> where Self: 'l;
+        fn lock(&self) -> Self::Guard<'_> {
+            self.c.lock().unwrap()
         }
     }
 
     #[test]
     fn lock_a_then_c() {
-        let state = FakeLocked { a: 123, c: '4' };
+        const A_DATA: u32 = 123;
+        const C_DATA: char = '4';
+        let state = FakeLocked { a: A_DATA.into(), c: C_DATA.into() };
 
         let mut locked = Locked::new(&state);
 
         let (a, mut locked): (_, Locked<&FakeLocked, A>) = locked.lock_and::<A>();
-        assert_eq!(a, &123);
+        assert_eq!(*a, A_DATA);
         // Show that A: LockBefore<B> and B: LockBefore<C> => A: LockBefore<C>.
         // Otherwise this wouldn't compile:
         let c = locked.lock::<C>();
-        assert_eq!(c, &'4');
+        assert_eq!(*c, C_DATA);
     }
 }

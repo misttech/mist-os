@@ -150,31 +150,33 @@ pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIp
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv4>>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv4>>
+    type Data = IpDeviceAddresses<I, Ipv4>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv4>>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv4>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv4>>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv4.ip_state.addrs.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv4.ip_state.addrs.write()
     }
 }
 
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv4>> for DualStackIpDeviceState<I> {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
+    type Data = MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv4.ip_state.multicast_groups.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv4.ip_state.multicast_groups.write()
     }
 }
@@ -182,16 +184,17 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv4>> for DualStac
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
+    type Data = NonZeroU8;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv4.ip_state.default_hop_limit.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv4.ip_state.default_hop_limit.write()
     }
 }
@@ -199,31 +202,33 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv6>>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv6>>
+    type Data = IpDeviceAddresses<I, Ipv6>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv6>>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv6>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv6>>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv6.ip_state.addrs.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv6.ip_state.addrs.write()
     }
 }
 
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv6>> for DualStackIpDeviceState<I> {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
+    type Data = MulticastGroupSet<Ipv6Addr, MldGroupState<I>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv6.ip_state.multicast_groups.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv6.ip_state.multicast_groups.write()
     }
 }
@@ -231,16 +236,17 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv6>> for DualStac
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
+    type Data = NonZeroU8;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv6.ip_state.default_hop_limit.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv6.ip_state.default_hop_limit.write()
     }
 }
@@ -318,16 +324,17 @@ pub(crate) struct Ipv4DeviceState<I: Instant> {
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceConfiguration>
+    type Data = Ipv4DeviceConfiguration;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceConfiguration>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4DeviceConfiguration>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4DeviceConfiguration>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv4.config.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv4.config.write()
     }
 }
@@ -453,16 +460,17 @@ impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
 impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceRetransTimeout>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, NonZeroDuration>
+    type Data = NonZeroDuration;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroDuration>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroDuration>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroDuration>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv6.retrans_timer.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv6.retrans_timer.write()
     }
 }
@@ -470,10 +478,11 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceRetransTimeout>
 impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
     for DualStackIpDeviceState<I>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState>
+    type Data = Ipv6RouteDiscoveryState;
+    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.ipv6.route_discovery.lock()
     }
 }
@@ -481,10 +490,11 @@ impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
 impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
     for DualStackIpDeviceState<I>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, Option<NonZeroU8>>
+    type Data = Option<NonZeroU8>;
+    type Guard<'l> = crate::sync::LockGuard<'l, Option<NonZeroU8>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.ipv6.router_soliciations_remaining.lock()
     }
 }
@@ -492,16 +502,17 @@ impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>
     for DualStackIpDeviceState<I>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceConfiguration>
+    type Data = Ipv6DeviceConfiguration;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceConfiguration>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6DeviceConfiguration>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6DeviceConfiguration>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.ipv6.config.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv6.config.write()
     }
 }
@@ -684,25 +695,27 @@ impl<Instant> Ipv6AddressEntry<Instant> {
 }
 
 impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad> for Ipv6AddressEntry<I> {
-    type Data<'l> = crate::sync::LockGuard<'l, Ipv6DadState>
+    type Data = Ipv6DadState;
+    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6DadState>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.dad_state.lock()
     }
 }
 
 impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv6AddressEntry<I> {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv6AddressState<I>>
+    type Data = Ipv6AddressState<I>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6AddressState<I>>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6AddressState<I>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6AddressState<I>>
         where
             Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.state.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.state.write()
     }
 }

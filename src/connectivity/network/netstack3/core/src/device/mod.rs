@@ -187,8 +187,9 @@ impl<
 impl<NonSyncCtx: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
     for SyncCtx<NonSyncCtx>
 {
-    type Data<'l> = &'l OriginTracker where Self: 'l;
-    fn access(&self) -> Self::Data<'_> {
+    type Data = OriginTracker;
+    type Guard<'l> = &'l OriginTracker where Self: 'l;
+    fn access(&self) -> Self::Guard<'_> {
         &self.state.device.origin
     }
 }
@@ -1637,16 +1638,17 @@ pub(crate) struct DeviceLayerState<C: DeviceLayerTypes + socket::NonSyncContext<
 impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState>
     for SyncCtx<NonSyncCtx>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<NonSyncCtx>>
+    type Data = Devices<NonSyncCtx>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Devices<NonSyncCtx>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Devices<NonSyncCtx>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Devices<NonSyncCtx>>
         where
             Self: 'l ;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.state.device.devices.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.state.device.devices.write()
     }
 }
@@ -1654,16 +1656,17 @@ impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerStat
 impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>>
     RwLockFor<crate::lock_ordering::DeviceLayerState> for DeviceLayerState<C>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<C>>
+    type Data = Devices<C>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Devices<C>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Devices<C>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Devices<C>>
         where
             Self: 'l ;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.devices.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.devices.write()
     }
 }

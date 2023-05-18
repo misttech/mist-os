@@ -162,36 +162,40 @@ where
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv4>> for SyncCtx<C> {
-    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv4, WeakDeviceId<C>, C>>
+    type Data = tcp::socket::Sockets<Ipv4, WeakDeviceId<C>, C>;
+    type Guard<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv4, WeakDeviceId<C>, C>>
         where Self: 'l;
 
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.state.transport.tcpv4.sockets.lock()
     }
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv6>> for SyncCtx<C> {
-    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv6, WeakDeviceId<C>, C>>
+    type Data = tcp::socket::Sockets<Ipv6, WeakDeviceId<C>, C>;
+    type Guard<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv6, WeakDeviceId<C>, C>>
         where Self: 'l;
 
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.state.transport.tcpv6.sockets.lock()
     }
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<Ipv4>> for SyncCtx<C> {
-    type Data<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
+    type Data = IsnGenerator<C::Instant>;
+    type Guard<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
 
-    fn access(&self) -> Self::Data<'_> {
+    fn access(&self) -> Self::Guard<'_> {
         let TcpState { isn_generator, sockets: _ } = &self.state.transport.tcpv4;
         isn_generator
     }
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<Ipv6>> for SyncCtx<C> {
-    type Data<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
+    type Data = IsnGenerator<C::Instant>;
+    type Guard<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
 
-    fn access(&self) -> Self::Data<'_> {
+    fn access(&self) -> Self::Guard<'_> {
         let TcpState { isn_generator, sockets: _ } = &self.state.transport.tcpv6;
         isn_generator
     }

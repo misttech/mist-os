@@ -473,10 +473,11 @@ pub(crate) struct EthernetDeviceState {
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type Data<'l> = &'l StaticEthernetDeviceState
+    type Data = StaticEthernetDeviceState;
+    type Guard<'l> = &'l StaticEthernetDeviceState
         where
             Self: 'l ;
-    fn access(&self) -> Self::Data<'_> {
+    fn access(&self) -> Self::Guard<'_> {
         &self.link.static_state
     }
 }
@@ -484,17 +485,18 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStati
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, DynamicEthernetDeviceState>
+    type Data = DynamicEthernetDeviceState;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, DynamicEthernetDeviceState>
         where
             Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, DynamicEthernetDeviceState>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, DynamicEthernetDeviceState>
         where
             Self: 'l;
 
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.link.dynamic_state.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.link.dynamic_state.write()
     }
 }
@@ -502,16 +504,17 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicSta
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
+    type Data = HeldDeviceSockets<C>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.sockets.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.sockets.write()
     }
 }
@@ -519,10 +522,11 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, Mac>>
+    type Data = NudState<Ipv6, Mac>;
+    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, Mac>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.ipv6_nud.lock()
     }
 }
@@ -530,10 +534,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice>>
+    type Data = ArpState<EthernetLinkDevice>;
+    type Guard<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.ipv4_arp.lock()
     }
 }
@@ -541,10 +546,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
+    type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
+    type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.tx_queue.queue.lock()
     }
 }
@@ -552,10 +558,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
+    type Data = DequeueState<(), Buf<Vec<u8>>>;
+    type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.tx_queue.deque.lock()
     }
 }

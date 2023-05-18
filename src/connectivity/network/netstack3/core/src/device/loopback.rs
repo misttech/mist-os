@@ -237,10 +237,11 @@ impl LoopbackDeviceState {
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
     for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, ReceiveQueueState<(), Buf<Vec<u8>>>>
+    type Data = ReceiveQueueState<(), Buf<Vec<u8>>>;
+    type Guard<'l> = crate::sync::LockGuard<'l, ReceiveQueueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.rx_queue.queue.lock()
     }
 }
@@ -248,10 +249,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
     for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
+    type Data = DequeueState<(), Buf<Vec<u8>>>;
+    type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.rx_queue.deque.lock()
     }
 }
@@ -259,10 +261,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
     for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
+    type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
+    type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.tx_queue.queue.lock()
     }
 }
@@ -270,10 +273,11 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
     for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
+    type Data = DequeueState<(), Buf<Vec<u8>>>;
+    type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.link.tx_queue.deque.lock()
     }
 }
@@ -281,16 +285,17 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
+    type Data = HeldDeviceSockets<C>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.sockets.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.sockets.write()
     }
 }

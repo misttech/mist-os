@@ -778,9 +778,10 @@ pub(crate) trait InnerIcmpv4Context<C: IcmpNonSyncCtx<Ipv4>>:
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>
     for SyncCtx<C>
 {
-    type Data<'l> = &'l bool where Self: 'l;
+    type Data = bool;
+    type Guard<'l> = &'l bool where Self: 'l;
 
-    fn access(&self) -> Self::Data<'_> {
+    fn access(&self) -> Self::Guard<'_> {
         &self.state.ipv4.icmp.send_timestamp_reply
     }
 }

@@ -23,17 +23,19 @@
 //! enum LockB {}
 //!
 //! impl LockFor<LockA> for HoldsLocks {
-//!     type Data<'l> = std::sync::MutexGuard<'l, u8>
+//!     type Data = u8;
+//!     type Guard<'l> = std::sync::MutexGuard<'l, u8>
 //!         where Self: 'l;
-//!     fn lock(&self) -> Self::Data<'_> {
+//!     fn lock(&self) -> Self::Guard<'_> {
 //!         self.a.lock().unwrap()
 //!     }
 //! }
 //!
 //! impl LockFor<LockB> for HoldsLocks {
-//!     type Data<'l> = std::sync::MutexGuard<'l, u32>
+//!     type Data = u32;
+//!     type Guard<'l> = std::sync::MutexGuard<'l, u32>
 //!         where Self: 'l;
-//!     fn lock(&self) -> Self::Data<'_> {
+//!     fn lock(&self) -> Self::Guard<'_> {
 //!         self.b.lock().unwrap()
 //!     }
 //! }
@@ -71,17 +73,19 @@
 //! # enum LockB {}
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
-//! #     type Data<'l> = std::sync::MutexGuard<'l, u8>
+//! #     type Data = u8;
+//! #     type Guard<'l> = std::sync::MutexGuard<'l, u8>
 //! #         where Self: 'l;
-//! #     fn lock(&self) -> Self::Data<'_> {
+//! #     fn lock(&self) -> Self::Guard<'_> {
 //! #         self.a.lock().unwrap()
 //! #     }
 //! # }
 //! #
 //! # impl LockFor<LockB> for HoldsLocks {
-//! #     type Data<'l> = std::sync::MutexGuard<'l, u32>
+//! #     type Data = u32;
+//! #     type Guard<'l> = std::sync::MutexGuard<'l, u32>
 //! #         where Self: 'l;
-//! #     fn lock(&self) -> Self::Data<'_> {
+//! #     fn lock(&self) -> Self::Guard<'_> {
 //! #         self.b.lock().unwrap()
 //! #     }
 //! # }
@@ -118,17 +122,19 @@
 //! # enum LockB {}
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
-//! #     type Data<'l> = std::sync::MutexGuard<'l, u8>
+//! #     type Data = u8;
+//! #     type Guard<'l> = std::sync::MutexGuard<'l, u8>
 //! #         where Self: 'l;
-//! #     fn lock(&self) -> Self::Data<'_> {
+//! #     fn lock(&self) -> Self::Guard<'_> {
 //! #         self.a.lock().unwrap()
 //! #     }
 //! # }
 //! #
 //! # impl LockFor<LockB> for HoldsLocks {
-//! #     type Data<'l> = std::sync::MutexGuard<'l, u32>
+//! #     type Data = u32;
+//! #     type Guard<'l> = std::sync::MutexGuard<'l, u32>
 //! #         where Self: 'l;
-//! #     fn lock(&self) -> Self::Data<'_> {
+//! #     fn lock(&self) -> Self::Guard<'_> {
 //! #         self.b.lock().unwrap()
 //! #     }
 //! # }
@@ -218,7 +224,7 @@ impl<'a, T, L> Locked<&'a T, L> {
     ///
     /// This allows access to state that doesn't require locking (and depends on
     /// [`UnlockedAccess`] to be implemented only in cases where that is true).
-    pub fn unlocked_access<M>(&self) -> T::Data<'a>
+    pub fn unlocked_access<M>(&self) -> T::Guard<'a>
     where
         T: UnlockedAccess<M>,
     {
@@ -234,7 +240,7 @@ impl<T, L> Locked<&T, L> {
     /// Acquire the given lock.
     ///
     /// This requires that `M` can be locked after `L`.
-    pub fn lock<M>(&mut self) -> T::Data<'_>
+    pub fn lock<M>(&mut self) -> T::Guard<'_>
     where
         T: LockFor<M>,
         L: LockBefore<M>,
@@ -246,7 +252,7 @@ impl<T, L> Locked<&T, L> {
     /// Acquire the given lock and a new locked context.
     ///
     /// This requires that `M` can be locked after `L`.
-    pub fn lock_and<M>(&mut self) -> (T::Data<'_>, Locked<&T, M>)
+    pub fn lock_and<M>(&mut self) -> (T::Guard<'_>, Locked<&T, M>)
     where
         T: LockFor<M>,
         L: LockBefore<M>,
@@ -260,7 +266,7 @@ impl<T, L> Locked<&T, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn read_lock<M>(&mut self) -> T::ReadData<'_>
+    pub fn read_lock<M>(&mut self) -> T::ReadGuard<'_>
     where
         T: RwLockFor<M>,
         L: LockBefore<M>,
@@ -273,7 +279,7 @@ impl<T, L> Locked<&T, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn read_lock_and<M>(&mut self) -> (T::ReadData<'_>, Locked<&T, M>)
+    pub fn read_lock_and<M>(&mut self) -> (T::ReadGuard<'_>, Locked<&T, M>)
     where
         T: RwLockFor<M>,
         L: LockBefore<M>,
@@ -287,7 +293,7 @@ impl<T, L> Locked<&T, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn write_lock<M>(&mut self) -> T::WriteData<'_>
+    pub fn write_lock<M>(&mut self) -> T::WriteGuard<'_>
     where
         T: RwLockFor<M>,
         L: LockBefore<M>,
@@ -300,7 +306,7 @@ impl<T, L> Locked<&T, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn write_lock_and<M>(&mut self) -> (T::WriteData<'_>, Locked<&T, M>)
+    pub fn write_lock_and<M>(&mut self) -> (T::WriteGuard<'_>, Locked<&T, M>)
     where
         T: RwLockFor<M>,
         L: LockBefore<M>,
@@ -403,29 +409,33 @@ mod test {
     }
 
     impl LockFor<A> for Data {
-        type Data<'l> = MutexGuard<'l, u8>;
-        fn lock(&self) -> Self::Data<'_> {
+        type Data = u8;
+        type Guard<'l> = MutexGuard<'l, u8>;
+        fn lock(&self) -> Self::Guard<'_> {
             self.a.lock().unwrap()
         }
     }
 
     impl LockFor<B> for Data {
-        type Data<'l> = MutexGuard<'l, u16>;
-        fn lock(&self) -> Self::Data<'_> {
+        type Data = u16;
+        type Guard<'l> = MutexGuard<'l, u16>;
+        fn lock(&self) -> Self::Guard<'_> {
             self.b.lock().unwrap()
         }
     }
 
     impl LockFor<C> for Data {
-        type Data<'l> = MutexGuard<'l, u64>;
-        fn lock(&self) -> Self::Data<'_> {
+        type Data = u64;
+        type Guard<'l> = MutexGuard<'l, u64>;
+        fn lock(&self) -> Self::Guard<'_> {
             self.c.lock().unwrap()
         }
     }
 
     impl LockFor<D> for Data {
-        type Data<'l> = MutexGuard<'l, u128>;
-        fn lock(&self) -> Self::Data<'_> {
+        type Data = u128;
+        type Guard<'l> = MutexGuard<'l, u128>;
+        fn lock(&self) -> Self::Guard<'_> {
             self.d.lock().unwrap()
         }
     }
@@ -436,9 +446,10 @@ mod test {
     enum UnlockedUsize {}
 
     impl UnlockedAccess<UnlockedUsize> for Data {
-        type Data<'l> = &'l usize where Self: 'l;
+        type Data = usize;
+        type Guard<'l> = &'l usize where Self: 'l;
 
-        fn access(&self) -> Self::Data<'_> {
+        fn access(&self) -> Self::Guard<'_> {
             &self.u
         }
     }

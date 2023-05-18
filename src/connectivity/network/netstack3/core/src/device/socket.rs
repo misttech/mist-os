@@ -1058,24 +1058,26 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
 }
 
 impl<C: crate::NonSyncContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets> for SyncCtx<C> {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>>
+    type Data = AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>>
         where Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, AnyDeviceSockets<StrongId<C::SocketState, WeakDeviceId<C>>>>
         where Self: 'l;
 
-    fn read_lock(&self) -> Self::ReadData<'_> {
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.state.device.shared_sockets.any_device_sockets.read()
     }
-    fn write_lock(&self) -> Self::WriteData<'_> {
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.state.device.shared_sockets.any_device_sockets.write()
     }
 }
 
 impl<C: crate::NonSyncContext> LockFor<crate::lock_ordering::AllDeviceSockets> for SyncCtx<C> {
-    type Data<'l> = crate::sync::LockGuard<'l, AllSockets<PrimaryId<C::SocketState, WeakDeviceId<C>>>>
+    type Data = AllSockets<PrimaryId<C::SocketState, WeakDeviceId<C>>>;
+    type Guard<'l> = crate::sync::LockGuard<'l, AllSockets<PrimaryId<C::SocketState, WeakDeviceId<C>>>>
         where Self: 'l;
 
-    fn lock(&self) -> Self::Data<'_> {
+    fn lock(&self) -> Self::Guard<'_> {
         self.state.device.shared_sockets.all_sockets.lock()
     }
 }
