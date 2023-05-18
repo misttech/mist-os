@@ -43,6 +43,8 @@ class FakeBackendForBlock : public virtio::FakeBackend {
 
   void set_status(uint8_t status) { status_ = status; }
 
+  bool ReadFeature(uint32_t bit) override { return bit == VIRTIO_F_VERSION_1; }
+
   void RingKick(uint16_t ring_index) override {
     FakeBackend::RingKick(ring_index);
 
