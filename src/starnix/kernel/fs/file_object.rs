@@ -12,9 +12,7 @@ use crate::fs::file_server::serve_file;
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, not_implemented};
-use crate::mm::{
-    DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags,
-};
+use crate::mm::{DesiredAddress, MappedVmo, MappingName, MappingOptions, ProtectionFlags};
 use crate::syscalls::*;
 use crate::task::*;
 use crate::types::as_any::*;
@@ -246,12 +244,12 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     fn fcntl(
         &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
         cmd: u32,
-        arg: u64,
+        _arg: u64,
     ) -> Result<SyscallResult, Errno> {
-        default_fcntl(current_task, file, cmd, arg)
+        default_fcntl(cmd)
     }
 
     /// Return a handle that allows access to this file descritor through the zxio protocols.
@@ -513,27 +511,9 @@ pub fn default_ioctl(request: u32) -> Result<SyscallResult, Errno> {
     error!(ENOTTY)
 }
 
-pub fn default_fcntl(
-    current_task: &CurrentTask,
-    file: &FileObject,
-    cmd: u32,
-    arg: u64,
-) -> Result<SyscallResult, Errno> {
-    match cmd {
-        F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
-            let flock_ref = UserRef::<uapi::flock>::new(arg.into());
-            let flock = current_task.mm.read_object(flock_ref)?;
-            let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
-            if let Some(flock) = file.record_lock(current_task, cmd, flock)? {
-                current_task.mm.write_object(flock_ref, &flock)?;
-            }
-            Ok(SUCCESS)
-        }
-        _ => {
-            not_implemented!("fcntl: command={} not implemented", cmd);
-            error!(EINVAL)
-        }
-    }
+pub fn default_fcntl(cmd: u32) -> Result<SyscallResult, Errno> {
+    not_implemented!("fcntl: command=0x{:x}", cmd);
+    error!(EOPNOTSUPP)
 }
 
 pub struct OPathOps {}
@@ -614,25 +594,6 @@ impl FileOps for OPathOps {
         _user_addr: UserAddress,
     ) -> Result<SyscallResult, Errno> {
         error!(EBADF)
-    }
-
-    fn fcntl(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        cmd: u32,
-        _arg: u64,
-    ) -> Result<SyscallResult, Errno> {
-        match cmd {
-            F_SETLK | F_SETLKW | F_GETLK => {
-                error!(EBADF)
-            }
-            _ => {
-                // Note: this can be a valid operation for files opened with O_PATH.
-                not_implemented!("fcntl: command={} not implemented", cmd);
-                error!(EINVAL)
-            }
-        }
     }
 }
 

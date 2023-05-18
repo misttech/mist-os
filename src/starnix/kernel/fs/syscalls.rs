@@ -197,6 +197,16 @@ pub fn sys_fcntl(
             file.update_file_flags(requested_flags, settable_flags);
             Ok(SUCCESS)
         }
+        F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
+            let file = current_task.files.get_unless_opath(fd)?;
+            let flock_ref = UserRef::<uapi::flock>::new(arg.into());
+            let flock = current_task.mm.read_object(flock_ref)?;
+            let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
+            if let Some(flock) = file.record_lock(current_task, cmd, flock)? {
+                current_task.mm.write_object(flock_ref, &flock)?;
+            }
+            Ok(SUCCESS)
+        }
         _ => {
             let file = current_task.files.get(fd)?;
             file.fcntl(current_task, cmd, arg)

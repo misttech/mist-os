@@ -318,7 +318,7 @@ impl FileOps for VmoFileObject {
     fn fcntl(
         &self,
         file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         cmd: u32,
         arg: u64,
     ) -> Result<SyscallResult, Errno> {
@@ -342,7 +342,7 @@ impl FileOps for VmoFileObject {
                 let seals = seals.lock();
                 Ok((*seals).into())
             }
-            _ => default_fcntl(current_task, file, cmd, arg),
+            _ => default_fcntl(cmd),
         }
     }
 }

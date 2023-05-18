@@ -315,16 +315,6 @@ impl FileOps for DevPtmxFile {
         self.terminal.main_query_events()
     }
 
-    fn fcntl(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _cmd: u32,
-        _arg: u64,
-    ) -> Result<SyscallResult, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
     fn ioctl(
         &self,
         _file: &FileObject,
@@ -416,16 +406,6 @@ impl FileOps for DevPtsFile {
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         self.terminal.replica_query_events()
-    }
-
-    fn fcntl(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _cmd: u32,
-        _arg: u64,
-    ) -> Result<SyscallResult, Errno> {
-        error!(EOPNOTSUPP)
     }
 
     fn ioctl(

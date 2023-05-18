@@ -186,8 +186,8 @@ impl Pipe {
 
     fn fcntl(
         &mut self,
-        file: &FileObject,
-        current_task: &CurrentTask,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
         cmd: u32,
         arg: u64,
     ) -> Result<SyscallResult, Errno> {
@@ -197,7 +197,7 @@ impl Pipe {
                 self.set_capacity(arg as usize)?;
                 Ok(self.capacity().into())
             }
-            _ => default_fcntl(current_task, file, cmd, arg),
+            _ => default_fcntl(cmd),
         }
     }
 
