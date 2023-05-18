@@ -66,7 +66,7 @@ fuchsia_component("scenic_only") {
   manifest = "meta/scenic_only.cml"
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/ui/scenic:component_v2_with_supplied_display_provider",
   ]
 }
@@ -87,9 +87,9 @@ fuchsia_component("scene_manager_scene_with_input") {
   manifest = "meta/scene_manager_scene_with_input.cml"
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
     "//src/lib/ui/input-synthesis:input-synthesis-component",
     "//src/ui/a11y/bin/a11y_manager:component_v2",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
     "//src/ui/bin/root_presenter:virtual_keyboard_component_v2",
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
     "//src/ui/bin/text:text_manager_comp",

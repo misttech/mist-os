@@ -161,11 +161,11 @@ group("tests") {
     # configurations on which these tests run rather than as deps.
     # TODO(fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
+    "///src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider",
     "//src/chromium:uses_web_engine",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider",
     "//src/ui/tests/integration_input_tests/touch/one-chromium",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client",
     "//src/ui/tests/integration_input_tests/touch/touch-gfx-client",
