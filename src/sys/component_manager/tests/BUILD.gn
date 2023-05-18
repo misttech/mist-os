@@ -22,7 +22,6 @@ group("tests") {
     "elf_runner:tests",
     "events_v2:events_v2_integration_test",
     "fuchsia_boot_resolver:tests($default_toolchain)",
-    "hub:hub_integration_test",
     "lifecycle_controller:tests",
     "namespace_capabilities:tests",
     "panic-test:component_manager_panic_test",

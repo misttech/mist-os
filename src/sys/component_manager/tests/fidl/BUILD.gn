@@ -10,15 +10,6 @@ fidl("components") {
   sources = [ "components.fidl" ]
 }
 
-fidl("hub") {
-  name = "fuchsia.test.hub"
-  sdk_category = "internal"
-
-  sources = [ "hub.fidl" ]
-
-  public_deps = [ "//sdk/fidl/fuchsia.io" ]
-}
-
 fidl("echofactory") {
   name = "fuchsia.test.echofactory"
 

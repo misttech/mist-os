@@ -69,13 +69,6 @@ pub enum ModelError {
         #[from]
         err: ComponentInstanceError,
     },
-    #[error("error in hub dir VFS for component {moniker}: {err}")]
-    HubDirError {
-        moniker: AbsoluteMoniker,
-
-        #[source]
-        err: VfsError,
-    },
     #[error("error in collection service dir VFS for component {moniker}: {err}")]
     CollectionServiceDirError {
         moniker: AbsoluteMoniker,
@@ -492,20 +485,6 @@ impl PkgDirError {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum HubError {
-    #[error("instance not found in hub data structure")]
-    InstanceNotFound,
-}
-
-impl HubError {
-    fn as_zx_status(&self) -> zx::Status {
-        match self {
-            Self::InstanceNotFound => zx::Status::NOT_FOUND,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Error)]
 pub enum ComponentProviderError {
     #[error("source instance not found")]
     SourceInstanceNotFound,
@@ -541,11 +520,6 @@ pub enum CapabilityProviderError {
     BadPath,
     #[error("bad flags")]
     BadFlags,
-    #[error("error in hub capability provider: {err}")]
-    HubError {
-        #[from]
-        err: HubError,
-    },
     #[error("error in pkg dir capability provider: {err}")]
     PkgDirError {
         #[from]
@@ -573,7 +547,6 @@ impl CapabilityProviderError {
         match self {
             Self::StreamCreationError => zx::Status::BAD_HANDLE,
             Self::BadFlags | Self::BadPath => zx::Status::INVALID_ARGS,
-            Self::HubError { err } => err.as_zx_status(),
             Self::PkgDirError { err } => err.as_zx_status(),
             Self::EventSourceError { err } => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),

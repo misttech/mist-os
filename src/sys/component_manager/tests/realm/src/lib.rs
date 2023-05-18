@@ -115,7 +115,7 @@ pub async fn echo_server() {
     let uses = decl.uses.unwrap();
     let exposes = decl.exposes.unwrap();
     assert_eq!(uses.len(), 1);
-    assert_eq!(exposes.len(), 3);
+    assert_eq!(exposes.len(), 2);
 
     let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
     let server_end = ServerEnd::new(server_end.into_channel());
@@ -181,10 +181,6 @@ pub async fn echo_server() {
                 name: "fuchsia.component.Binder".to_string(),
                 kind: fuchsia_fs::directory::DirentKind::Unknown,
             },
-            fuchsia_fs::directory::DirEntry {
-                name: "hub".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Unknown,
-            }
         ]
     );
 

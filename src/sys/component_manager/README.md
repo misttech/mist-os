@@ -27,7 +27,6 @@ $ fx test component_manager_tests
 
 Integration tests are also available in the following packages:
 
-- `hub_integration_test`
 - `storage_integration_test`
 - `routing_integration_test`
 - `elf_runner_test`

@@ -617,7 +617,7 @@ where
         config_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: CapabilityName::from("hub"),
+                source_name: CapabilityName::from("test"),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Directory,
             },
@@ -629,7 +629,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
 
         let dir_capability = CapabilitySource::<C>::Builtin {
-            capability: InternalCapability::Directory(CapabilityName::from("hub")),
+            capability: InternalCapability::Directory(CapabilityName::from("test")),
             top_instance: Weak::new(),
         };
         let valid_path_0 = AbsoluteMoniker::try_from(vec!["root"]).unwrap();

@@ -41,7 +41,7 @@ use {
         diagnostics::{cpu::ComponentTreeStats, startup::ComponentEarlyStartupTimeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
-            binder::BinderCapabilityHost, hub::Hub, lifecycle_controller::LifecycleController,
+            binder::BinderCapabilityHost, lifecycle_controller::LifecycleController,
             pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_query::RealmQuery,
             route_validator::RouteValidator,
         },
@@ -356,7 +356,6 @@ pub struct BuiltinEnvironment {
     pub binder_capability_host: Arc<BinderCapabilityHost>,
     pub realm_capability_host: Arc<RealmCapabilityHost>,
     pub storage_admin_capability_host: Arc<StorageAdmin>,
-    pub hub: Option<Arc<Hub>>,
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
     pub route_validator: Option<Arc<RouteValidator>>,
@@ -782,14 +781,6 @@ impl BuiltinEnvironment {
             None
         };
 
-        let hub = if runtime_config.enable_introspection {
-            let hub = Arc::new(Hub::new()?);
-            model.root().hooks.install(hub.hooks()).await;
-            Some(hub)
-        } else {
-            None
-        };
-
         let route_validator = if runtime_config.enable_introspection {
             let route_validator = Arc::new(RouteValidator::new(model.clone()));
             model.root().hooks.install(route_validator.hooks()).await;
@@ -879,7 +870,6 @@ impl BuiltinEnvironment {
             binder_capability_host,
             realm_capability_host,
             storage_admin_capability_host,
-            hub,
             realm_query,
             lifecycle_controller,
             route_validator,
@@ -901,8 +891,7 @@ impl BuiltinEnvironment {
         })
     }
 
-    /// Setup a ServiceFs that contains debug capabilities like the root Hub, LifecycleController,
-    /// and EventSource.
+    /// Returns a ServiceFs that contains protocols served by component manager.
     async fn create_service_fs<'a>(&self) -> Result<ServiceFs<ServiceObj<'a, ()>>, Error> {
         // Create the ServiceFs
         let mut service_fs = ServiceFs::new();

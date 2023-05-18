@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod binder;
-pub mod hub;
 pub mod lifecycle_controller;
 pub mod pkg_dir;
 pub mod realm;

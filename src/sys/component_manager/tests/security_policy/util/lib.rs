@@ -42,8 +42,7 @@ pub async fn start_policy_test(
 
     instance.start_component_tree().await.unwrap();
 
-    // Wait for the root component to be started so we can connect to its Realm service through the
-    // hub.
+    // Wait for the root component to be started so we can connect to its Realm service.
     let event_stream = EventSequence::new()
         .has_subset(
             vec![EventMatcher::ok().r#type(Started::TYPE).moniker("./root")],
