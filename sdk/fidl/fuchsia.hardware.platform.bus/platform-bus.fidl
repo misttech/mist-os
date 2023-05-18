@@ -97,7 +97,9 @@ type Node = table {
     /// Boot metadata (from ZBI items)
    11: boot_metadata vector<BootMetadata>:MAX;
 
-    // TODO(fxbug.dev/107030): allow drivers to specify any bind properties here.
+    /// Other node properties beyond BIND_PLATFORM_DEV_VID, BIND_PLATFORM_DEV_PID, and BIND_PLATFORM_DEV_DID.
+   12: properties
+            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
 };
 
 /// This is originally from the Banjo fuchsia.hardware.platform.device library,

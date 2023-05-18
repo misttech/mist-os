@@ -5,7 +5,8 @@
 #include "src/devices/bus/drivers/platform/platform-device.h"
 
 #include <assert.h>
-#include <fidl/fuchsia.hardware.platform.bus/cpp/natural_types.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -19,11 +20,64 @@
 #include <string.h>
 #include <zircon/syscalls/resource.h>
 
+#include <vector>
+
 #include <fbl/string_printf.h>
 
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform-bus.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
+
+namespace {
+
+zx::result<zx_device_prop_t> ConvertToDeviceProperty(
+    const fuchsia_driver_framework::NodeProperty& property) {
+  if (property.key().Which() != fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  return zx::ok(zx_device_prop_t{static_cast<uint16_t>(property.key().int_value().value()), 0,
+                                 property.value().int_value().value()});
+}
+
+zx::result<zx_device_str_prop_t> ConvertToDeviceStringProperty(
+    const fuchsia_driver_framework::NodeProperty& property) {
+  if (property.key().Which() != fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  const char* key = property.key().string_value()->data();
+  switch (property.value().Which()) {
+    using ValueTag = fuchsia_driver_framework::NodePropertyValue::Tag;
+    case ValueTag::kBoolValue: {
+      return zx::ok(zx_device_str_prop_t{
+          .key = key,
+          .property_value = str_prop_bool_val(property.value().bool_value().value()),
+      });
+    }
+    case ValueTag::kIntValue: {
+      return zx::ok(zx_device_str_prop_t{
+          .key = key,
+          .property_value = str_prop_int_val(property.value().int_value().value()),
+      });
+    }
+    case ValueTag::kEnumValue: {
+      return zx::ok(zx_device_str_prop_t{
+          .key = key,
+          .property_value = str_prop_enum_val(property.value().enum_value()->data()),
+      });
+    }
+    case ValueTag::kStringValue: {
+      return zx::ok(zx_device_str_prop_t{
+          .key = key,
+          .property_value = str_prop_str_val(property.value().string_value()->data()),
+      });
+    }
+    default:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+}
+
+}  // namespace
 
 namespace platform_bus {
 
@@ -564,15 +618,29 @@ zx_status_t PlatformDevice::Start() {
     }
   }
 
-  zx_device_prop_t props[] = {
+  std::vector<zx_device_prop_t> dev_props{
       {BIND_PLATFORM_DEV_VID, 0, vid_},
       {BIND_PLATFORM_DEV_PID, 0, pid_},
       {BIND_PLATFORM_DEV_DID, 0, did_},
       {BIND_PLATFORM_DEV_INSTANCE_ID, 0, instance_id_},
   };
 
+  std::vector<zx_device_str_prop_t> dev_str_props;
+  if (node_.properties().has_value()) {
+    for (auto& prop : node_.properties().value()) {
+      if (auto dev_prop = ConvertToDeviceProperty(prop); dev_prop.is_ok()) {
+        dev_props.emplace_back(dev_prop.value());
+      } else if (auto dev_str_prop = ConvertToDeviceStringProperty(prop); dev_str_prop.is_ok()) {
+        dev_str_props.emplace_back(dev_str_prop.value());
+      } else {
+        zxlogf(WARNING, "Node '%s' has unsupported property key type %lu.", name,
+               prop.key().Which());
+      }
+    }
+  }
+
   ddk::DeviceAddArgs args(name);
-  args.set_props(props).set_proto_id(ZX_PROTOCOL_PDEV);
+  args.set_props(dev_props).set_str_props(dev_str_props).set_proto_id(ZX_PROTOCOL_PDEV);
 
   std::array fidl_service_offers = {
       fuchsia_hardware_platform_device::Service::Name,
