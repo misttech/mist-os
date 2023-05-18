@@ -71,7 +71,8 @@ pub fn get_driver_alias(
 }
 
 async fn get_driver_topological_path(path: &str) -> Result<String> {
-    let proxy = connect_proxy::<fdevice::ControllerMarker>(path)?;
+    let controller_path = path.to_owned() + "/device_controller";
+    let proxy = connect_proxy::<fdevice::ControllerMarker>(&controller_path)?;
     proxy
         .get_topological_path()
         .await?
