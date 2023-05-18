@@ -4,6 +4,8 @@
 
 import("//build/fidl/fidl.gni")
 
+is_dart = current_toolchain == dart_toolchain
+
 # List of contexts where dangerous identifiers can be used
 uses = [
   "constants",
@@ -63,12 +65,11 @@ foreach(use, uses) {
           fidl_library = "${fidl_library_prefix}.${use}.${style}${shard}"
           fidl_target = fidl_library
           hlcpp_target = "hlcpp_${use}_${style}_${shard}"
-          dart_target = "dart_${use}_${style}_${shard}"
 
           # Deny list of libraries we can compile in Rust.
           # [BindingsDenyList] on struct members doesn't work in Rust.
           if (use != "struct.names" && use != "struct.types") {
-            rust_target = "rust_${use}_${style}_${shard}"
+            rust_target = true
           }
         },
       ]
@@ -107,22 +108,38 @@ template("generate_dangerous_fidl") {
 
 # Build the FIDL library
 template("dangerous_fidl") {
-  generate_target = "${target_name}_generate"
-  generated_file = "${target_gen_dir}/${invoker.fidl_library}.test.fidl"
-  generate_dangerous_fidl(generate_target) {
-    forward_variables_from(invoker,
-                           [
-                             "use",
-                             "style",
-                             "shard",
-                             "fidl_library",
-                           ])
-    output = generated_file
+  generate_target_name = "${target_name}_generate"
+  generate_target_dep = ":${generate_target_name}(${default_toolchain})"
+  generated_file_dir = get_label_info(generate_target_dep, "target_gen_dir")
+  generated_file = "${generated_file_dir}/${invoker.fidl_library}.test.fidl"
+
+  # Only perform the fidl source generation once, in the default toolchain
+  if (current_toolchain == default_toolchain) {
+    generate_dangerous_fidl(generate_target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "use",
+                               "style",
+                               "shard",
+                               "fidl_library",
+                             ])
+      output = generated_file
+    }
+  } else {
+    not_needed(invoker,
+               [
+                 "shard",
+                 "style",
+                 "use",
+               ])
   }
+
+  # But the fidl() template needs to be invoked in all toolchains in order to
+  # generate the correct bindings.
   fidl(target_name) {
     name = invoker.fidl_library
     sources = [ generated_file ]
-    non_fidl_deps = [ ":${generate_target}" ]
+    non_fidl_deps = [ generate_target_dep ]
     enable_hlcpp = true
   }
 }
@@ -142,43 +159,57 @@ foreach(test, dangerous_tests) {
   fidl_targets += [ ":${test.fidl_target}($fidl_toolchain)" ]
 }
 
-# Define all HLCPP targets
-hlcpp_targets = []
-foreach(test, dangerous_tests) {
-  executable(test.hlcpp_target) {
-    output_dir = target_out_dir
-    sources = [ "main.cc" ]
-    header_path = string_replace(test.fidl_library, ".", "/") + "/cpp/fidl.h"
-    cflags_cc = [
-      "-include",
-      header_path,
-    ]
-    deps = [ ":${test.fidl_target}_hlcpp" ]
-  }
-  hlcpp_targets += [ ":${test.hlcpp_target}" ]
-}
+if (toolchain_variant.base == default_toolchain) {
+  # This section needs to be executed for variants of the default_toolchain,
+  # such as asan
 
-# Define all Rust targets
-rust_targets = []
-foreach(test, dangerous_tests) {
-  if (defined(test.rust_target)) {
-    group(test.rust_target) {
-      deps = [ ":${test.fidl_target}_rust" ]
+  # Define all HLCPP targets
+  _hlcpp_targets = []
+  foreach(test, dangerous_tests) {
+    executable(test.hlcpp_target) {
+      output_dir = target_out_dir
+      sources = [ "main.cc" ]
+      header_path = string_replace(test.fidl_library, ".", "/") + "/cpp/fidl.h"
+      cflags_cc = [
+        "-include",
+        header_path,
+      ]
+      deps = [ ":${test.fidl_target}_hlcpp" ]
     }
-    rust_targets += [ ":${test.rust_target}" ]
+    _hlcpp_targets += [ ":${test.hlcpp_target}" ]
   }
-}
 
-# Define all Dart targets
-dart_targets = []
-foreach(test, dangerous_tests) {
-  group(test.dart_target) {
-    deps = [ ":${test.fidl_target}_dart($dart_toolchain)" ]
+  # But these groups only need to exist in the non-variant, base toolchain.
+  if (current_toolchain == default_toolchain) {
+    group("hlcpp_targets") {
+      deps = _hlcpp_targets
+    }
+
+    # Define all Rust target deps
+    group("rust_targets") {
+      deps = []
+      foreach(test, dangerous_tests) {
+        if (defined(test.rust_target)) {
+          deps += [ ":${test.fidl_target}_rust" ]
+        }
+      }
+    }
+
+    # Define all Dart target deps
+    group("dart_targets") {
+      deps = []
+      foreach(test, dangerous_tests) {
+        deps += [ ":${test.fidl_target}_dart($dart_toolchain)" ]
+      }
+    }
+
+    group("tests") {
+      testonly = true
+      deps = fidl_targets + [
+               ":dart_targets",
+               ":hlcpp_targets",
+               ":rust_targets",
+             ]
+    }
   }
-  dart_targets += [ ":${test.dart_target}" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = fidl_targets + hlcpp_targets + rust_targets + dart_targets
 }

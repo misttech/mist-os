@@ -37,7 +37,6 @@ template("fidl_bind_library") {
   assert(defined(invoker.fidl_ir_target),
          "fidl_bind_library(\"$target_name\") must define `fidl_ir_target`")
 
-  main_target = target_name
   generation_target = "${target_name}_generate"
 
   forward_variables_from(invoker,
@@ -78,23 +77,24 @@ template("fidl_bind_library") {
         generated_sources = rebase_path(outputs, root_build_dir)
       }
     }
+    not_needed(invoker, [ "visibility" ])
   } else {
     not_needed(invoker,
                [
                  "fidl_ir_json",
                  "fidl_ir_target",
                ])
-  }
 
-  bind_library(main_target) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
+    bind_library(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
 
-    source_dep = ":$generation_target($fidl_toolchain)"
-    source = generated_bind_library
-    name = library_name
+      source_dep = ":$generation_target($fidl_toolchain)"
+      source = generated_bind_library
+      name = library_name
+    }
   }
 }

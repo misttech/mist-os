@@ -296,13 +296,15 @@ template("fidl") {
       not_needed(invoker, [ "sources" ])
     }
 
-    fidl_tables("${target_name}_tables") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      forward_variables_from(common_parameters, [ "fidl_target" ])
+    if (current_toolchain != fidl_toolchain && !is_dart && !is_go) {
+      fidl_tables("${target_name}_tables") {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                               ])
+        forward_variables_from(common_parameters, [ "fidl_target" ])
+      }
     }
   } else {
     not_needed(invoker, non_dart_go_only + [ "sources" ])
