@@ -75,11 +75,6 @@
         moniker: "core/font_provider",
     },
     {
-        id: 116,
-        label: "Log Stats",
-        moniker: "core/log-stats",
-    },
-    {
         id: 117,
         label: "Memory Monitor",
         moniker: "core/memory_monitor",

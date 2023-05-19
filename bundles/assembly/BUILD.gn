@@ -499,7 +499,6 @@ assembly_input_bundle("common_minimal") {
     # Diagnostics
     "//src/cobalt/bin/app:cobalt",
     "//src/cobalt/bin/system-metrics:cobalt_system_metrics",
-    "//src/diagnostics/log-stats:package",
     "//src/diagnostics/persistence:diagnostics-persistence",
     "//src/diagnostics/kcounter:diagnostics-kcounter",
     "//src/diagnostics/sampler",
@@ -589,7 +588,6 @@ assembly_input_bundle("common_minimal") {
           shards = rebase_path(
                   [
                     "//src/diagnostics/kcounter/meta/diagnostics-kcounter.core_shard.cml",
-                    "//src/diagnostics/log-stats/meta/log-stats.core_shard.cml",
                     "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
                     "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
                     "//src/diagnostics/sampler/meta/sampler.core_shard.cml",

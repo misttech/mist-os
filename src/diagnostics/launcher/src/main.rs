@@ -17,7 +17,6 @@ struct LauncherArgs {
 #[argh(subcommand)]
 enum CreateChildArgs {
     Detect(detect::CommandLine),
-    LogStats(log_stats::CommandLine),
     Sampler(sampler::Args),
     Persistence(persistence::CommandLine),
     Kcounter(kcounter::CommandLine),
@@ -26,7 +25,6 @@ enum CreateChildArgs {
 #[fuchsia::main(logging = false)]
 async fn main() -> Result<(), Error> {
     let log_tag = match std::env::args().nth(1).as_ref().map(|s| s.as_str()) {
-        Some(log_stats::PROGRAM_NAME) => log_stats::PROGRAM_NAME,
         Some(detect::PROGRAM_NAME) => detect::PROGRAM_NAME,
         Some(sampler::PROGRAM_NAME) => sampler::PROGRAM_NAME,
         Some(persistence::PROGRAM_NAME) => persistence::PROGRAM_NAME,
@@ -40,7 +38,6 @@ async fn main() -> Result<(), Error> {
     match args.program {
         CreateChildArgs::Detect(_args) => detect::main().await,
         CreateChildArgs::Persistence(args) => persistence::main(args).await,
-        CreateChildArgs::LogStats(_args) => log_stats::main().await,
         CreateChildArgs::Sampler(_args) => sampler::main().await,
         CreateChildArgs::Kcounter(_args) => kcounter::main().await,
     }

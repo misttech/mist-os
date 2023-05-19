@@ -27,7 +27,6 @@ group("tests") {
     ":diagnostics-persistence-inspect-tests",
     ":fshost-metrics-tests",
     ":legacy-metrics-tests",
-    ":log-stats-inspect-tests",
     ":log_settings_min_severity",
   ]
 
@@ -214,21 +213,6 @@ fuchsia_unittest_package("legacy-metrics-tests") {
 
   test_specs = {
     environments = [
-      {
-        dimensions = {
-          device_type = "Astro"
-        }
-      },
-    ]
-  }
-}
-
-fuchsia_unittest_package("log-stats-inspect-tests") {
-  manifest = "meta/log_stats_inspect_tests.cml"
-
-  test_specs = {
-    environments = [
-      emu_env,
       {
         dimensions = {
           device_type = "Astro"

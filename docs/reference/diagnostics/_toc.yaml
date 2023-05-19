@@ -71,10 +71,6 @@ toc:
 - title: "Consumers"
   section:
 
-  # TODO(fxbug.dev/53921)
-  #   - title: "Log Stats"
-  #     path: /docs/reference/diagnostics/consumers/log-stats.md
-
   # - title: "Forwarding"
   #   section:
 

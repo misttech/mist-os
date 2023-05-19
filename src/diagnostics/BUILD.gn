@@ -9,7 +9,6 @@ group("diagnostics") {
     "archivist",
     "config",
     "kcounter",
-    "log-stats",
     "sampler",
     "wasm",
   ]
@@ -24,7 +23,6 @@ group("tests") {
     "iquery:tests",
     "kcounter:tests",
     "lib:tests",
-    "log-stats:tests",
     "log_listener:tests",
     "persistence:tests",
     "sampler:tests",

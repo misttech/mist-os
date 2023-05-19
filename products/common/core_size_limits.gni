@@ -128,7 +128,6 @@ size_checker_input = {
       src = [
         "packages/base/triage-detect",
         "packages/base/diagnostics-kcounter",
-        "packages/base/log-stats",
         "packages/base/log_listener",
         "packages/base/log_listener_shell",
         "packages/base/diagnostics-persistence",
