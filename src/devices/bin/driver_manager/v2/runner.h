@@ -31,7 +31,7 @@ class Runner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner
   zx::result<> Publish(component::OutgoingDirectory& outgoing);
 
   void StartDriverComponent(std::string_view moniker, std::string_view url,
-                            fuchsia_driver_index::DriverPackageType package_type,
+                            std::string_view collection_name,
                             fidl::VectorView<fuchsia_component_decl::wire::Offer> offers,
                             StartCallback callback);
 

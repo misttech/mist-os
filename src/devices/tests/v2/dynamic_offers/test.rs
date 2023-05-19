@@ -55,7 +55,7 @@ async fn test_dynamic_offers() -> Result<()> {
 
     let offers = vec![fdt::Offer {
         protocol_name: ft::WaiterMarker::PROTOCOL_NAME.to_string(),
-        collection: fdt::Collection::BootDrivers,
+        collection: fdt::Collection::PackageDrivers,
     }];
 
     // Start the DriverTestRealm.

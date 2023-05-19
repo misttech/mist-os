@@ -37,6 +37,20 @@ bool VerifyMatchedCompositeNodeParentInfo(fdi::wire::MatchedCompositeNodeParentI
   return true;
 }
 
+std::string_view ToCollectionName(fuchsia_driver_index::DriverPackageType package) {
+  switch (package) {
+    case fdi::DriverPackageType::kBoot:
+      return "boot-drivers";
+    case fdi::DriverPackageType::kBase:
+      return "pkg-drivers";
+    case fdi::DriverPackageType::kCached:
+    case fdi::DriverPackageType::kUniverse:
+      return "full-pkg-drivers";
+    default:
+      return {};
+  }
+}
+
 }  // namespace
 
 const Driver* DriverLoader::UrlToDriver(const std::string& url) {
@@ -134,7 +148,8 @@ void DriverLoader::LoadDriverComponent(std::string_view moniker, std::string_vie
             .component = std::move(driver_component.value()),
         }));
       };
-  runner_.StartDriverComponent(moniker, manifest_url, package_type, offers, std::move(start_cb));
+  runner_.StartDriverComponent(moniker, manifest_url, ToCollectionName(package_type), offers,
+                               std::move(start_cb));
 }
 
 const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,

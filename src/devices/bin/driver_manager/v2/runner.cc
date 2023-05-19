@@ -19,20 +19,6 @@ namespace fdecl = fuchsia_component_decl;
 
 constexpr uint32_t kTokenId = PA_HND(PA_USER0, 0);
 
-const char* ToCollectionName(fdi::DriverPackageType package_type) {
-  switch (package_type) {
-    case fdi::DriverPackageType::kBoot:
-      return "boot-drivers";
-    case fdi::DriverPackageType::kBase:
-      return "pkg-drivers";
-    case fdi::DriverPackageType::kCached:
-      return "full-pkg-drivers";
-    case fdi::DriverPackageType::kUniverse:
-      return "full-pkg-drivers";
-    default:
-      ZX_PANIC("Bad PackageType: %d", fidl::ToUnderlying(package_type));
-  }
-}
 zx::result<zx_koid_t> GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info{};
   if (zx_status_t status =
@@ -53,7 +39,7 @@ zx::result<> Runner::Publish(component::OutgoingDirectory& outgoing) {
 }
 
 void Runner::StartDriverComponent(std::string_view moniker, std::string_view url,
-                                  fuchsia_driver_index::DriverPackageType package_type,
+                                  std::string_view collection_name,
                                   fidl::VectorView<fuchsia_component_decl::wire::Offer> offers,
                                   StartCallback callback) {
   zx::event token;
@@ -67,8 +53,6 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
     return callback(koid.take_error());
   }
   start_requests_.emplace(koid.value(), std::move(callback));
-
-  std::string_view collection = ToCollectionName(package_type);
 
   fidl::Arena arena;
   auto child_decl = fdecl::wire::Child::Builder(arena)
@@ -109,7 +93,7 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
   realm_
       ->CreateChild(
           fdecl::wire::CollectionRef{
-              .name = fidl::StringView::FromExternal(collection),
+              .name = fidl::StringView::FromExternal(collection_name),
           },
           child_decl, child_args_builder.Build())
       .Then(std::move(create_callback));

@@ -150,7 +150,6 @@ Collection ToCollection(fdi::DriverPackageType package) {
     case fdi::DriverPackageType::kBase:
       return Collection::kPackage;
     case fdi::DriverPackageType::kCached:
-      return Collection::kFullPackage;
     case fdi::DriverPackageType::kUniverse:
       return Collection::kFullPackage;
     default:
@@ -376,7 +375,7 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
 
   std::weak_ptr node_weak = node.shared_from_this();
   runner_.StartDriverComponent(
-      node.MakeComponentMoniker(), url, package_type, node.offers(),
+      node.MakeComponentMoniker(), url, CollectionName(node.collection()).get(), node.offers(),
       [node_weak](zx::result<driver_manager::Runner::StartedComponent> component) {
         std::shared_ptr node = node_weak.lock();
         if (!node) {
