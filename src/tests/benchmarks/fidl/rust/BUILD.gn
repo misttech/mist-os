@@ -46,6 +46,7 @@ template("rust_gidl_benchmark_suite") {
     non_rust_deps = [ ":${target_name}__gidl" ]
 
     sources = [ output_file ]
+    disable_rustdoc = true
   }
 }
 
@@ -87,6 +88,7 @@ rustc_library("benchmark_suite_rust_lib") {
   non_rust_deps = [ ":benchmark_suite_rust_lib_gen" ]
 
   sources = [ benchmark_suite_file ]
+  disable_rustdoc = true
 }
 
 rustc_binary("rust_fidl_microbenchmarks_bin") {

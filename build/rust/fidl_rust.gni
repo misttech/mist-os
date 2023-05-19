@@ -96,6 +96,7 @@ template("fidl_rust") {
                [
                  "public_deps",
                  "visibility",
+                 "disable_rustdoc",
                ])
   } else {
     not_needed(invoker,
@@ -109,6 +110,7 @@ template("fidl_rust") {
                              [
                                "testonly",
                                "visibility",
+                               "disable_rustdoc",
                              ])
 
       name = crate_name

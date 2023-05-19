@@ -249,6 +249,7 @@ template("fidl") {
                                  "testonly",
                                  "visibility",
                                  "public_deps",
+                                 "disable_rustdoc",
                                ])
         forward_variables_from(common_parameters, "*", [ "fidl_target" ])
         fidl_gen_dir += "/rust"
@@ -263,6 +264,8 @@ template("fidl") {
         forward_variables_from(common_parameters, "*", [ "fidl_target" ])
         fidl_gen_dir += "/bindlib"
       }
+    } else {
+      not_needed(invoker, [ "disable_rustdoc" ])
     }
 
     if (enable_banjo && support_rust) {
@@ -307,6 +310,10 @@ template("fidl") {
       }
     }
   } else {
-    not_needed(invoker, non_dart_go_only + [ "sources" ])
+    not_needed(invoker,
+               non_dart_go_only + [
+                     "sources",
+                     "disable_rustdoc",
+                   ])
   }
 }

@@ -40,6 +40,7 @@ template("benchmark_fidl") {
     non_fidl_deps = [ ":${copy_target}" ]
     public_deps = [ "//zircon/vdso/zx" ]
     enable_hlcpp = true
+    disable_rustdoc = true
   }
 }
 
