@@ -107,6 +107,9 @@ class Startup(Step):
         ctx.log(f"- Product: {ctx.pb_name}")
         ctx.log(f"- Target: {ctx.target}")
 
+        # create the out directories if they do not exist
+        os.makedirs(os.path.dirname(ctx.pb_path), exist_ok=True)
+
     def cleanup(self, ctx):
         pass
 
