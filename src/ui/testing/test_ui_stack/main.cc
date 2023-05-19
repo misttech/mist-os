@@ -49,14 +49,8 @@ int run_test_ui_stack(int argc, const char** argv) {
   auto test_ui_stack_config = test_ui_stack_config_lib::Config::TakeFromStartupHandle();
   ui_testing::UITestRealm::Config config;
 
-  // Check for unsupported Flatland x Root Presenter configuration.
-  FX_DCHECK(!test_ui_stack_config.use_flatland() || test_ui_stack_config.use_scene_manager())
-      << "Unsupported UI configuration: Flatland x Root Presenter.";
-
   config.use_flatland = test_ui_stack_config.use_flatland();
-  config.scene_owner = test_ui_stack_config.use_scene_manager()
-                           ? ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER
-                           : ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
+  config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
   config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
   config.use_input = true;
   config.display_rotation = test_ui_stack_config.display_rotation();

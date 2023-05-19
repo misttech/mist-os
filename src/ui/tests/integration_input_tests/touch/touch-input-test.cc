@@ -98,7 +98,7 @@
 //         |
 //   <created realm root>
 //      /      \
-//   scenic  input-pipeline
+//   scenic  scene_manager
 //
 // For more information about testing v2 components and realm_builder,
 // visit the following links:
@@ -163,7 +163,6 @@ void ExpectLocationAndPhase(
 }
 
 struct UIStackConfig {
-  bool use_scene_manager = false;
   bool use_flatland = false;
   int32_t display_rotation = 0;
 
@@ -176,16 +175,10 @@ std::vector<UIStackConfig> UIStackConfigsToTest() {
   std::vector<UIStackConfig> configs;
 
   // GFX x SM
-  configs.push_back({.use_scene_manager = true,
-                     .use_flatland = false,
-                     .display_rotation = 90,
-                     .device_pixel_ratio = 2.f});
+  configs.push_back({.use_flatland = false, .display_rotation = 90, .device_pixel_ratio = 2.f});
 
   // Flatland X SM
-  configs.push_back({.use_scene_manager = true,
-                     .use_flatland = true,
-                     .display_rotation = 90,
-                     .device_pixel_ratio = 2.f});
+  configs.push_back({.use_flatland = true, .display_rotation = 90, .device_pixel_ratio = 2.f});
 
   return configs;
 }
@@ -569,8 +562,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
   fuchsia::sys::ComponentControllerPtr& client_component() { return client_component_; }
 
   // Override test-ui-stack parameters.
-  bool use_scene_manager() override { return std::get<0>(this->GetParam()).use_scene_manager; }
-
   bool use_flatland() override { return std::get<0>(this->GetParam()).use_flatland; }
 
   uint32_t display_rotation() override { return std::get<0>(this->GetParam()).display_rotation; }

@@ -95,7 +95,6 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   virtual float device_pixel_ratio() { return 1.f; }
   virtual uint32_t display_rotation() { return 0.f; }
   virtual bool use_flatland() = 0;
-  virtual bool use_scene_manager() = 0;
 
  private:
   void SetUpRealmBase();

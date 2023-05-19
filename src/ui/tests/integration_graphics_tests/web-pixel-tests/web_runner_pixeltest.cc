@@ -141,7 +141,6 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
                                   0 /*display_rotation*/);
   }
 
-  bool use_scene_manager() override { return true; }
   bool use_flatland() override { return true; }
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
 

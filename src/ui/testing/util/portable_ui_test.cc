@@ -67,8 +67,6 @@ void PortableUITest::SetUpRealmBase() {
 
   // Configure test-ui-stack.
   realm_builder_.InitMutableConfigToEmpty(kTestUIStack);
-  realm_builder_.SetConfigValue(kTestUIStack, "use_scene_manager",
-                                ConfigValue::Bool(use_scene_manager()));
   realm_builder_.SetConfigValue(kTestUIStack, "use_flatland", ConfigValue::Bool(use_flatland()));
   realm_builder_.SetConfigValue(kTestUIStack, "display_rotation",
                                 ConfigValue::Uint32(display_rotation()));

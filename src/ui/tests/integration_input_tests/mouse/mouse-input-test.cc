@@ -272,7 +272,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
   std::shared_ptr<MouseInputState> mouse_state_;
 
   // Override test-ui-stack config.
-  bool use_scene_manager() override { return true; }
   bool use_flatland() override { return true; }
 
   // Use a DPR other than 1.0, so that logical and physical coordinate spaces
