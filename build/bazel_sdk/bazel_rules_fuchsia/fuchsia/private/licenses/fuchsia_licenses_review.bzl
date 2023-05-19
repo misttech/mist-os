@@ -19,10 +19,11 @@ def _fuchsia_licenses_review(ctx):
         run_inputs.append(ctx.file.classification_input)
         run_arguments.append("--classification_input=%s" % ctx.file.classification_input.path)
 
+    extra_files = ctx.files.extra_files
     if ctx.files.extra_files:
-        for extra_file in ctx.files.extra_files:
-            run_inputs.append(extra_file)
-            run_arguments.append("--extra_files=%s" % extra_file.path)
+        run_inputs.extend(extra_files)
+        run_arguments.append("--extra_files")
+        run_arguments.extend([f.path for f in extra_files])
 
     ctx.actions.run(
         progress_message = "Generating license review material into %s" % out_dir.path,
@@ -49,6 +50,8 @@ The file contains:
     + LicenseRef-3.txt
     + ...
     + (A txt file with the contents of each extracted license)
+  + extra_files (directory)
+    + ... (additional files can be added here via extra_files arguments)
 
 The SPDX json conforms with:
 https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json

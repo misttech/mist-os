@@ -8,7 +8,10 @@ load("@rules_python//python:defs.bzl", "py_test")
 fuchsia_licenses_review(
     name = "review.zip",
     classification_input = "classification_input.json",
-    extra_files = ["extra_review_file.txt"],
+    extra_files = [
+        "extra_review_file.txt",
+        "extra_review_file_2.txt",
+    ],
     spdx_input = "input.spdx.json",
 )
 
