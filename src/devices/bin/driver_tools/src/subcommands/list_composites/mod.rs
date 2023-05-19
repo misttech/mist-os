@@ -21,11 +21,6 @@ pub async fn list_composites(
         fidl::endpoints::create_proxy::<fdd::CompositeInfoIteratorMarker>()?;
     proxy.get_composite_info(iterator_server).context("GetCompositeInfo() failed")?;
 
-    if proxy.is_dfv2().await? {
-        writeln!(writer, "DFv2 composites are currently not supported. See fxb/119947.")?;
-        return Ok(());
-    }
-
     loop {
         let composite_list =
             iterator.get_next().await.context("CompositeInfoIterator GetNext() failed")?;

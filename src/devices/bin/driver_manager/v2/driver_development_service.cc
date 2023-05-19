@@ -22,15 +22,7 @@ using namespace fuchsia_driver_framework;
 
 namespace driver_manager {
 
-DriverDevelopmentService::DriverDevelopmentService(dfv2::DriverRunner& driver_runner,
-                                                   async_dispatcher_t* dispatcher)
-    : driver_runner_(driver_runner), dispatcher_(dispatcher) {}
-
-void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddUnmanagedProtocol<fdd::DriverDevelopment>(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT(result.is_ok());
-}
+namespace {
 
 zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
                                                    const dfv2::Node* node) {
@@ -98,6 +90,18 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   device_info.offer_list(offers);
 
   return zx::ok(device_info.Build());
+}
+
+}  // namespace
+
+DriverDevelopmentService::DriverDevelopmentService(dfv2::DriverRunner& driver_runner,
+                                                   async_dispatcher_t* dispatcher)
+    : driver_runner_(driver_runner), dispatcher_(dispatcher) {}
+
+void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
+  auto result = outgoing.AddUnmanagedProtocol<fdd::DriverDevelopment>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  ZX_ASSERT(result.is_ok());
 }
 
 void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
@@ -169,8 +173,16 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
 
 void DriverDevelopmentService::GetCompositeInfo(GetCompositeInfoRequestView request,
                                                 GetCompositeInfoCompleter::Sync& completer) {
-  // TODO(fxb/119947): Implement support for DFv2.
-  LOGF(WARNING, "GetCompositeInfo() is currently not supported in DFv2. See fxb/119947.");
+  auto arena = std::make_unique<fidl::Arena<512>>();
+  std::vector<fdd::wire::CompositeInfo> list = driver_runner_.GetCompositeListInfo(*arena);
+  auto iterator = std::make_unique<driver_development::CompositeInfoIterator>(std::move(arena),
+                                                                              std::move(list));
+  fidl::BindServer(this->dispatcher_, std::move(request->iterator), std::move(iterator),
+                   [](auto* server, fidl::UnbindInfo info, auto channel) {
+                     if (!info.is_peer_closed()) {
+                       LOGF(WARNING, "Closed CompositeInfoIterator: %s", info.lossy_description());
+                     }
+                   });
 }
 
 void DriverDevelopmentService::GetDriverInfo(GetDriverInfoRequestView request,

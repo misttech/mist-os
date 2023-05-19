@@ -13,7 +13,12 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }  //  namespace fdf
 
+namespace fdd = fuchsia_driver_development;
+namespace fdm = fuchsia_device_manager;
+
 namespace dfv2 {
+
+namespace {
 
 fbl::Array<const zx_device_prop_t> NodeToProps(Node* node) {
   std::vector<zx_device_prop_t> props;
@@ -32,8 +37,9 @@ fbl::Array<const zx_device_prop_t> NodeToProps(Node* node) {
   return props_array;
 }
 
-zx::result<CompositeDeviceFragment> CompositeDeviceFragment::Create(
-    fuchsia_device_manager::DeviceFragment fragment) {
+}  // namespace
+
+zx::result<CompositeDeviceFragment> CompositeDeviceFragment::Create(fdm::DeviceFragment fragment) {
   auto composite_fragment = CompositeDeviceFragment();
 
   if (fragment.parts().size() != 1) {
@@ -54,6 +60,27 @@ zx::result<CompositeDeviceFragment> CompositeDeviceFragment::Create(
   composite_fragment.bind_rules_ = std::move(rules);
 
   return zx::ok(std::move(composite_fragment));
+}
+
+fdd::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo() const {
+  fdd::LegacyCompositeFragmentInfo fragment_info;
+  fragment_info.name() = name_;
+
+  auto bound_node = bound_node_.lock();
+  if (auto bound_node = bound_node_.lock()) {
+    fragment_info.device() = bound_node->MakeTopologicalPath();
+  }
+
+  std::vector<fdm::BindInstruction> bind_rules(bind_rules_.size());
+  for (size_t i = 0; i < bind_rules_.size(); i++) {
+    bind_rules[i] = fdm::BindInstruction{{
+        .op = bind_rules_[i].op,
+        .arg = bind_rules_[i].arg,
+        .debug = bind_rules_[i].debug,
+    }};
+  }
+  fragment_info.bind_rules() = std::move(bind_rules);
+  return fragment_info;
 }
 
 bool CompositeDeviceFragment::BindNode(std::shared_ptr<Node> node) {
@@ -85,6 +112,35 @@ void CompositeDeviceFragment::Inspect(inspect::Node& root) const {
   }
 
   root.RecordString(name_, moniker);
+}
+
+fdd::CompositeInfo CompositeDeviceAssembler::GetCompositeInfo() const {
+  auto info = fdd::CompositeInfo();
+  info.name() = name_;
+
+  // The first fragment is always the primary index.
+  info.primary_index() = 0;
+
+  std::vector<fdd::LegacyCompositeFragmentInfo> fragments;
+  fragments.reserve(fragments_.size());
+  for (auto& fragment : fragments_) {
+    fragments.push_back(fragment.GetCompositeFragmentInfo());
+  }
+  info.node_info() = fdd::CompositeNodeInfo::WithLegacy(fdd::LegacyCompositeNodeInfo{{
+      .fragments = std::move(fragments),
+  }});
+
+  if (!assembled_node_.has_value()) {
+    return info;
+  }
+
+  auto node_ptr = assembled_node_->lock();
+  if (auto node_ptr = assembled_node_->lock()) {
+    info.driver() = node_ptr->driver_url();
+    info.topological_path() = node_ptr->MakeTopologicalPath();
+  }
+
+  return info;
 }
 
 zx::result<std::unique_ptr<CompositeDeviceAssembler>> CompositeDeviceAssembler::Create(
@@ -180,6 +236,10 @@ bool CompositeDeviceAssembler::BindNode(std::shared_ptr<Node> node) {
 }
 
 void CompositeDeviceAssembler::TryToAssemble() {
+  if (assembled_node_.has_value()) {
+    return;
+  }
+
   std::vector<std::shared_ptr<Node>> strong_parents;
   std::vector<Node*> parents;
   std::vector<std::string> parents_names;
@@ -203,6 +263,8 @@ void CompositeDeviceAssembler::TryToAssemble() {
   }
 
   LOGF(INFO, "Built composite device at '%s'", node->MakeComponentMoniker().c_str());
+
+  assembled_node_ = *node;
 
   // Bind the node we just created.
   node_manager_->Bind(*node.value(), nullptr);
@@ -262,6 +324,16 @@ void CompositeDeviceManager::Inspect(inspect::Node& root) const {
   for (auto& assembler : assemblers_) {
     assembler->Inspect(root);
   }
+}
+
+std::vector<fdd::wire::CompositeInfo> CompositeDeviceManager::GetCompositeListInfo(
+    fidl::AnyArena& arena) const {
+  std::vector<fdd::wire::CompositeInfo> composite_list;
+  composite_list.reserve(assemblers_.size());
+  for (auto& assembler : assemblers_) {
+    composite_list.push_back(fidl::ToWire(arena, assembler->GetCompositeInfo()));
+  }
+  return composite_list;
 }
 
 void CompositeDeviceManager::AddCompositeDevice(AddCompositeDeviceRequest& request,

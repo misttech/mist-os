@@ -101,6 +101,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
   fpromise::promise<inspect::Inspector> Inspect() const;
+
+  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeListInfo(
+      fidl::AnyArena& arena) const;
+
   size_t NumOrphanedNodes() const { return orphaned_nodes_.size(); }
 
   std::shared_ptr<Node> root_node() const { return root_node_; }

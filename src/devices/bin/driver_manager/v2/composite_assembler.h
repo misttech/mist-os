@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.device.composite/cpp/fidl.h>
 #include <fidl/fuchsia.device.manager/cpp/fidl.h>
+#include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/cpp/inspect.h>
 
@@ -14,8 +15,6 @@
 #include "src/devices/bin/driver_manager/v2/node.h"
 
 namespace dfv2 {
-
-fbl::Array<const zx_device_prop_t> NodeToProps(Node* node);
 
 // This class represents a single fragment of a composite device. It will
 // match one node.
@@ -27,6 +26,8 @@ class CompositeDeviceFragment {
   // Try to bind the node against this fragment. This returns true if the node
   // matches and the fragment is currently unbound.
   bool BindNode(std::shared_ptr<Node> node);
+
+  fuchsia_driver_development::LegacyCompositeFragmentInfo GetCompositeFragmentInfo() const;
 
   std::shared_ptr<Node> bound_node() { return bound_node_.lock(); }
   std::string_view name() const { return name_; }
@@ -58,6 +59,8 @@ class CompositeDeviceAssembler {
   // will also create the composite node.
   bool BindNode(std::shared_ptr<Node> node);
 
+  fuchsia_driver_development::CompositeInfo GetCompositeInfo() const;
+
   void Inspect(inspect::Node& root) const;
 
  private:
@@ -76,6 +79,9 @@ class CompositeDeviceAssembler {
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
 
   std::vector<CompositeDeviceFragment> fragments_;
+
+  // The assembled composite node. Set by `TryToAssemble()`.
+  std::optional<std::weak_ptr<Node>> assembled_node_;
 };
 
 // This class manages all of the `CompositeDeviceAssemblers` that exist.
@@ -101,6 +107,9 @@ class CompositeDeviceManager
   void Publish(component::OutgoingDirectory& outgoing);
 
   void Inspect(inspect::Node& root) const;
+
+  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeListInfo(
+      fidl::AnyArena& arena) const;
 
  private:
   void AddCompositeDevice(AddCompositeDeviceRequest& request,

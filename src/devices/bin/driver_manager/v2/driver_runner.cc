@@ -32,6 +32,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 namespace fdh = fuchsia_driver_host;
+namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
 namespace fio = fuchsia_io;
 namespace fprocess = fuchsia_process;
@@ -299,6 +300,12 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   inspector.GetRoot().Record(std::move(dfv1_composites));
 
   return fpromise::make_ok_promise(inspector);
+}
+
+std::vector<fdd::wire::CompositeInfo> DriverRunner::GetCompositeListInfo(
+    fidl::AnyArena& arena) const {
+  // TODO(fxb/119947): Add composite node specs to the list.
+  return composite_device_manager_.GetCompositeListInfo(arena);
 }
 
 void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing) {
