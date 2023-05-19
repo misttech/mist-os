@@ -181,7 +181,7 @@ func (c *InstallerConfig) ConfigureBuild(ctx context.Context, device *device.Cli
 }
 
 // Updater returns the configured updater.
-func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL string) (updater.Updater, error) {
+func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL string, checkForUnkownFirmware bool) (updater.Updater, error) {
 	switch c.installerMode {
 	case Omaha:
 		avbTool, err := c.AVBTool()
@@ -194,20 +194,20 @@ func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL st
 			return nil, err
 		}
 
-		return updater.NewOmahaUpdater(repo, updatePackageURL, c.omahaTool, avbTool, zbiTool, c.workaroundOtaNoRewriteRules)
+		return updater.NewOmahaUpdater(repo, updatePackageURL, c.omahaTool, avbTool, zbiTool, c.workaroundOtaNoRewriteRules, checkForUnkownFirmware)
 
 	case SystemUpdateChecker:
 		// TODO: The e2e tests only support using the system-update-checker
 		// with the standard update package URL. Otherwise we need to
 		// fall back to manually triggering the system-updater.
 		if updatePackageURL == defaultUpdatePackageURL {
-			return updater.NewSystemUpdateChecker(repo), nil
+			return updater.NewSystemUpdateChecker(repo, checkForUnkownFirmware), nil
 		}
 
-		return updater.NewSystemUpdater(repo, updatePackageURL), nil
+		return updater.NewSystemUpdater(repo, updatePackageURL, checkForUnkownFirmware), nil
 
 	case SystemUpdater:
-		return updater.NewSystemUpdater(repo, updatePackageURL), nil
+		return updater.NewSystemUpdater(repo, updatePackageURL, checkForUnkownFirmware), nil
 
 	default:
 		return nil, fmt.Errorf("Invalid installer mode: %v", c.installerMode)
