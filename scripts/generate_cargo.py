@@ -6,6 +6,7 @@
 
 import argparse
 import collections
+import copy
 import datetime
 import enum
 import functools
@@ -329,18 +330,18 @@ def write_toml_file(
         fout.write("\n")
 
     def expand_and_deduplicate(deps, visited=None):
-      if visited is None:
-        visited = set()
-      for dep in deps:
-        if dep in visited:
-          continue
-        visited.add(dep)
-        expanded = project.expand_source_set_or_group(dep)
-        if expanded:
-          for exp in expand_and_deduplicate(expanded, visited):
-            yield exp
-        else:
-          yield dep
+        if visited is None:
+            visited = set()
+        for dep in deps:
+            if dep in visited:
+                continue
+            visited.add(dep)
+            expanded = project.expand_source_set_or_group(dep)
+            if expanded:
+                for exp in expand_and_deduplicate(expanded, visited):
+                    yield exp
+            else:
+                yield dep
 
     # collect all dependencies
     deps = list(expand_and_deduplicate(metadata["deps"]))
@@ -586,6 +587,10 @@ def main():
         for t in rust_targets:
             if t["type"] == "executable":
                 continue
+            if meta := project.rust_targets[t["label"]].get("metadata"):
+                if disable := meta.get("disable_rustdoc"):
+                    if disable == [True]:
+                        continue
             l = t["label"].replace(".actual", "")
             base = l.split("(")[0]
             is_host = "(//build/toolchain:host" in l
@@ -593,7 +598,7 @@ def main():
                 if base == cur:
                     continue
                 cur = base
-                result.append(t)
+                result.append(copy.deepcopy(t))
                 result[-1]["label"] = l
         return result
 

@@ -107,6 +107,9 @@ import("//build/rust/rustc_test.gni")
 #   quiet_clippy (boolean, optional)
 #     Passed through to rustc_artifact(), see that template for documentation.
 #
+#   disable_rustdoc (optional)
+#     Don't add this target to https://fuchsia.dev/go/rustdoc
+#
 #   original_target_name (optional)
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
@@ -168,6 +171,7 @@ template("rustc_library") {
                              [
                                "name",
                                "assert_no_deps",
+                               "disable_rustdoc",
                              ])
     }
   }
@@ -236,6 +240,9 @@ template("rustc_library") {
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
+      }
+      if (defined(invoker.disable_rustdoc)) {
+        disable_rustdoc = [ invoker.disable_rustdoc ]
       }
       expect_includes_barrier = deps
     }
