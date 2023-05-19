@@ -16,10 +16,17 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string_view>
+#include <type_traits>
 
 namespace devicetree {
 namespace {
+
+// See
+// https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#address-cells-and-size-cells
+constexpr uint32_t kRegDefaultAddressCells = 2;
+constexpr uint32_t kRegDefaultSizeCells = 1;
 
 constexpr uint32_t kMagic = 0xd00dfeed;
 // The structure block tokens, named as in the spec for clarity.
@@ -94,6 +101,29 @@ PropertyBlockContents ReadPropertyBlock(ByteView bytes) {
   auto [name_offset, block_end] = ReadBigEndianUint32(bytes.substr(offsetof(FdtProperty, nameoff)));
   ByteView value = block_end.substr(0, prop_size);
   return {value, name_offset, block_end.substr(StructBlockAlign(prop_size))};
+}
+
+template <size_t N>
+uint64_t ParseCells(ByteView bytes) {
+  static_assert(N == 1 || N == 2, "Only supports 1 or 2 cells.");
+  uint64_t higher = ReadBigEndianUint32(bytes).value;
+  if constexpr (N == 1) {
+    return higher;
+  } else {
+    uint64_t lower = ReadBigEndianUint32(bytes.substr(4)).value;
+    return higher << 32 | lower;
+  }
+}
+
+uint64_t ParseCells(ByteView bytes, uint32_t num_cells) {
+  switch (num_cells) {
+    case 1:
+      return ParseCells<1>(bytes);
+    case 2:
+      return ParseCells<2>(bytes);
+    default:
+      ZX_PANIC("Invalid number of cells (%" PRIu32 ")", num_cells);
+  }
 }
 
 }  // namespace
@@ -179,6 +209,33 @@ fit::result<PropertyDecoder::PathResolveError, ResolvedPath> PropertyDecoder::Re
   }
 
   return fit::ok(ResolvedPath{.prefix = maybe_aliased_path});
+}
+
+std::optional<RegProperty> RegProperty::Create(uint32_t num_address_cells, uint32_t num_size_cells,
+                                               ByteView bytes) {
+  if (num_address_cells > 2 || num_size_cells > 2) {
+    return std::nullopt;
+  }
+  return RegProperty(num_address_cells, num_size_cells, bytes);
+}
+
+std::optional<RegProperty> RegProperty::Create(const PropertyDecoder& decoder, ByteView bytes) {
+  if (!decoder.parent()) {
+    return std::nullopt;
+  }
+  const auto& parent = *decoder.parent();
+  return RegProperty::Create(parent.num_address_cells().value_or(kRegDefaultAddressCells),
+                             parent.num_size_cells().value_or(kRegDefaultSizeCells), bytes);
+}
+
+RegProperty::Register::Register(ByteView bytes, uint32_t num_address_cells,
+                                uint32_t num_size_cells) {
+  // address cells then size cells.
+  address = ParseCells(bytes, num_address_cells);
+  // size cells then size cells.
+  size = ParseCells(
+      bytes.substr(num_address_cells * sizeof(uint32_t), num_size_cells * sizeof(uint32_t)),
+      num_size_cells);
 }
 
 Devicetree::Devicetree(ByteView blob) {

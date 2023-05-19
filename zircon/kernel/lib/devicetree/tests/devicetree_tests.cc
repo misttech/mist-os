@@ -462,6 +462,29 @@ uint32_t byte_swap(uint32_t val) {
   }
 }
 
+struct RegisterBlockPropertyBuilder {
+  void Add(uint64_t address, uint64_t size) {
+    uint32_t address_low = byte_swap(0x0000FFFF & address);
+    uint32_t size_low = byte_swap(0x0000FFFF & size);
+
+    append(property_value, as_bytes(address_low));
+    if (address_cells == 2) {
+      uint32_t address_high = byte_swap(address >> 32);
+      append(property_value, as_bytes(address_high));
+    }
+
+    append(property_value, as_bytes(size_low));
+    if (size_cells == 2) {
+      uint32_t size_high = byte_swap(size >> 32);
+      append(property_value, as_bytes(size_high));
+    }
+  }
+
+  const uint32_t address_cells;
+  const uint32_t size_cells;
+  std::vector<uint8_t> property_value;
+};
+
 // Small helper so we can verify the behavior of CachedProperties.
 struct PropertyBuilder {
   devicetree::Properties Build() {
@@ -514,6 +537,24 @@ struct PropertyBuilder {
     append(property_block, absolute_path);
     property_block.push_back('\0');
     append(property_block, padding);
+  }
+
+  void Add(std::string_view name, cpp20::span<const uint8_t> byte_array) {
+    uint32_t name_off = byte_swap(static_cast<uint32_t>(string_block.size()));
+    // String must be null terminated.
+    append(string_block, name);
+    string_block.push_back('\0');
+
+    uint32_t len = byte_swap(static_cast<uint32_t>(byte_array.size()));
+
+    if (!property_block.empty()) {
+      const uint32_t kFdtPropToken = byte_swap(0x00000003);
+      append(property_block, as_bytes(kFdtPropToken));
+    }
+    // this are all 32b aliagned, no padding need.
+    append(property_block, as_bytes(len));
+    append(property_block, as_bytes(name_off));
+    append(property_block, byte_array);
   }
 
   std::vector<uint8_t> property_block;
@@ -688,6 +729,133 @@ TEST(PropertyDecoderTest, CellCountsAreCached) {
     ASSERT_TRUE(interrupt_cells);
     EXPECT_EQ(*interrupt_cells, 3);
   }
+}
+
+TEST(PropertyDecoderTest, CellCountsNullOptWhenNotPresent) {
+  PropertyBuilder builder;
+  {
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+    EXPECT_FALSE(decoder.num_address_cells());
+    EXPECT_FALSE(decoder.num_size_cells());
+    EXPECT_FALSE(decoder.num_interrupt_cells());
+  }
+
+  builder.Add("#address-cells", 3);
+  {
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+    EXPECT_TRUE(decoder.num_address_cells());
+    EXPECT_FALSE(decoder.num_size_cells());
+    EXPECT_FALSE(decoder.num_interrupt_cells());
+  }
+
+  builder.Add("#size-cells", 4);
+  {
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+    EXPECT_TRUE(decoder.num_address_cells());
+    EXPECT_TRUE(decoder.num_size_cells());
+    EXPECT_FALSE(decoder.num_interrupt_cells());
+  }
+
+  builder.Add("#interrupt-cells", 5);
+  {
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+    EXPECT_TRUE(decoder.num_address_cells());
+    EXPECT_TRUE(decoder.num_size_cells());
+    EXPECT_TRUE(decoder.num_interrupt_cells());
+  }
+}
+
+TEST(RegisterBlockPropertyTest, Accessors) {
+  RegisterBlockPropertyBuilder register_block{.address_cells = 1, .size_cells = 1};
+  register_block.Add(0xACED, 0xD1CE);
+  register_block.Add(0xDEED, 0xFEE7);
+  register_block.Add(0xDEAD, 0xBEEF);
+
+  PropertyBuilder parent_builder;
+  parent_builder.Add("#address-cells", 1);
+  parent_builder.Add("#size-cells", 1);
+  auto parent_props = parent_builder.Build();
+  devicetree::PropertyDecoder parent_decoder(parent_props);
+
+  PropertyBuilder builder;
+  builder.Add("#address-cells", 2);
+  builder.Add("#size-cells", 2);
+  builder.Add("reg", register_block.property_value);
+  auto props = builder.Build();
+  devicetree::PropertyDecoder decoder(&parent_decoder, props);
+
+  auto reg = decoder.FindProperty("reg");
+  ASSERT_TRUE(reg);
+
+  auto reg_block = reg->AsReg(decoder);
+  ASSERT_TRUE(reg_block);
+
+  ASSERT_EQ(reg_block->size(), 3);
+  EXPECT_EQ((*reg_block)[0].address, 0xACED);
+  EXPECT_EQ((*reg_block)[0].size, 0xD1CE);
+
+  EXPECT_EQ((*reg_block)[1].address, 0xDEED);
+  EXPECT_EQ((*reg_block)[1].size, 0xFEE7);
+
+  EXPECT_EQ((*reg_block)[2].address, 0xDEAD);
+  EXPECT_EQ((*reg_block)[2].size, 0xBEEF);
+}
+
+TEST(RegisterBlockPropertyTest, AccessorsMultipleAddressCells) {
+  RegisterBlockPropertyBuilder register_block{.address_cells = 2, .size_cells = 1};
+  register_block.Add(0x0000ACED0000ACED, 0xD1CE);
+  register_block.Add(0x0000DEED0000ACED, 0xFEE7);
+  register_block.Add(0x0000DEAD0000ACED, 0xBEEF);
+
+  PropertyBuilder parent_builder;
+  parent_builder.Add("#address-cells", 2);
+  parent_builder.Add("#size-cells", 1);
+  auto parent_props = parent_builder.Build();
+  devicetree::PropertyDecoder parent_decoder(parent_props);
+
+  PropertyBuilder builder;
+  // Random values for cells, should pick parent cells.
+  builder.Add("#address-cells", 1);
+  builder.Add("#size-cells", 2);
+  builder.Add("reg", register_block.property_value);
+  auto props = builder.Build();
+  devicetree::PropertyDecoder decoder(&parent_decoder, props);
+
+  auto reg = decoder.FindProperty("reg");
+  ASSERT_TRUE(reg);
+
+  auto reg_block = reg->AsReg(decoder);
+  ASSERT_TRUE(reg_block);
+
+  ASSERT_EQ(reg_block->size(), 3);
+  EXPECT_EQ((*reg_block)[0].address, 0xACED0000ACED);
+  EXPECT_EQ((*reg_block)[0].size, 0xD1CE);
+
+  EXPECT_EQ((*reg_block)[1].address, 0xACED0000DEED);
+  EXPECT_EQ((*reg_block)[1].size, 0xFEE7);
+
+  EXPECT_EQ((*reg_block)[2].address, 0xACED0000DEAD);
+  EXPECT_EQ((*reg_block)[2].size, 0xBEEF);
+}
+
+TEST(PropertyValueTest, AsRegisterBlockWithBadSizeIsNullopt) {
+  RegisterBlockPropertyBuilder register_block{.address_cells = 1, .size_cells = 1};
+  register_block.Add(0xACED, 0xD1CE);
+
+  PropertyBuilder builder;
+  builder.Add("reg", register_block.property_value);
+  auto props = builder.Build();
+  devicetree::PropertyDecoder decoder(props);
+
+  auto reg = decoder.FindProperty("reg");
+  ASSERT_TRUE(reg);
+
+  auto reg_block = reg->AsReg(decoder);
+  ASSERT_FALSE(reg_block);
 }
 
 }  // namespace

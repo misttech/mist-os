@@ -128,6 +128,66 @@ class StringList {
   std::string_view data_;
 };
 
+// Forward declaration of PropertyDecoder, see below.
+class PropertyDecoder;
+
+// Represents a |reg| property, which usually encodes mmio mapped registers for a device.
+//
+// This property usually encodes series or memory-mapped registers as pairs of [address, size] where
+// each entry in the pair is defined by a sequence of cells. For the address the number of cells is
+// determined by |num_address_cells| and for the size the number of cells is determined by
+// |num_size_cells|.
+//
+// See
+// https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#reg
+// for property description.
+class RegProperty {
+ public:
+  static std::optional<RegProperty> Create(uint32_t num_address_cells, uint32_t num_size_cells,
+                                           ByteView bytes);
+
+  static std::optional<RegProperty> Create(const PropertyDecoder& decoder, ByteView bytes);
+
+  struct Register {
+    Register(ByteView reg, uint32_t num_address_cells, uint32_t num_size_cells);
+
+    uint64_t address = 0;
+    uint64_t size = 0;
+  };
+
+  constexpr RegProperty() = default;
+  constexpr RegProperty(const RegProperty&) = default;
+  constexpr RegProperty(RegProperty&&) noexcept = default;
+  constexpr RegProperty& operator=(const RegProperty&) = default;
+  constexpr RegProperty& operator=(RegProperty&&) noexcept = default;
+
+  // Returns |i|-th register pair.
+  Register operator[](size_t index) const {
+    ZX_ASSERT(index < size());
+    const uint32_t entry_size = sizeof(uint32_t) * (num_address_cells_ + num_size_cells_);
+    size_t offset = index * entry_size;
+    return Register(bytes_.substr(offset, entry_size), num_address_cells_, num_size_cells_);
+  }
+
+  // Number of register entries in the RegProperty.
+  constexpr uint64_t size() const {
+    uint32_t register_size = num_size_cells_ + num_address_cells_;
+    if (register_size == 0) {
+      return 0;
+    }
+    return bytes_.size() / (sizeof(uint32_t) * (num_address_cells_ + num_size_cells_));
+  }
+
+ private:
+  explicit constexpr RegProperty(uint32_t num_address_cells_, uint32_t num_size_cells,
+                                 ByteView bytes)
+      : num_address_cells_(num_address_cells_), num_size_cells_(num_size_cells), bytes_(bytes) {}
+
+  uint32_t num_address_cells_ = 0;
+  uint32_t num_size_cells_ = 0;
+  ByteView bytes_;
+};
+
 // See
 // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#property-values
 // for the types and representations of possible property values.
@@ -165,6 +225,21 @@ class PropertyValue {
       return std::nullopt;
     }
     return true;
+  }
+
+  // Given a device node's property decoder |decoder|, the property value is assumed
+  // to be a property encoded array, to be interpreted as 'reg'.
+  //
+  // The number of address cells and size cells are obtained from the parent, or if
+  // not present they are assumed to be 2 for address cells or 1 for size cells.
+  //
+  // See:
+  //  * 'reg'
+  //  https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#reg
+  //  * defaults:
+  //  https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#address-cells-and-size-cells
+  std::optional<RegProperty> AsReg(const PropertyDecoder& decoder) const {
+    return RegProperty::Create(decoder, bytes_);
   }
 
  private:
