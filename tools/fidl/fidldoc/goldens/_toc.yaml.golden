@@ -3,7 +3,7 @@ toc:
     library_name: fidl
     versions: ["1"]
     selector_label: API Level
-    default_version: "1"
+    default_version: "HEAD"
 - title: Overview
   path: /README.md
 - title: API

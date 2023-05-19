@@ -319,17 +319,18 @@ fn create_toc(fidl_json_map: &HashMap<String, FidlJson>) -> TableOfContents {
 
     // Add all versions as <integer value, string representation> to a
     // BTreeMap so that they are automatically sorted by key.
-    // A string representation such as "HEAD" gets a 0 value.
+    // A string representation such as "HEAD" gets a u64::MAX value.
     let mut version_map: BTreeMap<u64, String> = BTreeMap::new();
     for item in table_of_contents_items.iter() {
         if !item.added.is_empty() {
-            version_map.insert(item.added.parse::<u64>().unwrap_or(0), item.added.clone());
+            version_map.insert(item.added.parse::<u64>().unwrap_or(u64::MAX), item.added.clone());
         }
     }
 
-    // Because the BTreeMap is ordered, the max version is the last item in it.
+    // Because the BTreeMap is ordered, the max version is the HEAD, but this
+    // returns the before last version which is the highest version after HEAD.
     let head = HEAD_VERSION.to_string();
-    let (_, max_version) = version_map.iter().next_back().unwrap_or((&0, &head));
+    let (_, max_version) = version_map.iter().nth_back(1).unwrap_or((&0, &head));
 
     TableOfContents {
         items: table_of_contents_items,
@@ -542,7 +543,7 @@ mod test {
 
         let toc = create_toc(&fidl_json_map);
         assert_eq!(toc.items.len(), 3);
-        assert_eq!(toc.versions, vec!["HEAD", "7"]);
+        assert_eq!(toc.versions, vec!["7", "HEAD"]);
         assert_eq!(toc.default_version, "7");
 
         let item0 = toc.items.get(0).unwrap();
