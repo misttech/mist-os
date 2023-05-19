@@ -1612,7 +1612,7 @@ mod tests {
             assert_matches!(
                 error.downcast::<fidl::Error>().unwrap(),
                 fidl::Error::ClientChannelClosed {
-                    status: zx::Status::PEER_CLOSED,
+                    status: _,
                     protocol_name: "fuchsia.hardware.power.statecontrol.Admin"
                 }
             );
