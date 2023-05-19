@@ -350,28 +350,6 @@ END_DATA(unknown_syscall_panic_string)
 .text
 #endif // KERNEL_NO_USERABI
 
-//
-// Syscall args are in a0-a7 already.
-// pc is in t1 and needs to go in the next available register,
-// or the stack if the regs are full.
-//
-// Note: must assemble to 8 or less bytes, with or without the
-// selection of compressed instructions.
-.macro syscall_dispatcher nargs, syscall
-.balign 8
-.if \nargs == 8
-    // store the pc in the slot we already left on the stack
-    sd     t1, (sp)
-.else
-    mv     a\nargs, t1
-.endif
-#ifndef KERNEL_NO_USERABI
-    tail   wrapper_\syscall
-#else
-    tail   unknown_syscall
-#endif
-.endm
-
 // void riscv64_syscall_dispatcher(iframe_t* iframe);
 // Registers in the iframe are parsed using the following convention:
 //
@@ -406,13 +384,18 @@ FUNCTION(riscv64_syscall_dispatcher)
     li     t2, ZX_SYS_COUNT
     bgeu   t0, t2, .Lunknown_syscall
 
-    // Jump to the right syscall wrapper. The syscall table is an
-    // array of 8 byte aligned routines for each syscall. Each routine
-    // marshalls some arguments and tail calls the routine which causes
-    // the wrapper to return to .Lpost_syscall.
-    slli   t0, t0, 3
-    lla    t2, .Lsyscall_table
-    add    t2, t2, t0
+    // Jump to the right syscall wrapper C++ function via assembly
+    // trampolines.  The trampolines expect the user PC in t1 and the user's
+    // arguments in the a0..a7 registers; they may write to the word at 0(sp).
+    // Each trampoline marshalls some arguments and tail calls the routine
+    // which causes the wrapper to return to .Lpost_syscall.  The syscall
+    // table is an array of offsets to trampoline entry points defined by the
+    // `syscall_dispatcher` macro (see below).
+    lla    t2, syscall_dispatcher_table
+    sll    t0, t0, 2   // Scale to 4 bytes per entry.
+    add    t0, t2, t0  // Index into the table.
+    lw     t2, (t0)    // Load 32-bit offset and sign-extend it.
+    add    t2, t2, t0  // Materialize the full trampoline PC.
     jalr   t2
 
 .Lpost_syscall:
@@ -430,9 +413,47 @@ FUNCTION(riscv64_syscall_dispatcher)
     call syscall_from_restricted // This does not return.
     unimp
 
-// Adds the label for the jump table.
-.balign 8
-.Lsyscall_table:
+END_FUNCTION(riscv64_syscall_dispatcher)
+
+// This establishes the label at the beginning of the section,
+// before any syscall_dispatcher macro invocations add to it.
+.pushsection .rodata.syscall_dispatcher_table, "a", %progbits
+.balign 4
+syscall_dispatcher_table:  // Use a non-.L label so it appears in disassembly.
+
+//
+// Syscall args are in a0-a7 already.
+// pc is in t1 and needs to go in the next available register,
+// or the stack if the regs are full.
+//
+.macro syscall_dispatcher nargs, syscall
+    // Each trampoline goes into its own little .text section that the
+    // linker can move around arbitrarily. Relaxation can change the size
+    // of the code sequence at link time: `tail`, `call`, and `j` always
+    // expand to a multi-instruction sequence that might get relaxed down
+    // to a single instruction.
+    .pushsection .text.syscall_dispatcher.\syscall, "ax", %progbits
+    syscall_dispatcher.\syscall:  // This label will appear in disassembly.
+.if \nargs == 8
+    // store the pc in the slot we already left on the stack
+    sd     t1, (sp)
+.else
+    mv     a\nargs, t1
+.endif
+#ifndef KERNEL_NO_USERABI
+    tail   wrapper_\syscall
+#else
+    tail   unknown_syscall
+#endif
+    .popsection
+
+    // Each trampoline's address goes into the table so it can be indexed as a
+    // flat array of fixed-size pointers.  To keep the table smaller, rather
+    // than full pointers, store 32-bit offsets from the location of the
+    // pointer itself.  All the macro invocations are within the table's
+    // section, so after the .popsection this adds the next entry to the end.
+    .int syscall_dispatcher.\syscall - .
+.endm
 
 // One of these macros is invoked by kernel.inc for each syscall.
 // These are the direct kernel entry points.
@@ -450,4 +471,5 @@ FUNCTION(riscv64_syscall_dispatcher)
 #undef BLOCKING_SYSCALL
 #undef VDSO_SYSCALL
 
-END_FUNCTION(riscv64_syscall_dispatcher)
+.size syscall_dispatcher_table, . - syscall_dispatcher_table
+.popsection
