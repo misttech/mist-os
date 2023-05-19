@@ -452,7 +452,7 @@ class FuchsiaTestCommand {
       if (_packageRepository == null) {
         emitEvent(TestResult.failedPreprocessing(
           message:
-              'Package repository is not available. Run "fx serve-updates" again or use the "--no-use-package-hash" flag.',
+              'Package repository is not available. Run "fx serve" again or use the "--no-use-package-hash" flag.',
           testName: testBundle.testDefinition.name,
         ));
         return false;
