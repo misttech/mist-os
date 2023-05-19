@@ -48,9 +48,6 @@ class WlanphyDeviceTest : public ::zxtest::Test,
         fake_wlan_phy_impl_device_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()) {
     zx_status_t status = ZX_OK;
 
-    status = wlanphy_init_loop();
-    EXPECT_EQ(ZX_OK, status);
-
     // Create end points for the protocol fuchsia_wlan_device::Phy, these two end points will be
     // bind with WlanphyDeviceTest(as fake wlandevicemonitor) and wlanphy device.
     auto endpoints_phy = fidl::CreateEndpoints<fuchsia_wlan_device::Phy>();
@@ -76,24 +73,35 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     // Create the server dispatcher of fuchsia_wlan_phyimpl::WlanPhyImpl protocol, its lifecycle
     // will be maintained by this test class.
     auto server_dispatcher_phy_impl_status = fdf::SynchronizedDispatcher::Create(
-        {}, "wlan-phy-test",
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan-phy-test",
         [&](fdf_dispatcher_t*) { server_dispatcher_phy_impl_completion_.Signal(); });
     ASSERT_FALSE(server_dispatcher_phy_impl_status.is_error());
     server_dispatcher_phy_impl_ = std::move(*server_dispatcher_phy_impl_status);
 
-    // Establish FIDL connection based on fuchsia_wlan_phyimpl::WlanPhyImpl protocol.
-    wlanphy_device_ =
-        new Device(fake_wlan_phy_impl_device_.get(), std::move(endpoints_phy_impl->client));
-    EXPECT_EQ(ZX_OK, wlanphy_device_->DeviceAdd());
-    // Call DdkAsyncRemove() here to make ReleaseFlaggedDevices fully executed. This function will
-    // stop the device from working properly, so we can call it anywhere before
-    // ReleaseFlaggedDevices() is called. We just call it as soon as the device is created here.
-    wlanphy_device_->DdkAsyncRemove();
+    libsync::Completion wlanphy_created;
+    async::PostTask(driver_dispatcher_.dispatcher(), [&]() {
+      wlanphy_device_ =
+          new Device(fake_wlan_phy_impl_device_.get(), std::move(endpoints_phy_impl->client));
+
+      EXPECT_EQ(ZX_OK, wlanphy_device_->DeviceAdd());
+
+      // Establish FIDL connection based on fuchsia_wlan_phyimpl::WlanPhyImpl protocol.
+      // Call DdkAsyncRemove() here to make ReleaseFlaggedDevices fully executed. This function will
+      // stop the device from working properly, so we can call it anywhere before
+      // ReleaseFlaggedDevices() is called. We just call it as soon as the device is created here.
+      wlanphy_device_->DdkAsyncRemove();
+
+      // Establish FIDL connection based on fuchsia_wlan_device::Phy protocol.
+      wlanphy_device_->Connect(std::move(endpoints_phy->server));
+
+      wlanphy_created.Signal();
+    });
+
+    status = wlanphy_created.Wait(zx::sec(10));
+    EXPECT_OK(status);
+    EXPECT_NOT_NULL(wlanphy_device_);
 
     fdf::BindServer(server_dispatcher_phy_impl_.get(), std::move(endpoints_phy_impl->server), this);
-
-    // Establish FIDL connection based on fuchsia_wlan_device::Phy protocol.
-    wlanphy_device_->Connect(std::move(endpoints_phy->server));
 
     // Initialize struct to avoid random values.
     memset(static_cast<void*>(&create_iface_req_), 0, sizeof(create_iface_req_));
@@ -222,6 +230,9 @@ class WlanphyDeviceTest : public ::zxtest::Test,
 
   // The completion to ensure server_dispatcher_phy_impl_'s shutdown before destroy.
   libsync::Completion server_dispatcher_phy_impl_completion_;
+
+  // The driver dispatcher used for testing.
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
 };
 
 TEST_F(WlanphyDeviceTest, GetSupportedMacRoles) {

@@ -31,7 +31,7 @@ namespace wlan_internal = ::fuchsia::wlan::internal;
 Device::Device(zx_device_t* parent)
     : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                     ::ddk::Unbindable>(parent),
-      server_dispatcher_(wlanphy_async_t()) {
+      server_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {
   ltrace_fn();
   ZX_ASSERT_MSG(parent != nullptr, "No parent device assigned for wlanphy device.");
 
@@ -51,7 +51,7 @@ Device::Device(zx_device_t* parent)
 Device::Device(zx_device_t* parent, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client)
     : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                     ::ddk::Unbindable>(parent),
-      server_dispatcher_(wlanphy_async_t()) {
+      server_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {
   ltrace_fn();
   ZX_ASSERT_MSG(parent != nullptr, "No parent device assigned for wlanphy device.");
 
@@ -117,7 +117,6 @@ void Device::DdkUnbind(::ddk::UnbindTxn txn) {
   // UnbindTxn in the shutdown callback of the dispatcher, so that we can make sure DdkUnbind()
   // won't end before the dispatcher shutdown.
   unbind_txn_ = std::move(txn);
-  wlanphy_destroy_loop();
   client_dispatcher_.ShutdownAsync();
 }
 

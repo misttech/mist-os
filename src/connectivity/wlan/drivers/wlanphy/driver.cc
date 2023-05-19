@@ -18,33 +18,6 @@
 #include "debug.h"
 #include "device.h"
 
-// Not guarded by a mutex, because it will be valid between .init and .release and nothing else will
-// exist outside those two calls.
-static async::Loop* loop = nullptr;
-static std::once_flag flag;
-
-zx_status_t wlanphy_init_loop() {
-  zx_status_t status = ZX_OK;
-  loop = new async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  status = loop->StartThread("wlanphy-loop");
-  if (status != ZX_OK) {
-    lerror("could not create event loop: %s", zx_status_get_string(status));
-    delete loop;
-    loop = nullptr;
-    return status;
-  } else {
-    linfo("event loop started");
-  }
-
-  return status;
-}
-
-zx_status_t wlanphy_init(void** out_ctx) {
-  static zx_status_t status = ZX_ERR_BAD_STATE;
-  std::call_once(flag, []() { status = wlanphy_init_loop(); });
-  return status;
-}
-
 zx_status_t wlanphy_bind(void* ctx, zx_device_t* device) {
   wlan::drivers::log::Instance::Init(kFiltSetting);
   ltrace_fn();
@@ -70,24 +43,9 @@ zx_status_t wlanphy_bind(void* ctx, zx_device_t* device) {
   return status;
 }
 
-async_dispatcher_t* wlanphy_async_t() {
-  if (loop == nullptr) {
-    lerror("Loop is not initialized.");
-    return nullptr;
-  }
-
-  return loop->dispatcher();
-}
-
-void wlanphy_destroy_loop() {
-  loop->Shutdown();
-  delete loop;
-}
-
 static constexpr zx_driver_ops_t wlanphy_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.init = wlanphy_init;
   ops.bind = wlanphy_bind;
   return ops;
 }();
