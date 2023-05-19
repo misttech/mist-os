@@ -10,7 +10,7 @@ type PciBdf = struct {
     function_id uint8;
 };
 
-const DEVICES_PER_BUS uint8 = 64;
+const DEVICES_PER_BUS uint8 = 32;
 const FUNCTIONS_PER_DEVICE uint8 = 8;
 const PINS_PER_FUNCTION uint8 = 4;
 
