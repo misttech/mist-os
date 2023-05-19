@@ -1996,6 +1996,17 @@ impl DynamicFileSource for ProcStatFile {
             stats[0] = thread_group.get_ppid() as u64;
             stats[1] = thread_group.process_group.leader as u64;
             stats[2] = thread_group.process_group.session.leader as u64;
+
+            // TTY device ID.
+            {
+                let session = thread_group.process_group.session.read();
+                stats[3] = session
+                    .controlling_terminal
+                    .as_ref()
+                    .map(|t| t.terminal.device().bits())
+                    .unwrap_or(0);
+            }
+
             stats[16] = thread_group.tasks.len() as u64;
             stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
         }

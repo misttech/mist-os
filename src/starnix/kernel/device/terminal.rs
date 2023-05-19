@@ -283,6 +283,10 @@ impl Terminal {
         }
     }
 
+    pub fn device(self: &Arc<Self>) -> DeviceType {
+        get_device_type_for_pts(self.id)
+    }
+
     state_accessor!(Terminal, mutable_state);
 }
 

@@ -93,7 +93,7 @@ impl FileSystemOps for DevPtsFs {
 }
 
 // Construct the DeviceType associated with the given pts replicas.
-fn get_device_type_for_pts(id: u32) -> DeviceType {
+pub fn get_device_type_for_pts(id: u32) -> DeviceType {
     DeviceType::new(DEVPTS_FIRST_MAJOR + id / 256, id % 256)
 }
 
