@@ -23,7 +23,7 @@ fx qemu -kN
 In terminal 2, serve package updates:
 
 ```bash
-fx serve-updates
+fx serve
 ```
 
 In terminal 3, read the logs:

@@ -40,14 +40,12 @@ build generates and serves a [TUF][TUF-home] file tree.
 
 The update agent on the target does not initially know where to look for
 updates. To connect the agent on the target to the HTTP server running on the
-development host, it must be told the IP address of the development host.
-The host HTTP server is started and the update agent is configured by calling
-`fx serve -v` or `fx serve-updates -v`.  `fx serve` will run both the bootserver
-and the update server and is often what people use. `fx serve-updates` runs just
-the update server. In both cases, `-v` is recommended because the command will
-print more output, which may assist with debugging. If the host connects
-successfully to the target you will see the message `Ready to push packages!` in
-the shell on your host.
+development host, it must be told the IP address of the development host.  The
+host HTTP server is started and the update agent is configured by calling `fx
+serve -v`.  `fx serve` will run the update server and is often what people use.
+`-v` is recommended because the command will print more output, which may assist
+with debugging. If the host connects successfully to the target you will see the
+message `Ready to push packages!` in the shell on your host.
 
 The update agent on the target will remain configured until it is repaved or
 persistent data is lost. The host will attempt to reconfigure the update agent
@@ -92,7 +90,6 @@ completion of the OTA the device will reboot.
 ## Just the commands
 
 * `fx serve -v` (to run the update server for both build-push and ota)
-  * `fx serve-updates -v` (to run only the update server, not the bootserver)
 * `fx run <component-url>` (each time a change is made you want to run)
 * `fx test <component-url>` (to build and run tests)
 * `fx ota` (to trigger a full system update and reboot)

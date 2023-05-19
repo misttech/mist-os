@@ -196,8 +196,8 @@ Note: You can explore the full source for the realm component at
    fx build
    ```
 
-1. Start or restart your device and package server (`fx serve` or
-   `fx serve-updates`) to ensure the Dart runner package can be served.
+1. Start or restart your device and package server (`fx serve`) to ensure the
+   Dart runner package can be served.
 
 1. Run the `echo_realm` component. This creates the client and server component
    instances and routes the capabilities:

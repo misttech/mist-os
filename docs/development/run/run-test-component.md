@@ -108,10 +108,10 @@ You now have a build that includes the example tests that can be
 
 ## Run the test suite {#run-the-test-suite}
 
-1.  Open a terminal and run `fx serve-updates`:
+1.  Open a terminal and run `fx serve`:
 
     ```posix-terminal
-    fx serve-updates
+    fx serve
     ```
 
 1.  Open another terminal and run the `hello-world` unit tests:

@@ -156,10 +156,10 @@ To run a Fuchsia component, use its
 [Fuchsia package URL](/docs/glossary/README.md#fuchsia-pkg-url) as an argument
 to the `run` command:
 
-1.  Open a terminal and run `fx serve-updates`:
+1.  Open a terminal and run `fx serve`:
 
     ```posix-terminal
-    fx serve-updates
+    fx serve
     ```
 
 1.  Open another terminal and run the example component:
@@ -190,9 +190,9 @@ to the `run` command:
 
 ### Troubleshooting {#troubleshooting}
 
-If `fx serve-updates` is not running, the command prints an error message from
-the device or emulator.
+If `fx serve` is not running, the command prints an error message from the
+device or emulator.
 
-If `fx serve-updates` is running, but the package is not found,
+If `fx serve` is running, but the package is not found,
 [repeat these steps](#include-the-example) and rebuild your Fuchsia image to
 include the appropriate packages.

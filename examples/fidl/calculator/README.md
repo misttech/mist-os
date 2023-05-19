@@ -45,7 +45,7 @@ ffx emu start --headless workstation_eng.qemu-x64
 1. start the package server:
 
 ```
-fx serve-updates
+fx serve
 ```
 
 After the emulator & package server are running, the instructions differ based
@@ -143,7 +143,7 @@ differs slightly depending on the language used.
 **Client**
 
 To run the client tests, ensure you have an available Fuchsia target (ex: `ffx
-emu start`) and are serving packages (ex: `fx serve-updates`) then run the
+emu start`) and are serving packages (ex: `fx serve`) then run the
 following:
 
 ```
@@ -153,8 +153,7 @@ fx test calculator-client-rust-unittests
 **Server**
 
 To run the server tests, ensure you have an available Fuchsia target (ex: `ffx
-emu start`) and are serving packages (ex: `fx serve-updates`) then run the
-following:
+emu start`) and are serving packages (ex: `fx serve`) then run the following:
 
 ```
 fx test calculator-server-rust-unittests
@@ -165,8 +164,7 @@ fx test calculator-server-rust-unittests
 **Client**
 
 To run the client tests, ensure you have an available Fuchsia target (ex: `ffx
-emu start`) and are serving packages (ex: `fx serve-updates`) then run the
-following:
+emu start`) and are serving packages (ex: `fx serve`) then run the following:
 
 ```
 fx test calculator-client-cpp-parser-unittests

@@ -20,5 +20,5 @@ If you do not already have an instance running, start the emulator:
 1.  Start a package server to enable the emulator to load software packages:
 
     ```posix-terminal
-    fx serve-updates
+    fx serve
     ```

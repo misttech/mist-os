@@ -21,25 +21,25 @@ Run the following command to start a package server and enable the emulator to
 load software packages:
 
 ```posix-terminal
-fx serve-updates
+fx serve
 ```
 
 The command prints output similar to the following, indicating the server is
 running and has successfully registered the emulator as a target device:
 
 ```none {:.devsite-disable-click-to-copy}
-[serve-updates] Discovery...
-[serve-updates] Device up
-[serve-updates] Registering devhost as update source
-[serve-updates] Ready to push packages!
-[serve-updates] Target uptime: 139
+[serve] Discovery...
+[serve] Device up
+[serve] Registering devhost as update source
+[serve] Ready to push packages!
+[serve] Target uptime: 139
 [pm auto] adding client: [fe80::5888:cea3:7557:7384%qemu]:46126
 [pm auto] client count: 1
 ```
 
 ### Examine the package server
 
-The `fx serve-updates` command runs a **local package server** used to deliver
+The `fx serve` command runs a **local package server** used to deliver
 packages to the target devices. By default, this server runs at on port 8083.
 
 Open a browser to `http://localhost:8083`. This loads an HTML page listing all

@@ -65,7 +65,7 @@ fx netboot
 ```
 ```
 # shell 2
-fx serve-updates
+fx serve
 ```
 
 As of January 2020, the `fx netboot` script quits after one serve. This isn't desirable when

@@ -238,7 +238,7 @@ to your `~/.bashrc` or equivalent. This change results in the following:
 * `fx test` only builds the minimal targets required for running. For component tests,
   that's the package, its GN dependencies and `//zircon`.
 
-* `fx serve` does not pave or flash; it is equivalent of `fx serve-updates`.
+* `fx serve` does not pave or flash.
 
 * `fx pave` by default exits after paving a single time. Use `--keep-running` to
   override.
@@ -360,13 +360,13 @@ The command `fx serve` performs two functions internally:
 
 * `fx pave` start a paving server, used for "fresh installs" of a Fuchsia
   device from a Zedboot state.
-* `fx serve-updates` start a package repository server, used for dynamic
+* `fx serve` start a package repository server, used for dynamic
   installation of software at runtime, as well as whole-system updates.
 
-Internally the `fx serve-updates` command also searches for a device to
-configure, and upon discovery (which may be restricted/modulated with
-`fx set-device` or `fx -d`) the target device is configured to use the
-repository server as a source of dynamic packages and system updates.
+Internally the `fx serve` command also searches for a device to configure, and
+upon discovery (which may be restricted/modulated with `fx set-device` or `fx
+-d`) the target device is configured to use the repository server as a source of
+dynamic packages and system updates.
 
 ## Update a target device {#update-a-target-device}
 
