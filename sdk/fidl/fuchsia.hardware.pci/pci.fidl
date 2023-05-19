@@ -12,6 +12,7 @@ const READBAR_MAX_SIZE uint32 = 1024;
 
 // Per the PCI specification.
 const BASE_CONFIG_SIZE uint32 = 256;
+const EXTENDED_CONFIG_SIZE uint32 = 4096;
 const BASE_ADDRESS_COUNT uint32 = 6;
 
 const MAX_NAME_LEN uint32 = 32;
