@@ -44,8 +44,9 @@ print_usage_and_exit() {
 host_platform() {
   readonly uname="$(uname -s -m)"
   case "${uname}" in
-  "Linux x86_64") echo linux-x64 ;;
+  "Darwin arm64") echo mac-arm64 ;;
   "Darwin x86_64") echo mac-x64 ;;
+  "Linux x86_64") echo linux-x64 ;;
   *)
     echo "unsupported infrastructure platform: ${uname}" 1>&2
     exit 1
