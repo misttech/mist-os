@@ -98,7 +98,7 @@ component that represents this process. When the process exits, this component
 will disappear from the component topology.
 
 The `<component-url>` is the component URL for the binary you wish to run. For
-example, `fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm` is the
+example, `fuchsia-pkg://fuchsia.com/hello_starnix#meta/hello_starnix.cm` is the
 component URL for the `hello_starnix` binary. The component manifest specifies
 which binary to run. The binary can be inside the container (e.g., `/bin/sh`)
 or the binary can be in the package that contains the component.

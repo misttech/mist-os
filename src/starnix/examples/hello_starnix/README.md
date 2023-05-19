@@ -16,7 +16,7 @@ You can confirm that this container is running using `ffx component list`. If ev
 Next, run `hello_starnix` inside this container:
 
 ```sh
-ffx component run --connect-stdio /core/starnix_runner/playground:starless/daemons:hello_starnix fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm
+ffx component run --connect-stdio /core/starnix_runner/playground:starless/daemons:hello_starnix fuchsia-pkg://fuchsia.com/hello_starnix#meta/hello_starnix.cm
 ```
 
 This command should produce the following output:
