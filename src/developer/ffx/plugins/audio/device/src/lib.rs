@@ -229,7 +229,16 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 
     let print_text_output = || -> Result<(), anyhow::Error> {
         let printable_unique_id: String = match stream_properties.unique_id {
-            Some(unique_id) => std::str::from_utf8(&unique_id)?.to_owned(),
+            Some(unique_id) => {
+                let formatted: [String; 16] = unique_id
+                    .into_iter()
+                    .map(|byte| format!("{:02x}", byte))
+                    .collect::<Vec<String>>()
+                    .try_into()
+                    .unwrap_or_default();
+
+                format!("{:}-{:}", formatted[0..7].concat(), formatted[8..15].concat())
+            }
             None => format!("Unavaiable"),
         };
 
