@@ -12,6 +12,12 @@
 
 namespace lazy_init::internal {
 
+constexpr void Assert(bool condition) {
+  if (!condition) {
+    __builtin_abort();
+  }
+}
+
 // Empty type that is trivially constructible/destructible.
 struct Empty {};
 

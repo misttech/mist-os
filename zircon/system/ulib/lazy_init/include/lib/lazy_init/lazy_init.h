@@ -5,8 +5,6 @@
 #ifndef LIB_LAZY_INIT_LAZY_INIT_H_
 #define LIB_LAZY_INIT_LAZY_INIT_H_
 
-#include <zircon/assert.h>
-
 #include <atomic>
 #include <cstddef>
 #include <new>
@@ -127,7 +125,7 @@ class LazyInit<T, CheckType::Basic, Destructor::Disabled> {
   T& Initialize(Args&&... args) {
     static_assert(alignof(LazyInit) >= alignof(T));
 
-    ZX_ASSERT(!initialized_);
+    internal::Assert(!initialized_);
     initialized_ = true;
     Access::Initialize(&storage_.value, std::forward<Args>(args)...);
     return *storage_;
@@ -137,12 +135,12 @@ class LazyInit<T, CheckType::Basic, Destructor::Disabled> {
   // is already performed, however, it is up to the caller to ensure that the
   // effects of initialization are visible.
   T& Get() {
-    ZX_ASSERT(initialized_);
+    internal::Assert(initialized_);
     return *storage_;
   }
 
   const T& Get() const {
-    ZX_ASSERT(initialized_);
+    internal::Assert(initialized_);
     return *storage_;
   }
 
@@ -166,7 +164,7 @@ class LazyInit<T, CheckType::Basic, Destructor::Disabled> {
   // Explicitly destroys the wrapped global. Called by the specialization of
   // LazyInit with the destructor enabled.
   void Destruct() {
-    ZX_ASSERT(initialized_);
+    internal::Assert(initialized_);
     storage_->T::~T();
 
     // Prevent the compiler from omitting this write during destruction.
@@ -212,12 +210,12 @@ class LazyInit<T, CheckType::Atomic, Destructor::Disabled> {
   // is already performed. The effects of initialization are guaranteed to be
   // visible if the assertion passes.
   T& Get() {
-    AssertState(State::Initialized, state_.load(std::memory_order_relaxed));
+    internal::Assert(State::Initialized == state_.load(std::memory_order_relaxed));
     return *storage_;
   }
 
   const T& Get() const {
-    AssertState(State::Initialized, state_.load(std::memory_order_relaxed));
+    internal::Assert(State::Initialized == state_.load(std::memory_order_relaxed));
     return *storage_;
   }
 
@@ -247,20 +245,14 @@ class LazyInit<T, CheckType::Atomic, Destructor::Disabled> {
     Destroyed,
   };
 
-  // Asserts that the expected state matches the actual state.
-  void AssertState(State expected, State actual) const {
-    ZX_ASSERT_MSG(expected == actual, "expected=%d actual=%d", static_cast<int>(expected),
-                  static_cast<int>(actual));
-  }
-
   // Transitions the guard from the |expected| state to the |target| state.
   // Asserts that the expected state matches the actual state.
   void TransitionState(State expected, State target) {
     State actual = state_.load(std::memory_order_relaxed);
-    AssertState(expected, actual);
+    internal::Assert(expected == actual);
     while (!state_.compare_exchange_weak(actual, target, std::memory_order_acquire,
                                          std::memory_order_relaxed)) {
-      AssertState(expected, actual);
+      internal::Assert(expected == actual);
     }
   }
 
