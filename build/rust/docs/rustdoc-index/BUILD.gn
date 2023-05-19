@@ -9,6 +9,6 @@ rustc_library("rustdoc-index") {
   sources = [ "src/lib.rs" ]
   inputs = [
     "header.md",
-    "../../../../docs/reference/rust/crates.md",
+    "../../../../docs/reference/rust/_common/_crates_list.md",
   ]
 }
