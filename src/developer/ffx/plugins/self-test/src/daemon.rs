@@ -35,6 +35,8 @@ pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
             &format!("overnet.socket={}", ascendd_path2.to_string_lossy()),
             "daemon",
             "stop",
+            "-t",
+            "1000",
         ])
         .await?;
 
@@ -46,7 +48,7 @@ pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
         "Daemon didn't stay up after the stop message was sent to the other daemon."
     );
 
-    let _out = isolate.ffx(&["daemon", "stop"]).await?;
+    let _out = isolate.ffx(&["daemon", "stop", "-t", "1000"]).await?;
     fuchsia_async::unblock(move || daemon.wait()).await?;
 
     Ok(Some(isolate))
