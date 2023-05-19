@@ -49,8 +49,8 @@ pub fn merge(
         }
         serde_json::to_string_pretty(&document)?
     } else {
-        // Perform a simple JSON merge algorithm for .cmx files.
-        // TODO(fxbug.dev/102390): Delete once appmgr is gone.
+        // Perform a simple JSON merge algorithm for non-.cml files.
+        // TODO(fxbug.dev/127380): Remove this once test manifest fragments are merged as CML files
         let mut res = json!({});
         for filename in &files {
             let v: Value = json_or_json5_from_file(filename)?;

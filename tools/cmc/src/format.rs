@@ -5,40 +5,23 @@
 use crate::error::Error;
 use crate::util;
 use cml::format_cml;
-use serde::ser::Serialize;
-use serde_json::ser::{CompactFormatter, PrettyFormatter, Serializer};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::str::from_utf8;
 
-/// For `.cml` JSON5 files, format the file to match the default style. (The "pretty" option is
-/// ignored.) See format_cml() for current style conventions.
+/// Formats a CML file.
 ///
-/// For all other files, assume the input is standard JSON:
-/// Read in the json file from the given path, minify it if pretty is false or pretty-ify it if
-/// pretty is true, and then write the results to stdout if output is None or to the given path if
-/// output is Some.
-pub fn format(
-    file: &PathBuf,
-    pretty: bool,
-    cml: bool,
-    output: Option<PathBuf>,
-) -> Result<(), Error> {
+/// The file must be valid JSON5, but does not have to be valid CML.
+///
+/// If `output` is not given, prints the result to stdout.
+///
+/// See [format_cml] for current style conventions.
+pub fn format(file: &PathBuf, output: Option<PathBuf>) -> Result<(), Error> {
     let mut buffer = String::new();
     fs::File::open(&file)?.read_to_string(&mut buffer)?;
 
-    let file_path = file
-        .clone()
-        .into_os_string()
-        .into_string()
-        .map_err(|e| Error::internal(format!("Unhandled file path: {:?}", e)))?;
-
-    let res = if cml || file_path.ends_with(".cml") {
-        format_cml(&buffer, &file)?
-    } else {
-        format_cmx(buffer, pretty)?
-    };
+    let res = format_cml(&buffer, &file)?;
 
     if let Some(output_path) = output {
         util::ensure_directory_exists(&output_path)?;
@@ -56,19 +39,6 @@ pub fn format(
     Ok(())
 }
 
-pub fn format_cmx(buffer: String, pretty: bool) -> Result<Vec<u8>, Error> {
-    let v: serde_json::Value = serde_json::from_str(&buffer)?;
-    let mut res = Vec::new();
-    if pretty {
-        let mut ser = Serializer::with_formatter(&mut res, PrettyFormatter::with_indent(b"    "));
-        v.serialize(&mut ser)?;
-    } else {
-        let mut ser = Serializer::with_formatter(&mut res, CompactFormatter {});
-        v.serialize(&mut ser)?;
-    }
-    Ok(res)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,50 +46,9 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
 
-    fn count_num_newlines(input: &str) -> usize {
-        let mut ret = 0;
-        for c in input.chars() {
-            if c == '\n' {
-                ret += 1;
-            }
-        }
-        ret
-    }
-
     #[test]
-    fn test_format_json() {
-        let example_json = r#"{ "program": { "binary": "bin/app"
-}, "sandbox": {
-"dev": [
-"class/camera" ], "features": [
- "persistent-storage", "vulkan"] } }"#;
-        let tmp_dir = TempDir::new().unwrap();
-
-        let tmp_file_path = tmp_dir.path().join("input.json");
-        File::create(&tmp_file_path).unwrap().write_all(example_json.as_bytes()).unwrap();
-
-        let output_file_path = tmp_dir.path().join("output.json");
-
-        // format as not-pretty
-        let result = format(&tmp_file_path, false, false, Some(output_file_path.clone()));
-        assert!(result.is_ok());
-
-        let mut buffer = String::new();
-        File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
-        assert_eq!(0, count_num_newlines(&buffer));
-
-        // format as pretty (not .cml)
-        let result = format(&tmp_file_path, true, false, Some(output_file_path.clone()));
-        assert!(result.is_ok());
-
-        let mut buffer = String::new();
-        File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
-        assert_eq!(13, count_num_newlines(&buffer));
-    }
-
-    #[test]
-    fn test_format_json5() {
-        let example_json5 = r##"{
+    fn test_format_cml() {
+        let example_cml = r##"{
     offer: [
         {
             runner: "elf",
@@ -219,12 +148,11 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
 
         let tmp_file_path = tmp_dir.path().join("input.cml");
-        File::create(&tmp_file_path).unwrap().write_all(example_json5.as_bytes()).unwrap();
+        File::create(&tmp_file_path).unwrap().write_all(example_cml.as_bytes()).unwrap();
 
         let output_file_path = tmp_dir.path().join("output.cml");
 
-        // format as json5 with .cml style options
-        let result = format(&tmp_file_path, false, true, Some(output_file_path.clone()));
+        let result = format(&tmp_file_path, Some(output_file_path.clone()));
         assert!(result.is_ok());
 
         let mut buffer = String::new();
@@ -234,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_format_cml_with_environments() {
-        let example_json5 = r##"{
+        let example_cml = r##"{
     include: [ "src/sys/test_manager/meta/common.shard.cml" ],
     environments: [
         {
@@ -315,12 +243,11 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
 
         let tmp_file_path = tmp_dir.path().join("input.cml");
-        File::create(&tmp_file_path).unwrap().write_all(example_json5.as_bytes()).unwrap();
+        File::create(&tmp_file_path).unwrap().write_all(example_cml.as_bytes()).unwrap();
 
         let output_file_path = tmp_dir.path().join("output.cml");
 
-        // format as json5 with .cml style options
-        let result = format(&tmp_file_path, false, true, Some(output_file_path.clone()));
+        let result = format(&tmp_file_path, Some(output_file_path.clone()));
         assert!(result.is_ok());
 
         let mut buffer = String::new();
@@ -329,44 +256,26 @@ mod tests {
     }
 
     #[test]
-    fn test_format_invalid_json_fails() {
-        let example_json = "{\"foo\": 1,}";
-        let tmp_dir = TempDir::new().unwrap();
-
-        let tmp_file_path = tmp_dir.path().join("input.json");
-        File::create(&tmp_file_path).unwrap().write_all(example_json.as_bytes()).unwrap();
-
-        // format as not-pretty (not .cml)
-        let result = format(&tmp_file_path, false, false, None);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_format_invalid_json_may_be_valid_json5() {
-        let example_json = "{\"foo\": 1,}";
-        let tmp_dir = TempDir::new().unwrap();
-
-        let tmp_file_path = tmp_dir.path().join("input.json");
-        File::create(&tmp_file_path).unwrap().write_all(example_json.as_bytes()).unwrap();
-
-        // json formatter
-        let result = format(&tmp_file_path, false, false, None);
-        assert!(result.is_err());
-        // json5 formatter
-        let result = format(&tmp_file_path, false, true, None);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_format_invalid_json5_fails() {
-        let example_json5 = "{\"foo\" 1}";
+    fn test_format_valid_json5() {
+        let example_json5 = "{\"foo\": 1,}";
         let tmp_dir = TempDir::new().unwrap();
 
         let tmp_file_path = tmp_dir.path().join("input.json");
         File::create(&tmp_file_path).unwrap().write_all(example_json5.as_bytes()).unwrap();
 
-        // json5 formatter
-        let result = format(&tmp_file_path, false, true, None);
+        let result = format(&tmp_file_path, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_format_invalid_json5() {
+        let invalid_json5 = "{\"foo\" 1}";
+        let tmp_dir = TempDir::new().unwrap();
+
+        let tmp_file_path = tmp_dir.path().join("input.json");
+        File::create(&tmp_file_path).unwrap().write_all(invalid_json5.as_bytes()).unwrap();
+
+        let result = format(&tmp_file_path, None);
         assert!(result.is_err());
     }
 }

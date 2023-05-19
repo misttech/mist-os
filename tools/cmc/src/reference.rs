@@ -4,14 +4,12 @@
 
 use {
     crate::{error::Error, util},
-    serde_json,
     std::{fs, path::PathBuf},
 };
 
 enum ComponentManifest {
     Cml(cml::Document),
     Cm(cm_rust::ComponentDecl),
-    Cmx(serde_json::Value),
 }
 
 // These runners respect `program.binary`. We only validate the `program` section for components
@@ -82,10 +80,9 @@ fn read_package_manifest(path: &PathBuf) -> Result<String, Error> {
 
 fn read_component_manifest(path: &PathBuf) -> Result<ComponentManifest, Error> {
     const BAD_EXTENSION: &str = "Input file does not have a component manifest extension \
-                                 (.cm or .cml or .cmx)";
+                                 (.cm or .cml)";
     let ext = path.extension().and_then(|e| e.to_str());
     Ok(match ext {
-        Some("cmx") => ComponentManifest::Cmx(util::read_cmx(path)?),
         Some("cml") => ComponentManifest::Cml(util::read_cml(path)?),
         Some("cm") => ComponentManifest::Cm(util::read_cm(path)?),
         _ => {
@@ -112,19 +109,6 @@ fn get_program_binary(component_manifest: &ComponentManifest) -> Option<String> 
             Some(program) => match program.info.get("binary") {
                 Some(binary) => match binary.as_str() {
                     Some(value) => Some(value.to_owned()),
-                    None => None,
-                },
-                None => None,
-            },
-            None => None,
-        },
-        ComponentManifest::Cmx(body) => match body.get("program") {
-            Some(program) => match program.as_object() {
-                Some(program) => match program.get("binary") {
-                    Some(binary) => match binary.as_str() {
-                        Some(value) => Some(value.to_owned()),
-                        None => None,
-                    },
                     None => None,
                 },
                 None => None,
@@ -163,9 +147,6 @@ fn get_component_runner(component_manifest: &ComponentManifest) -> Option<String
     match component_manifest {
         ComponentManifest::Cml(document) => {
             document.program.as_ref().and_then(|p| p.runner.as_ref().map(|s| s.as_str().to_owned()))
-        }
-        ComponentManifest::Cmx(payload) => {
-            payload.get("runner").and_then(|r| r.as_str().map(|s| s.to_owned()))
         }
         ComponentManifest::Cm(decl) => {
             decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))
@@ -286,29 +267,7 @@ mod tests {
     #[test]
     fn validate_returns_ok_if_program_binary_empty() {
         let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(&tmp_dir, "test.cmx", json!({}));
-        let package_manifest = tmp_file(
-            &tmp_dir,
-            "test.fini",
-            fini_file!("bin/hello_world=hello_world", "lib/foo=foo"),
-        );
-
-        assert_matches!(validate(&component_manifest, &package_manifest, None), Ok(()));
-    }
-
-    #[test]
-    fn validate_returns_ok_for_proper_cmx() {
-        let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(
-            &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
-                    "binary": "bin/hello_world"
-                },
-                "runner": "elf"
-            }),
-        );
+        let component_manifest = tmp_file(&tmp_dir, "empty.cml", json!({}));
         let package_manifest = tmp_file(
             &tmp_dir,
             "test.fini",
@@ -366,15 +325,15 @@ mod tests {
     #[test]
     fn validate_returns_ok_for_test_binaries() {
         let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(
+        let component_manifest = compiled_tmp_file(
             &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
-                    "binary": "test/hello_world"
+            "test.cm",
+            r#"{
+                program: {
+                    runner: "elf",
+                    binary: "test/hello_world",
                 },
-                "runner": "elf"
-            }),
+            }"#,
         );
         let package_manifest = tmp_file(
             &tmp_dir,
@@ -388,15 +347,15 @@ mod tests {
     #[test]
     fn validate_returns_ok_for_disabled_test_binaries() {
         let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(
+        let component_manifest = compiled_tmp_file(
             &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
-                    "binary": "test/hello_world"
+            "test.cm",
+            r#"{
+                program: {
+                    runner: "elf",
+                    binary: "test/disabled/hello_world",
                 },
-                "runner": "elf"
-            }),
+            }"#,
         );
         let package_manifest = tmp_file(
             &tmp_dir,
@@ -408,86 +367,19 @@ mod tests {
     }
 
     #[test]
-    fn validate_returns_ok_for_ignored_runners() {
-        let tmp_dir = TempDir::new().unwrap();
-        let package_manifest = tmp_file(&tmp_dir, "test.fini", "");
-
-        // Normally, an empty package manifest file would yield an error.
-        // However, the following runners are ignored during validation.
-        for runner in [
-            "fuchsia-pkg://fuchsia.com/guest-runner#meta/guest_runner.cmx",
-            "fuchsia-pkg://fuchsia.com/appmgr_mock_runner#meta/appmgr_mock_runner.cmx",
-            "fuchsia-pkg://fuchsia.com/netemul-runner#meta/netemul-runner.cmx",
-            "fuchsia-pkg://fuchsia.com/dart_jit_runner#meta/dart_jit_runner.cmx",
-        ]
-        .iter()
-        {
-            let component_manifest = tmp_file(
-                &tmp_dir,
-                "test.cmx",
-                json!({
-                    "program": {
-                        "binary": "bin/hello_world"
-                    },
-                    "runner": runner
-                }),
-            );
-
-            assert_matches!(validate(&component_manifest, &package_manifest, None), Ok(()));
-        }
-    }
-
-    #[test]
-    fn validate_returns_ok_if_runner_not_provided() {
-        let tmp_dir = TempDir::new().unwrap();
-        let package_manifest = tmp_file(&tmp_dir, "test.fini", fini_file!("bin/hello_world"));
-
-        let component_manifest = tmp_file(
-            &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
-                    "binary": "bin/hello_world"
-                }
-            }),
-        );
-
-        assert_matches!(validate(&component_manifest, &package_manifest, None), Ok(()));
-    }
-
-    #[test]
-    fn validate_returns_err_if_runner_not_provided_and_binary_not_found() {
-        let tmp_dir = TempDir::new().unwrap();
-        let package_manifest = tmp_file(&tmp_dir, "test.fini", fini_file!("bin/hello_world"));
-
-        let component_manifest = tmp_file(
-            &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
-                    "binary": "test/hello_world"
-                }
-            }),
-        );
-
-        assert_matches!(validate(&component_manifest, &package_manifest, None),
-        Err(Error::Validate { schema_name: None, err, .. }) if err.contains("test/hello_world is not provided by deps!") && err.contains("Did you mean bin/hello_world?"));
-    }
-
-    #[test]
     fn validate_returns_err_if_package_manifest_is_empty() {
         let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(
-            &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
-                    "binary": "bin/hello_world"
-                },
-                "runner": "elf"
-            }),
-        );
         let package_manifest = tmp_file(&tmp_dir, "test.fini", "");
+        let component_manifest = compiled_tmp_file(
+            &tmp_dir,
+            "test.cm",
+            r#"{
+                program: {
+                    runner: "elf",
+                    binary: "bin/hello_world",
+                },
+            }"#,
+        );
 
         assert_matches!(validate(&component_manifest, &package_manifest, None), Err(_));
     }
@@ -495,15 +387,15 @@ mod tests {
     #[test]
     fn validate_returns_err_if_binary_not_found() {
         let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(
+        let component_manifest = compiled_tmp_file(
             &tmp_dir,
-            "test.cmx",
-            json!({
-                "program": {
+            "test.cm",
+            r#"{
+                program: {
+                    runner: "elf",
                     "binary": "bin/not_a_listed_binary"
                 },
-                "runner": "elf"
-            }),
+            }"#,
         );
         let package_manifest = tmp_file(
             &tmp_dir,
@@ -548,29 +440,6 @@ mod tests {
                     binary: "bin/hello_world",
                 }
             "#,
-        );
-        let package_manifest = tmp_file(
-            &tmp_dir,
-            "test.fini",
-            fini_file!("bin/hello_world=hello_world", "lib/foo=foo"),
-        );
-
-        assert_matches!(validate(&component_manifest, &package_manifest, None), Err(_));
-    }
-
-    #[test]
-    fn validate_returns_err_if_cmx_is_malformed() {
-        let tmp_dir = TempDir::new().unwrap();
-        let component_manifest = tmp_file(
-            &tmp_dir,
-            "test.cmx",
-            // json parser should break when encountering unquoted keys.
-            r#"{
-                program: {
-                    binary: "bin/hello_world"
-                }
-                runner: "elf",
-            }"#,
         );
         let package_manifest = tmp_file(
             &tmp_dir,
