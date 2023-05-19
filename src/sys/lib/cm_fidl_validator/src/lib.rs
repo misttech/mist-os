@@ -1672,8 +1672,8 @@ impl<'a> ValidationContext<'a> {
         }
         for (_, offer_group) in offer_groups {
             if offer_group.len() == 1 {
-                // If there is not multiple offers for a (target_name, target) pair then there are
-                // no aggregation conditions to check.
+                // If there is not multiple offers for a  target_name, target pair then there are no
+                // aggregation conditions to check.
                 continue;
             }
             let mut source_instance_filter_entries: HashSet<String> = HashSet::new();
@@ -1682,7 +1682,6 @@ impl<'a> ValidationContext<'a> {
                 // Currently only service capabilities can be aggregated
                 match o.source_instance_filter {
                     None => {
-                        // TODO(fxbug.dev/127502): this check may be too strict.
                         self.errors.push(Error::invalid_aggregate_offer(
                             "source_instance_filter must be set for all aggregate service offers",
                         ));
@@ -6958,8 +6957,7 @@ mod tests {
         },
 
         test_validate_environment_no_stop_timeout => {
-            input = {
-                let mut decl = new_component_decl();
+            input = {  let mut decl = new_component_decl();
                 decl.environments = Some(vec![fdecl::Environment {
                     name: Some("env".to_string()),
                     extends: Some(fdecl::EnvironmentExtends::None),
@@ -7952,7 +7950,7 @@ mod tests {
             ])),
         },
 
-        test_validate_service_aggregation_missing_filter => {
+        test_validate_invalid_service_aggregation_missing_filter => {
             input = {
                 let mut decl = new_component_decl();
                 decl.offers = Some(vec![

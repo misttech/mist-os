@@ -610,7 +610,6 @@ mod tests {
         let file = r#"
 {
     "program": {
-        "runner": "elf",
         "netstacks": [
             {
                 "name": "local",
@@ -668,11 +667,10 @@ mod tests {
         assert_eq!(config, example_config());
     }
 
-    #[test_case(r#"{ "program": { "runner": "elf", "netstacks": [] } }"#; "missing required field `networks`")]
+    #[test_case(r#"{ "program": { "netstacks": [] } }"#; "missing required field `networks`")]
     #[test_case(
         r#"{
             "program": {
-                "runner": "elf",
                 "netstacks": [],
                 "networks": [],
                 "endpoints": []
@@ -683,7 +681,6 @@ mod tests {
     #[test_case(
         r#"{
             "program": {
-                "runner": "elf",
                 "netstacks": [],
                 "networks": [
                     {
@@ -703,7 +700,6 @@ mod tests {
     #[test_case(
         r#"{
             "program": {
-                "runner": "elf",
                 "netstacks": [
                     {
                         "name": "ns",

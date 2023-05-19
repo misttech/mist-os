@@ -1699,8 +1699,7 @@ pub struct Environment {
     pub debug: Option<Vec<DebugRegistration>>,
 
     /// The number of milliseconds to wait, after notifying a component in this environment that it
-    /// should terminate, before forcibly killing it. This field is required if the environment
-    /// extends from `none`.
+    /// should terminate, before forcibly killing it.
     #[serde(rename = "__stop_timeout_ms")]
     #[reference_doc(json_type = "number", rename = "__stop_timeout_ms")]
     #[serde(skip_serializing_if = "Option::is_none")]

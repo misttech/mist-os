@@ -14,7 +14,6 @@ use {
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     indexmap::IndexMap,
-    itertools::Itertools,
     serde_json::{Map, Value},
     sha2::{Digest, Sha256},
     std::collections::{BTreeMap, BTreeSet},
@@ -32,7 +31,7 @@ pub fn compile(
         document.all_capability_names().into_iter().collect();
     let all_children = document.all_children_names().into_iter().collect();
     let all_collections = document.all_collection_names().into_iter().collect();
-    let component = fdecl::Component {
+    Ok(fdecl::Component {
         program: document.program.as_ref().map(|p| translate_program(p)).transpose()?,
         uses: document
             .r#use
@@ -78,11 +77,7 @@ pub fn compile(
             })
             .transpose()?,
         ..Default::default()
-    };
-
-    cm_fidl_validator::validate(&component).map_err(Error::fidl_validator)?;
-
-    Ok(component)
+    })
 }
 
 // Converts a Map<String, serde_json::Value> to a fuchsia Dictionary.
@@ -189,7 +184,7 @@ fn dictionary_from_nested_map(map: IndexMap<String, Value>) -> Result<fdata::Dic
     Ok(fdata::Dictionary { entries: Some(entries), ..Default::default() })
 }
 
-/// Translates a [`Program`] to a [`fuchsia.component.decl/Program`].
+/// Translates a [`Program`] to a [`fuchsa.sys2.Program`].
 fn translate_program(program: &Program) -> Result<fdecl::Program, Error> {
     Ok(fdecl::Program {
         runner: program.runner.as_ref().map(|r| r.to_string()),
@@ -2491,13 +2486,8 @@ mod tests {
                         "durability": "transient",
                     },
                 ],
-                "environments": [
-                    {
-                        "name": "env_one",
-                        "extends": "realm",
-                    }
-                ]
-            }),
+            }
+        ),
             output = fdecl::Component {
                 uses: Some(vec![
                     fdecl::Use::Protocol (
@@ -2639,13 +2629,6 @@ mod tests {
                         environment: Some("env_one".to_string()),
                         ..Default::default()
                     }
-                ]),
-                environments: Some(vec![
-                    fdecl::Environment {
-                        name: Some("env_one".to_string()),
-                        extends: Some(fdecl::EnvironmentExtends::Realm),
-                        ..Default::default()
-                    },
                 ]),
                 ..default_component_decl()
             },
@@ -4053,7 +4036,6 @@ mod tests {
                 "environments": [
                     {
                         "name": "myenv",
-                        "__stop_timeout_ms": 10u32,
                     },
                     {
                         "name": "myenv2",
@@ -4073,7 +4055,7 @@ mod tests {
                         extends: Some(fdecl::EnvironmentExtends::None),
                         runners: None,
                         resolvers: None,
-                        stop_timeout_ms: Some(10),
+                        stop_timeout_ms: None,
                         ..Default::default()
                     },
                     fdecl::Environment {
@@ -4102,7 +4084,6 @@ mod tests {
                 "environments": [
                     {
                         "name": "myenv",
-                        "extends": "realm",
                         "runners": [
                             {
                                 "runner": "dart",
@@ -4123,7 +4104,7 @@ mod tests {
                 environments: Some(vec![
                     fdecl::Environment {
                         name: Some("myenv".to_string()),
-                        extends: Some(fdecl::EnvironmentExtends::Realm),
+                        extends: Some(fdecl::EnvironmentExtends::None),
                         runners: Some(vec![
                             fdecl::RunnerRegistration {
                                 source_name: Some("dart".to_string()),
@@ -4153,7 +4134,6 @@ mod tests {
                 "environments": [
                     {
                         "name": "myenv",
-                        "extends": "realm",
                         "runners": [
                             {
                                 "runner": "dart",
@@ -4168,7 +4148,7 @@ mod tests {
                 environments: Some(vec![
                     fdecl::Environment {
                         name: Some("myenv".to_string()),
-                        extends: Some(fdecl::EnvironmentExtends::Realm),
+                        extends: Some(fdecl::EnvironmentExtends::None),
                         runners: Some(vec![
                             fdecl::RunnerRegistration {
                                 source_name: Some("dart".to_string()),
@@ -4196,7 +4176,6 @@ mod tests {
                 "environments": [
                     {
                         "name": "myenv",
-                        "extends": "realm",
                         "debug": [
                             {
                                 "protocol": "fuchsia.serve.service",
@@ -4220,7 +4199,7 @@ mod tests {
                 environments: Some(vec![
                     fdecl::Environment {
                         name: Some("myenv".to_string()),
-                        extends: Some(fdecl::EnvironmentExtends::Realm),
+                        extends: Some(fdecl::EnvironmentExtends::None),
                         debug_capabilities: Some(vec![
                             fdecl::DebugRegistration::Protocol( fdecl::DebugProtocolRegistration {
                                 source_name: Some("fuchsia.serve.service".to_string()),
@@ -4587,39 +4566,5 @@ mod tests {
             &Name::from_str("something").unwrap()
         )
         .is_empty());
-    }
-
-    /// Construct a CML [Document] from the provided JSON literal expression or panic if error.
-    macro_rules! must_parse_cml {
-        ($($input:tt)+) => {
-            serde_json::from_str::<Document>(&json!($($input)+).to_string())
-                .expect("deserialization failed")
-        };
-    }
-
-    /// This is a smoke test that [compile] will use [cm_fidl_validator] to validate the FIDL
-    /// component declaration. The expected error output format may change over time as we move
-    /// which validation is performed in which module.
-    #[test]
-    fn test_validation_from_cm_fidl_validator() {
-        let missing_stop_timeout = must_parse_cml!({
-            "environments": [
-                {
-                    "name": "myenv3",
-                    "extends": "none",
-                }
-            ],
-        });
-        use cm_fidl_validator::error::Error as CmFidlError;
-        use cm_fidl_validator::error::ErrorList;
-        assert_matches!(
-            compile(&missing_stop_timeout, None),
-            Err(Error::FidlValidator  { errs: ErrorList { errs } })
-            if matches!(
-                &errs[..],
-                [ CmFidlError::MissingField(decl_field) ]
-                if &decl_field.decl == "Environment" && &decl_field.field == "stop_timeout_ms"
-            )
-        );
     }
 }

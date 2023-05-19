@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    cm_fidl_validator::error::ErrorList,
     cm_types::ParseError,
     std::path::Path,
     std::str::Utf8Error,
@@ -37,9 +36,6 @@ pub enum Error {
         err: String,
         filename: Option<String>,
     },
-    FidlValidator {
-        errs: ErrorList,
-    },
     Internal(String),
     Utf8(Utf8Error),
     /// A restricted feature was used without opting-in.
@@ -67,10 +63,6 @@ impl Error {
 
     pub fn validate(err: impl fmt::Display) -> Self {
         Self::Validate { err: err.to_string(), filename: None }
-    }
-
-    pub fn fidl_validator(errs: ErrorList) -> Self {
-        Self::FidlValidator { errs }
     }
 
     pub fn duplicate_rights(err: impl Into<String>) -> Self {
@@ -151,7 +143,6 @@ impl fmt::Display for Error {
                     write!(f, "{}", err)
                 }
             }
-            Error::FidlValidator{ errs} => format_multiple_fidl_validator_errors(errs, f),
             Error::Internal(err) => write!(f, "Internal error: {}", err),
             Error::Utf8(err) => write!(f, "UTF8 error: {}", err),
             Error::RestrictedFeature(feature) => write!(
@@ -161,43 +152,6 @@ impl fmt::Display for Error {
             ),
         }
     }
-}
-
-fn format_multiple_fidl_validator_errors(e: &ErrorList, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    // Some errors are caught by `cm_fidl_validator` but not caught by `cml` validation.
-    //
-    // Our strategy is:
-    //
-    // - If a `cm_fidl_validator` error can be easily transformed back to be relevant in the context
-    //   of `cml`, do that. For example, we should transform the FIDL declaration names
-    //   to corresponding cml names.
-    //
-    // - Otherwise, we consider that a bug and we should add corresponding validation in `cml`.
-    //   As such, we will surface this kind of errors as `Internal` as an indication.
-    //   That is represented by the `_` match arm here.
-    //
-    let mut found_internal_errors = false;
-    for e in e.errs.iter() {
-        match e {
-            // Add more branches as we come up with good transformations.
-            _ => {
-                write!(f, "Internal error: {}\n", e)?;
-                found_internal_errors = true;
-            }
-        }
-    }
-
-    if found_internal_errors {
-        write!(
-            f,
-            "This reflects error(s) in the `.cml` file. \
-Unfortunately, for some of them, cmc cannot provide more details at this time.
-Please file a bug at https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=ComponentFramework \
-with the cml in question, so we can work on better error reporting."
-        )?;
-    }
-
-    Ok(())
 }
 
 impl From<io::Error> for Error {
