@@ -1549,26 +1549,6 @@
                         message: "`fuchsia.dash.Launcher` was not exposed to `/` from child `#core`."
                     }
                 },
-
-                // TODO(https://fxbug.dev/127441): this can be removed after fxr/855490 lands.
-                {
-                    using_node: "/bootstrap/archivist",
-                    capability: "fuchsia.component.LogStatsBinder",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    offer_from_child_expose_not_found: {
-                                        child_moniker: "core",
-                                        moniker: "/",
-                                        capability_id: "fuchsia.component.LogStatsBinder"
-                                    },
-                                },
-                            },
-                        },
-                        message: "`fuchsia.component.LogStatsBinder` was not exposed to `/` from child `#core`."
-                   },
-                },
             ],
         },
     },

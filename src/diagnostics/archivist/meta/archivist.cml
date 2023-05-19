@@ -27,7 +27,6 @@
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.component.KcounterBinder",
-                "fuchsia.component.LogStatsBinder",
                 "fuchsia.component.PersistenceBinder",
                 "fuchsia.component.SamplerBinder",
             ],

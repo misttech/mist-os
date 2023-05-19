@@ -7,7 +7,6 @@ default_config = {
   bind_services = [
     "fuchsia.component.DetectBinder",
     "fuchsia.component.KcounterBinder",
-    "fuchsia.component.LogStatsBinder",
     "fuchsia.component.PersistenceBinder",
     "fuchsia.component.SamplerBinder",
   ]

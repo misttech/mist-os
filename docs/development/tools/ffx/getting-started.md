@@ -259,7 +259,6 @@ Instance ID: None
  [✓]  fuchsia.boot.WriteOnlyLog            N/A
  [✓]  fuchsia.component.DetectBinder       N/A
  [✓]  fuchsia.component.KcounterBinder     N/A
- [✓]  fuchsia.component.LogStatsBinder     N/A
  [✓]  fuchsia.component.PersistenceBinder  N/A
  [✓]  fuchsia.component.SamplerBinder      N/A
  [✓]  fuchsia.sys.internal.ComponentEvent  N/A

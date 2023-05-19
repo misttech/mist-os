@@ -18,7 +18,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
             "fuchsia.component.KcounterBinder",
-            "fuchsia.component.LogStatsBinder",
             "fuchsia.component.PersistenceBinder",
             "fuchsia.component.SamplerBinder",
         ]);
@@ -106,7 +105,6 @@ mod tests {
             Some(&Value::Array(vec![
                 "fuchsia.component.DetectBinder".into(),
                 "fuchsia.component.KcounterBinder".into(),
-                "fuchsia.component.LogStatsBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
             ]))
@@ -213,7 +211,6 @@ mod tests {
             archivist_fields.get("bind_services"),
             Some(&Value::Array(vec![
                 "fuchsia.component.KcounterBinder".into(),
-                "fuchsia.component.LogStatsBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
             ]))
