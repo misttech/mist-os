@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{io::Directory, path::RemotePath},
+    crate::{
+        io::{Directory, RemoteDirectory},
+        path::RemotePath,
+    },
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
@@ -20,7 +23,7 @@ pub async fn make_directory(storage_admin: StorageAdminProxy, path: String) -> R
 
     let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
     let server = server.into_channel();
-    let storage_dir = Directory::from_proxy(dir_proxy);
+    let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
     if remote_path.relative_path.as_os_str().is_empty() {
         bail!("Remote path cannot be the root");
@@ -33,10 +36,7 @@ pub async fn make_directory(storage_admin: StorageAdminProxy, path: String) -> R
         .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
     // Send a request to create the directory
-    let dir = storage_dir.open_dir(
-        remote_path.relative_path,
-        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE,
-    )?;
+    let dir = storage_dir.create_dir(remote_path.relative_path, false)?;
 
     // Verify that we can actually read the contents of the directory created
     dir.entry_names().await?;

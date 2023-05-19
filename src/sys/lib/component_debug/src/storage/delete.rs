@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{io::Directory, path::RemotePath},
+    crate::{
+        io::{Directory, RemoteDirectory},
+        path::RemotePath,
+    },
     anyhow::{anyhow, Result},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
@@ -20,7 +23,7 @@ pub async fn delete(storage_admin: StorageAdminProxy, path: String) -> Result<()
 
     let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
     let server = server.into_channel();
-    let storage_dir = Directory::from_proxy(dir_proxy);
+    let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
     storage_admin
         .open_component_storage_by_id(&remote_path.remote_id, server.into())

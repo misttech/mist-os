@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::io::Directory,
+    crate::io::{Directory, RemoteDirectory},
     anyhow::Context,
     cm_rust::{ComponentDecl, FidlIntoNative},
     fidl::endpoints::{create_proxy, ServerEnd},
@@ -171,7 +171,7 @@ pub enum GetStructuredConfigError {
 #[derive(Debug)]
 pub enum InstanceType {
     Cml,
-    Cmx(#[cfg_attr(feature = "serde", serde(skip))] Directory),
+    Cmx(#[cfg_attr(feature = "serde", serde(skip))] RemoteDirectory),
 }
 
 impl std::fmt::Display for InstanceType {
@@ -471,7 +471,7 @@ pub async fn get_runtime(
     // Parse the runtime directory and add it into the State object
     let moniker_str = format!(".{}", moniker.to_string());
     let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let runtime_dir = Directory::from_proxy(runtime_dir);
+    let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
         .open(
@@ -490,11 +490,11 @@ pub async fn get_runtime(
         .await
 }
 
-async fn parse_runtime_from_dir(runtime_dir: Directory) -> Result<Runtime, anyhow::Error> {
+async fn parse_runtime_from_dir(runtime_dir: RemoteDirectory) -> Result<Runtime, anyhow::Error> {
     // Some runners may not serve the runtime directory, so attempting to get the entries
     // may fail. This is normal and should be treated as no ELF runtime.
     if let Ok(true) = runtime_dir.exists("elf").await {
-        let elf_dir = runtime_dir.open_dir_readable("elf")?;
+        let elf_dir = runtime_dir.open_dir_readonly("elf")?;
 
         let (job_id, process_id, process_start_time, process_start_time_utc_estimate) = futures::join!(
             elf_dir.read_file("job_id"),
@@ -547,7 +547,7 @@ pub async fn get_outgoing_capabilities(
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
     let moniker_str = format!(".{}", moniker.to_string());
     let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let out_dir = Directory::from_proxy(out_dir);
+    let out_dir = RemoteDirectory::from_proxy(out_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
         .open(
@@ -590,13 +590,13 @@ pub async fn get_merkle_root(
 
 // Get all entries in a capabilities directory. If there is a "svc" directory, traverse it and
 // collect all protocol names as well.
-async fn get_capabilities(capability_dir: Directory) -> Result<Vec<String>, anyhow::Error> {
+async fn get_capabilities(capability_dir: RemoteDirectory) -> Result<Vec<String>, anyhow::Error> {
     let mut entries = capability_dir.entry_names().await?;
 
     for (index, name) in entries.iter().enumerate() {
         if name == "svc" {
             entries.remove(index);
-            let svc_dir = capability_dir.open_dir_readable("svc")?;
+            let svc_dir = capability_dir.open_dir_readonly("svc")?;
             let mut svc_entries = svc_dir.entry_names().await?;
             entries.append(&mut svc_entries);
             break;

@@ -6,7 +6,7 @@ use fidl::endpoints::create_proxy;
 
 use {
     crate::{
-        io::Directory,
+        io::{Directory, DirentKind, RemoteDirectory},
         path::{
             add_source_filename_to_path_if_absent, HostOrRemotePath, NamespacedPath, RemotePath,
             REMOTE_PATH_HELP,
@@ -15,7 +15,6 @@ use {
     anyhow::{bail, Result},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_fs::directory::DirentKind,
     regex::Regex,
     std::{
         collections::HashMap,
@@ -100,7 +99,7 @@ pub async fn copy_cmd(
                 )
                 .await?;
 
-                let dir = Directory::from_proxy(source_dir.to_owned());
+                let dir = RemoteDirectory::from_proxy(source_dir.to_owned());
                 let paths = maybe_expand_wildcards_remote(source.clone(), &dir).await?;
 
                 for remote_path in paths {
@@ -143,7 +142,7 @@ pub async fn copy_cmd(
                 )
                 .await?;
 
-                let dir = Directory::from_proxy(source_dir.to_owned());
+                let dir = RemoteDirectory::from_proxy(source_dir.to_owned());
                 let paths = maybe_expand_wildcards_remote(source.clone(), &dir).await?;
 
                 for remote_path in paths {
@@ -215,17 +214,17 @@ pub async fn copy_cmd(
     Ok(())
 }
 
-pub async fn is_remote_file(path: RemotePath, dir: &Directory) -> Result<bool> {
+pub async fn is_remote_file(path: RemotePath, dir: &RemoteDirectory) -> Result<bool> {
     let parent_dir = open_parent_subdir_readable(&path, dir)?;
 
     let source_file = path.relative_path.file_name().map_or_else(
         || Err(CopyError::EmptyFileName),
         |file| Ok(file.to_string_lossy().to_string()),
     )?;
-    let remote_entry = parent_dir.entry_if_exists(&source_file).await?;
+    let remote_type = parent_dir.entry_type(&source_file).await?;
 
-    match remote_entry {
-        Some(remote_destination) => match remote_destination.kind {
+    match remote_type {
+        Some(kind) => match kind {
             DirentKind::File => Ok(true),
             _ => Ok(false),
         },
@@ -233,16 +232,19 @@ pub async fn is_remote_file(path: RemotePath, dir: &Directory) -> Result<bool> {
     }
 }
 
-/// Returns a readable `Directory` by opening the parent dir of `path`.
+/// Returns a readable `RemoteDirectory` by opening the parent dir of `path`.
 ///
 /// * `path`: The path from which to derive the parent
-/// * `dir`: Directory to on which to open a subdir.
-pub fn open_parent_subdir_readable(path: &RemotePath, dir: &Directory) -> Result<Directory> {
+/// * `dir`: RemoteDirectory to on which to open a subdir.
+pub fn open_parent_subdir_readable(
+    path: &RemotePath,
+    dir: &RemoteDirectory,
+) -> Result<RemoteDirectory> {
     let parent_dir_path = match path.relative_path.parent() {
         Some(parent) => PathBuf::from(parent),
         None => return Err(CopyError::NoParentFolder { path: path.relative_path_string() }.into()),
     };
-    dir.open_dir(&parent_dir_path, fio::OpenFlags::RIGHT_READABLE)
+    dir.open_dir_readonly(&parent_dir_path)
 }
 
 /// If `path` contains a wildcard, returns the expanded list of files. Otherwise,
@@ -251,10 +253,10 @@ pub fn open_parent_subdir_readable(path: &RemotePath, dir: &Directory) -> Result
 /// # Arguments
 ///
 /// * `path`: A path that may contain a wildcard.
-/// * `dir`: Directory proxy to query to expand wildcards.
+/// * `dir`: RemoteDirectory proxy to query to expand wildcards.
 pub async fn maybe_expand_wildcards_remote(
     path: RemotePath,
-    dir: &Directory,
+    dir: &RemoteDirectory,
 ) -> Result<Vec<RemotePath>> {
     if !&path.contains_wildcard() {
         return Ok(vec![path]);
@@ -363,12 +365,12 @@ pub async fn open_namespace_dir_for_moniker(
     }
 }
 
-/// Returns a `Directory` within the directory backed by `dir` that is the parent
+/// Returns a `RemoteDirectory` within the directory backed by `dir` that is the parent
 /// of the last path component. If:
 ///
-///   * `path` is "/", returns a `Directory` at the root of `dir`
-///   * `path` is "/foo", returns a `Directory` at "/foo"
-///   * `path` is "/foo/bar/baz", returns a `Directory` at "/foo/bar"
+///   * `path` is "/", returns a `RemoteDirectory` at the root of `dir`
+///   * `path` is "/foo", returns a `RemoteDirectory` at "/foo"
+///   * `path` is "/foo/bar/baz", returns a `RemoteDirectory` at "/foo/bar"
 ///
 /// # Arguments
 /// * `dir`: A proxy to a directory.
@@ -376,13 +378,12 @@ pub async fn open_namespace_dir_for_moniker(
 pub fn open_parent_subdir_writable(
     dir: fio::DirectoryProxy,
     path: RemotePath,
-) -> Result<Directory> {
+) -> Result<RemoteDirectory> {
     if path.relative_path.components().count() >= 2 {
         let parent_path = path.relative_path.parent().unwrap();
-        Directory::from_proxy(dir)
-            .open_dir(&parent_path, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
+        RemoteDirectory::from_proxy(dir).open_dir_readwrite(&parent_path)
     } else {
-        Ok(Directory::from_proxy(dir))
+        Ok(RemoteDirectory::from_proxy(dir))
     }
 }
 
@@ -392,7 +393,7 @@ pub fn open_parent_subdir_writable(
 /// * `source`: The host filepath.
 /// * `destination`: The remote directory and path within it.
 pub async fn copy_host_file_to_remote(source: PathBuf, destination: NamespacedPath) -> Result<()> {
-    let destination_dir = Directory::from_proxy(destination.ns.to_owned());
+    let destination_dir = RemoteDirectory::from_proxy(destination.ns.to_owned());
     let destination_path = add_source_filename_to_path_if_absent(
         &open_parent_subdir_writable(destination.ns, destination.path.clone())?,
         HostOrRemotePath::Host(source.clone()),
@@ -402,7 +403,7 @@ pub async fn copy_host_file_to_remote(source: PathBuf, destination: NamespacedPa
 
     let data = read(&source)?;
     destination_dir.verify_directory_is_read_write(&destination_path.parent().unwrap()).await?;
-    destination_dir.create_file(destination_path, data.as_slice()).await?;
+    destination_dir.write_file(destination_path, data.as_slice()).await?;
 
     Ok(())
 }
@@ -414,7 +415,7 @@ pub async fn copy_host_file_to_remote(source: PathBuf, destination: NamespacedPa
 /// * `destination`: The host filepath.
 pub async fn copy_remote_file_to_host(source: NamespacedPath, destination: PathBuf) -> Result<()> {
     let file_path = &source.path.relative_path.clone();
-    let source_dir = Directory::from_proxy(source.ns.to_owned());
+    let source_dir = RemoteDirectory::from_proxy(source.ns.to_owned());
     let destination_path = add_source_filename_to_path_if_absent(
         &source_dir,
         HostOrRemotePath::Remote(source.path),
@@ -439,8 +440,8 @@ pub async fn copy_remote_file_to_remote(
     source: NamespacedPath,
     destination: NamespacedPath,
 ) -> Result<()> {
-    let source_dir = Directory::from_proxy(source.ns.to_owned());
-    let destination_dir = Directory::from_proxy(destination.ns.to_owned());
+    let source_dir = RemoteDirectory::from_proxy(source.ns.to_owned());
+    let destination_dir = RemoteDirectory::from_proxy(destination.ns.to_owned());
     let destination_path = add_source_filename_to_path_if_absent(
         &open_parent_subdir_writable(destination.ns, destination.path.clone())?,
         HostOrRemotePath::Remote(source.path.clone()),
@@ -450,7 +451,7 @@ pub async fn copy_remote_file_to_remote(
 
     let data = source_dir.read_file_bytes(&source.path.relative_path).await?;
     destination_dir.verify_directory_is_read_write(&destination_path.parent().unwrap()).await?;
-    destination_dir.create_file(destination_path, data.as_slice()).await?;
+    destination_dir.write_file(destination_path, data.as_slice()).await?;
     Ok(())
 }
 
@@ -460,7 +461,7 @@ pub async fn copy_remote_file_to_remote(
 /// * `dir`: A directory.
 /// * `file_pattern`: A file pattern to match.
 pub async fn get_dirents_matching_pattern(
-    dir: Directory,
+    dir: RemoteDirectory,
     file_pattern: String,
 ) -> Result<Vec<String>> {
     let mut entries = dir.entry_names().await?;

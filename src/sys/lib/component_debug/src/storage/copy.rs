@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::io::Directory,
+    crate::io::{Directory, RemoteDirectory},
     crate::path::{add_source_filename_to_path_if_absent, HostOrRemotePath, REMOTE_PATH_HELP},
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
@@ -26,7 +26,7 @@ pub async fn copy(
 ) -> Result<()> {
     let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
     let server = server.into_channel();
-    let storage_dir = Directory::from_proxy(dir_proxy);
+    let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
     match (HostOrRemotePath::parse(&source_path), HostOrRemotePath::parse(&destination_path)) {
         (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination)) => {
@@ -66,7 +66,7 @@ pub async fn copy(
 
             let data = read(host_source_path)
                 .map_err(|e| anyhow!("Could not read file from host: {:?}", e))?;
-            storage_dir.create_file(remote_destination_path, data.as_slice()).await?;
+            storage_dir.write_file(remote_destination_path, data.as_slice()).await?;
             Ok(())
         }
         _ => {

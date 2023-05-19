@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        io::Directory,
+        io::{Directory, RemoteDirectory},
         realm::{ExecutionInfo, Instance, InstanceType, ResolvedInfo, Runtime},
     },
     anyhow::{format_err, Context, Result},
@@ -21,7 +21,7 @@ use {
 /// Attempt to get CMX instances several times before calling it a failure.
 const CMX_HUB_RETRY_ATTEMPTS: u64 = 10;
 
-pub async fn get_runtime(hub_dir: &Directory) -> Result<Runtime> {
+pub async fn get_runtime(hub_dir: &RemoteDirectory) -> Result<Runtime> {
     let (job_id, process_id) =
         futures::join!(hub_dir.read_file("job-id"), hub_dir.read_file("process-id"),);
 
@@ -41,30 +41,30 @@ pub async fn get_runtime(hub_dir: &Directory) -> Result<Runtime> {
     })
 }
 
-pub async fn get_namespace_capabilities(hub_dir: &Directory) -> Result<Vec<String>> {
-    let in_dir = hub_dir.open_dir_readable("in")?;
+pub async fn get_namespace_capabilities(hub_dir: &RemoteDirectory) -> Result<Vec<String>> {
+    let in_dir = hub_dir.open_dir_readonly("in")?;
     get_capabilities(in_dir).await
 }
 
-pub async fn get_outgoing_capabilities(hub_dir: &Directory) -> Result<Vec<String>> {
-    let out_dir = hub_dir.open_dir_readable("out")?;
+pub async fn get_outgoing_capabilities(hub_dir: &RemoteDirectory) -> Result<Vec<String>> {
+    let out_dir = hub_dir.open_dir_readonly("out")?;
     get_capabilities(out_dir).await
 }
 
-pub async fn get_merkle_root(hub_dir: &Directory) -> Result<String> {
+pub async fn get_merkle_root(hub_dir: &RemoteDirectory) -> Result<String> {
     let merkle_root = hub_dir.read_file("in/pkg/meta").await?;
     Ok(merkle_root)
 }
 
 // Get all entries in a capabilities directory. If there is a "svc" directory, traverse it and
 // collect all protocol names as well.
-async fn get_capabilities(capability_dir: Directory) -> Result<Vec<String>, anyhow::Error> {
+async fn get_capabilities(capability_dir: RemoteDirectory) -> Result<Vec<String>, anyhow::Error> {
     let mut entries = capability_dir.entry_names().await?;
 
     for (index, name) in entries.iter().enumerate() {
         if name == "svc" {
             entries.remove(index);
-            let svc_dir = capability_dir.open_dir_readable("svc")?;
+            let svc_dir = capability_dir.open_dir_readonly("svc")?;
             let mut svc_entries = svc_dir.entry_names().await?;
             entries.append(&mut svc_entries);
             break;
@@ -101,7 +101,7 @@ async fn get_all_instances_internal(
     let moniker = AbsoluteMoniker::parse_str("/core/appmgr")?;
 
     let (root_realm_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let root_realm_dir = Directory::from_proxy(root_realm_dir);
+    let root_realm_dir = RemoteDirectory::from_proxy(root_realm_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
 
     match query
@@ -128,11 +128,11 @@ async fn get_all_instances_internal(
 
 fn parse_cmx_realm(
     moniker: AbsoluteMoniker,
-    realm_dir: Directory,
+    realm_dir: RemoteDirectory,
 ) -> BoxFuture<'static, Result<Vec<Instance>>> {
     async move {
-        let children_dir = realm_dir.open_dir_readable("c")?;
-        let realms_dir = realm_dir.open_dir_readable("r")?;
+        let children_dir = realm_dir.open_dir_readonly("c")?;
+        let realms_dir = realm_dir.open_dir_readonly("r")?;
 
         let future_children = parse_cmx_components_in_c_dir(children_dir, moniker.clone());
         let future_realms = parse_cmx_realms_in_r_dir(realms_dir, moniker.clone());
@@ -150,14 +150,14 @@ fn parse_cmx_realm(
 
 fn parse_cmx_component(
     moniker: AbsoluteMoniker,
-    dir: Directory,
+    dir: RemoteDirectory,
 ) -> BoxFuture<'static, Result<Vec<Instance>>> {
     async move {
         // Runner CMX components may have child components.
         let url = dir.read_file("url").await?;
 
         let mut instances = if dir.exists("c").await? {
-            let children_dir = dir.open_dir_readable("c")?;
+            let children_dir = dir.open_dir_readonly("c")?;
             parse_cmx_components_in_c_dir(children_dir, moniker.clone()).await?
         } else {
             vec![]
@@ -182,7 +182,7 @@ fn parse_cmx_component(
 }
 
 async fn parse_cmx_components_in_c_dir(
-    children_dir: Directory,
+    children_dir: RemoteDirectory,
     moniker: AbsoluteMoniker,
 ) -> Result<Vec<Instance>> {
     let child_component_names = children_dir.entry_names().await?;
@@ -190,7 +190,7 @@ async fn parse_cmx_components_in_c_dir(
     for child_component_name in child_component_names {
         let child_moniker = ChildMoniker::parse(&child_component_name)?;
         let child_moniker = moniker.child(child_moniker);
-        let job_ids_dir = children_dir.open_dir_readable(&child_component_name)?;
+        let job_ids_dir = children_dir.open_dir_readonly(&child_component_name)?;
         let child_dirs = open_all_job_ids(job_ids_dir).await?;
         for child_dir in child_dirs {
             let future_child = parse_cmx_component(child_moniker.clone(), child_dir);
@@ -206,14 +206,14 @@ async fn parse_cmx_components_in_c_dir(
 }
 
 async fn parse_cmx_realms_in_r_dir(
-    realms_dir: Directory,
+    realms_dir: RemoteDirectory,
     moniker: AbsoluteMoniker,
 ) -> Result<Vec<Instance>> {
     let mut future_realms = vec![];
     for child_realm_name in realms_dir.entry_names().await? {
         let child_moniker = ChildMoniker::parse(&child_realm_name)?;
         let child_moniker = moniker.child(child_moniker);
-        let job_ids_dir = realms_dir.open_dir_readable(&child_realm_name)?;
+        let job_ids_dir = realms_dir.open_dir_readonly(&child_realm_name)?;
         let child_realm_dirs = open_all_job_ids(job_ids_dir).await?;
         for child_realm_dir in child_realm_dirs {
             let future_realm = parse_cmx_realm(child_moniker.clone(), child_realm_dir);
@@ -228,13 +228,13 @@ async fn parse_cmx_realms_in_r_dir(
     Ok(instances)
 }
 
-async fn open_all_job_ids(job_ids_dir: Directory) -> Result<Vec<Directory>> {
+async fn open_all_job_ids(job_ids_dir: RemoteDirectory) -> Result<Vec<RemoteDirectory>> {
     let dirs = job_ids_dir
         .entry_names()
         .await?
         .into_iter()
-        .map(|job_id| job_ids_dir.open_dir_readable(&job_id))
-        .collect::<Result<Vec<Directory>>>()?;
+        .map(|job_id| job_ids_dir.open_dir_readonly(&job_id))
+        .collect::<Result<Vec<RemoteDirectory>>>()?;
     Ok(dirs)
 }
 

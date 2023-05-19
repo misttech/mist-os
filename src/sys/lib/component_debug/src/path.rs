@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::io::Directory,
+    crate::io::{Directory, DirentKind, RemoteDirectory},
     anyhow::{anyhow, bail, Error, Result},
     fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::DirentKind,
     std::path::{Component, PathBuf},
 };
 
@@ -22,7 +21,7 @@ use {
 ///
 /// # Arguments
 ///
-/// * `destination_dir`: Directory proxy to help retrieve directory entries on device
+/// * `destination_dir`: RemoteDirectory proxy to help retrieve directory entries on device
 /// * `source_path`:  source path from which to
 /// * `path`: source path of either a host filepath or a component namespace entry
 ///
@@ -31,7 +30,7 @@ use {
 /// * File name for `source_path` is empty
 /// * Communications error talking to remote endpoint
 pub async fn add_source_filename_to_path_if_absent(
-    destination_dir: &Directory,
+    destination_dir: &RemoteDirectory,
     source_path: HostOrRemotePath,
     path: HostOrRemotePath,
 ) -> Result<PathBuf, Error> {
@@ -60,29 +59,21 @@ pub async fn add_source_filename_to_path_if_absent(
         HostOrRemotePath::Remote(remote_path) => {
             let mut path = remote_path.relative_path;
             let destination_file = path.file_name();
-            let remote_destination_entry = if destination_file.is_some() {
+            let remote_destination_type = if destination_file.is_some() {
                 destination_dir
-                    .entry_if_exists(
-                        destination_file.unwrap_or_default().to_str().unwrap_or_default(),
-                    )
+                    .entry_type(destination_file.unwrap_or_default().to_str().unwrap_or_default())
                     .await?
             } else {
-                destination_dir.entry_if_exists(&source_file_str).await?
+                destination_dir.entry_type(&source_file_str).await?
             };
 
-            match (&remote_destination_entry, &destination_file) {
-                (Some(entry), _) => {
-                    match entry.kind {
+            match (&remote_destination_type, &destination_file) {
+                (Some(kind), _) => {
+                    match kind {
                         DirentKind::File => {}
                         // TODO(https://fxbug.dev/127335): Update component_manager vfs to assign proper DirentKinds when installing the directory tree.
-                        DirentKind::Directory | DirentKind::Unknown => {
+                        DirentKind::Directory => {
                             path.push(&source_file_str);
-                        }
-                        _ => {
-                            return Err(anyhow!(
-                                "Invalid entry type for file {}",
-                                &source_file_str
-                            ));
                         }
                     }
                     Ok(path)
