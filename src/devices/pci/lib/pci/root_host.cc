@@ -83,7 +83,7 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   }
 
   if (st != ZX_OK) {
-    zxlogf(DEBUG, "failed to allocate %s %#lx-%#lx: %s.", allocator_name, base, base + size,
+    zxlogf(DEBUG, "failed to allocate %s [%#lx, %#lx): %s.", allocator_name, base, base + size,
            zx_status_get_string(st));
     return zx::error(st);
   }
@@ -100,7 +100,7 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
                             rsrc_kind | ZX_RSRC_FLAG_EXCLUSIVE, new_base, new_size, name.data(),
                             name.size(), out_resource);
   if (st != ZX_OK) {
-    zxlogf(ERROR, "Failed to create resource for %s { %#lx - %#lx }: %s\n", name.data(), new_base,
+    zxlogf(ERROR, "Failed to create resource for %s [%#lx, %#lx): %s\n", name.data(), new_base,
            new_base + new_size, zx_status_get_string(st));
     return zx::error(st);
   }
@@ -113,7 +113,8 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
 
   // Discard the lifecycle aspect of the returned pointer, we'll be tracking it on the bus
   // side of things.
-  zxlogf(DEBUG, "assigned %s %#lx-%#lx to PciRoot.", allocator_name, new_base, new_base + new_size);
+  zxlogf(DEBUG, "allocated %s [%#lx, %#lx) to PciRoot.", allocator_name, new_base,
+         new_base + new_size);
   return zx::ok(new_base);
 }
 
