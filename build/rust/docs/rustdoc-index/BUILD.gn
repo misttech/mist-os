@@ -6,7 +6,9 @@ import("//build/rust/rustc_library.gni")
 
 rustc_library("rustdoc-index") {
   edition = "2021"
-  source_root = "rustdoc-index.rs"
-  sources = [ source_root ]
-  inputs = [ "rustdoc-index.md" ]
+  sources = [ "src/lib.rs" ]
+  inputs = [
+    "header.md",
+    "../../../../docs/reference/rust/crates.md",
+  ]
 }
