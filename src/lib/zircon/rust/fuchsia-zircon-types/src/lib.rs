@@ -1008,6 +1008,25 @@ pub union zx_exception_header_arch_t {
     pub riscv_64: zx_riscv64_exc_data_t,
 }
 
+impl Debug for zx_exception_header_arch_t {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Safety: We only need unsafe to access members of the union. This is
+        // safe because we only access the field that corresponds to the
+        // current architecture.
+        unsafe {
+            if cfg!(target_arch = "x86_64") {
+                write!(f, "{:?}", self.x86_64)
+            } else if cfg!(target_arch = "aarch64") {
+                write!(f, "{:?}", self.arm_64)
+            } else if cfg!(target_arch = "riscv64") {
+                write!(f, "{:?}", self.riscv_64)
+            } else {
+                write!(f, "(none)")
+            }
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_exception_header_t {
@@ -1041,7 +1060,7 @@ multiconst!(zx_excp_policy_code_t, [
 ]);
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct zx_exception_context_t {
     pub arch: zx_exception_header_arch_t,
     pub synth_code: zx_excp_policy_code_t,
@@ -1049,7 +1068,7 @@ pub struct zx_exception_context_t {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct zx_exception_report_t {
     pub header: zx_exception_header_t,
     pub context: zx_exception_context_t,
