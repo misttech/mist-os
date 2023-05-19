@@ -180,11 +180,11 @@ Service::~Service() {
 }
 
 void Service::Wait() {
+  FX_SLOG(INFO, "Waiting for next connection");
   waiter_.Wait(
       [this](zx_status_t /*success*/, uint32_t /*events*/) {
         struct sockaddr_in6 peer_addr {};
         socklen_t peer_addr_len = sizeof(peer_addr);
-        FX_SLOG(INFO, "Waiting for next connection");
         int conn = accept(sock_, reinterpret_cast<struct sockaddr*>(&peer_addr), &peer_addr_len);
         if (conn < 0) {
           if (errno == EPIPE) {
