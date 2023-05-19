@@ -6,16 +6,15 @@
 1. Ensure device type that you want to run the test on (will be listed in
 "device_type" field in test case's BUILD.gn file) is connected to host and
 detectable by FFX
-```shell
-
-$ ffx target list
-NAME                SERIAL       TYPE                        STATE      ADDRS/IP                           RCS
-fuchsia-emulator*   <unknown>    workstation_eng.qemu-x64    Product    [fe80::e2c:464d:6de4:4c55%qemu]    Y
-```
+    ```shell
+    $ ffx target list
+    NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
+    fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+    ```
 
 2. Ensure the testbeds used by the test case (will be listed in
 "local_config_source" field in test case's BUILD.gn file) has correct device
-information listed (`name` and `ssh_private_key` fields. For more information
+information listed (`name`, `ssh_private_key` etc. For more information
 about these fields, refer to
 [Lacewing Mobly Config YAML file](../../../README.md#Mobly-Config-YAML-File))
 
@@ -24,39 +23,63 @@ about these fields, refer to
 If a test case requires fuchsia emulator then follow the below steps to start it
 
 1. Build Fuchsia with SL4F
-```shell
-$ jiri update -gc
+    ```shell
+    $ jiri update -gc
 
-$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+    $ fx set core.qemu-x64 \
+        --with //src/testing/sl4f \
+        --with //src/sys/bin/start_sl4f \
+        --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+        --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx build
-```
+    $ fx clean-build
+    ```
 
-2. Start the package server. Keep this running in the background.
-```shell
-$ fx serve
-```
+2. In a separate terminal, run a package server
+    ```shell
+    $ fx serve
+    ```
 
-3. In a separate terminal, start the emulator
-```shell
-$ ffx emu stop && ffx emu start -H --net tap
-```
+3. In a separate terminal, start the emulator with networking enabled
+    ```shell
+    $ ffx emu stop && ffx emu start -H --net tap
+    ```
 
-4. Ensure shows up in FFX CLI
-```shell
+4. Ensure emulator shows up in FFX CLI
+    ```shell
+    $ ffx target list
+    NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
+    fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+    ```
 
-$ ffx target list
-NAME                SERIAL       TYPE                        STATE      ADDRS/IP                           RCS
-fuchsia-emulator*   <unknown>    workstation_eng.qemu-x64    Product    [fe80::e2c:464d:6de4:4c55%qemu]    Y
-```
+### Intel NUC
+If a test case requires an intel NUC or X64 hardware then
+
+1. Follow [Intel NUC] to bring up the NUC with Fuchsia
+
+2. In a separate terminal, run a package server
+    ```shell
+    $ fx -d <nuc_device_name> serve
+    ```
+
+3. Ensure NUC shows up in FFX CLI
+    ```shell
+    $ ffx target list
+    NAME                      SERIAL       TYPE        STATE      ADDRS/IP                                       RCS
+    fuchsia-54b2-038b-6e90    <unknown>    core.x64    Product    [fe80::881b:4248:1002:a7ce%enxa0cec8f442ce]    Y
+    ```
 
 ## Device class tests
 
 ### GenericFuchsiaDevice tests
 ```shell
-$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+$ fx set core.qemu-x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-# Start the emulator
+# start the emulator with networking enabled
 $ ffx emu stop && ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_generic_fuchsia_device:generic_fuchsia_device_test --e2e --output
@@ -64,7 +87,12 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_
 
 ### X64 tests
 ```shell
-$ fx set workstation_eng.x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+$ fx set core.x64 \
+    --with //build/images/recovery:recovery-installer \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_x64:x64_test --e2e --output
 ```
@@ -73,17 +101,25 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_
 
 ### Bluetooth tests
 ``` shell
-
-$ fx set workstation_eng.x64  --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+$ fx set core.x64 \
+    --with //build/images/recovery:recovery-installer \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth_default:bluetooth_default_test --e2e --output
 ```
 
 ### Component tests
 ```shell
-$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+$ fx set core.qemu-x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-# Start the emulator
+# start the emulator with networking enabled
 $ ffx emu stop && ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component_default:component_default_test --e2e --output
@@ -91,11 +127,16 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 
 ### Tracing tests
 ``` shell
+$ fx set core.qemu-x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
-
-# Start the emulator
+# start the emulator with networking enabled
 $ ffx emu stop && ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing_default:tracing_default_test --e2e --output
 ```
+
+[Intel NUC]: https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc

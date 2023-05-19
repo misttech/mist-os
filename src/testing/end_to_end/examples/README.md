@@ -6,12 +6,12 @@
 1. Ensure device type that you want to run the test on (will be listed in
 "device_type" field in test case's BUILD.gn file) is connected to host and
 detectable by FFX
-```shell
-
-$ ffx target list
-NAME                SERIAL       TYPE                        STATE      ADDRS/IP                           RCS
-fuchsia-emulator*   <unknown>    workstation_eng.qemu-x64    Product    [fe80::e2c:464d:6de4:4c55%qemu]    Y
-```
+    ```shell
+    $ ffx target list
+    NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
+    fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+    ```
+   If you need instructions to start an emulator, refer to [Fuchsia Emulator].
 
 2. Ensure the testbeds used by the test case (will be listed in
 "local_config_source" field in test case's BUILD.gn file) has correct device
@@ -19,43 +19,19 @@ information listed (`name` and `ssh_private_key` fields. For more information
 about these fields, refer to
 [Lacewing Mobly Config YAML file](../README.md#Mobly-Config-YAML-File))
 
-### Fuchsia Emulator
-If a test case requires fuchsia emulator then follow the below steps to start it
-
-1. Build Fuchsia with SL4F
-```shell
-$ jiri update -gc
-
-$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/examples:tests
-
-$ fx build
-```
-
-2. Start the package server. Keep this running in the background.
-```shell
-$ fx serve
-```
-
-3. In a separate terminal, start the emulator
-```shell
-$ ffx emu stop && ffx emu start -H --net tap
-```
-
-4. Ensure shows up in FFX CLI
-```shell
-
-$ ffx target list
-NAME                SERIAL       TYPE                        STATE      ADDRS/IP                           RCS
-fuchsia-emulator*   <unknown>    workstation_eng.qemu-x64    Product    [fe80::e2c:464d:6de4:4c55%qemu]    Y
-```
-
 ## Test execution in local mode
 ### Soft Reboot Test
 ```shell
-$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/examples:tests
+$ fx set core.qemu-x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/examples:tests
 
-# Start the emulator
+# start the emulator with networking enabled
 $ ffx emu stop && ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test --e2e --output
 ```
+
+[Fuchsia Emulator]: ../honeydew/tests/functional_tests/README.md#Fuchsia-Emulator

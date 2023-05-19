@@ -2,27 +2,30 @@
 
 ## Set up
 1. Configure example test to be built.
-```shell
-$ fx set workstation_eng.qemu-x64 --with-host //src/testing/end_to_end/mobly_driver/tests/functional_tests:tests
+    ```shell
+    $ fx set core.qemu-x64 \
+        --with //src/testing/sl4f \
+        --with //src/sys/bin/start_sl4f \
+        --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+        --with-host //src/testing/end_to_end/mobly_driver/tests/functional_tests:tests
 
-$ fx build
-```
+    $ fx clean-build
+    ```
 
 2. Start the package server. Keep this running in the background.
-```shell
-$ fx serve
-```
+    ```shell
+    $ fx serve
+    ```
 
 3. Ensure testbeds are detected on host
-```shell
+    ```shell
+    # (optional) - If the DUT can be emulated, start an emulator via ffx.
+    $ ffx emu start --net tap --headless
 
-# (optional) - If the DUT can be emulated, start an emulator via ffx.
-$ ffx emu start --net tap --headless
-
-$ ffx target list
-NAME                SERIAL       TYPE                        STATE      ADDRS/IP                           RCS
-fuchsia-emulator    <unknown>    workstation_eng.qemu-x64    Product    [fe80::963:275a:eeb8:2f47%qemu]    Y
-````
+    $ ffx target list
+    NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
+    fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+    ````
 
 
 ## Local mode

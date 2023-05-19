@@ -1,12 +1,12 @@
 # Unit test execution
 * To run all the unit tests,
     ```shell
-    fx set workstation_eng.qemu-x64 --with-host //src/testing/end_to_end/honeydew/tests/unit_tests:tests
+    fx set core.qemu-x64 --with-host //src/testing/end_to_end/honeydew/tests/unit_tests:tests
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests --host --output
     ```
 * To run individual unit tests,
     ```shell
-    fx set workstation_eng.qemu-x64 --with-host //src/testing/end_to_end/honeydew/tests/unit_tests:tests
+    fx set core.qemu-x64 --with-host //src/testing/end_to_end/honeydew/tests/unit_tests:tests
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests:init_test --host --output
 
