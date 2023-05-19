@@ -56,10 +56,5 @@
             from: "self",
             to: [ "#vulkan-tests" ],
         },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#vulkan-tests",
-        },
     ],
 }

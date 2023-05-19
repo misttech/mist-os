@@ -47,6 +47,12 @@ pub enum LaunchTestError {
     #[error("Failed to connect to TestSuite: {0:?}")]
     ConnectToTestSuite(#[source] anyhow::Error),
 
+    #[error("Failed to connect to StorageAdmin: {0:?}")]
+    ConnectToStorageAdmin(#[source] anyhow::Error),
+
+    #[error("Cannot open exposed directory: {0:?}")]
+    OpenExposedDir(#[source] anyhow::Error),
+
     #[error("Failed to stream logs from embedded Archivist: {0:?}")]
     StreamIsolatedLogs(StreamError),
 
@@ -95,7 +101,9 @@ impl From<LaunchTestError> for LaunchError {
             | LaunchTestError::SetLogInterest(_)
             | LaunchTestError::CreateTestFidl(_)
             | LaunchTestError::CreateTest(_)
-            | LaunchTestError::StreamIsolatedLogs(_) => Self::InternalError,
+            | LaunchTestError::StreamIsolatedLogs(_)
+            | LaunchTestError::OpenExposedDir(_)
+            | LaunchTestError::ConnectToStorageAdmin(_) => Self::InternalError,
             LaunchTestError::InvalidResolverData
             | LaunchTestError::InvalidManifest(_)
             | LaunchTestError::ManifestIo(_) => Self::InvalidManifest,

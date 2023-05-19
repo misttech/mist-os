@@ -89,10 +89,5 @@
             from: "self",
             to: [ "#cts-tests" ],
         },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#cts-tests",
-        },
     ],
 }

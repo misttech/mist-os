@@ -97,10 +97,5 @@
             from: "self",
             to: "#drm-tests",
         },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#drm-tests",
-        },
     ],
 }

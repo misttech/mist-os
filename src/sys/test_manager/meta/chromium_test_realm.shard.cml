@@ -170,10 +170,5 @@
             from: "self",
             to: [ "#chromium-tests" ],
         },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#chromium-tests",
-        },
     ],
 }

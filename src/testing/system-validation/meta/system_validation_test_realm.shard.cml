@@ -113,7 +113,6 @@
         {
             storage: [
                 "cache",
-                "custom_artifacts",
                 "data",
                 "tmp",
             ],

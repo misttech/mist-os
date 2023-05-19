@@ -46,11 +46,6 @@
             from: "self",
             to: [ "#media-tests" ],
         },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#media-tests",
-        },
 
         // These system capabilities are offered for use by the media tests.
         {

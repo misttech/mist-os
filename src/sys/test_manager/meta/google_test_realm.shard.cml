@@ -69,11 +69,6 @@
             to: [ "#google-tests" ],
         },
         {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#google-tests",
-        },
-        {
             directory: "root-ssl-certificates",
             from: "parent",
             to: "#google-tests",

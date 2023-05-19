@@ -148,10 +148,5 @@
             from: "self",
             to: [ "#chromium-system-tests" ],
         },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#chromium-system-tests",
-        },
     ],
 }

@@ -6,8 +6,9 @@ use {
     crate::{
         above_root_capabilities::AboveRootCapabilitiesForTest,
         constants::{
-            ENCLOSING_ENV_REALM_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME,
-            TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
+            CUSTOM_ARTIFACTS_CAPABILITY_NAME, ENCLOSING_ENV_REALM_NAME,
+            HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME, TEST_ROOT_COLLECTION,
+            TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
         },
         debug_data_processor::{serve_debug_data_publisher, DebugDataSender},
         diagnostics, enclosing_env,
@@ -31,7 +32,7 @@ use {
     ftest::Invocation,
     ftest_manager::{CaseStatus, LaunchError, SuiteEvent as FidlSuiteEvent, SuiteStatus},
     fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root},
+    fuchsia_component::client::connect_to_protocol_at_dir_root,
     fuchsia_component_test::{
         error::Error as RealmBuilderError, Capability, ChildOptions, RealmBuilder,
         RealmBuilderParams, RealmInstance, Ref, Route,
@@ -61,6 +62,8 @@ use {
 const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
 const ARCHIVIST_REALM_NAME: &'static str = "archivist";
 const ARCHIVIST_FOR_EMBEDDING_URL: &'static str = "#meta/archivist-for-embedding.cm";
+const MEMFS_FOR_EMBEDDING_URL: &'static str = "#meta/memfs.cm";
+const MEMFS_REALM_NAME: &'static str = "memfs";
 
 pub const HERMETIC_RESOLVER_CAPABILITY_NAME: &'static str = "hermetic_resolver";
 
@@ -78,14 +81,11 @@ pub(crate) struct RunningSuite {
     /// custom storage. Used to defer destruction of the realm until clients have completed
     /// reading the storage.
     custom_artifact_tokens: Vec<zx::EventPair>,
-    /// The test collection in which this suite is running.
-    test_collection: &'static str,
+
     /// `Realm` protocol for the test root.
     test_realm_proxy: fcomponent::RealmProxy,
-
-    /// `Realm` protocol for test collection parent
-    /// realm when running in some outside realm.
-    realm_proxy: Option<fcomponent::RealmProxy>,
+    /// exposed directory of the test realm.
+    exposed_dir: fio::DirectoryProxy,
 }
 
 impl RunningSuite {
@@ -138,6 +138,23 @@ impl RunningSuite {
             .map_err(|e| LaunchTestError::CreateTestFidl(e))?
             .map_err(|e| LaunchTestError::CreateTest(e))?;
 
+        let (exposed_dir, server_end) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let child_ref = fdecl::ChildRef {
+            name: TEST_ROOT_REALM_NAME.into(),
+            collection: Some(TEST_ROOT_COLLECTION.into()),
+        };
+        test_realm_proxy
+            .open_exposed_dir(&child_ref, server_end)
+            .await
+            .map_err(|e| LaunchTestError::ConnectToTestSuite(e.into()))?
+            .map_err(|e| {
+                LaunchTestError::ConnectToTestSuite(format_err!(
+                    "failed to open exposed dir: {:?}",
+                    e
+                ))
+            })?;
+
         Ok(RunningSuite {
             custom_artifact_tokens: vec![],
             archivist_ready_task: None,
@@ -148,8 +165,7 @@ impl RunningSuite {
             log_settings: None,
             instance,
             test_realm_proxy,
-            test_collection: facets.collection,
-            realm_proxy: suite_realm.as_ref().map_or(None, |o| o.realm_proxy.clone().into()),
+            exposed_dir,
         })
     }
 
@@ -247,7 +263,7 @@ impl RunningSuite {
                 None => None,
             };
 
-            let suite = self.connect_to_suite().await?;
+            let suite = self.connect_to_suite()?;
             let invocations = match enumerate_test_cases(&suite, matcher.as_ref()).await {
                 Ok(i) if i.is_empty() && matcher.is_some() => {
                     sender.send(Err(LaunchError::NoMatchingCases)).await.unwrap();
@@ -333,13 +349,9 @@ impl RunningSuite {
     ) -> Result<(), Error> {
         // TODO(https://fxbug.dev/123478): Support custom artifacts when test is running in outside
         // realm.
-        if self.realm_proxy.is_some() {
-            return Ok(());
-        }
-        let artifact_storage_admin = connect_to_protocol::<fsys::StorageAdminMarker>()?;
+        let artifact_storage_admin = self.connect_to_storage_admin()?;
 
-        let root_moniker =
-            format!("./{}:{}", self.test_collection, self.instance.root.child_name());
+        let root_moniker = "./";
         let (iterator, iter_server) = create_proxy::<fsys::StorageIteratorMarker>()?;
         artifact_storage_admin
             .list_storage_in_realm(&root_moniker, iter_server)
@@ -366,7 +378,7 @@ impl RunningSuite {
             let path = moniker_parsed
                 .path()
                 .iter()
-                .skip(3)
+                .skip(1)
                 .map(Clone::clone)
                 .collect::<Vec<cm_moniker::InstancedChildMoniker>>();
             let instanced_moniker = cm_moniker::InstancedRelativeMoniker::new(path);
@@ -387,26 +399,16 @@ impl RunningSuite {
         Ok(())
     }
 
-    pub(crate) async fn connect_to_suite(&self) -> Result<ftest::SuiteProxy, LaunchTestError> {
-        let (exposed_dir, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let child_ref = fdecl::ChildRef {
-            name: TEST_ROOT_REALM_NAME.into(),
-            collection: Some(TEST_ROOT_COLLECTION.into()),
-        };
-        let () = self
-            .test_realm_proxy
-            .open_exposed_dir(&child_ref, server_end)
-            .await
-            .map_err(|e| LaunchTestError::ConnectToTestSuite(e.into()))?
-            .map_err(|e| {
-                LaunchTestError::ConnectToTestSuite(format_err!(
-                    "failed to open exposed dir: {:?}",
-                    e
-                ))
-            })?;
-        connect_to_protocol_at_dir_root::<ftest::SuiteMarker>(&exposed_dir)
+    pub(crate) fn connect_to_suite(&self) -> Result<ftest::SuiteProxy, LaunchTestError> {
+        connect_to_protocol_at_dir_root::<ftest::SuiteMarker>(&self.exposed_dir)
             .map_err(|e| LaunchTestError::ConnectToTestSuite(e))
+    }
+
+    fn connect_to_storage_admin(&self) -> Result<fsys::StorageAdminProxy, LaunchTestError> {
+        self.instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fsys::StorageAdminMarker>()
+            .map_err(|e| LaunchTestError::ConnectToStorageAdmin(e))
     }
 
     /// Mark the resources associated with the suite for destruction, then wait for destruction to
@@ -416,9 +418,12 @@ impl RunningSuite {
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
         const TEARDOWN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(32);
 
+        let exposed_dir_fut = self.exposed_dir.close();
+        let exposed_dir_close_task = fasync::Task::spawn(async move {
+            let _ = exposed_dir_fut.await;
+        });
+
         // before destroying the realm, wait for any clients to finish accessing storage.
-        // TODO(fxbug.dev/84825): Separate realm destruction and destruction of custom
-        // storage resources.
         // TODO(fxbug.dev/84882): Remove signal for USER_0, this is used while Overnet does not support
         // signalling ZX_EVENTPAIR_CLOSED when the eventpair is closed.
         let tokens_closed_signals = self.custom_artifact_tokens.iter().map(|token| {
@@ -440,6 +445,8 @@ impl RunningSuite {
                 Err(anyhow!("Timeout waiting for clients to access storage"))
             })
             .await?;
+
+        exposed_dir_close_task.await;
 
         // Make the call to destroy the test, before destroying the entire realm. Once this
         // completes, it guarantees that any of its service providers (archivist, storage,
@@ -700,6 +707,10 @@ async fn get_realm(
         .replace_component_decl(HERMETIC_RESOLVER_REALM_NAME, hermetic_resolver_decl)
         .await?;
 
+    let memfs = wrapper_realm
+        .add_child(MEMFS_REALM_NAME, MEMFS_FOR_EMBEDDING_URL, ChildOptions::new())
+        .await?;
+
     // Create the hermetic environment in the test_wrapper.
     let mut test_wrapper_decl = wrapper_realm.get_realm_decl().await?;
     test_wrapper_decl.environments.push(cm_rust::EnvironmentDecl {
@@ -733,6 +744,14 @@ async fn get_realm(
         persistent_storage: None,
     });
 
+    test_wrapper_decl.capabilities.push(cm_rust::CapabilityDecl::Storage(cm_rust::StorageDecl {
+        name: cm_rust::CapabilityName::from(CUSTOM_ARTIFACTS_CAPABILITY_NAME),
+        source: cm_rust::StorageDirectorySource::Child(MEMFS_REALM_NAME.to_string()),
+        backing_dir: cm_rust::CapabilityName::from("memfs"),
+        subdir: Some("custom_artifacts".into()),
+        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
+    }));
+
     wrapper_realm.replace_realm_decl(test_wrapper_decl).await?;
 
     let test_root = Ref::collection(TEST_ROOT_COLLECTION);
@@ -757,7 +776,8 @@ async fn get_realm(
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(Ref::parent())
-                .to(&archivist),
+                .to(&archivist)
+                .to(&memfs),
         )
         .await?;
 
@@ -796,6 +816,24 @@ async fn get_realm(
             Route::new()
                 .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                 .from(&archivist)
+                .to(Ref::parent()),
+        )
+        .await?;
+
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::storage(CUSTOM_ARTIFACTS_CAPABILITY_NAME))
+                .from(Ref::self_())
+                .to(test_root.clone()),
+        )
+        .await?;
+
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fsys::StorageAdminMarker>())
+                .from(Ref::capability(CUSTOM_ARTIFACTS_CAPABILITY_NAME))
                 .to(Ref::parent()),
         )
         .await?;
@@ -885,6 +923,8 @@ async fn get_realm(
                 .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                 // from test root
                 .capability(Capability::protocol::<ftest::SuiteMarker>())
+                // custom_artifact capability
+                .capability(Capability::protocol::<fsys::StorageAdminMarker>())
                 .capability(Capability::protocol::<fcomponent::RealmMarker>())
                 .from(&wrapper_realm)
                 .to(Ref::parent()),

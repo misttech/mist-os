@@ -15,6 +15,8 @@ pub const KERNEL_DEBUG_DATA_FOR_SCP: &'static str = "/tmp/kernel_debug";
 pub const DEBUG_DATA_FOR_SCP: &'static str = "/tmp/debug";
 pub const ISOLATED_TMP: &'static str = "/tmp/isolated";
 
+pub const CUSTOM_ARTIFACTS_CAPABILITY_NAME: &'static str = "custom_artifacts";
+
 // TODO(fxbug.dev/100034): Delete these once we no longer need to hard code these in the code.
 pub const TEST_ENVIRONMENT_NAME: &'static str = "test-env";
 pub const HERMETIC_TESTS_COLLECTION: &'static str = "tests";
