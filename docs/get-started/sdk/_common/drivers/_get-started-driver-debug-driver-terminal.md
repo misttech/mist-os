@@ -26,7 +26,7 @@ Do the following:
    $ tools/ffx driver list-hosts
    Driver Host: 5507
        fuchsia-boot:///#meta/bus-pci.cm
-       fuchsia-boot:///#meta/display.cm
+       fuchsia-boot:///#meta/display-coordinator.cm
        fuchsia-boot:///#meta/goldfish-display.cm
        fuchsia-boot:///#meta/goldfish.cm
        fuchsia-boot:///#meta/goldfish_control.cm

@@ -34,7 +34,7 @@ Do the following:
    $ tools/ffx driver list --loaded
    fuchsia-boot:///#meta/block.core.cm
    fuchsia-boot:///#meta/bus-pci.cm
-   fuchsia-boot:///#meta/display.cm
+   fuchsia-boot:///#meta/display-coordinator.cm
    fuchsia-boot:///#meta/fvm.cm
    fuchsia-boot:///#meta/goldfish-display.cm
    fuchsia-boot:///#meta/goldfish.cm
@@ -94,7 +94,7 @@ Do the following:
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx driver list --loaded
    fuchsia-boot:///#meta/bus-pci.cm
-   fuchsia-boot:///#meta/display.cm
+   fuchsia-boot:///#meta/display-coordinator.cm
    fuchsia-boot:///#meta/fvm.cm
    fuchsia-boot:///#meta/goldfish-display.cm
    fuchsia-boot:///#meta/goldfish.cm
