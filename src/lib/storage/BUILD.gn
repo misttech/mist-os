@@ -16,6 +16,7 @@ group("tests") {
 
   deps = [
     "block_client:tests",
+    "delivery_blob:tests",
     "fs_management:tests",
     "key-bag:tests",
     "ramdevice_client:tests",

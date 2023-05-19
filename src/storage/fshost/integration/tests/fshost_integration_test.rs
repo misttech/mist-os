@@ -4,6 +4,7 @@
 
 use {
     assert_matches::assert_matches,
+    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_fshost::AdminMarker,
@@ -90,34 +91,6 @@ fn volumes_spec() -> VolumesSpec {
 
 fn data_fs_spec() -> DataSpec {
     DataSpec { format: Some(data_fs_name()), zxcrypt: data_fs_zxcrypt() }
-}
-
-async fn check_delivery_blob_support(
-    blobfs: fio::DirectoryProxy,
-    should_allow_delivery_blobs: bool,
-) {
-    // We just use the null blob's hash as a test.
-    let hash = "15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b";
-    let delivery_path = format!("v1-{}", hash);
-    let blob = fuchsia_fs::directory::open_file(
-        &blobfs,
-        &delivery_path,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-    )
-    .await;
-    if should_allow_delivery_blobs {
-        assert!(blob.is_ok(), "Failed to open delivery blob for writing: {:?}", &blob);
-    } else {
-        // If delivery blob support is disabled, we should get NOT_SUPPORTED.
-        assert!(blob.is_err(), "Succeeded opening delivery blob when feature disabled.");
-        match blob.unwrap_err() {
-            OpenError::OpenError(status) => assert_eq!(status, zx::Status::NOT_SUPPORTED),
-            other => panic!(
-                "Unexpected error when opening delivery blob (expected NOT_SUPPORTED): {:?}",
-                other
-            ),
-        }
-    }
 }
 
 #[fuchsia::test]
@@ -850,18 +823,70 @@ async fn verify_blobs() {
 // TODO(https://fxbug.dev/122125): fxblob delivery blob support.
 #[fuchsia::test]
 #[cfg_attr(feature = "fxblob", ignore)]
-async fn delivery_blob_config() {
-    for allow_delivery_blobs in [false, true] {
-        let mut builder = new_builder();
-        builder.fshost().set_config_value("blobfs_allow_delivery_blobs", allow_delivery_blobs);
-        builder.with_disk().format_volumes(volumes_spec());
-        let fixture = builder.build().await;
-        // Ensure we succeed/fail to create a delivery blob if the feature is enabled/disabled.
-        check_delivery_blob_support(
-            fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
-            allow_delivery_blobs,
-        )
-        .await;
-        fixture.tear_down().await;
+async fn delivery_blob_support_disabled() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("blobfs_allow_delivery_blobs", false);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+    // Attempt to open a delivery blob for writing.
+    const HASH: &'static str = "f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf";
+    let open_error = fuchsia_fs::directory::open_file(
+        &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
+        &delivery_blob_path(HASH),
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+    )
+    .await
+    .expect_err("Should fail to open delivery blob for writing when disabled.");
+    match open_error {
+        OpenError::OpenError(status) => assert_eq!(status, zx::Status::NOT_SUPPORTED),
+        other => panic!("Wrong error when opening blob (expected NOT_SUPPORTED): {:?}", other),
     }
+    fixture.tear_down().await;
+}
+
+// TODO(https://fxbug.dev/122125): fxblob delivery blob support.
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn delivery_blob_support_enabled() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("blobfs_allow_delivery_blobs", true);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+    // Generate delivery blob, ensuring it's compressed, so we exercise sandboxed decompression.
+    // 65536 bytes of 0xff "small" f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf
+    const HASH: &'static str = "f75f59a944d2433bc6830ec243bfefa457704d2aed12f30539cd4f18bf1d62cf";
+    let data: Vec<u8> = vec![0xff; 65536];
+    let payload = Type1Blob::generate(&data, CompressionMode::Always);
+    // `data` is highly compressible, so we should be able to transfer it in one write call.
+    assert!((payload.len() as u64) < fio::MAX_TRANSFER_SIZE, "Payload exceeds max transfer size!");
+    // Now attempt to write `payload` as we would any other blob, but using the delivery path.
+    let blob = fuchsia_fs::directory::open_file(
+        &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
+        &delivery_blob_path(HASH),
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+    )
+    .await
+    .expect("Failed to open delivery blob for writing.");
+    // Resize to required length.
+    blob.resize(payload.len() as u64).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+    // Write payload.
+    let bytes_written = blob.write(&payload).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+    assert_eq!(bytes_written, payload.len() as u64);
+    blob.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+    // We should now be able to open the blob by its hash and read the contents back.
+    let blob = fuchsia_fs::directory::open_file(
+        &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE),
+        HASH,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    .expect("Failed to open delivery blob for reading.");
+    // Read the last 1024 bytes of the file and ensure the bytes match the original `data`.
+    let len: u64 = 1024;
+    let offset: u64 = data.len().checked_sub(1024).unwrap() as u64;
+    let contents = blob.read_at(len, offset).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+    assert_eq!(contents.as_slice(), &data[offset as usize..]);
+
+    fixture.tear_down().await;
 }

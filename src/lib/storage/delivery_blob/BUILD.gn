@@ -1,0 +1,46 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components/fuchsia_unittest_package.gni")
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
+
+rustc_library("delivery_blob") {
+  edition = "2021"
+  name = "delivery_blob"
+  version = "0.1.0"
+  visibility = [
+    "//src/lib/storage/*",
+    "//src/storage/*",
+  ]
+  sources = [
+    "src/compression.rs",
+    "src/format.rs",
+    "src/lib.rs",
+  ]
+  deps = [
+    "//src/sys/pkg/lib/fuchsia-merkle",
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:crc",
+    "//third_party/rust_crates:rayon",
+    "//third_party/rust_crates:static_assertions",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zstd",
+    "//third_party/zstd",
+  ]
+  with_unit_tests = true
+}
+
+fuchsia_unittest_package("delivery-blob-test") {
+  deps = [ ":delivery_blob_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":delivery-blob-test",
+    ":delivery_blob_test($host_toolchain)",
+  ]
+}
