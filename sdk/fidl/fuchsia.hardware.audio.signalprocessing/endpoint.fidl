@@ -1,0 +1,69 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.audio.signalprocessing;
+using zx;
+
+/// Plug state for the endpoint.
+/// If the driver reports a `plug_detect_capabilities` equal to HARDWIRED, then the driver should
+/// respond to `WatchElementState` only the first time it is called for a given endpoint, with
+/// `plugged` set to true and `plug_state_time` set to time '0'.
+@available(added=12)
+type PlugState = table {
+    /// Endpoint is currently plugged in.
+    ///
+    /// Required
+    1: plugged bool;
+
+    /// Timestamps (using `CLOCK_DOMAIN_MONOTONIC`) the information provided in the other fields
+    /// of this table. Indicates when the transition described by this table occurred.
+    ///
+    /// Required.
+    2: plug_state_time zx.Time;
+};
+
+/// Plug detection capabilities for the endpoint.
+@available(added=12)
+type PlugDetectCapabilities = flexible enum {
+    /// Endpoint is hardwired (will always be plugged in).
+    HARDWIRED = 0;
+
+    /// Endpoint can be unplugged and plugged and can asynchronously notify of plug state changes.
+    CAN_ASYNC_NOTIFY = 1;
+};
+
+/// Endpoint types.
+@available(added=12)
+type EndpointType = flexible enum : uint8 {
+    /// The endpoint represents a ring buffer.
+    /// A ring buffer processing element's id allows for multi-ring buffer topologies to
+    /// be supported by a driver proding the fuchsia.hardware.audio/Device API.
+    RING_BUFFER = 1;
+
+    /// The endpoint represents a Digital Audio Interface Interconnect,
+    /// e.g. connecting an SoC audio subsystem to a DAC + amplifier hardware codec.
+    DAI_INTERCONNECT = 2;
+};
+
+
+/// Parameters for an `Element` with `type` equal to `ENDPOINT`.
+@available(added=12)
+type Endpoint = table {
+    /// Specifies what the endpoint represents.
+    ///
+    /// Required.
+    1: type EndpointType;
+
+    /// Plug Detect Capabilities.
+    /// Required.
+    2: plug_detect_capabilities PlugDetectCapabilities;
+};
+
+/// State for an `Element` with `type` equal to `ENDPOINT`.
+@available(added=12)
+type EndpointElementState = table {
+    /// The plug detect state for this endpoint.
+    ///
+    /// Required.
+    1: plug_state PlugState;
+};

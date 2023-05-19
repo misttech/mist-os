@@ -319,6 +319,48 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/Endpoint.plug_detect_capabilities",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio.signalprocessing/PlugDetectCapabilities"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/Endpoint.type",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/EndpointType"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio.signalprocessing/Endpoint"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/EndpointElementState.plug_state",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/PlugState"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio.signalprocessing/EndpointElementState"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/EndpointType.DAI_INTERCONNECT",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/EndpointType.RING_BUFFER",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.hardware.audio.signalprocessing/EndpointType",
+        "strictness": "flexible",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Equalizer.bands",
         "ordinal": "1",
         "type": "vector<fuchsia.hardware.audio.signalprocessing/EqualizerBand>:64"
@@ -662,6 +704,38 @@
         "value": "256"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/PlugDetectCapabilities.CAN_ASYNC_NOTIFY",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/PlugDetectCapabilities.HARDWIRED",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.hardware.audio.signalprocessing/PlugDetectCapabilities",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/PlugState.plug_state_time",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/PlugState.plugged",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio.signalprocessing/PlugState"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader.GetElements",
         "ordinal": "1951465235598395128",
@@ -853,6 +927,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElement.endpoint",
+        "ordinal": "5",
+        "type": "fuchsia.hardware.audio.signalprocessing/Endpoint"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElement.equalizer",
         "ordinal": "3",
         "type": "fuchsia.hardware.audio.signalprocessing/Equalizer"
@@ -879,6 +959,12 @@
         "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElementState.dynamics",
         "ordinal": "4",
         "type": "fuchsia.hardware.audio.signalprocessing/DynamicsElementState"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElementState.endpoint",
+        "ordinal": "5",
+        "type": "fuchsia.hardware.audio.signalprocessing/EndpointElementState"
     },
     {
         "kind": "union/member",

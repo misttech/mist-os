@@ -12,6 +12,8 @@ fidl("fuchsia.hardware.audio") {
     "codec.fidl",
     "codec_connector.fidl",
     "common.fidl",
+    "composite.fidl",
+    "composite_connector.fidl",
     "dai.fidl",
     "dai_connector.fidl",
     "dai_format.fidl",

@@ -4,8 +4,8 @@
 
 The signal processing interface is available to be potentially used by audio hardware codecs (from
 here on referred to as 'codecs') , DAIs and glue drivers. This interface `SignalProcessing` is a
-FIDL protocol used by the `Codec`, `Dai` and `StreamConfig` protocols to provide audio signal
-processing capabilities.
+FIDL protocol used by the `Codec`, `Dai`, `StreamConfig` and `Composite` protocols to provide audio
+signal processing capabilities.
 
 The `SignalProcessing` protocol is defined to control signal processing hardware and their
 topologies. We define processing elements (PEs) as a logical unit of audio data processing provided
@@ -33,10 +33,15 @@ Each driver can have its own topology. Glue drivers can abstract from applicatio
 exposed by DAI or codec drivers as needed for a particular configuration or product. Note that it is
 possible although not required to expose topologies to applications, in particular to `audio_core`.
 
-Note that topologies are not meant to fully describe the audio pipeline state/format/configuration
+
+Notes:
+
+* Topologies are not meant to fully describe the audio pipeline state/format/configuration
 in and out of every PE. The intent is to describe what can be changed/rearranged by the client (for
 instance a glue driver) based on its knowledge, configuration (for instance from metadata) and
 specific business logic.
+* Topologies used for audio drivers providing the `Composite` protocol must include `ENDPOINT`
+PEs that provide an id for the driver's supported ring buffers and DAI interconnects.
 
 ### Processing Elements
 
@@ -236,16 +241,17 @@ The PEs of type `CONNECTION_POINT` allow for:
 ## Endpoints {#endpoints}
 
 The PEs of type `ENDPOINT` are optional (even in the presence of `CONNECTION_POINT`s) and allow for
-completing the pipelines structures with a clear starting input(s) and ending output(s).
+completing the pipelines structures with a clear starting input(s) and ending output(s). However for
+drivers providing the `Composite` protocol, any supported ring buffer or DAI interconnect must be
+listed as an `ENDPOINT` with type `RING_BUFFER` and `DAI_INTERCONNECT` returned by `GetElements`.
+The endpoint PE id is needed by the `Composite` protocol APIs to identify the ring buffers and DAI
+interonnect configurations.
+
 If no `ENDPOINT` is specified, then a PE with no incoming edges is an input and a PE with no
 outgoing edges is an output. For instance, the example in
 [Multiple topologies](#multiple-topologies) above includes two topologies each with a single
 pipeline, the single pipeline in topology id 1 starts with PE id 3 and ends with PE id 1, and the
 single pipeline in topology id 2 starts with PE id 2 and ends with PE id 6.
-
-{% comment %}
-// TODO(fxbug.dev/64877): Add extra-context for endpoints usage.
-{% endcomment %}
 
 <!-- Reference links -->
 

@@ -240,7 +240,7 @@ impl StreamConfig {
                 let mut state = self.inner.lock().await;
 
                 let time = state.plugged_time;
-                let plug_state = PlugState {
+                let plug_state = fidl_fuchsia_hardware_audio::PlugState {
                     plugged: Some(state.plugged),
                     plug_state_time: Some(time),
                     ..Default::default()
@@ -465,7 +465,7 @@ impl DefaultConfigurator {
                 }
             }
             if let Some(responder) = stream_config_state.plug_state_responder.take() {
-                let plug_state = PlugState {
+                let plug_state = fidl_fuchsia_hardware_audio::PlugState {
                     plugged: Some(stream_config_state.plugged),
                     plug_state_time: Some(stream_config_state.plugged_time),
                     ..Default::default()
@@ -599,7 +599,8 @@ impl Configurator for DefaultConfigurator {
         let device = Device {
             manufacturer: manufacturer,
             product: product,
-            hardwired: plug_detect_capabilities != PlugDetectCapabilities::CanAsyncNotify,
+            hardwired: plug_detect_capabilities
+                != fidl_fuchsia_hardware_audio::PlugDetectCapabilities::CanAsyncNotify,
             is_codec: true,
             is_input: is_input,
         };
@@ -820,9 +821,9 @@ impl Configurator for DefaultConfigurator {
             max_gain_db: Some(0f32),
             gain_step_db: Some(0f32),
             plug_detect_capabilities: Some(if stream_config_state2.hardwired {
-                PlugDetectCapabilities::Hardwired
+                fidl_fuchsia_hardware_audio::PlugDetectCapabilities::Hardwired
             } else {
-                PlugDetectCapabilities::CanAsyncNotify
+                fidl_fuchsia_hardware_audio::PlugDetectCapabilities::CanAsyncNotify
             }),
             clock_domain: Some(0u32),
             manufacturer: Some("Google".to_string()),
@@ -1324,7 +1325,9 @@ mod tests {
             min_gain_db: Some(0f32),
             max_gain_db: Some(0f32),
             gain_step_db: Some(0f32),
-            plug_detect_capabilities: Some(PlugDetectCapabilities::Hardwired),
+            plug_detect_capabilities: Some(
+                fidl_fuchsia_hardware_audio::PlugDetectCapabilities::Hardwired,
+            ),
             clock_domain: Some(0u32),
             manufacturer: Some("Test Manufacturer".to_string()),
             product: Some("Test Product".to_string()),
@@ -1370,7 +1373,10 @@ mod tests {
         assert_eq!(properties.min_gain_db, Some(0f32));
         assert_eq!(properties.max_gain_db, Some(0f32));
         assert_eq!(properties.gain_step_db, Some(0f32));
-        assert_eq!(properties.plug_detect_capabilities, Some(PlugDetectCapabilities::Hardwired));
+        assert_eq!(
+            properties.plug_detect_capabilities,
+            Some(fidl_fuchsia_hardware_audio::PlugDetectCapabilities::Hardwired)
+        );
         assert_eq!(properties.clock_domain, Some(0u32));
         assert_eq!(properties.manufacturer, Some("Test Manufacturer".to_string()));
         assert_eq!(properties.product, Some("Test Product".to_string()));
@@ -1485,7 +1491,9 @@ mod tests {
                         manufacturer: Some("test".to_string()),
                         product: Some("testy".to_string()),
                         is_input: Some(self.is_input),
-                        plug_detect_capabilities: Some(PlugDetectCapabilities::Hardwired),
+                        plug_detect_capabilities: Some(
+                            fidl_fuchsia_hardware_audio::PlugDetectCapabilities::Hardwired,
+                        ),
                         ..Default::default()
                     };
                     responder.send(&info)?;
@@ -1509,7 +1517,7 @@ mod tests {
                 }
                 CodecRequest::SetDaiFormat { responder: _, format: _ } => {}
                 CodecRequest::WatchPlugState { responder } => {
-                    responder.send(&PlugState {
+                    responder.send(&fidl_fuchsia_hardware_audio::PlugState {
                         plugged: Some(TEST_CODEC_PLUGGED),
                         plug_state_time: Some(TEST_CODEC_PLUG_STATE_TIME),
                         ..Default::default()
@@ -1889,7 +1897,7 @@ mod tests {
         ) -> std::result::Result<(), anyhow::Error> {
             match request {
                 CodecRequest::WatchPlugState { responder } => {
-                    responder.send(&PlugState {
+                    responder.send(&fidl_fuchsia_hardware_audio::PlugState {
                         // A plug state with missing plugged field is bad.
                         plug_state_time: Some(TEST_CODEC_PLUG_STATE_TIME),
                         ..Default::default()

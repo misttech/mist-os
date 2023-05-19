@@ -189,6 +189,219 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.CreateRingBuffer",
+        "ordinal": "2937869091394166835",
+        "type": "(uint64 processing_element_id,fuchsia.hardware.audio/Format format,server_end:fuchsia.hardware.audio/RingBuffer ring_buffer) -> (fuchsia.hardware.audio/Composite_CreateRingBuffer_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.GetDaiFormats",
+        "ordinal": "273570507520538267",
+        "type": "(uint64 processing_element_id) -> (fuchsia.hardware.audio/Composite_GetDaiFormats_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.GetHealthState",
+        "ordinal": "5626242144218069636",
+        "type": "() -> (fuchsia.hardware.audio/HealthState state)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.GetProperties",
+        "ordinal": "3568099540527060011",
+        "type": "() -> (fuchsia.hardware.audio/CompositeProperties properties)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.GetRingBufferFormats",
+        "ordinal": "2128433516894055108",
+        "type": "(uint64 processing_element_id) -> (fuchsia.hardware.audio/Composite_GetRingBufferFormats_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.Reset",
+        "ordinal": "775558099916560790",
+        "type": "() -> (fuchsia.hardware.audio/Composite_Reset_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.SetDaiFormat",
+        "ordinal": "1538770219980065412",
+        "type": "(uint64 processing_element_id,fuchsia.hardware.audio/DaiFormat format) -> (fuchsia.hardware.audio/Composite_SetDaiFormat_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Composite.SignalProcessingConnect",
+        "ordinal": "757045078484476565",
+        "type": "(server_end:fuchsia.hardware.audio.signalprocessing/SignalProcessing protocol)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.hardware.audio/Composite"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/CompositeConnector.Connect",
+        "ordinal": "9143810630568502374",
+        "type": "(server_end:fuchsia.hardware.audio/Composite composite_protocol)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.hardware.audio/CompositeConnector"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CompositeProperties.clock_domain",
+        "ordinal": "5",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CompositeProperties.is_input",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CompositeProperties.manufacturer",
+        "ordinal": "2",
+        "type": "string:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CompositeProperties.product",
+        "ordinal": "3",
+        "type": "string:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CompositeProperties.unique_id",
+        "ordinal": "4",
+        "type": "array<uint8,16>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio/CompositeProperties"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/Composite_CreateRingBuffer_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_CreateRingBuffer_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio/DriverError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_CreateRingBuffer_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/Composite_CreateRingBuffer_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.audio/Composite_CreateRingBuffer_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio/Composite_GetDaiFormats_Response.dai_formats",
+        "ordinal": "1",
+        "type": "vector<fuchsia.hardware.audio/DaiSupportedFormats>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/Composite_GetDaiFormats_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_GetDaiFormats_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio/DriverError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_GetDaiFormats_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/Composite_GetDaiFormats_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.audio/Composite_GetDaiFormats_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio/Composite_GetRingBufferFormats_Response.ring_buffer_formats",
+        "ordinal": "1",
+        "type": "vector<fuchsia.hardware.audio/SupportedFormats>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/Composite_GetRingBufferFormats_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_GetRingBufferFormats_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio/DriverError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_GetRingBufferFormats_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/Composite_GetRingBufferFormats_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.audio/Composite_GetRingBufferFormats_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/Composite_Reset_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_Reset_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio/DriverError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_Reset_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/Composite_Reset_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.audio/Composite_Reset_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/Composite_SetDaiFormat_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_SetDaiFormat_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio/DriverError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio/Composite_SetDaiFormat_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/Composite_SetDaiFormat_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.audio/Composite_SetDaiFormat_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.audio/Dai.CreateRingBuffer",
         "ordinal": "6555400498770825815",
         "type": "(fuchsia.hardware.audio/DaiFormat dai_format,fuchsia.hardware.audio/Format ring_buffer_format,server_end:fuchsia.hardware.audio/RingBuffer ring_buffer)"
@@ -516,6 +729,37 @@
         "kind": "union",
         "name": "fuchsia.hardware.audio/Dai_GetRingBufferFormats_Result",
         "strictness": "strict"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DriverError.INTERNAL_ERROR",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DriverError.INVALID_ARGS",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DriverError.NOT_SUPPORTED",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DriverError.SHOULD_WAIT",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DriverError.WRONG_TYPE",
+        "value": "4"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.hardware.audio/DriverError",
+        "strictness": "flexible",
+        "type": "uint32"
     },
     {
         "kind": "table/member",

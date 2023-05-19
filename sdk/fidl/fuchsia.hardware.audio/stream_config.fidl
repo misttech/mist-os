@@ -5,9 +5,6 @@ library fuchsia.hardware.audio;
 
 using fuchsia.hardware.audio.signalprocessing;
 
-const UNIQUE_ID_SIZE uint32 = 16;
-const MAX_UI_STRING_SIZE uint32 = 256;
-
 /// Gain state requested by the client or returned by the driver.
 type GainState = table {
     /// Current mute state. If not included, the state is unmuted.

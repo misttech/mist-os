@@ -1,0 +1,156 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.audio;
+
+using fuchsia.hardware.audio.signalprocessing;
+
+@available(added=12)
+type CompositeProperties = table {
+    /// Driver type is input (true) or output (false)
+    /// If not included, then the driver may be used for both input and output.
+    ///
+    /// Optional.
+    1: is_input bool;
+
+    /// UI string for the manufacturer name. If not set, the manufacturer is unknown.
+    ///
+    /// Optional.
+    2: manufacturer string:MAX_UI_STRING_SIZE;
+
+    /// UI string for the product name. If not set, the product name is unknown.
+    ///
+    /// Optional.
+    3: product string:MAX_UI_STRING_SIZE;
+
+    /// A unique identifier. If not included, there is no unique id for the Device.
+    /// `unique_id` arrays starting with 0x42, 0x54, ... (or `BT` in ASCII) are
+    /// reserved for drivers implementing Bluetooth technologies.
+    /// `unique_id` arrays starting with 0x55, 0x53, 0x42, ... (or `USB` in ASCII) are
+    /// reserved for drivers implementing USB technologies.
+    /// Note that even though the above values map to readable ASCII characters, array
+    /// values can span the entire uint8 range (0-255).
+    ///
+    /// Optional.
+    4: unique_id array<uint8, UNIQUE_ID_SIZE>;
+
+    /// An identifier for the clock domain in which this hardware operates. If
+    /// two hardware devices have the same clock domain, their clock rates are
+    /// identical and perfectly synchronized. Although these two clocks have the
+    /// same rate, the clock positions may be offset from each other by an
+    /// arbitrary (but fixed) amount. The clock_domain typically comes from a
+    /// system wide entity, such as a platform bus or global clock tree.
+    ///
+    /// There are two special values:
+    ///
+    /// *  `CLOCK_DOMAIN_MONOTONIC` means the hardware is operating at the same
+    ///    rate as the system montonic clock.
+    ///
+    /// *  `CLOCK_DOMAIN_EXTERNAL` means the hardware is operating at an unknown
+    ///    rate and is not synchronized with any known clock, not even with
+    ///    other clocks in domain `CLOCK_DOMAIN_EXTERNAL`.
+    ///
+    /// If the domain is not `CLOCK_DOMAIN_MONOTONIC`, client must use position
+    /// notification updates to recover the hardware's clock.
+    ///
+    /// Required.
+    5: clock_domain ClockDomain;
+};
+
+/// The `Composite` interface is a FIDL protocol exposed by audio drivers. The `Composite` interface
+/// is generic and allows the configuration of various audio hardware types including those supported
+/// by the `StreamConfig`, `Dai` and `Codec` FIDL interfaces. The `Composite` interface is more
+/// generic and provides more flexible routing within audio subsystems. Also see
+/// [Audio Driver Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite.md)
+@available(added=12)
+protocol Composite {
+    /// Allows providing driver health state.
+    compose Health;
+
+    /// Allows providing signal processing capabilities.
+    compose fuchsia.hardware.audio.signalprocessing.Connector;
+
+    /// Resets the hardware including all DAI interconnects and signal processing.
+    /// As a result, all channels obtained by `CreateRingBuffer` will be closed.
+    ///
+    /// `Reset` returns when the hardware is fully reset. At this point, a client would need to
+    /// reconfigure any DAI interconnects, select a signal processing topology and reconfigure
+    /// any processing elements, and reconstruct any ring buffers.
+    ///
+    /// If the driver can't successfully reset the hardware, it will return an error and then close
+    /// the protocol channel, in this case the client may obtain a new protocol channel and retry.
+    Reset() -> () error DriverError;
+
+    /// Retrieves top level static properties.
+    GetProperties() -> (struct {
+        properties CompositeProperties;
+    });
+
+    /// Retrieves the ring buffer formats supported by a `RING_BUFFER` `ENDPOINT` type processing
+    /// element in the topology supported by this driver as returned by `GetElements` from
+    /// fuchsia.hardware.audio.signalprocessing.
+    /// Returns `SHOULD_WAIT` if the ring buffer formats are not available at the time, the
+    /// client may retry at a later time.
+    /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
+    /// by `GetElements`.
+    /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
+    /// `ENDPOINT` with `EndpointType` `RING_BUFFER`.
+    /// Retrieving multiple `SupportedFormats` allows for cases where exclusive combinations of
+    /// the parameters in `SupportedFormats` may be supported.
+    GetRingBufferFormats(struct {
+        processing_element_id uint64;
+    }) -> (struct {
+        ring_buffer_formats vector<SupportedFormats>:MAX_COUNT_FORMATS;
+    }) error DriverError;
+
+    /// `CreateRingBuffer` is sent by clients to select a ring buffer format for the
+    /// `RING_BUFFER` `ENDPOINT` type processing element specified by `processing_element_id`.
+    /// The format is based on information that the driver provides in `GetRingBufferFormats`,
+    /// what is supported by the client, and any other requirement.
+    /// The returned `ring_buffer` channel is used to access and control the audio buffer provided
+    /// by the driver.
+    /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
+    /// by `GetElements`.
+    /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
+    /// `ENDPOINT` with `EndpointType` `RING_BUFFER`.
+    CreateRingBuffer(resource struct {
+        processing_element_id uint64;
+        format Format;
+        ring_buffer server_end:RingBuffer;
+    }) -> () error DriverError;
+
+    /// Retrieves the DAI formats supported by a `DAI_INTERCONNECT` `ENDPOINT` type processing
+    /// element in the topology supported by this driver as returned by `GetElements` from
+    /// fuchsia.hardware.audio.signalprocessing.
+    /// Returns `SHOULD_WAIT` if the DAI formats are not available at the time, the client
+    /// may retry at a later time.
+    /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
+    /// by `GetElements`.
+    /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
+    /// `ENDPOINT` with `EndpointType` `DAI_INTERCONNECT`.
+    /// Retrieving multiple `DaiSupportedFormats` allows for cases where exclusive combinations of
+    /// the parameters in SupportedFormats may be supported.
+    GetDaiFormats(struct {
+        processing_element_id uint64;
+    }) -> (struct {
+        dai_formats vector<DaiSupportedFormats>:MAX_COUNT_FORMATS;
+    }) error DriverError;
+
+    /// `SetDaiFormat` is sent by clients to select a DAI format for the `DAI_INTERCONNECT`
+    /// `ENDPOINT` type processing element specified by `processing_element_id`.
+    /// The format is based on information that the driver provides in `GetDaiFormats`, what is
+    /// supported by the client, and any other requirement.
+    /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
+    /// by `GetElements`.
+    /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
+    /// `ENDPOINT` with `EndpointType` `DAI_INTERCONNECT`.
+    SetDaiFormat(struct {
+        processing_element_id uint64;
+        format DaiFormat;
+    }) -> () error DriverError;
+};
+
+@available(added=12)
+service DeviceService {
+    device client_end:Composite;
+};
