@@ -94,11 +94,6 @@ if (is_fuchsia) {
                        "target_out_dir") +
         "/bootable_product_config/product_assembly_config.json"
 
-    # Outputs of prime assembly.
-    outdir_prime = target_out_dir + "/fuchsia_prime_assembly"
-    images_prime_json = "${outdir_prime}/images.json"
-    packages_prime_json = "${outdir_prime}/packages.json"
-
     # Outputs of recovery.
     recovery_name = get_label_info(recovery_label, "name")
     recovery_outdir =

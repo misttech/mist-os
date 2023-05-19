@@ -28,20 +28,12 @@ labels = {
           "bazel_assembly_targets should define exactly one element when use_bazel_images_only=true")
 
       images = bazel_assembly_targets[0]
-
-      # images_prime target is used to provide extra metadata, for Bazel assembly
-      # we consolidate metadata on the same product bundle GN wrapper.
-      images_prime = bazel_assembly_targets[0]
     } else {
       assert(
           bazel_product_bundle_target != "",
           "bazel_product_bundle_prefix and bazel_product_bundle_board must be set to use Bazel assembly")
 
       images = bazel_product_bundle_target
-
-      # images_prime target is used to provide extra metadata, for Bazel assembly
-      # we consolidate metadata on the same product bundle GN wrapper.
-      images_prime = images
     }
 
     # Path to the `package_tool_package_manifest_list_create` target defined in
@@ -54,7 +46,6 @@ labels = {
     _images_without_toolchain = "//build/images/fuchsia"
     images = "${_images_without_toolchain}(${default_toolchain})"
     assembly_name = "fuchsia"
-    images_prime = "${_images_without_toolchain}:${assembly_name}_prime"
 
     fuchsia_netboot = "${_images_without_toolchain}:netboot"
 
