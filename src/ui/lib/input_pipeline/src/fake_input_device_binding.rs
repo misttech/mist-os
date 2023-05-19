@@ -3,15 +3,18 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device, crate::keyboard_binding, anyhow::Error, async_trait::async_trait,
+    crate::input_device,
+    crate::keyboard_binding,
+    anyhow::Error,
+    async_trait::async_trait,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    futures::channel::mpsc::Sender,
+    futures::channel::mpsc::{Sender, UnboundedSender},
 };
 
 /// A fake [`InputDeviceBinding`] for testing.
 pub struct FakeInputDeviceBinding {
     /// The channel to stream InputEvents to.
-    event_sender: Sender<input_device::InputEvent>,
+    event_sender: UnboundedSender<input_device::InputEvent>,
 
     /// The channel to stream received input config requests.
     input_config_requests_sender: Sender<InputConfigFeaturesRequest>,
@@ -20,7 +23,7 @@ pub struct FakeInputDeviceBinding {
 #[allow(dead_code)]
 impl FakeInputDeviceBinding {
     pub fn new(
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         input_config_requests_sender: Sender<InputConfigFeaturesRequest>,
     ) -> Self {
         FakeInputDeviceBinding { event_sender: input_event_sender, input_config_requests_sender }
@@ -43,7 +46,7 @@ impl input_device::InputDeviceBinding for FakeInputDeviceBinding {
         })
     }
 
-    fn input_event_sender(&self) -> Sender<input_device::InputEvent> {
+    fn input_event_sender(&self) -> UnboundedSender<input_device::InputEvent> {
         self.event_sender.clone()
     }
 

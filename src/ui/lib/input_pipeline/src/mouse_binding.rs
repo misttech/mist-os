@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
     crate::mouse_model_database,
     crate::utils::Position,
     anyhow::{format_err, Error},
@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
-    futures::channel::mpsc::Sender,
+    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
     std::collections::HashSet,
     std::iter::FromIterator,
 };
@@ -156,13 +156,10 @@ impl MouseEvent {
 /// from the device, and sends them to the device binding owner over `event_sender`.
 pub struct MouseBinding {
     /// The channel to stream InputEvents to.
-    event_sender: Sender<input_device::InputEvent>,
+    event_sender: UnboundedSender<input_device::InputEvent>,
 
     /// Holds information about this device.
     device_descriptor: MouseDeviceDescriptor,
-
-    /// The inventory of this binding's Inspect status.
-    pub inspect_status: InputDeviceStatus,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -192,7 +189,7 @@ pub struct MouseDeviceDescriptor {
 
 #[async_trait]
 impl input_device::InputDeviceBinding for MouseBinding {
-    fn input_event_sender(&self) -> Sender<input_device::InputEvent> {
+    fn input_event_sender(&self) -> UnboundedSender<input_device::InputEvent> {
         self.event_sender.clone()
     }
 
@@ -225,15 +222,17 @@ impl MouseBinding {
     pub async fn new(
         device_proxy: InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_binding =
+        let (device_binding, mut inspect_status) =
             Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
+        inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
+            inspect_status,
             Self::process_reports,
         );
 
@@ -254,9 +253,9 @@ impl MouseBinding {
     async fn bind_device(
         device: &InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let device_descriptor: fidl_input_report::DeviceDescriptor = match device
             .get_descriptor()
@@ -295,11 +294,10 @@ impl MouseBinding {
             counts_per_mm: model.counts_per_mm,
         };
 
-        Ok(MouseBinding {
-            event_sender: input_event_sender,
-            device_descriptor,
-            inspect_status: input_device_status,
-        })
+        Ok((
+            MouseBinding { event_sender: input_event_sender, device_descriptor },
+            input_device_status,
+        ))
     }
 
     /// Parses an [`InputReport`] into one or more [`InputEvent`]s.
@@ -318,17 +316,23 @@ impl MouseBinding {
     /// # Returns
     /// An [`InputReport`] which will be passed to the next call to [`process_reports`], as
     /// [`previous_report`]. If `None`, the next call's [`previous_report`] will be `None`.
+    /// A [`UnboundedReceiver<InputEvent>`] which will poll asynchronously generated events to be
+    /// recorded by `inspect_status` in `input_device::initialize_report_stream()`. If device
+    /// binding does not generate InputEvents asynchronously, this will be `None`.
     fn process_reports(
         report: InputReport,
         previous_report: Option<InputReport>,
         device_descriptor: &input_device::InputDeviceDescriptor,
-        input_event_sender: &mut Sender<input_device::InputEvent>,
-    ) -> Option<InputReport> {
+        input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
+        inspect_status: &InputDeviceStatus,
+    ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
+        inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a MouseInputReport.
         let mouse_report: &fidl_input_report::MouseInputReport = match &report.mouse {
             Some(mouse) => mouse,
             None => {
-                return previous_report;
+                inspect_status.count_filtered_reports(1u64);
+                return (previous_report, None);
             }
         };
 
@@ -350,6 +354,7 @@ impl MouseBinding {
             current_buttons.clone(),
             device_descriptor,
             input_event_sender,
+            inspect_status,
         );
 
         let counts_per_mm = match device_descriptor {
@@ -388,6 +393,7 @@ impl MouseBinding {
             current_buttons.union(&previous_buttons).cloned().collect(),
             device_descriptor,
             input_event_sender,
+            inspect_status,
         );
 
         let wheel_delta_v = match mouse_report.scroll_v {
@@ -414,6 +420,7 @@ impl MouseBinding {
             current_buttons.union(&previous_buttons).cloned().collect(),
             device_descriptor,
             input_event_sender,
+            inspect_status,
         );
 
         // Send an Up event with:
@@ -430,9 +437,10 @@ impl MouseBinding {
             current_buttons.clone(),
             device_descriptor,
             input_event_sender,
+            inspect_status,
         );
 
-        Some(report)
+        (Some(report), None)
     }
 }
 
@@ -457,7 +465,8 @@ fn send_mouse_event(
     affected_buttons: HashSet<MouseButton>,
     pressed_buttons: HashSet<MouseButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    sender: &mut Sender<input_device::InputEvent>,
+    sender: &mut UnboundedSender<input_device::InputEvent>,
+    inspect_status: &InputDeviceStatus,
 ) {
     // Only send Down/Up events when there are buttons affected.
     if (phase == MousePhase::Down || phase == MousePhase::Up) && affected_buttons.is_empty() {
@@ -475,7 +484,7 @@ fn send_mouse_event(
         return;
     }
 
-    match sender.try_send(input_device::InputEvent {
+    let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Mouse(MouseEvent::new(
             location,
             wheel_delta_v,
@@ -492,9 +501,11 @@ fn send_mouse_event(
         event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
-    }) {
+    };
+
+    match sender.unbounded_send(event.clone()) {
         Err(e) => tracing::error!("Failed to send MouseEvent with error: {:?}", e),
-        _ => {}
+        _ => inspect_status.count_generated_event(event),
     }
 }
 
@@ -551,7 +562,7 @@ fn buttons_from_optional_report(
 mod tests {
     use {
         super::*, crate::testing_utilities, fidl_fuchsia_input_report, fuchsia_async as fasync,
-        futures::StreamExt, pretty_assertions::assert_eq,
+        fuchsia_inspect::AnyProperty, futures::StreamExt, pretty_assertions::assert_eq,
     };
 
     const DEVICE_ID: u32 = 1;

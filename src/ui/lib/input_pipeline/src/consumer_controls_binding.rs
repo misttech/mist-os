@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl_fuchsia_input_report as fidl_input_report,
@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
-    futures::channel::mpsc::Sender,
+    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
 /// A [`ConsumerControlsEvent`] represents an event where one or more consumer control buttons
@@ -48,13 +48,10 @@ impl ConsumerControlsEvent {
 /// from the device, and sends them to the device binding owner over `event_sender`.
 pub struct ConsumerControlsBinding {
     /// The channel to stream InputEvents to.
-    event_sender: Sender<input_device::InputEvent>,
+    event_sender: UnboundedSender<input_device::InputEvent>,
 
     /// Holds information about this device.
     device_descriptor: ConsumerControlsDeviceDescriptor,
-
-    /// The inventory of this binding's Inspect status.
-    pub inspect_status: InputDeviceStatus,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -65,7 +62,7 @@ pub struct ConsumerControlsDeviceDescriptor {
 
 #[async_trait]
 impl input_device::InputDeviceBinding for ConsumerControlsBinding {
-    fn input_event_sender(&self) -> Sender<input_device::InputEvent> {
+    fn input_event_sender(&self) -> UnboundedSender<input_device::InputEvent> {
         self.event_sender.clone()
     }
 
@@ -98,15 +95,17 @@ impl ConsumerControlsBinding {
     pub async fn new(
         device_proxy: InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_binding =
+        let (device_binding, mut inspect_status) =
             Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
+        inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
+            inspect_status,
             Self::process_reports,
         );
 
@@ -127,9 +126,9 @@ impl ConsumerControlsBinding {
     async fn bind_device(
         device: &InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let device_descriptor: fidl_input_report::DeviceDescriptor = match device
             .get_descriptor()
@@ -164,11 +163,10 @@ impl ConsumerControlsBinding {
                 buttons: consumer_controls_input_descriptor.buttons.unwrap_or_default(),
             };
 
-        Ok(ConsumerControlsBinding {
-            event_sender: input_event_sender,
-            device_descriptor,
-            inspect_status: input_device_status,
-        })
+        Ok((
+            ConsumerControlsBinding { event_sender: input_event_sender, device_descriptor },
+            input_device_status,
+        ))
     }
 
     /// Parses an [`InputReport`] into one or more [`InputEvent`]s. Sends the [`InputEvent`]s
@@ -186,12 +184,17 @@ impl ConsumerControlsBinding {
     /// # Returns
     /// An [`InputReport`] which will be passed to the next call to [`process_reports`], as
     /// [`previous_report`]. If `None`, the next call's [`previous_report`] will be `None`.
+    /// A [`UnboundedReceiver<InputEvent>`] which will poll asynchronously generated events to be
+    /// recorded by `inspect_status` in `input_device::initialize_report_stream()`. If device
+    /// binding does not generate InputEvents asynchronously, this will be `None`.
     fn process_reports(
         report: InputReport,
         previous_report: Option<InputReport>,
         device_descriptor: &input_device::InputDeviceDescriptor,
-        input_event_sender: &mut Sender<input_device::InputEvent>,
-    ) -> Option<InputReport> {
+        input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
+        inspect_status: &InputDeviceStatus,
+    ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
+        inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a ConsumerControlInputReport.
         let pressed_buttons: Vec<fidl_input_report::ConsumerControlButton> =
             match report.consumer_control {
@@ -200,12 +203,20 @@ impl ConsumerControlsBinding {
                     .as_ref()
                     .map(|buttons| buttons.iter().cloned().collect())
                     .unwrap_or_default(),
-                None => return previous_report,
+                None => {
+                    inspect_status.count_filtered_reports(1u64);
+                    return (previous_report, None);
+                }
             };
 
-        send_consumer_controls_event(pressed_buttons, device_descriptor, input_event_sender);
+        send_consumer_controls_event(
+            pressed_buttons,
+            device_descriptor,
+            input_event_sender,
+            inspect_status,
+        );
 
-        Some(report)
+        (Some(report), None)
     }
 }
 
@@ -218,9 +229,10 @@ impl ConsumerControlsBinding {
 fn send_consumer_controls_event(
     pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    sender: &mut Sender<input_device::InputEvent>,
+    sender: &mut UnboundedSender<input_device::InputEvent>,
+    inspect_status: &InputDeviceStatus,
 ) {
-    if let Err(e) = sender.try_send(input_device::InputEvent {
+    let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::ConsumerControls(ConsumerControlsEvent::new(
             pressed_buttons,
         )),
@@ -228,14 +240,20 @@ fn send_consumer_controls_event(
         event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
-    }) {
-        tracing::error!("Failed to send ConsumerControlsEvent with error: {:?}", e);
+    };
+
+    match sender.unbounded_send(event.clone()) {
+        Err(e) => tracing::error!("Failed to send ConsumerControlsEvent with error: {:?}", e),
+        _ => inspect_status.count_generated_event(event),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::testing_utilities, fuchsia_async as fasync, futures::StreamExt};
+    use {
+        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_inspect::AnyProperty,
+        futures::StreamExt,
+    };
 
     // Tests that an InputReport containing one consumer control button generates an InputEvent
     // containing the same consumer control button.

@@ -122,14 +122,16 @@ mod tests {
             },
         );
         let (_, event_time_u64) = testing_utilities::event_times();
-        input_device::UnhandledInputEvent::try_from(testing_utilities::create_keyboard_event(
-            key,
-            event_type,
-            /* modifiers= */ None,
-            event_time_u64,
-            &device_descriptor,
-            keymap,
-        ))
+        input_device::UnhandledInputEvent::try_from(
+            testing_utilities::create_keyboard_event_with_time(
+                key,
+                event_type,
+                /* modifiers= */ None,
+                event_time_u64,
+                &device_descriptor,
+                keymap,
+            ),
+        )
         .unwrap()
     }
 

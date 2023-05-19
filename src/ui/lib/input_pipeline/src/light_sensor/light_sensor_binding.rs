@@ -12,7 +12,7 @@ use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor,
 use fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
-use futures::channel::mpsc::Sender;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Clone, Debug)]
 pub struct LightSensorEvent {
@@ -33,13 +33,10 @@ impl Eq for LightSensorEvent {}
 /// TODO more details
 pub(crate) struct LightSensorBinding {
     /// The channel to stream InputEvents to.
-    event_sender: Sender<input_device::InputEvent>,
+    event_sender: UnboundedSender<input_device::InputEvent>,
 
     /// Holds information about this device.
     device_descriptor: LightSensorDeviceDescriptor,
-
-    /// The inventory of this binding's Inspect status.
-    pub inspect_status: InputDeviceStatus,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -59,7 +56,7 @@ pub struct LightSensorDeviceDescriptor {
 
 #[async_trait]
 impl InputDeviceBinding for LightSensorBinding {
-    fn input_event_sender(&self) -> Sender<InputEvent> {
+    fn input_event_sender(&self) -> UnboundedSender<InputEvent> {
         self.event_sender.clone()
     }
 
@@ -92,22 +89,29 @@ impl LightSensorBinding {
     pub(crate) async fn new(
         device_proxy: InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_binding =
+        let (device_binding, mut inspect_status) =
             Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
+        inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy.clone(),
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
-            move |report, previous_report, device_descriptor, input_event_sender| {
+            inspect_status,
+            move |report,
+                  previous_report,
+                  device_descriptor,
+                  input_event_sender,
+                  inspect_status| {
                 Self::process_reports(
                     report,
                     previous_report,
                     device_descriptor,
                     input_event_sender,
                     device_proxy.clone(),
+                    inspect_status,
                 )
             },
         );
@@ -129,9 +133,9 @@ impl LightSensorBinding {
     async fn bind_device(
         device: &InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let descriptor = match device.get_descriptor().await {
             Ok(descriptor) => descriptor,
@@ -220,16 +224,18 @@ impl LightSensorBinding {
                         input_device_status.health_node.set_unhealthy("Missing light sensor data.");
                         format_err!("missing sensor data in device")
                     })?;
-                Ok(LightSensorBinding {
-                    event_sender: input_event_sender,
-                    device_descriptor: LightSensorDeviceDescriptor {
-                        vendor_id: device_info.vendor_id,
-                        product_id: device_info.product_id,
-                        device_id,
-                        sensor_layout,
+                Ok((
+                    LightSensorBinding {
+                        event_sender: input_event_sender,
+                        device_descriptor: LightSensorDeviceDescriptor {
+                            vendor_id: device_info.vendor_id,
+                            product_id: device_info.product_id,
+                            device_id,
+                            sensor_layout,
+                        },
                     },
-                    inspect_status: input_device_status,
-                })
+                    input_device_status,
+                ))
             }
             device_descriptor => {
                 input_device_status
@@ -256,13 +262,18 @@ impl LightSensorBinding {
     /// # Returns
     /// An [`InputReport`] which will be passed to the next call to [`process_reports`], as
     /// [`previous_report`]. If `None`, the next call's [`previous_report`] will be `None`.
+    /// A [`UnboundedReceiver<InputEvent>`] which will poll asynchronously generated events to be
+    /// recorded by `inspect_status` in `input_device::initialize_report_stream()`. If device
+    /// binding does not generate InputEvents asynchronously, this will be `None`.
     fn process_reports(
         report: InputReport,
         previous_report: Option<InputReport>,
         device_descriptor: &input_device::InputDeviceDescriptor,
-        input_event_sender: &mut Sender<input_device::InputEvent>,
+        input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
         device_proxy: InputDeviceProxy,
-    ) -> Option<InputReport> {
+        inspect_status: &InputDeviceStatus,
+    ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
+        inspect_status.count_received_report(&report);
         let light_sensor_descriptor =
             if let input_device::InputDeviceDescriptor::LightSensor(ref light_sensor_descriptor) =
                 device_descriptor
@@ -274,16 +285,22 @@ impl LightSensorBinding {
 
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
         let sensor = match &report.sensor {
-            None => return previous_report,
+            None => {
+                inspect_status.count_filtered_reports(1u64);
+                return (previous_report, None);
+            }
             Some(sensor) => sensor,
         };
 
         let values = match &sensor.values {
-            None => return None,
+            None => {
+                inspect_status.count_filtered_reports(1u64);
+                return (None, None);
+            }
             Some(values) => values,
         };
 
-        if let Err(e) = input_event_sender.try_send(input_device::InputEvent {
+        let event = input_device::InputEvent {
             device_event: input_device::InputDeviceEvent::LightSensor(LightSensorEvent {
                 device_proxy,
                 rgbc: Rgbc {
@@ -297,10 +314,14 @@ impl LightSensorBinding {
             event_time: zx::Time::get_monotonic(),
             handled: Handled::No,
             trace_id: None,
-        }) {
+        };
+
+        if let Err(e) = input_event_sender.unbounded_send(event.clone()) {
             tracing::error!("Failed to send LightSensorEvent with error: {e:?}");
+        } else {
+            inspect_status.count_generated_event(event);
         }
 
-        Some(report)
+        (Some(report), None)
     }
 }

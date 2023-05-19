@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
-    futures::channel::mpsc::Sender,
+    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
     maplit::hashmap,
     std::collections::HashMap,
     std::collections::HashSet,
@@ -190,7 +190,7 @@ pub struct ContactDeviceDescriptor {
 /// `event_sender`.
 pub struct TouchBinding {
     /// The channel to stream InputEvents to.
-    event_sender: Sender<InputEvent>,
+    event_sender: UnboundedSender<InputEvent>,
 
     /// Holds information about this device.
     device_descriptor: TouchDeviceDescriptor,
@@ -200,14 +200,11 @@ pub struct TouchBinding {
 
     /// Proxy to the device.
     device_proxy: InputDeviceProxy,
-
-    /// The inventory of this binding's Inspect status.
-    pub inspect_status: InputDeviceStatus,
 }
 
 #[async_trait]
 impl input_device::InputDeviceBinding for TouchBinding {
-    fn input_event_sender(&self) -> Sender<InputEvent> {
+    fn input_event_sender(&self) -> UnboundedSender<InputEvent> {
         self.event_sender.clone()
     }
 
@@ -251,21 +248,22 @@ impl TouchBinding {
     pub async fn new(
         device_proxy: InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_binding =
+        let (device_binding, mut inspect_status) =
             Self::bind_device(device_proxy.clone(), device_id, input_event_sender, device_node)
                 .await?;
         device_binding
             .set_touchpad_mode(true)
             .await
             .with_context(|| format!("enabling touchpad mode for device {}", device_id))?;
-
+        inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
+            inspect_status,
             Self::process_reports,
         );
 
@@ -286,9 +284,9 @@ impl TouchBinding {
     async fn bind_device(
         device_proxy: InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let device_descriptor: fidl_input_report::DeviceDescriptor = match device_proxy
             .get_descriptor()
@@ -314,34 +312,36 @@ impl TouchBinding {
                         ..
                     }),
                 ..
-            }) => Ok(TouchBinding {
-                event_sender: input_event_sender,
-                device_descriptor: match touch_device_type {
-                    TouchDeviceType::TouchScreen => {
-                        TouchDeviceDescriptor::TouchScreen(TouchScreenDeviceDescriptor {
-                            device_id,
-                            contacts: contact_descriptors
-                                .iter()
-                                .map(TouchBinding::parse_contact_descriptor)
-                                .filter_map(Result::ok)
-                                .collect(),
-                        })
-                    }
-                    TouchDeviceType::WindowsPrecisionTouchpad => {
-                        TouchDeviceDescriptor::Touchpad(TouchpadDeviceDescriptor {
-                            device_id,
-                            contacts: contact_descriptors
-                                .iter()
-                                .map(TouchBinding::parse_contact_descriptor)
-                                .filter_map(Result::ok)
-                                .collect(),
-                        })
-                    }
+            }) => Ok((
+                TouchBinding {
+                    event_sender: input_event_sender,
+                    device_descriptor: match touch_device_type {
+                        TouchDeviceType::TouchScreen => {
+                            TouchDeviceDescriptor::TouchScreen(TouchScreenDeviceDescriptor {
+                                device_id,
+                                contacts: contact_descriptors
+                                    .iter()
+                                    .map(TouchBinding::parse_contact_descriptor)
+                                    .filter_map(Result::ok)
+                                    .collect(),
+                            })
+                        }
+                        TouchDeviceType::WindowsPrecisionTouchpad => {
+                            TouchDeviceDescriptor::Touchpad(TouchpadDeviceDescriptor {
+                                device_id,
+                                contacts: contact_descriptors
+                                    .iter()
+                                    .map(TouchBinding::parse_contact_descriptor)
+                                    .filter_map(Result::ok)
+                                    .collect(),
+                            })
+                        }
+                    },
+                    touch_device_type,
+                    device_proxy,
                 },
-                touch_device_type,
-                device_proxy,
-                inspect_status: input_device_status,
-            }),
+                input_device_status,
+            )),
             descriptor => {
                 input_device_status
                     .health_node
@@ -396,23 +396,32 @@ impl TouchBinding {
     /// # Returns
     /// An [`InputReport`] which will be passed to the next call to [`process_reports`], as
     /// [`previous_report`]. If `None`, the next call's [`previous_report`] will be `None`.
+    /// A [`UnboundedReceiver<InputEvent>`] which will poll asynchronously generated events to be
+    /// recorded by `inspect_status` in `input_device::initialize_report_stream()`. If device
+    /// binding does not generate InputEvents asynchronously, this will be `None`.
     fn process_reports(
         report: InputReport,
         previous_report: Option<InputReport>,
         device_descriptor: &input_device::InputDeviceDescriptor,
-        input_event_sender: &mut Sender<InputEvent>,
-    ) -> Option<InputReport> {
+        input_event_sender: &mut UnboundedSender<InputEvent>,
+        inspect_status: &InputDeviceStatus,
+    ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
+        inspect_status.count_received_report(&report);
         match device_descriptor {
             input_device::InputDeviceDescriptor::TouchScreen(_) => process_touch_screen_reports(
                 report,
                 previous_report,
                 device_descriptor,
                 input_event_sender,
+                inspect_status,
             ),
-            input_device::InputDeviceDescriptor::Touchpad(_) => {
-                process_touchpad_reports(report, device_descriptor, input_event_sender)
-            }
-            _ => None,
+            input_device::InputDeviceDescriptor::Touchpad(_) => process_touchpad_reports(
+                report,
+                device_descriptor,
+                input_event_sender,
+                inspect_status,
+            ),
+            _ => (None, None),
         }
     }
 
@@ -454,8 +463,9 @@ fn process_touch_screen_reports(
     report: InputReport,
     previous_report: Option<InputReport>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    input_event_sender: &mut Sender<InputEvent>,
-) -> Option<InputReport> {
+    input_event_sender: &mut UnboundedSender<InputEvent>,
+    inspect_status: &InputDeviceStatus,
+) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
     fuchsia_trace::duration!("input", "touch-binding-process-report");
     fuchsia_trace::flow_end!("input", "input_report", report.trace_id.unwrap_or(0).into());
 
@@ -463,7 +473,8 @@ fn process_touch_screen_reports(
     let touch_report: &fidl_fuchsia_input_report::TouchInputReport = match &report.touch {
         Some(touch) => touch,
         None => {
-            return previous_report;
+            inspect_status.count_filtered_reports(1u64);
+            return (previous_report, None);
         }
     };
 
@@ -477,7 +488,8 @@ fn process_touch_screen_reports(
 
     // Don't send an event if there are no new contacts.
     if previous_contacts.is_empty() && current_contacts.is_empty() {
-        return Some(report);
+        inspect_status.count_filtered_reports(1u64);
+        return (Some(report), None);
     }
 
     // Contacts which exist only in current.
@@ -520,16 +532,18 @@ fn process_touch_screen_reports(
         device_descriptor,
         input_event_sender,
         trace_id,
+        inspect_status,
     );
 
-    Some(report)
+    (Some(report), None)
 }
 
 fn process_touchpad_reports(
     report: InputReport,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    input_event_sender: &mut Sender<InputEvent>,
-) -> Option<InputReport> {
+    input_event_sender: &mut UnboundedSender<InputEvent>,
+    inspect_status: &InputDeviceStatus,
+) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
     fuchsia_trace::duration!("input", "touch-binding-process-report");
     fuchsia_trace::flow_end!("input", "input_report", report.trace_id.unwrap_or(0).into());
 
@@ -537,7 +551,8 @@ fn process_touchpad_reports(
     let touch_report: &fidl_fuchsia_input_report::TouchInputReport = match &report.touch {
         Some(touch) => touch,
         None => {
-            return None;
+            inspect_status.count_filtered_reports(1u64);
+            return (None, None);
         }
     };
 
@@ -557,9 +572,16 @@ fn process_touchpad_reports(
 
     let trace_id = fuchsia_trace::Id::new();
     fuchsia_trace::flow_begin!("input", "report-to-event", trace_id);
-    send_touchpad_event(current_contacts, buttons, device_descriptor, input_event_sender, trace_id);
+    send_touchpad_event(
+        current_contacts,
+        buttons,
+        device_descriptor,
+        input_event_sender,
+        trace_id,
+        inspect_status,
+    );
 
-    Some(report)
+    (Some(report), None)
 }
 
 fn touch_contacts_from_touch_report(
@@ -590,10 +612,11 @@ fn send_touch_screen_event(
     contacts: HashMap<fidl_ui_input::PointerEventPhase, Vec<TouchContact>>,
     injector_contacts: HashMap<pointerinjector::EventPhase, Vec<TouchContact>>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    input_event_sender: &mut Sender<input_device::InputEvent>,
+    input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
     trace_id: fuchsia_trace::Id,
+    inspect_status: &InputDeviceStatus,
 ) {
-    match input_event_sender.try_send(input_device::InputEvent {
+    let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::TouchScreen(TouchScreenEvent {
             contacts,
             injector_contacts,
@@ -602,9 +625,11 @@ fn send_touch_screen_event(
         event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: Some(trace_id),
-    }) {
+    };
+
+    match input_event_sender.unbounded_send(event.clone()) {
         Err(e) => tracing::error!("Failed to send TouchScreenEvent with error: {:?}", e),
-        _ => {}
+        _ => inspect_status.count_generated_event(event),
     }
 }
 
@@ -619,10 +644,11 @@ fn send_touchpad_event(
     injector_contacts: Vec<TouchContact>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    input_event_sender: &mut Sender<input_device::InputEvent>,
+    input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
     trace_id: fuchsia_trace::Id,
+    inspect_status: &InputDeviceStatus,
 ) {
-    match input_event_sender.try_send(input_device::InputEvent {
+    let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Touchpad(TouchpadEvent {
             injector_contacts,
             pressed_buttons,
@@ -631,9 +657,11 @@ fn send_touchpad_event(
         event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: Some(trace_id),
-    }) {
+    };
+
+    match input_event_sender.unbounded_send(event.clone()) {
         Err(e) => tracing::error!("Failed to send TouchpadEvent with error: {:?}", e),
-        _ => {}
+        _ => inspect_status.count_generated_event(event),
     }
 }
 
@@ -676,6 +704,7 @@ mod tests {
         fidl::endpoints::spawn_stream_handler,
         fidl_fuchsia_ui_input_config::FeaturesMarker as InputConfigFeaturesMarker,
         fuchsia_async as fasync,
+        fuchsia_inspect::AnyProperty,
         futures::lock::Mutex,
         futures::StreamExt,
         pretty_assertions::assert_eq,
@@ -700,12 +729,19 @@ mod tests {
                 device_id: 1,
                 contacts: vec![],
             });
-        let (mut event_sender, mut event_receiver) = futures::channel::mpsc::channel(1);
-        let returned_report = TouchBinding::process_reports(
+        let (mut event_sender, mut event_receiver) = futures::channel::mpsc::unbounded();
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("TestDevice_Touch");
+        let mut inspect_status = InputDeviceStatus::new(test_node);
+        inspect_status.health_node.set_ok();
+
+        let (returned_report, _) = TouchBinding::process_reports(
             report,
             Some(previous_report),
             &descriptor,
             &mut event_sender,
+            &inspect_status,
         );
         assert!(returned_report.is_some());
         assert_eq!(returned_report.unwrap().event_time, Some(report_time));
@@ -713,6 +749,22 @@ mod tests {
         // Assert there are no pending events on the receiver.
         let event = event_receiver.try_next();
         assert!(event.is_err());
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            "TestDevice_Touch": {
+                reports_received_count: 1u64,
+                reports_filtered_count: 1u64,
+                events_generated: 0u64,
+                last_received_timestamp_ns: report_time as u64,
+                last_generated_timestamp_ns: 0u64,
+                "fuchsia.inspect.Health": {
+                    status: "OK",
+                    // Timestamp value is unpredictable and not relevant in this context,
+                    // so we only assert that the property is present.
+                    start_timestamp_nanos: AnyProperty
+                },
+            }
+        });
     }
 
     // Tests that a input report with a new contact generates an event with an add and a down.
@@ -921,12 +973,19 @@ mod tests {
                 device_id: 1,
                 contacts: vec![],
             });
-        let (mut event_sender, mut event_receiver) = futures::channel::mpsc::channel(1);
-        let _: Option<InputReport> = TouchBinding::process_reports(
+        let (mut event_sender, mut event_receiver) = futures::channel::mpsc::unbounded();
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("TestDevice_Touch");
+        let mut inspect_status = InputDeviceStatus::new(test_node);
+        inspect_status.health_node.set_ok();
+
+        let _ = TouchBinding::process_reports(
             report,
             Some(previous_report),
             &descriptor,
             &mut event_sender,
+            &inspect_status,
         );
         assert_matches!(event_receiver.try_next(), Ok(Some(InputEvent { trace_id: Some(_), .. })));
     }
@@ -977,8 +1036,7 @@ mod tests {
         })
         .unwrap();
 
-        let (device_event_sender, _) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, _) = futures::channel::mpsc::unbounded();
 
         // Create a test inspect node as required by TouchBinding::new()
         let inspector = fuchsia_inspect::Inspector::default();
@@ -1034,8 +1092,7 @@ mod tests {
         })
         .unwrap();
 
-        let (device_event_sender, _) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, _) = futures::channel::mpsc::unbounded();
 
         // Create a test inspect node as required by TouchBinding::new()
         let inspector = fuchsia_inspect::Inspector::default();
@@ -1096,8 +1153,7 @@ mod tests {
         })
         .unwrap();
 
-        let (device_event_sender, _device_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, _device_event_receiver) = futures::channel::mpsc::unbounded();
 
         // Create a test inspect node as required by TouchBinding::new()
         let inspector = fuchsia_inspect::Inspector::default();

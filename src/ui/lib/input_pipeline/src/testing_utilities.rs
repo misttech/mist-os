@@ -74,6 +74,7 @@ pub fn create_input_event(
 /// - `modifiers`: The input3 modifiers that are to be included as pressed.
 /// - `event_time`: The timestamp in nanoseconds when the event was recorded.
 /// - `device_descriptor`: The device descriptor to add to the event.
+/// - `keymap`: The keymap which will be used to derive value for `key`.
 /// - `handled`: Whether the event has been consumed by an upstream handler.
 pub fn create_keyboard_event_with_handled(
     key: fidl_fuchsia_input::Key,
@@ -101,6 +102,7 @@ pub fn create_keyboard_event_with_handled(
 /// - `modifiers`: The input3 modifiers that are to be included as pressed.
 /// - `event_time`: The timestamp in nanoseconds when the event was recorded.
 /// - `device_descriptor`: The device descriptor to add to the event.
+/// - `keymap`: The keymap which will be used to derive value for `key`.
 /// - `repeat_sequence`: The sequence of this key event in the autorepeat process.
 pub fn create_keyboard_event_with_key_meaning_and_repeat_sequence(
     key: fidl_fuchsia_input::Key,
@@ -128,6 +130,7 @@ pub fn create_keyboard_event_with_key_meaning_and_repeat_sequence(
 /// - `modifiers`: The input3 modifiers that are to be included as pressed.
 /// - `event_time`: The timestamp in nanoseconds when the event was recorded.
 /// - `device_descriptor`: The device descriptor to add to the event.
+/// - `keymap`: The keymap which will be used to derive value for `key`.
 pub fn create_keyboard_event_with_key_meaning(
     key: fidl_fuchsia_input::Key,
     event_type: fidl_fuchsia_ui_input3::KeyEventType,
@@ -157,7 +160,8 @@ pub fn create_keyboard_event_with_key_meaning(
 /// - `modifiers`: The input3 modifiers that are to be included as pressed.
 /// - `event_time`: The timestamp in nanoseconds when the event was recorded.
 /// - `device_descriptor`: The device descriptor to add to the event.
-pub fn create_keyboard_event(
+/// - `keymap`: The keymap which will be used to derive value for `key`.
+pub fn create_keyboard_event_with_time(
     key: fidl_fuchsia_input::Key,
     event_type: fidl_fuchsia_ui_input3::KeyEventType,
     modifiers: Option<fidl_ui_input3::Modifiers>,
@@ -173,6 +177,31 @@ pub fn create_keyboard_event(
         device_descriptor,
         keymap,
         None,
+    )
+}
+
+/// Creates a [`keyboard_binding::KeyboardEvent`] with the provided keys.
+///
+/// # Parameters
+/// - `key`: The input3 key which changed state.
+/// - `event_type`: The input3 key event type (e.g. pressed, released).
+/// - `modifiers`: The input3 modifiers that are to be included as pressed.
+/// - `device_descriptor`: The device descriptor to add to the event.
+/// - `keymap`: The keymap which will be used to derive value for `key`.
+pub fn create_keyboard_event(
+    key: fidl_fuchsia_input::Key,
+    event_type: fidl_fuchsia_ui_input3::KeyEventType,
+    modifiers: Option<fidl_ui_input3::Modifiers>,
+    device_descriptor: &input_device::InputDeviceDescriptor,
+    keymap: Option<String>,
+) -> input_device::InputEvent {
+    create_keyboard_event_with_time(
+        key,
+        event_type,
+        modifiers,
+        zx::Time::get_monotonic(),
+        device_descriptor,
+        keymap,
     )
 }
 
@@ -690,19 +719,44 @@ macro_rules! assert_input_report_sequence_generates_events {
         device_type: $DeviceType:ty,
     ) => {
         let mut previous_report: Option<fidl_fuchsia_input_report::InputReport> = None;
-        let (event_sender, mut event_receiver) = futures::channel::mpsc::channel(std::cmp::max(
-            $input_reports.len(),
-            $expected_events.len(),
-        ));
+        let num_reports = $input_reports.len();
+        let num_events = $expected_events.len();
+        let (event_sender, mut event_receiver) = futures::channel::mpsc::unbounded();
+
+        // Create fake inspect_status, needed for process_reports()
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("TestDevice");
+        let mut inspect_status = InputDeviceStatus::new(test_node);
+        inspect_status.health_node.set_ok();
+
+        let mut expected_last_received_timestamp = 0u64;
+        let mut expected_last_generated_timestamp = 0u64;
 
         // Send all the reports prior to verifying the received events.
         for report in $input_reports {
-            previous_report = <$DeviceType>::process_reports(
+            if let Some(report_time) = report.event_time {
+                expected_last_received_timestamp = report_time.try_into().unwrap();
+            }
+            let inspect_receiver: Option<UnboundedReceiver<InputEvent>>;
+            (previous_report, inspect_receiver) = <$DeviceType>::process_reports(
                 report,
                 previous_report,
                 &$device_descriptor,
                 &mut event_sender.clone(),
+                &inspect_status
             );
+
+            // If a report generates multiple events asynchronously, we send them over a mpsc channel
+            // to inspect_receiver. We update the event count on inspect_status here since we cannot
+            // pass a reference to inspect_status to an async task in process_reports().
+            match inspect_receiver {
+                Some(mut receiver) => {
+                    while let Some(event) = receiver.next().await {
+                        inspect_status.count_generated_event(event);
+                    }
+                },
+                None => (),
+            };
         }
 
         for mut expected_event in $expected_events {
@@ -717,11 +771,28 @@ macro_rules! assert_input_report_sequence_generates_events {
                     // Overwrite the expected_event's event_time, because an InputEvent's event_time
                     // is set at the time InputReports are processed into InputEvents.
                     expected_event.event_time = received_event.event_time;
+                    expected_last_generated_timestamp = received_event.event_time.into_nanos().try_into().unwrap();
                     pretty_assertions::assert_eq!(expected_event, received_event)
                 }
                 _ => assert!(false),
             };
         }
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            "TestDevice": {
+                reports_received_count: num_reports as u64,
+                reports_filtered_count: AnyProperty,
+                events_generated: num_events as u64,
+                last_received_timestamp_ns: expected_last_received_timestamp,
+                last_generated_timestamp_ns: expected_last_generated_timestamp,
+                "fuchsia.inspect.Health": {
+                    status: "OK",
+                    // Timestamp value is unpredictable and not relevant in this context,
+                    // so we only assert that the property is present.
+                    start_timestamp_nanos: AnyProperty
+                },
+            }
+        });
     };
 }
 

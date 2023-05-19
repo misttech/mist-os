@@ -80,7 +80,7 @@ mod tests {
         super::*,
         crate::input_device::InputDeviceDescriptor,
         crate::input_handler::InputHandler,
-        crate::testing_utilities::{create_fake_input_event, create_keyboard_event},
+        crate::testing_utilities::{create_fake_input_event, create_keyboard_event_with_time},
         assert_matches::assert_matches,
         fidl_fuchsia_input::Key,
         fidl_fuchsia_ui_input3::KeyEventType,
@@ -117,7 +117,7 @@ mod tests {
         let keyboard_handler = KeyboardHandler::new_internal(Some(aggregator_proxy));
 
         let event_time = zx::Time::get_monotonic();
-        let input_event = create_keyboard_event(
+        let input_event = create_keyboard_event_with_time(
             Key::A,
             KeyEventType::Pressed,
             None,

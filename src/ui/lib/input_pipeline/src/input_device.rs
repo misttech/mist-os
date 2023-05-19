@@ -18,15 +18,16 @@ use {
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fuchsia_async as fasync,
     fuchsia_inspect::health::Reporter,
+    fuchsia_inspect::{NumericProperty, Property},
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    futures::{channel::mpsc::Sender, stream::StreamExt},
+    futures::{
+        channel::mpsc::{UnboundedReceiver, UnboundedSender},
+        stream::StreamExt,
+    },
     std::path::PathBuf,
 };
 
 pub use input_device_constants::InputDeviceType;
-
-/// The buffer size for the stream that InputEvents are sent over.
-pub const INPUT_EVENT_BUFFER_SIZE: usize = 100;
 
 /// The path to the input-report directory.
 pub static INPUT_REPORT_PATH: &str = "/dev/class/input-report";
@@ -38,21 +39,21 @@ pub struct InputDeviceStatus {
     _node: fuchsia_inspect::Node,
 
     /// The total number of reports received by the device driver.
-    _reports_received_count: fuchsia_inspect::UintProperty,
+    reports_received_count: fuchsia_inspect::UintProperty,
 
     /// The number of reports received by the device driver that did
     /// not get converted into InputEvents processed by InputPipeline.
-    _reports_filtered_count: fuchsia_inspect::UintProperty,
+    reports_filtered_count: fuchsia_inspect::UintProperty,
 
     /// The total number of events generated from received
     /// InputReports that were sent to InputPipeline.
-    _events_generated: fuchsia_inspect::UintProperty,
+    events_generated: fuchsia_inspect::UintProperty,
 
     /// The event time the last received InputReport was generated.
-    _last_received_timestamp_ns: fuchsia_inspect::UintProperty,
+    last_received_timestamp_ns: fuchsia_inspect::UintProperty,
 
     /// The event time the last InputEvent was generated.
-    _last_generated_timestamp_ns: fuchsia_inspect::UintProperty,
+    last_generated_timestamp_ns: fuchsia_inspect::UintProperty,
 
     // This node records the health status of the `InputDevice`.
     pub health_node: fuchsia_inspect::health::Node,
@@ -71,13 +72,30 @@ impl InputDeviceStatus {
 
         Self {
             _node: device_node,
-            _reports_received_count: reports_received_count,
-            _reports_filtered_count: reports_filtered_count,
-            _events_generated: events_generated,
-            _last_received_timestamp_ns: last_received_timestamp_ns,
-            _last_generated_timestamp_ns: last_generated_timestamp_ns,
+            reports_received_count,
+            reports_filtered_count,
+            events_generated,
+            last_received_timestamp_ns,
+            last_generated_timestamp_ns,
             health_node,
         }
+    }
+
+    pub fn count_received_report(&self, report: &InputReport) {
+        self.reports_received_count.add(1);
+        match report.event_time {
+            Some(event_time) => self.last_received_timestamp_ns.set(event_time.try_into().unwrap()),
+            None => (),
+        }
+    }
+
+    pub fn count_filtered_reports(&self, count: u64) {
+        self.reports_filtered_count.add(count);
+    }
+
+    pub fn count_generated_event(&self, event: InputEvent) {
+        self.events_generated.add(1);
+        self.last_generated_timestamp_ns.set(event.event_time.into_nanos().try_into().unwrap());
     }
 }
 
@@ -190,7 +208,7 @@ pub trait InputDeviceBinding: Send {
     fn get_device_descriptor(&self) -> InputDeviceDescriptor;
 
     /// Returns the input event stream's sender.
-    fn input_event_sender(&self) -> Sender<InputEvent>;
+    fn input_event_sender(&self) -> UnboundedSender<InputEvent>;
 
     /// Handles input config changes.
     async fn handle_input_config_request(
@@ -214,7 +232,8 @@ pub trait InputDeviceBinding: Send {
 pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
     device_proxy: fidl_input_report::InputDeviceProxy,
     device_descriptor: InputDeviceDescriptor,
-    mut event_sender: Sender<InputEvent>,
+    mut event_sender: UnboundedSender<InputEvent>,
+    inspect_status: InputDeviceStatus,
     mut process_reports: InputDeviceProcessReportsFn,
 ) where
     InputDeviceProcessReportsFn: 'static
@@ -223,8 +242,9 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
             InputReport,
             Option<InputReport>,
             &InputDeviceDescriptor,
-            &mut Sender<InputEvent>,
-        ) -> Option<InputReport>,
+            &mut UnboundedSender<InputEvent>,
+            &InputDeviceStatus,
+        ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>),
 {
     fasync::Task::local(async move {
         let mut previous_report: Option<InputReport> = None;
@@ -248,13 +268,26 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
             match report_stream.next().await {
                 Some(Ok(Ok(input_reports))) => {
                     fuchsia_trace::duration!("input", "input-device-process-reports");
+                    let mut inspect_receiver: Option<UnboundedReceiver<InputEvent>>;
                     for report in input_reports {
-                        previous_report = process_reports(
+                        (previous_report, inspect_receiver) = process_reports(
                             report,
                             previous_report,
                             &device_descriptor,
                             &mut event_sender,
+                            &inspect_status,
                         );
+                        // If a report generates multiple events asynchronously, we send them over a mpsc channel
+                        // to inspect_receiver. We update the event count on inspect_status here since we cannot
+                        // pass a reference to inspect_status to an async task in process_reports().
+                        match inspect_receiver {
+                            Some(mut receiver) => {
+                                while let Some(event) = receiver.next().await {
+                                    inspect_status.count_generated_event(event);
+                                }
+                            }
+                            None => (),
+                        };
                     }
                 }
                 Some(Ok(Err(_service_error))) => break,
@@ -299,63 +332,58 @@ pub async fn get_device_binding(
     device_type: InputDeviceType,
     device_proxy: fidl_input_report::InputDeviceProxy,
     device_id: u32,
-    input_event_sender: Sender<InputEvent>,
+    input_event_sender: UnboundedSender<InputEvent>,
     device_node: fuchsia_inspect::Node,
 ) -> Result<Box<dyn InputDeviceBinding>, Error> {
     match device_type {
         InputDeviceType::ConsumerControls => {
-            let mut binding = consumer_controls_binding::ConsumerControlsBinding::new(
+            let binding = consumer_controls_binding::ConsumerControlsBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
             .await?;
-            binding.inspect_status.health_node.set_ok();
             Ok(Box::new(binding))
         }
         InputDeviceType::Mouse => {
-            let mut binding = mouse_binding::MouseBinding::new(
+            let binding = mouse_binding::MouseBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
             .await?;
-            binding.inspect_status.health_node.set_ok();
             Ok(Box::new(binding))
         }
         InputDeviceType::Touch => {
-            let mut binding = touch_binding::TouchBinding::new(
+            let binding = touch_binding::TouchBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
             .await?;
-            binding.inspect_status.health_node.set_ok();
             Ok(Box::new(binding))
         }
         InputDeviceType::Keyboard => {
-            let mut binding = keyboard_binding::KeyboardBinding::new(
+            let binding = keyboard_binding::KeyboardBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
             .await?;
-            binding.inspect_status.health_node.set_ok();
             Ok(Box::new(binding))
         }
         InputDeviceType::LightSensor => {
-            let mut binding = light_sensor_binding::LightSensorBinding::new(
+            let binding = light_sensor_binding::LightSensorBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
             .await?;
-            binding.inspect_status.health_node.set_ok();
             Ok(Box::new(binding))
         }
     }

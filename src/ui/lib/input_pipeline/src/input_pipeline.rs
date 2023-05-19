@@ -14,9 +14,9 @@ use {
     fuchsia_async as fasync,
     fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_inspect::health::Reporter,
-    fuchsia_inspect::{NumericProperty, Property},
+    fuchsia_inspect::NumericProperty,
     fuchsia_zircon as zx,
-    futures::channel::mpsc::{self, Receiver, Sender, UnboundedReceiver, UnboundedSender},
+    futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
     itertools::Itertools,
@@ -239,10 +239,10 @@ pub struct InputPipeline {
 
     /// A clone of this sender is given to every InputDeviceBinding that this pipeline owns.
     /// Each InputDeviceBinding will send InputEvents to the pipeline through this channel.
-    device_event_sender: Sender<input_device::InputEvent>,
+    device_event_sender: UnboundedSender<input_device::InputEvent>,
 
     /// Receives InputEvents from all InputDeviceBindings that this pipeline owns.
-    device_event_receiver: Receiver<input_device::InputEvent>,
+    device_event_receiver: UnboundedReceiver<input_device::InputEvent>,
 
     /// The types of devices this pipeline supports.
     input_device_types: Vec<input_device::InputDeviceType>,
@@ -277,8 +277,7 @@ impl InputPipeline {
         // The tasks in the assembly are all unstarted.  Run them now.
         InputPipeline::run(tasks);
 
-        let (device_event_sender, device_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, device_event_receiver) = futures::channel::mpsc::unbounded();
         let input_device_bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
         InputPipeline {
             pipeline_sender,
@@ -372,7 +371,7 @@ impl InputPipeline {
 
     /// Gets the input device sender: this is the channel that should be cloned
     /// and used for injecting events from the drivers into the input pipeline.
-    pub fn input_event_sender(&self) -> &Sender<input_device::InputEvent> {
+    pub fn input_event_sender(&self) -> &UnboundedSender<input_device::InputEvent> {
         &self.device_event_sender
     }
 
@@ -410,7 +409,7 @@ impl InputPipeline {
         mut device_watcher: Watcher,
         dir_proxy: fio::DirectoryProxy,
         device_types: Vec<input_device::InputDeviceType>,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         bindings: InputDeviceBindingHashMap,
         input_devices_node: &fuchsia_inspect::Node,
         break_on_idle: bool,
@@ -481,7 +480,7 @@ impl InputPipeline {
     pub async fn handle_input_device_registry_request_stream(
         mut stream: fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
         device_types: &Vec<input_device::InputDeviceType>,
-        input_event_sender: &Sender<input_device::InputEvent>,
+        input_event_sender: &UnboundedSender<input_device::InputEvent>,
         bindings: &InputDeviceBindingHashMap,
         device_id: u32,
         input_devices_node: &fuchsia_inspect::Node,
@@ -593,7 +592,7 @@ async fn add_device_bindings(
     device_types: &Vec<input_device::InputDeviceType>,
     filename: &String,
     device_proxy: fidl_fuchsia_input_report::InputDeviceProxy,
-    input_event_sender: &Sender<input_device::InputEvent>,
+    input_event_sender: &UnboundedSender<input_device::InputEvent>,
     bindings: &InputDeviceBindingHashMap,
     device_id: u32,
     input_devices_node: &fuchsia_inspect::Node,
@@ -604,6 +603,10 @@ async fn add_device_bindings(
         for device_type in device_types {
             if input_device::is_device_type(&descriptor, *device_type).await {
                 matched_device_types.push(device_type);
+                match devices_connected {
+                    Some(dev_connected) => dev_connected.add(1),
+                    None => (),
+                };
             }
         }
         if matched_device_types.is_empty() {
@@ -674,10 +677,6 @@ async fn add_device_bindings(
     if !new_bindings.is_empty() {
         let mut bindings = bindings.lock().await;
         bindings.entry(device_id).or_insert(Vec::new()).extend(new_bindings);
-        match devices_connected {
-            Some(dev_connected) => dev_connected.set(bindings.len() as u64),
-            None => (),
-        };
     }
 }
 
@@ -700,7 +699,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_inspect::AnyProperty,
         fuchsia_zircon as zx,
-        futures::channel::mpsc::Sender,
+        futures::channel::mpsc::UnboundedSender,
         futures::FutureExt,
         pretty_assertions::assert_eq,
         rand::Rng,
@@ -717,7 +716,9 @@ mod tests {
     ///
     /// # Parameters
     /// - `sender`: The channel to send the InputEvent over.
-    fn send_input_event(mut sender: Sender<input_device::InputEvent>) -> input_device::InputEvent {
+    fn send_input_event(
+        sender: UnboundedSender<input_device::InputEvent>,
+    ) -> input_device::InputEvent {
         let mut rng = rand::thread_rng();
         let offset = Position { x: rng.gen_range(0..10) as f32, y: rng.gen_range(0..10) as f32 };
         let input_event = input_device::InputEvent {
@@ -750,7 +751,7 @@ mod tests {
             handled: input_device::Handled::No,
             trace_id: None,
         };
-        match sender.try_send(input_event.clone()) {
+        match sender.unbounded_send(input_event.clone()) {
             Err(_) => assert!(false),
             _ => {}
         }
@@ -797,8 +798,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn multiple_devices_single_handler() {
         // Create two fake device bindings.
-        let (device_event_sender, device_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, device_event_receiver) = futures::channel::mpsc::unbounded();
         let (input_config_features_sender, _input_config_features_receiver) =
             futures::channel::mpsc::channel(1);
         let first_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
@@ -812,7 +812,7 @@ mod tests {
 
         // Create a fake input handler.
         let (handler_event_sender, mut handler_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+            futures::channel::mpsc::channel(100);
         let input_handler = observe_fake_events_input_handler::ObserveFakeEventsInputHandler::new(
             handler_event_sender,
         );
@@ -855,8 +855,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn single_device_multiple_handlers() {
         // Create two fake device bindings.
-        let (device_event_sender, device_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, device_event_receiver) = futures::channel::mpsc::unbounded();
         let (input_config_features_sender, _input_config_features_receiver) =
             futures::channel::mpsc::channel(1);
         let input_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
@@ -866,13 +865,13 @@ mod tests {
 
         // Create two fake input handlers.
         let (first_handler_event_sender, mut first_handler_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+            futures::channel::mpsc::channel(100);
         let first_input_handler =
             observe_fake_events_input_handler::ObserveFakeEventsInputHandler::new(
                 first_handler_event_sender,
             );
         let (second_handler_event_sender, mut second_handler_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+            futures::channel::mpsc::channel(100);
         let second_input_handler =
             observe_fake_events_input_handler::ObserveFakeEventsInputHandler::new(
                 second_handler_event_sender,
@@ -963,8 +962,7 @@ mod tests {
             server_end_for_pipeline,
         );
 
-        let (input_event_sender, _input_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();
         let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
         let supported_device_types = vec![input_device::InputDeviceType::Mouse];
 
@@ -1091,8 +1089,7 @@ mod tests {
             server_end_for_pipeline,
         );
 
-        let (input_event_sender, _input_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();
         let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
         let supported_device_types = vec![input_device::InputDeviceType::Keyboard];
 
@@ -1158,8 +1155,7 @@ mod tests {
             create_request_stream::<fidl_fuchsia_input_report::InputDeviceMarker>().unwrap();
 
         let device_types = vec![input_device::InputDeviceType::Mouse];
-        let (input_event_sender, _input_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();
         let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
 
         // Handle input device requests.
@@ -1205,8 +1201,7 @@ mod tests {
     /// Tests that config changes are forwarded to device bindings.
     #[fasync::run_singlethreaded(test)]
     async fn handle_input_config_request_stream() {
-        let (device_event_sender, _device_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let (device_event_sender, _device_event_receiver) = futures::channel::mpsc::unbounded();
         let (input_config_features_sender, mut input_config_features_receiver) =
             futures::channel::mpsc::channel(1);
         let fake_device_binding = fake_input_device_binding::FakeInputDeviceBinding::new(
@@ -1247,7 +1242,7 @@ mod tests {
         let test_node = inspector.root().create_child("input_pipeline");
         // Create fake input handler for assembly
         let (fake_handler_event_sender, _fake_handler_event_receiver) =
-            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+            futures::channel::mpsc::channel(100);
         let fake_input_handler =
             observe_fake_events_input_handler::ObserveFakeEventsInputHandler::new(
                 fake_handler_event_sender,

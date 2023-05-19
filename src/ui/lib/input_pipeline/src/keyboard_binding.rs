@@ -4,7 +4,7 @@
 
 use {
     crate::autorepeater,
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
     fidl_fuchsia_input,
@@ -15,7 +15,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
-    futures::{channel::mpsc::Sender, SinkExt},
+    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
 /// A [`KeyboardEvent`] represents an input event from a keyboard device.
@@ -263,18 +263,15 @@ impl Default for KeyboardDeviceDescriptor {
 /// from the device, and sends them to the device binding owner over `event_sender`.
 pub struct KeyboardBinding {
     /// The channel to stream InputEvents to.
-    event_sender: Sender<input_device::InputEvent>,
+    event_sender: UnboundedSender<input_device::InputEvent>,
 
     /// Holds information about this device.
     device_descriptor: KeyboardDeviceDescriptor,
-
-    /// The inventory of this binding's Inspect status.
-    pub inspect_status: InputDeviceStatus,
 }
 
 #[async_trait]
 impl input_device::InputDeviceBinding for KeyboardBinding {
-    fn input_event_sender(&self) -> Sender<input_device::InputEvent> {
+    fn input_event_sender(&self) -> UnboundedSender<input_device::InputEvent> {
         self.event_sender.clone()
     }
 
@@ -307,15 +304,17 @@ impl KeyboardBinding {
     pub async fn new(
         device_proxy: InputDeviceProxy,
         device_id: u32,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_binding =
+        let (device_binding, mut inspect_status) =
             Self::bind_device(&device_proxy, input_event_sender, device_id, device_node).await?;
+        inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
+            inspect_status,
             Self::process_reports,
         );
 
@@ -364,10 +363,10 @@ impl KeyboardBinding {
     /// correctly.
     async fn bind_device(
         device: &InputDeviceProxy,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_id: u32,
         device_node: fuchsia_inspect::Node,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let descriptor = match device.get_descriptor().await {
             Ok(descriptor) => descriptor,
@@ -389,15 +388,17 @@ impl KeyboardBinding {
                 input: Some(fidl_fuchsia_input_report::KeyboardInputDescriptor { keys3, .. }),
                 output: _,
                 ..
-            }) => Ok(KeyboardBinding {
-                event_sender: input_event_sender,
-                device_descriptor: KeyboardDeviceDescriptor {
-                    keys: keys3.unwrap_or_default(),
-                    device_info,
-                    device_id,
+            }) => Ok((
+                KeyboardBinding {
+                    event_sender: input_event_sender,
+                    device_descriptor: KeyboardDeviceDescriptor {
+                        keys: keys3.unwrap_or_default(),
+                        device_info,
+                        device_id,
+                    },
                 },
-                inspect_status: input_device_status,
-            }),
+                input_device_status,
+            )),
             device_descriptor => {
                 input_device_status
                     .health_node
@@ -426,15 +427,23 @@ impl KeyboardBinding {
     /// # Returns
     /// An [`InputReport`] which will be passed to the next call to [`process_reports`], as
     /// [`previous_report`]. If `None`, the next call's [`previous_report`] will be `None`.
+    /// A [`UnboundedReceiver<InputEvent>`] which will poll asynchronously generated events to be
+    /// recorded by `inspect_status` in `input_device::initialize_report_stream()`. If device
+    /// binding does not generate InputEvents asynchronously, this will be `None`.
     fn process_reports(
         report: InputReport,
         previous_report: Option<InputReport>,
         device_descriptor: &input_device::InputDeviceDescriptor,
-        input_event_sender: &mut Sender<input_device::InputEvent>,
-    ) -> Option<InputReport> {
+        input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
+        inspect_status: &InputDeviceStatus,
+    ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
+        inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
         match &report.keyboard {
-            None => return previous_report,
+            None => {
+                inspect_status.count_filtered_reports(1u64);
+                return (previous_report, None);
+            }
             _ => (),
         };
 
@@ -447,7 +456,8 @@ impl KeyboardBinding {
                 // In this case the report is treated as malformed, and the previous report is not
                 // updated.
                 tracing::error!("Failed to parse keyboard keys: {:?}", report);
-                return previous_report;
+                inspect_status.count_filtered_reports(1u64);
+                return (previous_report, None);
             }
         };
 
@@ -456,15 +466,18 @@ impl KeyboardBinding {
             .and_then(|unwrapped_report| KeyboardBinding::parse_pressed_keys(&unwrapped_report))
             .unwrap_or_default();
 
+        let (inspect_sender, inspect_receiver) = futures::channel::mpsc::unbounded();
+
         KeyboardBinding::send_key_events(
             &new_keys,
             &previous_keys,
             device_descriptor.clone(),
             zx::Time::get_monotonic(),
             input_event_sender.clone(),
+            inspect_sender,
         );
 
-        Some(report)
+        (Some(report), Some(inspect_receiver))
     }
 
     /// Parses the currently pressed [`fidl_fuchsia_input3::Key`]s from an input report.
@@ -497,7 +510,8 @@ impl KeyboardBinding {
         previous_keys: &Vec<fidl_fuchsia_input::Key>,
         device_descriptor: input_device::InputDeviceDescriptor,
         event_time: zx::Time,
-        input_event_sender: Sender<input_device::InputEvent>,
+        input_event_sender: UnboundedSender<input_device::InputEvent>,
+        inspect_sender: UnboundedSender<input_device::InputEvent>,
     ) {
         // Dispatches all key events individually in a separate task.  This is done in a separate
         // function so that the lifetime of `new_keys` above could be detached from that of the
@@ -506,23 +520,22 @@ impl KeyboardBinding {
             key_events: Vec<(fidl_fuchsia_input::Key, fidl_fuchsia_ui_input3::KeyEventType)>,
             device_descriptor: input_device::InputDeviceDescriptor,
             event_time: zx::Time,
-            mut input_event_sender: Sender<input_device::InputEvent>,
+            input_event_sender: UnboundedSender<input_device::InputEvent>,
+            inspect_sender: UnboundedSender<input_device::InputEvent>,
         ) {
             fasync::Task::local(async move {
                 let mut event_time = event_time;
                 for (key, event_type) in key_events.into_iter() {
-                    match input_event_sender
-                        .send(input_device::InputEvent {
-                            device_event: input_device::InputDeviceEvent::Keyboard(
-                                KeyboardEvent::new(key, event_type),
-                            ),
-                            device_descriptor: device_descriptor.clone(),
-                            event_time,
-                            handled: Handled::No,
-                            trace_id: None,
-                        })
-                        .await
-                    {
+                    let event = input_device::InputEvent {
+                        device_event: input_device::InputDeviceEvent::Keyboard(
+                            KeyboardEvent::new(key, event_type),
+                        ),
+                        device_descriptor: device_descriptor.clone(),
+                        event_time,
+                        handled: Handled::No,
+                        trace_id: None,
+                    };
+                    match input_event_sender.unbounded_send(event.clone()) {
                         Err(error) => {
                             tracing::error!(
                             "Failed to send KeyboardEvent for key: {:?}, event_type: {:?}: {:?}",
@@ -531,7 +544,7 @@ impl KeyboardBinding {
                             error
                         );
                         }
-                        _ => (),
+                        _ => { let _ = inspect_sender.unbounded_send(event).expect("Failed to count generated KeyboardEvent in Input Pipeline Inspect tree."); },
                     }
                     // If key events happen to have been reported at the same time,
                     // we pull them apart artificially. A 1ns increment will likely
@@ -565,15 +578,21 @@ impl KeyboardBinding {
         // a closure.
         let all_keys = released_keys.chain(pressed_keys).collect::<Vec<_>>();
 
-        dispatch_events(all_keys, device_descriptor, event_time, input_event_sender);
+        dispatch_events(
+            all_keys,
+            device_descriptor,
+            event_time,
+            input_event_sender,
+            inspect_sender,
+        );
     }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::StreamExt,
+        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_inspect::AnyProperty,
+        fuchsia_zircon as zx, futures::StreamExt,
     };
 
     /// Tests that a key that is present in the new report, but was not present in the previous report
@@ -584,7 +603,7 @@ mod tests {
             keys: vec![fidl_fuchsia_input::Key::A],
             ..Default::default()
         });
-        let (event_time_i64, event_time_u64) = testing_utilities::event_times();
+        let (event_time_i64, _) = testing_utilities::event_times();
 
         let reports = vec![testing_utilities::create_keyboard_input_report(
             vec![fidl_fuchsia_input::Key::A],
@@ -594,7 +613,6 @@ mod tests {
             fidl_fuchsia_input::Key::A,
             fidl_fuchsia_ui_input3::KeyEventType::Pressed,
             None,
-            event_time_u64,
             &descriptor,
             /* keymap= */ None,
         )];
@@ -615,7 +633,7 @@ mod tests {
             keys: vec![fidl_fuchsia_input::Key::A],
             ..Default::default()
         });
-        let (event_time_i64, event_time_u64) = testing_utilities::event_times();
+        let (event_time_i64, _) = testing_utilities::event_times();
 
         let reports = vec![
             testing_utilities::create_keyboard_input_report(
@@ -630,7 +648,6 @@ mod tests {
                 fidl_fuchsia_input::Key::A,
                 fidl_fuchsia_ui_input3::KeyEventType::Pressed,
                 None,
-                event_time_u64,
                 &descriptor,
                 /* keymap= */ None,
             ),
@@ -638,7 +655,6 @@ mod tests {
                 fidl_fuchsia_input::Key::A,
                 fidl_fuchsia_ui_input3::KeyEventType::Released,
                 None,
-                event_time_u64,
                 &descriptor,
                 /* keymap= */ None,
             ),
@@ -660,7 +676,7 @@ mod tests {
             keys: vec![fidl_fuchsia_input::Key::A],
             ..Default::default()
         });
-        let (event_time_i64, event_time_u64) = testing_utilities::event_times();
+        let (event_time_i64, _) = testing_utilities::event_times();
 
         let reports = vec![
             testing_utilities::create_keyboard_input_report(
@@ -677,7 +693,6 @@ mod tests {
             fidl_fuchsia_input::Key::A,
             fidl_fuchsia_ui_input3::KeyEventType::Pressed,
             None,
-            event_time_u64,
             &descriptor,
             /* keymap= */ None,
         )];
@@ -697,7 +712,7 @@ mod tests {
             keys: vec![fidl_fuchsia_input::Key::A, fidl_fuchsia_input::Key::B],
             ..Default::default()
         });
-        let (event_time_i64, event_time) = testing_utilities::event_times();
+        let (event_time_i64, _) = testing_utilities::event_times();
 
         let reports = vec![
             testing_utilities::create_keyboard_input_report(
@@ -715,7 +730,6 @@ mod tests {
                 fidl_fuchsia_input::Key::A,
                 fidl_fuchsia_ui_input3::KeyEventType::Pressed,
                 None,
-                event_time,
                 &descriptor,
                 /* keymap= */ None,
             ),
@@ -723,7 +737,6 @@ mod tests {
                 fidl_fuchsia_input::Key::A,
                 fidl_fuchsia_ui_input3::KeyEventType::Released,
                 None,
-                event_time,
                 &descriptor,
                 /* keymap= */ None,
             ),
@@ -731,9 +744,6 @@ mod tests {
                 fidl_fuchsia_input::Key::B,
                 fidl_fuchsia_ui_input3::KeyEventType::Pressed,
                 None,
-                // Simultaneous key events are artificially separated by 1ns
-                // on purpose.
-                event_time + zx::Duration::from_nanos(1),
                 &descriptor,
                 /* keymap= */ None,
             ),
