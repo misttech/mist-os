@@ -19,4 +19,3 @@ Scenic must decide which View should receive pointer events. Typically,
 which Scenic then uses as the target of event dispatch.
 
 [view-glossary]: /docs/glossary#view
-[hit-testing]: /docs/concepts/ui/scenic/hit_testing.md

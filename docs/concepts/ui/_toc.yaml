@@ -30,8 +30,6 @@ toc:
     path: /docs/concepts/ui/scenic/views.md
   - title: "Pointer input"
     path: /docs/concepts/ui/scenic/input.md
-  - title: "Hit testing"
-    path: /docs/concepts/ui/scenic/hit_testing.md
   - title: "Color spaces"
     path: /docs/concepts/ui/scenic/color_spaces.md
   - title: "Display"
