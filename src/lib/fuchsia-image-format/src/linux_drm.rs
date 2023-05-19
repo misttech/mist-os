@@ -36,6 +36,7 @@ pub fn drm_format_to_vulkan_format(drm_format: u32) -> Result<u32, Error> {
     match drm_format {
         DRM_FORMAT_ARGB8888 | DRM_FORMAT_XRGB8888 => Ok(vk::FORMAT_B8G8R8A8_UNORM),
         DRM_FORMAT_ABGR8888 | DRM_FORMAT_XBGR8888 => Ok(vk::FORMAT_R8G8B8A8_UNORM),
+        DRM_FORMAT_RGB565 => Ok(vk::FORMAT_R5G6B5_UNORM_PACK16),
         _ => Err(anyhow!("Unsupported format.")),
     }
 }
@@ -44,6 +45,7 @@ pub fn drm_format_to_sysmem_format(drm_format: u32) -> Result<fsysmem::PixelForm
     match drm_format {
         DRM_FORMAT_ARGB8888 | DRM_FORMAT_XRGB8888 => Ok(fsysmem::PixelFormatType::Bgra32),
         DRM_FORMAT_ABGR8888 | DRM_FORMAT_XBGR8888 => Ok(fsysmem::PixelFormatType::R8G8B8A8),
+        DRM_FORMAT_RGB565 => Ok(fsysmem::PixelFormatType::Rgb565),
         _ => Err(anyhow!("Unsupported format.")),
     }
 }
@@ -90,3 +92,4 @@ pub const DRM_FORMAT_XRGB8888: u32 = fourcc_code(b'X', b'R', b'2', b'4');
 pub const DRM_FORMAT_XBGR8888: u32 = fourcc_code(b'X', b'B', b'2', b'4');
 pub const DRM_FORMAT_ARGB8888: u32 = fourcc_code(b'A', b'R', b'2', b'4');
 pub const DRM_FORMAT_ABGR8888: u32 = fourcc_code(b'A', b'B', b'2', b'4');
+pub const DRM_FORMAT_RGB565: u32 = fourcc_code(b'R', b'G', b'1', b'6');
