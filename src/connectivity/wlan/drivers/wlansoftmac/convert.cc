@@ -123,7 +123,12 @@ zx_status_t ConvertWlanSoftmacQueryResponse(
   out->hardware_capability = in.hardware_capability();
 
   for (size_t i = 0; i < in.band_caps().count(); i++) {
-    switch (in.band_caps()[i].band) {
+    if (!in.band_caps()[i].has_band()) {
+      lerror("band value not populated");
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    switch (in.band_caps()[i].band()) {
       case fuchsia_wlan_common::wire::WlanBand::kTwoGhz:
         out->band_caps_list[i].band = WLAN_BAND_TWO_GHZ;
         break;
@@ -131,21 +136,43 @@ zx_status_t ConvertWlanSoftmacQueryResponse(
         out->band_caps_list[i].band = WLAN_BAND_FIVE_GHZ;
         break;
       default:
-        lerror("WlanBand is not supported: %hhu", static_cast<uint8_t>(in.band_caps()[i].band));
+        lerror("WlanBand is not supported: %hhu", static_cast<uint8_t>(in.band_caps()[i].band()));
         return ZX_ERR_NOT_SUPPORTED;
     }
-    out->band_caps_list[i].basic_rate_count = in.band_caps()[i].basic_rate_count;
 
-    memcpy(out->band_caps_list[i].basic_rate_list, in.band_caps()[i].basic_rate_list.data(),
-           in.band_caps()[i].basic_rate_count);
-    out->band_caps_list[i].ht_supported = in.band_caps()[i].ht_supported;
-    ConvertHtCapabilities(in.band_caps()[i].ht_caps, &out->band_caps_list[i].ht_caps);
-    out->band_caps_list[i].vht_supported = in.band_caps()[i].vht_supported;
-    ConvertVhtCapabilities(in.band_caps()[i].vht_caps, &out->band_caps_list[i].vht_caps);
-    out->band_caps_list[i].operating_channel_count = in.band_caps()[i].operating_channel_count;
-    memcpy(out->band_caps_list[i].operating_channel_list,
-           in.band_caps()[i].operating_channel_list.data(),
-           sizeof(uint8_t) * in.band_caps()[i].operating_channel_count);
+    if (!in.band_caps()[i].has_basic_rate_list() || in.band_caps()[i].basic_rate_count() == 0) {
+      out->band_caps_list[i].basic_rate_count = 0;
+    } else {
+      out->band_caps_list[i].basic_rate_count =
+          static_cast<uint8_t>(in.band_caps()[i].basic_rate_count());
+      memcpy(out->band_caps_list[i].basic_rate_list, in.band_caps()[i].basic_rate_list().data(),
+             in.band_caps()[i].basic_rate_count());
+    }
+
+    if (!in.band_caps()[i].has_ht_caps()) {
+      out->band_caps_list[i].ht_supported = false;
+    } else {
+      ConvertHtCapabilities(in.band_caps()[i].ht_caps(), &out->band_caps_list[i].ht_caps);
+      out->band_caps_list[i].ht_supported = true;
+    }
+
+    if (!in.band_caps()[i].has_vht_caps()) {
+      out->band_caps_list[i].vht_supported = false;
+    } else {
+      out->band_caps_list[i].vht_supported = true;
+      ConvertVhtCapabilities(in.band_caps()[i].vht_caps(), &out->band_caps_list[i].vht_caps);
+    }
+
+    if (!in.band_caps()[i].has_operating_channel_list() ||
+        in.band_caps()[i].has_operating_channel_count() == 0) {
+      out->band_caps_list[i].operating_channel_count = 0;
+    } else {
+      out->band_caps_list[i].operating_channel_count =
+          static_cast<uint16_t>(in.band_caps()[i].operating_channel_count());
+      memcpy(out->band_caps_list[i].operating_channel_list,
+             in.band_caps()[i].operating_channel_list().data(),
+             sizeof(uint8_t) * in.band_caps()[i].operating_channel_count());
+    }
   }
 
   out->band_caps_count = static_cast<uint8_t>(in.band_caps().count());

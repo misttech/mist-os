@@ -63,6 +63,9 @@
 
 #include "banjo/common.h"
 #include "banjo/softmac.h"
+#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/arena.h"
+#include "lib/fidl/cpp/wire/array.h"
 
 extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-debug.h"
@@ -112,6 +115,7 @@ size_t compose_band_list(const struct iwl_nvm_data* nvm_data,
 //
 void fill_band_cap_list(const struct iwl_nvm_data* nvm_data,
                         const wlan_common_wire::WlanBand* bands, size_t band_caps_count,
+                        fidl::AnyArena& arena,
                         wlan_softmac_wire::WlanSoftmacBandCapability* band_cap_list) {
   ZX_ASSERT(band_caps_count <= std::size(nvm_data->bands));
 
@@ -119,33 +123,50 @@ void fill_band_cap_list(const struct iwl_nvm_data* nvm_data,
     wlan_common_wire::WlanBand band_id = bands[band_idx];
     const struct ieee80211_supported_band* sband =
         &nvm_data->bands[fidl::ToUnderlying(band_id)];  // source
-    wlan_softmac_wire::WlanSoftmacBandCapability* band_cap =
-        &band_cap_list[band_idx];  // destination
 
-    band_cap->band = band_id;
-    band_cap->ht_supported = sband->ht_cap.ht_supported;
+    auto band_cap_builder = fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability::Builder(arena);
+    band_cap_builder.band(band_id);
+
+    fuchsia_wlan_ieee80211::wire::HtCapabilities ht_caps_bytes = {0};
     struct ieee80211_ht_cap_packed* ht_caps =
-        reinterpret_cast<struct ieee80211_ht_cap_packed*>(band_cap->ht_caps.bytes.data());
+        reinterpret_cast<struct ieee80211_ht_cap_packed*>(ht_caps_bytes.bytes.data());
     ht_caps->ht_capability_info = sband->ht_cap.cap;
     ht_caps->ampdu_params =
         (sband->ht_cap.ampdu_factor << IEEE80211_AMPDU_RX_LEN_SHIFT) |   // (64K - 1) bytes
         (sband->ht_cap.ampdu_density << IEEE80211_AMPDU_DENSITY_SHIFT);  // 8 us
     memcpy(&ht_caps->supported_mcs_set, &sband->ht_cap.mcs, sizeof(struct ieee80211_mcs_info));
+    band_cap_builder.ht_caps(ht_caps_bytes);
     // TODO(fxbug.dev/36684): band_info->vht_caps =
 
-    ZX_ASSERT(sband->n_bitrates <= std::size(band_cap->basic_rate_list));
-    for (size_t rate_idx = 0; rate_idx < sband->n_bitrates; ++rate_idx) {
-      band_cap->basic_rate_list[rate_idx] = cfg_rates_to_80211(sband->bitrates[rate_idx]);
+    fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMaxSupportedBasicRates> basic_rate_list;
+    auto basic_rate_count = sband->n_bitrates;
+    if (fuchsia_wlan_ieee80211::wire::kMaxSupportedBasicRates < sband->n_bitrates) {
+      basic_rate_count = fuchsia_wlan_ieee80211::wire::kMaxSupportedBasicRates;
+      IWL_WARN(mvmvif, "Trimming basic_rate_list from %zu to %zu", sband->n_bitrates,
+               basic_rate_count);
     }
-    band_cap->basic_rate_count = sband->n_bitrates;
+    for (size_t rate_idx = 0; rate_idx < basic_rate_count; ++rate_idx) {
+      basic_rate_list[rate_idx] = cfg_rates_to_80211(sband->bitrates[rate_idx]);
+    }
+    band_cap_builder.basic_rate_list(basic_rate_list);
+    band_cap_builder.basic_rate_count(basic_rate_count);
 
     // Fill the channel list of this band.
-    ZX_ASSERT(sband->n_channels <= std::size(band_cap->operating_channel_list));
-    uint8_t* ch_list = band_cap->operating_channel_list.begin();
-    for (size_t ch_idx = 0; ch_idx < sband->n_channels; ++ch_idx) {
-      ch_list[ch_idx] = sband->channels[ch_idx].ch_num;
+    fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMaxUniqueChannelNumbers>
+        operating_channel_list;
+    auto operating_channel_count = sband->n_channels;
+    if (fuchsia_wlan_ieee80211::wire::kMaxUniqueChannelNumbers < sband->n_channels) {
+      operating_channel_count = fuchsia_wlan_ieee80211::wire::kMaxUniqueChannelNumbers;
+      IWL_WARN(mvmif, "Trimming operating channel count from %zu to %zu", sband->n_channels,
+               operating_channel_count);
     }
-    band_cap->operating_channel_count = static_cast<uint8_t>(sband->n_channels);
+    for (size_t ch_idx = 0; ch_idx < operating_channel_count; ++ch_idx) {
+      operating_channel_list[ch_idx] = sband->channels[ch_idx].ch_num;
+    }
+    band_cap_builder.operating_channel_list(operating_channel_list);
+    band_cap_builder.operating_channel_count(operating_channel_count);
+
+    band_cap_list[band_idx] = band_cap_builder.Build();
   }
 }
 
@@ -195,12 +216,10 @@ zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacQueryResponse* re
       return ZX_ERR_BAD_STATE;
   }
 
-  std::vector<wlan_common_wire::WlanPhyType> phy_vec;
-  phy_vec.push_back(wlan_common_wire::WlanPhyType::kDsss);
-  phy_vec.push_back(wlan_common_wire::WlanPhyType::kHr);
-  phy_vec.push_back(wlan_common_wire::WlanPhyType::kOfdm);
-  phy_vec.push_back(wlan_common_wire::WlanPhyType::kErp);
-  phy_vec.push_back(wlan_common_wire::WlanPhyType::kHt);
+  std::vector<wlan_common_wire::WlanPhyType> phy_vec = {
+      wlan_common_wire::WlanPhyType::kDsss, wlan_common_wire::WlanPhyType::kHr,
+      wlan_common_wire::WlanPhyType::kOfdm, wlan_common_wire::WlanPhyType::kErp,
+      wlan_common_wire::WlanPhyType::kHt};
 
   builder.supported_phys(fidl::VectorView<wlan_common_wire::WlanPhyType>(arena, phy_vec));
 
@@ -214,7 +233,7 @@ zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacQueryResponse* re
   wlan_softmac_wire::WlanSoftmacBandCapability band_caps_buffer[wlan_common_wire::kMaxBands];
   size_t band_caps_count = compose_band_list(nvm_data, bands);
 
-  fill_band_cap_list(nvm_data, bands, band_caps_count, band_caps_buffer);
+  fill_band_cap_list(nvm_data, bands, band_caps_count, arena, band_caps_buffer);
   auto band_caps_vec = std::vector<wlan_softmac_wire::WlanSoftmacBandCapability>(
       band_caps_buffer, band_caps_buffer + band_caps_count);
   builder.band_caps(

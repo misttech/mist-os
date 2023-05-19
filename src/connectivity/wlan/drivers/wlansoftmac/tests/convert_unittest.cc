@@ -10,6 +10,7 @@
 #include <wlan/drivers/log_instance.h>
 #include <wlan/drivers/test/log_overrides.h>
 
+#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
 #include "fidl/fuchsia.wlan.softmac/cpp/wire_types.h"
 #include "fuchsia/wlan/softmac/c/banjo.h"
 
@@ -109,28 +110,38 @@ TEST_F(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
 
   builder.hardware_capability((uint32_t)kFakeFidlSoftmacHardwareCapabilityBit);
 
-  wlan_softmac::WlanSoftmacBandCapability band_caps_buffer[wlan_common::kMaxBands];
-
+  fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability band_caps_buffer[wlan_common::kMaxBands];
   for (size_t i = 0; i < wlan_common::kMaxBands; i++) {
-    auto& band_cap = band_caps_buffer[i];
+    auto band_cap_builder = wlan_softmac::WlanSoftmacBandCapability::Builder(arena);
 
-    band_cap.band = kFakeFidlBand;
-    band_cap.basic_rate_count = wlan_ieee80211::kMaxSupportedBasicRates;
+    band_cap_builder.band(kFakeFidlBand);
 
+    fidl::Array<uint8_t, wlan_ieee80211::kMaxSupportedBasicRates> basic_rate_array;
     for (size_t j = 0; j < wlan_ieee80211::kMaxSupportedBasicRates; j++) {
-      band_cap.basic_rate_list.data()[j] = kFakeRate;
+      basic_rate_array[j] = kFakeRate;
     }
+    band_cap_builder.basic_rate_list(basic_rate_array);
+    band_cap_builder.basic_rate_count(wlan_ieee80211::kMaxSupportedBasicRates);
 
-    band_cap.ht_supported = kPopulaterBool;
-    memcpy(band_cap.ht_caps.bytes.data(), kFakeHtCapBytes, wlan_ieee80211::kHtCapLen);
-    band_cap.vht_supported = kPopulaterBool;
-    memcpy(band_cap.vht_caps.bytes.data(), kFakeVhtCapBytes, wlan_ieee80211::kVhtCapLen);
+    wlan_ieee80211::HtCapabilities ht_caps;
+    memcpy(ht_caps.bytes.begin(), kFakeHtCapBytes, wlan_ieee80211::kHtCapLen);
+    band_cap_builder.ht_caps(ht_caps);
+    band_cap_builder.ht_supported(kPopulaterBool);
 
-    band_cap.operating_channel_count = wlan_ieee80211::kMaxUniqueChannelNumbers;
+    wlan_ieee80211::VhtCapabilities vht_caps;
+    memcpy(vht_caps.bytes.begin(), kFakeVhtCapBytes, wlan_ieee80211::kVhtCapLen);
+    band_cap_builder.vht_caps(vht_caps);
+    band_cap_builder.vht_supported(kPopulaterBool);
+
+    fidl::Array<uint8_t, wlan_ieee80211::kMaxUniqueChannelNumbers> operating_channel_array;
     for (size_t j = 0; j < wlan_ieee80211::kMaxUniqueChannelNumbers; j++) {
-      band_cap.operating_channel_list[j] = kFakeChannel;
+      operating_channel_array[j] = kFakeChannel;
     }
+    band_cap_builder.operating_channel_list(operating_channel_array);
+    band_cap_builder.operating_channel_count(wlan_ieee80211::kMaxUniqueChannelNumbers);
+    band_caps_buffer[i] = band_cap_builder.Build();
   }
+
   builder.band_caps(
       fidl::VectorView<wlan_softmac::WlanSoftmacBandCapability>(arena, band_caps_buffer));
   auto in = builder.Build();

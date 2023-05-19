@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/arena.h>
 #include <lib/mock-function/mock-function.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/channel.h>
@@ -49,6 +50,9 @@ constexpr wlan_band_t kInvalidBandId = 0xa5;
 constexpr zx_handle_t kDummyMlmeChannel = 73939133;  // An arbitrary value not ZX_HANDLE_INVALID
 constexpr size_t kDefaultBeaconPeriod = 100;
 constexpr size_t kNonDefaultBeaconPeriod = 123;
+constexpr size_t kWlanSoftmacBandCapabilityBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability,
+                           fidl::MessageDirection::kReceiving>();
 constexpr fuchsia_wlan_internal::BssType kDefaultBssType =
     fuchsia_wlan_internal::wire::BssType::kInfrastructure;
 
@@ -228,59 +232,61 @@ TEST_F(WlanSoftmacDeviceTest, FillBandCapabilityList) {
   const struct iwl_nvm_data* nvm_data = iwl_trans_get_mvm(sim_trans_.iwl_trans())->nvm_data;
   fuchsia_wlan_common::WlanBand bands[fuchsia_wlan_common::wire::kMaxBands];
   size_t band_cap_count = compose_band_list(nvm_data, bands);
+  fidl::Arena<kWlanSoftmacBandCapabilityBufferSize> arena;
   ASSERT_LE(band_cap_count, fuchsia_wlan_common::wire::kMaxBands);
 
   fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability
       band_cap_list[fuchsia_wlan_common_MAX_BANDS] = {};
-  fill_band_cap_list(nvm_data, bands, band_cap_count, band_cap_list);
+  fill_band_cap_list(nvm_data, bands, band_cap_count, arena, band_cap_list);
 
   // 2.4Ghz
   fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability* band_cap = &band_cap_list[0];
-  EXPECT_EQ(fuchsia_wlan_common::WlanBand::kTwoGhz, band_cap->band);
-  EXPECT_TRUE(band_cap->ht_supported);
-  EXPECT_EQ(12, band_cap->basic_rate_count);
-  EXPECT_EQ(2, band_cap->basic_rate_list[0]);     // 1Mbps
-  EXPECT_EQ(108, band_cap->basic_rate_list[11]);  // 54Mbps
-  EXPECT_EQ(13, band_cap->operating_channel_count);
-  EXPECT_EQ(1, band_cap->operating_channel_list[0]);
-  EXPECT_EQ(13, band_cap->operating_channel_list[12]);
+  EXPECT_EQ(fuchsia_wlan_common::WlanBand::kTwoGhz, band_cap->band());
+  EXPECT_TRUE(band_cap->has_ht_caps());
+  EXPECT_EQ(12, band_cap->basic_rate_count());
+  EXPECT_EQ(2, band_cap->basic_rate_list()[0]);     // 1Mbps
+  EXPECT_EQ(108, band_cap->basic_rate_list()[11]);  // 54Mbps
+  EXPECT_EQ(13, band_cap->operating_channel_count());
+  EXPECT_EQ(1, band_cap->operating_channel_list()[0]);
+  EXPECT_EQ(13, band_cap->operating_channel_list()[12]);
   // 5GHz
   band_cap = &band_cap_list[1];
-  EXPECT_EQ(fuchsia_wlan_common::WlanBand::kFiveGhz, band_cap->band);
-  EXPECT_TRUE(band_cap->ht_supported);
-  EXPECT_EQ(8, band_cap->basic_rate_count);
-  EXPECT_EQ(12, band_cap->basic_rate_list[0]);   // 6Mbps
-  EXPECT_EQ(108, band_cap->basic_rate_list[7]);  // 54Mbps
-  EXPECT_EQ(25, band_cap->operating_channel_count);
-  EXPECT_EQ(36, band_cap->operating_channel_list[0]);
-  EXPECT_EQ(165, band_cap->operating_channel_list[24]);
+  EXPECT_EQ(fuchsia_wlan_common::WlanBand::kFiveGhz, band_cap->band());
+  EXPECT_TRUE(band_cap->has_ht_caps());
+  EXPECT_EQ(8, band_cap->basic_rate_count());
+  EXPECT_EQ(12, band_cap->basic_rate_list()[0]);   // 6Mbps
+  EXPECT_EQ(108, band_cap->basic_rate_list()[7]);  // 54Mbps
+  EXPECT_EQ(25, band_cap->operating_channel_count());
+  EXPECT_EQ(36, band_cap->operating_channel_list()[0]);
+  EXPECT_EQ(165, band_cap->operating_channel_list()[24]);
 }
 
 TEST_F(WlanSoftmacDeviceTest, FillBandCapabilityListOnly5GHz) {
   // The default 'nvm_data' is loaded from test/sim-default-nvm.cc.
-
+  fidl::Arena<kWlanSoftmacBandCapabilityBufferSize> arena;
   fuchsia_wlan_common::WlanBand bands[fuchsia_wlan_common::wire::kMaxBands] = {
       fuchsia_wlan_common::WlanBand::kFiveGhz,
   };
   fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability
       band_cap_list[fuchsia_wlan_common::wire::kMaxBands] = {};
 
-  fill_band_cap_list(iwl_trans_get_mvm(sim_trans_.iwl_trans())->nvm_data, bands, 1, band_cap_list);
+  fill_band_cap_list(iwl_trans_get_mvm(sim_trans_.iwl_trans())->nvm_data, bands, 1, arena,
+                     band_cap_list);
   // 5GHz
   fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability* band_cap = &band_cap_list[0];
-  EXPECT_EQ(fuchsia_wlan_common::WlanBand::kFiveGhz, band_cap->band);
-  EXPECT_TRUE(band_cap->ht_supported);
-  EXPECT_EQ(8, band_cap->basic_rate_count);
-  EXPECT_EQ(12, band_cap->basic_rate_list[0]);   // 6Mbps
-  EXPECT_EQ(108, band_cap->basic_rate_list[7]);  // 54Mbps
-  EXPECT_EQ(25, band_cap->operating_channel_count);
-  EXPECT_EQ(36, band_cap->operating_channel_list[0]);
-  EXPECT_EQ(165, band_cap->operating_channel_list[24]);
+  EXPECT_EQ(fuchsia_wlan_common::WlanBand::kFiveGhz, band_cap->band());
+  EXPECT_TRUE(band_cap->has_ht_caps());
+  EXPECT_EQ(8, band_cap->basic_rate_count());
+  EXPECT_EQ(12, band_cap->basic_rate_list()[0]);   // 6Mbps
+  EXPECT_EQ(108, band_cap->basic_rate_list()[7]);  // 54Mbps
+  EXPECT_EQ(25, band_cap->operating_channel_count());
+  EXPECT_EQ(36, band_cap->operating_channel_list()[0]);
+  EXPECT_EQ(165, band_cap->operating_channel_list()[24]);
   // index 1 should be empty.
   band_cap = &band_cap_list[1];
-  EXPECT_FALSE(band_cap->ht_supported);
-  EXPECT_EQ(0, band_cap->basic_rate_count);
-  EXPECT_EQ(0, band_cap->operating_channel_count);
+  EXPECT_FALSE(band_cap->has_ht_caps());
+  EXPECT_FALSE(band_cap->has_basic_rate_list());
+  EXPECT_FALSE(band_cap->has_operating_channel_list());
 }
 
 TEST_F(WlanSoftmacDeviceTest, Query) {
@@ -298,13 +304,13 @@ TEST_F(WlanSoftmacDeviceTest, Query) {
   //   .band_cap_list[1]: fuchsia_wlan_common::WlanBand::kFiveGhz
   //
   ASSERT_EQ(2, info.band_caps().count());
-  EXPECT_EQ(12, info.band_caps().data()[0].basic_rate_count);
-  EXPECT_EQ(2, info.band_caps().data()[0].basic_rate_list[0]);     // 1 Mbps
-  EXPECT_EQ(36, info.band_caps().data()[0].basic_rate_list[7]);    // 18 Mbps
-  EXPECT_EQ(108, info.band_caps().data()[0].basic_rate_list[11]);  // 54 Mbps
-  EXPECT_EQ(8, info.band_caps().data()[1].basic_rate_count);
-  EXPECT_EQ(12, info.band_caps().data()[1].basic_rate_list[0]);  // 6 Mbps
-  EXPECT_EQ(165, info.band_caps().data()[1].operating_channel_list[24]);
+  EXPECT_EQ(12, info.band_caps().data()[0].basic_rate_count());
+  EXPECT_EQ(2, info.band_caps().data()[0].basic_rate_list()[0]);     // 1 Mbps
+  EXPECT_EQ(36, info.band_caps().data()[0].basic_rate_list()[7]);    // 18 Mbps
+  EXPECT_EQ(108, info.band_caps().data()[0].basic_rate_list()[11]);  // 54 Mbps
+  EXPECT_EQ(8, info.band_caps().data()[1].basic_rate_count());
+  EXPECT_EQ(12, info.band_caps().data()[1].basic_rate_list()[0]);  // 6 Mbps
+  EXPECT_EQ(165, info.band_caps().data()[1].operating_channel_list()[24]);
 }
 
 TEST_F(WlanSoftmacDeviceTest, DiscoveryFeatureQuery) {

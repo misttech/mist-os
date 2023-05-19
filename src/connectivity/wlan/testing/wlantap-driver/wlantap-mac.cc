@@ -84,8 +84,9 @@ struct WlantapMacImpl : WlantapMac,
 
   // WlanSoftmac protocol impl
 
-  // Large enough to back a full WlanSoftmacQueryResponse FIDL struct.
-  static constexpr size_t kWlanSoftmacQueryResponseBufferSize = 5120;
+  static constexpr size_t kWlanSoftmacQueryResponseBufferSize =
+      fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacQueryResponse,
+                             fidl::MessageDirection::kSending>();
 
   void Query(fdf::Arena& arena, QueryCompleter::Sync& completer) override {
     fidl::Arena<kWlanSoftmacQueryResponseBufferSize> table_arena;

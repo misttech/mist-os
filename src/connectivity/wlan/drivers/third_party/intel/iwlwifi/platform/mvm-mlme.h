@@ -32,6 +32,7 @@ size_t compose_band_list(const struct iwl_nvm_data* nvm_data,
                          wlan_common_wire::WlanBand bands[fuchsia_wlan_common_MAX_BANDS]);
 void fill_band_cap_list(const struct iwl_nvm_data* nvm_data,
                         const wlan_common_wire::WlanBand* bands, size_t band_cap_count,
+                        fidl::AnyArena& arena,
                         wlan_softmac_wire::WlanSoftmacBandCapability* band_cap_list);
 
 // Phy protocol helpers
