@@ -87,6 +87,7 @@ pub(crate) trait HostPipeChildBuilder {
         id: u64,
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
+        watchdogs: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)>
     where
         Self: Sized;
@@ -103,8 +104,9 @@ impl HostPipeChildBuilder for HostPipeChildCircuitBuilder {
         id: u64,
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
+        watchdogs: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, true).await
+        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, true, watchdogs).await
     }
 }
 
@@ -119,8 +121,9 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         id: u64,
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
+        watchdogs: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, false).await
+        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, false, watchdogs).await
     }
 }
 
@@ -130,6 +133,31 @@ pub(crate) struct HostPipeChild {
     task: Option<Task<()>>,
 }
 
+fn setup_watchdogs() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    tracing::debug!("Setting up executor watchdog");
+    let flag = Arc::new(AtomicBool::new(false));
+
+    fuchsia_async::Task::spawn({
+        let flag = Arc::clone(&flag);
+        async move {
+            fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
+            flag.store(true, Ordering::Relaxed);
+            tracing::debug!("Executor watchdog fired");
+        }
+    })
+    .detach();
+
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        if !flag.load(Ordering::Relaxed) {
+            tracing::error!("Aborting due to watchdog timeout!");
+            std::process::abort();
+        }
+    });
+}
+
 impl HostPipeChild {
     async fn new_inner(
         addr: SocketAddr,
@@ -137,6 +165,7 @@ impl HostPipeChild {
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
         circuit: bool,
+        watchdogs: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
         // TODO (119900): Re-enable ABI checks when ffx repository server uses ssh to setup
         // repositories for older devices.
@@ -157,6 +186,10 @@ impl HostPipeChild {
         let mut ssh = build_ssh_command(addr, args).await?;
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
+
+        if watchdogs {
+            setup_watchdogs();
+        }
 
         let mut ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
 
@@ -355,6 +388,7 @@ where
     inner: Arc<HostPipeChild>,
     relaunch_command_delay: Duration,
     host_pipe_child_builder: T,
+    watchdogs: bool,
 }
 
 impl<T> Drop for HostPipeConnection<T>
@@ -369,24 +403,28 @@ where
 
 pub(crate) async fn spawn_circuit(
     target: Weak<Target>,
+    watchdogs: bool,
 ) -> Result<HostPipeConnection<HostPipeChildCircuitBuilder>> {
     let host_pipe_child_builder = HostPipeChildCircuitBuilder {};
     HostPipeConnection::<HostPipeChildCircuitBuilder>::spawn_with_builder(
         target,
         host_pipe_child_builder,
         RETRY_DELAY,
+        watchdogs,
     )
     .await
 }
 
 pub(crate) async fn spawn(
     target: Weak<Target>,
+    watchdogs: bool,
 ) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder>> {
     let host_pipe_child_builder = HostPipeChildDefaultBuilder {};
     HostPipeConnection::<HostPipeChildDefaultBuilder>::spawn_with_builder(
         target,
         host_pipe_child_builder,
         RETRY_DELAY,
+        watchdogs,
     )
     .await
 }
@@ -395,7 +433,7 @@ impl<T> HostPipeConnection<T>
 where
     T: HostPipeChildBuilder + Copy,
 {
-    async fn start_child_pipe(target: &Weak<Target>, builder: T) -> Result<Arc<HostPipeChild>> {
+    async fn start_child_pipe(target: &Weak<Target>, builder: T, watchdogs: bool) -> Result<Arc<HostPipeChild>> {
         let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
         let target_nodename = target.nodename();
         tracing::debug!("Spawning new host-pipe instance to target {:?}", target_nodename);
@@ -407,7 +445,7 @@ where
         })?;
 
         let (host_addr, cmd) = builder
-            .new(ssh_address, target.id(), log_buf.clone(), target.events.clone())
+            .new(ssh_address, target.id(), log_buf.clone(), target.events.clone(), watchdogs)
             .await
             .with_context(|| {
                 format!("creating host-pipe command to target {:?}", target_nodename)
@@ -428,11 +466,12 @@ where
         target: Weak<Target>,
         host_pipe_child_builder: T,
         relaunch_command_delay: Duration,
+        watchdogs: bool,
     ) -> Result<Self> {
-        let hpc = Self::start_child_pipe(&target, host_pipe_child_builder).await?;
+        let hpc = Self::start_child_pipe(&target, host_pipe_child_builder, watchdogs).await?;
         let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
 
-        Ok(Self { target, inner: hpc, relaunch_command_delay, host_pipe_child_builder })
+        Ok(Self { target, inner: hpc, relaunch_command_delay, host_pipe_child_builder, watchdogs })
     }
 
     pub async fn wait(&mut self) -> Result<()> {
@@ -478,7 +517,7 @@ where
             Timer::new(self.relaunch_command_delay).await;
 
             let hpc =
-                Self::start_child_pipe(&Rc::downgrade(&self.target), self.host_pipe_child_builder)
+                Self::start_child_pipe(&Rc::downgrade(&self.target), self.host_pipe_child_builder, self.watchdogs)
                     .await?;
             self.inner = hpc;
         }
@@ -537,6 +576,7 @@ mod test {
             id: u64,
             stderr_buf: Rc<LogBuffer>,
             event_queue: events::Queue<TargetEvent>,
+            _watchdogs: bool,
         ) -> Result<(Option<HostAddr>, HostPipeChild)> {
             match self.operation_type {
                 ChildOperationType::Normal => {
@@ -606,6 +646,7 @@ mod test {
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::Normal },
             Duration::default(),
+            false
         )
         .await;
         assert_matches!(res, Ok(_));
@@ -623,6 +664,7 @@ mod test {
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::InternalFailure },
             Duration::default(),
+            false
         )
         .await;
         assert!(res.is_err());
@@ -651,6 +693,7 @@ mod test {
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::SshFailure },
             Duration::default(),
+            false,
         )
         .await;
         assert_matches!(res, Ok(_));

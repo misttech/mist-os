@@ -965,9 +965,10 @@ impl Target {
             }
 
             let modes = ffx_config::get_connection_modes().await;
+            let watchdogs: bool = ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
             let legacy = async {
                 if modes.use_legacy() {
-                    let nr = spawn(weak_target.clone()).await;
+                    let nr = spawn(weak_target.clone(), watchdogs).await;
                     match nr {
                         Ok(mut hp) => {
                             tracing::debug!(
@@ -985,7 +986,7 @@ impl Target {
             };
             let circuit = async {
                 if modes.use_cso() {
-                    let nr = spawn_circuit(weak_target.clone()).await;
+                    let nr = spawn_circuit(weak_target.clone(), watchdogs).await;
                     match nr {
                         Ok(mut hp) => {
                             tracing::debug!(
