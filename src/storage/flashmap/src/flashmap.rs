@@ -484,8 +484,7 @@ impl Flashmap {
                 FlashmapRequest::Read { name, offset, size, responder } => {
                     responder
                         .send(
-                            &mut self
-                                .read_flashmap_area(&name, offset, size)
+                            self.read_flashmap_area(&name, offset, size)
                                 .await
                                 .map_err(|e| e.into_raw()),
                         )
