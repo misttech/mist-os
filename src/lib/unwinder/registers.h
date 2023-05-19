@@ -71,12 +71,11 @@ enum class RegisterID : uint8_t {
   kArm64_x28 = 28,
   kArm64_x29 = 29,
   kArm64_x30 = 30,
-  kArm64_x31 = 31,
+  kArm64_sp = 31,
   kArm64_pc = 32,
   kArm64_last,
   // Alias.
   kArm64_lr = kArm64_x30,
-  kArm64_sp = kArm64_x31,
 
   // riscv64. https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-dwarf.adoc
   // The name is chosen to keep consistency with zx_riscv64_thread_state_general_regs_t.

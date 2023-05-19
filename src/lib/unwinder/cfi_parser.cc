@@ -498,24 +498,31 @@ Error CfiParser::Step(Memory* stack, RegisterID return_address_register, const R
 
   // By definition, the CFA is the stack pointer at the call site, so restoring SP means setting it
   // to CFA. However, if there's a rule that defines SP, we don't override that. This is used in
-  // the starnix runner to achieve "unwinding into restricted mode".
+  // the starnix restricted executor to achieve "unwinding into restricted mode".
   if (uint64_t sp; next.GetSP(sp).has_err()) {
     next.SetSP(cfa);
   }
 
-  // Return address is the address after the call instruction, so setting PC to that simulates a
-  // return. On x64, return_address_register is just RIP so it's a noop. On arm64,
-  // return_address_register is LR, which must be copied to PC.
+  // Usually the PC will be undefined and should be recovered from |return_address_register|, as PC
+  // is technically not part of the DWARF standard.  However, in starnix restricted executor we want
+  // to unwind into restricted mode and recover both LR and PC for the restricted frame, so PC is
+  // defined directly in the CFI and we want to skip the assignment PC = LR.
   //
-  // An unavailable return address, usually because of "DW_CFA_undefined: RIP/LR", marks the end of
-  // the unwinding. We don't consider it an error.
-  if (uint64_t return_address; next.Get(return_address_register, return_address).ok()) {
-    // It's important to unset the return_address_register because we want to restore all registers
-    // to the previous frame. Since the value of return_address_register is changed during the call,
-    // it's not possible to recover it any more. The same holds true when return_address_register is
-    // IP, e.g., on x64.
-    next.Unset(return_address_register);
-    next.SetPC(return_address);
+  // PC will also be defined on x64 as the return_address_register is just PC. It doesn't matter
+  // whether we skip the assignment or not as it's just a noop.
+  if (uint64_t pc; next.GetPC(pc).has_err()) {
+    // Return address is the address after the call instruction, so setting PC to that simulates a
+    // return. It's RIP on x64, LR on Arm64, and RA on Riscv64.
+    //
+    // An unavailable return address, usually because of "DW_CFA_undefined: RIP/LR", marks the end
+    // of the unwinding. We don't consider it an error.
+    if (uint64_t return_address; next.Get(return_address_register, return_address).ok()) {
+      // It's important to unset the return_address_register because we want to restore all
+      // registers to the previous frame. Since the value of return_address_register is changed
+      // during the call, it's not possible to recover it any more.
+      next.Unset(return_address_register);
+      next.SetPC(return_address);
+    }
   }
 
   LOG_DEBUG("%s => %s\n", current.Describe().c_str(), next.Describe().c_str());

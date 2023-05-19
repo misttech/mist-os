@@ -13,9 +13,9 @@ macro_rules! generate_cfi_directives {
     ($state:expr) => {
         unsafe {
             let state_addr = std::ptr::addr_of!($state);
-            // The base address that the unwinder will use is stored in r15. Then it will look for
+            // The base address that the unwinder will use is stored in r14. Then it will look for
             // each register value at an offset specified below. These offsets match the offsets of
-            // the register values in the `zx_thread_state_general_regs_t` struct.
+            // the register values in the `zx_restricted_state_t` struct.
             std::arch::asm!(
                 ".cfi_remember_state",
                 ".cfi_def_cfa r14, 0",
@@ -55,7 +55,7 @@ macro_rules! restore_cfi_directives {
     () => {
         unsafe {
             // Restore the CFI state before continuing.
-            std::arch::asm!(".cfi_restore_state");
+            std::arch::asm!(".cfi_restore_state", options(nomem, preserves_flags, nostack));
         }
     };
 }

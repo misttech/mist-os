@@ -134,7 +134,7 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
   // obtain the debug_address, which is used for resolving TLS location.
   std::vector<debug_ipc::AddressRegion> address_regions = process.GetAddressSpace(0);
 
-  // When `-z noseparate-code` is enabled, multiple ELF segments could live on the same page and
+  // With `-fuse-ld=lld -z noseparate-code`, multiple ELF segments could live on the same page and
   // get mapped multiple times with different flags. For example,
   //
   // Program Headers:
@@ -162,8 +162,8 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
     if (region.base < end_of_last_module) {
       continue;
     }
-    // ELF headers live in read-only regions.
-    if (region.mmu_flags != ZX_VM_PERM_READ) {
+    // With `-fuse-ld=ld -z noseparate-code`, ELF headers live together with the text section.
+    if ((region.mmu_flags & ~ZX_VM_PERM_EXECUTE) != ZX_VM_PERM_READ) {
       continue;
     }
     if (!visited_modules.insert(region.base).second) {

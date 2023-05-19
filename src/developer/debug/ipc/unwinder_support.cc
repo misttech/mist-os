@@ -65,7 +65,7 @@ debug::RegisterID ConvertRegisterID(unwinder::Registers::Arch arch, unwinder::Re
       {unwinder::RegisterID::kArm64_x28, debug::RegisterID::kARMv8_x28},
       {unwinder::RegisterID::kArm64_x29, debug::RegisterID::kARMv8_x29},
       {unwinder::RegisterID::kArm64_x30, debug::RegisterID::kARMv8_lr},
-      {unwinder::RegisterID::kArm64_x31, debug::RegisterID::kARMv8_sp},
+      {unwinder::RegisterID::kArm64_sp, debug::RegisterID::kARMv8_sp},
       {unwinder::RegisterID::kArm64_pc, debug::RegisterID::kARMv8_pc},
   };
 
