@@ -124,8 +124,12 @@ class SetDefaults(Step):
     def run(self, ctx):
         ctx.log(f"Setting ffx configs to true {self.config_keys}.")
         for key in self.config_keys:
-            self.original_config_entries[key] = ctx.ffx().run(
-                "config", "get", key)
+            try:
+                self.original_config_entries[key] = ctx.ffx().run(
+                    "config", "get", key)
+            except:
+                self.original_config_entries[key] = None
+
             ctx.ffx().run("config", "set", key, "true")
 
         try:
@@ -143,7 +147,10 @@ class SetDefaults(Step):
     def cleanup(self, ctx):
         ctx.log("Setting ffx config values back to original values")
         for key, value in self.original_config_entries.items():
-            ctx.ffx().run("config", "set", key, value)
+            if value:
+                ctx.ffx().run("config", "set", key, value)
+            else:
+                ctx.ffx().run("config", "remove", key)
 
         if self.original_target and len(self.original_target) > 0:
             ctx.log(f"Setting default target back to {self.original_target}")
