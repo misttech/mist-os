@@ -14,6 +14,7 @@ fidl("test.placementofattributes") {
   public_deps = [ ":test.exampleusing" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
 
 fidl("test.exampleusing") {
@@ -22,4 +23,5 @@ fidl("test.exampleusing") {
   experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }

@@ -100,6 +100,7 @@ foreach(filename, standalone_libraries) {
 
     # Generate fuzzers to make sure they build.
     golden_fuzzer = true
+    disable_rustdoc = true
   }
 }
 

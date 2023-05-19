@@ -17,6 +17,7 @@ fidl("test.foreigntypeinresponseusedthroughcompose") {
   ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
 
 fidl("test.middle") {
@@ -26,6 +27,7 @@ fidl("test.middle") {
   experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
 
 fidl("test.bottom") {
@@ -34,4 +36,5 @@ fidl("test.bottom") {
   experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }

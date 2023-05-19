@@ -121,6 +121,7 @@ template("measure_tape") {
       source_root = out_rs
       sources = [ out_rs ]
       disable_clippy = true
+      disable_rustdoc = true
     }
 
     generated_outputs = [ out_rs ]

@@ -161,6 +161,7 @@ template("source_compatibility_test") {
       name = fidl_library
       sources = [ fidl_sources[fidl] ]
       enable_hlcpp = true
+      disable_rustdoc = true
     }
   }
 

@@ -10,6 +10,7 @@ fidl("test.protocollayouts.imported") {
   experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
 
 fidl("test.protocollayouts") {
@@ -22,4 +23,5 @@ fidl("test.protocollayouts") {
   public_deps = [ ":test.protocollayouts.imported" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }

@@ -141,6 +141,7 @@ template("dangerous_fidl") {
     sources = [ generated_file ]
     non_fidl_deps = [ generate_target_dep ]
     enable_hlcpp = true
+    disable_rustdoc = true
   }
 }
 

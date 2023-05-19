@@ -10,6 +10,7 @@ fidl("test.errorsyntax.parent") {
   experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
 
 fidl("test.errorsyntax") {
@@ -22,4 +23,5 @@ fidl("test.errorsyntax") {
   public_deps = [ ":test.errorsyntax.parent" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }

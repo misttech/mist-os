@@ -14,6 +14,7 @@ fidl("test.importedconstvalues") {
   public_deps = [ ":test.dependent" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
 
 fidl("test.dependent") {
@@ -22,4 +23,5 @@ fidl("test.dependent") {
   experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }

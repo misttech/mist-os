@@ -13,4 +13,5 @@ fidl("test.protocollayoutssamelibrary") {
   ]
   enable_hlcpp = true
   golden_fuzzer = true
+  disable_rustdoc = true
 }
