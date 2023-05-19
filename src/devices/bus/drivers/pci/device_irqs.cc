@@ -227,6 +227,8 @@ zx::result<std::pair<zx::msi, zx_info_msi_t>> Device::AllocateMsi(uint32_t irq_c
   }
   ZX_DEBUG_ASSERT(msi_info.num_irq == irq_cnt);
   ZX_DEBUG_ASSERT(msi_info.interrupt_count == 0);
+  zxlogf(DEBUG, "[%s] allocated MSI range [%#x, %#x)", cfg_->addr(), msi_info.base_irq_id,
+         msi_info.base_irq_id + msi_info.num_irq);
 
   return zx::ok(std::make_pair(std::move(msi), msi_info));
 }
