@@ -395,21 +395,23 @@ where
     }
 }
 
-static LOGGER_ONCE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(true);
-
 /// Install a logger for tests.
 ///
 /// Call this method at the beginning of the test for which logging is desired.
 /// This function sets global program state, so all tests that run after this
 /// function is called will use the logger.
 pub(crate) fn set_logger_for_test() {
-    // `init` will panic if called multiple times.
-    if LOGGER_ONCE.swap(false, core::sync::atomic::Ordering::AcqRel) {
+    tracing::subscriber::set_global_default(
         tracing_subscriber::fmt()
             .event_format(SimpleFormatter)
             .with_max_level(tracing::Level::TRACE)
-            .init();
-    }
+            .with_test_writer()
+            .finish(),
+    )
+    .unwrap_or({
+        // Ignore errors caused by some other test invocation having already set
+        // the global default subscriber.
+    })
 }
 
 /// Get the counter value for a `key`.
