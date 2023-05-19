@@ -258,7 +258,7 @@ impl MountRecord {
         let (client_end, server_end) = zx::Channel::create();
         directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
 
-        let fs = RemoteFs::new_fs(&container.kernel, client_end, rights)?;
+        let fs = RemoteFs::new_fs(&container.kernel, client_end, path, rights)?;
         current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
         self.mounts.push(current_node);
 

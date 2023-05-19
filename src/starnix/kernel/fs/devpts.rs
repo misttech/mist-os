@@ -70,7 +70,12 @@ fn init_devpts(kernel: &Kernel) -> FileSystemHandle {
         // Register tty/ptmx device major
         registry.register_chrdev_major(device, TTY_ALT_MAJOR).unwrap();
     }
-    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs);
+    let fs = FileSystem::new(
+        kernel,
+        CacheMode::Uncached,
+        DevPtsFs,
+        FileSystemLabel::without_source("devpts"),
+    );
     fs.set_root(DevPtsRootDir { state });
     assert!(fs.root().node.inode_num == ROOT_INODE);
     fs

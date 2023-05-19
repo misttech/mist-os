@@ -277,9 +277,9 @@ class ProcMountsTest : public ProcTestBase {
 
 TEST_F(ProcMountsTest, Basic) {
   EXPECT_THAT(read_mounts(), IsSupersetOf({
-                                 " / TODO TODO 0 0",
-                                 " /dev TODO TODO 0 0",
-                                 " /tmp TODO TODO 0 0",
+                                 "data/system / remote_bundle rw 0 0",
+                                 "tmpfs /dev tmpfs rw 0 0",
+                                 "tmpfs /tmp tmpfs rw 0 0",
                              }));
 }
 
@@ -291,7 +291,7 @@ TEST_F(ProcMountsTest, MountAdded) {
   ASSERT_THAT(mount(nullptr, mp.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
 
   auto expected_mounts = before_mounts;
-  std::string mount = " " + mp + " TODO TODO 0 0";
+  std::string mount = "tmpfs " + mp + " tmpfs rw 0 0";
   expected_mounts.push_back(mount);
   EXPECT_THAT(read_mounts(), UnorderedElementsAreArray(expected_mounts));
 

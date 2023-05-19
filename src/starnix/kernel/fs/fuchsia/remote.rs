@@ -38,13 +38,23 @@ impl RemoteFs {
     pub fn new_fs(
         kernel: &Kernel,
         root: zx::Channel,
+        source: &str,
         rights: fio::OpenFlags,
     ) -> Result<FileSystemHandle, Errno> {
         let remote_node = RemoteNode::new(root.into_handle(), rights)?;
         let attrs = remote_node.zxio.attr_get().map_err(|_| errno!(EIO))?;
         let mut root_node = FsNode::new_root(remote_node);
         root_node.inode_num = attrs.id;
-        let fs = FileSystem::new(kernel, CacheMode::Cached, RemoteFs);
+        let fs = FileSystem::new(
+            kernel,
+            CacheMode::Cached,
+            RemoteFs,
+            FileSystemLabel::new(
+                "remotefs",
+                source.as_bytes(),
+                rights.contains(fio::OpenFlags::RIGHT_WRITABLE),
+            ),
+        );
         fs.set_root_node(root_node);
         Ok(fs)
     }
@@ -735,7 +745,7 @@ mod test {
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
-        let fs = RemoteFs::new_fs(&kernel, client, rights)?;
+        let fs = RemoteFs::new_fs(&kernel, client, "/pkg", rights)?;
         let ns = Namespace::new(fs);
         let root = ns.root();
         let mut context = LookupContext::default();
@@ -866,7 +876,7 @@ mod test {
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
                 .expect("clone failed");
             let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(&kernel, client, rights).expect("new_fs failed");
+            let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
             let ns = Namespace::new(fs);
             let root = ns.root();
             root.symlink(&current_task, b"symlink", b"target").expect("symlink failed");

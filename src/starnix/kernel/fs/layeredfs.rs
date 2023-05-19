@@ -27,8 +27,9 @@ impl LayeredFs {
         base_fs: FileSystemHandle,
         mappings: BTreeMap<FsString, FileSystemHandle>,
     ) -> FileSystemHandle {
+        let label = base_fs.label.clone();
         let layered_fs = Arc::new(LayeredFs { base_fs, mappings });
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, layered_fs.clone());
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, layered_fs.clone(), label);
         fs.set_root_node(FsNode::new_root(layered_fs));
         fs
     }

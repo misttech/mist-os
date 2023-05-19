@@ -79,7 +79,7 @@ impl Namespace {
 pub struct Mount {
     root: DirEntryHandle,
     flags: MountFlags,
-    _fs: FileSystemHandle,
+    fs: FileSystemHandle,
 
     /// A unique identifier for this mount reported in /proc/pid/mountinfo.
     id: u64,
@@ -174,7 +174,7 @@ impl Mount {
             root,
             origin_mount,
             flags,
-            _fs: fs,
+            fs,
             state: Default::default(),
         })
     }
@@ -529,12 +529,10 @@ impl DynamicFileSource for ProcMountsFileSource {
             if !mountpoint.is_descendant_of(&root) {
                 return Ok(());
             }
-            let origin =
-                NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
-            let fs_spec = String::from_utf8_lossy(&origin.path(&task)).into_owned();
+            let fs_spec = String::from_utf8_lossy(mount.fs.label.source_string());
             let fs_file = String::from_utf8_lossy(&mountpoint.path(&task)).into_owned();
-            let fs_vfstype = "TODO";
-            let fs_mntopts = "TODO";
+            let fs_vfstype = mount.fs.label.name();
+            let fs_mntopts = mount.flags.to_string();
             writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
             Ok(())
         })?;
@@ -614,12 +612,13 @@ impl DynamicFileSource for ProcMountinfoFile {
                 NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
             write!(
                 sink,
-                "{} {} {} {} {}",
+                "{} {} {} {} {} {}",
                 mount.id,
                 parent.id,
                 mount.root.node.fs().dev_id,
                 String::from_utf8_lossy(&origin.path(&task)),
-                String::from_utf8_lossy(&mountpoint.path(&task))
+                String::from_utf8_lossy(&mountpoint.path(&task)),
+                mount.flags.to_string(),
             )?;
             if let Some(peer_group) = mount.read().peer_group() {
                 write!(sink, " shared:{}", peer_group.id)?;
@@ -627,7 +626,13 @@ impl DynamicFileSource for ProcMountinfoFile {
             if let Some(upstream) = mount.read().upstream() {
                 write!(sink, " master:{}", upstream.id)?;
             }
-            writeln!(sink)?;
+            writeln!(
+                sink,
+                " - {} {} {}",
+                mount.fs.label.name(),
+                String::from_utf8_lossy(mount.fs.label.source_string()),
+                mount.fs.label.opts_string()
+            )?;
             Ok(())
         })?;
         Ok(())

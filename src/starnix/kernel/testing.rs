@@ -27,7 +27,7 @@ fn create_pkgfs(kernel: &Kernel) -> FileSystemHandle {
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let (server, client) = zx::Channel::create();
     fdio::open("/pkg", rights, server).expect("failed to open /pkg");
-    RemoteFs::new_fs(kernel, client, rights).unwrap()
+    RemoteFs::new_fs(kernel, client, "/pkg", rights).unwrap()
 }
 
 /// Creates a `Kernel` and `Task` with the package file system for testing purposes.

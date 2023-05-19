@@ -53,5 +53,12 @@ impl FileSystemOps for AnonFs {
     }
 }
 pub fn anon_fs(kernel: &Kernel) -> &FileSystemHandle {
-    kernel.anon_fs.get_or_init(|| FileSystem::new(kernel, CacheMode::Uncached, AnonFs))
+    kernel.anon_fs.get_or_init(|| {
+        FileSystem::new(
+            kernel,
+            CacheMode::Uncached,
+            AnonFs,
+            FileSystemLabel::without_source("anon"),
+        )
+    })
 }

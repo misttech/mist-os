@@ -332,22 +332,8 @@
                 "MountTest.TmpfsEmptySizeAllocCheck",
                 "MountTest.TmpfsSizePartialWriteSinglePage",
                 "MountTest.TmpfsSizePartialWriteMultiplePages",
-                "MountTest.MaxMounts",
-                "MountTest.MakeShared",
-                "MountTest.MakeMultipleShared",
                 "MountTest.ReuseGroupIDs",
-                "MountTest.InerheritPropagation",
-                "MountTest.MakePrivate",
-                "MountTest.ArgumentsAreIgnored",
-                "MountTest.SetMountPropagationOfStackedMounts",
-                "MountTest.MakePeer",
-                "MountTest.PropagateMountEvent",
                 "MountTest.PropagateUmountEvent",
-                "MountTest.UmountIgnoresPeersWithChildren",
-                "MountTest.BindSharedOnShared",
-                "MountTest.BindSharedOnPrivate",
-                "MountTest.BindPeerGroupsWithChildren",
-                "MountTest.BindParentToChild",
                 "MountTest.MountInfoHasRoot",
 
                 // msgqueue_test
@@ -511,9 +497,7 @@
                 "ProcSysVmOvercommitMemory.HasNumericValue",
                 "ProcFilesystems.Bug65172365",
                 "ProcSelfMountinfo.RequiredFieldsArePresent",
-                "ProcSelfMountinfo.ContainsProcfsEntry",
                 "ProcSelfMounts.RequiredFieldsArePresent",
-                "ProcSelfMounts.ContainsProcfsEntry",
                 "Proc.GetdentsEnoent",
                 "Proc.PidTidIOAccounting",
                 "ProcPidMem.DifferentUserAttached",
@@ -1047,6 +1031,9 @@
                 "Inotify.ReadWithTooSmallBufferFails",
                 "Inotify.BlockingReadOnInotifyFd",
                 "Inotify.EpollNoDeadlock",
+
+                // Breaks tests that run after it.
+                "MountTest.MaxMounts",
 
                 // Passes in debian image, remove.
                 "ExecveTest.SymlinkLoop",

@@ -25,3 +25,35 @@ bitflags! {
         const STORED_FLAGS = Self::RDONLY.bits | Self::NOEXEC.bits | Self::NOSUID.bits | Self::NODEV.bits | Self::NOATIME.bits | Self::LAZYTIME.bits;
     }
 }
+
+impl ToString for MountFlags {
+    fn to_string(&self) -> String {
+        let mut result = String::with_capacity(32);
+        result += if self.contains(Self::RDONLY) { "ro" } else { "rw" };
+        if self.contains(Self::NOEXEC) {
+            result += ",noexec"
+        }
+        if self.contains(Self::NOSUID) {
+            result += ",nosuid"
+        }
+        if self.contains(Self::NODEV) {
+            result += ",nodev"
+        }
+        if self.contains(Self::NOATIME) {
+            result += ",noatime"
+        }
+        if self.contains(Self::NOEXEC) {
+            result += ",noexec"
+        }
+        if self.contains(Self::SILENT) {
+            result += ",silent"
+        }
+        if self.contains(Self::BIND) {
+            result += ",bind"
+        }
+        if self.contains(Self::LAZYTIME) {
+            result += ",lazytime"
+        }
+        result
+    }
+}

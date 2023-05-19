@@ -174,7 +174,7 @@ pub fn create_remotefs_filesystem(
 ) -> Result<FileSystemHandle, Error> {
     let root = syncio::directory_open_directory_async(root, fs_src, rights)
         .map_err(|e| anyhow!("Failed to open root: {}", e))?;
-    RemoteFs::new_fs(kernel, root.into_channel(), rights).map_err(|e| e.into())
+    RemoteFs::new_fs(kernel, root.into_channel(), fs_src, rights).map_err(|e| e.into())
 }
 
 pub fn create_filesystem_from_spec<'a>(

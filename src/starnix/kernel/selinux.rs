@@ -28,7 +28,12 @@ impl FileSystemOps for SeLinuxFs {
 
 impl SeLinuxFs {
     fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs);
+        let fs = FileSystem::new(
+            kernel,
+            CacheMode::Permanent,
+            SeLinuxFs,
+            FileSystemLabel::without_source("selinux"),
+        );
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
         dir.entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644));

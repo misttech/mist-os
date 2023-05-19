@@ -25,6 +25,10 @@ pub struct FileSystem {
     next_inode: AtomicU64,
     ops: Box<dyn FileSystemOps>,
 
+    /// Label contains info that can be used to distinguish this file system from others,
+    /// particularly in `/proc/mounts`.
+    pub label: FileSystemLabel,
+
     /// The device ID of this filesystem. Returned in the st_dev field when stating an inode in
     /// this filesystem.
     pub dev_id: DeviceType,
@@ -85,11 +89,13 @@ impl FileSystem {
         kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
+        label: FileSystemLabel,
     ) -> FileSystemHandle {
         Arc::new(FileSystem {
             root: OnceCell::new(),
             next_inode: AtomicU64::new(1),
             ops: Box::new(ops),
+            label,
             dev_id: kernel.device_registry.write().next_anonymous_dev_id(),
             rename_mutex: Mutex::new(()),
             nodes: Mutex::new(HashMap::new()),
@@ -358,3 +364,37 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
 }
 
 pub type FileSystemHandle = Arc<FileSystem>;
+
+#[derive(Clone)]
+pub struct FileSystemLabel {
+    name: &'static str,
+    source: Option<FsString>,
+    writable: bool,
+}
+
+impl FileSystemLabel {
+    pub fn new(name: &'static str, source: &FsStr, writable: bool) -> Self {
+        Self { name, source: Some(source.to_vec()), writable }
+    }
+
+    pub fn without_source(name: &'static str) -> Self {
+        Self { name, source: None, writable: true }
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub fn source_string(&self) -> &FsStr {
+        match &self.source {
+            Some(s) => s,
+
+            // Use file system name for file systems without source.
+            None => self.name.as_bytes(),
+        }
+    }
+
+    pub fn opts_string(&self) -> String {
+        (if self.writable { "rw" } else { "ro" }).to_string()
+    }
+}

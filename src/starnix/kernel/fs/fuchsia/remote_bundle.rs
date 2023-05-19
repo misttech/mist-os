@@ -64,8 +64,16 @@ impl RemoteBundle {
         );
         let mut root_node = FsNode::new_root(DirectoryObject);
         root_node.inode_num = ext4_metadata::ROOT_INODE_NUM;
-        let fs =
-            FileSystem::new(kernel, CacheMode::Cached, RemoteBundle { metadata, root, rights });
+        let fs = FileSystem::new(
+            kernel,
+            CacheMode::Cached,
+            RemoteBundle { metadata, root, rights },
+            FileSystemLabel::new(
+                "remote_bundle",
+                path.as_bytes(),
+                rights.contains(fio::OpenFlags::RIGHT_WRITABLE),
+            ),
+        );
         fs.set_root_node(root_node);
         Ok(fs)
     }

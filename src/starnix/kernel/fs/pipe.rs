@@ -248,7 +248,14 @@ impl FileSystemOps for PipeFs {
     }
 }
 fn pipe_fs(kernel: &Kernel) -> &FileSystemHandle {
-    kernel.pipe_fs.get_or_init(|| FileSystem::new(kernel, CacheMode::Uncached, PipeFs))
+    kernel.pipe_fs.get_or_init(|| {
+        FileSystem::new(
+            kernel,
+            CacheMode::Uncached,
+            PipeFs,
+            FileSystemLabel::without_source("pipe"),
+        )
+    })
 }
 
 pub struct PipeFileObject {
