@@ -85,9 +85,7 @@ impl DriverConnector {
                 .iter()
                 .filter_map(|segment| {
                     if let capability::RouteSegment::ExposeBy { moniker, .. } = segment {
-                        // Remove the leading `/` so it can be converted into a selector
-                        // later on.
-                        Some(moniker.to_string().split_off(1))
+                        Some(moniker.to_string())
                     } else {
                         None
                     }
