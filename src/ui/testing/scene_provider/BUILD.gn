@@ -32,7 +32,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.test:fuchsia.ui.observation.test_hlcpp",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
@@ -65,7 +64,6 @@ fuchsia_structured_config_values("scene_provider_default_config") {
   cm_label = ":scene_provider_manifest"
   values = {
     use_flatland = false
-    use_scene_manager = false
   }
 }
 

@@ -25,7 +25,6 @@
                 "fuchsia.session.scene.Manager",
                 "fuchsia.ui.app.ViewProvider",
                 "fuchsia.ui.observation.test.Registry",
-                "fuchsia.ui.policy.Presenter",
             ],
         },
     ],
@@ -40,6 +39,5 @@
     ],
     config: {
         use_flatland: { type: "bool" },
-        use_scene_manager: { type: "bool" },
     },
 }

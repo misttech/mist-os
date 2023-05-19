@@ -8,7 +8,6 @@
 #include <fuchsia/element/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/ui/observation/test/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
@@ -76,12 +75,10 @@ class SceneProvider : public fuchsia::ui::test::scene::Controller,
   fidl::BindingSet<fuchsia::ui::test::scene::Controller> scene_controller_bindings_;
   fidl::BindingSet<fuchsia::element::GraphicalPresenter> graphical_presenter_bindings_;
   fuchsia::session::scene::ManagerSyncPtr scene_manager_;
-  fuchsia::ui::policy::PresenterSyncPtr root_presenter_;
   std::optional<FakeViewController> fake_view_controller_;
   fuchsia::element::AnnotationControllerPtr annotation_controller_;
   sys::ComponentContext* context_ = nullptr;
   bool use_flatland_ = false;
-  bool use_scene_manager_ = false;
 };
 
 }  // namespace ui_testing
