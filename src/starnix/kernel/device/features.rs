@@ -56,6 +56,8 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                     SpecialNode,
                 )?;
             }
+            "test_data" => {}
+            "custom_artifacts" => {}
             feature => {
                 log_warn!("Unsupported feature: {:?}", feature);
             }
@@ -87,8 +89,10 @@ pub fn run_component_features(
             "logd" => {}
             "selinux_enabled" => {}
             "magma" => {}
+            "test_data" => {}
+            "custom_artifacts" => {}
             feature => {
-                log_warn!("Unsupported feature: {:?}", feature);
+                log_warn!("Unsupported component feature: {:?}", feature);
             }
         }
     }

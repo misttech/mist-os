@@ -507,8 +507,13 @@ pub(crate) use fileops_impl_seekable_write;
 pub(crate) use fileops_impl_seekless;
 
 pub fn default_ioctl(request: u32) -> Result<SyscallResult, Errno> {
-    not_implemented!("ioctl: request=0x{:x}", request);
-    error!(ENOTTY)
+    match request {
+        TCGETS => error!(ENOTTY),
+        _ => {
+            not_implemented!("ioctl: request=0x{:x}", request);
+            error!(ENOTTY)
+        }
+    }
 }
 
 pub fn default_fcntl(cmd: u32) -> Result<SyscallResult, Errno> {

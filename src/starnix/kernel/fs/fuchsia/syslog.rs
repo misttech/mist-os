@@ -48,9 +48,6 @@ impl FileOps for SyslogFile {
         request: u32,
         _user_addr: UserAddress,
     ) -> Result<SyscallResult, Errno> {
-        match request {
-            TCGETS => error!(ENOTTY),
-            _ => default_ioctl(request),
-        }
+        default_ioctl(request)
     }
 }

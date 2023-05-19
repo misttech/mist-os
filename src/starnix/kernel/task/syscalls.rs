@@ -14,7 +14,7 @@ use crate::auth::{Credentials, SecureBits};
 use crate::execution::*;
 use crate::fs::*;
 use crate::lock::RwLock;
-use crate::logging::{log_error, log_info, log_trace};
+use crate::logging::{log_error, log_trace};
 use crate::mm::*;
 use crate::syscalls::*;
 use crate::task::*;
@@ -441,7 +441,6 @@ pub fn sys_setresgid(
 }
 
 pub fn sys_exit(current_task: &CurrentTask, code: i32) -> Result<(), Errno> {
-    log_info!(tag = "exit", "exit({})", code);
     // Only change the current exit status if this has not been already set by exit_group, as
     // otherwise it has priority.
     current_task.write().exit_status.get_or_insert(ExitStatus::Exit(code as u8));
@@ -449,7 +448,6 @@ pub fn sys_exit(current_task: &CurrentTask, code: i32) -> Result<(), Errno> {
 }
 
 pub fn sys_exit_group(current_task: &CurrentTask, code: i32) -> Result<(), Errno> {
-    log_info!(tag = "exit", "exit_group({})", code);
     current_task.thread_group.exit(ExitStatus::Exit(code as u8));
     Ok(())
 }

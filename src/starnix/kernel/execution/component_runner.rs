@@ -41,13 +41,7 @@ pub async fn start_component(
     container: Arc<Container>,
 ) -> Result<(), Error> {
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
-    log_info!(
-        "start_component: {}\narguments: {:?}\nmanifest: {:?}\nns: {:?}",
-        url,
-        start_info.numbered_handles,
-        start_info.program,
-        start_info.ns,
-    );
+    log_info!("start_component: {}", url);
 
     // TODO(fxbug.dev/125782): We leak the directory created by this function.
     let component_path = generate_component_path(&container)?;
@@ -103,7 +97,6 @@ pub async fn start_component(
     let environ = resolve_program_strvec("environ")?;
     let component_features =
         get_program_strvec(&start_info, "features").cloned().unwrap_or_default();
-    log_info!("start_component environment: {:?}", environ);
 
     let binary_path = get_program_string(&start_info, "binary")
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
