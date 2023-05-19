@@ -186,7 +186,7 @@ template("bazel_product_bundle") {
       # that need to be substituted with "product_bundle" to work correctly
       # with the Ninja directory, so copy it for later processing.
       {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/pave.sh"
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_pave.sh"
         ninja = files.original_paving_script
       },
     ]

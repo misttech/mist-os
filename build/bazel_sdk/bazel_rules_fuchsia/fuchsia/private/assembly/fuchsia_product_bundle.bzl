@@ -29,7 +29,7 @@ def _scrutiny_validation(
     ]
     if is_recovery:
         ffx_invocation.append("--recovery")
-    label_name = ctx.label.name + "_recovery" if is_recovery else ""
+    label_name = ctx.label.name + ("_recovery" if is_recovery else "")
     deps.append(_verify_bootfs_filelist(
         ctx,
         label_name,
@@ -506,7 +506,7 @@ def _fuchsia_product_bundle_impl(ctx):
 
     # TODO(fxb/121752): Remove the generation of pave.sh after infra is
     # ready to use product bundle to flash device.
-    pave_script = ctx.actions.declare_file("pave.sh")
+    pave_script = ctx.actions.declare_file(ctx.label.name + "_pave.sh")
     ctx.actions.run(
         outputs = [pave_script],
         inputs = [pb_out_dir],
