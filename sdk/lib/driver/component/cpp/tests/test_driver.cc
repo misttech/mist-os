@@ -9,6 +9,42 @@ zx::result<> TestDriver::Start() {
   return zx::ok();
 }
 
+zx::result<> TestDriver::ExportDevfsNodeSync() {
+  fidl::Arena arena;
+  zx::result connector = devfs_connector_.Bind(dispatcher());
+  if (connector.is_error()) {
+    return connector.take_error();
+  }
+
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                   .connector(std::move(connector.value()))
+                   .Build();
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, "devfs_node")
+                  .devfs_args(devfs)
+                  .Build();
+
+  // Create endpoints of the `NodeController` for the node.
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+
+  fidl::WireResult result = node_client_.sync()->AddChild(
+      args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+
+  if (!result.ok()) {
+    FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
+    return zx::error(result.status());
+  }
+
+  devfs_node_controller_.Bind(std::move(controller_endpoints->client));
+  devfs_node_.Bind(std::move(node_endpoints->client));
+  return zx::ok();
+}
+
 zx::result<> TestDriver::ServeDriverService() {
   zx::result result =
       context().outgoing()->AddService<fuchsia_driver_component_test::DriverService>(

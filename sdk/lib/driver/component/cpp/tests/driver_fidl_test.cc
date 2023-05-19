@@ -163,6 +163,28 @@ TEST_F(TestIncomingAndOutgoingFidls, ValidateDriverIncomingServices) {
                    }).status_value());
 }
 
+TEST_F(TestIncomingAndOutgoingFidls, ConnectWithDevfs) {
+  // TODO(fxb/123068): Access directly from test thread.
+  ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher(), [this]() {
+                     zx::result result = driver()->ExportDevfsNodeSync();
+                     ASSERT_EQ(ZX_OK, result.status_value());
+                   }).status_value());
+
+  zx::result device_result = node_server().SyncCall([](fdf_testing::TestNode* root_node) {
+    return root_node->children().at("devfs_node").ConnectToDevice();
+  });
+
+  ASSERT_EQ(ZX_OK, device_result.status_value());
+  fidl::ClientEnd<fuchsia_driver_component_test::ZirconProtocol> device_client_end(
+      std::move(device_result.value()));
+  fidl::WireSyncClient<fuchsia_driver_component_test::ZirconProtocol> zircon_proto_client(
+      std::move(device_client_end));
+
+  fidl::WireResult result = zircon_proto_client->ZirconMethod();
+  ASSERT_EQ(ZX_OK, result.status());
+  ASSERT_EQ(true, result.value().is_ok());
+}
+
 TEST_F(TestIncomingAndOutgoingFidls, ConnectWithZirconService) {
   // TODO(fxb/123068): Access directly from test thread.
   ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher(), [this]() {

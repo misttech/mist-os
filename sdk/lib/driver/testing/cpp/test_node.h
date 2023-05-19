@@ -44,6 +44,9 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   // Creates the start args for a driver, and serve the fdf::Node in it.
   zx::result<CreateStartArgsResult> CreateStartArgsAndServe();
 
+  // Connects to the devfs device this node is serving.
+  zx::result<zx::channel> ConnectToDevice();
+
   bool HasNode() {
     std::lock_guard guard(checker_);
     return node_binding_.has_value();
@@ -74,6 +77,11 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
 
   void RemoveChild(const std::string& name);
 
+  void set_devfs_connector_client(fidl::ClientEnd<fuchsia_device_fs::Connector> client) {
+    std::lock_guard guard(checker_);
+    devfs_connector_client_.Bind(std::move(client), dispatcher_);
+  }
+
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_binding_
       __TA_GUARDED(checker_);
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_binding_
@@ -85,6 +93,7 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   std::string name_ __TA_GUARDED(checker_);
   std::optional<std::reference_wrapper<TestNode>> parent_ __TA_GUARDED(checker_);
   ChildrenMap children_ __TA_GUARDED(checker_);
+  fidl::WireClient<fuchsia_device_fs::Connector> devfs_connector_client_ __TA_GUARDED(checker_);
   async::synchronization_checker checker_;
 };
 

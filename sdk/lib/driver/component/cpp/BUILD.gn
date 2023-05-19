@@ -82,6 +82,7 @@ executable("cpp_test") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fidl/cpp",

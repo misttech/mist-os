@@ -93,6 +93,26 @@ zx::result<TestNode::CreateStartArgsResult> TestNode::CreateStartArgsAndServe() 
   });
 }
 
+zx::result<zx::channel> TestNode::ConnectToDevice() {
+  zx::channel client_end, server_end;
+  zx_status_t status = zx::channel::create(0, &client_end, &server_end);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  std::lock_guard guard(checker_);
+  if (!devfs_connector_client_.is_valid()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  fidl::OneWayStatus one_way_status = devfs_connector_client_->Connect(std::move(server_end));
+  if (!one_way_status.ok()) {
+    return zx::error(one_way_status.status());
+  }
+
+  return zx::ok(std::move(client_end));
+}
+
 void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
   std::lock_guard guard(checker_);
   std::string name{request->args.name().get()};
@@ -109,6 +129,11 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
   if (request->node) {
     zx::result result = node.Serve(std::move(request->node));
     ZX_ASSERT_MSG(result.is_ok(), "|Serve| failed with %s", result.status_string());
+  }
+
+  if (request->args.has_devfs_args()) {
+    fuchsia_driver_framework::wire::DevfsAddArgs& devfs_args = request->args.devfs_args();
+    node.set_devfs_connector_client(std::move(devfs_args.connector()));
   }
 
   completer.ReplySuccess();
