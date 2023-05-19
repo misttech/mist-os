@@ -221,10 +221,23 @@ using byte_span_size =
 // `std::contiguous_iterator_tag` concept. Since that's not present in C++17,
 // hook into the libc++ marker template type instead.
 
-namespace std {
+_LIBCPP_BEGIN_NAMESPACE_STD
+
+// Different libc++ versions use one of these class names to determine if an
+// iterator is contiguous. We define both so that this works regardless of the
+// libc++ version. We have to forward declare these types for the case that
+// the other is not already defined.
 template <class It>
-struct __is_cpp17_contiguous_iterator<cpp20::internal::span_iterator<It>> : true_type {};
-}  // namespace std
+struct __is_cpp17_contiguous_iterator;
+template <typename T>
+struct __is_cpp17_contiguous_iterator<cpp20::internal::span_iterator<T>> : true_type {};
+template <class It>
+struct __libcpp_is_contiguous_iterator;
+template <typename T>
+struct __libcpp_is_contiguous_iterator<cpp20::internal::span_iterator<T>> : true_type {};
+
+_LIBCPP_END_NAMESPACE_STD
+
 #endif
 #endif
 
