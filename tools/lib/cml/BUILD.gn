@@ -14,6 +14,7 @@ rustc_library("cml") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/directed_graph",
     "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_types",
@@ -34,14 +35,17 @@ rustc_library("cml") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:difference",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:test-case",
   ]
 
   sources = [
     "src/error.rs",
+    "src/features.rs",
     "src/lib.rs",
     "src/one_or_many.rs",
     "src/translate.rs",
+    "src/validate.rs",
   ]
 }
 
