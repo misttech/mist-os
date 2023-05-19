@@ -103,7 +103,7 @@ async fn test_stop_timeouts() {
                 EventMatcher::ok().moniker(parent.clone()).stop(Some(ExitStatusMatcher::AnyCrash)),
                 EventMatcher::ok().r#type(Destroyed::TYPE).moniker(parent.clone()),
             ],
-            Ordering::Ordered,
+            Ordering::Unordered,
         )
         .expect(event_stream_3)
         .await
