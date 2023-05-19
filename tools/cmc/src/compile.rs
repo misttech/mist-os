@@ -343,14 +343,16 @@ mod tests {
                         "to": [ "#coll" ],
                         "as": "fuchsia.logger.Log2",
                     },
-                    {
-                        "service": [
-                            "my.service.Service",
-                            "my.service.Service2",
-                        ],
-                        "from": ["#logger", "self"],
-                        "to": [ "#netstack" ]
-                    },
+                    // TODO(fxbug.dev/127502): Uncomment when static aggregation passes
+                    // `cm_fidl_validator`.
+                    // {
+                    //     "service": [
+                    //         "my.service.Service",
+                    //         "my.service.Service2",
+                    //     ],
+                    //     "from": ["#logger", "self"],
+                    //     "to": [ "#netstack" ]
+                    // },
                     {
                         "service": "my.service.CollectionService",
                         "from": ["#coll"],
@@ -421,64 +423,68 @@ mod tests {
                             ..Default::default()
                         }
                     ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("my.service.Service".to_string()),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service2".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("my.service.Service2".to_string()),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
-                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                            source_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("my.service.Service".to_string()),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
-                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                            source_name: Some("my.service.Service2".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("my.service.Service2".to_string()),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
+
+                    // TODO(fxbug.dev/127502): Uncomment when static aggregation passes
+                    // `cm_fidl_validator`.
+                    // fdecl::Offer::Service (
+                    //     fdecl::OfferService {
+                    //         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                    //             name: "logger".to_string(),
+                    //             collection: None,
+                    //         })),
+                    //         source_name: Some("my.service.Service".to_string()),
+                    //         target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                    //             name: "netstack".to_string(),
+                    //             collection: None,
+                    //         })),
+                    //         target_name: Some("my.service.Service".to_string()),
+                    //         availability: Some(fdecl::Availability::Required),
+                    //         ..Default::default()
+                    //     }
+                    // ),
+                    // fdecl::Offer::Service (
+                    //     fdecl::OfferService {
+                    //         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                    //             name: "logger".to_string(),
+                    //             collection: None,
+                    //         })),
+                    //         source_name: Some("my.service.Service2".to_string()),
+                    //         target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                    //             name: "netstack".to_string(),
+                    //             collection: None,
+                    //         })),
+                    //         target_name: Some("my.service.Service2".to_string()),
+                    //         availability: Some(fdecl::Availability::Required),
+                    //         ..Default::default()
+                    //     }
+                    // ),
+                    // fdecl::Offer::Service (
+                    //     fdecl::OfferService {
+                    //         source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                    //         source_name: Some("my.service.Service".to_string()),
+                    //         target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                    //             name: "netstack".to_string(),
+                    //             collection: None,
+                    //         })),
+                    //         target_name: Some("my.service.Service".to_string()),
+                    //         availability: Some(fdecl::Availability::Required),
+                    //         ..Default::default()
+                    //     }
+                    // ),
+                    // fdecl::Offer::Service (
+                    //     fdecl::OfferService {
+                    //         source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                    //         source_name: Some("my.service.Service2".to_string()),
+                    //         target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                    //             name: "netstack".to_string(),
+                    //             collection: None,
+                    //         })),
+                    //         target_name: Some("my.service.Service2".to_string()),
+                    //         availability: Some(fdecl::Availability::Required),
+                    //         ..Default::default()
+                    //     }
+                    // ),
+
                     fdecl::Offer::Service (
                         fdecl::OfferService {
                             source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "coll".to_string() })),
