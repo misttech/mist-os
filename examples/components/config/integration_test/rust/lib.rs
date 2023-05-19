@@ -41,7 +41,7 @@ async fn inspect_rust() {
 
     assert_eq!(inspector.children.len(), 1, "selector must return exactly one child");
 
-    // Ensure the published values match the static package definition.
+    // Verify that the published values match the static package definition in ../../rust/BUILD.gn.
     assert_data_tree!(inspector, root: {
         config: {
             greeting: "World",
@@ -100,10 +100,57 @@ async fn inspect_rust_replace_some_values() {
 }
 
 #[fuchsia::test]
-async fn inspect_rust_replace_all_values() {
+async fn inspect_rust_replace_all_packaged_values() {
     let builder = RealmBuilder::new().await.unwrap();
     let config_component = builder
-        .add_child("config_example_replace_all", CHILD_URL, ChildOptions::new().eager())
+        .add_child("config_example_replace_all_packaged", CHILD_URL, ChildOptions::new().eager())
+        .await
+        .unwrap();
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .from(Ref::parent())
+                .to(&config_component),
+        )
+        .await
+        .unwrap();
+
+    builder.init_mutable_config_from_package(&config_component).await.unwrap();
+
+    builder.set_config_value_string(&config_component, "greeting", "Fuchsia").await.unwrap();
+    builder.set_config_value_uint64(&config_component, "delay_ms", 200).await.unwrap();
+
+    let _instance = builder.build().await.unwrap();
+
+    let inspector = ArchiveReader::new()
+        .add_selector("*/config_example_replace_all_packaged:root")
+        .with_minimum_schema_count(1)
+        .snapshot::<Inspect>()
+        .await
+        .unwrap()
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .unwrap();
+
+    assert_eq!(inspector.children.len(), 1, "selector must return exactly one child");
+
+    assert_data_tree!(inspector, root: {
+        config: {
+            greeting: "Fuchsia",
+            delay_ms: 200u64,
+        }
+    })
+}
+
+// Same test as above except the config is initialized to empty.
+#[fuchsia::test]
+async fn inspect_rust_set_all_values_when_empty() {
+    let builder = RealmBuilder::new().await.unwrap();
+    let config_component = builder
+        .add_child("config_example_set_all", CHILD_URL, ChildOptions::new().eager())
         .await
         .unwrap();
 
@@ -127,7 +174,7 @@ async fn inspect_rust_replace_all_values() {
     let _instance = builder.build().await.unwrap();
 
     let inspector = ArchiveReader::new()
-        .add_selector("*/config_example_replace_all:root")
+        .add_selector("*/config_example_set_all:root")
         .with_minimum_schema_count(1)
         .snapshot::<Inspect>()
         .await

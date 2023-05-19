@@ -62,6 +62,7 @@ TEST_F(IntegrationTest, ConfigCpp) {
 
   auto data = GetInspect(child_name);
 
+  // Verify that the published values match the static package definition in ../../cpp/BUILD.gn.
   EXPECT_EQ(rapidjson::Value("World"), data.GetByPath({"root", "config", "greeting"}));
   EXPECT_EQ(rapidjson::Value(100), data.GetByPath({"root", "config", "delay_ms"}));
 }
@@ -93,11 +94,37 @@ TEST_F(IntegrationTest, ConfigCppReplaceSome) {
   EXPECT_EQ(rapidjson::Value(100), data.GetByPath({"root", "config", "delay_ms"}));
 }
 
-TEST_F(IntegrationTest, ConfigCppReplaceAll) {
+TEST_F(IntegrationTest, ConfigCppReplaceAllPackaged) {
   auto realm_builder = component_testing::RealmBuilder::Create();
   auto options =
       component_testing::ChildOptions{.startup_mode = component_testing::StartupMode::EAGER};
-  auto child_name = "config_example_replace_all";
+  auto child_name = "config_example_replace_all_packaged";
+  realm_builder.AddChild(child_name, kChildUrl, options);
+
+  realm_builder.InitMutableConfigFromPackage(child_name);
+
+  realm_builder.SetConfigValue(child_name, "greeting", "Fuchsia");
+  realm_builder.SetConfigValue(child_name, "delay_ms",
+                               component_testing::ConfigValue::Uint64(200u));
+
+  realm_builder.AddRoute(component_testing::Route{
+      .capabilities = {component_testing::Protocol{"fuchsia.logger.LogSink"}},
+      .source = component_testing::ParentRef(),
+      .targets = {component_testing::ChildRef{child_name}}});
+  auto realm = realm_builder.Build();
+
+  auto data = GetInspect(child_name);
+
+  EXPECT_EQ(rapidjson::Value("Fuchsia"), data.GetByPath({"root", "config", "greeting"}));
+  EXPECT_EQ(rapidjson::Value(200), data.GetByPath({"root", "config", "delay_ms"}));
+}
+
+// Same test as above except the config is initialized to empty.
+TEST_F(IntegrationTest, ConfigCppSetAllWhenEmpty) {
+  auto realm_builder = component_testing::RealmBuilder::Create();
+  auto options =
+      component_testing::ChildOptions{.startup_mode = component_testing::StartupMode::EAGER};
+  auto child_name = "config_example_set_all";
   realm_builder.AddChild(child_name, kChildUrl, options);
 
   // [START config_empty]
