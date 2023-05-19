@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{cml, error::Error},
+    crate::{
+        cml,
+        error::{Error, Location},
+    },
     cm_rust::ComponentDecl,
     fidl::unpersist,
     fidl_fuchsia_component_decl::Component,
@@ -84,7 +87,11 @@ pub fn read_cml(file: &Path) -> Result<cml::Document, Error> {
             Error::parse(format!("Couldn't read include {:?}: {}", file, e), None, Some(file))
         })?;
 
-    cml::parse(&buffer, file)
+    serde_json5::from_str(&buffer).map_err(|e| {
+        let serde_json5::Error::Message { location, msg } = e;
+        let location = location.map(|l| Location { line: l.line, column: l.column });
+        Error::parse(msg, location, Some(file))
+    })
 }
 
 /// Read .cm file and parse into a cm_rust::ComponentDecl.

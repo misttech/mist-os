@@ -216,6 +216,7 @@ mod tests {
         super::*,
         crate::compile::compile,
         crate::features::FeatureSet,
+        crate::validate,
         assert_matches::assert_matches,
         serde_json::json,
         std::{fmt::Display, fs::File, io::Write},
@@ -245,7 +246,7 @@ mod tests {
             None,
             &FeatureSet::empty(),
             &None,
-            cml::validate::ProtocolRequirements { must_offer: &[], must_use: &[] },
+            validate::ProtocolRequirements { must_offer: &[], must_use: &[] },
         )
         .unwrap();
         return path;

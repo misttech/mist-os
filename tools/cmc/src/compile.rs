@@ -23,7 +23,7 @@ pub fn compile(
     config_package_path: Option<&str>,
     features: &FeatureSet,
     experimental_force_runner: &Option<String>,
-    required_protocols: cml::validate::ProtocolRequirements<'_>,
+    required_protocols: validate::ProtocolRequirements<'_>,
 ) -> Result<(), Error> {
     match file.extension().and_then(|e| e.to_str()) {
         Some("cml") => Ok(()),
@@ -57,7 +57,7 @@ pub fn compile(
         }
     }
 
-    cml::validate::validate_cml(&document, &file, &features, &required_protocols)?;
+    validate::validate_cml(&document, &file, &features, &required_protocols)?;
 
     util::ensure_directory_exists(&output)?;
     let mut out_file =
@@ -138,7 +138,7 @@ mod tests {
             Some("test.cvf"),
             features,
             experimental_force_runner,
-            cml::validate::ProtocolRequirements { must_offer, must_use },
+            validate::ProtocolRequirements { must_offer, must_use },
         )?;
         let mut buffer = Vec::new();
         fs::File::open(&out_path).unwrap().read_to_end(&mut buffer).unwrap();
@@ -1110,7 +1110,7 @@ mod tests {
                 None,
                 &FeatureSet::empty(),
                 &None,
-                cml::validate::ProtocolRequirements { must_offer: &[], must_use: &[] },
+                validate::ProtocolRequirements { must_offer: &[], must_use: &[] },
             );
             assert_matches!(
                 result,

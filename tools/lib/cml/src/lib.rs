@@ -5,9 +5,7 @@
 //! A library of common utilities used by `cmc` and related tools.
 
 pub mod error;
-pub mod features;
 pub mod one_or_many;
-pub mod validate;
 
 #[allow(unused)] // A test-only macro is defined outside of a test builds.
 pub mod translate;
@@ -39,21 +37,11 @@ pub use cm_types::{
     AllowedOffers, Availability, DependencyType, Durability, Name, OnTerminate, ParseError, Path,
     RelativePath, StartupMode, StorageId, Url,
 };
-use error::Location;
 
 pub use crate::{one_or_many::OneOrMany, translate::compile};
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();
-}
-
-/// Parses a string `buffer` into a [Document]. `file` is used for error reporting.
-pub fn parse(buffer: &String, file: &std::path::Path) -> Result<Document, Error> {
-    serde_json5::from_str(&buffer).map_err(|e| {
-        let serde_json5::Error::Message { location, msg } = e;
-        let location = location.map(|l| Location { line: l.line, column: l.column });
-        Error::parse(msg, location, Some(file))
-    })
 }
 
 /// A name/identity of a capability exposed/offered to another component.
