@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/input/touch_source_with_local_hit.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/types.h>
 
 #include "src/lib/fsl/handles/object_info.h"
 
@@ -43,7 +44,10 @@ void TouchSourceWithLocalHit::Watch(std::vector<fuchsia::ui::pointer::TouchRespo
     std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> out_events;
     out_events.reserve(events.size());
     for (auto& event : events) {
-      FX_DCHECK(event.local_hit.has_value());
+      if (!event.local_hit.has_value()) {
+        FX_LOGS(WARNING) << "Local hit not set!";  // "impossible" but still happens
+        event.local_hit = {.local_viewref_koid = ZX_KOID_INVALID, .local_point = {0.f, 0.f}};
+      }
 
       out_events.emplace_back(fuchsia::ui::pointer::augment::TouchEventWithLocalHit{
           .touch_event = std::move(event.touch_event),
