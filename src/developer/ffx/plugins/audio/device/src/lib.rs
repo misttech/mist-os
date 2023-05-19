@@ -9,6 +9,7 @@ use {
     errors::ffx_bail,
     ffx_audio_device_args::{DeviceCommand, DeviceDirection, SubCommand},
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
+    fidl::HandleBased,
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
         AudioDaemonProxy, AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
@@ -38,7 +39,18 @@ impl FfxMain for DeviceTool {
                 device_info(self.audio_proxy, self.cmd).await.map_err(Into::into)
             }
             SubCommand::Play(_) => {
-                device_play(self.audio_proxy, self.cmd).await.map_err(Into::into)
+                let (play_remote, play_local) = fidl::Socket::create_datagram();
+                device_play(
+                    self.audio_proxy,
+                    self.cmd,
+                    play_local,
+                    play_remote,
+                    std::io::stdin(),
+                    &ffx_audio_common::STDOUT,
+                    &ffx_audio_common::STDERR,
+                )
+                .await
+                .map_err(Into::into)
             }
             SubCommand::Record(_) => {
                 device_record(self.audio_proxy, self.cmd).await.map_err(Into::into)
@@ -477,9 +489,24 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
     Ok(())
 }
 
-async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
-    let (play_remote, play_local) = fidl::Socket::create_datagram();
-
+async fn device_play<R, W, E>(
+    audio_proxy: AudioDaemonProxy,
+    cmd: DeviceCommand,
+    play_local: fidl::Socket,
+    play_remote: fidl::Socket,
+    input_reader: R, // Input generalized to stdin or test buffer. Forward to socket.
+    output_writer: &'static W, // Output generalized to stdout or a test buffer. Forward data
+    // from daemon to this writer.
+    output_error_writer: &'static E, // Likewise, forward error data to a separate writer
+                                     // generalized to stderr or a test buffer.
+) -> Result<(), anyhow::Error>
+where
+    R: std::io::Read + std::marker::Send + 'static,
+    W: std::marker::Send + 'static + std::marker::Sync,
+    E: std::marker::Send + 'static + std::marker::Sync,
+    &'static W: std::io::Write,
+    &'static E: std::io::Write,
+{
     let device_id = match cmd.id {
         Some(id) => Ok(id),
         None => get_first_device(
@@ -490,8 +517,14 @@ async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         .await
         .and_then(|device| device.id.ok_or(anyhow::anyhow!("Failed to get default device"))),
     }?;
+
+    // Duplicate socket handle so that connection stays alive in real + testing scenarios.
+    let daemon_request_socket = play_remote
+        .duplicate_handle(fidl::Rights::SAME_RIGHTS)
+        .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
+
     let request = AudioDaemonPlayRequest {
-        socket: Some(play_remote),
+        socket: Some(daemon_request_socket),
         location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::RingBuffer(
             fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
                 is_input: Some(false),
@@ -509,7 +542,15 @@ async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         ..Default::default()
     };
 
-    ffx_audio_common::play(request, audio_proxy, play_local).await?;
+    ffx_audio_common::play(
+        request,
+        audio_proxy,
+        play_local,
+        input_reader,
+        output_writer,
+        output_error_writer,
+    )
+    .await?;
     Ok(())
 }
 
@@ -602,4 +643,52 @@ async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
         .await
         .map(|_| ())
         .map_err(|e| anyhow::anyhow!("Error setting gain state. {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffx_audio_device_args::DevicePlayCommand;
+    use ffx_audio_device_args::{DeviceCommand, DeviceDirection};
+    use ffx_core::macro_deps::futures::AsyncWriteExt;
+    use fidl::encoding::zerocopy::AsBytes;
+    use fidl::HandleBased;
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    pub async fn test_play_success() -> Result<(), fho::Error> {
+        let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
+
+        let command = DeviceCommand {
+            subcommand: ffx_audio_device_args::SubCommand::Play(DevicePlayCommand {}),
+            id: Some("abc123".to_string()),
+            device_direction: Some(DeviceDirection::Input),
+        };
+
+        let (play_remote, play_local) = fidl::Socket::create_datagram();
+        let mut async_play_local = fidl::AsyncSocket::from_socket(
+            play_local.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
+        )
+        .unwrap();
+
+        async_play_local.write_all(ffx_audio_common::tests::WAV_HEADER_EXT).await.unwrap();
+
+        let result = device_play(
+            audio_daemon,
+            command,
+            play_local,
+            play_remote,
+            &ffx_audio_common::tests::WAV_HEADER_EXT[..],
+            &ffx_audio_common::tests::MOCK_STDOUT,
+            &ffx_audio_common::tests::MOCK_STDERR,
+        )
+        .await;
+
+        result.unwrap();
+        let expected_output = "Successfully processed all audio data.".as_bytes();
+        let lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();
+        let output: &[u8] = lock.as_bytes();
+
+        assert_eq!(output, expected_output);
+        Ok(())
+    }
 }

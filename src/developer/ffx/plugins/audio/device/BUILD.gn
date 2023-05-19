@@ -35,4 +35,9 @@ ffx_plugin("ffx_audio_device") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]
+
+  test_deps = [
+    "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//src/lib/fuchsia-async",
+  ]
 }

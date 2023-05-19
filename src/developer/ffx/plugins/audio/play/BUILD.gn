@@ -7,6 +7,8 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 ffx_plugin("ffx_audio_play") {
   version = "0.1.0"
   edition = "2021"
+  with_unit_tests = true
+  args_with_unit_tests = true
 
   args_deps = [
     "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
@@ -25,6 +27,12 @@ ffx_plugin("ffx_audio_play") {
   ]
 
   args_sources = [ "src/args.rs" ]
+
+  test_deps = [
+    "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/fuchsia-async",
+  ]
 
   sources = [ "src/lib.rs" ]
 }
