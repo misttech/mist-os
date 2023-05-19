@@ -64,7 +64,7 @@ function check-if-we-can-start-package-server {
   if [[ "${mode}" = "pm" ]]; then
     # Something is using the port. Try to determine if it's another pm server, or ffx.
     if [[ "${is_pm_running}" -eq 0 ]]; then
-      fx-error "It looks like another \"fx serve-updates\" process may be running."
+      fx-error "It looks like another \"fx serve\" process may be running."
       fx-error "It may be the ffx repository server. Try shutting it down with:"
       fx-error ""
       fx-error "$ ffx repository server stop"
@@ -158,14 +158,14 @@ function check-for-package-server {
   if [[ "${mode}" = "pm" ]]; then
     # Make sure it is running.
     if [[ -z "$(pgrep -f 'pm serve .*/amber-files')" ]]; then
-      fx-error "It looks like serve-updates is not running."
+      fx-error "It looks like 'fx serve' is not running."
       fx-error "You probably need to start \"fx serve\""
       return 1
     fi
 
     # Warn if it is using the wrong repository.
     if [[ -z "$(pgrep -f "pm serve .*${FUCHSIA_BUILD_DIR}/amber-files")" ]]; then
-      fx-warn "WARNING: It looks like serve-updates is running in a different workspace."
+      fx-warn "WARNING: It looks like 'fx serve' is running in a different workspace."
       fx-warn "WARNING: You probably need to stop that one and start a new one here with \"fx serve\""
     fi
 
@@ -173,9 +173,9 @@ function check-for-package-server {
     if is_feature_enabled "incremental"; then
       # Regex terminates with a space to avoid matching the -persist option.
       if [[ -z "$(pgrep -f "pm serve .*${FUCHSIA_BUILD_DIR}/amber-files .*-p ")" ]]; then
-        fx-warn "WARNING: Incremental build is enabled, but it looks like incremental build is disabled for serve-updates."
-        fx-warn "WARNING: You probably need to stop serve-updates, and restart it with incremental build enabled."
-        fx-warn "WARNING: You can enable incremental build in the shell running serve-updates with 'export FUCHSIA_DISABLED_incremental=0'"
+        fx-warn "WARNING: Incremental build is enabled, but it looks like incremental build is disabled for 'fx serve'."
+        fx-warn "WARNING: You probably need to stop 'fx serve', and restart it with incremental build enabled."
+        fx-warn "WARNING: You can enable incremental build in the shell running 'fx serve' with 'export FUCHSIA_DISABLED_incremental=0'"
       fi
     fi
   else

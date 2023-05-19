@@ -130,7 +130,7 @@ function main {
       fx-error "Unable to register update source."
       if [[ $err -eq 2 ]]; then
         # The GET request failed.
-        fx-error " - Is 'fx serve' or 'fx serve-updates' running?"
+        fx-error " - Is 'fx serve' running?"
         fx-error " - Can the target reach ${config_url} ?"
       fi
       return "$err"

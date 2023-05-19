@@ -192,6 +192,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/pave",
         "//tools/devshell/pave-remote",
         "//tools/devshell/report-bug",
+        "//tools/devshell/serve",
         "//tools/devshell/serve-remote",
         "//tools/devshell/serve-updates",
         "//tools/devshell/set",

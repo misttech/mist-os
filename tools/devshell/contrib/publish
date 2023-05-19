@@ -74,7 +74,7 @@ function main {
     fx-info "${PUBLISHED_PACKAGE_COUNT_MSG}!"
   else
     fx-warn "${PUBLISHED_PACKAGE_COUNT_MSG}, but it looks like the package server is not running."
-    fx-warn "You probably need to run \"fx serve-updates\"."
+    fx-warn "You probably need to run \"fx serve\"."
   fi
 }
 

@@ -272,7 +272,7 @@ if "${serve}"; then
     # If the user requested serving, then we'll check to see if there's a
     # remote server already running and kill it, this prevents most cases where
     # signal propagation seems to sometimes not make it to "pm".
-    # TODO(drees) This can be combined with the serve-updates call later to reduce ssh calls.
+    # TODO(drees) This can be combined with the `fx serve` call later to reduce ssh calls.
     if ssh "${host}" "${ssh_base_args[@]}" "ss -ln | grep :${package_server_port}" > /dev/null; then
       ssh "${ssh_base_args[@]}" "${host}" 'pkill -x -u $USER pm' || true
     fi
@@ -324,7 +324,7 @@ if "${serve}"; then
   echo -e "Press Ctrl-C to stop remote serving and tunneling.\n"
 
   # Set the experimental environment variables to ensure they're passed to `fx
-  # set` and `fx serve-updates`.
+  # set` and `fx serve`.
   experimental_vars=$(get_env_vars_non_default_features)
 
   if "${verbose}"; then
@@ -334,7 +334,7 @@ if "${serve}"; then
   fi
   ssh_serve_args=(
     "-tt" # explicitly force a pty, for HUP'ing on the remote
-    "cd ${dir} && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx set-device '${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}' && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx serve-updates -l \":${package_server_port}\" ${serve_verbose_arg} ${serve_persist_arg}"
+    "cd ${dir} && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx set-device '${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}' && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx serve -l \":${package_server_port}\" ${serve_verbose_arg} ${serve_persist_arg}"
   )
   ssh "${host}" "${ssh_base_args[@]}" "${ssh_serve_args[@]}"
 else

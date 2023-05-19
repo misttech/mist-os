@@ -20,14 +20,14 @@ BT_FILE_DEPS=(
   "tools/devshell/lib/updates.sh"
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/platform.sh"
-  "tools/devshell/serve-updates"
+  "tools/devshell/serve"
   "tools/devshell/jq.fx"
   "tools/devshell/tests/subcommands/data/fx_serve_update_test/testpackage.json"
   "tools/devshell/tests/subcommands/data/fx_serve_update_test/testpackage.manifest"
 )
 
 # Build a fake gn to satisfy vars.sh and some other commands to satisfy
-# serve-updates.
+# serve.
 BT_MOCKED_TOOLS=(
   "tools/devshell/build"
   "tools/devshell/add-update-source"
@@ -127,8 +127,8 @@ EOHTTP
       exit 1
     fi
 
-    # Even though serve-updates will try to kill the pm process when it is shut
-    # down, it won't actually kill the mock pm, because serve-updates kills only
+    # Even though serve will try to kill the pm process when it is shut
+    # down, it won't actually kill the mock pm, because serve kills only
     # kills the pm mock wrapper, not the mock_side_effects. So in order to
     # actually shut down the mock pm, wait for the real binary to be deleted.
     # Wait for the mock pm to be removed, then shut down.
@@ -147,16 +147,16 @@ EOHTTP
 EOF
 }
 
-# Wait for serve-updates to report it is ready to push packages.
+# Wait for serve to report it is ready to push packages.
 _wait_for_serve_updates_to_start() {
   local serve_updates_pid=$1
   local stdout=$2
 
   local tries=0
   while (( tries < 10 )); do
-    # Error out if serve-updates failed.
+    # Error out if serve failed.
     if ! kill -0 "${serve_updates_pid}" 2> /dev/null; then
-      BT_FAIL "serve-updates failed"
+      BT_FAIL "serve failed"
     fi
 
     if [[ -e "${stdout}" ]]; then
@@ -170,7 +170,7 @@ _wait_for_serve_updates_to_start() {
   done
 
   if [[ "${tries}" -eq 10 ]]; then
-    BT_FAIL "timed out waiting for serve-updates to start"
+    BT_FAIL "timed out waiting for serve to start"
   fi
 
   return 0
@@ -222,11 +222,11 @@ else
 fi
 EOF
 
-  # Fire up fx serve-updates.
-  "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -l "${serve_updates_port}" 1>stdout &
+  # Fire up fx serve.
+  "${FUCHSIA_DEVSHELL_DIR}/serve" -l "${serve_updates_port}" 1>stdout &
   local serve_updates_pid=$!
 
-  # Give fx serve-updates some time to come up.
+  # Give fx serve some time to come up.
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
   # Request the list of targets. Confirm testpackage is one of the targets.
@@ -234,7 +234,7 @@ EOF
 
   BT_EXPECT_FILE_CONTAINS_SUBSTRING targets.json "testpackage/0"
 
-  # Shut down our fake pm, which should stop serve-updates.
+  # Shut down our fake pm, which should stop serve.
   kill "${serve_updates_pid}"
   wait "${serve_updates_pid}"
 
@@ -263,12 +263,12 @@ else
 fi
 EOF
 
-  # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
+  # Fire up fx serve. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental_legacy=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  FUCHSIA_DISABLED_incremental_legacy=0 "${FUCHSIA_DEVSHELL_DIR}/serve" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
   local serve_updates_pid=$!
 
-  # Give fx serve-updates some time to come up.
+  # Give fx serve some time to come up.
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
   # Request the list of targets. Confirm testpackage is one of the targets.
@@ -276,7 +276,7 @@ EOF
 
   BT_EXPECT_FILE_CONTAINS_SUBSTRING targets.json "testpackage/0"
 
-  # Shut down our fake pm, which should stop serve-updates.
+  # Shut down our fake pm, which should stop serve.
   kill "${serve_updates_pid}"
   wait "${serve_updates_pid}"
 
@@ -304,9 +304,9 @@ else
 fi
 EOF
 
-  # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
+  # Fire up fx serve. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  BT_EXPECT_FAIL "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -l ":${serve_updates_port}" 2> stderr
+  BT_EXPECT_FAIL "${FUCHSIA_DEVSHELL_DIR}/serve" -l ":${serve_updates_port}" 2> stderr
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "The repository server died."
 }
 
@@ -351,14 +351,14 @@ else
 fi
 EOF
 
-  # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
+  # Fire up fx serve. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -l ":${serve_updates_port}" 1>stdout &
+  "${FUCHSIA_DEVSHELL_DIR}/serve" -l ":${serve_updates_port}" 1>stdout &
   local serve_updates_pid=$!
 
   _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
-  # Shut down our fake ffx server, which should stop serve-updates.
+  # Shut down our fake ffx server, which should stop serve.
   kill "${serve_updates_pid}"
   wait "${serve_updates_pid}"
 
@@ -422,14 +422,14 @@ else
 fi
 EOF
 
-  # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
+  # Fire up fx serve. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
   local serve_updates_pid=$!
 
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
-  # Shut down our fake ffx server, which should stop serve-updates.
+  # Shut down our fake ffx server, which should stop serve.
   kill "${serve_updates_pid}"
   wait "${serve_updates_pid}"
 

@@ -38,14 +38,14 @@ function help_optional_feature {
     ;;
   "incremental_legacy")
     h=(
-      "Packages are published and served incrementally by 'fx serve-updates'"
+      "Packages are published and served incrementally by 'fx serve'"
       "as they are built using the legacy incremental publisher. Explicit"
       "'fx build' is not required for most operations."
       )
     ;;
   "incremental" | "incremental_new")
     h=(
-      "Packages are published and served incrementally by 'fx serve-updates'"
+      "Packages are published and served incrementally by 'fx serve'"
       "as they are built. Explicit 'fx build' is not required for most operations."
       )
     ;;
