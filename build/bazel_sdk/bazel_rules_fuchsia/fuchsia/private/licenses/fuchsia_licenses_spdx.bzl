@@ -56,6 +56,7 @@ def _fuchsia_licenses_spdx_impl(ctx):
             "--licenses_used=%s" % licenses_used_file.path,
             "--spdx_output=%s" % spdx_output.path,
             "--root_package_name=%s" % root_package_name,
+            "--root_package_homepage=%s" % ctx.attr.root_package_homepage,
             "--document_namespace=%s" % ctx.attr.document_namespace,
             "--licenses_cross_refs_base_url=%s" % ctx.attr.licenses_cross_refs_base_url,
         ],
@@ -84,7 +85,9 @@ https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json
         "root_package_name": attr.string(
             doc = """The name of the SPDX root package.
 If absent, the target's name is used instead.""",
-            default = "",
+        ),
+        "root_package_homepage": attr.string(
+            doc = """The homepage of the SPDX root package.""",
         ),
         "document_namespace": attr.string(
             doc = "A unique namespace url for the SPDX references in the doc",
@@ -93,7 +96,6 @@ If absent, the target's name is used instead.""",
         "licenses_cross_refs_base_url": attr.string(
             doc = "Base URL for license paths that are local files",
             mandatory = True,
-            default = "",
         ),
         "_generate_licenses_spdx_tool": attr.label(
             executable = True,

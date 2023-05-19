@@ -96,10 +96,12 @@ class SpdxPackage:
     name: str
     copyright_text: str
     license_concluded: SpdxLicenseExpression
+    homepage: str
 
     def to_json_dict(self):
         output = {"SPDXID": self.spdx_id, "name": self.name}
         _maybe_set(output, "copyrightText", self.copyright_text)
+        _maybe_set(output, "homepage", self.homepage)
         if self.license_concluded:
             output["licenseConcluded"] = self.license_concluded.serialize()
         return output
@@ -109,7 +111,7 @@ class SpdxPackage:
         license_concluded = SpdxLicenseExpression.create(
             license_concluded_str,
             input.location) if license_concluded_str else None
-
+        homepage = input.get_or("homepage", None)
         copyright_text = input.get_or("copyrightText", None)
         if copyright_text == "NOASSERTION":
             copyright_text = None
@@ -119,6 +121,7 @@ class SpdxPackage:
             name=input.get("name"),
             copyright_text=copyright_text,
             license_concluded=license_concluded,
+            homepage=homepage,
         )
 
     def replace_license_ids(self, license_id_replacer: "SpdxIdReplacer"):
@@ -379,7 +382,7 @@ class SpdxIndex:
             if not self.get_parent_packages(p)
         ]
 
-    def get_packages_by_license(self, license):
+    def get_packages_by_license(self, license: SpdxExtractedLicensingInfo):
         id = license.license_id
         if id in self._packages_by_license_id:
             return self.get_packages_by_ids(self._packages_by_license_id[id])
@@ -388,24 +391,24 @@ class SpdxIndex:
                 f"No packages associated with '{license}",
                 self._spdx_doc_file_path)
 
-    def get_license_by_id(self, id):
+    def get_license_by_id(self, id: str):
         if id in self._license_by_id:
             return self._license_by_id[id]
         else:
             raise LicenseException(
                 f"No license with id '{id}", self._spdx_doc_file_path)
 
-    def get_package_by_id(self, id):
+    def get_package_by_id(self, id: str):
         if id in self._package_by_id:
             return self._package_by_id[id]
         else:
             raise LicenseException(
                 f"No package with id '{id}", self._spdx_doc_file_path)
 
-    def get_packages_by_ids(self, ids):
+    def get_packages_by_ids(self, ids: List[str]):
         return [self.get_package_by_id(id) for id in ids]
 
-    def get_parent_packages(self, package):
+    def get_parent_packages(self, package: SpdxPackage):
         id = package.spdx_id
         if id in self._parent_packages_by_child_id:
             return self.get_packages_by_ids(
@@ -413,7 +416,7 @@ class SpdxIndex:
         else:
             return []
 
-    def get_child_packages(self, package):
+    def get_child_packages(self, package: SpdxPackage):
         id = package.spdx_id
         if id in self._child_packages_by_parent_id:
             return self.get_packages_by_ids(
@@ -422,7 +425,8 @@ class SpdxIndex:
             return []
 
     def dependency_chains_for_license(
-            self, license_id: str) -> List[List[SpdxPackage]]:
+            self,
+            license: SpdxExtractedLicensingInfo) -> List[List[SpdxPackage]]:
         """"
         Computes all the dependencies of a given license.
 
@@ -445,7 +449,6 @@ class SpdxIndex:
 
         output = []
 
-        license = self.get_license_by_id(license_id)
         for p in self.get_packages_by_license(license):
             path_recursion(current_path=[p], current_package=p)
 

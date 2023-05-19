@@ -25,6 +25,7 @@
         {
             "SPDXID": "SPDXRef-Package-1",
             "name": "Package A",
+            "homepage": "http://foo.bar",
             "licenseConcluded": "LicenseRef-X"
         },
         {

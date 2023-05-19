@@ -25,6 +25,7 @@ license(
     copyright_notice = "Test Copyright",
     license_kinds = [],
     license_text = "default_license.txt",
+    package_url = "http://foo.bar",
 )
 
 license(

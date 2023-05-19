@@ -25,7 +25,8 @@
         {
             "SPDXID": "SPDXRef-Package-1",
             "name": "Package A",
-            "licenseConcluded": "LicenseRef-X"
+            "licenseConcluded": "LicenseRef-X",
+            "homepage": "http://foo.bar"
         },
         {
             "SPDXID": "SPDXRef-Package-2",
@@ -104,13 +105,17 @@
                     "url": "https://y"
                 }
             ],
-            "seeAlso": [ "https://y2" ]
+            "seeAlso": [
+                "https://y2"
+            ]
         },
         {
             "name": "License Z",
             "licenseId": "LicenseRef-Z",
             "extractedText": "Test License Z",
-            "seeAlsos": [ "https://z" ]
+            "seeAlsos": [
+                "https://z"
+            ]
         }
-   ]
+    ]
 }

@@ -426,7 +426,7 @@ class LicenseClassification:
             links.extend(spdx_license.cross_refs)
         if spdx_license.see_also:
             links.extend(spdx_license.see_also)
-        chains = index.dependency_chains_for_license(spdx_license.license_id)
+        chains = index.dependency_chains_for_license(spdx_license)
         dependents = [">".join([p.name for p in chain]) for chain in chains]
         # Sort and dedup dependent chains: There might be duplicate chains since
         # the package names are not globally unique.

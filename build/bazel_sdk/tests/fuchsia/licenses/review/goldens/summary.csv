@@ -2,7 +2,8 @@ name,identifications,conditions,overriden_conditions,link,tracking_issues,commen
 License X,"License Kind 1,
 License Kind 2,
 License Kind 3","allowed condition,
-forbidden condition",allowed_condition,https://x,bug/1234,Some comment text,"http://mirror1
+forbidden condition",allowed_condition,"http://foo.bar
+https://x",bug/1234,Some comment text,"http://mirror1
 http://mirror2",False,False,False,LicenseRef-X,"Root>Package A
 Root>Package B
 Root>Package F","License Kind 1 at lines 1-2: allowed condition,

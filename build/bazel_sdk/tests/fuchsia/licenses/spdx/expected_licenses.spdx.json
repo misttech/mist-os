@@ -45,6 +45,7 @@
             "SPDXID": "SPDXRef-Package-5",
             "name": "Package with default license",
             "copyrightText": "Test Copyright",
+            "homepage": "http://foo.bar",
             "licenseConcluded": "LicenseRef-e098e6470cf46e4ece31231215d180e7"
         }
     ],

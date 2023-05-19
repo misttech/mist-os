@@ -23,13 +23,30 @@ def _dedup(input: List[str]) -> List[str]:
     return sorted(list(set(input)))
 
 
-def _dependents_string(license_id, spdx_index) -> str:
+def _dependents_string(
+        license: SpdxExtractedLicensingInfo, spdx_index: SpdxIndex) -> str:
     dependents = [
         ">".join([p.name
                   for p in path])
-        for path in spdx_index.dependency_chains_for_license(license_id)
+        for path in spdx_index.dependency_chains_for_license(license)
     ]
     return "\n".join(sorted(dependents))
+
+
+def _packages_homepages(
+        license: SpdxExtractedLicensingInfo, spdx_index: SpdxIndex) -> str:
+    return [
+        p.homepage
+        for p in spdx_index.get_packages_by_license(license)
+        if p.homepage
+    ]
+
+
+def _link_string(
+        license: SpdxExtractedLicensingInfo, spdx_index: SpdxIndex) -> str:
+    links = license.unique_links()
+    links.extend(_packages_homepages(license, spdx_index))
+    return "\n".join(_dedup(links))
 
 
 def _write_summary_csv(
@@ -73,6 +90,7 @@ def _write_summary_csv(
             tracking_issues = []
             comments = []
             public_source_mirrors = []
+
             shipped_info = {}
             identification_stats = {}
             if license_id in classifications.classifications_by_id:
@@ -123,7 +141,7 @@ def _write_summary_csv(
                 "name":
                     license.name,
                 "link":
-                    '\n'.join(license.unique_links()),
+                    _link_string(license, spdx_index),
                 "identifications":
                     ",\n".join(_dedup(identifications)),
                 "conditions":
@@ -140,7 +158,7 @@ def _write_summary_csv(
                 "_spdx_license_id":
                     license_id,
                 "_dependents":
-                    _dependents_string(license_id, spdx_index),
+                    _dependents_string(license, spdx_index),
                 "_detailed_identifications":
                     ",\n".join(_dedup(detailed_identifications)),
                 "_detailed_overrides":
@@ -181,8 +199,6 @@ def _write_detailed_csv(
 
         for license in spdx_doc.extracted_licenses:
             license_id = license.license_id
-            dependents = _dependents_string(license_id, spdx_index)
-            links = '\n'.join(license.unique_links())
 
             if license_id in classifications.classifications_by_id:
                 for identification in classifications.classifications_by_id[
@@ -191,8 +207,8 @@ def _write_detailed_csv(
                     row = {
                         "spdx_license_id": license_id,
                         "license_name": license.name,
-                        "dependents": dependents,
-                        "link": links,
+                        "dependents": _dependents_string(license, spdx_index),
+                        "link": _link_string(license, spdx_index),
                         "identification": identification.identified_as,
                         "start_line": identification.start_line,
                         "end_line": identification.end_line,

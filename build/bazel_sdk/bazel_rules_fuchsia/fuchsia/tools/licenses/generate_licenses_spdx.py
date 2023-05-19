@@ -8,6 +8,7 @@ import argparse
 import json
 from typing import Dict, List
 from sys import stderr
+from fuchsia.tools.licenses.common_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
 
@@ -17,7 +18,7 @@ def _log(*kwargs):
 
 def _create_doc_from_licenses_used_json(
         licenses_used_path: str, root_package_name: str,
-        document_namespace: str,
+        root_package_homepage: str, document_namespace: str,
         licenses_cross_refs_base_url: str) -> SpdxDocument:
     """
     Populates the SPDX docuemnt with bazel license rules information.
@@ -48,15 +49,18 @@ def _create_doc_from_licenses_used_json(
         spdx_id=package_id_factory.new_id(),
         name=root_package_name,
         copyright_text=None,
-        license_concluded=None)
+        license_concluded=None,
+        homepage=root_package_homepage)
 
     packages.append(root_package)
     describes.append(root_package.spdx_id)
 
     for json_dict in json_list:
-        bazel_package_name = json_dict['package_name']
-        copyright_notice = json_dict['copyright_notice']
-        license_text_file_path = json_dict['license_text']
+        dict_reader = DictReader(json_dict, location=licenses_used_path)
+        bazel_package_name = dict_reader.get('package_name')
+        homepage = dict_reader.get_or('package_url', None)
+        copyright_notice = dict_reader.get('copyright_notice')
+        license_text_file_path = dict_reader.get('license_text')
 
         package_id = package_id_factory.new_id()
         license_id = None
@@ -82,6 +86,7 @@ def _create_doc_from_licenses_used_json(
                 copyright_text=copyright_notice,
                 license_concluded=SpdxLicenseExpression.create(license_id)
                 if license_id else None,
+                homepage=homepage,
             ))
 
         describes.append(package_id)
@@ -183,6 +188,11 @@ def main():
         required=True,
     )
     parser.add_argument(
+        '--root_package_homepage',
+        help='The homepage of the root package in the SDPX doc.',
+        required=True,
+    )
+    parser.add_argument(
         '--licenses_cross_refs_base_url',
         help='Base URL for license paths that are local files.',
         required=True,
@@ -194,7 +204,9 @@ def main():
 
     document = _create_doc_from_licenses_used_json(
         licenses_used_path=args.licenses_used,
-        root_package_name=args.root_package_name,
+        root_package_name=args.root_package_name
+        if args.root_package_name else None,
+        root_package_homepage=args.root_package_homepage,
         document_namespace=args.document_namespace,
         licenses_cross_refs_base_url=args.licenses_cross_refs_base_url,
     )
