@@ -10,19 +10,25 @@ const MAX_DAI_UI_STRING_SIZE uint32 = 256;
 const MAX_COUNT_DAI_FORMATS uint32 = MAX_COUNT_FORMATS;
 
 type DaiProperties = table {
-    /// Dai type is input or output. Required.
+    /// Driver type is input (true) or output (false)
+    ///
+    /// Required.
     1: is_input bool;
 
-    /// Name of the DAI interface provider manufacturer. If not included, the manufacturer is
-    /// unspecified.
+    /// UI string for the manufacturer name. If not included, the manufacturer is unspecified.
+    ///
+    /// Optional.
     2: manufacturer string:MAX_DAI_UI_STRING_SIZE;
 
-    /// Product name of the DAI interface provider. If not included, the product name is
-    /// unspecified.
+    /// UI string for the product name. If not included, the product name is unspecified.
+    ///
+    /// Optional.
     3: product_name string:MAX_DAI_UI_STRING_SIZE;
 
     /// A unique identifier for the driver.
     /// If not included, there is no unique id for the driver.
+    ///
+    /// Optional.
     @available(added=HEAD)
     4: unique_id array<uint8, UNIQUE_ID_SIZE>;
 
@@ -35,14 +41,14 @@ type DaiProperties = table {
     ///
     /// There are two special values:
     ///
-    /// *  CLOCK_DOMAIN_MONOTONIC means the hardware is operating at the same
+    /// *  `CLOCK_DOMAIN_MONOTONIC` means the hardware is operating at the same
     ///    rate as the system montonic clock.
     ///
-    /// *  CLOCK_DOMAIN_EXTERNAL means the hardware is operating at an unknown
+    /// *  `CLOCK_DOMAIN_EXTERNAL` means the hardware is operating at an unknown
     ///    rate and is not synchronized with any known clock, not even with
-    ///    other clocks in domain CLOCK_DOMAIN_EXTERNAL.
+    ///    other clocks in domain `CLOCK_DOMAIN_EXTERNAL`.
     ///
-    /// If the domain is not CLOCK_DOMAIN_MONOTONIC, client must use position
+    /// If the domain is not `CLOCK_DOMAIN_MONOTONIC`, client must use position
     /// notification updates to recover the hardware's clock.
     ///
     /// Required.

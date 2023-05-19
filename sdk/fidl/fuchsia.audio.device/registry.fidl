@@ -115,11 +115,11 @@ type Info = table {
     ///
     /// There are two special values for clock domain:
     ///
-    /// *  CLOCK_DOMAIN_MONOTONIC means the hardware is driven by the system
+    /// *  `CLOCK_DOMAIN_MONOTONIC` means the hardware is driven by the system
     ///    montonic clock and will always be synchronized with that timeline.
     ///
-    /// *  CLOCK_DOMAIN_EXTERNAL means the hardware is not synchronized with any
-    ///    other known clocks (even any other clocks in CLOCK_DOMAIN_EXTERNAL).
+    /// *  `CLOCK_DOMAIN_EXTERNAL` means the hardware is not synchronized with any
+    ///    other known clocks (even any other clocks in `CLOCK_DOMAIN_EXTERNAL`).
     ///
     /// Required.
    10: clock_domain ClockDomain;

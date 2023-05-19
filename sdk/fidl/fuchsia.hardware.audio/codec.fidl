@@ -21,21 +21,31 @@ type CodecInfo = struct {
 
 @available(added=HEAD)
 type CodecProperties = table {
-    /// Codec type is input or output.
-    /// If not included, then the codec may be used for both input and output.
+    /// Driver type is input (true) or output (false)
+    /// If not included, then the driver may be used for both input and output.
+    ///
+    /// Optional.
     1: is_input bool;
 
     /// UI string for the manufacturer name. If not included, the manufacturer is unspecified.
+    ///
+    /// Optional.
     2: manufacturer string:MAX_UI_STRING_SIZE;
 
     /// UI string for the product name. If not included, the product name is unspecified.
+    ///
+    /// Optional.
     3: product string:MAX_UI_STRING_SIZE;
 
     /// Unique identifier for the codec.
     /// If not included, there is no unique id for the Codec.
+    ///
+    /// Optional.
     4: unique_id string:UNIQUE_ID_SIZE;
 
-    /// Plug Detect Capabilities. Required.
+    /// Plug Detect Capabilities.
+    ///
+    /// Required.
     5: plug_detect_capabilities PlugDetectCapabilities;
 };
 
@@ -64,24 +74,35 @@ type GainType = strict enum : uint8 {
 // //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
 @available(deprecated=9, removed=12)
 type GainFormat = table {
-    /// Specifies what the numbers for gain represent, e.g. a percentage. Required.
+    /// Specifies what the numbers for gain represent, e.g. a percentage.
+    ///
+    /// Required.
     1: type GainType;
 
-    /// Minimum gain. Required.
+    /// Minimum gain.
+    ///
+    /// Required.
     2: min_gain float32;
 
-    /// Maximum gain. Required.
+    /// Maximum gain.
+    ///
+    /// Required.
     3: max_gain float32;
 
     /// Gain step in decibels, this value must not be negative, but may be zero to convey an
     /// effectively continuous range of values. Must not exceed `max_gain_db` - `min_gain_db`.
+    ///
     /// Required.
     4: gain_step float32;
 
     /// Gain mute capability. If not included, mute is not supported.
+    ///
+    /// Optional.
     5: can_mute bool;
 
     /// Automatic Gain Control (AGC) capability. If not included, AGC is not supported.
+    ///
+    /// Optional.
     6: can_agc bool;
 };
 
@@ -89,24 +110,30 @@ type GainFormat = table {
 type CodecFormatInfo = table {
     /// The driver's best estimate of the external delay (in nanoseconds) present in the pipeline
     /// for the chosen format. When precisely synchronizing presentation across multiple entities
-    /// (e.g. devices), the external delay should be taken into account. Optional.
+    /// (e.g. devices), the external delay should be taken into account.
     /// If not included `external_delay` is unknown.
+    ///
+    /// Optional.
     1: external_delay zx.Duration;
 
     /// The driver's best estimate of the amount of time (in nanoseconds) it takes the hardware to
     /// actually start playback/capture after a `Start` command is issued.
     /// It may take some time for the hardware to get into fully operational mode, for example due
     /// a power state change. This delay must be taken into account if not getting the initial audio
-    /// samples played or captured is not acceptable. Optional.
+    /// samples played or captured is not acceptable.
     /// If not included `turn_on_delay` is unknown.
+    ///
+    /// Optional.
     2: turn_on_delay zx.Duration;
 
     /// The driver's best estimate of the amount of time (in nanoseconds) it takes the hardware to
     /// actually stop playback/capture after a `Stop` command is issued.
     /// It may take some time for the hardware to get into fully stopped mode, for example due
     /// a power state change. This delay must be taken into account if playback/capture of samples
-    /// after a 'Stop' command is not acceptable. Optional.
+    /// after a 'Stop' command is not acceptable.
     /// If not included, the turn off delay is unknown.
+    ///
+    /// Optional.
     3: turn_off_delay zx.Duration;
 };
 

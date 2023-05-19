@@ -130,6 +130,6 @@ type RingBuffer = resource table {
     /// TODO(fxbug.dev/114923): If fuchsia.hardware.audio doesn't need to import
     /// fuchsia.audio, we can use that type directly below.
     ///
-    /// Optional. If not specified, defaults to CLOCK_DOMAIN_EXTERNAL.
+    /// Optional. If not specified, defaults to `CLOCK_DOMAIN_EXTERNAL`.
     6: reference_clock_domain uint32;
 };

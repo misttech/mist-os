@@ -4,11 +4,13 @@
 library fuchsia.hardware.audio;
 
 type HealthState = table {
-    /// Driver is currently healthy. Optional.
+    /// Driver is currently healthy.
     /// No health information is provided if this field is not included.
     /// This allows drivers to signal their health state in scenarios where they have not enough
     /// capabilities or resources to recover on their own, for instance not able to power down the
     /// hardware via a GPIO or control over the power subsystem.
+    ///
+    /// Optional.
     1: healthy bool;
 };
 

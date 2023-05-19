@@ -30,7 +30,9 @@ type EqualizerBandType = flexible enum : uint64 {
 type EqualizerBand = table {
     /// Unique ID for this band, only required to be unique within the corresponding
     /// `Element`, and valid until the channel associated with the `SignalProcessing`
-    /// protocol is closed. Required.
+    /// protocol is closed.
+    ///
+    /// Required.
     1: id uint64;
 };
 
@@ -75,35 +77,49 @@ type Equalizer = table {
     /// `SetElement`.
     /// The number of elements of the `bands` vector determines the number of bands
     /// supported by this processing element.
+    ///
+    /// Required.
     1: bands vector<EqualizerBand>:MAX_COUNT_EQUALIZER_BANDS;
 
     /// The controls supported by this equalizer.
+    ///
+    /// Optional.
     2: supported_controls EqualizerSupportedControls;
 
     /// If included and true, individual bands can be disabled via `ElementState`.
     /// If not included or false, the bands are always enabled.
     /// For a band to be functional its enclosing equalizer processing element has to be enabled.
+    ///
+    /// Optional.
     3: can_disable_bands bool;
 
-    /// Minimum frequency for the bands in Hz. Required.
+    /// Minimum frequency for the bands in Hz.
+    ///
+    /// Required.
     4: min_frequency uint32;
 
-    /// Maximum frequency for the bands in Hz. Required.
+    /// Maximum frequency for the bands in Hz.
+    ///
+    /// Required.
     5: max_frequency uint32;
 
-    /// Maximum quality factor, usually denoted by "Q", for the bands. Optional.
+    /// Maximum quality factor, usually denoted by "Q", for the bands.
     /// Indicates how narrow the frequency transition is. Higher Q values imply narrower
     /// notches/peaks and steeper cuts/shelves. Must be positive.
+    ///
+    /// Optional.
     6: max_q float32;
 
     /// Minimum gain in dB.
-    /// Required if any `EqualizerBand.EqualizerBandType` is set to `PEAK`, `LOW_SHELF`,
-    /// `HIGH_SHELF`.
+    ///
+    /// Optional but required if any `EqualizerBand.EqualizerBandType` is set to `PEAK`,
+    /// `LOW_SHELF`, `HIGH_SHELF`.
     7: min_gain_db float32;
 
     /// Maximum gain in dB.
-    /// Required if any `EqualizerBand.EqualizerBandType` is set to `PEAK`, `LOW_SHELF`,
-    /// `HIGH_SHELF`.
+    ///
+    /// Optional but required if any `EqualizerBand.EqualizerBandType` is set to `PEAK`,
+    /// `LOW_SHELF`, `HIGH_SHELF`.
     8: max_gain_db float32;
 };
 
@@ -113,25 +129,35 @@ type EqualizerBandState = table {
     /// `Equalizer` `bands`. Required.
     1: id uint64;
 
-    /// Type of band. Optional.
+    /// Type of band.
+    ///
+    /// Optional.
     2: type EqualizerBandType;
 
-    /// Center frequency for the band. Optional.
+    /// Center frequency for the band.
+    ///
+    /// Optional.
     3: frequency uint32;
 
-    /// Quality factor, usually denoted as "Q". Optional.
+    /// Quality factor, usually denoted as "Q".
     /// Indicates how narrow the frequency transition is. Higher Q values imply narrower
     /// notches/peaks and steeper cuts/shelves. Must be positive.
+    ///
+    /// Optional.
     4: q float32;
 
-    /// Gain in dB. Required for `EqualizerBandType` `PEAK`, `LOW_SHELF` and `HIGH_SHELF`.
+    /// Gain in dB.
+    ///
+    /// Optional but required for `EqualizerBandType` `PEAK`, `LOW_SHELF` and `HIGH_SHELF`.
     /// May not be included for `EqualizerBandType` `NOTCH`, `LOW_CUT` or `HIGH_CUT`.
     5: gain_db float32;
 
-    /// Enable/disable the band. Optional. By default all bands are enabled.
+    /// Enable/disable the band. By default all bands are enabled.
     /// Disabling the enclosing processing element by setting `ElementState.enabled` to
     /// false disables the whole equalizer and it does not change this field. For a band to be
     /// functional its enclosing equalizer processing element has to be enabled.
+    ///
+    /// Optional.
     6: enabled bool;
 };
 
@@ -141,6 +167,7 @@ type EqualizerElementState = table {
     /// number of elements of the `bands` returned in returned in the corresponding
     /// `Equalizer`. `bands_state` must have at least one element.
     /// The bands controlled by `bands_state` are determined by each `band.id`.
-    // Required.
+    ///
+    /// Required.
     1: bands_state vector<EqualizerBandState>:MAX_COUNT_EQUALIZER_BANDS;
 };

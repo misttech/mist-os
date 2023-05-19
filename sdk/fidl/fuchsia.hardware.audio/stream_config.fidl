@@ -8,12 +8,18 @@ using fuchsia.hardware.audio.signalprocessing;
 /// Gain state requested by the client or returned by the driver.
 type GainState = table {
     /// Current mute state. If not included, the state is unmuted.
+    ///
+    /// Optional.
     1: muted bool;
 
     /// Current Automatic Gain Control (AGC) state. If not included, AGC is disabled.
+    ///
+    /// Optional.
     2: agc_enabled bool;
 
-    /// Current gain in decibels. Required.
+    /// Current gain in decibels.
+    ///
+    /// Required.
     3: gain_db float32;
 };
 
@@ -25,35 +31,54 @@ type StreamProperties = table {
     /// reserved for drivers implementing USB technologies.
     /// Note that even though the above values map to readable ASCII characters, array
     /// values can span the entire uint8 range (0-255).
+    ///
+    /// Optional.
     1: unique_id array<uint8, UNIQUE_ID_SIZE>;
 
-    /// Stream type is input or output. Required.
+    /// Driver type is input (true) or output (false)
+    ///
+    /// Required.
     2: is_input bool;
 
     /// Gain mute capability. If not included, the StreamConfig can't mute.
+    ///
+    /// Optional.
     3: can_mute bool;
 
     /// Automatic Gain Control (AGC) capability. If not included, the StreamConfig can't AGC.
+    ///
+    /// Optional.
     4: can_agc bool;
 
-    /// Minimum gain in decibels. Required.
+    /// Minimum gain in decibels.
+    ///
+    /// Required.
     5: min_gain_db float32;
 
-    /// Maximum gain in decibels. Required.
+    /// Maximum gain in decibels.
+    ///
+    /// Required.
     6: max_gain_db float32;
 
     /// Gain step in decibels, this value must not be negative, but may be zero to convey an
     /// effectively continuous range of values. Must not exceed `max_gain_db` - `min_gain_db`.
+    ///
     /// Required.
     7: gain_step_db float32;
 
-    /// Plug Detect Capabilities. Required.
+    /// Plug Detect Capabilities.
+    ///
+    /// Required.
     8: plug_detect_capabilities PlugDetectCapabilities;
 
     /// UI string for the manufacturer name. If not included, the manufacturer is unspecified.
+    ///
+    /// Optional.
     9: manufacturer string:MAX_UI_STRING_SIZE;
 
     /// UI string for the product name. If not included, the product name is unspecified.
+    ///
+    /// Optional.
    10: product string:MAX_UI_STRING_SIZE;
 
     /// An identifier for the clock domain in which this hardware operates. If
@@ -65,14 +90,14 @@ type StreamProperties = table {
     ///
     /// There are two special values:
     ///
-    /// *  CLOCK_DOMAIN_MONOTONIC means the hardware is operating at the same
+    /// *  `CLOCK_DOMAIN_MONOTONIC` means the hardware is operating at the same
     ///    rate as the system montonic clock.
     ///
-    /// *  CLOCK_DOMAIN_EXTERNAL means the hardware is operating at an unknown
+    /// *  `CLOCK_DOMAIN_EXTERNAL` means the hardware is operating at an unknown
     ///    rate and is not synchronized with any known clock, not even with
-    ///    other clocks in domain CLOCK_DOMAIN_EXTERNAL.
+    ///    other clocks in domain `CLOCK_DOMAIN_EXTERNAL`.
     ///
-    /// If the domain is not CLOCK_DOMAIN_MONOTONIC, client must use position
+    /// If the domain is not `CLOCK_DOMAIN_MONOTONIC`, client must use position
     /// notification updates to recover the hardware's clock.
     ///
     /// Required.

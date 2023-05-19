@@ -52,6 +52,7 @@ type DelayInfo = table {
     /// to copy data in and out of the ring buffer, specified via `RingBufferProperties`
     /// `driver_transfer_bytes`.
     ///
+    /// Optional.
     2: external_delay zx.Duration;
 };
 
@@ -129,6 +130,8 @@ type RingBufferProperties = table {
     /// as in a Bluetooth driver. This delay must be taken into account if not getting the initial
     /// audio samples played or captured is not acceptable.
     /// If not included `turn_on_delay` is unknown.
+    ///
+    /// Optional.
     4: turn_on_delay zx.Duration;
 
     /// Size (in bytes) representing a temporary buffer used by the driver/HW in order to transfer

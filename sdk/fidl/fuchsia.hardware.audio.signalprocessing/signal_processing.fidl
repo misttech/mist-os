@@ -87,21 +87,30 @@ type Latency = flexible union {
 type Element = table {
     /// Unique ID for this element. The scope of this id is only within the `SignalProcessing`
     /// protocol lifespan, i.e. until the channel associated with the protocol is closed.
+    ///
     /// Required.
     1: id uint64;
 
-    /// Processing element type. Required.
+    /// Processing element type.
+    ///
+    /// Required.
     2: type ElementType;
 
     /// If included, type-specific parameters for the processing element.
+    ///
+    /// Optional.
     3: type_specific TypeSpecificElement;
 
     /// If included and true, the processing element can be disabled via
     /// `ElementSetState`.
     /// If not included or false, the processing element is always enabled.
+    ///
+    /// Optional.
     4: can_disable bool;
 
     /// If included, a textual description of the processing element.
+    ///
+    /// Optional.
     5: description string:MAX_STRING_SIZE;
 };
 
@@ -134,6 +143,8 @@ type ElementState = table {
     /// type-specific state is only informational, for instance if a `SetElementState` enables a
     /// disabled processing element providing a `TypeSpecificElementState`, then any previous
     /// informational `TypeSpecificElementState` is superceded.
+    ///
+    /// Optional.
     1: type_specific TypeSpecificElementState;
 
     /// Process element enable/disable state. Optional. By default processing elements are enabled.
@@ -141,15 +152,21 @@ type ElementState = table {
     /// this field can't be set to `false`.
     /// If `enabled` is not included, then `state` must be included if and only if the processing
     /// element is currently enabled.
+    ///
+    /// Optional.
     2: enabled bool;
 
     /// If included, how much latency is added to the pipeline if this processing element is
     /// enabled. This field must not be present in a `SetElementState` `state` since
     /// the latency can't be set by a client, it can only provided by the server in a
     /// `WatchElementState` reply.
+    ///
+    /// Optional.
     3: latency Latency;
 
     /// If included, an opaque object of octets for exchanging vendor specific information.
+    ///
+    /// Optional.
     @available(added=HEAD)
     4: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
 };
@@ -165,12 +182,14 @@ type EdgePair = struct {
 type Topology = table {
     /// Unique ID for this topology. The scope of this id is only within the `SignalProcessing`
     /// protocol lifespan, i.e. until the channel associated with the protocol is closed.
+    ///
     /// Required.
     1: id uint64;
 
     /// Vector of processing elements edge pairs in this order.
     /// The ordering of processing elements with edge pairs form pipelines.
     /// To define multiple possible pipelines, return more `Topology` entries in `GetTopologies`.
+    ///
     /// Required.
     2: processing_elements_edge_pairs vector<EdgePair>:MAX_COUNT_PROCESSING_ELEMENTS_EDGE_PAIRS;
 };

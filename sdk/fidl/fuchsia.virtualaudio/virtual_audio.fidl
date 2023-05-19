@@ -133,8 +133,8 @@ type FormatRange = struct {
 
 type ClockProperties = struct {
     /// The clock domain is an int32 provided by the clock tree to an audio
-    /// driver. special values for CLOCK_DOMAIN_MONOTONIC (0), and
-    /// CLOCK_DOMAIN_EXTERNAL (-1) (not locally controllable) are defined in
+    /// driver. special values for `CLOCK_DOMAIN_MONOTONIC` (0), and
+    /// `CLOCK_DOMAIN_EXTERNAL` (-1) (not locally controllable) are defined in
     /// `fuchsia.hardware.audio`. Other than -1, any negative value
     /// for clock_domain is invalid and will be ignored.
     domain int32;
