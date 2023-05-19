@@ -126,7 +126,7 @@
                 // fuse_test
                 "FuseTest.RejectBadInit",
 
-                // futex_test
+                // futex_test - https://fxbug.dev/79277 Needs atomic ops on restricted memory.
                 "PrivateFutexTest.WakeOp0Set",
                 "PrivateFutexTest.WakeOp0Add",
                 "PrivateFutexTest.WakeOp0Or",
@@ -141,6 +141,7 @@
                 "GetcpuTest.IsValidCpuStress",
 
                 // getdents_test
+                // Assumes structure of root directory.
                 "ReaddirTest.RootContainsBasicDirectories",
 
                 // getrusage_test
@@ -246,6 +247,7 @@
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyActive",
 
                 // lseek_test
+                // Assumes structure of root directory.
                 "LseekTest.EtcPasswdDup",
 
                 // link_test
