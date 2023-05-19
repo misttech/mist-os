@@ -79,6 +79,16 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
       .set_number_of_utp_task_management_request_slots(kNutmrs - 1)
       .set_number_of_utp_transfer_request_slots(kNutrs - 1)
       .WriteTo(&registers_);
+  HostControllerStatusReg::Get()
+      .ReadFrom(&registers_)
+      .set_utp_task_management_request_list_ready(true)
+      .set_utp_transfer_request_list_ready(true)
+      .set_device_present(true)
+      .WriteTo(&registers_);
+  HostControllerEnableReg::Get()
+      .ReadFrom(&registers_)
+      .set_host_controller_enable(true)
+      .WriteTo(&registers_);
 
   std::memset(&device_desc_, 0, sizeof(DeviceDescriptor));
   device_desc_.bLength = sizeof(DeviceDescriptor);

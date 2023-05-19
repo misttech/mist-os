@@ -66,16 +66,18 @@ void RegisterMmioProcessor::DefaultUTRLDBRHandler(UfsMockDevice& mock_device, ui
   ZX_ASSERT_MSG(UtrListRunStopReg::Get().ReadFrom(mock_device.GetRegisters()).value() == 1,
                 "UtrListRunStopReg value is not 1");
 
-  zx_paddr_t utrl_base_paddr =
+  zx_paddr_t transfer_request_list_base_paddr =
       (static_cast<zx_paddr_t>(
            UtrListBaseAddressUpperReg::Get().ReadFrom(mock_device.GetRegisters()).address_upper())
        << 32) |
       UtrListBaseAddressReg::Get().ReadFrom(mock_device.GetRegisters()).reg_value();
-  zx::result<zx_vaddr_t> utrl_base_addr = mock_device.MapDmaPaddr(utrl_base_paddr);
-  ZX_ASSERT_MSG(utrl_base_addr.is_ok(), "Failed to map address.");
+  zx::result<zx_vaddr_t> transfer_request_list_base_addr =
+      mock_device.MapDmaPaddr(transfer_request_list_base_paddr);
+  ZX_ASSERT_MSG(transfer_request_list_base_addr.is_ok(), "Failed to map address.");
 
-  cpp20::span<TransferRequestDescriptor> utr_descriptors(
-      reinterpret_cast<TransferRequestDescriptor*>(utrl_base_addr.value()), UfsMockDevice::kNutrs);
+  cpp20::span<TransferRequestDescriptor> transfer_request_descriptors(
+      reinterpret_cast<TransferRequestDescriptor*>(transfer_request_list_base_addr.value()),
+      UfsMockDevice::kNutrs);
 
   std::bitset<32> slots = value;
   for (uint32_t slot = 0; slot < slots.size(); ++slot) {
@@ -83,7 +85,21 @@ void RegisterMmioProcessor::DefaultUTRLDBRHandler(UfsMockDevice& mock_device, ui
       continue;
     }
 
-    mock_device.GetTransferRequestProcessor().HandleTransferRequest(utr_descriptors[slot]);
+    mock_device.GetTransferRequestProcessor().HandleTransferRequest(
+        transfer_request_descriptors[slot]);
+  }
+}
+
+void RegisterMmioProcessor::DefaultUTRLRSRHandler(UfsMockDevice& mock_device, uint32_t value) {
+  ZX_ASSERT_MSG(value <= 1, "Invalid argument, UTRLRSR register can only be set to 1 or 0. ");
+
+  if (HostControllerStatusReg::Get()
+          .ReadFrom(mock_device.GetRegisters())
+          .utp_transfer_request_list_ready()) {
+    UtrListRunStopReg::Get()
+        .ReadFrom(mock_device.GetRegisters())
+        .set_value(value)
+        .WriteTo(mock_device.GetRegisters());
   }
 }
 

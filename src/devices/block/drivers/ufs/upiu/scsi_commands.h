@@ -94,43 +94,44 @@ struct ScsiSenseData {
   uint8_t sense_key_specific2[2];
 };
 
+class ScsiCommandUpiu;
+
 // TODO(fxbug.dev/124835): Currently, |scsi_xfer| is used internally as an entry in the I/O command
 // queue. This will be replaced by an |IoCommand| struct containing a |block_op_t|.
 struct scsi_xfer
     : public fbl::DoublyLinkedListable<std::unique_ptr<scsi_xfer>, fbl::NodeOptions::None> {
-  std::unique_ptr<CommandUpiu> upiu;
+  std::unique_ptr<ScsiCommandUpiu> upiu;
   uint8_t lun;
   ScsiOpcode op;
-  uint64_t start;
-  uint64_t count;
+  uint64_t start_lba;
+  uint64_t block_count;
   void *buffer;
   zx_paddr_t buffer_phy;
   void *cmd_data;
   sync_completion_t *done;
   sync_completion_t local_event;
-  bool completion_done;
-  uint64_t current;
-  uint64_t total;
-  int status;
+  zx_status_t status;
   uint32_t block_size;
-  bool pm_bypass;
 };
 
 using uint24_t = struct {
   uint8_t byte[3];
 };
 
-inline uint24_t htobe24(uint32_t little) {
-  ZX_ASSERT_MSG(little <= 0xffffff, "Input %08xh is greater than 24 bits.", little);
-  uint24_t big{
-      static_cast<uint8_t>((little >> 16) & 0xff),
-      static_cast<uint8_t>((little >> 8) & 0xff),
-      static_cast<uint8_t>(little & 0xff),
+inline uint24_t htobe24(uint32_t unsigned_int_32) {
+  ZX_ASSERT_MSG(unsigned_int_32 <= 0xffffff, "Input %08xh is greater than 24 bits.",
+                unsigned_int_32);
+  uint24_t big_24{
+      static_cast<uint8_t>((unsigned_int_32 >> 16) & 0xff),
+      static_cast<uint8_t>((unsigned_int_32 >> 8) & 0xff),
+      static_cast<uint8_t>(unsigned_int_32 & 0xff),
   };
-  return big;
+  return big_24;
 }
 
-inline uint32_t betoh24(uint24_t big) { return big.byte[0] << 16 | big.byte[1] << 8 | big.byte[2]; }
+inline uint32_t betoh24(uint24_t big_24) {
+  return big_24.byte[0] << 16 | big_24.byte[1] << 8 | big_24.byte[2];
+}
 
 inline uint16_t UnalignedLoad16(const uint16_t *ptr) {
   uint16_t value;
@@ -166,10 +167,9 @@ class ScsiCommandUpiu : public CommandUpiu {
  public:
   DEF_SUBFIELD(data_.cdb[0], 7, 0, opcode);
 
-  ScsiCommandUpiu() = default;
   ~ScsiCommandUpiu() override = default;
 
-  explicit ScsiCommandUpiu(ScsiOpcode opcode) : CommandUpiu() {
+  explicit ScsiCommandUpiu(ScsiOpcode opcode) : CommandUpiu(UpiuCommandSetType::kScsi) {
     set_opcode(static_cast<uint8_t>(opcode));
   }
 
@@ -182,6 +182,7 @@ class ScsiCommandUpiu : public CommandUpiu {
   virtual uint32_t GetTransferBytes() const { return 0; }
 
   // for test
+  ScsiCommandUpiu() = default;
   // Because |CopyFrom()| does not copy member variables, classes that inherit from
   // |ScsiCommandUpiu| must copy member variables separately if they are declared.
   template <class T>
@@ -228,7 +229,9 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
     set_fua_nv(0);
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kDeviceToHost; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kDeviceToHost;
+  }
 
   std::optional<uint32_t> GetStartLba() const override {
     const uint32_t *lba = reinterpret_cast<const uint32_t *>(&data_.cdb[2]);  // cdb 2, 3, 4, 5
@@ -263,7 +266,9 @@ class ScsiStartStopUnitUpiu : public ScsiCommandUpiu {
     set_start(data->start);
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kNone; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kNone;
+  }
 
  private:
   // for test
@@ -302,7 +307,9 @@ class ScsiWrite10Upiu : public ScsiCommandUpiu {
     }
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kHostToDevice; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kHostToDevice;
+  }
 
   std::optional<uint32_t> GetStartLba() const override {
     const uint32_t *lba = reinterpret_cast<const uint32_t *>(&data_.cdb[2]);  // cdb 2, 3, 4, 5
@@ -332,7 +339,9 @@ class ScsiRequestSenseUpiu : public ScsiCommandUpiu {
     set_allocation_length(sizeof(ScsiSenseData));
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kDeviceToHost; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kDeviceToHost;
+  }
 
   uint32_t GetTransferBytes() const override { return allocation_length(); }
 };
@@ -357,7 +366,9 @@ class ScsiSecurityProtocolInUpiu : public ScsiCommandUpiu {
     UnalignedStore32(allocation_length, htobe32(length));
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kDeviceToHost; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kDeviceToHost;
+  }
 
   uint32_t GetTransferBytes() const override {
     const uint32_t *allocation_length =
@@ -395,7 +406,9 @@ class ScsiSecurityProtocolOutUpiu : public ScsiCommandUpiu {
     uint32_t *allocation_length = reinterpret_cast<uint32_t *>(&data_.cdb[6]);  // cdb 6,7,8,9
     UnalignedStore32(allocation_length, htobe32(length));
   }
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kHostToDevice; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kHostToDevice;
+  }
 
   uint32_t GetTransferBytes() const override {
     const uint32_t *allocation_length =
@@ -428,7 +441,9 @@ class ScsiSynchronizeCache10Upiu : public ScsiCommandUpiu {
     UnalignedStore16(number_of_logical_blocks, htobe16(length));
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kNone; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kNone;
+  }
 
  private:
   // for test
@@ -454,7 +469,9 @@ class ScsiUnmapUpiu : public ScsiCommandUpiu {
     UnalignedStore16(parameter_list_length, htobe16(param_len));
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kHostToDevice; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kHostToDevice;
+  }
 
   uint32_t GetTransferBytes() const override {
     const uint16_t *parameter_list_length =
@@ -495,7 +512,9 @@ class ScsiWriteBufferUpiu : public ScsiCommandUpiu {
     UnalignedStore24(parameter_list_length, htobe24(length));                       // in bytes
   }
 
-  UtrdDataDirection GetDataDirection() const override { return UtrdDataDirection::kHostToDevice; }
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kHostToDevice;
+  }
 
   uint32_t GetTransferBytes() const override {
     const uint24_t *parameter_list_length =

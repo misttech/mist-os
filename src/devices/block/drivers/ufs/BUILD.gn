@@ -27,17 +27,10 @@ group("tests") {
 
 source_set("shared") {
   sources = [
-    "registers.h",
+    "request_list.cc",
+    "transfer_request_processor.cc",
     "ufs.cc",
-    "ufs.h",
     "uic/uic_commands.cc",
-    "uic/uic_commands.h",
-    "upiu/attributes.h",
-    "upiu/descriptors.h",
-    "upiu/flags.h",
-    "upiu/query_request.h",
-    "upiu/scsi_commands.h",
-    "upiu/upiu_transactions.h",
   ]
   configs += [ "//build/config:all_source" ]
   deps = [
@@ -50,6 +43,7 @@ source_set("shared") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]
@@ -94,7 +88,7 @@ test_deps = [
 test("ufs-unit-tests-bin") {
   output_name = "ufs-unit-tests"
   sources = [
-    "test/init.cc",
+    "test/init-test.cc",
     "test/mock-device/fake-dma-handler.cc",
     "test/mock-device/query-request-processor.cc",
     "test/mock-device/register-mmio-processor.cc",
@@ -102,7 +96,10 @@ test("ufs-unit-tests-bin") {
     "test/mock-device/transfer-request-processor.cc",
     "test/mock-device/ufs-mock-device.cc",
     "test/mock-device/uiccmd-processor.cc",
+    "test/query-request-test.cc",
     "test/register-test.cc",
+    "test/request-processor-test.cc",
+    "test/scsi-command-test.cc",
     "test/uic-test.cc",
     "test/unit-lib.cc",
   ]

@@ -137,27 +137,27 @@ TEST_F(RegisterTest, HostControllerEnable) {
 }
 
 TEST_F(RegisterTest, UtpTransferRequestListBaseAddress) {
-  // TODO(fxbug.dev/124835): Writing unit test after a UtrList is implemented
+  // TODO(fxbug.dev/124835): Writing unit test after a transfer request list is implemented
 }
 
 TEST_F(RegisterTest, UtpTransferRequestListDoorbell) {
-  // TODO(fxbug.dev/124835): Writing unit test after a UtrList is implemented
+  // TODO(fxbug.dev/124835): Writing unit test after a transfer request list is implemented
 }
 
 TEST_F(RegisterTest, UtpTransferRequestListRunStop) {
-  // TODO(fxbug.dev/124835): Writing unit test after a UtrList is implemented
+  // TODO(fxbug.dev/124835): Writing unit test after a transfer request list is implemented
 }
 
 TEST_F(RegisterTest, UtpTaskManagementRequestListBaseAddress) {
-  // TODO(fxbug.dev/124835): Writing unit test after a UtmrList is implemented
+  // TODO(fxbug.dev/124835): Writing unit test after a task management list is implemented
 }
 
 TEST_F(RegisterTest, UtpTaskManagementRequestListDoorbell) {
-  // TODO(fxbug.dev/124835): Writing unit test after a UtmrList is implemented
+  // TODO(fxbug.dev/124835): Writing unit test after a task management list is implemented
 }
 
 TEST_F(RegisterTest, UTPTaskManagementRequestListRunStop) {
-  // TODO(fxbug.dev/124835): Writing unit test after a UtmrList is implemented
+  // TODO(fxbug.dev/124835): Writing unit test after a task management list is implemented
 }
 
 }  // namespace ufs

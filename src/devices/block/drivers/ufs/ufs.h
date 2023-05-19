@@ -16,6 +16,7 @@
 #include <fbl/string_printf.h>
 
 #include "registers.h"
+#include "transfer_request_processor.h"
 #include "upiu/attributes.h"
 #include "upiu/descriptors.h"
 #include "upiu/flags.h"
@@ -23,7 +24,7 @@
 namespace ufs {
 
 constexpr uint32_t kMaxLun = 8;
-
+constexpr uint32_t kDeviceInitTimeoutMs = 2000;
 constexpr uint32_t kHostControllerTimeoutUs = 1000;
 
 enum NotifyEvent {
@@ -31,10 +32,19 @@ enum NotifyEvent {
   kReset,
   kPreLinkStartup,
   kPostLinkStartup,
-  kSetupTransferUtrl,
+  kSetupTransferRequestList,
   kDeviceInitDone,
   kPrePowerModeChange,
   kPostPowerModeChange,
+};
+
+struct BlockDevice {
+  bool is_scanned = false;
+  std::string name;
+  uint8_t lun = 0;
+  off_t total_size = 0;
+  size_t block_size = 0;
+  uint32_t block_count = 0;
 };
 
 class Ufs;
@@ -66,6 +76,12 @@ class Ufs : public UfsDeviceType {
   inspect::Node &inspect_node() { return inspect_node_; }
 
   fdf::MmioBuffer &GetMmio() { return mmio_; }
+  BlockDevice &GetBlockDevice(uint8_t lun) { return block_devices_[lun]; }
+
+  TransferRequestProcessor &GetTransferRequestProcessor() const {
+    ZX_DEBUG_ASSERT(transfer_request_processor_ != nullptr);
+    return *transfer_request_processor_;
+  }
 
   // Used to register a platform-specific NotifyEventCallback, which handles variants and quirks for
   // each host interface platform.
@@ -83,8 +99,18 @@ class Ufs : public UfsDeviceType {
   zx_status_t WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t timeout_us,
                               const fbl::String &timeout_message);
 
+  sync_completion_t &GetScsiEvent() { return scsi_event_; }
+
+  void QueueScsiCommand(std::unique_ptr<scsi_xfer> xfer);
+
  private:
   friend class UfsTest;
+  // TODO(fxbug.dev/124835): Irq threads and scsi threads will be refactored.
+  int IrqLoop();
+  int ScsiLoop();
+
+  // Interrupt service routine. Check that the request is complete.
+  zx::result<> Isr();
 
   // Initialize the UFS controller and bind the logical units.
   zx_status_t Init();
@@ -102,9 +128,33 @@ class Ufs : public UfsDeviceType {
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
 
-  // Controller internal information.
-  uint32_t number_of_utmr_slots_;
-  uint32_t number_of_utr_slots_;
+  // TODO(fxbug.dev/124835): Remove mock information when logical unit is implemented.
+  static constexpr size_t kMockBlockSize = 4096;
+  static constexpr uint32_t kMockTotalDeviceCapacity = (1 << 24);  // 16MB
+
+  BlockDevice block_devices_[kMaxLun]{
+      // TODO(fxbug.dev/124835): Temporarily add a single block device since block device scan is
+      // not yet implemented.
+      {
+          true,
+          "mock-device",
+          0,
+          kMockTotalDeviceCapacity,
+          kMockBlockSize,
+          static_cast<uint32_t>(kMockTotalDeviceCapacity / kMockBlockSize),
+      }};
+
+  // TODO(fxbug.dev/124835): Replace SCSI thread to I/O thread
+  thrd_t scsi_thread_ = 0;
+  thrd_t irq_thread_ = 0;
+  bool scsi_thread_started_ = false;
+  bool irq_thread_started_ = false;
+
+  sync_completion_t scsi_event_;
+  std::mutex xfer_list_lock_;
+  fbl::DoublyLinkedList<std::unique_ptr<scsi_xfer>> scsi_xfer_list_ TA_GUARDED(xfer_list_lock_);
+
+  std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
 
   // Callback function to perform when the host controller is notified.
   HostControllerCallback host_controller_callback_;

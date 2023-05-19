@@ -49,6 +49,12 @@ class QueryRequestProcessor {
   static zx_status_t DefaultSetFlagHandler(UfsMockDevice &mock_device,
                                            QueryRequestUpiu::Data &req_upiu,
                                            QueryResponseUpiu::Data &rsp_upiu);
+  static zx_status_t DefaultToggleFlagHandler(UfsMockDevice &mock_device,
+                                              QueryRequestUpiu::Data &req_upiu,
+                                              QueryResponseUpiu::Data &rsp_upiu);
+  static zx_status_t DefaultClearFlagHandler(UfsMockDevice &mock_device,
+                                             QueryRequestUpiu::Data &req_upiu,
+                                             QueryResponseUpiu::Data &rsp_upiu);
 
   DEF_DEFAULT_HANDLER_BEGIN(QueryOpcode, QueryRequestHandler)
   DEF_DEFAULT_HANDLER(QueryOpcode::kReadDescriptor, DefaultReadDescriptorHandler)
@@ -56,6 +62,8 @@ class QueryRequestProcessor {
   DEF_DEFAULT_HANDLER(QueryOpcode::kWriteAttribute, DefaultWriteAttributeHandler)
   DEF_DEFAULT_HANDLER(QueryOpcode::kReadFlag, DefaultReadFlagHandler)
   DEF_DEFAULT_HANDLER(QueryOpcode::kSetFlag, DefaultSetFlagHandler)
+  DEF_DEFAULT_HANDLER(QueryOpcode::kToggleFlag, DefaultToggleFlagHandler)
+  DEF_DEFAULT_HANDLER(QueryOpcode::kClearFlag, DefaultClearFlagHandler)
   DEF_DEFAULT_HANDLER_END()
 
  private:

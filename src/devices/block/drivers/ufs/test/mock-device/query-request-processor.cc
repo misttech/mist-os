@@ -91,12 +91,37 @@ zx_status_t QueryRequestProcessor::DefaultSetFlagHandler(UfsMockDevice &mock_dev
     return ZX_ERR_INVALID_ARGS;
   }
 
-  mock_device.SetFlag(static_cast<Flags>(req_upiu.idn), betoh32(req_upiu.value));
+  mock_device.SetFlag(static_cast<Flags>(req_upiu.idn), true);
   if (req_upiu.idn == static_cast<uint8_t>(Flags::fDeviceInit)) {
     mock_device.SetFlag(Flags::fDeviceInit, false);
     rsp_upiu.flag_value = 0;
+  } else {
+    rsp_upiu.flag_value = 1;
   }
 
+  return ZX_OK;
+}
+
+zx_status_t QueryRequestProcessor::DefaultToggleFlagHandler(UfsMockDevice &mock_device,
+                                                            QueryRequestUpiu::Data &req_upiu,
+                                                            QueryResponseUpiu::Data &rsp_upiu) {
+  if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  mock_device.SetFlag(static_cast<Flags>(req_upiu.idn),
+                      !mock_device.GetFlag(static_cast<Flags>(req_upiu.idn)));
+  return ZX_OK;
+}
+
+zx_status_t QueryRequestProcessor::DefaultClearFlagHandler(UfsMockDevice &mock_device,
+                                                           QueryRequestUpiu::Data &req_upiu,
+                                                           QueryResponseUpiu::Data &rsp_upiu) {
+  if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  mock_device.SetFlag(static_cast<Flags>(req_upiu.idn), false);
   return ZX_OK;
 }
 

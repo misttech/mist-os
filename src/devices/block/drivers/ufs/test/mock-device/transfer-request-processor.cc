@@ -9,10 +9,10 @@
 namespace ufs {
 namespace ufs_mock_device {
 
-void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &utr_desc) {
+void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &descriptor) {
   zx_paddr_t command_desc_base_paddr =
-      (static_cast<zx_paddr_t>(utr_desc.utp_command_descriptor_base_address_upper()) << 32) |
-      utr_desc.utp_command_descriptor_base_address();
+      (static_cast<zx_paddr_t>(descriptor.utp_command_descriptor_base_address_upper()) << 32) |
+      descriptor.utp_command_descriptor_base_address();
 
   zx::result<zx_vaddr_t> command_desc_base_addr = mock_device_.MapDmaPaddr(command_desc_base_paddr);
   ZX_ASSERT_MSG(command_desc_base_addr.is_ok(), "Failed to map address.");
@@ -20,11 +20,12 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
   CommandDescriptorData command_descriptor_data;
   command_descriptor_data.command_upiu_base_addr = command_desc_base_addr.value();
   command_descriptor_data.response_upiu_base_addr =
-      command_desc_base_addr.value() + utr_desc.response_upiu_offset() * sizeof(uint32_t);
-  command_descriptor_data.response_upiu_length = utr_desc.response_upiu_length() * sizeof(uint32_t);
+      command_desc_base_addr.value() + descriptor.response_upiu_offset() * sizeof(uint32_t);
+  command_descriptor_data.response_upiu_length =
+      descriptor.response_upiu_length() * sizeof(uint32_t);
   command_descriptor_data.prdt_base_addr =
-      command_desc_base_addr.value() + utr_desc.prdt_offset() * sizeof(uint32_t);
-  command_descriptor_data.prdt_length = utr_desc.prdt_length() * sizeof(uint32_t);
+      command_desc_base_addr.value() + descriptor.prdt_offset() * sizeof(uint32_t);
+  command_descriptor_data.prdt_length = descriptor.prdt_length() * sizeof(uint32_t);
 
   UpiuHeader *command_upiu_header =
       reinterpret_cast<UpiuHeader *>(command_descriptor_data.command_upiu_base_addr);
@@ -45,14 +46,14 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
   }
 
   if (status == ZX_OK) {
-    utr_desc.set_overall_command_status(OverallCommandStatus::kSuccess);
+    descriptor.set_overall_command_status(OverallCommandStatus::kSuccess);
   } else {
-    utr_desc.set_overall_command_status(OverallCommandStatus::kInvalid);
+    descriptor.set_overall_command_status(OverallCommandStatus::kInvalid);
   }
 
-  if ((utr_desc.overall_command_status() == OverallCommandStatus::kSuccess &&
-       utr_desc.interrupt()) ||
-      utr_desc.overall_command_status() != OverallCommandStatus::kSuccess) {
+  if ((descriptor.overall_command_status() == OverallCommandStatus::kSuccess &&
+       descriptor.interrupt()) ||
+      descriptor.overall_command_status() != OverallCommandStatus::kSuccess) {
     InterruptStatusReg::Get()
         .ReadFrom(mock_device_.GetRegisters())
         .set_utp_transfer_request_completion_status(true)

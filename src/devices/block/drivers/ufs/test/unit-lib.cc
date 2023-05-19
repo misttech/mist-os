@@ -14,7 +14,7 @@ namespace ufs {
 
 namespace {
 // Recursively unbind and release all devices.
-zx_status_t ProcessDeviceRemoval(MockDevice* device) {
+zx_status_t ProcessDeviceRemoval(MockDevice *device) {
   device->UnbindOp();
   // deleting children, so use a while loop:
   while (!device->children().empty()) {
@@ -67,5 +67,31 @@ void UfsTest::RunInit() {
 }
 
 void UfsTest::TearDown() { ProcessDeviceRemoval(device_); }
+
+zx::result<> UfsTest::SendCommand(uint8_t slot, TransferRequestDescriptorDataDirection ddir,
+                                  uint16_t resp_offset, uint16_t resp_len, uint16_t prdt_offset,
+                                  uint16_t prdt_len, bool sync) {
+  return ufs_->GetTransferRequestProcessor().SendCommand(slot, ddir, resp_offset, resp_len,
+                                                         prdt_offset, prdt_len, sync);
+}
+
+zx::result<std::array<zx_paddr_t, 2>> UfsTest::MapAndGetPhysicalAddress(
+    uint32_t option, zx::unowned_vmo &vmo, fzl::VmoMapper &mapper, zx::pmt &pmt,
+    uint64_t offset_vmo, uint64_t length) {
+  const uint32_t kPageSize = zx_system_get_page_size();
+  if (zx_status_t status = mapper.Map(*vmo, offset_vmo * kPageSize, length); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  std::array<zx_paddr_t, 2> paddrs;
+  if (zx_status_t status = mock_device_->GetFakeBti().pin(
+          option, *vmo, offset_vmo * kPageSize, length, paddrs.data(), length / kPageSize, &pmt);
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok(paddrs);
+}
 
 }  // namespace ufs

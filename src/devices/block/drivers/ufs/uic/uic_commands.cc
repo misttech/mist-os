@@ -64,7 +64,7 @@ zx::result<> UicCommand::SendUicCommand(uint32_t argument1, uint32_t argument2,
   if (GetOpcode() != UicCommandOpcode::kDmeReset) {
     uint32_t result_code = UicCommandArgument2Reg::Get().ReadFrom(&mmio).result_code();
     if (result_code != UicCommandArgument2Reg::GenericErrorCode::kSuccess) {
-      zxlogf(ERROR, "Failed to send UIC command, result_code = %u\n", result_code);
+      zxlogf(ERROR, "Failed to send UIC command, result_code = %u", result_code);
       return zx::error(ZX_ERR_INTERNAL);
     }
   }

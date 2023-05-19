@@ -37,7 +37,7 @@ class TransferRequestProcessor {
   TransferRequestProcessor &operator=(const TransferRequestProcessor &&) = delete;
   ~TransferRequestProcessor() = default;
   explicit TransferRequestProcessor(UfsMockDevice &mock_device) : mock_device_(mock_device) {}
-  void HandleTransferRequest(TransferRequestDescriptor &utr_desc);
+  void HandleTransferRequest(TransferRequestDescriptor &descriptor);
 
   static zx_status_t DefaultNopOutHandler(UfsMockDevice &mock_device,
                                           CommandDescriptorData command_descriptor_data);

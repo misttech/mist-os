@@ -34,9 +34,7 @@ class RegisterMmioProcessor {
   static void DefaultISHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultHCEHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultUTRLDBRHandler(UfsMockDevice& mock_device, uint32_t value);
-  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTRLRSR handler
-  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLDBR handler
-  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLRSR handler
+  static void DefaultUTRLRSRHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultUICCMDHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultUICCMDARG1Handler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultUICCMDARG2Handler(UfsMockDevice& mock_device, uint32_t value);
@@ -55,7 +53,7 @@ class RegisterMmioProcessor {
   // RegisterMap::kUTRLBA does not require a handler.
   // RegisterMap::kUTRLBAU does not require a handler.
   DEF_DEFAULT_HANDLER(RegisterMap::kUTRLDBR, DefaultUTRLDBRHandler)
-  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTRLRSR handler
+  DEF_DEFAULT_HANDLER(RegisterMap::kUTRLRSR, DefaultUTRLRSRHandler)
   // UTP Task Management
   // RegisterMap::kUTMRLBA does not require a handler.
   // RegisterMap::kUTMRLBAU does not require a handler.

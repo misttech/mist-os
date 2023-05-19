@@ -12,7 +12,7 @@ namespace ufs {
 constexpr uint8_t kCommandTypeUfsStorage = 0x1;
 
 // UFSHCI Specification Version 3.0, section 6.1.1 "UTP Transfer Request Descriptor".
-enum UtrdDataDirection {
+enum TransferRequestDescriptorDataDirection {
   kNone = 0,
   kHostToDevice,
   kDeviceToHost,
@@ -39,7 +39,7 @@ struct TransferRequestDescriptor {
 
   // dword 0
   DEF_SUBFIELD(dwords[0], 31, 28, command_type);
-  DEF_SUBFIELD(dwords[0], 26, 25, dd);
+  DEF_SUBFIELD(dwords[0], 26, 25, data_direction);
   DEF_SUBBIT(dwords[0], 24, interrupt);
   DEF_SUBBIT(dwords[0], 23, ce);
   DEF_SUBFIELD(dwords[0], 7, 0, cci);
@@ -73,7 +73,7 @@ struct PhysicalRegionDescriptionTableEntry {
   // dword 1
   DEF_SUBFIELD(dwords[1], 31, 0, data_base_address_upper);
   // dword 3
-  DEF_SUBFIELD(dwords[3], 17, 0, data_byte_count);
+  DEF_SUBFIELD(dwords[3], 17, 0, data_byte_count);  // Maximum byte count is 256KB
 } __PACKED;
 static_assert(sizeof(PhysicalRegionDescriptionTableEntry) == 16,
               "PhysicalRegionDescriptionTableEntry struct must be 16 bytes");
