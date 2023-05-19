@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/cli"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 )
 
 type config struct {
@@ -60,5 +61,25 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 }
 
 func (c *config) validate() error {
-	return c.buildConfig.Validate()
+	if err := c.buildConfig.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.installerConfig.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.deviceConfig.Validate(); err != nil {
+		return err
+	}
+
+	if err := util.ValidatePath(c.afterInitScript); err != nil {
+		return err
+	}
+
+	if err := util.ValidatePath(c.afterTestScript); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/updater"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 )
 
@@ -53,15 +54,17 @@ type InstallerConfig struct {
 	omahaAddress                string
 	omahaRequireCup             bool
 	workaroundOtaNoRewriteRules bool
+	testDataPath                string
 }
 
 func NewInstallerConfig(fs *flag.FlagSet, testDataPath string) (*InstallerConfig, error) {
 	c := &InstallerConfig{}
 
+	c.testDataPath = testDataPath
 	fs.StringVar(&c.avbToolPath, "avbtool-path", filepath.Join(testDataPath, "avbtool.py"), "path to the avbtool binary")
 	fs.StringVar(&c.installerMode, "installer", SystemUpdateChecker, "the installation mode (default: system-update-checker)")
-	fs.StringVar(&c.keyMetadataPath, "vbmeta-key-metadata", filepath.Join(testDataPath, "avb_atx_metadata.bin"), "path to the vbmeta public key metadata")
-	fs.StringVar(&c.keyPath, "vbmeta-key", filepath.Join(testDataPath, "atx_psk.pem"), "path to the vbmeta private key")
+	fs.StringVar(&c.keyMetadataPath, "vbmeta-key-metadata", "", "path to the vbmeta public key metadata")
+	fs.StringVar(&c.keyPath, "vbmeta-key", "", "path to the vbmeta private key")
 	fs.StringVar(&c.omahaAddress, "omaha-address", ":0", "which address to serve omaha server on (default random)")
 	fs.StringVar(&c.omahaToolPath, "omaha-tool-path", filepath.Join(testDataPath, "mock-omaha-server"), "the path of the mock-omaha-server binary to invoke.")
 	// This must match the key_id in
@@ -76,8 +79,31 @@ func NewInstallerConfig(fs *flag.FlagSet, testDataPath string) (*InstallerConfig
 	return c, nil
 }
 
+func (c *InstallerConfig) Validate() error {
+	for _, s := range []string{
+		c.avbToolPath,
+		c.keyMetadataPath,
+		c.keyPath,
+		c.omahaToolPath,
+		c.privateKeyPath,
+		c.zbiToolPath,
+	} {
+		if err := util.ValidatePath(s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *InstallerConfig) AVBTool() (*avb.AVBTool, error) {
 	if c.avbTool == nil {
+		if c.keyPath == "" {
+			c.keyPath = filepath.Join(c.testDataPath, "atx_psk.pem")
+		}
+		if c.keyMetadataPath == "" {
+			c.keyMetadataPath = filepath.Join(c.testDataPath, "avb_atx_metadata.bin")
+		}
+
 		avbTool, err := avb.NewAVBTool(c.avbToolPath, c.keyPath, c.keyMetadataPath)
 		if err != nil {
 			return nil, err

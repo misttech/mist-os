@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/cli"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 )
 
 type config struct {
@@ -75,6 +76,22 @@ func (c *config) validate() error {
 
 	if c.cycleCount < 1 {
 		return fmt.Errorf("-cycle-count must be >= 1")
+	}
+
+	if err := c.deviceConfig.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.installerConfig.Validate(); err != nil {
+		return err
+	}
+
+	if err := util.ValidatePath(c.afterInitScript); err != nil {
+		return err
+	}
+
+	if err := util.ValidatePath(c.afterTestScript); err != nil {
+		return err
 	}
 
 	return nil

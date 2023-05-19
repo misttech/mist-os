@@ -267,3 +267,17 @@ func RunWithDeadline(ctx context.Context, deadline time.Time, f func() error) er
 		return fmt.Errorf("Function timed out: %w", ctx.Err())
 	}
 }
+
+func ValidatePath(path string) error {
+	if path != "" {
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("no such file or directory exists: %q", path)
+			} else {
+				return fmt.Errorf("unexpected error reading %q: %v", path, err)
+			}
+		}
+	}
+
+	return nil
+}
