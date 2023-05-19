@@ -9,6 +9,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/bin/driver_manager/driver_development/info_iterator.h"
 #include "src/devices/bin/driver_manager/tests/multiple_device_test.h"
 
 class DriverDevelopmentTest : public MultipleDeviceTestCase {};
@@ -26,7 +27,8 @@ TEST_F(DriverDevelopmentTest, DeviceInfo) {
   ASSERT_EQ(ZX_OK, result.status_value());
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_driver_development::DeviceInfoIterator>();
-  auto iterator = std::make_unique<DeviceInfoIterator>(std::move(arena), std::move(*result));
+  auto iterator = std::make_unique<driver_development::DeviceInfoIterator>(std::move(arena),
+                                                                           std::move(*result));
 
   async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
   fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), std::move(iterator));
@@ -65,7 +67,8 @@ TEST_F(DriverDevelopmentTest, UnknownFlagsWork) {
   ASSERT_EQ(ZX_OK, result.status_value());
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_driver_development::DeviceInfoIterator>();
-  auto iterator = std::make_unique<DeviceInfoIterator>(std::move(arena), std::move(*result));
+  auto iterator = std::make_unique<driver_development::DeviceInfoIterator>(std::move(arena),
+                                                                           std::move(*result));
 
   async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
   fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), std::move(iterator));

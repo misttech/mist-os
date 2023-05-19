@@ -13,8 +13,6 @@ namespace fdm = fuchsia_device_manager;
 
 namespace {
 
-constexpr size_t kMaxEntries = 100;
-
 const char* get_protocol_name(uint32_t protocol_id) {
   switch (protocol_id) {
 #define DDK_PROTOCOL_DEF(tag, val, name, flags) \
@@ -136,29 +134,4 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
     device_info_vec.push_back(device_info.Build());
   }
   return zx::ok(std::move(device_info_vec));
-}
-
-void DeviceInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
-  if (offset_ >= list_.size()) {
-    completer.Reply(fidl::VectorView<fdd::wire::DeviceInfo>{});
-    return;
-  }
-
-  auto result = cpp20::span(&list_[offset_], std::min(kMaxEntries, list_.size() - offset_));
-  offset_ += result.size();
-
-  completer.Reply(
-      fidl::VectorView<fdd::wire::DeviceInfo>::FromExternal(result.data(), result.size()));
-}
-
-void CompositeInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
-  if (offset_ >= list_.size()) {
-    completer.Reply(fidl::VectorView<fdd::wire::CompositeInfo>{});
-    return;
-  }
-
-  auto result = cpp20::span(&list_[offset_], std::min(kMaxEntries, list_.size() - offset_));
-  offset_ += result.size();
-  completer.Reply(
-      fidl::VectorView<fdd::wire::CompositeInfo>::FromExternal(result.data(), result.size()));
 }

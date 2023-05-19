@@ -13,35 +13,6 @@
 #include "src/devices/bin/driver_manager/driver.h"
 #include "src/devices/bin/driver_manager/v1/unbind_task.h"
 
-class DeviceInfoIterator : public fidl::WireServer<fuchsia_driver_development::DeviceInfoIterator> {
- public:
-  explicit DeviceInfoIterator(std::unique_ptr<fidl::Arena<512>> arena,
-                              std::vector<fuchsia_driver_development::wire::DeviceInfo> list)
-      : arena_(std::move(arena)), list_(std::move(list)) {}
-
-  void GetNext(GetNextCompleter::Sync& completer) override;
-
- private:
-  size_t offset_ = 0;
-  std::unique_ptr<fidl::Arena<512>> arena_;
-  std::vector<fuchsia_driver_development::wire::DeviceInfo> list_;
-};
-
-class CompositeInfoIterator
-    : public fidl::WireServer<fuchsia_driver_development::CompositeInfoIterator> {
- public:
-  explicit CompositeInfoIterator(std::unique_ptr<fidl::Arena<512>> arena,
-                                 std::vector<fuchsia_driver_development::wire::CompositeInfo> list)
-      : arena_(std::move(arena)), list_(std::move(list)) {}
-
-  void GetNext(GetNextCompleter::Sync& completer) override;
-
- private:
-  size_t offset_ = 0;
-  std::unique_ptr<fidl::Arena<512>> arena_;
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> list_;
-};
-
 zx::result<std::vector<fuchsia_driver_development::wire::DeviceInfo>> GetDeviceInfo(
     fidl::AnyArena& allocator, const std::vector<fbl::RefPtr<const Device>>& devices);
 

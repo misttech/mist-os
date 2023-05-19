@@ -11,6 +11,7 @@
 #include <queue>
 #include <unordered_set>
 
+#include "src/devices/bin/driver_manager/driver_development/info_iterator.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 
@@ -30,30 +31,6 @@ void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
       bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
-
-namespace {
-class DeviceInfoIterator : public fidl::WireServer<fdd::DeviceInfoIterator> {
- public:
-  explicit DeviceInfoIterator(std::unique_ptr<fidl::Arena<512>> arena,
-                              std::vector<fdd::wire::DeviceInfo> list)
-      : arena_(std::move(arena)), list_(std::move(list)) {}
-
-  void GetNext(GetNextCompleter::Sync& completer) {
-    constexpr size_t kMaxEntries = 15;
-    auto result =
-        cpp20::span(list_.begin() + offset_, std::min(kMaxEntries, list_.size() - offset_));
-    offset_ += result.size();
-
-    completer.Reply(
-        fidl::VectorView<fdd::wire::DeviceInfo>::FromExternal(result.data(), result.size()));
-  }
-
- private:
-  size_t offset_ = 0;
-  std::unique_ptr<fidl::Arena<512>> arena_;
-  std::vector<fdd::wire::DeviceInfo> list_;
-};
-}  // namespace
 
 zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
                                                    const dfv2::Node* node) {
@@ -171,7 +148,8 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
     }
     device_infos.push_back(std::move(result.value()));
   }
-  auto iterator = std::make_unique<DeviceInfoIterator>(std::move(arena), std::move(device_infos));
+  auto iterator = std::make_unique<driver_development::DeviceInfoIterator>(std::move(arena),
+                                                                           std::move(device_infos));
   fidl::BindServer(
       this->dispatcher_, std::move(request->iterator), std::move(iterator),
       [](auto* self, fidl::UnbindInfo info, fidl::ServerEnd<fdd::DeviceInfoIterator> server_end) {

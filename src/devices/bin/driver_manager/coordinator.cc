@@ -52,6 +52,7 @@
 #include <src/lib/fsl/vmo/vector.h>
 
 #include "lib/fidl/cpp/wire/channel.h"
+#include "src/devices/bin/driver_manager/driver_development/info_iterator.h"
 #include "src/devices/bin/driver_manager/package_resolver.h"
 #include "src/devices/bin/driver_manager/v1/composite_node_spec_v1.h"
 #include "src/devices/bin/driver_manager/v1/driver_development.h"
@@ -827,7 +828,8 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
     return;
   }
 
-  auto iterator = std::make_unique<DeviceInfoIterator>(std::move(arena), std::move(*result));
+  auto iterator = std::make_unique<driver_development::DeviceInfoIterator>(std::move(arena),
+                                                                           std::move(*result));
   fidl::BindServer(dispatcher(), std::move(request->iterator), std::move(iterator),
                    [](auto* server, fidl::UnbindInfo info, auto channel) {
                      if (!info.is_peer_closed()) {
@@ -840,7 +842,8 @@ void Coordinator::GetCompositeInfo(GetCompositeInfoRequestView request,
                                    GetCompositeInfoCompleter::Sync& completer) {
   auto arena = std::make_unique<fidl::Arena<512>>();
   auto list = device_manager_->GetCompositeInfoList(*arena);
-  auto iterator = std::make_unique<CompositeInfoIterator>(std::move(arena), std::move(list));
+  auto iterator = std::make_unique<driver_development::CompositeInfoIterator>(std::move(arena),
+                                                                              std::move(list));
   fidl::BindServer(dispatcher(), std::move(request->iterator), std::move(iterator),
                    [](auto* server, fidl::UnbindInfo info, auto channel) {
                      if (!info.is_peer_closed()) {

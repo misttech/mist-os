@@ -156,6 +156,7 @@ source_set("lib") {
     ":manifest_parser",
     "composite_node_spec:lib",
     "devfs",
+    "driver_development:lib",
     "v2:driver_runner",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",
