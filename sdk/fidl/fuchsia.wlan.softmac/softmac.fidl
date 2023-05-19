@@ -289,13 +289,6 @@ type WlanSoftmacStartActiveScanRequest = table {
     9: max_probes_per_channel uint8;
 };
 
-type WlanVhtOp = struct {
-    vht_cbw uint8;
-    center_freq_seg0 uint8;
-    center_freq_seg1 uint8;
-    basic_mcs uint16;
-};
-
 // IEEE Std 802.11-2016, 9.4.2.57
 type WlanHtOp = struct {
     primary_channel uint8;
@@ -364,7 +357,7 @@ type WlanAssociationConfig = table {
 
     /// IEEE Std 802.11-2016, 9.4.2.158, 159
    11: vht_cap ieee80211.VhtCapabilities;
-   12: vht_op WlanVhtOp;
+   12: vht_op ieee80211.VhtOperation;
 };
 
 /// The wlansoftmac C++ driver establishes a FIDL channel serving the WlanSoftmacBridge

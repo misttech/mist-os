@@ -812,21 +812,17 @@ struct VhtOperation {
     // 4 - 255 reserved
   };
 
-  static VhtOperation FromDdk(const wlan_vht_op_t& ddk) {
+  static VhtOperation FromDdk(const vht_operation_t& ddk) {
     VhtOperation dst{};
-    dst.vht_cbw = ddk.vht_cbw;
-    dst.center_freq_seg0 = ddk.center_freq_seg0;
-    dst.center_freq_seg1 = ddk.center_freq_seg1;
-    dst.basic_mcs.set_val(ddk.basic_mcs);
+    static_assert(sizeof(dst) == sizeof(ddk.bytes));
+    memcpy(&dst, ddk.bytes, sizeof(ddk.bytes));
     return dst;
   }
 
-  wlan_vht_op_t ToDdk() const {
-    wlan_vht_op_t dst{};
-    dst.vht_cbw = vht_cbw;
-    dst.center_freq_seg0 = center_freq_seg0;
-    dst.center_freq_seg1 = center_freq_seg1;
-    dst.basic_mcs = basic_mcs.val();
+  vht_operation_t ToDdk() const {
+    vht_operation_t dst{};
+    static_assert(sizeof(dst.bytes) == sizeof(*this));
+    memcpy(&dst.bytes, this, sizeof(dst.bytes));
     return dst;
   }
 

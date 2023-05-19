@@ -106,19 +106,16 @@ TEST(VhtCapabilities, DdkConversion) {
   EXPECT_EQ(0x0011223344556677U, ieee.vht_mcs_nss.as_uint64());
 
   auto ddk2 = ieee.ToDdk();
-  for (size_t i = 0; i < sizeof(ddk.bytes); i++) {
-    EXPECT_EQ(ddk.bytes[i], ddk2.bytes[i]);
-  }
+  EXPECT_EQ(0, memcmp(ddk.bytes, ddk2.bytes, sizeof(ddk.bytes)));
 }
 
 TEST(VhtOperation, DdkConversion) {
-  wlan_vht_op ddk{
-      .vht_cbw = 0x01,
-      .center_freq_seg0 = 42,
-      .center_freq_seg1 = 106,
-      .basic_mcs = 0x1122,
-  };
-
+  vht_operation_t ddk{.bytes = {
+                          0x01,        // cbw
+                          42,          // center_freq_seg0
+                          106,         // center freq seg1
+                          0x22, 0x11,  // basic_mcs
+                      }};
   auto ieee = VhtOperation::FromDdk(ddk);
   EXPECT_EQ(0x01U, ieee.vht_cbw);
   EXPECT_EQ(42U, ieee.center_freq_seg0);
@@ -126,10 +123,7 @@ TEST(VhtOperation, DdkConversion) {
   EXPECT_EQ(0x1122U, ieee.basic_mcs.val());
 
   auto ddk2 = ieee.ToDdk();
-  EXPECT_EQ(ddk.vht_cbw, ddk2.vht_cbw);
-  EXPECT_EQ(ddk.center_freq_seg0, ddk2.center_freq_seg0);
-  EXPECT_EQ(ddk.center_freq_seg1, ddk2.center_freq_seg1);
-  EXPECT_EQ(ddk.basic_mcs, ddk2.basic_mcs);
+  EXPECT_EQ(0, memcmp(ddk.bytes, ddk2.bytes, sizeof(ddk.bytes)));
 }
 
 }  // namespace

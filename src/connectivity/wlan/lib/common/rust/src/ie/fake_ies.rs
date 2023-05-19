@@ -119,10 +119,6 @@ pub fn fake_vht_capabilities() -> VhtCapabilities {
     }
 }
 
-pub fn fake_vht_op_cbw(vht_cbw: VhtChannelBandwidth) -> VhtOperation {
-    VhtOperation { vht_cbw, ..fake_vht_operation() }
-}
-
 pub fn fake_vht_operation() -> VhtOperation {
     VhtOperation {
         vht_cbw: VhtChannelBandwidth::CBW_80_160_80P80,

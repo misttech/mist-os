@@ -1256,15 +1256,11 @@ pub struct VhtOperation {
     pub basic_mcs_nss: VhtMcsNssMap, // u16
 }
 
-impl From<VhtOperation> for fidl_softmac::WlanVhtOp {
+impl From<VhtOperation> for fidl_ieee80211::VhtOperation {
     fn from(op: VhtOperation) -> Self {
-        Self {
-            // vht_cbw is a NewType for u8 instead of a bitfield, thus does not have raw() defined.
-            vht_cbw: op.vht_cbw.0,
-            center_freq_seg0: op.center_freq_seg0,
-            center_freq_seg1: op.center_freq_seg1,
-            basic_mcs: *&{ op.basic_mcs_nss }.raw(),
-        }
+        let mut banjo_op = Self { bytes: Default::default() };
+        banjo_op.bytes.copy_from_slice(&op.as_bytes()[..]);
+        banjo_op
     }
 }
 
@@ -1454,13 +1450,7 @@ mod tests {
     #[test]
     fn successfully_convert_vht_operation_to_fidl() {
         let vht_op = crate::ie::fake_ies::fake_vht_operation();
-        let fidl_vht_op: fidl_softmac::WlanVhtOp = vht_op.into();
-        // Local reference to avoid referring to an unaligned_reference
-        let vht_op_basic_mcs_nss_0 = vht_op.basic_mcs_nss.0;
-
-        assert_eq!(vht_op.vht_cbw.0, fidl_vht_op.vht_cbw);
-        assert_eq!(vht_op.center_freq_seg0, fidl_vht_op.center_freq_seg0);
-        assert_eq!(vht_op.center_freq_seg1, fidl_vht_op.center_freq_seg1);
-        assert_eq!(vht_op_basic_mcs_nss_0, fidl_vht_op.basic_mcs);
+        let ddk: fidl_ieee80211::VhtOperation = vht_op.into();
+        assert_eq!(vht_op.as_bytes(), ddk.bytes);
     }
 }
