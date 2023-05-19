@@ -26,6 +26,8 @@ _common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
+# TODO(fxbug.dev/100020): Split this into -with/out-injector targets and only build the source files
+# needed.
 executable("radar-proxy-bin") {
   output_name = "radar_proxy"
   sources = [
@@ -38,37 +40,55 @@ executable("radar-proxy-bin") {
   deps = _common_deps
 }
 
-fuchsia_component_manifest("manifest") {
+fuchsia_component_manifest("manifest-base") {
   component_name = "radar-proxy"
-  manifest = "meta/radar-proxy.cml"
+  manifest = "meta/radar-proxy-base.shard.cml"
 }
 
 fuchsia_structured_config_values("disable-burst-reader-proxying-config") {
-  cm_label = ":manifest"
+  cm_label = ":manifest-base"
   values = {
     proxy_radar_burst_reader = false
   }
 }
 
 fuchsia_structured_config_values("enable-burst-reader-proxying-config") {
-  cm_label = ":manifest"
+  cm_label = ":manifest-base"
   values = {
     proxy_radar_burst_reader = true
   }
 }
 
 fuchsia_structured_config_cpp_elf_lib("config") {
-  cm_label = ":manifest"
+  cm_label = ":manifest-base"
 }
 
-fuchsia_component("radar-proxy-component") {
+fuchsia_component("radar-proxy-component-with-injector") {
   component_name = "radar-proxy"
-  cm_label = ":manifest"
+  manifest = "meta/radar-proxy-with-injector.cml"
   deps = [ ":radar-proxy-bin" ]
 }
 
+fuchsia_package("radar-proxy-with-injector") {
+  package_name = "radar-proxy"
+  deps = [ ":radar-proxy-component-with-injector" ]
+}
+
+fuchsia_component("radar-proxy-component-without-injector") {
+  component_name = "radar-proxy"
+  manifest = "meta/radar-proxy-without-injector.cml"
+  deps = [ ":radar-proxy-bin" ]
+}
+
+fuchsia_package("radar-proxy-without-injector") {
+  package_name = "radar-proxy"
+  deps = [ ":radar-proxy-component-without-injector" ]
+}
+
+# TODO(fxbug.dev/100020): Make platform configuration include one of the above packages and remove
+# this.
 fuchsia_package("radar-proxy") {
-  deps = [ ":radar-proxy-component" ]
+  deps = [ ":radar-proxy-component-without-injector" ]
 }
 
 core_shard("radar-proxy-shard") {
