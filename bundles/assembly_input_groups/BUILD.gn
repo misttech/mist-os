@@ -36,8 +36,8 @@ assembly_input_groups("bootstrap") {
     "//bundles/drivers:usb-peripheral-stack",
     "//bundles/drivers:utils",
     "//src/sys/component_manager:component_manager_bootfs_config",
-    "//src/sys/full-resolver",
   ]
+  base_packages = [ "//src/sys/full-resolver" ]
   cmdline_deps = [ ":userboot.next-component-manager" ]
 }
 
