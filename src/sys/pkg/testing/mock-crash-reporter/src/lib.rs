@@ -66,8 +66,8 @@ impl MockCrashReporterService {
         while let Some(event) = stream.try_next().await.expect("received CrashReporter request") {
             match event {
                 fidl_fuchsia_feedback::CrashReporterRequest::File { report, responder } => {
-                    let mut res = self.call_hook.file(report).await.map_err(|s| s.into_raw());
-                    responder.send(&mut res).unwrap();
+                    let res = self.call_hook.file(report).await.map_err(|s| s.into_raw());
+                    responder.send(res).unwrap();
                 }
 
                 fidl_fuchsia_feedback::CrashReporterRequest::FileReport { report, responder } => {

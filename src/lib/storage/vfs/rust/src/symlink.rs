@@ -126,7 +126,7 @@ impl Connection {
                 let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
             fio::SymlinkRequest::Close { responder } => {
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 return Err(HandleRequestError::Other);
             }
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
@@ -136,7 +136,7 @@ impl Connection {
                     .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
             }
             fio::SymlinkRequest::Sync { responder } => {
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             fio::SymlinkRequest::GetAttr { responder } => match self.handle_get_attr().await {
                 Ok(attrs) => responder.send(zx::Status::OK.into_raw(), &attrs)?,
@@ -150,7 +150,7 @@ impl Connection {
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::ListExtendedAttributes { iterator, .. } => {
                 iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
@@ -159,10 +159,10 @@ impl Connection {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::SetExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::RemoveExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target().await {
                 Ok(target) => responder

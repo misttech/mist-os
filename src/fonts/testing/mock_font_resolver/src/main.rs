@@ -40,7 +40,7 @@ async fn run_resolver_service(mut stream: FontResolverRequestStream) -> Result<(
         debug!("FontResolver got request {:?}", request);
         let FontResolverRequest::Resolve { package_url, directory_request, responder } = request;
         let response = resolve(package_url, directory_request).await;
-        responder.send(&mut response.map_err(|s| s.into_raw()))?;
+        responder.send(response.map_err(|s| s.into_raw()))?;
     }
     Ok(())
 }

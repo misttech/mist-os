@@ -290,7 +290,7 @@ impl<T: Read + Write + Seek + Send> SshKeyManager<T> {
         while let Some(req) = stream.try_next().await.context("Getting request")? {
             match req {
                 AuthorizedKeysRequest::AddKey { key, responder } => {
-                    responder.send(&mut self.add_key(key).await.map_err(|e| {
+                    responder.send(self.add_key(key).await.map_err(|e| {
                         warn!(?e, "Error while adding key");
                         e.to_zx_status().into_raw()
                     }))?;
@@ -303,7 +303,7 @@ impl<T: Read + Write + Seek + Send> SshKeyManager<T> {
                     });
                 }
                 AuthorizedKeysRequest::RemoveKey { responder, .. } => {
-                    responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
                 }
             };
         }

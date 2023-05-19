@@ -167,8 +167,8 @@ where
                 } else {
                     info!("RemoveCredential: Succeeded");
                 }
-                let mut response = result.map_err(ServiceError::into);
-                responder.send(&mut response).context("sending RemoveLabel response")?;
+                let response = result.map_err(ServiceError::into);
+                responder.send(response).context("sending RemoveLabel response")?;
                 self.diagnostics.incoming_manager_outcome(
                     IncomingManagerMethod::RemoveCredential,
                     response.map(|_| ()),
@@ -200,13 +200,13 @@ where
         match request {
             ResetterRequest::Reset { responder } => {
                 info!("Reset: Request Received");
-                let mut resp = self.reset().await;
+                let resp = self.reset().await;
                 if let Err(e) = resp {
                     warn!("Reset: Failed: {:?}", e);
                 } else {
                     info!("Reset: Succeeded");
                 }
-                responder.send(&mut resp).context("sending Reset response")?;
+                responder.send(resp).context("sending Reset response")?;
                 self.diagnostics.incoming_reset_outcome(IncomingResetMethod::Reset, resp);
             }
         }

@@ -64,21 +64,21 @@ impl FuzzRegistry {
                         timeout,
                         responder,
                     }) => {
-                        let mut response = match parse_url(fuzzer_url) {
+                        let response = match parse_url(fuzzer_url) {
                             Ok(url) => self
                                 .connect(url, controller, timeout)
                                 .await
                                 .map_err(|e| e.into_raw()),
                             Err(e) => Err(e.into_raw()),
                         };
-                        responder.send(&mut response)
+                        responder.send(response)
                     }
                     Ok(fuzz::RegistryRequest::Disconnect { fuzzer_url, responder }) => {
-                        let mut response = match parse_url(fuzzer_url) {
+                        let response = match parse_url(fuzzer_url) {
                             Ok(url) => self.disconnect(url).await.map_err(|e| e.into_raw()),
                             Err(e) => Err(e.into_raw()),
                         };
-                        responder.send(&mut response)
+                        responder.send(response)
                     }
                     Err(e) => Err(e),
                 };

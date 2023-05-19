@@ -57,7 +57,7 @@ fn add_lazy_sampled_node(
             let mut unwrapped = state.lock().unwrap();
 
             if let Some(responder) = unwrapped.sample_count_callback_opt.take() {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
 
             let samples = fuchsia_inspect::Inspector::default();
@@ -99,9 +99,7 @@ fn serve_sampler_test_controller(mut stream: SamplerTestControllerRequestStream)
                     let mut unwrapped = state.lock().unwrap();
 
                     if unwrapped.sample_count_callback_opt.is_some() {
-                        responder
-                            .send(&mut Err(SamplingError::MultipleSampleCallbacksError))
-                            .unwrap();
+                        responder.send(Err(SamplingError::MultipleSampleCallbacksError)).unwrap();
                         continue;
                     }
 

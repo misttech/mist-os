@@ -406,7 +406,7 @@ mod tests {
         // of the advertisement is not fully terminated (though we expect it to be shortly).
         expect_stream_pending(&mut exec, &mut advertiser);
         // Upstream finally is ready to stop advertising.
-        let _ = responder.send(&mut Err(PeripheralError::Aborted));
+        let _ = responder.send(Err(PeripheralError::Aborted));
 
         let le_event = expect_stream_item(&mut exec, &mut advertiser);
         assert_matches!(le_event, LowEnergyEvent::AdvertisementTerminated);
@@ -451,7 +451,7 @@ mod tests {
             pin_mut!(closed_fut);
             let (closed_result, mut adv_fut) = run_while(&mut exec, adv_fut, closed_fut);
             assert_matches!(closed_result, Ok(_));
-            let _ = responder.send(&mut Ok(())).unwrap();
+            let _ = responder.send(Ok(())).unwrap();
 
             // Second advertise request should be OK and received by upstream LE server.
             let result = exec.run_until_stalled(&mut adv_fut).expect("advertise is ready");

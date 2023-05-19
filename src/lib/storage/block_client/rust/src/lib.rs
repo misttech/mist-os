@@ -1104,7 +1104,7 @@ mod tests {
                                                 .expect("send failed"),
                                             block::SessionRequest::Close { responder } => {
                                                 fifo_future_abort.abort();
-                                                responder.send(&mut Ok(())).expect("send failed")
+                                                responder.send(Ok(())).expect("send failed")
                                             }
                                         }
                                     })

@@ -63,7 +63,7 @@ async fn serve_generic_sme(
                         })
                     }
                     fidl_sme::GenericSmeRequest::GetClientSme { sme_server, responder } => {
-                        let mut response =
+                        let response =
                             if let SmeServer::Client(server_sender) = &mut sme_server_sender {
                                 server_sender
                                     .send(sme_server)
@@ -72,25 +72,25 @@ async fn serve_generic_sme(
                             } else {
                                 Err(zx::Status::NOT_SUPPORTED.into_raw())
                             };
-                        responder.send(&mut response)
+                        responder.send(response)
                     }
                     fidl_sme::GenericSmeRequest::GetApSme { sme_server, responder } => {
-                        let mut response =
-                            if let SmeServer::Ap(server_sender) = &mut sme_server_sender {
-                                server_sender
-                                    .send(sme_server)
-                                    .await
-                                    .map_err(|_| zx::Status::PEER_CLOSED.into_raw())
-                            } else {
-                                Err(zx::Status::NOT_SUPPORTED.into_raw())
-                            };
-                        responder.send(&mut response)
+                        let response = if let SmeServer::Ap(server_sender) = &mut sme_server_sender
+                        {
+                            server_sender
+                                .send(sme_server)
+                                .await
+                                .map_err(|_| zx::Status::PEER_CLOSED.into_raw())
+                        } else {
+                            Err(zx::Status::NOT_SUPPORTED.into_raw())
+                        };
+                        responder.send(response)
                     }
                     fidl_sme::GenericSmeRequest::GetSmeTelemetry {
                         telemetry_server,
                         responder,
                     } => {
-                        let mut response = if let Some(server) = telemetry_server_sender.as_mut() {
+                        let response = if let Some(server) = telemetry_server_sender.as_mut() {
                             server
                                 .send(telemetry_server)
                                 .await
@@ -99,17 +99,17 @@ async fn serve_generic_sme(
                             warn!("Requested unsupported SME telemetry API");
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         };
-                        responder.send(&mut response)
+                        responder.send(response)
                     }
                     fidl_sme::GenericSmeRequest::GetFeatureSupport {
                         feature_support_server,
                         responder,
                     } => {
-                        let mut response = feature_support_server_sender
+                        let response = feature_support_server_sender
                             .send(feature_support_server)
                             .await
                             .map_err(|_| zx::Status::PEER_CLOSED.into_raw());
-                        responder.send(&mut response)
+                        responder.send(response)
                     }
                 };
                 if let Err(e) = result {

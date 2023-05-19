@@ -37,8 +37,8 @@ impl MockRebootService {
         while let Some(event) = stream.try_next().await.expect("received request") {
             match event {
                 AdminRequest::Reboot { reason, responder } => {
-                    let mut result = (self.call_hook)(reason);
-                    responder.send(&mut result)?;
+                    let result = (self.call_hook)(reason);
+                    responder.send(result)?;
                 }
                 _ => {
                     panic!("unhandled RebootService method {event:?}");

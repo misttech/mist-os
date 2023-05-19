@@ -338,7 +338,7 @@ impl MockPiconetServerInner {
                 fasync::Task::spawn(async move {
                     adv_fut.await;
                     // Reply to the hanging-get responder when the advertisement completes.
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 })
                 .detach();
                 self.find_matching_searches(id, svc_ids);

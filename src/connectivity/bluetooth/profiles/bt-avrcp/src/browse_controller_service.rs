@@ -69,14 +69,13 @@ impl BrowseControllerService {
                     .get_now_playing_items(start_index, end_index, attribute_option)
                     .await,
             )?,
-            BrowseControllerRequest::PlayFileSystemItem { uid, responder } => responder.send(
-                &mut self.controller.play_item(uid, Scope::MediaPlayerVirtualFilesystem).await,
-            )?,
+            BrowseControllerRequest::PlayFileSystemItem { uid, responder } => responder
+                .send(self.controller.play_item(uid, Scope::MediaPlayerVirtualFilesystem).await)?,
             BrowseControllerRequest::PlayNowPlayingItem { uid, responder } => {
-                responder.send(&mut self.controller.play_item(uid, Scope::NowPlaying).await)?
+                responder.send(self.controller.play_item(uid, Scope::NowPlaying).await)?
             }
             BrowseControllerRequest::SetBrowsedPlayer { player_id, responder } => responder
-                .send(&mut self.controller.set_browsed_player(player_id).await.map(Into::into))?,
+                .send(self.controller.set_browsed_player(player_id).await.map(Into::into))?,
         };
         Ok(())
     }

@@ -190,7 +190,7 @@ mod tests {
                     assert!(session_url == TEST_SESSION_URL.to_string());
 
                     SESSION_LAUNCH_CALL_COUNT.inc();
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
             }
         })?;
@@ -199,7 +199,7 @@ mod tests {
             match restarter_request {
                 fsession::RestarterRequest::Restart { responder } => {
                     SESSION_RESTART_CALL_COUNT.inc();
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
             }
         })?;
@@ -216,7 +216,7 @@ mod tests {
                     assert_eq!(child.collection.unwrap(), SESSION_COLLECTION_NAME);
 
                     DESTROY_CHILD_CALL_COUNT.inc();
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 r => {
                     panic!("didn't expect request: {:?}", r)

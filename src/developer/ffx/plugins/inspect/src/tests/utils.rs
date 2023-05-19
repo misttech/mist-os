@@ -109,7 +109,7 @@ pub fn setup_fake_rcs() -> RemoteControlProxy {
                 RemoteControlRequest::RootRealmQuery { server, responder } => {
                     let querier = Arc::clone(&querier);
                     fuchsia_async::Task::local(querier.serve(server)).detach();
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => unreachable!("Not implemented"),
             }
@@ -136,7 +136,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                 RemoteControlRequest::RootRealmQuery { server, responder } => {
                     let querier = Arc::clone(&querier);
                     fuchsia_async::Task::local(async move { querier.serve(server).await }).detach();
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 RemoteControlRequest::ConnectCapability {
                     moniker,
@@ -168,7 +168,7 @@ fn handle_remote_control_connect(
     service_chan: Channel,
     accessor_proxy: ArchiveAccessorProxy,
 ) -> fuchsia_async::Task<()> {
-    responder.send(&mut Ok(())).unwrap();
+    responder.send(Ok(())).unwrap();
     fuchsia_async::Task::local(async move {
         let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
         let mut diagnostics_stream = server_end.into_stream().unwrap();

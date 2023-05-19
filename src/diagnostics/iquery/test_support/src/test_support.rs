@@ -253,9 +253,9 @@ impl MockRealmQuery {
                             // Serve the out dir, everything else doesn't get served.
                             res.serve_out_dir(object.into_channel().into());
                         }
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     } else {
-                        responder.send(&mut Err(fsys2::OpenError::InstanceNotFound)).unwrap();
+                        responder.send(Err(fsys2::OpenError::InstanceNotFound)).unwrap();
                     }
                 }
                 fsys2::RealmQueryRequest::GetManifest { moniker, responder, .. } => {

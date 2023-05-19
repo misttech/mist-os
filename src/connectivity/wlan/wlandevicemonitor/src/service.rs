@@ -120,15 +120,15 @@ pub(crate) async fn serve_monitor_requests(
             }
             DeviceMonitorRequest::GetClientSme { iface_id, sme_server, responder } => {
                 let result = get_client_sme(&ifaces, iface_id, sme_server).await;
-                responder.send(&mut result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))
             }
             DeviceMonitorRequest::GetApSme { iface_id, sme_server, responder } => {
                 let result = get_ap_sme(&ifaces, iface_id, sme_server).await;
-                responder.send(&mut result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))
             }
             DeviceMonitorRequest::GetSmeTelemetry { iface_id, telemetry_server, responder } => {
                 let result = get_sme_telemetry(&ifaces, iface_id, telemetry_server).await;
-                responder.send(&mut result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))
             }
             DeviceMonitorRequest::GetFeatureSupport {
                 iface_id,
@@ -136,7 +136,7 @@ pub(crate) async fn serve_monitor_requests(
                 responder,
             } => {
                 let result = get_feature_support(&ifaces, iface_id, feature_support_server).await;
-                responder.send(&mut result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))
             }
         }?;
     }
@@ -1720,7 +1720,7 @@ mod tests {
         // Verify the destroy iface request to the corresponding PHY is correct.
         assert_eq!(0, req.id);
 
-        responder.send(&mut Ok(())).expect("failed to send DestroyIfaceResponse");
+        responder.send(Ok(())).expect("failed to send DestroyIfaceResponse");
         assert_eq!(Poll::Ready(Ok(())), exec.run_until_stalled(&mut destroy_fut));
 
         // Verify iface was removed from available ifaces.
@@ -1749,9 +1749,7 @@ mod tests {
         // Verify the destroy iface request to the corresponding PHY is correct.
         assert_eq!(0, req.id);
 
-        responder
-            .send(&mut Err(zx::sys::ZX_ERR_INTERNAL))
-            .expect("failed to send DestroyIfaceResponse");
+        responder.send(Err(zx::sys::ZX_ERR_INTERNAL)).expect("failed to send DestroyIfaceResponse");
         assert_eq!(
             Poll::Ready(Err(zx::Status::INTERNAL)),
             exec.run_until_stalled(&mut destroy_fut)
@@ -1788,7 +1786,7 @@ mod tests {
         // ZX_ERR_NOT_FOUND.  In this case, we should verify that the internal accounting is still
         // updated.
         responder
-            .send(&mut Err(zx::sys::ZX_ERR_NOT_FOUND))
+            .send(Err(zx::sys::ZX_ERR_NOT_FOUND))
             .expect("failed to send DestroyIfaceResponse");
         assert_eq!(
             Poll::Ready(Err(zx::Status::NOT_FOUND)),
@@ -1846,7 +1844,7 @@ mod tests {
         // Respond to a client SME request with a client endpoint.
         let sme_server = assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetClientSme { sme_server, responder }))) => {
-                responder.send(&mut Ok(())).expect("Failed to send response");
+                responder.send(Ok(())).expect("Failed to send response");
                 sme_server
             }
         );
@@ -1894,7 +1892,7 @@ mod tests {
             generic_sme_server.into_stream().expect("Failed to create generic SME stream");
         assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetClientSme { responder, .. }))) => {
-                responder.send(&mut Err(1)).expect("Failed to send response");
+                responder.send(Err(1)).expect("Failed to send response");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
@@ -1959,7 +1957,7 @@ mod tests {
         // Respond to a feature support request with a feature support endpoint.
         assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetFeatureSupport { responder, .. }))) => {
-                responder.send(&mut Ok(())).expect("Failed to send response");
+                responder.send(Ok(())).expect("Failed to send response");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(_)));

@@ -1006,9 +1006,9 @@ mod test {
                     }
                     TargetHandlerRequest::SendCommand { command, pressed: _, responder } => {
                         if command == AvcPanelCommand::Play {
-                            responder.send(&mut Ok(()))
+                            responder.send(Ok(()))
                         } else {
-                            responder.send(&mut Err(TargetPassthroughError::CommandNotImplemented))
+                            responder.send(Err(TargetPassthroughError::CommandNotImplemented))
                         }
                     }
                     TargetHandlerRequest::ListPlayerApplicationSettingAttributes { responder } => {
@@ -1042,7 +1042,7 @@ mod test {
                         ..Default::default()
                     })),
                     TargetHandlerRequest::SetAddressedPlayer { responder, .. } => {
-                        responder.send(&mut Ok(()))
+                        responder.send(Ok(()))
                     }
                     TargetHandlerRequest::GetMediaPlayerItems { responder, .. } => {
                         responder.send(&mut Err(TargetAvcError::RejectedNoAvailablePlayers))

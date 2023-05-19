@@ -138,8 +138,7 @@ impl RemoteControlService {
                 responder,
             } => {
                 responder.send(
-                    &mut self
-                        .clone()
+                    self.clone()
                         .connect_capability(moniker, capability_name, flags, server_chan)
                         .await,
                 )?;
@@ -152,7 +151,7 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::RootRealmExplorer { server, responder } => {
                 responder.send(
-                    &mut fdio::service_connect(
+                    fdio::service_connect(
                         &format!(
                             "/svc/{}.root",
                             fidl_fuchsia_sys2::RealmExplorerMarker::PROTOCOL_NAME
@@ -165,7 +164,7 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::RootRealmQuery { server, responder } => {
                 responder.send(
-                    &mut fdio::service_connect(
+                    fdio::service_connect(
                         &format!(
                             "/svc/{}.root",
                             fidl_fuchsia_sys2::RealmQueryMarker::PROTOCOL_NAME
@@ -178,7 +177,7 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::RootLifecycleController { server, responder } => {
                 responder.send(
-                    &mut fdio::service_connect(
+                    fdio::service_connect(
                         &format!(
                             "/svc/{}.root",
                             fidl_fuchsia_sys2::LifecycleControllerMarker::PROTOCOL_NAME
@@ -191,7 +190,7 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::RootRouteValidator { server, responder } => {
                 responder.send(
-                    &mut fdio::service_connect(
+                    fdio::service_connect(
                         &format!(
                             "/svc/{}.root",
                             fidl_fuchsia_sys2::RouteValidatorMarker::PROTOCOL_NAME
@@ -204,7 +203,7 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::KernelStats { server, responder } => {
                 responder.send(
-                    &mut fdio::service_connect(
+                    fdio::service_connect(
                         &format!("/svc/{}", fidl_fuchsia_kernel::StatsMarker::PROTOCOL_NAME),
                         server.into_channel(),
                     )
@@ -214,7 +213,7 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::BootArguments { server, responder } => {
                 responder.send(
-                    &mut fdio::service_connect(
+                    fdio::service_connect(
                         &format!("/svc/{}", fidl_fuchsia_boot::ArgumentsMarker::PROTOCOL_NAME),
                         server.into_channel(),
                     )
@@ -225,7 +224,7 @@ impl RemoteControlService {
             rcs::RemoteControlRequest::ForwardTcp { addr, socket, responder } => {
                 let addr: SocketAddressExt = addr.into();
                 let addr = addr.0;
-                let mut result = match fasync::Socket::from_socket(socket) {
+                let result = match fasync::Socket::from_socket(socket) {
                     Ok(socket) => match self.connect_forwarded_port(addr, socket).await {
                         Ok(()) => Ok(()),
                         Err(e) => {
@@ -238,7 +237,7 @@ impl RemoteControlService {
                         Err(rcs::TunnelError::SocketFailed)
                     }
                 };
-                responder.send(&mut result)?;
+                responder.send(result)?;
                 Ok(())
             }
             rcs::RemoteControlRequest::ReverseTcp { addr, client, responder } => {
@@ -248,18 +247,18 @@ impl RemoteControlService {
                     Ok(proxy) => proxy,
                     Err(e) => {
                         error!("Could not communicate with callback: {:?}", e);
-                        responder.send(&mut Err(rcs::TunnelError::CallbackError))?;
+                        responder.send(Err(rcs::TunnelError::CallbackError))?;
                         return Ok(());
                     }
                 };
-                let mut result = match self.listen_reversed_port(addr, client).await {
+                let result = match self.listen_reversed_port(addr, client).await {
                     Ok(()) => Ok(()),
                     Err(e) => {
                         error!("Port forward connection failed: {:?}", e);
                         Err(rcs::TunnelError::ConnectFailed)
                     }
                 };
-                responder.send(&mut result)?;
+                responder.send(result)?;
                 Ok(())
             }
             rcs::RemoteControlRequest::GetTime { responder } => {
@@ -923,7 +922,7 @@ mod tests {
                 match request {
                     fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                         assert_eq!(moniker, "./core/my_component");
-                        responder.send(&mut Ok(())).unwrap()
+                        responder.send(Ok(())).unwrap()
                     }
                     _ => panic!("unexpected request: {:?}", request),
                 }
@@ -959,7 +958,7 @@ mod tests {
 
                     setup_exposed_dir(object.into_channel().into());
 
-                    responder.send(&mut Ok(())).unwrap()
+                    responder.send(Ok(())).unwrap()
                 }
                 _ => panic!("unexpected request: {:?}", request),
             }

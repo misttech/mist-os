@@ -173,7 +173,7 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                     // the reply.
                     responder
                         // [START diff_5]
-                        .send(&mut write_item(&mut store.clone().lock().unwrap(), attempt))
+                        .send(write_item(&mut store.clone().lock().unwrap(), attempt))
                         // [END diff_5]
                         .context("error sending reply")?;
                     println!("WriteItem response sent");
@@ -187,7 +187,7 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                     // protocol instance, allowing this call to return immediately and continue the
                     // request stream with other work.
                     responder
-                        .send(&mut iterate(store.clone(), starting_at, iterator.into_stream()?))
+                        .send(iterate(store.clone(), starting_at, iterator.into_stream()?))
                         .context("error sending reply")?;
                     println!("Iterate response sent");
                 } //

@@ -104,8 +104,8 @@ impl Persona {
                 responder.send(&mut response)?;
             }
             PersonaRequest::RegisterAuthListener { payload, responder } => {
-                let mut response = self.register_auth_listener(payload);
-                responder.send(&mut response)?;
+                let response = self.register_auth_listener(payload);
+                responder.send(response)?;
             }
         }
         Ok(())

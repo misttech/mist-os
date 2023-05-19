@@ -83,7 +83,7 @@ impl AccountHandlerConnection for FakeAccountHandlerConnection {
                         if lifetime_clone == Lifetime::Ephemeral {
                             response = Err(ApiError::Internal)
                         }
-                        responder.send(&mut response).unwrap();
+                        responder.send(response).unwrap();
                     }
                     AccountHandlerControlRequest::Terminate { .. } => {
                         break;

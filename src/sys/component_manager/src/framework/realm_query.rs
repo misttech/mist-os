@@ -165,7 +165,7 @@ impl RealmQuery {
                     object,
                     responder,
                 } => {
-                    let mut result = open(
+                    let result = open(
                         &self.model,
                         &scope_moniker,
                         &moniker,
@@ -176,7 +176,7 @@ impl RealmQuery {
                         object,
                     )
                     .await;
-                    responder.send(&mut result)
+                    responder.send(result)
                 }
                 fsys::RealmQueryRequest::ConnectToStorageAdmin {
                     moniker,
@@ -184,7 +184,7 @@ impl RealmQuery {
                     server_end,
                     responder,
                 } => {
-                    let mut result = connect_to_storage_admin(
+                    let result = connect_to_storage_admin(
                         &self.model,
                         &scope_moniker,
                         &moniker,
@@ -192,7 +192,7 @@ impl RealmQuery {
                         server_end,
                     )
                     .await;
-                    responder.send(&mut result)
+                    responder.send(result)
                 }
             };
             if let Err(error) = result {

@@ -100,7 +100,7 @@ impl KeyManager {
             KeyManagerRequest::GenerateAsymmetricKey { key_name, key, responder } => {
                 self.with_provider(self.provider, |provider| {
                     // Default algorithm for asymmetric key is ECDSA-SHA512-P521.
-                    responder.send(&mut self.generate_asymmetric_key_and_bind(
+                    responder.send(self.generate_asymmetric_key_and_bind(
                         &key_name,
                         key,
                         AsymmetricKeyAlgorithm::EcdsaSha512P521,
@@ -114,7 +114,7 @@ impl KeyManager {
                 key,
                 responder,
             } => self.with_provider(self.provider, |provider| {
-                responder.send(&mut self.generate_asymmetric_key_and_bind(
+                responder.send(self.generate_asymmetric_key_and_bind(
                     &key_name,
                     key,
                     key_algorithm,
@@ -122,7 +122,7 @@ impl KeyManager {
                 ))
             }),
             KeyManagerRequest::GetAsymmetricPrivateKey { key_name, key, responder } => {
-                responder.send(&mut self.get_asymmetric_private_key_and_bind(&key_name, key))
+                responder.send(self.get_asymmetric_private_key_and_bind(&key_name, key))
             }
             KeyManagerRequest::ImportAsymmetricPrivateKey {
                 data,
@@ -131,7 +131,7 @@ impl KeyManager {
                 key,
                 responder,
             } => self.with_provider(self.provider, |provider| {
-                responder.send(&mut self.import_asymmetric_private_key_and_bind(
+                responder.send(self.import_asymmetric_private_key_and_bind(
                     &data,
                     &key_name,
                     key_algorithm,
@@ -148,7 +148,7 @@ impl KeyManager {
                     responder.send(self.unseal_data(cipher_text, provider.unwrap()))
                 }),
             KeyManagerRequest::DeleteKey { key_name, responder } => {
-                responder.send(&mut self.delete_key(&key_name))
+                responder.send(self.delete_key(&key_name))
             }
         }
     }

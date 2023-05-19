@@ -89,7 +89,7 @@ async fn handler(
         AccessRequest::MakeDiscoverable { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.MakeDiscoverable()");
             let stream = token.into_stream().unwrap(); // into_stream never fails
-            let mut result = hd
+            let result = hd
                 .set_discoverable()
                 .await
                 .map(|token| {
@@ -97,12 +97,12 @@ async fn handler(
                         Some(watch_stream_for_session(stream, token).boxed());
                 })
                 .map_err(Into::into);
-            responder.send(&mut result).map_err(Error::from)
+            responder.send(result).map_err(Error::from)
         }
         AccessRequest::StartDiscovery { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.StartDiscovery()");
             let stream = token.into_stream().unwrap(); // into_stream never fails
-            let mut result = hd
+            let result = hd
                 .start_discovery()
                 .await
                 .map(|token| {
@@ -110,7 +110,7 @@ async fn handler(
                         Some(watch_stream_for_session(stream, token).boxed());
                 })
                 .map_err(Into::into);
-            responder.send(&mut result).map_err(Error::from)
+            responder.send(result).map_err(Error::from)
         }
         AccessRequest::WatchPeers { responder } => {
             trace!("Received FIDL call: fuchsia.bluetooth.sys.Access.WatchPeers()");
@@ -132,7 +132,7 @@ async fn handler(
             if let Err(e) = &result {
                 warn!("Error connecting to peer {}: {:?}", id, e);
             }
-            responder.send(&mut result.map_err(Into::into))?;
+            responder.send(result.map_err(Into::into))?;
             Ok(())
         }
         AccessRequest::Disconnect { id, responder } => {
@@ -142,7 +142,7 @@ async fn handler(
             if let Err(e) = &result {
                 warn!("Error disconnecting from peer {}: {:?}", id, e);
             }
-            responder.send(&mut result.map_err(Into::into))?;
+            responder.send(result.map_err(Into::into))?;
             Ok(())
         }
         AccessRequest::Pair { id, options, responder } => {
@@ -153,20 +153,20 @@ async fn handler(
             // If NonBondable is asked for a Br/Edr pairing, return an InvalidArguments error
             if opts.bondable == BondableMode::NonBondable && opts.transport == Technology::Classic {
                 info!("Rejecting Pair: non-bondable mode not supported for BR/EDR");
-                responder.send(&mut Err(sys::Error::InvalidArguments))?;
+                responder.send(Err(sys::Error::InvalidArguments))?;
                 return Ok(());
             }
             let result = hd.pair(id, opts).await;
             if let Err(e) = &result {
                 warn!("Error pairing with peer {}: {:?}", id, e);
             }
-            let mut result = result.map_err(|e| match e.into() {
+            let result = result.map_err(|e| match e.into() {
                 sys::Error::PeerNotFound => sys::Error::PeerNotFound,
                 sys::Error::InvalidArguments => sys::Error::InvalidArguments,
                 // We map all other host errors to Error::Failed before reporting to the caller
                 _ => sys::Error::Failed,
             });
-            responder.send(&mut result)?;
+            responder.send(result)?;
             Ok(())
         }
         AccessRequest::Forget { id, responder } => {
@@ -176,7 +176,7 @@ async fn handler(
             if let Err(e) = &result {
                 warn!("Error forgetting peer {}: {:?}", id, e);
             }
-            responder.send(&mut result.map_err(Into::into))?;
+            responder.send(result.map_err(Into::into))?;
             Ok(())
         }
     }

@@ -212,7 +212,7 @@ impl Nvdata {
                 }
                 FirmwareParamRequest::Set { key, value, responder } => {
                     responder
-                        .send(&mut self.set(key, value).await.map_err(|e| match e {
+                        .send(self.set(key, value).await.map_err(|e| match e {
                             NvdataError::UnknownKey => zx::Status::NOT_SUPPORTED.into_raw(),
                             NvdataError::NotWritable => zx::Status::IO_REFUSED.into_raw(),
                             NvdataError::ExpectedBool => zx::Status::INVALID_ARGS.into_raw(),
@@ -537,7 +537,7 @@ mod tests {
                             let offset: usize = offset as usize;
                             self.contents.lock().await[offset..offset + data.len()]
                                 .copy_from_slice(data.as_slice());
-                            responder.send(&mut Ok(())).expect("Write reply ok");
+                            responder.send(Ok(())).expect("Write reply ok");
                         }
                     }
                 }

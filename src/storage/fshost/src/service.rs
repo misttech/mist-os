@@ -400,19 +400,19 @@ pub fn fshost_admin(
                 match request {
                     Ok(fshost::AdminRequest::Mount { responder, .. }) => {
                         tracing::info!("admin mount called");
-                        responder
-                            .send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))
-                            .unwrap_or_else(|e| {
+                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
+                            |e| {
                                 tracing::error!("failed to send Mount response. error: {:?}", e);
-                            });
+                            },
+                        );
                     }
                     Ok(fshost::AdminRequest::Unmount { responder, .. }) => {
                         tracing::info!("admin unmount called");
-                        responder
-                            .send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))
-                            .unwrap_or_else(|e| {
+                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
+                            |e| {
                                 tracing::error!("failed to send Unmount response. error: {:?}", e);
-                            });
+                            },
+                        );
                     }
                     Ok(fshost::AdminRequest::GetDevicePath { responder, .. }) => {
                         tracing::info!("admin get device path called");
@@ -427,7 +427,7 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         tracing::info!(?filename, "admin write data file called");
-                        let mut res = match write_data_file(
+                        let res = match write_data_file(
                             &config,
                             ramdisk_prefix.clone(),
                             &launcher,
@@ -442,7 +442,7 @@ pub fn fshost_admin(
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|e| {
+                        responder.send(res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send WriteDataFile response. error: {:?}",
                                 e
@@ -452,7 +452,7 @@ pub fn fshost_admin(
                     Ok(fshost::AdminRequest::WipeStorage { responder, blobfs_root }) => {
                         tracing::info!("admin wipe storage called");
                         let mut ignored_paths = matcher_lock.lock().await;
-                        let mut res = if !config.ramdisk_image {
+                        let res = if !config.ramdisk_image {
                             tracing::error!(
                                 "Can't WipeStorage from a non-recovery build; \
                                 ramdisk_image must be set."
@@ -475,14 +475,13 @@ pub fn fshost_admin(
                                 }
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|e| {
+                        responder.send(res).unwrap_or_else(|e| {
                             tracing::error!(?e, "failed to send WipeStorage response");
                         });
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         tracing::info!("admin shred data volume called");
-                        let mut res = match shred_data_volume(&config, ramdisk_prefix.clone()).await
-                        {
+                        let res = match shred_data_volume(&config, ramdisk_prefix.clone()).await {
                             Ok(()) => Ok(()),
                             Err(e) => {
                                 debug_log(&format!(
@@ -492,7 +491,7 @@ pub fn fshost_admin(
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|e| {
+                        responder.send(res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send ShredDataVolume response. error: {:?}",
                                 e

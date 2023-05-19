@@ -293,7 +293,7 @@ mod test {
             vec![fnet_mcast::OutgoingInterfaces { id: NET_IF_ID, min_ttl: MIN_TTL }]
         );
 
-        add_route_responder.send(&mut Ok(())).expect("Responding to add_route");
+        add_route_responder.send(Ok(())).expect("Responding to add_route");
 
         // Test is done, do a final check to ensure that multicast routing service is
         // waiting for next routing event.

@@ -42,7 +42,7 @@ mod test {
 
         let proxy = setup_fake_privacy_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             PrivacyRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -66,7 +66,7 @@ mod test {
     async fn validate_privacy_set_output(expected_user_data_sharing_consent: bool) -> Result<()> {
         let proxy = setup_fake_privacy_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             PrivacyRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

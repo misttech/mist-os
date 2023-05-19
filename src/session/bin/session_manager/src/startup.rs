@@ -189,7 +189,7 @@ mod tests {
                     assert_eq!(child.collection, Some(SESSION_CHILD_COLLECTION.to_string()));
                     assert_eq!(child.name, SESSION_NAME);
 
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::CreateChild { collection, decl, args: _, responder } => {
                     assert_eq!(NUM_REALM_REQUESTS.get(), 1);
@@ -197,7 +197,7 @@ mod tests {
                     assert_eq!(decl.name.unwrap(), SESSION_NAME);
                     assert_eq!(&collection.name, SESSION_CHILD_COLLECTION);
 
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child, exposed_dir, responder } => {
                     assert_eq!(NUM_REALM_REQUESTS.get(), 2);
@@ -205,7 +205,7 @@ mod tests {
                     assert_eq!(child.name, SESSION_NAME);
 
                     spawn_directory_server(exposed_dir, directory_request_handler);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
@@ -226,16 +226,16 @@ mod tests {
             async move {
                 match realm_request {
                     fcomponent::RealmRequest::DestroyChild { responder, .. } => {
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                     }
                     fcomponent::RealmRequest::CreateChild { responder, .. } => {
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                     }
                     fcomponent::RealmRequest::OpenExposedDir { exposed_dir, responder, .. } => {
                         exposed_dir_server_end_sender
                             .send(exposed_dir)
                             .expect("Failed to relay `exposed_dir`");
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                     }
                     _ => panic!("Realm handler received an unexpected request"),
                 }
@@ -266,15 +266,15 @@ mod tests {
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
                 fcomponent::RealmRequest::DestroyChild { responder, .. } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::CreateChild { responder, .. } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
                     // Close the incoming channel before responding to avoid race conditions.
                     let () = std::mem::drop(exposed_dir);
-                    let () = responder.send(&mut Ok(())).unwrap();
+                    let () = responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };

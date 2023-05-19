@@ -81,9 +81,9 @@ impl Instance {
                         StoreAccessorRequest::Commit { .. } => acc.commit().await?,
                         StoreAccessorRequest::Flush { responder } => {
                             if read_only {
-                                responder.send(&mut Err(FlushError::ReadOnly))?;
+                                responder.send(Err(FlushError::ReadOnly))?;
                             } else {
-                                responder.send(&mut acc.flush().await)?;
+                                responder.send(acc.flush().await)?;
                             }
                         }
                     }

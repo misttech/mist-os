@@ -6175,10 +6175,7 @@ impl WithErrorSyntaxErrorAsPrimitiveResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut WithErrorSyntaxErrorAsPrimitiveResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<(), u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -6189,26 +6186,20 @@ impl WithErrorSyntaxErrorAsPrimitiveResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut WithErrorSyntaxErrorAsPrimitiveResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<(), u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut WithErrorSyntaxErrorAsPrimitiveResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<(), u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: *result,
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -6263,10 +6254,7 @@ impl WithErrorSyntaxErrorAsEnumResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut WithErrorSyntaxErrorAsEnumResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<(), ErrorEnum>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -6279,24 +6267,21 @@ impl WithErrorSyntaxErrorAsEnumResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut WithErrorSyntaxErrorAsEnumResult,
+        mut result: Result<(), ErrorEnum>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut WithErrorSyntaxErrorAsEnumResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<(), ErrorEnum>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: *result,
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

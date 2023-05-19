@@ -101,8 +101,7 @@ mod tests {
         ($request_type:tt, $error_type:tt) => {
             setup_fake_gpu_loggger(move |req| match req {
                 fmetrics::MetricsLoggerRequest::$request_type { responder, .. } => {
-                    let mut result = Err(fmetrics::MetricsLoggerError::$error_type);
-                    responder.send(&mut result).unwrap();
+                    responder.send(Err(fmetrics::MetricsLoggerError::$error_type)).unwrap();
                 }
                 _ => panic!(
                     "Expected MetricsLoggerRequest::{}; got {:?}",
@@ -140,8 +139,7 @@ mod tests {
                 assert_eq!(output_samples_to_syslog, false);
                 assert_eq!(output_stats_to_syslog, false);
                 assert_eq!(duration_ms, 4000);
-                let mut result = Ok(());
-                responder.send(&mut result).unwrap();
+                responder.send(Ok(())).unwrap();
                 sender.try_send(()).unwrap();
             }
             _ => panic!("Expected MetricsLoggerRequest::StartLogging; got {:?}", req),
@@ -171,8 +169,7 @@ mod tests {
                 assert_eq!(metrics[0], Metric::GpuUsage(GpuUsage { interval_ms: 1000 }),);
                 assert_eq!(output_samples_to_syslog, false);
                 assert_eq!(output_stats_to_syslog, false);
-                let mut result = Ok(());
-                responder.send(&mut result).unwrap();
+                responder.send(Ok(())).unwrap();
                 sender.try_send(()).unwrap();
             }
             _ => panic!("Expected MetricsLoggerRequest::StartLoggingForever; got {:?}", req),

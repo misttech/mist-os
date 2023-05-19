@@ -163,7 +163,7 @@ async fn run(
                         data = &data[MAX_SEND_LENGTH..];
                     }
                     write.send(data.to_vec()).await?;
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 }
                 DeviceRequest::GetClass { responder } => {
                     responder.send(Class::KernelDebug)?;

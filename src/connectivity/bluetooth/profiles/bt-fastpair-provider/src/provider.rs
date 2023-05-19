@@ -526,7 +526,7 @@ impl Provider {
             ServiceRequest::EnableFastPair { watcher, responder } => {
                 match self.upstream.set(watcher) {
                     Ok(()) => {
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                         if let Some(discoverable) = self.host_watcher.pairing_mode() {
                             self.advertise(discoverable).await?;
                         }
@@ -535,8 +535,8 @@ impl Provider {
                     }
                     Err(e) => {
                         info!("Couldn't enable Fast Pair: {e:?}");
-                        let _ = responder
-                            .send(&mut Err(fuchsia_zircon::Status::ALREADY_BOUND.into_raw()));
+                        let _ =
+                            responder.send(Err(fuchsia_zircon::Status::ALREADY_BOUND.into_raw()));
                     }
                 }
             }
@@ -780,7 +780,7 @@ mod tests {
         // Simulate upstream server detecting this.
         let adv_client = adv_client.into_proxy().unwrap();
         let _ = adv_client.on_closed().await;
-        let _ = responder.send(&mut Ok(())).unwrap();
+        let _ = responder.send(Ok(())).unwrap();
 
         // Upstream LE server should receive the new LE advertisement. Since there are no Account
         // Keys, the expected service data is minimal.
@@ -800,7 +800,7 @@ mod tests {
         // Provider server should cancel the existing advertisement.
         let adv_client = adv_client.into_proxy().unwrap();
         let _ = adv_client.on_closed().await;
-        let _ = responder.send(&mut Ok(())).unwrap();
+        let _ = responder.send(Ok(())).unwrap();
     }
 
     #[fuchsia::test]

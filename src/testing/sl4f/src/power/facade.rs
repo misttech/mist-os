@@ -152,7 +152,7 @@ mod tests {
                     assert_eq!(output_stats_to_syslog, false);
                     assert_eq!(duration_ms, query_duration_ms);
 
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("Unexpected stream item: {:?}", other),
             }
@@ -200,7 +200,7 @@ mod tests {
                     assert_eq!(output_samples_to_syslog, false);
                     assert_eq!(output_stats_to_syslog, false);
 
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("Unexpected stream item: {:?}", other),
             }

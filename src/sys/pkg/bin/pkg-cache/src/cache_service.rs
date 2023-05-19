@@ -98,7 +98,7 @@ pub(crate) async fn serve(
                         Status::from(response).to_string().as_str(),
                     )]);
                     drop(node);
-                    responder.send(&mut response.map_err(|status| status.into_raw()))?;
+                    responder.send(response.map_err(|status| status.into_raw()))?;
                 }
                 PackageCacheRequest::Open { meta_far_blob_id, dir, responder } => {
                     let meta_far: Hash = BlobId::from(meta_far_blob_id).into();
@@ -125,7 +125,7 @@ pub(crate) async fn serve(
                         "status",
                         Status::from(response).to_string().as_str(),
                     )]);
-                    responder.send(&mut response.map_err(|status| status.into_raw()))?;
+                    responder.send(response.map_err(|status| status.into_raw()))?;
                 }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
@@ -137,7 +137,7 @@ pub(crate) async fn serve(
                     serve_cache_package_index(cache_packages.clone(), stream).await;
                 }
                 PackageCacheRequest::Sync { responder } => {
-                    responder.send(&mut blobfs.sync().await.map_err(|e| {
+                    responder.send(blobfs.sync().await.map_err(|e| {
                         error!("error syncing blobfs: {:#}", anyhow!(e));
                         Status::INTERNAL.into_raw()
                     }))?;
@@ -992,7 +992,7 @@ async fn serve_write_blob(
 
                     // Interpret responding errors as the stream closing unexpectedly.
                     let _: Result<(), fidl::Error> =
-                        responder.send(&mut match truncate_result_to_status(&res) {
+                        responder.send(match truncate_result_to_status(&res) {
                             Status::OK => Ok(()),
                             error => Err(error.into_raw()),
                         });
@@ -1040,7 +1040,7 @@ async fn serve_write_blob(
                 // a close.
                 (fio::FileRequest::Close { responder }, state) => {
                     let () = close().await;
-                    let _: Result<(), fidl::Error> = responder.send(&mut Ok(()));
+                    let _: Result<(), fidl::Error> = responder.send(Ok(()));
                     return match state {
                         State::ExpectClose => Ok(()),
                         _ => Err(ServeWriteBlobError::UnexpectedClose),
@@ -2455,7 +2455,7 @@ mod serve_write_blob_tests {
                 serve_fidl_request!(stream, {
                     fio::FileRequest::Resize { length: actual_length, responder } => {
                         assert_eq!(length, actual_length);
-                            let () = responder.send(&mut if blobfs_response == Status::OK {
+                            let () = responder.send(if blobfs_response == Status::OK {
                             Ok(())
                         } else {
                         Err(blobfs_response.into_raw())
@@ -2467,7 +2467,7 @@ mod serve_write_blob_tests {
                 if blobfs_response != Status::OK {
                     serve_fidl_request!(stream, {
                         fio::FileRequest::Close { responder } => {
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         },
                     });
                 }
@@ -2506,7 +2506,7 @@ mod serve_write_blob_tests {
                 if blobfs_response != Status::OK {
                     serve_fidl_request!(stream, {
                         fio::FileRequest::Close { responder } => {
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         },
                     });
                 }
@@ -2530,7 +2530,7 @@ mod serve_write_blob_tests {
         drop(proxy);
         serve_fidl_stream!(stream, {
             fio::FileRequest::Close { responder } => {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             },
         })
         .await;
@@ -2541,7 +2541,7 @@ mod serve_write_blob_tests {
         let ((), ()) = future::join(
             serve_fidl_stream!(stream, {
                 fio::FileRequest::Close { responder } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 },
             }),
             async move {
@@ -2697,7 +2697,7 @@ mod serve_write_blob_tests {
         let () = executor.run_singlethreaded(async {
             serve_fidl_request!(blobfs_blob_stream, {
                 fio::FileRequest::Close { responder } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 },
             })
         });

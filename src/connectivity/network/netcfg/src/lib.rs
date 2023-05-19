@@ -3242,7 +3242,7 @@ mod tests {
                         }
                     );
                     check_fwd_entry(entry, &mut routers);
-                    responder.send(&mut Ok(())).expect("send add fwd entry response");
+                    responder.send(Ok(())).expect("send add fwd entry response");
                     (routers, stack)
                 },
             );
@@ -3291,7 +3291,7 @@ mod tests {
                     }
                 );
                 check_fwd_entry(entry, &mut routers);
-                responder.send(&mut Ok(())).expect("send del fwd entry response");
+                responder.send(Ok(())).expect("send del fwd entry response");
                 (routers, stack)
             });
 
@@ -3483,7 +3483,7 @@ mod tests {
         );
 
         assert_eq!(expected_servers, &servers);
-        responder.send(&mut Ok(())).expect("send set dns servers response");
+        responder.send(Ok(())).expect("send set dns servers response");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -4043,7 +4043,7 @@ mod tests {
             .try_for_each(|req| {
                 let (_, responder): (Vec<fnet::SocketAddress>, _) =
                     req.into_set_dns_servers().expect("request must be SetDnsServers");
-                responder.send(&mut Ok(())).expect("send SetDnsServers response");
+                responder.send(Ok(())).expect("send SetDnsServers response");
                 futures::future::ok(())
             })
             .fuse();

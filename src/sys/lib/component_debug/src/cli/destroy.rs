@@ -74,7 +74,7 @@ mod test {
                     assert_eq!(expected_moniker, parent_moniker);
                     assert_eq!(expected_collection, child.collection.unwrap());
                     assert_eq!(expected_name, child.name);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }

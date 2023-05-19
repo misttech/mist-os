@@ -43,7 +43,7 @@ async fn run_virtio_vsock(
     let (device_builder, guest_mem) = machina_virtio_device::from_start_info(start_info)?;
 
     if let Err(err) = vsock_device.set_guest_cid(guest_cid) {
-        responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?;
+        responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
         return Err(err);
     }
 
@@ -56,12 +56,12 @@ async fn run_virtio_vsock(
         )
     });
     if result.is_err() {
-        responder.send(&mut result.map_err(|status| status.into_raw()))?;
+        responder.send(result.map_err(|status| status.into_raw()))?;
         return result.map_err(|err| anyhow!("Failed to register initial listener: {}", err));
     }
 
     // Acknowledge that StartInfo was correct by responding to the controller.
-    responder.send(&mut Ok(()))?;
+    responder.send(Ok(()))?;
 
     // Complete the setup of queues and get a virtio device.
     let mut virtio_device_fidl = virtio_vsock_fidl.cast_stream();
@@ -101,9 +101,7 @@ async fn handle_host_vsock_endpoint(
         .try_for_each_concurrent(None, |request| async {
             match request {
                 HostVsockEndpointRequest::Listen { port, acceptor, responder } => responder.send(
-                    &mut vsock_device
-                        .listen(port, acceptor.into_proxy()?)
-                        .map_err(|err| err.into_raw()),
+                    vsock_device.listen(port, acceptor.into_proxy()?).map_err(|err| err.into_raw()),
                 ),
                 HostVsockEndpointRequest::Connect { guest_port, responder } => {
                     vsock_device.client_initiated_connect(guest_port, responder).await

@@ -242,7 +242,7 @@ mod tests {
                 match request {
                     SaveNetwork { config, responder } => {
                         assert_eq!(config, network_config());
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     Connect { id, responder } => {
                         assert_eq!(id, network_id());
@@ -311,7 +311,7 @@ mod tests {
                 match request {
                     SaveNetwork { config, responder } => {
                         assert_eq!(config, network_config());
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     Connect { id, responder } => {
                         assert_eq!(id, network_id());

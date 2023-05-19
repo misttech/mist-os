@@ -163,14 +163,14 @@ pub mod tests {
                                 "Writing a non-erased area"
                             );
                             data[offset..offset + buf.len()].copy_from_slice(&buf);
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         }
                         FlashmapRequest::Erase { name, offset, range, responder } => {
                             assert_eq!(&name, NVRAM_AREA_NAME);
                             assert_eq!(offset, 0);
                             assert_eq!(range, NVRAM_REGION_SIZE);
                             self.data.lock().await.fill(0xff);
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         }
                     }
                 }

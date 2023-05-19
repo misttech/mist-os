@@ -180,10 +180,10 @@ async fn handle_file_req_fail_truncate(call_count: Arc<AtomicU64>, req: fio::Fil
     match req {
         fio::FileRequest::Resize { length: _length, responder } => {
             call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            responder.send(&mut Err(Status::NO_MEMORY.into_raw())).expect("send truncate response");
+            responder.send(Err(Status::NO_MEMORY.into_raw())).expect("send truncate response");
         }
         fio::FileRequest::Close { responder } => {
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(Ok(()));
         }
         req => panic!("unexpected request: {:?}", req),
     }
@@ -192,10 +192,10 @@ async fn handle_file_req_fail_truncate(call_count: Arc<AtomicU64>, req: fio::Fil
 async fn handle_file_req_fail_write(call_count: Arc<AtomicU64>, req: fio::FileRequest) {
     match req {
         fio::FileRequest::Resize { length: _length, responder } => {
-            responder.send(&mut Ok(())).expect("send resize response");
+            responder.send(Ok(())).expect("send resize response");
         }
         fio::FileRequest::Close { responder } => {
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(Ok(()));
         }
         fio::FileRequest::Write { data: _data, responder } => {
             call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);

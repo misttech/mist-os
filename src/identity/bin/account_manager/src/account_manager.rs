@@ -80,8 +80,8 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
                 responder.send(&mut response)?;
             }
             AccountManagerRequest::GetAccount { payload, responder } => {
-                let mut response = self.get_account(payload).await;
-                responder.send(&mut response)?;
+                let response = self.get_account(payload).await;
+                responder.send(response)?;
             }
             AccountManagerRequest::DeprecatedGetAccount {
                 id: _,
@@ -92,12 +92,12 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
                 unimplemented!();
             }
             AccountManagerRequest::RegisterAccountListener { payload, responder } => {
-                let mut response = self.register_account_listener(payload).await;
-                responder.send(&mut response)?;
+                let response = self.register_account_listener(payload).await;
+                responder.send(response)?;
             }
             AccountManagerRequest::RemoveAccount { id, responder } => {
-                let mut response = self.remove_account(id.into()).await;
-                responder.send(&mut response)?;
+                let response = self.remove_account(id.into()).await;
+                responder.send(response)?;
             }
             AccountManagerRequest::ProvisionNewAccount { payload, responder } => {
                 let mut response = self.provision_new_account(payload).await;

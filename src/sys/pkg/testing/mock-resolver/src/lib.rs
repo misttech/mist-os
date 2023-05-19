@@ -137,7 +137,7 @@ pub async fn handle_package_directory_stream(
                 }
                 fio::DirectoryRequest::Close { responder } => {
                     // Don't do anything with this for now.
-                    responder.send(&mut Ok(())).expect("send Close response")
+                    responder.send(Ok(())).expect("send Close response")
                 }
                 other => panic!("unhandled request type: {other:?}"),
             }

@@ -188,11 +188,11 @@ mod tests {
                 } => {
                     assert_eq!(decl.url.unwrap(), component_url);
                     CREATE_CHILD_CALL_COUNT.inc();
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
                     spawn_directory_server(exposed_dir, directory_request_handler);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => {
                     panic!("Realm handler received unexpected request");
@@ -210,7 +210,7 @@ mod tests {
                         view_controller_request: _,
                         responder,
                     } => {
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                     }
                 }
             })

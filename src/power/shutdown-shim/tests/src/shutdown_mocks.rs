@@ -80,37 +80,37 @@ async fn run_statecontrol_admin(
         match stream.try_next().await? {
             Some(fstatecontrol::AdminRequest::PowerFullyOn { responder }) => {
                 // PowerFullyOn is unsupported
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             Some(fstatecontrol::AdminRequest::Reboot { reason, responder }) => {
                 info!("Reboot called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::Reboot(reason)))?;
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(fstatecontrol::AdminRequest::RebootToBootloader { responder }) => {
                 info!("RebootToBootloader called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::RebootToBootloader))?;
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(fstatecontrol::AdminRequest::RebootToRecovery { responder }) => {
                 info!("RebootToRecovery called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::RebootToRecovery))?;
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(fstatecontrol::AdminRequest::Poweroff { responder }) => {
                 info!("Poweroff called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::Poweroff))?;
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(fstatecontrol::AdminRequest::Mexec { responder, .. }) => {
                 info!("Mexec called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::Mexec))?;
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(fstatecontrol::AdminRequest::SuspendToRam { responder }) => {
                 info!("SuspendToRam called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::SuspendToRam))?;
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             _ => (),
         }

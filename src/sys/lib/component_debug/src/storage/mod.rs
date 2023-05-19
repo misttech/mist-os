@@ -61,7 +61,7 @@ pub mod test {
             StorageAdminRequest::OpenComponentStorageById { id, object, responder, .. } => {
                 assert_eq!(expected_id, id);
                 setup_fake_directory_fn(node_to_directory(object));
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             _ => panic!("got unexpected {:?}", req),
         })
@@ -104,7 +104,7 @@ pub mod test {
                     ServerEnd::new(object.into_channel()),
                 )
                 .unwrap();
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             _ => panic!("got unexpected {:?}", req),
         })

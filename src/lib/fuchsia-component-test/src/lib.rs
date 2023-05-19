@@ -2683,21 +2683,21 @@ mod tests {
                             .send(ServerRequest::AddChild { name, url, options })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::AddChildFromDecl { responder, name, decl, options } => {
                         report_requests
                             .send(ServerRequest::AddChildFromDecl { name, decl, options })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::AddLocalChild { responder, name, options } => {
                         report_requests
                             .send(ServerRequest::AddLocalChild { name, options })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::AddChildRealm {
                         responder,
@@ -2717,7 +2717,7 @@ mod tests {
                             handle_realm_stream(child_realm_stream, child_realm_report_requests)
                                 .await
                         }));
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::GetComponentDecl { responder, name } => {
                         report_requests
@@ -2735,7 +2735,7 @@ mod tests {
                             .send(ServerRequest::ReplaceComponentDecl { name, component_decl })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::GetRealmDecl { responder } => {
                         report_requests.send(ServerRequest::GetRealmDecl).await.unwrap();
@@ -2746,42 +2746,42 @@ mod tests {
                             .send(ServerRequest::ReplaceRealmDecl { component_decl })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::AddRoute { responder, capabilities, from, to } => {
                         report_requests
                             .send(ServerRequest::AddRoute { capabilities, from, to })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::ReadOnlyDirectory { responder, name, to, .. } => {
                         report_requests
                             .send(ServerRequest::ReadOnlyDirectory { name, to })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::InitMutableConfigFromPackage { name, responder } => {
                         report_requests
                             .send(ServerRequest::InitMutableConfigFromPackage { name })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::InitMutableConfigToEmpty { name, responder } => {
                         report_requests
                             .send(ServerRequest::InitMutableConfigToEmpty { name })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     ftest::RealmRequest::SetConfigValue { responder, name, key, value } => {
                         report_requests
                             .send(ServerRequest::SetConfigValue { name, key, value })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                 }
             }

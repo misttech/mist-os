@@ -60,7 +60,7 @@ mod test {
         setup_fake_target_proxy(move |req| match req {
             TargetRequest::Reboot { state: _, responder } => {
                 assert!(!(cmd.bootloader && cmd.recovery));
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             r => panic!("unexpected request: {:?}", r),
         })

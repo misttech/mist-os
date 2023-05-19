@@ -42,12 +42,12 @@ impl PkgLocalMirror {
             LocalMirrorRequest::GetMetadata { repo_url, path, metadata, responder } => {
                 let url = RepositoryUrl::try_from(&repo_url)
                     .with_context(|| format!("parsing repo url: {:?}", repo_url.url))?;
-                let mut response = self.manager.get_metadata(url, &path, metadata).await;
-                let () = responder.send(&mut response).context("sending GetMetadata response")?;
+                let response = self.manager.get_metadata(url, &path, metadata).await;
+                let () = responder.send(response).context("sending GetMetadata response")?;
             }
             LocalMirrorRequest::GetBlob { blob_id, blob, responder } => {
-                let mut response = self.manager.get_blob(blob_id.into(), blob).await;
-                let () = responder.send(&mut response).context("sending GetBlob response")?;
+                let response = self.manager.get_blob(blob_id.into(), blob).await;
+                let () = responder.send(response).context("sending GetBlob response")?;
             }
         }
         Ok(())

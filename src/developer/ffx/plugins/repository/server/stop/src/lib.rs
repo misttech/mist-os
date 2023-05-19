@@ -77,7 +77,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStop { responder } => {
                     sender.take().unwrap().send(()).unwrap();
-                    responder.send(&mut Ok(())).unwrap()
+                    responder.send(Ok(())).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
@@ -97,7 +97,7 @@ mod tests {
         let repos = setup_fake_repos(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
-                responder.send(&mut Err(RepositoryError::InternalError.into())).unwrap()
+                responder.send(Err(RepositoryError::InternalError.into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
         });

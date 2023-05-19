@@ -533,17 +533,17 @@ async fn serve_failing_blobfs(
                 todo!("https://fxbug.dev/77623: rights_request={:?}", rights_request);
             }
             fio::DirectoryRequest::Close { responder } => {
-                responder.send(&mut Err(zx::Status::IO.into_raw())).context("failing close")?
+                responder.send(Err(zx::Status::IO.into_raw())).context("failing close")?
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 let _ = responder;
                 todo!("https://fxbug.dev/77623");
             }
             fio::DirectoryRequest::Sync { responder } => {
-                responder.send(&mut Err(zx::Status::IO.into_raw())).context("failing sync")?
+                responder.send(Err(zx::Status::IO.into_raw())).context("failing sync")?
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
             }
             fio::DirectoryRequest::GetAttr { responder } => responder
                 .send(
@@ -614,7 +614,7 @@ async fn serve_failing_blobfs(
                 );
             }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
-                responder.send(&mut Err(zx::Status::IO.into_raw())).context("failing unlink")?
+                responder.send(Err(zx::Status::IO.into_raw())).context("failing unlink")?
             }
             fio::DirectoryRequest::ReadDirents { max_bytes: _, responder } => {
                 responder.send(zx::Status::IO.into_raw(), &[]).context("failing readdirents")?
@@ -630,7 +630,7 @@ async fn serve_failing_blobfs(
                 responder.send(zx::Status::IO.into_raw(), None).context("failing gettoken")?
             }
             fio::DirectoryRequest::Rename { src: _, dst_parent_token: _, dst: _, responder } => {
-                responder.send(&mut Err(zx::Status::IO.into_raw())).context("failing rename")?
+                responder.send(Err(zx::Status::IO.into_raw())).context("failing rename")?
             }
             fio::DirectoryRequest::Link { src: _, dst_parent_token: _, dst: _, responder } => {
                 responder.send(zx::Status::IO.into_raw()).context("failing link")?
@@ -645,7 +645,7 @@ async fn serve_failing_blobfs(
                 .send(zx::Status::IO.into_raw(), None)
                 .context("failing queryfilesystem")?,
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?
             }
         };
     }

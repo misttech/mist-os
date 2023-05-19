@@ -710,19 +710,19 @@ impl Daemon {
                     )
                     .await
                 {
-                    Ok(()) => responder.send(&mut Ok(())).context("fidl response")?,
+                    Ok(()) => responder.send(Ok(())).context("fidl response")?,
                     Err(e) => {
                         tracing::error!("{}", e);
                         match e {
                             ProtocolError::NoProtocolFound(_) => {
-                                responder.send(&mut Err(DaemonError::ProtocolNotFound))?
+                                responder.send(Err(DaemonError::ProtocolNotFound))?
                             }
                             ProtocolError::StreamOpenError(_) => {
-                                responder.send(&mut Err(DaemonError::ProtocolOpenError))?
+                                responder.send(Err(DaemonError::ProtocolOpenError))?
                             }
                             ProtocolError::BadRegisterState(_)
                             | ProtocolError::DuplicateTaskId(..) => {
-                                responder.send(&mut Err(DaemonError::BadProtocolRegisterState))?
+                                responder.send(Err(DaemonError::BadProtocolRegisterState))?
                             }
                         }
                     }

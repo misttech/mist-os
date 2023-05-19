@@ -549,34 +549,34 @@ mod tests {
     ) -> (avrcp::ControllerRequestStream, avrcp::BrowseControllerRequestStream) {
         pin_mut!(avrcp_request_stream);
         // Connects to AVRCP.
-        let mut controller_request_stream =
-            match exec.run_until_stalled(&mut avrcp_request_stream.select_next_some()) {
-                Poll::Ready(Ok(avrcp::PeerManagerRequest::GetControllerForTarget {
-                    client,
-                    responder,
-                    ..
-                })) => responder
-                    .send(&mut Ok(()))
-                    .and_then(|_| client.into_stream())
-                    .expect("should have sent"),
-                x => panic!("Expected a GetController request, got {:?}", x),
-            };
+        let mut controller_request_stream = match exec
+            .run_until_stalled(&mut avrcp_request_stream.select_next_some())
+        {
+            Poll::Ready(Ok(avrcp::PeerManagerRequest::GetControllerForTarget {
+                client,
+                responder,
+                ..
+            })) => {
+                responder.send(Ok(())).and_then(|_| client.into_stream()).expect("should have sent")
+            }
+            x => panic!("Expected a GetController request, got {:?}", x),
+        };
 
         // Finish serving GetControllerForTarget.
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
-        let browse_controller_request_stream =
-            match exec.run_until_stalled(&mut avrcp_request_stream.select_next_some()) {
-                Poll::Ready(Ok(avrcp::PeerManagerRequest::GetBrowseControllerForTarget {
-                    client,
-                    responder,
-                    ..
-                })) => responder
-                    .send(&mut Ok(()))
-                    .and_then(|_| client.into_stream())
-                    .expect("should have sent"),
-                x => panic!("Expected a GetBrowseController request, got {:?}", x),
-            };
+        let browse_controller_request_stream = match exec
+            .run_until_stalled(&mut avrcp_request_stream.select_next_some())
+        {
+            Poll::Ready(Ok(avrcp::PeerManagerRequest::GetBrowseControllerForTarget {
+                client,
+                responder,
+                ..
+            })) => {
+                responder.send(Ok(())).and_then(|_| client.into_stream()).expect("should have sent")
+            }
+            x => panic!("Expected a GetBrowseController request, got {:?}", x),
+        };
 
         // Finish serving GetBrowseControllerForTarget.
         let res = exec.run_until_stalled(&mut relay_fut);
@@ -969,7 +969,7 @@ mod tests {
         match exec.run_until_stalled(&mut controller_requests.next()) {
             Poll::Ready(Some(Ok(avrcp::ControllerRequest::SendCommand { command, responder }))) => {
                 assert_eq!(expected_command, command);
-                responder.send(&mut Ok(())).expect("should have sent");
+                responder.send(Ok(())).expect("should have sent");
             }
             x => panic!("Expected a SendCommand({:?}) request, got {:?}", expected_command, x),
         }
@@ -1020,7 +1020,7 @@ mod tests {
                 responder,
             }))) => {
                 assert_eq!(battery_status, expected_battery_status);
-                responder.send(&mut Ok(())).expect("can respond to client");
+                responder.send(Ok(())).expect("can respond to client");
             }
             x => panic!("Expected a InformBatteryStatus request, got {:?}", x),
         }

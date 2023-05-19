@@ -47,7 +47,7 @@ mod tests {
                 assert_eq!(node_name, "test_node_name");
                 assert_eq!(command, "test_command");
                 assert_eq!(args, vec!["test_arg_1", "test_arg_2"]);
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
         });
 

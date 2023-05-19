@@ -327,8 +327,8 @@ fn handle_annotation_controller_request(
         } => {
             let result = annotations.update_annotations(annotations_to_set, annotations_to_delete);
             match result {
-                Ok(()) => responder.send(&mut Ok(())),
-                Err(AnnotationError::Update(e)) => responder.send(&mut Err(e)),
+                Ok(()) => responder.send(Ok(())),
+                Err(AnnotationError::Update(e)) => responder.send(Err(e)),
                 Err(_) => unreachable!(),
             }
             .ok();

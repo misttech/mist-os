@@ -266,7 +266,7 @@ mod test {
                         expected_numbered_handle_count,
                         args.numbered_handles.unwrap_or(vec![]).len()
                     );
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -294,7 +294,7 @@ mod test {
                     assert_eq!(expected_moniker, parent_moniker);
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -311,7 +311,7 @@ mod test {
             match req {
                 fsys::LifecycleControllerRequest::StartInstance { moniker, responder, .. } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -328,7 +328,7 @@ mod test {
             match req {
                 fsys::LifecycleControllerRequest::StopInstance { moniker, responder, .. } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -347,7 +347,7 @@ mod test {
                     moniker, responder, ..
                 } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -366,7 +366,7 @@ mod test {
                     moniker, responder, ..
                 } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -382,7 +382,7 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::CreateInstance { responder, .. } => {
-                    responder.send(&mut Err(error)).unwrap();
+                    responder.send(Err(error)).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -398,7 +398,7 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::StartInstance { responder, .. } => {
-                    responder.send(&mut Err(error)).unwrap();
+                    responder.send(Err(error)).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }

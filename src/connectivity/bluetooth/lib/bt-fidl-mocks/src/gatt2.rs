@@ -83,10 +83,10 @@ impl RemoteServiceMock {
                 responder,
             } => {
                 if h == handle {
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                     Ok(Status::Satisfied(notifier))
                 } else {
-                    responder.send(&mut Err(gatt2::Error::InvalidHandle))?;
+                    responder.send(Err(gatt2::Error::InvalidHandle))?;
                     Ok(Status::Pending)
                 }
             }

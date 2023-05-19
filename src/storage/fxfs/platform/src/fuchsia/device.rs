@@ -335,9 +335,7 @@ impl BlockServer {
                                 }
                             }
                             // TODO(fxbug.dev/89873): close fifo
-                            block::SessionRequest::Close { responder } => {
-                                responder.send(&mut Ok(()))?
-                            }
+                            block::SessionRequest::Close { responder } => responder.send(Ok(()))?,
                         };
                         Ok(())
                     })
@@ -351,7 +349,7 @@ impl BlockServer {
                 dev_offset: _,
                 vmo_offset: _,
             } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::WriteBlocks {
@@ -361,7 +359,7 @@ impl BlockServer {
                 dev_offset: _,
                 vmo_offset: _,
             } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetTypeGuid { responder } => {
@@ -462,7 +460,7 @@ impl BlockServer {
             } => {}
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::Close { responder } => {
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetConnectionInfo { responder } => {
@@ -472,7 +470,7 @@ impl BlockServer {
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::Sync { responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::GetAttr { responder } => {
                 match self.file.get_attrs().await {
@@ -504,7 +502,7 @@ impl BlockServer {
                 responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::UpdateAttributes { payload: _, responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::ListExtendedAttributes { iterator, .. } => {
                 iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
@@ -513,10 +511,10 @@ impl BlockServer {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::SetExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::RemoveExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetFlags { responder } => {
@@ -545,16 +543,16 @@ impl BlockServer {
                 self.handle_clone_request(server);
             }
             VolumeAndNodeRequest::Bind { driver: _, responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::Rebind { driver: _, responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::UnbindChildren { responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::ScheduleUnbind { responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::GetTopologicalPath { responder } => {
                 responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;

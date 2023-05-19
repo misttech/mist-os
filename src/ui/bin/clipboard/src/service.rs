@@ -244,12 +244,11 @@ impl<T: ServiceDependencies> Service<T> {
                     RequestWriter { payload, responder } => {
                         match this.register_focused_writer_client(payload) {
                             Ok(_) => {
-                                responder.send(&mut Ok(()))?;
+                                responder.send(Ok(()))?;
                             }
                             Err(e) => {
                                 let server_error: fclip::ClipboardError = e.into();
-                                let mut result = Err(server_error);
-                                responder.send(&mut result)?;
+                                responder.send(Err(server_error))?;
                             }
                         };
                     }
@@ -315,19 +314,19 @@ impl<T: ServiceDependencies> Service<T> {
                         Ok(Some(req)) => {
                             match req {
                                 fclip::WriterRequest::SetItem { payload, responder } => {
-                                    let mut result = this
+                                    let result = this
                                         .clone()
                                         .handle_set_item(payload, view_ref_koid)
                                         .map_err(|e| e.into());
                                   debug!("SetItem response: {:?}", &result);
-                                  responder.send(&mut result)?;
+                                  responder.send(result)?;
                                 },
                                 fclip::WriterRequest::Clear { payload: _, responder } => {
-                                    let mut result = this
+                                    let result = this
                                         .clone()
                                         .handle_clear(view_ref_koid)
                                         .map_err(|e| e.into());
-                                    responder.send(&mut result)?;
+                                    responder.send(result)?;
                                 },
                             }
                             // Keep looping
@@ -425,12 +424,11 @@ impl<T: ServiceDependencies> Service<T> {
                     RequestReader { payload, responder } => {
                         match this.register_focused_reader_client(payload) {
                             Ok(_) => {
-                                responder.send(&mut Ok(()))?;
+                                responder.send(Ok(()))?;
                             }
                             Err(e) => {
                                 let server_error: fclip::ClipboardError = e.into();
-                                let mut result = Err(server_error);
-                                responder.send(&mut result)?;
+                                responder.send(Err(server_error))?;
                             }
                         }
                     }

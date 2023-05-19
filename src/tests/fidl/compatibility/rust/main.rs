@@ -47,18 +47,18 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                 } => {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        let mut result = echo
+                        let result = echo
                             .echo_minimal_with_error("", result_variant)
                             .await
                             .context("Error calling echo_minimal_with_error on proxy")?;
-                        responder.send(&mut result).context("Error responding")?;
+                        responder.send(result).context("Error responding")?;
                     } else {
-                        let mut result = if let RespondWith::Err = result_variant {
+                        let result = if let RespondWith::Err = result_variant {
                             EchoEchoMinimalWithErrorResult::Err(0)
                         } else {
                             EchoEchoMinimalWithErrorResult::Ok(())
                         };
-                        responder.send(&mut result).context("Error responding")?;
+                        responder.send(result).context("Error responding")?;
                     }
                 }
                 EchoRequest::EchoMinimalNoRetVal { forward_to_server, control_handle } => {

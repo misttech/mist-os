@@ -159,7 +159,7 @@ impl FidlProtocol for Forward {
                     Ok(t) => t,
                     Err(_) => {
                         return responder
-                            .send(&mut Err(ffx::TunnelError::CouldNotListen))
+                            .send(Err(ffx::TunnelError::CouldNotListen))
                             .context("error sending response");
                     }
                 };
@@ -185,7 +185,7 @@ impl FidlProtocol for Forward {
                     tracing::warn!("Failed to persist tunnel configuration: {:?}", e);
                 }
 
-                responder.send(&mut Ok(())).context("error sending response")?;
+                responder.send(Ok(())).context("error sending response")?;
                 Ok(())
             }
             ffx::TunnelRequest::ReversePort { target, host_address, target_address, responder } => {
@@ -194,7 +194,7 @@ impl FidlProtocol for Forward {
                     Err(e) => {
                         tracing::error!("Could not connect to proxy for TCP forwarding: {:?}", e);
                         return responder
-                            .send(&mut Err(ffx::TunnelError::TargetConnectFailed))
+                            .send(Err(ffx::TunnelError::TargetConnectFailed))
                             .context("error sending response");
                     }
                 };
@@ -206,7 +206,7 @@ impl FidlProtocol for Forward {
                     Err(e) => {
                         tracing::error!("Could not establish reverse TCP forward: {:?}", e);
                         return responder
-                            .send(&mut Err(ffx::TunnelError::CouldNotListen))
+                            .send(Err(ffx::TunnelError::CouldNotListen))
                             .context("error sending response");
                     }
                 }
@@ -267,7 +267,7 @@ impl FidlProtocol for Forward {
                     }
                 });
 
-                responder.send(&mut Ok(())).context("error sending response")?;
+                responder.send(Ok(())).context("error sending response")?;
                 Ok(())
             }
         }
@@ -341,7 +341,7 @@ mod tests {
                                 SocketAddressExt("127.0.0.1:5678".parse().unwrap()),
                                 SocketAddressExt::from(addr)
                             );
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         }
                         other => panic!("Unexpected request: {:?}", other),
                     }

@@ -176,7 +176,7 @@ impl ServiceGroup {
 impl Drop for ServiceGroup {
     fn drop(&mut self) {
         if let Some(responder) = self.responder.take() {
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(Ok(()));
         }
     }
 }

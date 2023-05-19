@@ -44,7 +44,7 @@ impl MockSpaceService {
     ) -> Result<(), Error> {
         while let Some(event) = stream.try_next().await.expect("received request") {
             let fidl_fuchsia_space::ManagerRequest::Gc { responder } = event;
-            responder.send(&mut (self.call_hook)())?;
+            responder.send((self.call_hook)())?;
         }
 
         Ok(())

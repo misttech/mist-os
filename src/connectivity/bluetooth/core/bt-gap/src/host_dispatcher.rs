@@ -1116,11 +1116,11 @@ pub(crate) mod test {
             match host_server.next().await {
                 Some(Ok(HostRequest::SetLocalName { responder, .. })) => {
                     info!("Setting Local Name");
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 Some(Ok(HostRequest::SetDeviceClass { responder, .. })) => {
                     info!("Setting Device Class");
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 Some(Ok(HostRequest::RequestGatt2Server_ { server, .. })) => {
                     // don't respond at all on the server side.
@@ -1132,7 +1132,7 @@ pub(crate) mod test {
                         Some(Ok(Server_Request::PublishService { info, service, responder })) => {
                             info!("Captured publish of GAS Service: {:?}", info);
                             gas_endpoints.service = Some(service.into_proxy().unwrap());
-                            let _ = responder.send(&mut Ok(()));
+                            let _ = responder.send(Ok(()));
                         }
                         x => error!("Got unexpected GAS Server request: {:?}", x),
                     }
@@ -1140,7 +1140,7 @@ pub(crate) mod test {
                 }
                 Some(Ok(HostRequest::SetConnectable { responder, .. })) => {
                     info!("Setting connectable");
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 Some(Ok(req)) => info!("Unhandled Host Request in add: {:?}", req),
                 Some(Err(e)) => error!("Error in host server: {:?}", e),

@@ -963,7 +963,7 @@ mod tests {
                 while let Poll::Ready(Some(Ok(req))) =
                     self.exec.run_until_stalled(&mut self.cobalt_stream.next())
                 {
-                    self.cobalt_events.append(&mut req.respond_to_metric_req(&mut Ok(())));
+                    self.cobalt_events.append(&mut req.respond_to_metric_req(Ok(())));
                     made_progress = true;
                 }
             }
@@ -1011,14 +1011,14 @@ mod tests {
         // Respond to MetricEventLoggerRequest and extract its MetricEvent.
         fn respond_to_metric_req(
             self,
-            result: &mut Result<(), fidl_fuchsia_metrics::Error>,
+            result: Result<(), fidl_fuchsia_metrics::Error>,
         ) -> Vec<fidl_fuchsia_metrics::MetricEvent>;
     }
 
     impl CobaltExt for fidl_fuchsia_metrics::MetricEventLoggerRequest {
         fn respond_to_metric_req(
             self,
-            result: &mut Result<(), fidl_fuchsia_metrics::Error>,
+            result: Result<(), fidl_fuchsia_metrics::Error>,
         ) -> Vec<fidl_fuchsia_metrics::MetricEvent> {
             match self {
                 Self::LogOccurrence { metric_id, count, event_codes, responder } => {

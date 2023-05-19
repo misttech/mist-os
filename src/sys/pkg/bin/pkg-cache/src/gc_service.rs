@@ -31,8 +31,7 @@ pub async fn serve(
 
     while let Some(event) = stream.try_next().await? {
         let SpaceManagerRequest::Gc { responder } = event;
-        responder
-            .send(&mut gc(&blobfs, base_packages.as_ref(), &package_index, &event_pair).await)?;
+        responder.send(gc(&blobfs, base_packages.as_ref(), &package_index, &event_pair).await)?;
     }
     Ok(())
 }

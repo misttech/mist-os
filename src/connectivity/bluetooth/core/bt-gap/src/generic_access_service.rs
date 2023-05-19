@@ -142,7 +142,7 @@ impl GenericAccessService {
             // Writing to the the available GENERIC_ACCESS service characteristics
             // is optional according to the spec, and it was decided not to implement
             gatt::LocalServiceRequest::WriteValue { responder, .. } => {
-                Ok(responder.send(&mut Err(gatt::Error::WriteNotPermitted))?)
+                Ok(responder.send(Err(gatt::Error::WriteNotPermitted))?)
             }
             gatt::LocalServiceRequest::PeerUpdate { payload: _, responder } => {
                 Ok(responder.drop_without_shutdown())

@@ -189,7 +189,7 @@ mod tests {
                     responder,
                     ..
                 }) => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 request => panic!("Unexpected request to Coordinator: {:?}", request),
             }

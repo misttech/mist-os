@@ -188,18 +188,16 @@ mod tests {
                                             .lock()
                                             .unwrap()
                                             .push(Event::Add(rule.try_into().unwrap()));
-                                        responder.send(&mut Ok(())).unwrap();
+                                        responder.send(Ok(())).unwrap();
                                     }
                                     EditTransactionRequest::Commit { responder } => {
                                         if fail_attempts > 0 {
                                             fail_attempts -= 1;
                                             events_task.lock().unwrap().push(Event::CommitFailed);
-                                            responder
-                                                .send(&mut Err(fail_status.into_raw()))
-                                                .unwrap();
+                                            responder.send(Err(fail_status.into_raw())).unwrap();
                                         } else {
                                             events_task.lock().unwrap().push(Event::Commit);
-                                            responder.send(&mut Ok(())).unwrap();
+                                            responder.send(Ok(())).unwrap();
                                         }
                                     }
                                 }

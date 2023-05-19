@@ -36,9 +36,9 @@ async fn handler(
             })
         }
         HostWatcherRequest::SetActive { id, responder } => {
-            let mut result =
+            let result =
                 hd.set_active_host(id.into()).map_err(|_| zx::Status::NOT_FOUND.into_raw());
-            responder.send(&mut result).map_err(Error::from)
+            responder.send(result).map_err(Error::from)
         }
     }
 }

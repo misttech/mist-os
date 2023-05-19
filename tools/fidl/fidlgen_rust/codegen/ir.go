@@ -1334,7 +1334,8 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		// TODO(fxbug.dev/54368): Complete migration from `&mut Result<Owned, Err>` to `Result<Param, Err>`.
 		migrate := innerType.DeclType == fidlgen.TableDeclType ||
 			innerType.DeclType == fidlgen.UnionDeclType ||
-			innerType.IsResourceType()
+			innerType.IsResourceType() ||
+			len(c.structs[innerType.Identifier].Members) == 0
 		if migrate {
 			okParamType := "()"
 			if len(inner.Parameters) > 0 {

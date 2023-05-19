@@ -47,7 +47,7 @@ mod test {
 
         let proxy = setup_fake_do_not_disturb_proxy(move |req| match req {
             DoNotDisturbRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             DoNotDisturbRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -86,7 +86,7 @@ mod test {
     ) -> Result<()> {
         let proxy = setup_fake_do_not_disturb_proxy(move |req| match req {
             DoNotDisturbRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             DoNotDisturbRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

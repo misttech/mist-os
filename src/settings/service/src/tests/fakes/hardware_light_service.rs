@@ -117,17 +117,17 @@ impl Service for HardwareLightService {
                             .await
                             .insert(index, value)
                             .expect("unknown light");
-                        responder.send(&mut Ok(())).expect("set brightness value")
+                        responder.send(Ok(())).expect("set brightness value")
                     }
                     LightRequest::SetSimpleValue { index, value, responder } => {
                         let _ =
                             simple_values.lock().await.insert(index, value).expect("unknown light");
-                        responder.send(&mut Ok(())).expect("set simple value")
+                        responder.send(Ok(())).expect("set simple value")
                     }
                     LightRequest::SetRgbValue { index, value, responder } => {
                         let _ =
                             rgb_values.lock().await.insert(index, value).expect("unknown light");
-                        responder.send(&mut Ok(())).expect("set rgb value")
+                        responder.send(Ok(())).expect("set rgb value")
                     }
                     _ => {}
                 }

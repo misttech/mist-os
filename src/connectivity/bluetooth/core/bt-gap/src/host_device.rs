@@ -423,7 +423,7 @@ pub(crate) mod test {
                     HostRequest::StartDiscovery { responder } => {
                         assert!(!host_info.read().discovering);
                         host_info.write().discovering = true;
-                        assert_matches::assert_matches!(responder.send(&mut Ok(())), Ok(()));
+                        assert_matches::assert_matches!(responder.send(Ok(())), Ok(()));
                     }
                     HostRequest::StopDiscovery { control_handle: _ } => {
                         assert!(host_info.read().discovering);

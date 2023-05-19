@@ -43,7 +43,7 @@ mod test {
         const TRUE: bool = true;
         let proxy = setup_fake_accessibility_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             AccessibilityRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -86,7 +86,7 @@ mod test {
         let set_clone = expected_set.clone();
         let proxy = setup_fake_accessibility_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             AccessibilityRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

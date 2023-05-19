@@ -50,7 +50,7 @@ mod tests {
         setup_fake_target_proxy(move |req| match req {
             ffx::TargetRequest::SetPreferredSshAddress { ip, responder } => {
                 assert_eq!(expected_ip, ip);
-                responder.send(&mut Ok(())).expect("set_preferred_ssh_address failed");
+                responder.send(Ok(())).expect("set_preferred_ssh_address failed");
             }
             r => panic!("got unexpected request: {:?}", r),
         })

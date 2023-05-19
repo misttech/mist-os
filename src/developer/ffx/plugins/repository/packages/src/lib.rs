@@ -349,7 +349,7 @@ mod test {
                     }
                 })
                 .detach();
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             RepositoryRegistryRequest::ShowPackage {
                 repository_name,
@@ -397,7 +397,7 @@ mod test {
                     }
                 })
                 .detach();
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
         })

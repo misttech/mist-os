@@ -176,7 +176,7 @@ mod tests {
                         HostRequest::SetConnectable { enabled, responder } => {
                             assert!(expected_reqs.remove("set_connectable"));
                             assert_eq!(test_config.bredr.connectable, enabled);
-                            assert_matches!(responder.send(&mut Ok(())), Ok(()));
+                            assert_matches!(responder.send(Ok(())), Ok(()));
                         }
                         HostRequest::SetLeSecurityMode { le_security_mode, .. } => {
                             assert!(expected_reqs.remove("set_le_security_mode"));

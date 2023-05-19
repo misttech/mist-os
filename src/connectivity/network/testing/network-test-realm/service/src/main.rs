@@ -802,12 +802,12 @@ impl Controller {
     ) -> Result<(), fidl::Error> {
         match request {
             fntr::ControllerRequest::StartHermeticNetworkRealm { netstack, responder } => {
-                let mut result = self.start_hermetic_network_realm(netstack).await;
-                responder.send(&mut result)?;
+                let result = self.start_hermetic_network_realm(netstack).await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::StopHermeticNetworkRealm { responder } => {
-                let mut result = self.stop_hermetic_network_realm().await;
-                responder.send(&mut result)?;
+                let result = self.stop_hermetic_network_realm().await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::AddInterface {
                 mac_address,
@@ -816,16 +816,16 @@ impl Controller {
                 wait_any_ip_address,
             } => {
                 let mac_address = fnet_ext::MacAddress::from(mac_address);
-                let mut result = self.add_interface(mac_address, &name, wait_any_ip_address).await;
-                responder.send(&mut result)?;
+                let result = self.add_interface(mac_address, &name, wait_any_ip_address).await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::StartStub { component_url, responder } => {
-                let mut result = self.start_stub(&component_url).await;
-                responder.send(&mut result)?;
+                let result = self.start_stub(&component_url).await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::StopStub { responder } => {
-                let mut result = self.stop_stub().await;
-                responder.send(&mut result)?;
+                let result = self.stop_stub().await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::PollUdp {
                 target,
@@ -858,18 +858,18 @@ impl Controller {
                 timeout,
                 responder,
             } => {
-                let mut result = self
+                let result = self
                     .ping(target, payload_length, interface_name, zx::Duration::from_nanos(timeout))
                     .await;
-                responder.send(&mut result)?;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::JoinMulticastGroup { address, interface_id, responder } => {
-                let mut result = self.join_multicast_group(address, interface_id).await;
-                responder.send(&mut result)?;
+                let result = self.join_multicast_group(address, interface_id).await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::LeaveMulticastGroup { address, interface_id, responder } => {
-                let mut result = self.leave_multicast_group(address, interface_id).await;
-                responder.send(&mut result)?;
+                let result = self.leave_multicast_group(address, interface_id).await;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::StartDhcpv6Client {
                 payload:
@@ -882,18 +882,18 @@ impl Controller {
                     },
                 responder,
             } => {
-                let mut result = self
+                let result = self
                     .start_dhcpv6_client(interface_id, address, stateful, request_dns_servers)
                     .await;
-                responder.send(&mut result)?;
+                responder.send(result)?;
             }
             fntr::ControllerRequest::StopDhcpv6Client { responder } => {
-                let mut result = if self.dhcpv6_client_stream_map.inner().drain().count() == 0 {
+                let result = if self.dhcpv6_client_stream_map.inner().drain().count() == 0 {
                     Err(fntr::Error::Dhcpv6ClientNotRunning)
                 } else {
                     Ok(())
                 };
-                responder.send(&mut result)?;
+                responder.send(result)?;
             }
         }
         Ok(())

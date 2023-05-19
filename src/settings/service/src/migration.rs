@@ -1051,7 +1051,7 @@ mod tests {
                     assert_eq!(metric_id, expected_metric_ids[index]);
                     assert_eq!(count, 1);
                     assert_eq!(event_codes[0], expected_event_codes[index]);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                     index += 1;
                 }
             }

@@ -664,11 +664,11 @@ mod tests {
 
     impl PendingOpen {
         fn succeed(self) -> PackageDirProvider {
-            self.responder.send(&mut Ok(())).unwrap();
+            self.responder.send(Ok(())).unwrap();
             PackageDirProvider { stream: self.dir }
         }
         fn fail_not_found(self) {
-            self.responder.send(&mut Err(Status::NOT_FOUND.into_raw())).unwrap();
+            self.responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
         }
     }
 
@@ -689,20 +689,20 @@ mod tests {
 
         fn finish_hold_stream_open(self) -> (NeededBlobsRequestStream, PackageDirProvider) {
             self.stream.control_handle().shutdown_with_epitaph(Status::OK);
-            self.responder.send(&mut Ok(())).unwrap();
+            self.responder.send(Ok(())).unwrap();
             (self.stream, PackageDirProvider { stream: self.dir })
         }
 
         fn finish(self) -> PackageDirProvider {
             self.stream.control_handle().shutdown_with_epitaph(Status::OK);
-            self.responder.send(&mut Ok(())).unwrap();
+            self.responder.send(Ok(())).unwrap();
             PackageDirProvider { stream: self.dir }
         }
 
         #[cfg(target_os = "fuchsia")]
         fn fail_the_get(self) {
             self.responder
-                .send(&mut Err(Status::IO_INVALID.into_raw()))
+                .send(Err(Status::IO_INVALID.into_raw()))
                 .expect("client should be waiting");
         }
 
@@ -1180,7 +1180,7 @@ mod tests {
         async fn fail_truncate(mut self) -> Self {
             match self.stream.next().await {
                 Some(Ok(fio::FileRequest::Resize { length: _, responder })) => {
-                    responder.send(&mut Err(Status::NO_SPACE.into_raw())).unwrap();
+                    responder.send(Err(Status::NO_SPACE.into_raw())).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
             }
@@ -1191,7 +1191,7 @@ mod tests {
             match self.stream.next().await {
                 Some(Ok(fio::FileRequest::Resize { length, responder })) => {
                     assert_eq!(length, expected_length);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
             }
@@ -1237,7 +1237,7 @@ mod tests {
         async fn expect_close(mut self) {
             match self.stream.next().await {
                 Some(Ok(fio::FileRequest::Close { responder })) => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
             }

@@ -135,27 +135,27 @@ impl RealmCapabilityHost {
     ) -> Result<(), fidl::Error> {
         match request {
             fcomponent::RealmRequest::CreateChild { responder, collection, decl, args } => {
-                let mut res =
+                let res =
                     async { Self::create_child(component, collection, decl, args).await }.await;
-                responder.send(&mut res)?;
+                responder.send(res)?;
             }
             fcomponent::RealmRequest::DestroyChild { responder, child } => {
-                let mut res = Self::destroy_child(component, child).await;
-                responder.send(&mut res)?;
+                let res = Self::destroy_child(component, child).await;
+                responder.send(res)?;
             }
             fcomponent::RealmRequest::ListChildren { responder, collection, iter } => {
-                let mut res = Self::list_children(
+                let res = Self::list_children(
                     component,
                     self.config.list_children_batch_size,
                     collection,
                     iter,
                 )
                 .await;
-                responder.send(&mut res)?;
+                responder.send(res)?;
             }
             fcomponent::RealmRequest::OpenExposedDir { responder, child, exposed_dir } => {
-                let mut res = Self::open_exposed_dir(component, child, exposed_dir).await;
-                responder.send(&mut res)?;
+                let res = Self::open_exposed_dir(component, child, exposed_dir).await;
+                responder.send(res)?;
             }
         }
         Ok(())

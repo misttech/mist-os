@@ -134,7 +134,7 @@ mod tests {
                 Ok(backlight::DeviceRequest::SetStateNormalized { state, responder }) => {
                     assert_matches!(state, backlight::State { backlight_on: false, brightness: _ });
                     assert_eq!(state.brightness, 0.5);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }
@@ -165,7 +165,7 @@ mod tests {
                 Ok(backlight::DeviceRequest::SetStateNormalized { state, responder }) => {
                     assert_matches!(state, backlight::State { backlight_on: true, brightness: _ });
                     assert_eq!(state.brightness, 1.0);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }
@@ -219,7 +219,7 @@ mod tests {
             }
             match backlight_request_stream.next().await.unwrap() {
                 Ok(backlight::DeviceRequest::SetStateNormalized { responder, .. }) => {
-                    responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).unwrap();
+                    responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }

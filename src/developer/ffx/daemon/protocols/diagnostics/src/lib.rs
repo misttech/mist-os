@@ -282,7 +282,7 @@ mod test {
             .register_instanced_protocol_closure::<ffx::TargetCollectionMarker, _>(|_cx, req| {
                 match req {
                     ffx::TargetCollectionRequest::OpenTarget { responder, .. } => responder
-                        .send(&mut Err(ffx::OpenTargetError::TargetNotFound))
+                        .send(Err(ffx::OpenTargetError::TargetNotFound))
                         .map_err(Into::into),
                     _ => panic!("unsupported for this test"),
                 }
@@ -328,7 +328,7 @@ mod test {
                             }
                         })
                         .detach();
-                        responder.send(&mut Ok(())).map_err(Into::into)
+                        responder.send(Ok(())).map_err(Into::into)
                     }
                     _ => panic!("unsupported for this test"),
                 }

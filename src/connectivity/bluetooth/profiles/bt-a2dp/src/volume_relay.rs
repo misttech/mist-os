@@ -340,7 +340,7 @@ mod tests {
                 handler,
                 responder,
             })) => {
-                responder.send(&mut Ok(())).expect("response to handler set");
+                responder.send(Ok(())).expect("response to handler set");
                 handler
             }
             x => panic!("Expected SetAbsoluteVolumeHandler, got: {:?}", x),
@@ -429,7 +429,7 @@ mod tests {
         match exec.run_until_stalled(&mut request_fut) {
             Poll::Ready(Ok(settings::AudioRequest::Set { settings, responder })) => {
                 assert_eq!(1, settings.streams.expect("a stream was set").len());
-                let _ = responder.send(&mut Ok(()))?;
+                let _ = responder.send(Ok(()))?;
             }
             x => panic!("Expected Ready audio set request and got: {:?}", x),
         };
@@ -469,7 +469,7 @@ mod tests {
 
         match exec.run_until_stalled(&mut request_fut) {
             Poll::Ready(Ok(settings::AudioRequest::Set { responder, .. })) => {
-                let _ = responder.send(&mut Ok(()))?;
+                let _ = responder.send(Ok(()))?;
             }
             x => panic!("Expected Ready audio set request and got: {:?}", x),
         };

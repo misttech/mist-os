@@ -242,7 +242,7 @@ mod test {
                 .expect("Unexpected call to Guest Proxy");
             assert_eq!(port, 0);
             responder
-                .send(&mut Err(zx_status::Status::CONNECTION_REFUSED.into_raw()))
+                .send(Err(zx_status::Status::CONNECTION_REFUSED.into_raw()))
                 .expect("Failed to send status code to client");
         };
 
@@ -263,7 +263,7 @@ mod test {
                 .into_listen()
                 .expect("Unexpected call to Guest Proxy");
             assert_eq!(port, 0);
-            responder.send(&mut Ok(())).expect("Failed to send status code to client");
+            responder.send(Ok(())).expect("Failed to send status code to client");
             let _ = acceptor
                 .into_proxy()
                 .expect("Failed to convert client end into proxy")

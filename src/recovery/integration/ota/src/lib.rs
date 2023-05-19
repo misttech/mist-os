@@ -504,7 +504,7 @@ async fn fshost_admin_server_mock(
                 if let ffsh::AdminRequest::WipeStorage { blobfs_root, responder } = request {
                     fuchsia_fs::directory::clone_onto_no_describe(&blobfs_proxy, None, blobfs_root)
                         .expect("failed to clone blobfs proxy");
-                    responder.send(&mut Ok(())).expect("Error replying to wipe storage request");
+                    responder.send(Ok(())).expect("Error replying to wipe storage request");
                 }
             }
         })

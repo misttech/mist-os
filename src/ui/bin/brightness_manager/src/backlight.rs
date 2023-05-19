@@ -629,11 +629,11 @@ mod dual_state_tests {
                         responder.send(&mut result).expect("send GetStateNormalized");
                     }
                     SetStateNormalized { state, responder } => {
-                        let mut result = self.set_state_normalized_response.lock().await.clone();
+                        let result = self.set_state_normalized_response.lock().await.clone();
                         if result.is_ok() {
                             self.set_get_state_normalized_response(Ok(state)).await;
                         }
-                        responder.send(&mut result).expect("send SetStateNormalized");
+                        responder.send(result).expect("send SetStateNormalized");
                     }
                     _ => {
                         unimplemented!();
@@ -686,11 +686,11 @@ mod dual_state_tests {
                 tracing::debug!("FakeDisplayPowerService: {}", req.method_name());
                 match req {
                     DisplayPowerRequest::SetDisplayPower { power_on, responder } => {
-                        let mut result = self.set_display_power_response.lock().await.clone();
+                        let result = self.set_display_power_response.lock().await.clone();
                         if result.is_ok() {
                             self.last_set_display_power_value.lock().await.replace(power_on);
                         }
-                        responder.send(&mut result).expect("send SetDisplayPower");
+                        responder.send(result).expect("send SetDisplayPower");
                     }
                 };
             }

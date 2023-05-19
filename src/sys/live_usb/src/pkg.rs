@@ -95,10 +95,10 @@ mod tests {
                     EditTransactionRequest::Add { rule, responder } => {
                         let rule: Rule = rule.try_into().unwrap();
                         self.rules.push(rule);
-                        responder.send(&mut Ok(())).expect("send reply ok");
+                        responder.send(Ok(())).expect("send reply ok");
                     }
                     EditTransactionRequest::Commit { responder } => {
-                        responder.send(&mut Ok(())).expect("send reply ok");
+                        responder.send(Ok(())).expect("send reply ok");
                     }
                     e => panic!("Unexpected request {:?}", e),
                 }

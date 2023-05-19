@@ -74,7 +74,7 @@ impl MockVerifierService {
             .for_each(|request| match request.expect("received verifier request") {
                 fidl::BlobfsVerifierRequest::Verify { options, responder } => call_hook
                     .verify(options)
-                    .map(|mut res| responder.send(&mut res).expect("sent verifier response")),
+                    .map(|res| responder.send(res).expect("sent verifier response")),
             })
             .await
     }
@@ -89,7 +89,7 @@ impl MockVerifierService {
             .for_each(|request| match request.expect("received verifier request") {
                 fidl::NetstackVerifierRequest::Verify { options, responder } => call_hook
                     .verify(options)
-                    .map(|mut res| responder.send(&mut res).expect("sent verifier response")),
+                    .map(|res| responder.send(res).expect("sent verifier response")),
             })
             .await
     }

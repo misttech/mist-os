@@ -118,7 +118,7 @@ impl MutableConnection {
         match request {
             fio::DirectoryRequest::Unlink { name, options, responder } => {
                 let result = this.as_mut().handle_unlink(name, options).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::DirectoryRequest::GetToken { responder } => {
                 let (status, token) = match Self::handle_get_token(this.into_ref()) {
@@ -129,7 +129,7 @@ impl MutableConnection {
             }
             fio::DirectoryRequest::Rename { src, dst_parent_token, dst, responder } => {
                 let result = this.handle_rename(src, Handle::from(dst_parent_token), dst).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::DirectoryRequest::SetAttr { flags, attributes, responder } => {
                 let status = match this.as_mut().handle_setattr(flags, attributes).await {
@@ -139,8 +139,7 @@ impl MutableConnection {
                 responder.send(status.into_raw())?;
             }
             fio::DirectoryRequest::Sync { responder } => {
-                responder
-                    .send(&mut this.base.directory.sync().await.map_err(zx::Status::into_raw))?;
+                responder.send(this.base.directory.sync().await.map_err(zx::Status::into_raw))?;
             }
             request @ (fio::DirectoryRequest::AddInotifyFilter { .. }
             | fio::DirectoryRequest::AdvisoryLock { .. }
@@ -168,13 +167,12 @@ impl MutableConnection {
                 responder, name, target, connection, ..
             } => {
                 if !this.base.options.rights.contains(fio::Operations::MODIFY_DIRECTORY) {
-                    responder.send(&mut Err(zx::Status::ACCESS_DENIED.into_raw()))?;
+                    responder.send(Err(zx::Status::ACCESS_DENIED.into_raw()))?;
                 } else if !validate_name(&name) {
-                    responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?;
+                    responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
                 } else {
                     responder.send(
-                        &mut this
-                            .as_mut()
+                        this.as_mut()
                             .base
                             .directory
                             .create_symlink(name, target, connection)
@@ -194,15 +192,15 @@ impl MutableConnection {
             }
             fio::DirectoryRequest::SetExtendedAttribute { name, value, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");
-                let mut res =
+                let res =
                     this.handle_set_extended_attribute(name, value).await.map_err(|s| s.into_raw());
-                responder.send(&mut res)?;
+                responder.send(res)?;
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { name, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::RemoveExtendedAttribute");
-                let mut res =
+                let res =
                     this.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(&mut res)?;
+                responder.send(res)?;
             }
         }
         Ok(ConnectionState::Alive)

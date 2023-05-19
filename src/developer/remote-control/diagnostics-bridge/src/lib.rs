@@ -275,7 +275,7 @@ where
                 } => {
                     let (data_type, stream_mode) = match self.validate_params(&parameters) {
                         Err(e) => {
-                            responder.send(&mut Err(e))?;
+                            responder.send(Err(e))?;
                             continue;
                         }
                         Ok(v) => v,
@@ -295,17 +295,17 @@ where
                                 .map(|data| reader.run_snapshot_server(data, iterator).boxed()),
                         },
                         _ => {
-                            responder.send(&mut Err(StreamError::UnsupportedParameter))?;
+                            responder.send(Err(StreamError::UnsupportedParameter))?;
                             continue;
                         }
                     };
                     match res {
                         Ok(fut) => {
-                            responder.send(&mut Ok(()))?;
+                            responder.send(Ok(()))?;
                             fut.await?;
                         }
                         Err(e) => {
-                            responder.send(&mut Err(e))?;
+                            responder.send(Err(e))?;
                         }
                     }
                 }

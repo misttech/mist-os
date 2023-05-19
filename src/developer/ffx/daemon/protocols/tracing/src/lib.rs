@@ -526,7 +526,7 @@ mod tests {
                 }
                 trace::ControllerRequest::StartTracing { responder, .. } => {
                     assert!(self.socket.lock().await.is_some());
-                    responder.send(&mut Ok(())).map_err(Into::into)
+                    responder.send(Ok(())).map_err(Into::into)
                 }
                 trace::ControllerRequest::StopTracing { responder, options } => {
                     assert_eq!(options.write_results.unwrap(), true);
@@ -622,9 +622,9 @@ mod tests {
             .register_fidl_protocol::<TracingProtocol>()
             .register_instanced_protocol_closure::<trace::ControllerMarker, _>(|_, req| match req {
                 trace::ControllerRequest::InitializeTracing { .. } => Ok(()),
-                trace::ControllerRequest::StartTracing { responder, .. } => responder
-                    .send(&mut Err(trace::StartErrorCode::AlreadyStarted))
-                    .map_err(Into::into),
+                trace::ControllerRequest::StartTracing { responder, .. } => {
+                    responder.send(Err(trace::StartErrorCode::AlreadyStarted)).map_err(Into::into)
+                }
                 r => panic!("unexpecte request: {:#?}", r),
             })
             .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })
@@ -655,9 +655,9 @@ mod tests {
             .register_fidl_protocol::<TracingProtocol>()
             .register_instanced_protocol_closure::<trace::ControllerMarker, _>(|_, req| match req {
                 trace::ControllerRequest::InitializeTracing { .. } => Ok(()),
-                trace::ControllerRequest::StartTracing { responder, .. } => responder
-                    .send(&mut Err(trace::StartErrorCode::NotInitialized))
-                    .map_err(Into::into),
+                trace::ControllerRequest::StartTracing { responder, .. } => {
+                    responder.send(Err(trace::StartErrorCode::NotInitialized)).map_err(Into::into)
+                }
                 r => panic!("unexpecte request: {:#?}", r),
             })
             .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })

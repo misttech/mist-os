@@ -232,18 +232,17 @@ impl GattServerFacade {
                     false => GATT_MAX_ATTRIBUTE_VALUE_LENGTH,
                 };
                 if max_attribute_size < (value_to_write.len() + offset as usize) {
-                    let _result =
-                        responder.send(&mut Err(gatt::Error::InvalidAttributeValueLength));
+                    let _result = responder.send(Err(gatt::Error::InvalidAttributeValueLength));
                 } else if value.len() < offset as usize {
-                    let _result = responder.send(&mut Err(gatt::Error::InvalidOffset));
+                    let _result = responder.send(Err(gatt::Error::InvalidOffset));
                 } else {
                     GattServerFacade::write_and_extend(value, value_to_write, offset as usize);
-                    let _result = responder.send(&mut Ok(()));
+                    let _result = responder.send(Ok(()));
                 }
             }
             None => {
                 // ID doesn't exist in the database
-                let _result = responder.send(&mut Err(gatt::Error::WriteNotPermitted));
+                let _result = responder.send(Err(gatt::Error::WriteNotPermitted));
             }
         }
     }

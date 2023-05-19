@@ -66,7 +66,7 @@ mod test {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::LifecycleControllerRequest::UnresolveInstance { moniker, responder } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 r => panic!(
                     "Unexpected Lifecycle Controller request when expecting Unresolve: {:?}",
@@ -76,7 +76,7 @@ mod test {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 r => {
                     panic!(
@@ -92,7 +92,7 @@ mod test {
                     responder,
                 } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 r => {
                     panic!("Unexpected Lifecycle Controller request when expecting Start: {:?}", r)

@@ -169,7 +169,7 @@ where
             }
             fio::DirectoryRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::Close");
-                responder.send(&mut self.directory.close().map_err(|status| status.into_raw()))?;
+                responder.send(self.directory.close().map_err(|status| status.into_raw()))?;
                 return Ok(ConnectionState::Closed);
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
@@ -208,7 +208,7 @@ where
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::UpdateAttributes");
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ListExtendedAttributes { iterator, .. } => {
                 fuchsia_trace::duration!("storage", "Directory::ListExtendedAttributes");
@@ -220,11 +220,11 @@ where
             }
             fio::DirectoryRequest::SetExtendedAttribute { responder, .. } => {
                 fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { responder, .. } => {
                 fuchsia_trace::duration!("storage", "Directory::RemoveExtendedAttribute");
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::GetFlags { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetFlags");
@@ -300,7 +300,7 @@ where
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::AdvisoryLock");
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ReadDirents { max_bytes, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::ReadDirents");
@@ -351,22 +351,22 @@ where
                 }
             }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::GetToken { responder } => {
                 responder.send(zx::Status::NOT_SUPPORTED.into_raw(), None)?;
             }
             fio::DirectoryRequest::Rename { src: _, dst_parent_token: _, dst: _, responder } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(zx::Status::NOT_SUPPORTED.into_raw())?;
             }
             fio::DirectoryRequest::Sync { responder } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
         }
         Ok(ConnectionState::Alive)

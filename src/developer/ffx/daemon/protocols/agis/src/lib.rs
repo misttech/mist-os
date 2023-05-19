@@ -43,7 +43,7 @@ impl FidlProtocol for ListenerProtocol {
                 let ffx_socket = match connector.get_socket(global_id).await? {
                     Ok(socket) => fidl::handle::AsyncSocket::from_socket(socket)?,
                     Err(e) => {
-                        responder.send(&mut Err(e.clone()))?;
+                        responder.send(Err(e.clone()))?;
                         return Err(anyhow!("Connector::GetSocket error: {:?}", e));
                     }
                 };
@@ -109,7 +109,7 @@ impl FidlProtocol for ListenerProtocol {
                     let (_, _) = futures::join!(ffx_copier, unix_copier);
                 });
 
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 Ok(())
             }
 
@@ -123,7 +123,7 @@ impl FidlProtocol for ListenerProtocol {
                     tracing::info!("cancelling task {:?}", t);
                     t.cancel().await;
                 }
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 Ok(())
             }
         }

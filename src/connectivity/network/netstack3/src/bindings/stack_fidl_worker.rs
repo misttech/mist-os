@@ -30,7 +30,7 @@ impl StackFidlWorker {
                     StackRequest::AddForwardingEntry { entry, responder } => {
                         responder_send!(
                             responder,
-                            &mut worker.fidl_add_forwarding_entry(entry)
+                            worker.fidl_add_forwarding_entry(entry)
                         );
                     }
                     StackRequest::DelForwardingEntry {
@@ -45,7 +45,7 @@ impl StackFidlWorker {
                     } => {
                         responder_send!(
                             responder,
-                            &mut worker.fidl_del_forwarding_entry(subnet)
+                            worker.fidl_del_forwarding_entry(subnet)
                         );
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
@@ -56,7 +56,7 @@ impl StackFidlWorker {
                     } => {
                         // TODO(https://fxbug.dev/76987): Support configuring
                         // per-NIC forwarding.
-                        responder_send!(responder, &mut Err(fidl_net_stack::Error::NotSupported));
+                        responder_send!(responder, Err(fidl_net_stack::Error::NotSupported));
                     }
                     StackRequest::GetDnsServerWatcher { watcher, control_handle: _ } => {
                         let () = watcher
@@ -71,7 +71,7 @@ impl StackFidlWorker {
                         if enable {
                             error!("TODO(https://fxbug.dev/111066): Support starting DHCP client");
                         }
-                        responder_send!(responder, &mut Ok(()));
+                        responder_send!(responder, Ok(()));
                     }
                     StackRequest::BridgeInterfaces{ interfaces: _, bridge, control_handle: _ } => {
                         error!("TODO(https://fxbug.dev/86661): Support bridging in NS3, probably via a new API");

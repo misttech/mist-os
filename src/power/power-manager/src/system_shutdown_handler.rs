@@ -225,26 +225,26 @@ impl SystemShutdownHandler {
                 while let Some(req) = stream.try_next().await? {
                     match req {
                         fpowercontrol::AdminRequest::PowerFullyOn { responder } => {
-                            let _ = responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()));
+                            let _ = responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()));
                         }
                         fpowercontrol::AdminRequest::Reboot { reason, responder } => {
                             let result =
                                 self.handle_shutdown(ShutdownRequest::Reboot(reason)).await;
-                            let _ = responder.send(&mut result.map_err(|e| e.into_raw()));
+                            let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                         fpowercontrol::AdminRequest::RebootToBootloader { responder } => {
                             let result =
                                 self.handle_shutdown(ShutdownRequest::RebootBootloader).await;
-                            let _ = responder.send(&mut result.map_err(|e| e.into_raw()));
+                            let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                         fpowercontrol::AdminRequest::RebootToRecovery { responder } => {
                             let result =
                                 self.handle_shutdown(ShutdownRequest::RebootRecovery).await;
-                            let _ = responder.send(&mut result.map_err(|e| e.into_raw()));
+                            let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                         fpowercontrol::AdminRequest::Poweroff { responder } => {
                             let result = self.handle_shutdown(ShutdownRequest::PowerOff).await;
-                            let _ = responder.send(&mut result.map_err(|e| e.into_raw()));
+                            let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                         fpowercontrol::AdminRequest::Mexec { responder, .. } => {
                             // TODO(fxbug.dev/86681): Currently implemented and
@@ -252,11 +252,11 @@ impl SystemShutdownHandler {
                             // shutdown-shim to be deprecated, the mexec
                             // preparation logic would need to be migrated
                             // here.
-                            let _ = responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()));
+                            let _ = responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()));
                         }
                         fpowercontrol::AdminRequest::SuspendToRam { responder } => {
                             let result = self.handle_suspend().await;
-                            let _ = responder.send(&mut result.map_err(|e| e.into_raw()));
+                            let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                     }
                 }

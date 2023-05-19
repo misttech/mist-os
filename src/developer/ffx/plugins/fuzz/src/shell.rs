@@ -818,8 +818,7 @@ mod test_fixtures {
                     assert_eq!(moniker, "/core/fuzz-manager");
                     assert_eq!(capability_name, fuzz::ManagerMarker::DEBUG_NAME);
                     let server_end = ServerEnd::<fuzz::ManagerMarker>::new(server_chan);
-                    let mut response = Ok(());
-                    responder.send(&mut response)?;
+                    responder.send(Ok(()))?;
                     task =
                         Some(create_task(serve_manager(server_end, test.clone()), test.writer()));
                 }

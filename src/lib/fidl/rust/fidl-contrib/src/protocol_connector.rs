@@ -390,7 +390,7 @@ mod test {
                 match request {
                     ProtocolRequest::DoAction { responder } => {
                         calls_made.fetch_add(1, Ordering::SeqCst);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                 }
 
@@ -419,7 +419,7 @@ mod test {
                     stream.try_next().await.expect("ProtocolFactoryRequestStream yielded an Err(_)")
                 {
                     let close_after = close_after.map(|ca| Arc::new(AtomicU8::new(ca)));
-                    responder.send(&mut Ok(())).expect("Replying to CreateProtocol caller failed");
+                    responder.send(Ok(())).expect("Replying to CreateProtocol caller failed");
                     let _ = protocol_mock(
                         protocol.into_stream().expect("Converting ServerEnd to stream failed"),
                         calls_made.clone(),

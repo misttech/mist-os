@@ -583,7 +583,7 @@ where
             match request {
                 fidl_fuchsia_net_dhcp::Server_Request::StartServing { responder } => {
                     responder.send(
-                        &mut match server.borrow_mut().enable() {
+                        match server.borrow_mut().enable() {
                             Ok(Some(socket_collection)) => {
                                 socket_sink.send(socket_collection).await.map_err(|e| {
                                     error!("Failed to send sockets to sink: {:?}", e);
@@ -614,13 +614,12 @@ where
                 fidl_fuchsia_net_dhcp::Server_Request::GetParameter { name: n, responder: r } => {
                     r.send(&mut server.borrow().dispatch_get_parameter(n).map_err(|e| e.into_raw()))
                 }
-                fidl_fuchsia_net_dhcp::Server_Request::SetOption { value: v, responder: r } => r
-                    .send(
-                        &mut server.borrow_mut().dispatch_set_option(v).map_err(|e| e.into_raw()),
-                    ),
+                fidl_fuchsia_net_dhcp::Server_Request::SetOption { value: v, responder: r } => {
+                    r.send(server.borrow_mut().dispatch_set_option(v).map_err(|e| e.into_raw()))
+                }
                 fidl_fuchsia_net_dhcp::Server_Request::SetParameter { value: v, responder: r } => r
                     .send(
-                        &mut server
+                        server
                             .borrow_mut()
                             .if_disabled(|s| s.dispatch_set_parameter(v))
                             .map_err(|e| e.into_raw()),
@@ -631,17 +630,17 @@ where
                 fidl_fuchsia_net_dhcp::Server_Request::ListParameters { responder: r } => r.send(
                     &mut server.borrow().dispatch_list_parameters().map_err(|e| e.into_raw()),
                 ),
-                fidl_fuchsia_net_dhcp::Server_Request::ResetOptions { responder: r } => r.send(
-                    &mut server.borrow_mut().dispatch_reset_options().map_err(|e| e.into_raw()),
-                ),
+                fidl_fuchsia_net_dhcp::Server_Request::ResetOptions { responder: r } => {
+                    r.send(server.borrow_mut().dispatch_reset_options().map_err(|e| e.into_raw()))
+                }
                 fidl_fuchsia_net_dhcp::Server_Request::ResetParameters { responder: r } => r.send(
-                    &mut server
+                    server
                         .borrow_mut()
                         .if_disabled(|s| s.dispatch_reset_parameters(&default_params))
                         .map_err(|e| e.into_raw()),
                 ),
                 fidl_fuchsia_net_dhcp::Server_Request::ClearLeases { responder: r } => r.send(
-                    &mut server
+                    server
                         .borrow_mut()
                         .dispatch_clear_leases()
                         .map_err(fuchsia_zircon::Status::into_raw),

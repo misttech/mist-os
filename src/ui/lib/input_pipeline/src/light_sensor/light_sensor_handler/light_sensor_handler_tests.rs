@@ -132,7 +132,7 @@ fn get_mock_device_proxy(
 
 fn get_mock_device_proxy_with_response(
     mut get_response: Option<InputDeviceGetFeatureReportResult>,
-    mut response: InputDeviceSetFeatureReportResult,
+    response: InputDeviceSetFeatureReportResult,
 ) -> (InputDeviceProxy, Rc<RefCell<Option<FeatureReport>>>, fasync::Task<()>) {
     let (device_proxy, mut stream) =
         create_proxy_and_stream::<InputDeviceMarker>().expect("proxy created");
@@ -171,7 +171,7 @@ fn get_mock_device_proxy_with_response(
                     }
                     InputDeviceRequest::SetFeatureReport { report, responder } => {
                         *called.borrow_mut() = Some(report);
-                        responder.send(&mut response).expect("sending set response to test");
+                        responder.send(response).expect("sending set response to test");
                     }
                     _ => {} // no-op
                 }

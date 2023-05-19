@@ -514,7 +514,7 @@ pub mod test_check_for_system_update_impl {
                 match req {
                     fidl_space::ManagerRequest::Gc { responder } => {
                         *self.call_count.lock() += 1;
-                        responder.send(&mut Ok(())).unwrap()
+                        responder.send(Ok(())).unwrap()
                     }
                 }
             }

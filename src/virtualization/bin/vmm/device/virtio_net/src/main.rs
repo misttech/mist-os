@@ -33,17 +33,17 @@ async fn run_virtio_net(mut virtio_net_fidl: VirtioNetRequestStream) -> Result<(
     // thread.
     let result = device::NetDevice::<guest_ethernet::GuestEthernet>::new();
     if let Err(err) = result {
-        responder.send(&mut Err(err.into_raw()))?;
+        responder.send(Err(err.into_raw()))?;
         return Err(anyhow!("failed to create GuestEthernet: {}", err));
     }
     let mut net_device = result.unwrap();
 
     if let Err(err) = net_device.initialize(mac_address, enable_bridge).await {
-        responder.send(&mut Err(err.into_raw()))?;
+        responder.send(Err(err.into_raw()))?;
         return Err(anyhow!("failed to initialize GuestEthernet: {}", err));
     }
 
-    responder.send(&mut Ok(()))?;
+    responder.send(Ok(()))?;
 
     // Complete the setup of queues and get a virtio device.
     let mut virtio_device_fidl = virtio_net_fidl.cast_stream();

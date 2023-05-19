@@ -42,11 +42,11 @@ impl Reporter {
 
         let (id, battery_info) = match Self::validate_information(report) {
             Ok((id, b)) => {
-                let _ = responder.send(&mut Ok(()))?;
+                let _ = responder.send(Ok(()))?;
                 (id, b)
             }
             Err(e) => {
-                let _ = responder.send(&mut Err(zx::Status::from(&e).into_raw()))?;
+                let _ = responder.send(Err(zx::Status::from(&e).into_raw()))?;
                 return Ok(());
             }
         };

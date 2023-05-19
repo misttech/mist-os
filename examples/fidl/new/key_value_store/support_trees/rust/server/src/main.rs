@@ -129,7 +129,7 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                     // the reply.
                     responder
                         // [START diff_5]
-                        .send(&mut write_item(&mut store.borrow_mut(), attempt, ""))
+                        .send(write_item(&mut store.borrow_mut(), attempt, ""))
                         // [END diff_5]
                         .context("error sending reply")?;
                     println!("WriteItem response sent");

@@ -124,7 +124,7 @@ mod test {
             let request = file.try_next().await;
             if let Ok(Some(fio::FileRequest::Resize { length, responder })) = request {
                 assert_eq!(length, 0);
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             } else {
                 panic!("did not get resize request: {:?}", request)
             }
@@ -141,7 +141,7 @@ mod test {
             // Closing file should succeed
             let request = file.try_next().await;
             if let Ok(Some(fio::FileRequest::Close { responder })) = request {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             } else {
                 panic!("did not get close request: {:?}", request)
             }
@@ -171,7 +171,7 @@ mod test {
             // Closing file should succeed
             let request = file.try_next().await;
             if let Ok(Some(fio::FileRequest::Close { responder })) = request {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             } else {
                 panic!("did not get close request: {:?}", request)
             }

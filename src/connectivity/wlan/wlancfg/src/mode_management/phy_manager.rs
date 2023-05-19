@@ -952,7 +952,7 @@ mod tests {
                     responder,
                 }
             ))) => {
-                responder.send(&mut Ok(())).expect("sending feature support response");
+                responder.send(Ok(())).expect("sending feature support response");
                 feature_support_server
             }
         );

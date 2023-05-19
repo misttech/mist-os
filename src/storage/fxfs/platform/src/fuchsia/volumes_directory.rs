@@ -350,23 +350,22 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         while let Some(request) = requests.try_next().await? {
             match request {
-                VolumeRequest::Check { responder, options } => responder.send(
-                    &mut self.handle_check(store_id, options).await.map_err(|error| {
+                VolumeRequest::Check { responder, options } => {
+                    responder.send(self.handle_check(store_id, options).await.map_err(|error| {
                         error!(?error, store_id, "Failed to check volume");
                         map_to_raw_status(error)
-                    }),
-                )?,
+                    }))?
+                }
                 VolumeRequest::Mount { responder, outgoing_directory, options } => responder.send(
-                    &mut self
-                        .handle_mount(name, store_id, outgoing_directory, options)
-                        .await
-                        .map_err(|error| {
+                    self.handle_mount(name, store_id, outgoing_directory, options).await.map_err(
+                        |error| {
                             error!(?error, name, store_id, "Failed to mount volume");
                             map_to_raw_status(error)
-                        }),
+                        },
+                    ),
                 )?,
                 VolumeRequest::SetLimit { responder, bytes } => responder.send(
-                    &mut self.handle_set_limit(store_id, bytes).await.map_err(|error| {
+                    self.handle_set_limit(store_id, bytes).await.map_err(|error| {
                         error!(?error, store_id, "Failed to set volume limit");
                         map_to_raw_status(error)
                     }),

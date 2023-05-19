@@ -85,9 +85,7 @@ async fn handle_stream_experimental(
                 responder.send(Err(fonts_exp::Error::NotFound)).context("send GetTypefaceById")?;
             }
             ListTypefaces { request: _, iterator: _, responder } => {
-                responder
-                    .send(&mut Err(fonts_exp::Error::NotFound))
-                    .context("send ListTypefaces")?;
+                responder.send(Err(fonts_exp::Error::NotFound)).context("send ListTypefaces")?;
             }
             GetTypefacesByFamily { family: _, responder } => {
                 responder

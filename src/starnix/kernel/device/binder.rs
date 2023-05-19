@@ -2653,13 +2653,13 @@ impl BinderDriver {
                             let connection = connection.clone();
 
                             kernel.kthreads.pool.dispatch(move || {
-                                let mut result = connection
+                                let result = connection
                                     .ioctl(&current_task, request, parameter.into())
                                     .map_err(|e| {
                                         fposix::Errno::from_primitive(e.code.error_code() as i32)
                                             .unwrap_or(fposix::Errno::Einval)
                                     });
-                                let _ = responder.send(&mut result);
+                                let _ = responder.send(result);
                             });
                         }
                     }
@@ -6697,7 +6697,7 @@ pub mod tests {
                         std::slice::from_raw_parts_mut(address as *mut u8, size as usize)
                     };
                     content.read(buffer, 0)?;
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 }
                 fbinder::ProcessAccessorRequest::ReadMemory { address, length, responder } => {
                     let vmo = zx::Vmo::create(length)?;

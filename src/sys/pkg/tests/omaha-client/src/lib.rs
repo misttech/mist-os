@@ -702,7 +702,7 @@ impl MockCache {
         while let Some(request) = stream.try_next().await.unwrap() {
             match request {
                 fidl_fuchsia_pkg::PackageCacheRequest::Sync { responder } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("unsupported PackageCache request: {other:?}"),
             }
@@ -772,7 +772,7 @@ pub mod fuchsia_pkg_cup {
                         assert!(cup.nonce.is_some());
                         assert!(cup.response.is_some());
                         assert!(cup.signature.is_some());
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     CupRequest::GetInfo { url, responder } => {
                         let response = self.info_map[&url.url.parse().unwrap()].clone();

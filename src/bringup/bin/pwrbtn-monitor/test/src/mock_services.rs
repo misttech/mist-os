@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
                         // Failing to send the response is fine, the pwrbtn-monitor code doesn't
                         // wait for a reply to this call and therefore it might have closed the
                         // channel by the time we try to send the reply.
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
 
                         send_test_result.try_send(()).expect("failed to send test completion");
                     }

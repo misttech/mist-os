@@ -42,14 +42,14 @@ async fn main() {
 async fn handle_request(request: fnetemul::ConfigurableNetstackRequest) -> Result<(), fidl::Error> {
     match request {
         fnetemul::ConfigurableNetstackRequest::ConfigureInterface { payload, responder } => {
-            let mut result = match configure_interface(payload).await {
+            let result = match configure_interface(payload).await {
                 Ok(()) => Ok(()),
                 Err(e) => {
                     error!("error configuring interface: {:?}", e);
                     Err(e.into())
                 }
             };
-            match responder.send(&mut result) {
+            match responder.send(result) {
                 Err(e) if e.is_closed() => {
                     warn!("channel was closed before response was sent");
                     Ok(())

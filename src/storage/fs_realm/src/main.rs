@@ -177,26 +177,26 @@ pub fn fs_realm_service(fs_realm_state: FsRealmState) -> Arc<service::Service> {
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(fs_realm::ControllerRequest::Mount { responder, name, device, options }) => {
-                        let mut res = match fs_realm_state.mount(&name, device, options).await {
+                        let res = match fs_realm_state.mount(&name, device, options).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
                                 tracing::error!(?error, "mount failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|error| {
+                        responder.send(res).unwrap_or_else(|error| {
                             tracing::error!(?error, "failed to send Mount response");
                         });
                     }
                     Ok(fs_realm::ControllerRequest::Unmount { responder, name }) => {
-                        let mut res = match fs_realm_state.unmount(&name).await {
+                        let res = match fs_realm_state.unmount(&name).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
                                 tracing::error!(?error, "unmount failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|error| {
+                        responder.send(res).unwrap_or_else(|error| {
                             tracing::error!(?error, "failed to send Unmount response");
                         });
                     }
@@ -206,26 +206,26 @@ pub fn fs_realm_service(fs_realm_state: FsRealmState) -> Arc<service::Service> {
                         device,
                         options,
                     }) => {
-                        let mut res = match format(&name, device, options).await {
+                        let res = match format(&name, device, options).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
                                 tracing::error!(?error, "format failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|error| {
+                        responder.send(res).unwrap_or_else(|error| {
                             tracing::error!(?error, "failed to send Format response");
                         });
                     }
                     Ok(fs_realm::ControllerRequest::Check { responder, name, device }) => {
-                        let mut res = match check(&name, device).await {
+                        let res = match check(&name, device).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
                                 tracing::error!(?error, "check failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
-                        responder.send(&mut res).unwrap_or_else(|error| {
+                        responder.send(res).unwrap_or_else(|error| {
                             tracing::error!(?error, "failed to send Check response");
                         });
                     }

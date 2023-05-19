@@ -86,7 +86,7 @@ mod test {
                 responder,
             } => {
                 sender.take().unwrap().send((repository_name, target_identifier)).unwrap();
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
         });
@@ -132,7 +132,7 @@ mod test {
                 target_identifier: _,
                 responder,
             } => {
-                responder.send(&mut Err(RepositoryError::TargetCommunicationFailure)).unwrap();
+                responder.send(Err(RepositoryError::TargetCommunicationFailure)).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
         });

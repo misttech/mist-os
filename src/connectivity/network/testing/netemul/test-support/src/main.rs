@@ -59,7 +59,7 @@ async fn handle_counter(
                     info!("opening directory at '{}'", path);
                     match std::fs::read_dir(&path) {
                         Ok(std::fs::ReadDir { .. }) => responder
-                            .send(&mut Ok(()))
+                            .send(Ok(()))
                             .unwrap_or_else(|e| error!("error sending response: {:?}", e)),
                         Err(e) => {
                             let status = match e.kind() {
@@ -73,7 +73,7 @@ async fn handle_counter(
                                 }
                             };
                             let () = responder
-                                .send(&mut Err(status.into_raw()))
+                                .send(Err(status.into_raw()))
                                 .unwrap_or_else(|e| error!("error sending response: {:?}", e));
                         }
                     }

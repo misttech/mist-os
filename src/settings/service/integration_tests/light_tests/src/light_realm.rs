@@ -251,7 +251,7 @@ impl LightRealm {
                         .expect("get rgb value"),
                     LightRequest::SetBrightnessValue { index, value, responder } => responder
                         .send(
-                            &mut brightness_values
+                            brightness_values
                                 .lock()
                                 .await
                                 .insert(index as usize, value)
@@ -261,7 +261,7 @@ impl LightRealm {
                         .expect("set brightness value"),
                     LightRequest::SetSimpleValue { index, value, responder } => responder
                         .send(
-                            &mut simple_values
+                            simple_values
                                 .lock()
                                 .await
                                 .insert(index as usize, value)
@@ -271,7 +271,7 @@ impl LightRealm {
                         .expect("set simple value"),
                     LightRequest::SetRgbValue { index, value, responder } => responder
                         .send(
-                            &mut rgb_values
+                            rgb_values
                                 .lock()
                                 .await
                                 .insert(index as usize, value)

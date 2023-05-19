@@ -482,16 +482,16 @@ async fn run_driver_registrar_server(
                     match full_resolver {
                         None => {
                             responder
-                                .send(&mut Err(Status::PROTOCOL_NOT_SUPPORTED.into_raw()))
+                                .send(Err(Status::PROTOCOL_NOT_SUPPORTED.into_raw()))
                                 .or_else(ignore_peer_closed)
                                 .context("error responding to Register")?;
                         }
                         Some(resolver) => {
-                            let mut register_result =
+                            let register_result =
                                 indexer.register_driver(package_url, resolver).await;
 
                             responder
-                                .send(&mut register_result)
+                                .send(register_result)
                                 .or_else(ignore_peer_closed)
                                 .context("error responding to Register")?;
                         }

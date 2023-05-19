@@ -240,7 +240,7 @@ mod test {
                 assert_eq!(MAC_ADDRESS, mac_address);
                 assert_eq!(INTERFACE_NAME.to_string(), name);
                 assert_eq!(wait_ip_address, false);
-                responder.send(&mut Ok(())).expect("failed to send AddInterface response");
+                responder.send(Ok(())).expect("failed to send AddInterface response");
             },
         )
         .await;
@@ -259,7 +259,7 @@ mod test {
                     .expect("expected request of type JoinMulticastGroup");
                 assert_eq!(IP_ADDRESS, ip_address);
                 assert_eq!(INTERFACE_ID, interface_id);
-                responder.send(&mut Ok(())).expect("failed to send JoinMulticastGroup response");
+                responder.send(Ok(())).expect("failed to send JoinMulticastGroup response");
             },
         )
         .await;
@@ -278,7 +278,7 @@ mod test {
                     .expect("expected request of type LeaveMulticastGroup");
                 assert_eq!(IP_ADDRESS, ip_address);
                 assert_eq!(INTERFACE_ID, interface_id);
-                responder.send(&mut Ok(())).expect("failed to send LeaveMulticastGroup response");
+                responder.send(Ok(())).expect("failed to send LeaveMulticastGroup response");
             },
         )
         .await;
@@ -302,7 +302,7 @@ mod test {
                 assert_eq!(expected_payload_length, payload_length);
                 assert_eq!(Some(INTERFACE_NAME.to_string()), interface_name);
                 assert_eq!(expected_timeout, timeout);
-                responder.send(&mut Ok(())).expect("failed to send Ping response");
+                responder.send(Ok(())).expect("failed to send Ping response");
             },
         )
         .await;
@@ -350,9 +350,7 @@ mod test {
                     .into_start_hermetic_network_realm()
                     .expect("expected request of type StartHermeticNetworkRealm");
                 assert_eq!(expected_netstack, netstack);
-                responder
-                    .send(&mut Ok(()))
-                    .expect("failed to send StartHermeticNetworkRealm response");
+                responder.send(Ok(())).expect("failed to send StartHermeticNetworkRealm response");
             },
         )
         .await;
@@ -368,7 +366,7 @@ mod test {
                 let (component_url, responder) =
                     request.into_start_stub().expect("expected request of type StartStub");
                 assert_eq!(COMPONENT_URL.to_string(), component_url);
-                responder.send(&mut Ok(())).expect("failed to send StartStub response");
+                responder.send(Ok(())).expect("failed to send StartStub response");
             },
         )
         .await;
@@ -382,7 +380,7 @@ mod test {
                 request
                     .into_stop_hermetic_network_realm()
                     .expect("expected request of type StopHermeticNetworkRealm")
-                    .send(&mut Ok(()))
+                    .send(Ok(()))
                     .expect("failed to send StopHermeticNetworkRealm response");
             },
         )
@@ -397,7 +395,7 @@ mod test {
                 request
                     .into_stop_stub()
                     .expect("expected request of type StopStub")
-                    .send(&mut Ok(()))
+                    .send(Ok(()))
                     .expect("failed to send StopStub response");
             },
         )
@@ -430,7 +428,7 @@ mod test {
                         ..
                     } if interface_id == INTERFACE_ID && addr == IPV6_ADDRESS.into()
                 );
-                responder.send(&mut Ok(())).expect("failed to send StartDhcpv6Client response");
+                responder.send(Ok(())).expect("failed to send StartDhcpv6Client response");
             },
         )
         .await;
@@ -446,7 +444,7 @@ mod test {
                 request
                     .into_stop_dhcpv6_client()
                     .expect("expected request of type StopDhcpv6Client")
-                    .send(&mut Ok(()))
+                    .send(Ok(()))
                     .expect("failed to send StopDhcpv6Client response");
             },
         )

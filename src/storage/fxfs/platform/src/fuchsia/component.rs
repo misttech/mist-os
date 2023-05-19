@@ -241,24 +241,24 @@ impl Component {
     async fn handle_startup_requests(&self, mut stream: StartupRequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await? {
             match request {
-                StartupRequest::Start { responder, device, options } => responder.send(
-                    &mut self.handle_start(device, options).await.map_err(|error| {
+                StartupRequest::Start { responder, device, options } => {
+                    responder.send(self.handle_start(device, options).await.map_err(|error| {
                         error!(?error, "handle_start failed");
                         map_to_raw_status(error)
-                    }),
-                )?,
+                    }))?
+                }
                 StartupRequest::Format { responder, device, .. } => {
-                    responder.send(&mut self.handle_format(device).await.map_err(|error| {
+                    responder.send(self.handle_format(device).await.map_err(|error| {
                         error!(?error, "handle_format failed");
                         map_to_raw_status(error)
                     }))?
                 }
-                StartupRequest::Check { responder, device, options } => responder.send(
-                    &mut self.handle_check(device, options).await.map_err(|error| {
+                StartupRequest::Check { responder, device, options } => {
+                    responder.send(self.handle_check(device, options).await.map_err(|error| {
                         error!(?error, "handle_check failed");
                         map_to_raw_status(error)
-                    }),
-                )?,
+                    }))?
+                }
             }
         }
         Ok(())
@@ -415,7 +415,7 @@ impl Component {
                     );
                     responder
                         .send(
-                            &mut volumes
+                            volumes
                                 .create_and_serve_volume(
                                     &name,
                                     crypt,
@@ -431,7 +431,7 @@ impl Component {
                 VolumesRequest::Remove { name, responder } => {
                     info!(name = name.as_str(), "Remove volume");
                     responder
-                        .send(&mut volumes.remove_volume(&name).await.map_err(map_to_raw_status))
+                        .send(volumes.remove_volume(&name).await.map_err(map_to_raw_status))
                         .unwrap_or_else(|e| {
                             warn!(error = e.as_value(), "Failed to send volume removal response")
                         });

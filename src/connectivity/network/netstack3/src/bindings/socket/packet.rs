@@ -213,7 +213,7 @@ impl BindingData {
 }
 
 impl CloseResponder for fppacket::SocketCloseResponder {
-    fn send(self, arg: &mut fidl_fuchsia_unknown::CloseableCloseResult) -> Result<(), fidl::Error> {
+    fn send(self, arg: Result<(), i32>) -> Result<(), fidl::Error> {
         fppacket::SocketCloseResponder::send(self, arg)
     }
 }
@@ -407,58 +407,58 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, fppacket::SOCKET_PROTOCOL_NAME.as_bytes());
             }
             fppacket::SocketRequest::SetReuseAddress { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetReuseAddress { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetError { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetBroadcast { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetBroadcast { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetSendBuffer { value_bytes: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetSendBuffer { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
-                responder_send!(responder, &mut Ok(self.set_receive_buffer(value_bytes)));
+                responder_send!(responder, Ok(self.set_receive_buffer(value_bytes)));
             }
             fppacket::SocketRequest::GetReceiveBuffer { responder } => {
                 responder_send!(responder, &mut Ok(self.receive_buffer()));
             }
             fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetKeepAlive { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetOutOfBandInline { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetOutOfBandInline { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetNoCheck { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetNoCheck { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetLinger { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetReusePort { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetReusePort { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
@@ -467,13 +467,13 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetBindToDevice { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetBindToDevice { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetTimestamp { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetTimestamp { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
@@ -482,7 +482,7 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, self.describe());
             }
             fppacket::SocketRequest::Bind { protocol, bound_interface_id, responder } => {
-                responder_send!(responder, &mut self.bind(protocol, bound_interface_id))
+                responder_send!(responder, self.bind(protocol, bound_interface_id))
             }
             fppacket::SocketRequest::GetInfo { responder } => {
                 responder_send!(responder, &mut self.get_info());
@@ -509,12 +509,12 @@ impl<'a> RequestHandler<'a> {
                 .contains(&control)
                 {
                     tracing::warn!("unsupported control data: {:?}", control);
-                    responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                    responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
                 } else if flags != fpsocket::SendMsgFlags::empty() {
                     tracing::warn!("unsupported control flags: {:?}", flags);
-                    responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                    responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
                 } else {
-                    responder_send!(responder, &mut self.send_msg(packet_info, data));
+                    responder_send!(responder, self.send_msg(packet_info, data));
                 }
             }
         }

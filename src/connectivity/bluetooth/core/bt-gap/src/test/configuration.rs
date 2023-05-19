@@ -119,7 +119,7 @@ async fn disable_connectable_mode() {
         SetConnectable,
         (|enabled: bool, responder: HostSetConnectableResponder| {
             assert!(!enabled);
-            assert_matches!(responder.send(&mut Ok(())), Ok(()))
+            assert_matches!(responder.send(Ok(())), Ok(()))
         }),
         enabled,
         responder

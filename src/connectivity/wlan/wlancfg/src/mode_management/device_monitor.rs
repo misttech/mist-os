@@ -375,7 +375,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: 0, sme_server: _, responder
             }))) => {
-                assert!(responder.send(&mut Ok(())).is_ok())
+                assert!(responder.send(Ok(())).is_ok())
             }
         );
 
@@ -421,7 +421,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: 0, sme_server: _, responder
             }))) => {
-                assert!(responder.send(&mut Err(zx::sys::ZX_ERR_NOT_FOUND)).is_ok())
+                assert!(responder.send(Err(zx::sys::ZX_ERR_NOT_FOUND)).is_ok())
             }
         );
 
@@ -651,7 +651,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_service::DeviceMonitorRequest::GetClientSme {
                 iface_id: 0, sme_server: _, responder
             }))) => {
-                assert!(responder.send(&mut Ok(())).is_ok())
+                assert!(responder.send(Ok(())).is_ok())
             }
         );
 

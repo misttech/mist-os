@@ -140,7 +140,7 @@ mod test {
                 Ok(LightRequest::SetBrightnessValue { index, value, responder }) => {
                     assert_eq!(index, 3);
                     assert_eq!(value, 0.5);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }

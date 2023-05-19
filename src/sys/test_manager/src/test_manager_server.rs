@@ -160,7 +160,7 @@ pub async fn run_test_manager_query_server(
                     Ok(c) => c,
                     Err(e) => {
                         warn!("Cannot query test, invalid iterator {}: {}", test_url, e);
-                        let _ = responder.send(&mut Err(LaunchError::InvalidArgs));
+                        let _ = responder.send(Err(LaunchError::InvalidArgs));
                         break;
                     }
                 };
@@ -187,7 +187,7 @@ pub async fn run_test_manager_query_server(
                         let suite = match suite_instance.connect_to_suite().await {
                             Ok(proxy) => proxy,
                             Err(e) => {
-                                let _ = responder.send(&mut Err(e.into()));
+                                let _ = responder.send(Err(e.into()));
                                 continue;
                             }
                         };
@@ -209,7 +209,7 @@ pub async fn run_test_manager_query_server(
                                         }
                                     })
                                 {
-                                    let _ = responder.send(&mut Ok(()));
+                                    let _ = responder.send(Ok(()));
                                     let mut names = names.chunks(NAMES_CHUNK);
                                     while let Ok(Some(request)) = iterator.try_next().await {
                                         match request {
@@ -234,12 +234,12 @@ pub async fn run_test_manager_query_server(
                                         }
                                     }
                                 } else {
-                                    let _ = responder.send(&mut Err(LaunchError::CaseEnumeration));
+                                    let _ = responder.send(Err(LaunchError::CaseEnumeration));
                                 }
                             }
                             Err(err) => {
                                 warn!(?err, "cannot enumerate tests for {}", test_url);
-                                let _ = responder.send(&mut Err(LaunchError::CaseEnumeration));
+                                let _ = responder.send(Err(LaunchError::CaseEnumeration));
                             }
                         }
                         if let Err(err) = t.await {
@@ -247,7 +247,7 @@ pub async fn run_test_manager_query_server(
                         }
                     }
                     Err(e) => {
-                        let _ = responder.send(&mut Err(e.into()));
+                        let _ = responder.send(Err(e.into()));
                     }
                 }
             }

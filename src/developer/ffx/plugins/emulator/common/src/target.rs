@@ -90,8 +90,8 @@ mod test {
     {
         setup_fake_target_collection_proxy(move |req| match req {
             ffx::TargetCollectionRequest::OpenTarget { query, target_handle, responder } => {
-                let mut res = (open_target_handler)(query, target_handle);
-                responder.send(&mut res).unwrap();
+                let res = (open_target_handler)(query, target_handle);
+                responder.send(res).unwrap();
             }
             _ => {}
         })
@@ -127,7 +127,7 @@ mod test {
                                 responder,
                                 remote_control: _,
                             } => {
-                                responder.send(&mut Ok(())).unwrap();
+                                responder.send(Ok(())).unwrap();
                             }
                             r => panic!("unexpected request: {:?}", r),
                         });
@@ -155,9 +155,7 @@ mod test {
                 // Open the RCS and return connection refused
                 spawn_target_handler(_handle, |req| match req {
                     ffx::TargetRequest::OpenRemoteControl { responder, remote_control: _ } => {
-                        responder
-                            .send(&mut Err(ffx::TargetConnectionError::ConnectionRefused))
-                            .unwrap();
+                        responder.send(Err(ffx::TargetConnectionError::ConnectionRefused)).unwrap();
                     }
                     r => panic!("unexpected request: {:?}", r),
                 });

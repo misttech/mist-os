@@ -21,7 +21,7 @@ pub(crate) async fn serve(requests: NetstackVerifierRequestStream) -> Result<(),
             // Wait an arbitrary amount of time; if we didn't crash, we're probably healthy.
             fuchsia_async::Timer::new(WAIT_DURATION).await;
 
-            responder.send(&mut Ok(()))
+            responder.send(Ok(()))
         })
         .await
 }

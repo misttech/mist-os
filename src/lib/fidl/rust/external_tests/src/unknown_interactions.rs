@@ -1103,7 +1103,7 @@ async fn send_flexible_event() {
 #[fasync::run_singlethreaded(test)]
 async fn send_strict_err_event() {
     run_send_event(
-        |server| server.send_strict_event_err(&mut Ok(())).expect("server failed to send event"),
+        |server| server.send_strict_event_err(Ok(())).expect("server failed to send event"),
         &[
             0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x01, //
             0xe8, 0xc1, 0x96, 0x8e, 0x1e, 0x34, 0x7c, 0x53, //
@@ -1119,7 +1119,7 @@ async fn send_strict_err_event() {
 #[fasync::run_singlethreaded(test)]
 async fn send_flexible_err_event_success() {
     run_send_event(
-        |server| server.send_flexible_event_err(&mut Ok(())).expect("server failed to send event"),
+        |server| server.send_flexible_event_err(Ok(())).expect("server failed to send event"),
         &[
             0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x80, 0x01, //
             0xca, 0xa7, 0x49, 0xfa, 0x0e, 0x90, 0xe7, 0x41, //
@@ -1135,7 +1135,7 @@ async fn send_flexible_err_event_success() {
 #[fasync::run_singlethreaded(test)]
 async fn send_flexible_err_event_error() {
     run_send_event(
-        |server| server.send_flexible_event_err(&mut Err(15)).expect("server failed to send event"),
+        |server| server.send_flexible_event_err(Err(15)).expect("server failed to send event"),
         &[
             0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x80, 0x01, //
             0xca, 0xa7, 0x49, 0xfa, 0x0e, 0x90, 0xe7, 0x41, //
@@ -1228,7 +1228,7 @@ async fn strict_two_way_err_response_success() {
                 request,
                 UnknownInteractionsProtocolRequest::StrictTwoWayErr { responder } => responder
             );
-            responder.send(&mut Ok(())).expect("server failed to send response");
+            responder.send(Ok(())).expect("server failed to send response");
         },
         &[
             0xab, 0xcd, 0x00, 0x00, 0x02, 0x00, 0x00, 0x01, //
@@ -1260,7 +1260,7 @@ async fn strict_two_way_err_response_failure() {
                 request,
                 UnknownInteractionsProtocolRequest::StrictTwoWayErr { responder } => responder
             );
-            responder.send(&mut Err(32)).expect("server failed to send response");
+            responder.send(Err(32)).expect("server failed to send response");
         },
         &[
             0xab, 0xcd, 0x00, 0x00, 0x02, 0x00, 0x00, 0x01, //
@@ -1324,7 +1324,7 @@ async fn flexible_two_way_err_response_success() {
                 request,
                 UnknownInteractionsProtocolRequest::FlexibleTwoWayErr { responder } => responder
             );
-            responder.send(&mut Ok(())).expect("server failed to send response");
+            responder.send(Ok(())).expect("server failed to send response");
         },
         &[
             0xab, 0xcd, 0x00, 0x00, 0x02, 0x00, 0x80, 0x01, //
@@ -1356,7 +1356,7 @@ async fn flexible_two_way_err_response_error() {
                 request,
                 UnknownInteractionsProtocolRequest::FlexibleTwoWayErr { responder } => responder
             );
-            responder.send(&mut Err(15)).expect("server failed to send response");
+            responder.send(Err(15)).expect("server failed to send response");
         },
         &[
             0xab, 0xcd, 0x00, 0x00, 0x02, 0x00, 0x80, 0x01, //

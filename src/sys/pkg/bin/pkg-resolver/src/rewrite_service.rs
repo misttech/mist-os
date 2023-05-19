@@ -108,18 +108,18 @@ impl RewriteService {
                             transaction.reset_all();
                         }
                         EditTransactionRequest::Add { rule, responder } => {
-                            let mut response = match rule.try_into() {
+                            let response = match rule.try_into() {
                                 Ok(rule) => {
                                     transaction.add(rule);
                                     Ok(())
                                 }
                                 Err(_) => Err(Status::INVALID_ARGS.into_raw()),
                             };
-                            responder.send(&mut response)?;
+                            responder.send(response)?;
                         }
                         EditTransactionRequest::Commit { responder } => {
                             let stringified = format!("{transaction:?}");
-                            let mut response = match state.write().await.apply(transaction).await {
+                            let response = match state.write().await.apply(transaction).await {
                                 Ok(()) => {
                                     info!("rewrite transaction committed: {}", stringified);
                                     Ok(())
@@ -136,7 +136,7 @@ impl RewriteService {
                                     Err(Status::ACCESS_DENIED.into_raw())
                                 }
                             };
-                            responder.send(&mut response)?;
+                            responder.send(response)?;
                             return Ok(());
                         }
                     }

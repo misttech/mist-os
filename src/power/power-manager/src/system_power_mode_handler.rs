@@ -525,16 +525,15 @@ impl SystemPowerModeHandler {
                 while let Some(req) = stream.try_next().await? {
                     match req {
                         fpowermode::RequesterRequest::Request { mode, set, responder } => {
-                            let mut result =
-                                self.modify_system_power_mode(mode, set).and_then(|_| {
-                                    self.client_states.process_system_power_modes_changed(
-                                        &self.system_power_modes.borrow(),
-                                    );
-                                    Ok(())
-                                });
+                            let result = self.modify_system_power_mode(mode, set).and_then(|_| {
+                                self.client_states.process_system_power_modes_changed(
+                                    &self.system_power_modes.borrow(),
+                                );
+                                Ok(())
+                            });
 
                             log_if_err!(
-                                responder.send(&mut result),
+                                responder.send(result),
                                 "Failed to send power mode request response"
                             );
                         }

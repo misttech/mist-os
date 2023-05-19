@@ -284,7 +284,7 @@ mod tests {
             pin_mut!(event_fut);
             assert!(exec.run_until_stalled(&mut event_fut).is_pending());
 
-            adv_responder.send(&mut Ok(())).expect("able to respond");
+            adv_responder.send(Ok(())).expect("able to respond");
 
             match exec.run_until_stalled(&mut event_fut) {
                 Poll::Ready(Some(Err(Error::Advertisement { result: Ok(()) }))) => {}

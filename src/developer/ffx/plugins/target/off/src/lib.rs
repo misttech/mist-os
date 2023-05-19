@@ -40,7 +40,7 @@ mod test {
     fn setup_fake_admin_server() -> AdminProxy {
         setup_fake_admin_proxy(|req| match req {
             AdminRequest::Poweroff { responder } => {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             _ => assert!(false),
         })

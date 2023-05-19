@@ -273,7 +273,7 @@ pub(crate) mod testing {
                     }
                     StoreAccessorRequest::Flush { responder } => {
                         stats_clone.lock().await.record(StashAction::Flush);
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                     }
                     _ => {}
                 }

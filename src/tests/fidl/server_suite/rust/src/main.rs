@@ -240,12 +240,12 @@ async fn run_open_target_controller_server(
         println!("OpenTargetController got request: {}", request_name(&request));
         match request {
             OpenTargetControllerRequest::SendStrictEvent { responder } => {
-                let mut res = sut_handle.send_strict_event().map_err(classify_send_event_error);
-                responder.send(&mut res).expect(EXPECT_REPLY_FAILED);
+                let res = sut_handle.send_strict_event().map_err(classify_send_event_error);
+                responder.send(res).expect(EXPECT_REPLY_FAILED);
             }
             OpenTargetControllerRequest::SendFlexibleEvent { responder } => {
-                let mut res = sut_handle.send_flexible_event().map_err(classify_send_event_error);
-                responder.send(&mut res).expect(EXPECT_REPLY_FAILED);
+                let res = sut_handle.send_flexible_event().map_err(classify_send_event_error);
+                responder.send(res).expect(EXPECT_REPLY_FAILED);
             }
         }
     }
@@ -274,10 +274,10 @@ async fn run_open_target_server(
             }
             OpenTargetRequest::StrictTwoWayErr { payload, responder } => match payload {
                 OpenTargetStrictTwoWayErrRequest::ReplySuccess(Empty) => {
-                    responder.send(&mut Ok(())).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Ok(())).expect(EXPECT_REPLY_FAILED);
                 }
                 OpenTargetStrictTwoWayErrRequest::ReplyError(reply_error) => {
-                    responder.send(&mut Err(reply_error)).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Err(reply_error)).expect(EXPECT_REPLY_FAILED);
                 }
             },
             OpenTargetRequest::StrictTwoWayFieldsErr { payload, responder } => match payload {
@@ -296,10 +296,10 @@ async fn run_open_target_server(
             }
             OpenTargetRequest::FlexibleTwoWayErr { payload, responder } => match payload {
                 OpenTargetFlexibleTwoWayErrRequest::ReplySuccess(Empty) => {
-                    responder.send(&mut Ok(())).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Ok(())).expect(EXPECT_REPLY_FAILED);
                 }
                 OpenTargetFlexibleTwoWayErrRequest::ReplyError(reply_error) => {
-                    responder.send(&mut Err(reply_error)).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Err(reply_error)).expect(EXPECT_REPLY_FAILED);
                 }
             },
             OpenTargetRequest::FlexibleTwoWayFieldsErr { payload, responder } => match payload {

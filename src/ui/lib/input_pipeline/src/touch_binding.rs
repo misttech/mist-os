@@ -1020,7 +1020,7 @@ mod tests {
                     } => {
                         match set_feature_report_sender.unbounded_send(report) {
                             Ok(_) => {
-                                let _ = responder.send(&mut Ok(()));
+                                let _ = responder.send(Ok(()));
                             }
                             Err(e) => {
                                 panic!("try_send set_feature_report_request failed: {}", e);
@@ -1085,7 +1085,7 @@ mod tests {
                     }));
                 }
                 fidl_input_report::InputDeviceRequest::SetFeatureReport { responder, .. } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 r => panic!("unsupported request {:?}", r),
             }
@@ -1136,7 +1136,7 @@ mod tests {
                     } => {
                         match set_feature_report_sender.unbounded_send(report) {
                             Ok(_) => {
-                                let _ = responder.send(&mut Ok(()));
+                                let _ = responder.send(Ok(()));
                             }
                             Err(e) => {
                                 panic!("try_send set_feature_report_request failed: {}", e);

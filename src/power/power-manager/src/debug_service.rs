@@ -29,7 +29,7 @@ pub fn publish_debug_service<'a, 'b>(
                 while let Some(req) = stream.try_next().await? {
                     match req {
                         fdebug::DebugRequest::Message { node_name, command, args, responder } => {
-                            let mut result = match nodes.get(&node_name) {
+                            let result = match nodes.get(&node_name) {
                                 Some(node) => {
                                     match node.handle_message(&Message::Debug(command, args)).await
                                     {
@@ -50,7 +50,7 @@ pub fn publish_debug_service<'a, 'b>(
                                 None => Err(fdebug::MessageError::InvalidNodeName),
                             };
 
-                            responder.send(&mut result)?;
+                            responder.send(result)?;
                         }
                     }
                 }

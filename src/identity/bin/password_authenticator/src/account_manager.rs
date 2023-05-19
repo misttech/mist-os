@@ -200,8 +200,8 @@ where
                 responder.send(&account_ids).context("sending GetAccountIds response")?;
             }
             AccountManagerRequest::DeprecatedGetAccount { id, password, account, responder } => {
-                let mut resp = self.get_account(id, &password, account).await;
-                responder.send(&mut resp).context("sending DeprecatedGetAccount response")?;
+                let resp = self.get_account(id, &password, account).await;
+                responder.send(resp).context("sending DeprecatedGetAccount response")?;
             }
             AccountManagerRequest::DeprecatedProvisionNewAccount {
                 password,
@@ -209,29 +209,27 @@ where
                 account,
                 responder,
             } => {
-                let mut resp = self
+                let resp = self
                     .provision_new_account(&metadata, &password)
                     .and_then(|account_id| self.get_account(account_id, &password, account))
                     .await;
-                responder
-                    .send(&mut resp)
-                    .context("sending DeprecatedProvisionNewAccount response")?;
+                responder.send(resp).context("sending DeprecatedProvisionNewAccount response")?;
             }
             AccountManagerRequest::GetAccountMetadata { id, responder } => {
                 let mut resp = self.get_account_metadata(id).await;
                 responder.send(&mut resp).context("sending GetAccountMetadata response")?;
             }
             AccountManagerRequest::GetAccount { payload: _, responder } => {
-                let mut resp = Err(faccount::Error::UnsupportedOperation);
-                responder.send(&mut resp).context("sending GetAccount response")?;
+                let resp = Err(faccount::Error::UnsupportedOperation);
+                responder.send(resp).context("sending GetAccount response")?;
             }
             AccountManagerRequest::RegisterAccountListener { payload: _, responder } => {
-                let mut resp = Err(faccount::Error::UnsupportedOperation);
-                responder.send(&mut resp).context("sending RegisterAccountListener response")?;
+                let resp = Err(faccount::Error::UnsupportedOperation);
+                responder.send(resp).context("sending RegisterAccountListener response")?;
             }
             AccountManagerRequest::RemoveAccount { id, responder } => {
-                let mut resp = self.remove_account(id).await;
-                responder.send(&mut resp).context("sending RemoveAccount response")?;
+                let resp = self.remove_account(id).await;
+                responder.send(resp).context("sending RemoveAccount response")?;
             }
             AccountManagerRequest::ProvisionNewAccount { payload: _, responder } => {
                 let mut resp = Err(faccount::Error::UnsupportedOperation);

@@ -1155,7 +1155,7 @@ mod tests {
                     iface_id, sme_server, responder,
                 }))) => {
                     assert_eq!(iface_id, 11);
-                    responder.send(&mut Ok(())).expect("failed to send GetClientSme response");
+                    responder.send(Ok(())).expect("failed to send GetClientSme response");
                     sme_server.into_stream().expect("sme server stream failed")
                 }
             );

@@ -58,7 +58,7 @@ impl AsyncRequestHandler<fcrash::CrashReporterMarker> for FakeCrashReporter {
                     Ok(signature) => {
                         info!("Received crash report: {}", signature);
                         self.send_test_event(Ok(TestEvent::CrashReport(signature)))?;
-                        responder.send(&mut Ok(())).context("failed to send response to client")?;
+                        responder.send(Ok(())).context("failed to send response to client")?;
                     }
                     Err(problem) => {
                         error!("Problem in report: {}", problem);

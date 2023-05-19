@@ -760,7 +760,7 @@ async fn serve_graphical_presenter(
         view_controller_requests.push(view_controller_request);
 
         view_spec_sender.try_send(view_spec).expect("failed to send ViewSpec");
-        let _ = responder.send(&mut Ok(()));
+        let _ = responder.send(Ok(()));
     }
 }
 

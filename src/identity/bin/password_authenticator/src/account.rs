@@ -173,23 +173,23 @@ impl<SM: StorageManager + 'static> Account<SM> {
     {
         match request {
             AccountRequest::StorageLock { responder } => {
-                let mut res = match self.clone().lock_account().await {
+                let res = match self.clone().lock_account().await {
                     Ok(()) => Ok(()),
                     Err(err) => {
                         error!("{}", err);
                         Err(faccount::Error::Resource)
                     }
                 };
-                responder.send(&mut res).context("sending Lock response")?;
+                responder.send(res).context("sending Lock response")?;
             }
             AccountRequest::InteractionLock { responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending InteractionLock response")?;
             }
             AccountRequest::GetDataDirectory { data_directory, responder } => {
-                let mut result = self.get_data_directory(data_directory).await;
-                responder.send(&mut result).context("sending GetDataDirectory response")?;
+                let result = self.get_data_directory(data_directory).await;
+                responder.send(result).context("sending GetDataDirectory response")?;
             }
             AccountRequest::GetAuthState { responder } => {
                 responder
@@ -206,7 +206,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
             }
             AccountRequest::GetPersona { id: _, persona: _, responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending GetPersona response")?;
             }
             AccountRequest::GetPersonaIds { responder } => {
@@ -214,7 +214,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
             }
             AccountRequest::RegisterAuthListener { payload: _, responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending RegisterAuthListener response")?;
             }
             AccountRequest::GetAuthMechanismEnrollments { responder } => {
@@ -229,7 +229,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
             }
             AccountRequest::RemoveAuthMechanismEnrollment { enrollment_id: _, responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending RemoveAuthMechanismEnrollment response")?;
             }
         }

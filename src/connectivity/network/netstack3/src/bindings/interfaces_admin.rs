@@ -676,9 +676,9 @@ async fn dispatch_control_request(
         }
         fnet_interfaces_admin::ControlRequest::Remove { responder } => {
             if removable {
-                return responder.send(&mut Ok(())).map(|()| ControlRequestResult::Remove);
+                return responder.send(Ok(())).map(|()| ControlRequestResult::Remove);
             }
-            responder.send(&mut Err(fnet_interfaces_admin::ControlRemoveError::NotAllowed))
+            responder.send(Err(fnet_interfaces_admin::ControlRemoveError::NotAllowed))
         }
         fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface { responder: _ } => {
             todo!("https://fxbug.dev/117844 support GetAuthorizationForInterface")

@@ -374,10 +374,10 @@ impl StorageAdmin {
                                 }),
                             )
                             .detach();
-                            responder.send(&mut Ok(()))?;
+                            responder.send(Ok(()))?;
                         }
                         Err(e) => {
-                            responder.send(&mut Err(e))?;
+                            responder.send(Err(e))?;
                         }
                     }
                 }
@@ -386,12 +386,12 @@ impl StorageAdmin {
                     let component_id = match ComponentInstanceId::from_str(&id) {
                         Ok(id) => id,
                         Err(_) => {
-                            responder.send(&mut Err(fcomponent::Error::InvalidArguments))?;
+                            responder.send(Err(fcomponent::Error::InvalidArguments))?;
                             continue;
                         }
                     };
                     if !instance_id_index.look_up_instance_id(&component_id) {
-                        responder.send(&mut Err(fcomponent::Error::ResourceNotFound))?;
+                        responder.send(Err(fcomponent::Error::ResourceNotFound))?;
                         continue;
                     }
                     match storage::open_isolated_storage_by_id(
@@ -401,18 +401,17 @@ impl StorageAdmin {
                     .await
                     {
                         Ok(dir) => responder.send(
-                            &mut dir
-                                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
+                            dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
                                 .map_err(|_| fcomponent::Error::Internal),
                         )?,
-                        Err(_) => responder.send(&mut Err(fcomponent::Error::Internal))?,
+                        Err(_) => responder.send(Err(fcomponent::Error::Internal))?,
                     }
                 }
                 fsys::StorageAdminRequest::DeleteComponentStorage {
                     relative_moniker,
                     responder,
                 } => {
-                    let mut response = match InstancedRelativeMoniker::try_from(
+                    let response = match InstancedRelativeMoniker::try_from(
                         relative_moniker.as_str(),
                     ) {
                         Err(error) => {
@@ -446,7 +445,7 @@ impl StorageAdmin {
                             }
                         }
                     };
-                    responder.send(&mut response)?
+                    responder.send(response)?
                 }
                 fsys::StorageAdminRequest::GetStatus { responder } => {
                     if let Ok(storage_root) =
@@ -470,17 +469,17 @@ impl StorageAdmin {
                         match Self::delete_all_storage(&storage_root, Self::delete_dir_contents)
                             .await
                         {
-                            Ok(_) => responder.send(&mut Ok(()))?,
+                            Ok(_) => responder.send(Ok(()))?,
                             Err(e) => {
                                 warn!("errors encountered deleting storage: {:?}", e);
-                                responder.send_no_shutdown_on_err(&mut Result::Err(e.into()))?;
+                                responder.send_no_shutdown_on_err(Result::Err(e.into()))?;
                             }
                         }
                     } else {
                         // This might not be _entirely_ accurate, but in this error case we weren't
                         // able to talk to the directory, so that is, in a sense, lack of
                         // connection.
-                        responder.send_no_shutdown_on_err(&mut Result::Err(
+                        responder.send_no_shutdown_on_err(Result::Err(
                             fsys::DeletionError::Connection,
                         ))?;
                     }

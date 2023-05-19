@@ -42,12 +42,12 @@ async fn handle_audio_request(
                     }
 
                     AudioRecordingControlRequest::ClearInputAudio { index, responder } => {
-                        let mut result =
+                        let result =
                             match facade_clone.clear_input_audio(index.try_into().unwrap()).await {
                                 Ok(_) => Ok(()),
                                 Err(_) => Err(AudioRecordingError::Fail),
                             };
-                        responder.send(&mut result).context("error sending response").unwrap();
+                        responder.send(result).context("error sending response").unwrap();
                     }
 
                     AudioRecordingControlRequest::GetOutputAudio { responder } => {
@@ -60,36 +60,36 @@ async fn handle_audio_request(
                     }
 
                     AudioRecordingControlRequest::StartInputInjection { index, responder } => {
-                        let mut result = match facade_clone
+                        let result = match facade_clone
                             .start_input_injection(index.try_into().unwrap())
                             .await
                         {
                             Ok(_) => Ok(()),
                             Err(_) => Err(AudioRecordingError::Fail),
                         };
-                        responder.send(&mut result).context("error sending response").unwrap();
+                        responder.send(result).context("error sending response").unwrap();
                     }
 
                     AudioRecordingControlRequest::StopInputInjection { responder } => {
-                        let mut result = match facade_clone.stop_input_injection().await {
+                        let result = match facade_clone.stop_input_injection().await {
                             Ok(_) => Ok(()),
                             Err(_) => Err(AudioRecordingError::Fail),
                         };
-                        responder.send(&mut result).context("error sending response").unwrap();
+                        responder.send(result).context("error sending response").unwrap();
                     }
                     AudioRecordingControlRequest::StartOutputSave { responder } => {
-                        let mut result = match facade_clone.start_output_save().await {
+                        let result = match facade_clone.start_output_save().await {
                             Ok(_) => Ok(()),
                             Err(_) => Err(AudioRecordingError::Fail),
                         };
-                        responder.send(&mut result).context("error sending response").unwrap();
+                        responder.send(result).context("error sending response").unwrap();
                     }
                     AudioRecordingControlRequest::StopOutputSave { responder } => {
-                        let mut result = match facade_clone.stop_output_save().await {
+                        let result = match facade_clone.stop_output_save().await {
                             Ok(_) => Ok(()),
                             Err(_) => Err(AudioRecordingError::Fail),
                         };
-                        responder.send(&mut result).context("error sending response").unwrap();
+                        responder.send(result).context("error sending response").unwrap();
                     }
                 }
                 Ok(())

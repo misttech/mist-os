@@ -95,7 +95,7 @@ mod test {
     async fn test_run_command() {
         let proxy = setup_fake_input_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             InputRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -140,7 +140,7 @@ mod test {
     async fn validate_input_set_output(mut expected_input: Input) -> Result<()> {
         let proxy = setup_fake_input_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             InputRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

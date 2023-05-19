@@ -578,27 +578,27 @@ pub async fn handle_scene_manager_request_stream(
                 responder,
             } => {
                 let mut scene_manager = scene_manager.lock().await;
-                let mut set_root_view_result = scene_manager
+                let set_root_view_result = scene_manager
                     .set_root_view(ViewportToken::Gfx(view_holder_token), Some(view_ref))
                     .await
                     .map_err(|e| {
                         error!("Failed to obtain ViewRef from PresentRootViewLegacy(): {}", e);
                         PresentRootViewError::InternalError
                     });
-                if let Err(e) = responder.send(&mut set_root_view_result) {
+                if let Err(e) = responder.send(set_root_view_result) {
                     error!("Error responding to PresentRootViewLegacy(): {}", e);
                 }
             }
             SceneManagerRequest::PresentRootView { viewport_creation_token, responder } => {
                 let mut scene_manager = scene_manager.lock().await;
-                let mut set_root_view_result = scene_manager
+                let set_root_view_result = scene_manager
                     .set_root_view(ViewportToken::Flatland(viewport_creation_token), None)
                     .await
                     .map_err(|e| {
                         error!("Failed to obtain ViewRef from PresentRootView(): {}", e);
                         PresentRootViewError::InternalError
                     });
-                if let Err(e) = responder.send(&mut set_root_view_result) {
+                if let Err(e) = responder.send(set_root_view_result) {
                     error!("Error responding to PresentRootView(): {}", e);
                 }
             }
@@ -622,14 +622,14 @@ pub async fn handle_graphical_presenter_request_stream(
                     } => {
                         info!("Processing fuchsia.element.GraphicalPresenter/PresentView() with GFX view tokens.");
                         let mut scene_manager = scene_manager.lock().await;
-                        let mut set_root_view_result = scene_manager
+                        let set_root_view_result = scene_manager
                             .set_root_view(ViewportToken::Gfx(view_holder_token), view_ref)
                             .await
                             .map_err(|e| {
                                 error!("Failed to PresentView() - GFX: {}", e);
                                 PresentViewError::InvalidArgs
                             });
-                        if let Err(e) = responder.send(&mut set_root_view_result) {
+                        if let Err(e) = responder.send(set_root_view_result) {
                             error!("Error responding to PresentView(): {}", e);
                         }
                     }
@@ -641,20 +641,20 @@ pub async fn handle_graphical_presenter_request_stream(
                     } => {
                         info!("Processing fuchsia.element.GraphicalPresenter/PresentView() with Flatland view tokens.");
                         let mut scene_manager = scene_manager.lock().await;
-                        let mut set_root_view_result = scene_manager
+                        let set_root_view_result = scene_manager
                             .set_root_view(ViewportToken::Flatland(viewport_creation_token), None)
                             .await
                             .map_err(|e| {
                                 error!("Failed to PresentView() - Flatland: {}", e);
                                 PresentViewError::InvalidArgs
                             });
-                        if let Err(e) = responder.send(&mut set_root_view_result) {
+                        if let Err(e) = responder.send(set_root_view_result) {
                             error!("Error responding to PresentView(): {}", e);
                         }
                     }
                     _ => {
                         error!("Failed to retrieve valid tokens from ViewSpec");
-                        if let Err(e) = responder.send(&mut Err(PresentViewError::InvalidArgs)) {
+                        if let Err(e) = responder.send(Err(PresentViewError::InvalidArgs)) {
                             error!("Error responding to PresentView(): {}", e);
                         }
                     }

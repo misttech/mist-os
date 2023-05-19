@@ -324,14 +324,14 @@ where
     ) -> Result<(), Error> {
         match request {
             ManagerRequest::CheckNow { options, monitor, responder } => {
-                let mut res = Self::handle_check_now(Rc::clone(&server), options, monitor).await;
+                let res = Self::handle_check_now(Rc::clone(&server), options, monitor).await;
 
                 server
                     .borrow_mut()
                     .metrics_reporter
                     .emit_event(ApiEvent::UpdateManagerCheckNowResult(res));
 
-                responder.send(&mut res).context("error sending CheckNow response")?;
+                responder.send(res).context("error sending CheckNow response")?;
             }
 
             ManagerRequest::PerformPendingReboot { responder } => {

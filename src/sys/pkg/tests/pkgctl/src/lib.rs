@@ -247,7 +247,7 @@ impl MockEngineService {
                                 self.list_dynamic_handler(iterator).await?;
                             }
                             EditTransactionRequest::Commit { responder } => {
-                                responder.send(&mut Ok(())).expect("send ok");
+                                responder.send(Ok(())).expect("send ok");
                             }
                             _ => {
                                 panic!("unhandled request method {sub_req:?}");
@@ -306,26 +306,26 @@ impl MockRepositoryManagerService {
                     self.captured_args.lock().push(CapturedRepositoryManagerRequest::Add {
                         repo: RepositoryConfig::try_from(repo).expect("valid repo config"),
                     });
-                    responder.send(&mut Ok(())).expect("send ok");
+                    responder.send(Ok(())).expect("send ok");
                 }
                 RepositoryManagerRequest::Remove { repo_url, responder } => {
                     self.captured_args
                         .lock()
                         .push(CapturedRepositoryManagerRequest::Remove { repo_url });
-                    responder.send(&mut Ok(())).expect("send ok");
+                    responder.send(Ok(())).expect("send ok");
                 }
                 RepositoryManagerRequest::AddMirror { repo_url, mirror, responder } => {
                     self.captured_args.lock().push(CapturedRepositoryManagerRequest::AddMirror {
                         repo_url,
                         mirror: MirrorConfig::try_from(mirror).expect("valid mirror config"),
                     });
-                    responder.send(&mut Ok(())).expect("send ok");
+                    responder.send(Ok(())).expect("send ok");
                 }
                 RepositoryManagerRequest::RemoveMirror { repo_url, mirror_url, responder } => {
                     self.captured_args.lock().push(
                         CapturedRepositoryManagerRequest::RemoveMirror { repo_url, mirror_url },
                     );
-                    responder.send(&mut Ok(())).expect("send ok");
+                    responder.send(Ok(())).expect("send ok");
                 }
                 RepositoryManagerRequest::List { iterator, control_handle: _control_handle } => {
                     self.captured_args.lock().push(CapturedRepositoryManagerRequest::List);
@@ -439,7 +439,7 @@ impl MockPackageCacheService {
                         .lock()
                         .push(CapturedPackageCacheRequest::Open { meta_far_blob_id });
                     responder
-                        .send(&mut self.open_response.lock().unwrap().map_err(|s| s.into_raw()))
+                        .send(self.open_response.lock().unwrap().map_err(|s| s.into_raw()))
                         .expect("send ok");
                 }
                 PackageCacheRequest::Get { .. } => {
@@ -477,9 +477,9 @@ impl MockSpaceManagerService {
             match req {
                 fidl_space::ManagerRequest::Gc { responder } => {
                     if let Some(e) = *self.gc_err.lock() {
-                        responder.send(&mut Err(e))?;
+                        responder.send(Err(e))?;
                     } else {
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                 }
             }

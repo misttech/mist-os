@@ -32,7 +32,7 @@ pub async fn serve_manager(
                     let mut url_mut = url.borrow_mut();
                     *url_mut = Some(fuzzer_url);
                 }
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 task = Some(create_task(serve_controller(stream, test.clone()), &writer));
             }
             fuzz::ManagerRequest::GetOutput { fuzzer_url, output, socket, responder } => {
@@ -45,13 +45,13 @@ pub async fn serve_manager(
                     url.clone().unwrap_or(String::default())
                 };
                 if fuzzer_url == running {
-                    let mut response = match fake.set_output(output, socket) {
+                    let response = match fake.set_output(output, socket) {
                         zx::Status::OK => Ok(()),
                         status => Err(status.into_raw()),
                     };
-                    responder.send(&mut response)?;
+                    responder.send(response)?;
                 } else {
-                    responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw()))?;
+                    responder.send(Err(zx::Status::NOT_FOUND.into_raw()))?;
                 }
             }
             fuzz::ManagerRequest::Stop { fuzzer_url, responder } => {
@@ -64,9 +64,9 @@ pub async fn serve_manager(
                 };
                 if fuzzer_url == running {
                     task = None;
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 } else {
-                    responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw()))?;
+                    responder.send(Err(zx::Status::NOT_FOUND.into_raw()))?;
                 }
             }
         };

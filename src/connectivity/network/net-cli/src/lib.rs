@@ -2047,7 +2047,7 @@ mod tests {
                         metric: 0,
                     }
                 );
-                responder.send(&mut Ok(())).expect("responder.send should succeed");
+                responder.send(Ok(())).expect("responder.send should succeed");
             }
         };
 
@@ -2398,7 +2398,7 @@ mac             -
                 .expect("request should be of type StopDhcpClient");
             assert_eq!(opts::InterfaceIdentifier::Id(u64::from(received_id)), expected_id);
             assert_eq!(enable, expected_enable);
-            responder.send(&mut Ok(())).map_err(anyhow::Error::new)
+            responder.send(Ok(())).map_err(anyhow::Error::new)
         };
         let ((), ()) =
             futures::future::try_join(op, op_succeeds).await.expect("dhcp command should succeed");
@@ -2450,7 +2450,7 @@ mac             -
                         .into_add_forwarding_entry()
                         .expect("request should be of type AddRoute");
                     assert_eq!(entry, expected_entry);
-                    responder.send(&mut Ok(()))
+                    responder.send(Ok(()))
                 }
                 opts::RouteEnum::Del(route) => {
                     let expected_entry = route.into_route_table_entry(
@@ -2464,7 +2464,7 @@ mac             -
                         .into_del_forwarding_entry()
                         .expect("request should be of type DelRoute");
                     assert_eq!(entry, expected_entry);
-                    responder.send(&mut Ok(()))
+                    responder.send(Ok(()))
                 }
             }?;
             Ok(())
@@ -3009,7 +3009,7 @@ mac             -
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_address, IF_ADDR_V4.addr);
             assert_eq!(got_mac, MAC_1);
-            let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
+            let () = responder.send(Ok(())).expect("responder.send should succeed");
             Ok(())
         };
         let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
@@ -3032,7 +3032,7 @@ mac             -
                 .expect("request should be of type ClearEntries");
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_version, IP_VERSION);
-            let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
+            let () = responder.send(Ok(())).expect("responder.send should succeed");
             Ok(())
         };
         let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
@@ -3055,7 +3055,7 @@ mac             -
                 .expect("request should be of type RemoveEntry");
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_address, IF_ADDR_V4.addr);
-            let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
+            let () = responder.send(Ok(())).expect("responder.send should succeed");
             Ok(())
         };
         let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
@@ -3113,7 +3113,7 @@ mac             -
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_version, IP_VERSION);
             assert_eq!(got_config, config);
-            let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
+            let () = responder.send(Ok(())).expect("responder.send should succeed");
             Ok(())
         };
         let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
@@ -3215,8 +3215,7 @@ mac             -
                         let (opt, responder) =
                             req.into_set_option().expect("request should be of type set option");
                         assert_eq!(<opts::dhcpd::Option_ as Into<fdhcp::Option_>>::into(name), opt);
-                        let () =
-                            responder.send(&mut Ok(())).expect("responder.send should succeed");
+                        let () = responder.send(Ok(())).expect("responder.send should succeed");
                         Ok(())
                     }
                     opts::dhcpd::SetArg::Parameter(opts::dhcpd::ParameterArg { name }) => {
@@ -3227,8 +3226,7 @@ mac             -
                             <opts::dhcpd::Parameter as Into<fdhcp::Parameter>>::into(name),
                             opt
                         );
-                        let () =
-                            responder.send(&mut Ok(())).expect("responder.send should succeed");
+                        let () = responder.send(Ok(())).expect("responder.send should succeed");
                         Ok(())
                     }
                 },
@@ -3255,29 +3253,27 @@ mac             -
                         let responder = req
                             .into_reset_options()
                             .expect("request should be of type reset options");
-                        let () =
-                            responder.send(&mut Ok(())).expect("responder.send should succeed");
+                        let () = responder.send(Ok(())).expect("responder.send should succeed");
                         Ok(())
                     }
                     opts::dhcpd::ResetArg::Parameter(opts::dhcpd::ParameterToken {}) => {
                         let responder = req
                             .into_reset_parameters()
                             .expect("request should be of type reset parameters");
-                        let () =
-                            responder.send(&mut Ok(())).expect("responder.send should succeed");
+                        let () = responder.send(Ok(())).expect("responder.send should succeed");
                         Ok(())
                     }
                 },
                 opts::dhcpd::DhcpdEnum::ClearLeases(opts::dhcpd::ClearLeases {}) => {
                     let responder =
                         req.into_clear_leases().expect("request should be of type clear leases");
-                    let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
+                    let () = responder.send(Ok(())).expect("responder.send should succeed");
                     Ok(())
                 }
                 opts::dhcpd::DhcpdEnum::Start(opts::dhcpd::Start {}) => {
                     let responder =
                         req.into_start_serving().expect("request should be of type start serving");
-                    let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
+                    let () = responder.send(Ok(())).expect("responder.send should succeed");
                     Ok(())
                 }
                 opts::dhcpd::DhcpdEnum::Stop(opts::dhcpd::Stop {}) => {

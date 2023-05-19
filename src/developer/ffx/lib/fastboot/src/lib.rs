@@ -107,7 +107,7 @@ pub mod test {
             setup_fake_fastboot_proxy(move |req| match req {
                 FastbootRequest::Prepare { listener, responder } => {
                     listener.into_proxy().unwrap().on_reboot().unwrap();
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::GetVar { responder, name } => {
                     let mut state = state.lock().unwrap();
@@ -123,47 +123,47 @@ pub mod test {
                 }
                 FastbootRequest::GetAllVars { listener, responder, .. } => {
                     listener.into_proxy().unwrap().on_variable("test", "test").unwrap();
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::Flash { listener, responder, .. } => {
                     listener.into_proxy().unwrap().on_finished().unwrap();
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::GetStaged { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::Erase { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::Boot { responder } => {
                     let mut state = state.lock().unwrap();
                     state.boots += 1;
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::Reboot { responder } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::RebootBootloader { listener, responder } => {
                     listener.into_proxy().unwrap().on_reboot().unwrap();
                     let mut state = state.lock().unwrap();
                     state.bootloader_reboots += 1;
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::ContinueBoot { responder } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::SetActive { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::Stage { path, responder, .. } => {
                     let mut state = state.lock().unwrap();
                     state.staged_files.push(path);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 FastbootRequest::Oem { command, responder } => {
                     let mut state = state.lock().unwrap();
                     state.oem_commands.push(command);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
             }),
         )

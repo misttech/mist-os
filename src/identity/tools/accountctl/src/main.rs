@@ -203,7 +203,7 @@ mod tests {
                     if id != self.id {
                         Err(anyhow!("Received RemoveAccount for {}, expected {}", id, self.id))
                     } else {
-                        responder.send(&mut Ok(())).context("Failed to send response")
+                        responder.send(Ok(())).context("Failed to send response")
                     }
                 }
                 _ => Err(anyhow!("Did not expect {:?}", req)),

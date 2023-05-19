@@ -962,7 +962,7 @@ async fn run_lookup_admin<T: ResolverLookup>(
         .try_for_each(|req| async {
             match req {
                 LookupAdminRequest::SetDnsServers { servers, responder } => {
-                    let mut response = match state.update_servers(servers) {
+                    let response = match state.update_servers(servers) {
                         UpdateServersResult::Updated(servers) => {
                             let () = update_resolver(resolver, servers);
                             Ok(())
@@ -972,7 +972,7 @@ async fn run_lookup_admin<T: ResolverLookup>(
                             Err(zx::Status::INVALID_ARGS.into_raw())
                         }
                     };
-                    let () = responder.send(&mut response)?;
+                    let () = responder.send(response)?;
                 }
                 LookupAdminRequest::GetDnsServers { responder } => {
                     let () = responder.send(&state.servers())?;

@@ -548,7 +548,7 @@ mod tests {
     async fn verify_stash_flush(stash_stream: &mut StoreAccessorRequestStream) {
         match stash_stream.next().await.unwrap() {
             Ok(StoreAccessorRequest::Flush { responder }) => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             } // expected
             request => panic!("Unexpected request: {request:?}"),
         }
@@ -558,7 +558,7 @@ mod tests {
     async fn fail_stash_flush(stash_stream: &mut StoreAccessorRequestStream) {
         match stash_stream.next().await.unwrap() {
             Ok(StoreAccessorRequest::Flush { responder }) => {
-                let _ = responder.send(&mut Err(FlushError::CommitFailed));
+                let _ = responder.send(Err(FlushError::CommitFailed));
             } // expected
             request => panic!("Unexpected request: {request:?}"),
         }

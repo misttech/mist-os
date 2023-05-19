@@ -19,14 +19,14 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
                         "fuchsia.net.filter.Filter is not implemented \
                            (https://fxbug.dev/106604); ignoring DisableInterface"
                     );
-                    responder_send!(responder, &mut Ok(()));
+                    responder_send!(responder, Ok(()));
                 }
                 FilterRequest::EnableInterface { responder, .. } => {
                     error!(
                         "fuchsia.net.filter.Filter is not implemented \
                            (https://fxbug.dev/106604); ignoring EnableInterface"
                     );
-                    responder_send!(responder, &mut Ok(()));
+                    responder_send!(responder, Ok(()));
                 }
                 FilterRequest::GetRules { responder } => {
                     error!(
@@ -48,7 +48,7 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
                             {{ generation: {:?}, rules: {:?} }}",
                         generation, rules
                     );
-                    responder_send!(responder, &mut Ok(()));
+                    responder_send!(responder, Ok(()));
                 }
                 FilterRequest::GetNatRules { .. } => {
                     todo!("https://fxbug.dev/106604: implement filtering support");

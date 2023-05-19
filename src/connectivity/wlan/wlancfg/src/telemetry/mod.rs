@@ -6680,8 +6680,8 @@ mod tests {
                 assert_eq!(experiment_ids, expected_experiments);
                 match failure_mode {
                     CreateMetricsLoggerFailureMode::FactoryRequest => panic!("The factory request failure should have been handled already."),
-                    CreateMetricsLoggerFailureMode::None => responder.send(&mut Ok(())).expect("failed to send response"),
-                    CreateMetricsLoggerFailureMode::ApiFailure => responder.send(&mut Err(fidl_fuchsia_metrics::Error::InvalidArguments)).expect("failed to send response"),
+                    CreateMetricsLoggerFailureMode::None => responder.send(Ok(())).expect("failed to send response"),
+                    CreateMetricsLoggerFailureMode::ApiFailure => responder.send(Err(fidl_fuchsia_metrics::Error::InvalidArguments)).expect("failed to send response"),
                 }
             }
         );
@@ -7096,9 +7096,7 @@ mod tests {
                         let telemetry_stream = telemetry_server
                             .into_stream()
                             .expect("Failed to create telemetry stream");
-                        responder
-                            .send(&mut Ok(()))
-                            .expect("Failed to respond to telemetry request");
+                        responder.send(Ok(())).expect("Failed to respond to telemetry request");
                         self.telemetry_svc_stream = Some(telemetry_stream);
                         self.exec.run_until_stalled(test_fut)
                     }
@@ -7185,7 +7183,7 @@ mod tests {
                 while let Poll::Ready(Some(Ok(req))) =
                     self.exec.run_until_stalled(&mut self.cobalt_1dot1_stream.next())
                 {
-                    self.cobalt_events.append(&mut req.respond_to_metric_req(&mut Ok(())));
+                    self.cobalt_events.append(&mut req.respond_to_metric_req(Ok(())));
                     made_progress = true;
                 }
             }
@@ -7330,14 +7328,14 @@ mod tests {
         // Respond to MetricEventLoggerRequest and extract its MetricEvent
         fn respond_to_metric_req(
             self,
-            result: &mut Result<(), fidl_fuchsia_metrics::Error>,
+            result: Result<(), fidl_fuchsia_metrics::Error>,
         ) -> Vec<fidl_fuchsia_metrics::MetricEvent>;
     }
 
     impl CobaltExt for MetricEventLoggerRequest {
         fn respond_to_metric_req(
             self,
-            result: &mut Result<(), fidl_fuchsia_metrics::Error>,
+            result: Result<(), fidl_fuchsia_metrics::Error>,
         ) -> Vec<fidl_fuchsia_metrics::MetricEvent> {
             match self {
                 Self::LogOccurrence { metric_id, count, event_codes, responder } => {

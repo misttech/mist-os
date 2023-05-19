@@ -302,7 +302,7 @@ mod tests {
                         assert_eq!(dev_offset, 0);
                         assert_eq!(length, 4096);
                         vmo.write(&constants::FVM_MAGIC, vmo_offset).unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => {
                         println!("Unexpected request: {:?}", request);

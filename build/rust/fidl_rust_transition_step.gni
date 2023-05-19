@@ -20,4 +20,4 @@
 #
 #   3. Clean up the other repos to leave /* new code */ only.
 #
-fidl_rust_transition_step = "migrate_resource_results"
+fidl_rust_transition_step = "migrate_unit_results"

@@ -818,16 +818,16 @@ mod tests {
         let result = match request {
             wlan_policy::ClientControllerRequest::SaveNetwork { config: _, responder } => {
                 if success {
-                    responder.send(&mut Ok(()))
+                    responder.send(Ok(()))
                 } else {
-                    responder.send(&mut Err(wlan_policy::NetworkConfigChangeError::GeneralError))
+                    responder.send(Err(wlan_policy::NetworkConfigChangeError::GeneralError))
                 }
             }
             wlan_policy::ClientControllerRequest::RemoveNetwork { config: _, responder } => {
                 if success {
-                    responder.send(&mut Ok(()))
+                    responder.send(Ok(()))
                 } else {
-                    responder.send(&mut Err(wlan_policy::NetworkConfigChangeError::GeneralError))
+                    responder.send(Err(wlan_policy::NetworkConfigChangeError::GeneralError))
                 }
             }
             _ => panic!("expecting a request that optionally receives a NetworkConfigChangeError"),
@@ -1948,7 +1948,7 @@ mod tests {
             Poll::Ready(Some(Ok(wlan_deprecated::DeprecatedConfiguratorRequest::SuggestAccessPointMacAddress {
                 mac: fidl_fuchsia_net::MacAddress { octets: [0, 1, 2, 3, 4, 5] }, responder
             }))) => {
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
             }
         );
 
@@ -1973,7 +1973,7 @@ mod tests {
             Poll::Ready(Some(Ok(wlan_deprecated::DeprecatedConfiguratorRequest::SuggestAccessPointMacAddress {
                 mac: fidl_fuchsia_net::MacAddress { octets: [0, 1, 2, 3, 4, 5] }, responder
             }))) => {
-                assert!(responder.send(&mut Err(wlan_deprecated::SuggestMacAddressError::InvalidArguments)).is_ok());
+                assert!(responder.send(Err(wlan_deprecated::SuggestMacAddressError::InvalidArguments)).is_ok());
             }
         );
 

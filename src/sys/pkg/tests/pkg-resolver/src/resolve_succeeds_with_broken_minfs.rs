@@ -329,9 +329,8 @@ impl FailingWriteFileStreamHandler {
                         responder.send(&mut result).unwrap();
                     }
                     fio::FileRequest::Close { responder } => {
-                        let mut backing_file_close_response =
-                            self.backing_file.close().await.unwrap();
-                        responder.send(&mut backing_file_close_response).unwrap();
+                        let backing_file_close_response = self.backing_file.close().await.unwrap();
+                        responder.send(backing_file_close_response).unwrap();
                     }
                     other => {
                         panic!("unhandled request type for path {:?}: {:?}", self.path, other);
@@ -417,8 +416,8 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         responder.send(status, &attrs).unwrap();
                     }
                     fio::DirectoryRequest::Close { responder } => {
-                        let mut result = tempdir_proxy.close().await.unwrap();
-                        responder.send(&mut result).unwrap();
+                        let result = tempdir_proxy.close().await.unwrap();
+                        responder.send(result).unwrap();
                     }
                     fio::DirectoryRequest::GetToken { responder } => {
                         let (status, handle) = tempdir_proxy.get_token().await.unwrap();
@@ -429,7 +428,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                             panic!("unsupported rename from {} to {}", src, dst);
                         }
                         fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        responder.send(&mut Err(Status::NOT_FOUND.into_raw())).unwrap();
+                        responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
                     }
                     fio::DirectoryRequest::Open {
                         flags,

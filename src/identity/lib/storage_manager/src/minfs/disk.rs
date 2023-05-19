@@ -590,7 +590,7 @@ pub mod test {
                         VolumeAndNodeRequest::Bind { driver, responder } => {
                             assert_eq!(driver, "zxcrypt.cm");
                             let zxcrypt_dir = simple::simple();
-                            let mut resp = self
+                            let resp = self
                                 .block_dir
                                 .add_entry(
                                     "zxcrypt",
@@ -608,9 +608,7 @@ pub mod test {
                                 )
                                 .map_err(|_| zx::Status::ALREADY_BOUND.into_raw());
 
-                            responder
-                                .send(&mut resp)
-                                .expect("failed to send Controller.Bind response");
+                            responder.send(resp).expect("failed to send Controller.Bind response");
                         }
 
                         // fuchsia.io.Node methods

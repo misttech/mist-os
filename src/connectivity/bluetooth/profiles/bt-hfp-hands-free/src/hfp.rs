@@ -92,7 +92,7 @@ mod tests {
         let request = stream.next().await.unwrap().expect("FIDL request is OK");
         match request {
             Advertise { responder, .. } => {
-                let _ = responder.send(&mut Ok(())).unwrap();
+                let _ = responder.send(Ok(())).unwrap();
             }
             _ => panic!("Not an advertisement"),
         };

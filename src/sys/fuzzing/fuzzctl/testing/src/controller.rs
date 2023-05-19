@@ -229,7 +229,7 @@ pub async fn serve_controller(
             Some(Ok(fuzz::ControllerRequest::Configure { options, responder })) => {
                 test.record("fuchsia.fuzzer/Controller.Configure");
                 fake.set_options(options);
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(Ok(fuzz::ControllerRequest::GetOptions { responder })) => {
                 test.record("fuchsia.fuzzer/Controller.GetOptions");
@@ -240,7 +240,7 @@ pub async fn serve_controller(
                 test.record(format!("fuchsia.fuzzer/Controller.AddToCorpus({:?})", corpus));
                 fake.receive_input(input).await?;
                 fake.set_corpus_type(corpus);
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
             }
             Some(Ok(fuzz::ControllerRequest::ReadCorpus { corpus, corpus_reader, responder })) => {
                 test.record("fuchsia.fuzzer/Controller.ReadCorpus");
@@ -276,7 +276,7 @@ pub async fn serve_controller(
                         let mut status = fake.get_status();
                         status.running = Some(true);
                         fake.set_status(status);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     (_, _, Ok(fuzz_result)) => {
                         let input_to_send = fake.take_input_to_send().unwrap_or(Vec::new());
@@ -287,12 +287,12 @@ pub async fn serve_controller(
                             input: Some(fidl_input),
                             ..Default::default()
                         });
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                         input.send().await?;
                         fake.send_output(fuzz::DONE_MARKER).await?;
                     }
                     (_, _, Err(status)) => {
-                        responder.send(&mut Err(status.into_raw()))?;
+                        responder.send(Err(status.into_raw()))?;
                     }
                 };
             }
@@ -307,11 +307,11 @@ pub async fn serve_controller(
                             input: None,
                             ..Default::default()
                         });
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                         fake.send_output(fuzz::DONE_MARKER).await?;
                     }
                     Err(status) => {
-                        responder.send(&mut Err(status.into_raw()))?;
+                        responder.send(Err(status.into_raw()))?;
                     }
                 }
             }
@@ -327,7 +327,7 @@ pub async fn serve_controller(
                     input: Some(fidl_input),
                     ..Default::default()
                 });
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 input.send().await?;
                 fake.send_output(fuzz::DONE_MARKER).await?;
             }
@@ -343,7 +343,7 @@ pub async fn serve_controller(
                     input: Some(fidl_input),
                     ..Default::default()
                 });
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 input.send().await?;
                 fake.send_output(fuzz::DONE_MARKER).await?;
             }
@@ -355,7 +355,7 @@ pub async fn serve_controller(
                     input: None,
                     ..Default::default()
                 });
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 fake.send_output(fuzz::DONE_MARKER).await?;
             }
             Some(Ok(fuzz::ControllerRequest::WatchArtifact { responder })) => {

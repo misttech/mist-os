@@ -600,7 +600,7 @@ impl MockCacheService {
                 fidl_fuchsia_pkg::PackageCacheRequest::Sync { responder } => {
                     self.interactions.lock().push(BlobfsSync);
                     responder.send(
-                        &mut self.sync_response.lock().unwrap_or(Ok(())).map_err(|s| s.into_raw()),
+                        self.sync_response.lock().unwrap_or(Ok(())).map_err(|s| s.into_raw()),
                     )?;
                 }
                 other => panic!("unsupported PackageCache request: {other:?}"),
@@ -626,7 +626,7 @@ impl MockSpaceService {
         while let Some(event) = stream.try_next().await.expect("received request") {
             let fidl_fuchsia_space::ManagerRequest::Gc { responder } = event;
             self.interactions.lock().push(Gc);
-            responder.send(&mut Ok(()))?;
+            responder.send(Ok(()))?;
         }
 
         Ok(())

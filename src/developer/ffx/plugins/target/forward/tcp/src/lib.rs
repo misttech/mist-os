@@ -65,7 +65,7 @@ mod test {
                     assert_eq!("dummy_target", target);
                     assert_eq!(host_address_test, host_address);
                     assert_eq!(target_address_test, target_address);
-                    responder.send(&mut Ok(())).context("sending response").expect("should send")
+                    responder.send(Ok(())).context("sending response").expect("should send")
                 }
                 other => panic!("Unexpected request: {:?}", other),
             }

@@ -44,7 +44,7 @@ where
         {
             match request {
                 fbedrock::DictRequest::Insert { key, value, responder, .. } => {
-                    let mut result = match self.entries.entry(key) {
+                    let result = match self.entries.entry(key) {
                         Entry::Occupied(_) => Err(fbedrock::DictError::AlreadyExists),
                         Entry::Vacant(entry) => match Box::<T>::try_from(value) {
                             Ok(cap) => {
@@ -54,7 +54,7 @@ where
                             Err(_) => Err(fbedrock::DictError::BadHandle),
                         },
                     };
-                    responder.send(&mut result).context("failed to send response")?;
+                    responder.send(result).context("failed to send response")?;
                 }
                 fbedrock::DictRequest::Remove { key, responder } => {
                     let cap = self.entries.remove(&key);

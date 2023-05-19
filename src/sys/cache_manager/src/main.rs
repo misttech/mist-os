@@ -208,7 +208,7 @@ mod tests {
                     match request {
                         Some(fsys::StorageAdminRequest::DeleteAllStorageContents { responder }) => {
                             call_chan.unbounded_send(CallType::Delete).unwrap();
-                            let _ = responder.send(&mut Ok(()));
+                            let _ = responder.send(Ok(()));
                         }
                         Some(fsys::StorageAdminRequest::GetStatus { responder }) => {
                             call_chan.unbounded_send(CallType::Status).unwrap();

@@ -134,7 +134,7 @@ impl TilesSession for GfxTilesSession {
                 );
 
                 // Finally, acknowledge the PresentView request.
-                if let Err(e) = responder.send(&mut Ok(())) {
+                if let Err(e) = responder.send(Ok(())) {
                     error!("Failed to send response for GraphicalPresenter.PresentView(): {}", e);
                     return Err(anyhow!(e));
                 }

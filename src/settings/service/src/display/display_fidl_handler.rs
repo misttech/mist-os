@@ -104,13 +104,13 @@ impl ErrorResponder for DisplaySetResponder {
     }
 
     fn respond(self: Box<Self>, error: fidl_fuchsia_settings::Error) -> Result<(), fidl::Error> {
-        self.send(&mut Err(error))
+        self.send(Err(error))
     }
 }
 
 impl request::Responder<Scoped<DisplaySetResult>> for DisplaySetResponder {
-    fn respond(self, Scoped(mut response): Scoped<DisplaySetResult>) {
-        let _ = self.send(&mut response);
+    fn respond(self, Scoped(response): Scoped<DisplaySetResult>) {
+        let _ = self.send(response);
     }
 }
 

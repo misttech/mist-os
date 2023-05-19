@@ -313,7 +313,7 @@ impl Blob {
         match self.stream.next().await {
             None => {}
             Some(Ok(fio::FileRequest::Close { responder })) => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
                 self.expect_done().await;
             }
             Some(other) => panic!("unexpected request: {other:?}"),
@@ -363,7 +363,7 @@ impl Blob {
         match self.stream.next().await {
             None => {}
             Some(Ok(fio::FileRequest::Close { responder })) => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             Some(other) => panic!("unexpected request: {other:?}"),
         }
@@ -408,7 +408,7 @@ impl Blob {
                     responder.send(Status::OK.into_raw(), &attr).unwrap();
                 }
                 Some(Ok(fio::FileRequest::Close { responder })) => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                     return;
                 }
                 None => {
@@ -423,7 +423,7 @@ impl Blob {
         match self.stream.next().await {
             Some(Ok(fio::FileRequest::Resize { length, responder })) => {
                 responder
-                    .send(&mut if status == Status::OK { Ok(()) } else { Err(status.into_raw()) })
+                    .send(if status == Status::OK { Ok(()) } else { Err(status.into_raw()) })
                     .unwrap();
 
                 length
@@ -500,7 +500,7 @@ impl Blob {
 
             match self.stream.next().await {
                 Some(Ok(fio::FileRequest::Close { responder })) => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("unexpected request: {other:?}"),
             }

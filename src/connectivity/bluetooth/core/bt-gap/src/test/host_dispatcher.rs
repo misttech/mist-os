@@ -131,7 +131,7 @@ async fn apply_settings_fails_host_removed() {
     let run_host = async move {
         match host_server.try_next().await {
             Ok(Some(HostRequest::SetConnectable { responder, .. })) => {
-                responder.send(&mut Err(sys::Error::Failed)).unwrap()
+                responder.send(Err(sys::Error::Failed)).unwrap()
             }
             x => panic!("Unexpected request: {:?}", x),
         }
@@ -168,7 +168,7 @@ async fn default_name_behavior() {
             match request.unwrap() {
                 HostRequest::SetLocalName { local_name, responder } => {
                     info!("Host Local name was set to {}", local_name);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 x => panic!("Unexpected request to host server: {:?}", x),
             }

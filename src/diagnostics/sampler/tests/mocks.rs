@@ -45,16 +45,16 @@ pub fn serve_reboot_controller(
                 controller::MockRebootControllerRequest::TriggerReboot { responder } => {
                     match proxy.on_reboot(reboot::RebootReason::UserRequest).await {
                         Err(_) => {
-                            responder.send(&mut Err(controller::RebootError::ClientError)).unwrap();
+                            responder.send(Err(controller::RebootError::ClientError)).unwrap();
                         }
                         Ok(()) => {
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         }
                     }
                 }
                 controller::MockRebootControllerRequest::CrashRebootChannel { responder } => {
                     drop(proxy);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
             }
         }

@@ -61,7 +61,7 @@ async fn run_metrics_service(
                 match event {
                     CreateMetricEventLogger { project_spec, logger, responder } => {
                         let handler = make_handler(project_spec, &loggers, logger);
-                        let () = responder.send(&mut Ok(()))?;
+                        let () = responder.send(Ok(()))?;
                         handler.await
                     }
                     CreateMetricEventLoggerWithExperiments {
@@ -72,7 +72,7 @@ async fn run_metrics_service(
                     } => {
                         // TODO(fxb/90740): Support experiment_ids.
                         let handler = make_handler(project_spec, &loggers, logger);
-                        let () = responder.send(&mut Ok(()))?;
+                        let () = responder.send(Ok(()))?;
                         handler.await
                     }
                 }
@@ -110,7 +110,7 @@ async fn handle_metric_event_logger(
                         .with_event_codes(event_codes)
                         .as_occurrence(count),
                 );
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 state
             }
             LogInteger { responder, metric_id, value, event_codes } => {
@@ -118,7 +118,7 @@ async fn handle_metric_event_logger(
                 state.log.push(
                     MetricEvent::builder(metric_id).with_event_codes(event_codes).as_integer(value),
                 );
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 state
             }
             LogIntegerHistogram { responder, metric_id, histogram, event_codes } => {
@@ -128,7 +128,7 @@ async fn handle_metric_event_logger(
                         .with_event_codes(event_codes)
                         .as_integer_histogram(histogram),
                 );
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 state
             }
             LogString { responder, metric_id, string_value, event_codes } => {
@@ -138,13 +138,13 @@ async fn handle_metric_event_logger(
                         .with_event_codes(event_codes)
                         .as_string(string_value),
                 );
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 state
             }
             LogMetricEvents { responder, mut events } => {
                 let state = &mut log.log_metric_events;
                 state.log.append(&mut events);
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 state
             }
         };

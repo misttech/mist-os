@@ -24,7 +24,7 @@ fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
                 futures::future::ready(match request.expect("stream socket request stream") {
                     fposix_socket::StreamSocketRequest::Close { responder } => {
                         let () = responder.control_handle().shutdown();
-                        let () = responder.send(&mut Ok(())).expect("send Close response");
+                        let () = responder.send(Ok(())).expect("send Close response");
                     }
                     fposix_socket::StreamSocketRequest::Query { responder } => {
                         let () = responder

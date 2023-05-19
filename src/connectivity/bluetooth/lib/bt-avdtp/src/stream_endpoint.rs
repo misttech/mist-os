@@ -941,7 +941,7 @@ mod tests {
                 responder,
             }))) => {
                 assert_eq!(bredr::A2dpDirectionPriority::Sink, priority);
-                responder.send(&mut Ok(())).expect("response to send cleanly");
+                responder.send(Ok(())).expect("response to send cleanly");
             }
             x => panic!("Expected a item to be ready on the request stream, got {:?}", x),
         };
@@ -956,7 +956,7 @@ mod tests {
                 responder,
             }))) => {
                 assert_eq!(bredr::A2dpDirectionPriority::Normal, priority);
-                responder.send(&mut Ok(())).expect("response to send cleanly");
+                responder.send(Ok(())).expect("response to send cleanly");
             }
             x => panic!("Expected a item to be ready on the request stream, got {:?}", x),
         };

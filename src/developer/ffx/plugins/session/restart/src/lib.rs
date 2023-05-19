@@ -31,7 +31,7 @@ mod test {
     async fn test_restart_session() {
         let proxy = setup_fake_restarter_proxy(|req| match req {
             RestarterRequest::Restart { responder } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
         });
 

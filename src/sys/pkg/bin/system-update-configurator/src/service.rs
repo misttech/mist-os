@@ -58,12 +58,12 @@ async fn handle_request(req: IncomingRequest, storage: &mut dyn Bridge) {
             }
         }
         IncomingRequest::OptOutAdmin(OptOutAdminRequest::Set { value, responder }) => {
-            let mut res = match storage.set_opt_out(value.into()).await {
+            let res = match storage.set_opt_out(value.into()).await {
                 Ok(()) => Ok(()),
                 Err(_) => Err(OptOutAdminError::Internal),
             };
 
-            if let Err(e) = responder.send(&mut res) {
+            if let Err(e) = responder.send(res) {
                 warn!("Could not respond to OptOut::Set request: {:#}", anyhow!(e));
             }
         }

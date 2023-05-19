@@ -1048,7 +1048,7 @@ mod test {
         time_offset: u64,
     ) -> ControlFlow<()> {
         assert_matches!(query.string_matcher, Some(value) if value == TARGET_NAME);
-        responder.send(&mut Ok(())).unwrap();
+        responder.send(Ok(())).unwrap();
         let mut target_stream = target_handle.into_stream().unwrap();
         while let Some(Ok(TargetRequest::OpenRemoteControl { remote_control, responder })) =
             target_stream.next().await
@@ -1075,7 +1075,7 @@ mod test {
         use_socket: bool,
         time_offset: u64,
     ) -> Option<ControlFlow<()>> {
-        responder.send(&mut Ok(())).unwrap();
+        responder.send(Ok(())).unwrap();
         let mut remote_control_stream = remote_control.into_stream().unwrap();
         if let Some(Ok(RemoteControlRequest::IdentifyHost { responder })) =
             remote_control_stream.next().await
@@ -1125,7 +1125,7 @@ mod test {
     ) -> Option<Option<ControlFlow<()>>> {
         assert_eq!(moniker, ARCHIVIST_MONIKER);
         assert_eq!(capability_name, ArchiveAccessorMarker::DEBUG_NAME);
-        responder.send(&mut Ok(())).unwrap();
+        responder.send(Ok(())).unwrap();
         let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
         let mut diagnostics_stream = server_end.into_stream().unwrap();
         if let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {

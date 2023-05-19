@@ -80,8 +80,8 @@ pub async fn serve_with_proxy<P: RealmProxy>(
             RealmProxy_Request::ConnectToNamedProtocol {
                 protocol, server_end, responder, ..
             } => {
-                let mut res = proxy.connect_to_named_protocol(protocol.as_str(), server_end);
-                responder.send(&mut res)?;
+                let res = proxy.connect_to_named_protocol(protocol.as_str(), server_end);
+                responder.send(res)?;
             }
         }
     }

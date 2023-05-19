@@ -124,8 +124,7 @@ impl ControllerService {
             }
             ControllerRequest::InformBatteryStatus { battery_status, responder } => {
                 responder.send(
-                    &mut self
-                        .controller
+                    self.controller
                         .inform_battery_status(battery_status)
                         .await
                         .map_err(ControllerError::from),
@@ -153,7 +152,7 @@ impl ControllerService {
                 }
             }
             ControllerRequest::SetAddressedPlayer { player_id: _, responder } => {
-                responder.send(&mut Err(ControllerError::CommandNotImplemented))?;
+                responder.send(Err(ControllerError::CommandNotImplemented))?;
             }
             ControllerRequest::SetAbsoluteVolume { requested_volume, responder } => {
                 responder.send(
@@ -166,8 +165,7 @@ impl ControllerService {
             }
             ControllerRequest::SendCommand { command, responder } => {
                 responder.send(
-                    &mut self
-                        .controller
+                    self.controller
                         .send_keypress(command.into_primitive())
                         .await
                         .map_err(ControllerError::from),

@@ -222,7 +222,7 @@ mod test {
             .into_connect()
             .expect("received unexpected request on stream");
 
-        responder.send(&mut Ok(())).expect("failed to send response");
+        responder.send(Ok(())).expect("failed to send response");
         let mut guest_stream = guest_server_end.into_stream().unwrap();
 
         assert!(executor.run_until_stalled(&mut fut).is_pending());

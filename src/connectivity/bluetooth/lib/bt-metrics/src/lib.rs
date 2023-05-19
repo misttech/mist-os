@@ -107,7 +107,7 @@ pub fn respond_to_metrics_req_for_test(
             event_codes,
             responder,
         } => {
-            let _ = responder.send(&mut Ok(())).unwrap();
+            let _ = responder.send(Ok(())).unwrap();
             metrics::MetricEvent {
                 metric_id,
                 event_codes,
@@ -120,7 +120,7 @@ pub fn respond_to_metrics_req_for_test(
             event_codes,
             responder,
         } => {
-            let _ = responder.send(&mut Ok(())).unwrap();
+            let _ = responder.send(Ok(())).unwrap();
             metrics::MetricEvent {
                 metric_id,
                 event_codes,

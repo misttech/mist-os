@@ -445,7 +445,7 @@ mod tests {
                 let proxy = advertised_peripheral.into_proxy()?;
                 let _ = proxy.on_connected(&peer, conn_client_end).await;
 
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
 
                 let mock = MockPeripheral {
                     _stream: stream,

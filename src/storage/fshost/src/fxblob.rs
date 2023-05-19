@@ -31,7 +31,7 @@ pub fn blobfs_verifier_service() -> Arc<service::Service> {
                         ..
                     }) => {
                         // TODO(fxbug.dev/126334): Implement by calling out to Fxfs' blob volume.
-                        responder.send(&mut Ok(())).unwrap_or_else(|e| {
+                        responder.send(Ok(())).unwrap_or_else(|e| {
                             tracing::error!("failed to send Verify response. error: {:?}", e);
                         });
                     }

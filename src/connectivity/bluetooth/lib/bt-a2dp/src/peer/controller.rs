@@ -43,11 +43,11 @@ impl Controller {
                 {
                     Ok(resp) => {
                         info!("SetConfiguration successful: {:?}", resp);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("SetConfiguration for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -58,11 +58,11 @@ impl Controller {
                             "Service capabilities from GetConfiguration: {:?}",
                             service_capabilities
                         );
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("GetConfiguration for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -73,11 +73,11 @@ impl Controller {
                             "Service capabilities from GetCapabilities {:?}",
                             service_capabilities
                         );
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("GetCapabilities for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -88,11 +88,11 @@ impl Controller {
                             "Service capabilities from GetAllCapabilities: {:?}",
                             service_capabilities
                         );
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("GetAllCapabilities for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -101,11 +101,11 @@ impl Controller {
                 match a2dp.stream_suspend(local_id).await {
                     Ok(_) => {
                         info!("SuspendStream was successful");
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("SuspendStream for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -120,13 +120,13 @@ impl Controller {
                 match a2dp.avdtp().reconfigure(endpoint_id, &generic_capabilities[..]).await {
                     Ok(resp) => {
                         info!("ReconfigureStream was successful {:?}", resp);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("ReconfigureStream for {} failed: {:?}", endpoint_id, e);
                         match e {
                             Error::RemoteRejected(e) if e.service_category().is_some() => {}
-                            _ => responder.send(&mut Err(PeerError::ProtocolError))?,
+                            _ => responder.send(Err(PeerError::ProtocolError))?,
                         }
                     }
                 }
@@ -135,11 +135,11 @@ impl Controller {
                 match a2dp.avdtp().close(endpoint_id).await {
                     Ok(resp) => {
                         info!("ReleaseStream was successful: {:?}", resp);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("ReleaseStream for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -147,11 +147,11 @@ impl Controller {
                 match a2dp.avdtp().start(&[endpoint_id.clone()]).await {
                     Ok(resp) => {
                         info!("StartStream was successful: {:?}", resp);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         error!("StartStream for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -159,11 +159,11 @@ impl Controller {
                 match a2dp.avdtp().abort(endpoint_id).await {
                     Ok(resp) => {
                         info!("AbortStream was successful: {:?}", resp);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         info!("AbortStream for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -171,11 +171,11 @@ impl Controller {
                 match a2dp.avdtp().open(endpoint_id).await {
                     Ok(resp) => {
                         info!("EstablishStream was successful: {:?}", resp);
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     Err(e) => {
                         info!("EstablishStream for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }
@@ -195,17 +195,17 @@ impl Controller {
                         {
                             Ok(resp) => {
                                 info!("ReconfigureStream was successful {:?}", resp);
-                                responder.send(&mut Ok(()))?;
+                                responder.send(Ok(()))?;
                             }
                             Err(e) => {
                                 info!("ReconfigureStream for {} failed: {:?}", endpoint_id, e);
-                                responder.send(&mut Err(PeerError::ProtocolError))?;
+                                responder.send(Err(PeerError::ProtocolError))?;
                             }
                         }
                     }
                     Err(e) => {
                         info!("SuspendStream for {} failed: {:?}", endpoint_id, e);
-                        responder.send(&mut Err(PeerError::ProtocolError))?;
+                        responder.send(Err(PeerError::ProtocolError))?;
                     }
                 }
             }

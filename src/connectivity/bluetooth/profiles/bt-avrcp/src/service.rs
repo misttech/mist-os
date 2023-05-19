@@ -63,7 +63,7 @@ where
                 match client.into_stream() {
                     Err(err) => {
                         warn!("Unable to take client stream: {:?}", err);
-                        responder.send(&mut Err(zx::Status::UNAVAILABLE.into_raw()))?;
+                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
                     }
                     Ok(client_stream) => {
                         let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
@@ -71,7 +71,7 @@ where
                         let controller = response.into_future().await?;
                         // BrowseController can remain connected after PeerManager disconnects.
                         spawn_browse_controller_fn(controller, client_stream).detach();
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                 }
             }
@@ -82,7 +82,7 @@ where
                 match client.into_stream() {
                     Err(err) => {
                         warn!("Unable to take client stream: {:?}", err);
-                        responder.send(&mut Err(zx::Status::UNAVAILABLE.into_raw()))?;
+                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
                     }
                     Ok(client_stream) => {
                         let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
@@ -90,7 +90,7 @@ where
                         let controller = response.into_future().await?;
                         // Controller can remain connected after PeerManager disconnects.
                         spawn_controller_fn(controller, client_stream).detach();
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                 }
             }
@@ -104,13 +104,11 @@ where
                             );
                         sender.try_send(register_absolute_volume_handler_request)?;
                         match response.into_future().await? {
-                            Ok(_) => responder.send(&mut Ok(()))?,
-                            Err(_) => {
-                                responder.send(&mut Err(zx::Status::ALREADY_BOUND.into_raw()))?
-                            }
+                            Ok(_) => responder.send(Ok(()))?,
+                            Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
                         }
                     }
-                    Err(_) => responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?,
+                    Err(_) => responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?,
                 };
             }
             PeerManagerRequest::RegisterTargetHandler { handler, responder } => {
@@ -121,13 +119,11 @@ where
                             ServiceRequest::new_register_target_handler_request(target_handler);
                         sender.try_send(register_target_handler_request)?;
                         match response.into_future().await? {
-                            Ok(_) => responder.send(&mut Ok(()))?,
-                            Err(_) => {
-                                responder.send(&mut Err(zx::Status::ALREADY_BOUND.into_raw()))?
-                            }
+                            Ok(_) => responder.send(Ok(()))?,
+                            Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
                         }
                     }
-                    Err(_) => responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?,
+                    Err(_) => responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?,
                 };
             }
         }
@@ -172,7 +168,7 @@ where
                 match client.into_stream() {
                     Err(err) => {
                         warn!("Unable to take test client stream {:?}", err);
-                        responder.send(&mut Err(zx::Status::UNAVAILABLE.into_raw()))?;
+                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
                     }
                     Ok(client_stream) => {
                         let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
@@ -180,7 +176,7 @@ where
                         let controller = response.into_future().await?;
                         // BrowseControllerExt can remain connected after PeerManager disconnects.
                         spawn_browse_controller_fn(controller, client_stream).detach();
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                 }
             }
@@ -191,7 +187,7 @@ where
                 match client.into_stream() {
                     Err(err) => {
                         warn!("Unable to take test client stream {:?}", err);
-                        responder.send(&mut Err(zx::Status::UNAVAILABLE.into_raw()))?;
+                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
                     }
                     Ok(client_stream) => {
                         let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
@@ -199,7 +195,7 @@ where
                         let controller = response.into_future().await?;
                         // ControllerExt can remain connected after PeerManager disconnects.
                         spawn_controller_fn(controller, client_stream).detach();
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                 }
             }

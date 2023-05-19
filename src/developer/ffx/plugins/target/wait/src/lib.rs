@@ -121,7 +121,7 @@ mod tests {
                             std::future::pending::<()>().await;
                         })
                         .detach();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     e => panic!("unexpected request: {:?}", e),
                 }
@@ -137,7 +137,7 @@ mod tests {
                     TargetRequest::OpenRemoteControl { responder, remote_control, .. } => {
                         if responsive_rcs {
                             spawn_remote_control(remote_control.into_stream().unwrap());
-                            responder.send(&mut Ok(())).expect("responding to open rcs")
+                            responder.send(Ok(())).expect("responding to open rcs")
                         } else {
                             std::future::pending::<()>().await;
                         }
@@ -156,7 +156,7 @@ mod tests {
                 match req {
                     TargetCollectionRequest::OpenTarget { responder, target_handle, .. } => {
                         spawn_target_handler(target_handle.into_stream().unwrap(), responsive_rcs);
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     e => panic!("unexpected request: {:?}", e),
                 }

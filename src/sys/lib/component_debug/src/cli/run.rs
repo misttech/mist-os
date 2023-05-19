@@ -241,7 +241,7 @@ mod test {
                         assert_eq!(expected_parent_moniker, parent_moniker);
                         assert_eq!(expected_name, child.name);
                         assert_eq!(expected_collection, child.collection.unwrap());
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
                 }
@@ -260,7 +260,7 @@ mod test {
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -269,7 +269,7 @@ mod test {
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -282,7 +282,7 @@ mod test {
                     responder,
                 } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -310,7 +310,7 @@ mod test {
                     assert_eq!(expected_parent_moniker, parent_moniker);
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -328,7 +328,7 @@ mod test {
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
-                    responder.send(&mut Err(fsys::CreateError::InstanceAlreadyExists)).unwrap();
+                    responder.send(Err(fsys::CreateError::InstanceAlreadyExists)).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -357,7 +357,7 @@ mod test {
                     assert_eq!(expected_parent_moniker, parent_moniker);
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -375,7 +375,7 @@ mod test {
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -384,7 +384,7 @@ mod test {
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }
@@ -397,7 +397,7 @@ mod test {
                     responder,
                 } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
             }

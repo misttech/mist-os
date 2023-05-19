@@ -343,12 +343,12 @@ impl GattService {
         {
             (peer_id.into(), handle, value)
         } else {
-            let _ = responder.send(&mut Err(gatt::Error::InvalidParameters));
+            let _ = responder.send(Err(gatt::Error::InvalidParameters));
             return None;
         };
 
-        let response: GattServiceResponder = Box::new(|mut result| {
-            let _ = responder.send(&mut result);
+        let response: GattServiceResponder = Box::new(|result| {
+            let _ = responder.send(result);
         });
         match handle {
             KEY_BASED_PAIRING_CHARACTERISTIC_HANDLE => {
@@ -468,7 +468,7 @@ pub(crate) mod tests {
                 x => panic!("Expected ready request but got: {:?}", x),
             };
         // Upstream server responds positively.
-        let _ = responder.send(&mut Ok(()));
+        let _ = responder.send(Ok(()));
 
         // Publish service request should resolve successfully.
         let publish_result =
@@ -495,7 +495,7 @@ pub(crate) mod tests {
                     .into_publish_service()
                     .expect("only possible request");
                 // Respond positively.
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
                 // Publish service request should resolve.
                 let gatt_service = publish_fut.await.expect("should resolve ok");
                 (gatt_service, local_service_client.into_proxy().unwrap())

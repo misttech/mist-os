@@ -201,7 +201,7 @@ mod tests {
         let stream_fut = async move {
             match stream.try_next().await {
                 Ok(Some(VirtualCameraDeviceRequest::AddToDeviceWatcher { responder })) => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 err => panic!("Err in request handler: {:?}", err),
             }
@@ -228,7 +228,7 @@ mod tests {
             match stream.try_next().await {
                 Ok(Some(VirtualCameraDeviceRequest::AddToDeviceWatcher { responder })) => {
                     responder.send(
-                      &mut Err(fidl_fuchsia_camera_test_virtualcamera::
+                      Err(fidl_fuchsia_camera_test_virtualcamera::
                         Error::AlreadyAddedToDeviceWatcher
                       )).unwrap();
                 }

@@ -36,7 +36,7 @@ impl DeprecatedConfigurator {
                                 Err(e) => {
                                     error!("failed to parse MAC address: {:?}", e);
                                     match responder.send(
-                                        &mut Err(fidl_deprecated::SuggestMacAddressError::InvalidArguments)
+                                        Err(fidl_deprecated::SuggestMacAddressError::InvalidArguments)
                                     ) {
                                         Ok(()) => {},
                                         Err(e) => error!(
@@ -49,7 +49,7 @@ impl DeprecatedConfigurator {
                             let mut phy_manager = self.phy_manager.lock().await;
                             phy_manager.suggest_ap_mac(mac);
 
-                            match responder.send(&mut Ok(())) {
+                            match responder.send(Ok(())) {
                                 Ok(()) => {}
                                 Err(e) => {
                                     error!("could not send SuggestAccessPointMacAddress response: {:?}", e);

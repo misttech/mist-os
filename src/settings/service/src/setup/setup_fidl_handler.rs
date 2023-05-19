@@ -22,7 +22,7 @@ impl ErrorResponder for SetupSetResponder {
     }
 
     fn respond(self: Box<Self>, error: fidl_fuchsia_settings::Error) -> Result<(), fidl::Error> {
-        self.send(&mut Err(error))
+        self.send(Err(error))
     }
 }
 
@@ -82,8 +82,8 @@ impl From<SetupInfo> for SetupSettings {
 }
 
 impl request::Responder<Scoped<SetupSetResult>> for SetupSetResponder {
-    fn respond(self, Scoped(mut response): Scoped<SetupSetResult>) {
-        let _ = self.send(&mut response).ok();
+    fn respond(self, Scoped(response): Scoped<SetupSetResult>) {
+        let _ = self.send(response).ok();
     }
 }
 

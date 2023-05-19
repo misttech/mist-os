@@ -228,7 +228,7 @@ mod tests {
                         assert_eq!(dev_offset, 0);
                         assert_eq!(length, content.len() as u64);
                         vmo.write(content, vmo_offset).unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => unreachable!(),
                 }

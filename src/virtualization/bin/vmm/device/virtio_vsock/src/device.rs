@@ -597,7 +597,7 @@ mod tests {
             HostVsockEndpointRequest::Listen { port, acceptor, responder } => {
                 let result = device.listen(port, acceptor.into_proxy().unwrap());
                 responder
-                    .send(&mut result.map_err(|err| err.into_raw()))
+                    .send(result.map_err(|err| err.into_raw()))
                     .expect("failed to send listen response");
             }
             HostVsockEndpointRequest::Connect { guest_port, responder } => device

@@ -291,7 +291,7 @@ mod tests {
                 assert_eq!(Some(OTA_COMPONENT_URL.to_string()), decl.url);
                 assert_eq!(Some(StartupMode::Lazy), decl.startup);
                 assert_eq!(CreateChildArgs::default(), args);
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             });
 
             ota_manager2.complete_ota(OtaStatus::Succeeded).await;
@@ -316,7 +316,7 @@ mod tests {
             assert_matches!(stream.next().await.unwrap().unwrap(), RealmRequest::CreateChild {
                 responder, ..
             } => {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             });
 
             ota_manager2.complete_ota(OtaStatus::Failed).await;
@@ -341,7 +341,7 @@ mod tests {
             assert_matches!(stream.next().await.unwrap().unwrap(), RealmRequest::CreateChild {
                 responder, ..
             } => {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             });
 
             // complete_ota should have no effect on error state.
@@ -369,7 +369,7 @@ mod tests {
             } => {
                 assert_eq!(CHILD_NAME.to_string(), child.name);
                 assert_eq!(Some(COLLECTION_NAME.to_string()), child.collection);
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             });
         })
         .detach();
@@ -394,7 +394,7 @@ mod tests {
             } => {
                 assert_eq!(CHILD_NAME.to_string(), child.name);
                 assert_eq!(Some(COLLECTION_NAME.to_string()), child.collection);
-                responder.send(&mut Err(Error::Internal)).unwrap();
+                responder.send(Err(Error::Internal)).unwrap();
             });
         })
         .detach();
@@ -430,7 +430,7 @@ mod tests {
             assert_eq!(Some(OTA_COMPONENT_URL.to_string()), decl.url);
             assert_eq!(Some(StartupMode::Lazy), decl.startup);
             assert_eq!(CreateChildArgs::default(), args);
-            responder.send(&mut Ok(())).unwrap();
+            responder.send(Ok(())).unwrap();
         });
 
         fasync::Task::local(async move {
@@ -444,7 +444,7 @@ mod tests {
         } => {
             assert_eq!(CHILD_NAME.to_string(), child.name);
             assert_eq!(Some(COLLECTION_NAME.to_string()), child.collection);
-            responder.send(&mut Ok(())).unwrap();
+            responder.send(Ok(())).unwrap();
         });
     }
 

@@ -37,7 +37,7 @@ mod test {
     async fn test_run_command() {
         let proxy = setup_fake_intl_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             IntlRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -79,7 +79,7 @@ mod test {
     async fn validate_intl_set_output(expected_intl: Intl) -> Result<()> {
         let proxy = setup_fake_intl_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             IntlRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

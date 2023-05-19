@@ -71,7 +71,7 @@ mod test {
         let proxy = setup_fake_manager_proxy(|req| match req {
             ManagerRequest::ProposeElement { spec, responder, .. } => {
                 assert_eq!(spec.component_url.unwrap(), TEST_ELEMENT_URL.to_string());
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
         });
 
@@ -86,7 +86,7 @@ mod test {
 
         let proxy = setup_fake_manager_proxy(|req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
         });
 
@@ -101,7 +101,7 @@ mod test {
 
         let proxy = setup_fake_manager_proxy(move |req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
         });
 

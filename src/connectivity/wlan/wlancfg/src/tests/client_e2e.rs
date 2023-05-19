@@ -376,7 +376,7 @@ fn prepare_client_interface(
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
             iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
         })) => {
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
             let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
 
             // Send back feature support information
@@ -437,7 +437,7 @@ fn prepare_client_interface(
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
         })) => {
             // Send back a positive acknowledgement.
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
             sme_server
         }
     );
@@ -456,7 +456,7 @@ fn prepare_client_interface(
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
             iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
         })) => {
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
             let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
 
             // Send back feature support information
@@ -493,7 +493,7 @@ fn prepare_client_interface(
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
         })) => {
             // Send back a positive acknowledgement.
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
             sme_server
         }
     );
@@ -551,7 +551,7 @@ fn process_stash_write<BackgroundFut>(
     assert_variant!(
         stash_flush_req,
         Some(Ok(fidl_stash::StoreAccessorRequest::Flush{responder})) => {
-            responder.send(&mut Ok(())).expect("failed to send stash response");
+            responder.send(Ok(())).expect("failed to send stash response");
         }
     );
     info!("finished stash writing")
@@ -724,7 +724,7 @@ fn save_and_connect(
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
         })) => {
             // Send back a positive acknowledgement.
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
             sme_server
         }
     );
@@ -1438,7 +1438,7 @@ fn test_autoconnect_to_saved_network() {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
         })) => {
             // Send back a positive acknowledgement.
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
             sme_server
         }
     );
@@ -1666,7 +1666,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
             })) => {
                 // Send back a positive acknowledgement.
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
                 sme_server
             }
         );

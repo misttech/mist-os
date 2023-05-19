@@ -26,7 +26,7 @@ impl<T: Capability + TryFrom<zx::Handle>> Sender<T> {
                         Ok(capability) => capability,
                         Err(_) => {
                             responder
-                                .send(&mut Err(fbedrock::SenderError::BadHandle))
+                                .send(Err(fbedrock::SenderError::BadHandle))
                                 .context("failed to send response")?;
                             continue;
                         }
@@ -37,7 +37,7 @@ impl<T: Capability + TryFrom<zx::Handle>> Sender<T> {
                         continue;
                     }
 
-                    responder.send(&mut Ok(())).context("failed to send response")?;
+                    responder.send(Ok(())).context("failed to send response")?;
                 }
             }
         }

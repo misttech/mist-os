@@ -195,7 +195,7 @@ mod test {
         let callback = move |req| {
             match req {
                 ComponentRegistryRequest::Register { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 ComponentRegistryRequest::GetVulkanSocket { responder, .. } => {
                     // Create an arbitrary, valid socket to test as a return value.
@@ -203,7 +203,7 @@ mod test {
                     responder.send(Ok(Some(s))).unwrap();
                 }
                 ComponentRegistryRequest::Unregister { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
             };
         };
@@ -232,10 +232,10 @@ mod test {
         let callback = move |req| {
             match req {
                 ListenerRequest::Listen { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 ListenerRequest::Shutdown { responder, .. } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
             };
         };

@@ -111,7 +111,7 @@ mod test {
                 Ok(Some(fio::DirectoryRequest::Unlink { name: a, options: o, responder })) => {
                     assert_eq!(a, "foo");
                     assert_eq!(o, fio::UnlinkOptions::default());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 request => {
                     panic!("did not get delete request; received: {:?}", request)

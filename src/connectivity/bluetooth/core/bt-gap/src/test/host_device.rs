@@ -56,7 +56,7 @@ async fn host_device_set_local_name() -> Result<(), Error> {
     let expect_fidl = expect_call(server.clone(), |_, e| match e {
         HostRequest::SetLocalName { local_name, responder } => {
             info.write().local_name = Some(local_name);
-            responder.send(&mut Ok(()))?;
+            responder.send(Ok(()))?;
             Ok(())
         }
         _ => Err(format_err!("Unexpected!")),
@@ -87,7 +87,7 @@ async fn test_discovery_session() -> Result<(), Error> {
     let expect_fidl = expect_call(server.clone(), |_, e| match e {
         HostRequest::StartDiscovery { responder } => {
             info.write().discovering = true;
-            responder.send(&mut Ok(()))?;
+            responder.send(Ok(()))?;
             Ok(())
         }
         _ => Err(format_err!("Unexpected!")),

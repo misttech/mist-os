@@ -188,7 +188,7 @@ async fn serve_registry(
                     timeout: _,
                     responder,
                 } => {
-                    let mut response = match status {
+                    let response = match status {
                         zx::Status::OK => {
                             fuzzers.connect(&fuzzer_url, controller);
                             Ok(())
@@ -198,14 +198,14 @@ async fn serve_registry(
                             Err(status.into_raw())
                         }
                     };
-                    responder.send(&mut response)
+                    responder.send(response)
                 }
                 fuzz::RegistryRequest::Disconnect { fuzzer_url, responder } => {
-                    let mut response = match fuzzers.remove(&fuzzer_url) {
+                    let response = match fuzzers.remove(&fuzzer_url) {
                         zx::Status::OK => Ok(()),
                         status => Err(status.into_raw()),
                     };
-                    responder.send(&mut response)
+                    responder.send(response)
                 }
             }
             .map_err(Error::msg)

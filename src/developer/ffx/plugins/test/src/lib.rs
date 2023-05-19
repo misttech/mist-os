@@ -393,8 +393,7 @@ mod test {
                             responder,
                         } => {
                             server_channels.push(server.into_channel());
-                            let mut r = Ok(());
-                            responder.send(&mut r).expect("error sending EchoString response");
+                            responder.send(Ok(())).expect("error sending EchoString response");
                         }
 
                         fremotecontrol::RemoteControlRequest::RootRealmQuery {
@@ -402,8 +401,7 @@ mod test {
                             responder,
                         } => {
                             server_channels.push(server.into_channel());
-                            let mut r = Ok(());
-                            responder.send(&mut r).expect("error sending EchoString response");
+                            responder.send(Ok(())).expect("error sending EchoString response");
                         }
                         _ => {
                             panic!("Not implemented: {:?}", request);

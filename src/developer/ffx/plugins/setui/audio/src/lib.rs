@@ -39,7 +39,7 @@ mod test {
     async fn test_run_command() {
         let proxy = setup_fake_audio_proxy(move |req| match req {
             AudioRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             AudioRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -78,7 +78,7 @@ mod test {
     async fn validate_audio_set_output(expected_audio: Audio) -> Result<()> {
         let proxy = setup_fake_audio_proxy(move |req| match req {
             AudioRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             AudioRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

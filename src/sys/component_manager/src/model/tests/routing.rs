@@ -161,7 +161,7 @@ async fn use_framework_service() {
                                 .name()
                                 .to_string(),
                         );
-                        responder.send(&mut Ok(()))?;
+                        responder.send(Ok(()))?;
                     }
                     _ => {}
                 }

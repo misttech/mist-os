@@ -105,20 +105,20 @@ impl<H: Hypervisor> FidlServer<H> {
         match request {
             GuestLifecycleRequest::Create { guest_config, responder } => {
                 if self.run_responder.is_some() {
-                    if let Err(e) = responder.send(&mut Err(GuestError::AlreadyRunning)) {
+                    if let Err(e) = responder.send(Err(GuestError::AlreadyRunning)) {
                         tracing::warn!(%e, "Failed to send GuestLifecycle.Create response");
                     }
                     return;
                 }
                 match VirtualMachine::new(self.hypervisor.clone(), guest_config) {
                     Err(e) => {
-                        if let Err(e) = responder.send(&mut Err(e)) {
+                        if let Err(e) = responder.send(Err(e)) {
                             tracing::warn!(%e, "Failed to send GuestLifecycle.Create response");
                         }
                     }
                     Ok(virtual_machine) => {
                         self.virtual_machine = Some(virtual_machine);
-                        if let Err(e) = responder.send(&mut Ok(())) {
+                        if let Err(e) = responder.send(Ok(())) {
                             tracing::warn!(%e, "Failed to send GuestLifecycle.Create response");
                         }
                     }
@@ -136,19 +136,19 @@ impl<H: Hypervisor> FidlServer<H> {
             }
             GuestLifecycleRequest::Run { responder } => {
                 if self.virtual_machine.is_none() {
-                    if let Err(e) = responder.send(&mut Err(GuestError::NotCreated)) {
+                    if let Err(e) = responder.send(Err(GuestError::NotCreated)) {
                         tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
                     }
                     return;
                 }
                 if self.run_responder.is_some() {
-                    if let Err(e) = responder.send(&mut Err(GuestError::AlreadyRunning)) {
+                    if let Err(e) = responder.send(Err(GuestError::AlreadyRunning)) {
                         tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
                     }
                     return;
                 }
                 if let Err(e) = self.virtual_machine.as_mut().unwrap().start_primary_vcpu().await {
-                    if let Err(e) = responder.send(&mut Err(e)) {
+                    if let Err(e) = responder.send(Err(e)) {
                         tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
                     }
                     return;
@@ -184,11 +184,11 @@ impl<H: Hypervisor> FidlServer<H> {
         }
     }
 
-    fn destroy_and_respond(&mut self, mut result: Result<(), GuestError>) {
+    fn destroy_and_respond(&mut self, result: Result<(), GuestError>) {
         self.guest_fidl.clear();
         self.virtual_machine = None;
         if let Some(responder) = self.run_responder.take() {
-            responder.send(&mut result).unwrap();
+            responder.send(result).unwrap();
         }
     }
 }

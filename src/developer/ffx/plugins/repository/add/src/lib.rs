@@ -81,7 +81,7 @@ mod tests {
                 match req {
                     RepositoryRegistryRequest::AddRepository { name, repository, responder } => {
                         sender.send((name, repository)).await.unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     other => panic!("Unexpected request: {:?}", other),
                 }

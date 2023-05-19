@@ -129,9 +129,9 @@ pub fn serve_realm_query(
                     if let Some(dir) = dirs.get(&(moniker, dir_type)) {
                         let path = dir.path().join(path).display().to_string();
                         fuchsia_fs::node::open_channel_in_namespace(&path, flags, object).unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     } else {
-                        responder.send(&mut Err(fsys::OpenError::NoSuchDir)).unwrap();
+                        responder.send(Err(fsys::OpenError::NoSuchDir)).unwrap();
                     }
                 }
                 _ => panic!("Unexpected RealmQuery request"),

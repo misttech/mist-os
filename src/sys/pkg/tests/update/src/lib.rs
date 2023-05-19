@@ -220,7 +220,7 @@ impl MockUpdateManagerService {
                         let states = receiver.next().await.unwrap();
                         fasync::Task::spawn(Self::send_states(proxy, states)).detach();
                     }
-                    responder.send(&mut self.check_now_response.lock()).unwrap();
+                    responder.send(*self.check_now_response.lock()).unwrap();
                 }
 
                 fidl_update::ManagerRequest::PerformPendingReboot { responder: _ } => {

@@ -53,7 +53,7 @@ impl DeviceIdRequestToken {
 
     // Notifies the `responder` when the request has been closed.
     fn notify_responder(responder: di::DeviceIdentificationSetDeviceIdentificationResponder) {
-        let _ = responder.send(&mut Ok(()));
+        let _ = responder.send(Ok(()));
         info!("DeviceIdRequestToken successfully closed");
     }
 }
@@ -98,7 +98,7 @@ impl Drop for DeviceIdRequestToken {
     fn drop(&mut self) {
         if let Some(responder) = self.responder.take() {
             warn!("DeviceIdRequestToken for service {:?} dropped unexpectedly", self.service);
-            let _ = responder.send(&mut Err(fuchsia_zircon::Status::CANCELED.into_raw()));
+            let _ = responder.send(Err(fuchsia_zircon::Status::CANCELED.into_raw()));
         }
     }
 }

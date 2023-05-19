@@ -113,7 +113,7 @@ mod test {
                 alias_conflict_mode: _,
             } => {
                 sender.take().unwrap().send(target_info).unwrap();
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
         });
@@ -255,7 +255,7 @@ mod test {
                 responder,
                 alias_conflict_mode: _,
             } => {
-                responder.send(&mut Err(RepositoryError::TargetCommunicationFailure)).unwrap();
+                responder.send(Err(RepositoryError::TargetCommunicationFailure)).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
         });

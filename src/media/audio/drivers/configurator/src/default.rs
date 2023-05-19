@@ -1561,8 +1561,7 @@ mod tests {
                             Some(type_specific) => match type_specific {
                                 TypeSpecificElementState::Gain(gain) => {
                                     self.gain = gain.gain;
-                                    let mut ret = Ok(());
-                                    return Ok(responder.send(&mut ret)?);
+                                    return Ok(responder.send(Ok(()))?);
                                 }
                                 _ => panic!("Must be of type gain"),
                             },

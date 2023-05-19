@@ -145,7 +145,7 @@ mod tests {
                     assert_eq!(decl.url.unwrap(), child_url);
                     assert_eq!(&collection.name, child_collection);
 
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -169,7 +169,7 @@ mod tests {
                     args: _,
                     responder,
                 } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -191,7 +191,7 @@ mod tests {
                     args: _,
                     responder,
                 } => {
-                    let _ = responder.send(&mut Err(fcomponent::Error::Internal));
+                    let _ = responder.send(Err(fcomponent::Error::Internal));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -213,7 +213,7 @@ mod tests {
                     assert_eq!(child.name, child_name);
                     assert_eq!(child.collection, Some(child_collection.to_string()));
 
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -236,7 +236,7 @@ mod tests {
                     exposed_dir: _,
                     responder,
                 } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -274,7 +274,7 @@ mod tests {
                         exposed_dir_server.into_stream().unwrap(),
                         directory_request_handler,
                     );
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -319,7 +319,7 @@ mod tests {
                     exposed_dir: _,
                     responder,
                 } => {
-                    let _ = responder.send(&mut Err(fcomponent::Error::Internal));
+                    let _ = responder.send(Err(fcomponent::Error::Internal));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -341,7 +341,7 @@ mod tests {
                     assert_eq!(child.name, child_name);
                     assert_eq!(child.collection, Some(child_collection.to_string()));
 
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }

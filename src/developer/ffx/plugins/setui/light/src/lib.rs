@@ -67,7 +67,7 @@ mod test {
     async fn test_run_command() {
         let proxy = setup_fake_light_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             LightRequest::WatchLightGroups { .. } => {
                 panic!("Unexpected call to watch light groups");
@@ -109,7 +109,7 @@ mod test {
     async fn validate_light_set_output(expected_light: LightGroup) -> Result<()> {
         let proxy = setup_fake_light_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             LightRequest::WatchLightGroups { .. } => {
                 panic!("Unexpected call to watch light groups");

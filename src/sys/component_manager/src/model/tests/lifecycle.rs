@@ -808,8 +808,7 @@ async fn on_terminate_with_failed_reboot_panics() {
     test.mock_runner.abort_controller(&info.channel_id);
     match receiver.next().await.unwrap() {
         fstatecontrol::AdminRequest::Reboot { responder, .. } => {
-            let mut res = Err(zx::sys::ZX_ERR_INTERNAL);
-            responder.send(&mut res).unwrap();
+            responder.send(Err(zx::sys::ZX_ERR_INTERNAL)).unwrap();
         }
         _ => panic!("unexpected request"),
     };

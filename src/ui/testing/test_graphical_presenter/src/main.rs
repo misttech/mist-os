@@ -241,12 +241,12 @@ impl TestGraphicalPresenter {
                 let viewport_creation_token = match view_spec.viewport_creation_token {
                     Some(token) => token,
                     None => {
-                        responder.send(&mut Err(PresentViewError::InvalidArgs))?;
+                        responder.send(Err(PresentViewError::InvalidArgs))?;
                         return Err(anyhow!("No viewport creation token was provided"));
                     }
                 };
                 // The request is OK, so complete the request.
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
 
                 let view_controller_request_stream =
                     view_controller_request.map(|s| s.into_stream().ok()).flatten();

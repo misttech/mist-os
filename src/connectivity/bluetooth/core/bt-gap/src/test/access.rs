@@ -54,7 +54,7 @@ async fn test_pair() -> Result<(), Error> {
         host_server.try_for_each(move |req| {
             assert_matches!(&req, HostRequest::Pair { id, options, responder: _ } if *id == req_id.into() && PairingOptions::from(options) == req_opts);
             if let HostRequest::Pair { id: _, options: _, responder } = req {
-                assert_matches!(responder.send(&mut Ok(())), Ok(()));
+                assert_matches!(responder.send(Ok(())), Ok(()));
             }
             future::ok(())
         }).await.map_err(|e| e.into())

@@ -234,7 +234,7 @@ impl GuestManager {
                     match request {
                         GuestManagerRequest::Launch { guest_config, controller, responder } => {
                             if self.is_guest_started() {
-                                send_checked!(responder, &mut Err(GuestManagerError::AlreadyRunning));
+                                send_checked!(responder, Err(GuestManagerError::AlreadyRunning));
                                 continue;
                             }
 
@@ -242,7 +242,7 @@ impl GuestManager {
                             let config = self.get_merged_config(guest_config);
                             if let Err(err) = config {
                                 tracing::error!(%err, "Could not create guest config");
-                                send_checked!(responder, &mut Err(GuestManagerError::BadConfig));
+                                send_checked!(responder, Err(GuestManagerError::BadConfig));
                                 continue;
                             }
                             let config = config.unwrap();
@@ -257,13 +257,13 @@ impl GuestManager {
 
                             if let Err(err) = create {
                                 tracing::error!(?err, "Could not create VMM");
-                                send_checked!(responder, &mut Err(GuestManagerError::StartFailure));
+                                send_checked!(responder, Err(GuestManagerError::StartFailure));
                                 self.handle_guest_stopped(create);
                                 continue;
                             }
 
                             self.status = GuestStatus::Running;
-                            send_checked!(responder, &mut Ok(()));
+                            send_checked!(responder, Ok(()));
                             // Run returns when the guest has stopped. Push this long running
                             // async call into a FuturesUnordered to be polled by the select.
                             assert!(run_futures.len() == 1);
@@ -287,9 +287,9 @@ impl GuestManager {
                         }
                         GuestManagerRequest::Connect { controller, responder } => {
                             if !self.is_guest_started() {
-                                send_checked!(responder, &mut Err(GuestManagerError::NotRunning));
+                                send_checked!(responder, Err(GuestManagerError::NotRunning));
                             } else {
-                                send_checked!(responder, &mut GuestManager::connect(&lifecycle, controller)
+                                send_checked!(responder, GuestManager::connect(&lifecycle, controller)
                                           .map_err(|_| GuestManagerError::NotRunning ));
                             }
                         }
@@ -592,7 +592,7 @@ mod tests {
             match req {
                 GuestLifecycleRequest::Create { guest_config, responder } => {
                     self.state = VmmState::NotRunning;
-                    responder.send(&mut Ok(())).expect("stream should not be closed");
+                    responder.send(Ok(())).expect("stream should not be closed");
                 }
                 GuestLifecycleRequest::Bind { guest, control_handle } => {
                     ();
@@ -614,7 +614,7 @@ mod tests {
             self.running_vmm
                 .take()
                 .expect("VMM should be running")
-                .send(&mut Ok(()))
+                .send(Ok(()))
                 .expect("stream should not be closed");
         }
 
@@ -936,7 +936,7 @@ mod tests {
                 match manager.vmm.borrow_mut().next().await {
                     GuestLifecycleRequest::Create { guest_config, responder } => {
                         responder
-                            .send(&mut Err(GuestError::InternalError))
+                            .send(Err(GuestError::InternalError))
                             .expect("stream should not be closed");
                     }
                     req => panic!("vmm: expected create, got {:?}", req),

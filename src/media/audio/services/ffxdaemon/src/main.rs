@@ -726,7 +726,7 @@ impl AudioDaemon {
 
                     device.set_gain(gain_state)?;
                     responder
-                        .send(&mut Ok(()))
+                        .send(Ok(()))
                         .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                 }
             };
@@ -751,7 +751,7 @@ pub async fn stop_listener(
         Ok(Some(request)) => match request {
             fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerRequest::Cancel { responder } => {
                 stop_signal.store(true, std::sync::atomic::Ordering::SeqCst);
-                responder.send(&mut Ok(())).context("FIDL error with stop request")
+                responder.send(Ok(())).context("FIDL error with stop request")
             }
         },
         Ok(None) | Err(_) => {

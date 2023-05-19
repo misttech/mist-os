@@ -32,8 +32,8 @@ struct AudioSetTraceResponder {
 }
 
 impl request::Responder<Scoped<AudioSetResult>> for AudioSetTraceResponder {
-    fn respond(self, Scoped(mut response): Scoped<AudioSetResult>) {
-        let _ = self.responder.send(&mut response);
+    fn respond(self, Scoped(response): Scoped<AudioSetResult>) {
+        let _ = self.responder.send(response);
     }
 }
 
@@ -43,13 +43,13 @@ impl ErrorResponder for AudioSetTraceResponder {
     }
 
     fn respond(self: Box<Self>, error: fidl_fuchsia_settings::Error) -> Result<(), fidl::Error> {
-        self.responder.send(&mut Err(error))
+        self.responder.send(Err(error))
     }
 }
 
 impl request::Responder<Scoped<AudioSetResult>> for AudioSetResponder {
-    fn respond(self, Scoped(mut response): Scoped<AudioSetResult>) {
-        let _ = self.send(&mut response);
+    fn respond(self, Scoped(response): Scoped<AudioSetResult>) {
+        let _ = self.send(response);
     }
 }
 

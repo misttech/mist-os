@@ -160,8 +160,8 @@ impl CryptService {
                             key,
                             responder,
                         } => {
-                            let mut response = self.add_wrapping_key(wrapping_key_id, key);
-                            responder.send(&mut response).unwrap_or_else(|e| {
+                            let response = self.add_wrapping_key(wrapping_key_id, key);
+                            responder.send(response).unwrap_or_else(|e| {
                                 error!(
                                     error = e.as_value(),
                                     "Failed to send AddWrappingKey response"
@@ -173,8 +173,8 @@ impl CryptService {
                             wrapping_key_id,
                             responder,
                         } => {
-                            let mut response = self.set_active_key(purpose, wrapping_key_id);
-                            responder.send(&mut response).unwrap_or_else(|e| {
+                            let response = self.set_active_key(purpose, wrapping_key_id);
+                            responder.send(response).unwrap_or_else(|e| {
                                 error!(error = e.as_value(), "Failed to send SetActiveKey response")
                             });
                         }
@@ -182,8 +182,8 @@ impl CryptService {
                             wrapping_key_id,
                             responder,
                         } => {
-                            let mut response = self.forget_wrapping_key(wrapping_key_id);
-                            responder.send(&mut response).unwrap_or_else(|e| {
+                            let response = self.forget_wrapping_key(wrapping_key_id);
+                            responder.send(response).unwrap_or_else(|e| {
                                 error!(
                                     error = e.as_value(),
                                     "Failed to send ForgetWrappingKey response"

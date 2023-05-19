@@ -809,7 +809,7 @@ mod tests {
                     assert_eq!(nonce, Some([8_u8; 32]));
                     assert_eq!(response, Some(vec![1, 2, 3]));
                     assert_eq!(signature, Some(vec![10, 11, 12]));
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 request => panic!("Unexpected request: {request:?}"),
             }

@@ -77,8 +77,8 @@ mod test {
                 match request {
                     powercontrol::AdminRequest::Reboot { reason, responder } => {
                         sender.start_send(reason).unwrap();
-                        let mut result: powercontrol::AdminRebootResult = { Ok(()) };
-                        responder.send(&mut result).ok();
+                        let result: powercontrol::AdminRebootResult = { Ok(()) };
+                        responder.send(result).ok();
                     }
                     _ => {
                         panic!("Mock server not configured to handle request");

@@ -139,7 +139,7 @@ impl DeviceIdServer {
 
         let mut service = match DeviceIdentificationService::from_di_records(&records) {
             Err(e) => {
-                let _ = responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()));
+                let _ = responder.send(Err(zx::Status::INVALID_ARGS.into_raw()));
                 return Err(e);
             }
             Ok(defs) => defs,
@@ -151,7 +151,7 @@ impl DeviceIdServer {
             }
             Ok(false) => {}
             Err(e) => {
-                let _ = responder.send(&mut Err(e.into_raw()));
+                let _ = responder.send(Err(e.into_raw()));
                 return Err(e.into());
             }
         }
@@ -162,9 +162,9 @@ impl DeviceIdServer {
                 // advertise. This is OK. However, return error so that this can be logged by the
                 // server as the FIDL client request was not handled.
                 if e.is_closed() {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 } else {
-                    let _ = responder.send(&mut Err(zx::Status::CANCELED.into_raw()));
+                    let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
                 }
                 return Err(e.into());
             }
@@ -173,7 +173,7 @@ impl DeviceIdServer {
 
         let bredr_advertisement = match Self::advertise(&self.profile, (&service).into()) {
             Err(e) => {
-                let _ = responder.send(&mut Err(zx::Status::CANCELED.into_raw()));
+                let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
                 return Err(e);
             }
             Ok(fut) => fut,
@@ -315,7 +315,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut fidl_client_fut).expect_pending("still active");
 
         // Upstream BR/EDR Profile server terminates advertisement for some reason.
-        let _ = responder.send(&mut Err(ErrorCode::TimedOut));
+        let _ = responder.send(Err(ErrorCode::TimedOut));
         let (fidl_client_result, _server_fut) = run_while(&mut exec, server_fut, fidl_client_fut);
         assert_matches!(fidl_client_result, Ok(Ok(_)));
     }

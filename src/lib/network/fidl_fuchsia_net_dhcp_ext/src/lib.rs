@@ -532,7 +532,7 @@ mod test {
                     metric: fnet_stack::UNSPECIFIED_METRIC,
                 }
             );
-            responder.send(&mut Ok(())).expect("responder send");
+            responder.send(Ok(())).expect("responder send");
 
             let (forwarding_entry, responder) = stack_stream
                 .next()
@@ -552,7 +552,7 @@ mod test {
                     metric: fnet_stack::UNSPECIFIED_METRIC,
                 }
             );
-            responder.send(&mut Ok(())).expect("responder send");
+            responder.send(Ok(())).expect("responder send");
         }
         .fuse();
 

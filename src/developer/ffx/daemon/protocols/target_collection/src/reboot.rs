@@ -115,11 +115,11 @@ impl RebootController {
             TargetConnectionState::Fastboot(_) => match state {
                 TargetRebootState::Product => {
                     match self.get_fastboot_proxy().await?.reboot().await? {
-                        Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                        Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
                             tracing::error!("Fastboot communication error: {:?}", e);
                             responder
-                                .send(&mut Err(TargetRebootError::FastbootCommunication))
+                                .send(Err(TargetRebootError::FastbootCommunication))
                                 .map_err(Into::into)
                         }
                     }
@@ -142,21 +142,21 @@ impl RebootController {
                             }
                         }
                     ) {
-                        Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                        Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
                             tracing::error!("Fastboot communication error: {:?}", e);
                             responder
-                                .send(&mut Err(TargetRebootError::FastbootCommunication))
+                                .send(Err(TargetRebootError::FastbootCommunication))
                                 .map_err(Into::into)
                         }
                     }
                 }
-                TargetRebootState::Recovery => responder
-                    .send(&mut Err(TargetRebootError::FastbootToRecovery))
-                    .map_err(Into::into),
+                TargetRebootState::Recovery => {
+                    responder.send(Err(TargetRebootError::FastbootToRecovery)).map_err(Into::into)
+                }
             },
             TargetConnectionState::Zedboot(_) => {
-                let mut response = if let Some(addr) = self.target.netsvc_address() {
+                let response = if let Some(addr) = self.target.netsvc_address() {
                     match state {
                         TargetRebootState::Product => reboot(addr).await.map(|_| ()).map_err(|e| {
                             tracing::error!("zedboot reboot failed {:?}", e);
@@ -178,7 +178,7 @@ impl RebootController {
                 } else {
                     Err(TargetRebootError::NetsvcAddressNotFound)
                 };
-                responder.send(&mut response).map_err(Into::into)
+                responder.send(response).map_err(Into::into)
             }
             // Everything else use AdminProxy
             _ => {
@@ -189,11 +189,11 @@ impl RebootController {
                 if use_ssh_for_reboot {
                     let res = run_ssh_command(Rc::downgrade(&self.target), state).await;
                     match res {
-                        Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                        Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
                             tracing::error!("Target communication error when rebooting: {:?}", e);
                             responder
-                                .send(&mut Err(TargetRebootError::TargetCommunication))
+                                .send(Err(TargetRebootError::TargetCommunication))
                                 .map_err(Into::into)
                         }
                     }
@@ -208,14 +208,14 @@ impl RebootController {
                     {
                         Ok(a) => a,
                         Err(e) => {
-                            responder.send(&mut Err(e))?;
+                            responder.send(Err(e))?;
                             return Err(anyhow!("failed to get admin proxy"));
                         }
                     };
                     match state {
                         TargetRebootState::Product => {
                             match admin_proxy.reboot(RebootReason::UserRequest).await {
-                                Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                                Ok(_) => responder.send(Ok(())).map_err(Into::into),
                                 Err(e) => {
                                     handle_fidl_connection_err(e, responder).map_err(Into::into)
                                 }
@@ -223,7 +223,7 @@ impl RebootController {
                         }
                         TargetRebootState::Bootloader => {
                             match admin_proxy.reboot_to_bootloader().await {
-                                Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                                Ok(_) => responder.send(Ok(())).map_err(Into::into),
                                 Err(e) => {
                                     handle_fidl_connection_err(e, responder).map_err(Into::into)
                                 }
@@ -231,7 +231,7 @@ impl RebootController {
                         }
                         TargetRebootState::Recovery => match admin_proxy.reboot_to_recovery().await
                         {
-                            Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                            Ok(_) => responder.send(Ok(())).map_err(Into::into),
                             Err(e) => handle_fidl_connection_err(e, responder).map_err(Into::into),
                         },
                     }
@@ -249,11 +249,11 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
                 "Reboot returned a client channel closed - assuming reboot succeeded: {:?}",
                 e
             );
-            responder.send(&mut Ok(()))?;
+            responder.send(Ok(()))?;
         }
         _ => {
             tracing::error!("Target communication error: {:?}", e);
-            responder.send(&mut Err(TargetRebootError::TargetCommunication))?;
+            responder.send(Err(TargetRebootError::TargetCommunication))?;
         }
     }
     Ok(())
@@ -374,11 +374,11 @@ mod tests {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     FastbootRequest::Reboot { responder } => {
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     FastbootRequest::RebootBootloader { listener, responder } => {
                         listener.into_proxy().unwrap().on_reboot().unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => assert!(false),
                 }
@@ -394,13 +394,13 @@ mod tests {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     AdminRequest::Reboot { reason: RebootReason::UserRequest, responder } => {
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     AdminRequest::RebootToBootloader { responder } => {
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     AdminRequest::RebootToRecovery { responder } => {
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => assert!(false),
                 }

@@ -30,7 +30,7 @@ impl MockMetricEventLogger {
             match event {
                 fidl::MetricEventLoggerRequest::LogMetricEvents { events, responder } => {
                     self.cobalt_events.lock().extend(events);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => {
                     panic!("unhandled MetricEventLogger method {event:?}");
@@ -75,7 +75,7 @@ impl MockMetricEventLoggerFactory {
                     self.loggers.lock().push(mock_logger.clone());
                     fasync::Task::spawn(mock_logger.run_logger(logger.into_stream().unwrap()))
                         .detach();
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => {
                     panic!("unhandled MetricEventLoggerFactory method: {event:?}");

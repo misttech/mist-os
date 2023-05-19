@@ -82,11 +82,9 @@ mod test {
                 .expect("unexpected call to mock manager");
 
             if response == zx_status::Status::OK {
-                responder.send(&mut Ok(())).expect("failed to send mock response");
+                responder.send(Ok(())).expect("failed to send mock response");
             } else {
-                responder
-                    .send(&mut Err(response.into_raw()))
-                    .expect("failed to send mock response");
+                responder.send(Err(response.into_raw())).expect("failed to send mock response");
             }
         })
         .detach();

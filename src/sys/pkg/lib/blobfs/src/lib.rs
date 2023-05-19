@@ -436,7 +436,7 @@ mod tests {
             match stream.try_next().await.unwrap().unwrap() {
                 fio::DirectoryRequest::Unlink { name, responder, .. } => {
                     assert_eq!(name, blob_merkle.to_string());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("unexpected request: {other:?}"),
             }
@@ -722,7 +722,7 @@ mod tests {
             match stream.try_next().await.unwrap().unwrap() {
                 fio::DirectoryRequest::Sync { responder } => {
                     counter_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("unexpected request: {other:?}"),
             }

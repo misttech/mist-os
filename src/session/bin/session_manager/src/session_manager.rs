@@ -237,8 +237,8 @@ impl SessionManager {
         {
             match request {
                 felement::ManagerRequest::ProposeElement { spec, controller, responder } => {
-                    let mut result = manager_proxy.propose_element(spec, controller).await?;
-                    responder.send(&mut result)?;
+                    let result = manager_proxy.propose_element(spec, controller).await?;
+                    responder.send(result)?;
                 }
             };
         }
@@ -269,10 +269,10 @@ impl SessionManager {
                     view_controller_request,
                     responder,
                 } => {
-                    let mut result = graphical_presenter_proxy
+                    let result = graphical_presenter_proxy
                         .present_view(view_spec, annotation_controller, view_controller_request)
                         .await?;
-                    responder.send(&mut result)?;
+                    responder.send(result)?;
                 }
             };
         }
@@ -295,8 +295,8 @@ impl SessionManager {
         {
             match request {
                 LauncherRequest::Launch { configuration, responder } => {
-                    let mut result = self.handle_launch_request(configuration).await;
-                    let _ = responder.send(&mut result);
+                    let result = self.handle_launch_request(configuration).await;
+                    let _ = responder.send(result);
                 }
             };
         }
@@ -319,8 +319,8 @@ impl SessionManager {
         {
             match request {
                 RestarterRequest::Restart { responder } => {
-                    let mut result = self.handle_restart_request().await;
-                    let _ = responder.send(&mut result);
+                    let result = self.handle_restart_request().await;
+                    let _ = responder.send(result);
                 }
             };
         }
@@ -448,7 +448,7 @@ mod tests {
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::CreateChild {
                     collection: _,
@@ -457,11 +457,11 @@ mod tests {
                     responder,
                 } => {
                     assert_eq!(decl.url.unwrap(), session_url);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
                     spawn_noop_directory_server(exposed_dir);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
@@ -496,7 +496,7 @@ mod tests {
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::CreateChild {
                     collection: _,
@@ -505,11 +505,11 @@ mod tests {
                     responder,
                 } => {
                     assert_eq!(decl.url.unwrap(), session_url);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
                     spawn_noop_directory_server(exposed_dir);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
@@ -587,7 +587,7 @@ mod tests {
                     felement::ManagerRequest::ProposeElement { spec, responder, .. } => {
                         num_elements_proposed += 1;
                         assert_eq!(Some(element_url.to_string()), spec.component_url);
-                        let _ = responder.send(&mut Ok(()));
+                        let _ = responder.send(Ok(()));
                     }
                 }
             }

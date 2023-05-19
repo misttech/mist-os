@@ -1663,8 +1663,8 @@ mod test {
                         }
                     }
                     TargetCollectionRequest::OpenTarget { query, responder, target_handle } => {
-                        let mut res = (open_targets_closure)(query, target_handle);
-                        responder.send(&mut res).unwrap();
+                        let res = (open_targets_closure)(query, target_handle);
+                        responder.send(res).unwrap();
                     }
                     _ => {}
                 }
@@ -1702,14 +1702,14 @@ mod test {
                                     responder,
                                     remote_control: _,
                                 } => {
-                                    responder.send(&mut Ok(())).unwrap();
+                                    responder.send(Ok(())).unwrap();
                                 }
                                 r => panic!("unexpected request: {:?}", r),
                             });
                             Ok(())
                         },
                     );
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => {
                     assert!(false, "got unexpected request: {:?}", req);
@@ -1778,14 +1778,14 @@ mod test {
                             spawn_target_handler(target_handle, |req| match req {
                                 TargetRequest::OpenRemoteControl { responder, remote_control } => {
                                     serve_responsive_rcs(remote_control);
-                                    responder.send(&mut Ok(())).unwrap();
+                                    responder.send(Ok(())).unwrap();
                                 }
                                 r => panic!("unexpected request: {:?}", r),
                             });
                             Ok(())
                         },
                     );
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 req => {
                     assert!(false, "got unexpected request: {:?}", req);
@@ -1882,10 +1882,10 @@ mod test {
                                         }
                                         if target == SSH_ERR_NODENAME {
                                             responder
-                                                .send(&mut Err(TargetConnectionError::UnknownError))
+                                                .send(Err(TargetConnectionError::UnknownError))
                                                 .unwrap();
                                         } else {
-                                            responder.send(&mut Ok(())).unwrap();
+                                            responder.send(Ok(())).unwrap();
                                         }
                                     }
                                     TargetRequest::GetSshLogs { responder } => {
@@ -1897,7 +1897,7 @@ mod test {
                                 Ok(())
                             },
                         );
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => {
                         assert!(false, "got unexpected request: {:?}", req);
@@ -1916,7 +1916,7 @@ mod test {
                 }
                 DaemonRequest::ConnectToProtocol { name: _, server_end: _, responder } => {
                     // Do nothing with the server_end.
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => {
                     assert!(false, "got unexpected request: {:?}", req);

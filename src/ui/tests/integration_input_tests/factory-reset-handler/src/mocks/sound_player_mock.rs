@@ -78,7 +78,7 @@ impl SoundPlayerMock {
                     responder.send(&mut self.add_sound_from_file()).unwrap();
                 }
                 PlayerRequest::PlaySound { responder, .. } => {
-                    responder.send(&mut self.play_sound()).unwrap();
+                    responder.send(self.play_sound()).unwrap();
                 }
                 _ => panic!("Unexpected {:?}", request),
             };

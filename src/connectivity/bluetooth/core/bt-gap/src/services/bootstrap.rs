@@ -32,11 +32,11 @@ impl BootstrapSession {
         match event {
             BootstrapRequest::Commit { responder } => {
                 let identities = self.take_identities();
-                let mut result = hd
+                let result = hd
                     .commit_bootstrap(identities)
                     .await
                     .map_err(|_| sys::BootstrapError::WriteFailure);
-                responder.send(&mut result).map_err(Into::into)
+                responder.send(result).map_err(Into::into)
             }
             BootstrapRequest::AddIdentities { identities, control_handle: _ } => {
                 // Accumulate identities locally; Only push to HostDispatcher once `commit()` is

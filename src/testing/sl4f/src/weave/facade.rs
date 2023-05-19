@@ -175,12 +175,12 @@ mod tests {
         fn expect_reset_config(
             self,
             _expected_flags: fidl_fuchsia_weave::ResetConfigFlags,
-            mut result: StackResetConfigResult,
+            result: StackResetConfigResult,
         ) -> Self {
             self.push_stack(move |req| match req {
                 StackRequest::ResetConfig { responder, flags } => {
                     assert_matches!(flags, _expected_flags);
-                    responder.send(&mut result).unwrap()
+                    responder.send(result).unwrap()
                 }
                 req => panic!("unexpected request: {:?}", req),
             })

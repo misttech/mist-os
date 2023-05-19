@@ -334,7 +334,7 @@ impl ProfileRegistrar {
         // Validate that the new PSMs are disjoint because we unregister and re-register as a group.
         let new_psms = psms_from_service_definitions(&services);
         if !self.is_disjoint_psms(&new_psms) {
-            let _ = responder.send(&mut Err(ErrorCode::Failed));
+            let _ = responder.send(Err(ErrorCode::Failed));
             return Err(format_err!("New advertisement requesting pre-allocated PSMs"));
         }
 
@@ -347,7 +347,7 @@ impl ProfileRegistrar {
         let required_server_channels =
             services.iter().filter(|def| is_rfcomm_service_definition(def)).count();
         if required_server_channels > self.rfcomm_server.available_server_channels().await {
-            let _ = responder.send(&mut Err(ErrorCode::Failed));
+            let _ = responder.send(Err(ErrorCode::Failed));
             return Err(format_err!("RfcommServer not enough free Server Channels"));
         }
         for mut service in services.iter_mut().filter(|def| is_rfcomm_service_definition(def)) {
@@ -382,7 +382,7 @@ impl ProfileRegistrar {
         async move {
             let _ = adv_fut
                 .await
-                .and_then(|mut r| responder.send(&mut r))
+                .and_then(|r| responder.send(r))
                 .map_err(|e| trace!("Relayed advertisement terminated: {e:?}"));
         }
     }
@@ -695,7 +695,7 @@ mod tests {
         };
 
         // Upstream decides to resolve the Advertise call.
-        let _ = responder.send(&mut Ok(()));
+        let _ = responder.send(Ok(()));
 
         let _ = exec.run_until_stalled(&mut handler_fut);
         // Client should be notified, and it's advertisement should terminate.
@@ -1053,7 +1053,7 @@ mod tests {
 
         // We expect ProfileRegistrar to unregister the current active advertisement. Respond to
         // the unregister request by responding over the responder.
-        let _ = responder1.send(&mut Ok(()));
+        let _ = responder1.send(Ok(()));
         let _ = exec.run_until_stalled(&mut handler_fut);
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
@@ -1142,7 +1142,7 @@ mod tests {
         exec.run_until_stalled(&mut advertise_fut).expect_pending("should still be advertising");
 
         // Upstream server decides to terminate advertisement - we expect the Future to finish.
-        let _ = responder.send(&mut Ok(()));
+        let _ = responder.send(Ok(()));
         let _ = exec.run_until_stalled(&mut advertise_fut).expect("advertisement should finish");
     }
 

@@ -506,10 +506,10 @@ async fn handle_datagram_request(
         }
         fposix_socket::SynchronousDatagramSocketRequest::Bind { addr, responder } => {
             socket.borrow_mut().bind(addr, sockets);
-            responder.send(&mut Ok(())).context("send Bind response")?;
+            responder.send(Ok(())).context("send Bind response")?;
         }
         fposix_socket::SynchronousDatagramSocketRequest::Close { responder } => {
-            responder.send(&mut Ok(())).context("send Close response")?;
+            responder.send(Ok(())).context("send Close response")?;
             let socket = socket.borrow();
             socket.control_handle.shutdown();
             if let Some(addr) = socket.bound {
@@ -533,7 +533,7 @@ async fn handle_datagram_request(
             // NB: the fake netstack doesn't actually enforce receive buffer size.
             *receive_buffer_size = value_bytes;
             info!("modified size of receive buffer to {}", receive_buffer_size);
-            responder.send(&mut Ok(())).context("send SetReceiveBuffer response")?;
+            responder.send(Ok(())).context("send SetReceiveBuffer response")?;
         }
         fposix_socket::SynchronousDatagramSocketRequest::GetSockName { responder } => {
             if let Some(addr) = socket.borrow().bound {
@@ -546,7 +546,7 @@ async fn handle_datagram_request(
         }
         fposix_socket::SynchronousDatagramSocketRequest::Connect { addr, responder } => {
             socket.borrow_mut().connected = Some(addr);
-            responder.send(&mut Ok(())).context("send Connect response")?;
+            responder.send(Ok(())).context("send Connect response")?;
         }
         fposix_socket::SynchronousDatagramSocketRequest::SendMsg {
             addr,
@@ -676,7 +676,7 @@ async fn handle_stream_request(
 ) -> Result<(), anyhow::Error> {
     match request.context("receive request")? {
         fposix_socket::StreamSocketRequest::Close { responder } => {
-            responder.send(&mut Ok(())).context("send Close response")?;
+            responder.send(Ok(())).context("send Close response")?;
             socket.borrow().close(sockets);
         }
         fposix_socket::StreamSocketRequest::Describe { responder } => {
@@ -694,19 +694,19 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::Bind { addr, responder } => {
             responder
-                .send(&mut StreamSocket::bind(&socket, addr, sockets))
+                .send(StreamSocket::bind(&socket, addr, sockets))
                 .context("send Bind response")?;
         }
         fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
             responder
                 .send(
-                    &mut StreamSocket::connect(&socket, addr, sockets)
+                    StreamSocket::connect(&socket, addr, sockets)
                         .map(|stream| stream_requests.push(stream)),
                 )
                 .context("send Connect response")?;
         }
         fposix_socket::StreamSocketRequest::Listen { backlog: _, responder } => {
-            responder.send(&mut socket.borrow_mut().listen()).context("send Listen response")?;
+            responder.send(socket.borrow_mut().listen()).context("send Listen response")?;
         }
         fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
             responder
@@ -718,7 +718,7 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
             let mut socket = socket.borrow_mut();
-            let mut result = match socket.state {
+            let result = match socket.state {
                 StreamSocketState::Created
                 | StreamSocketState::Bound(_)
                 | StreamSocketState::Listening { .. } => {
@@ -730,7 +730,7 @@ async fn handle_stream_request(
                     Err(fposix::Errno::Eopnotsupp)
                 }
             };
-            responder.send(&mut result).context("send SetSendBuffer response")?;
+            responder.send(result).context("send SetSendBuffer response")?;
         }
 
         fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
@@ -740,7 +740,7 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
             let mut socket = socket.borrow_mut();
-            let mut result = match socket.state {
+            let result = match socket.state {
                 StreamSocketState::Created
                 | StreamSocketState::Bound(_)
                 | StreamSocketState::Listening { .. } => {
@@ -752,7 +752,7 @@ async fn handle_stream_request(
                     Err(fposix::Errno::Eopnotsupp)
                 }
             };
-            responder.send(&mut result).context("send SetReceiveBuffer response")?;
+            responder.send(result).context("send SetReceiveBuffer response")?;
         }
         fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
             responder
@@ -765,10 +765,10 @@ async fn handle_stream_request(
                 .context("send GetSockName response")?;
         }
         fposix_socket::StreamSocketRequest::SetTcpNoDelay { value: _, responder } => {
-            responder.send(&mut Ok(())).context("send SetTcpNoDelay response")?;
+            responder.send(Ok(())).context("send SetTcpNoDelay response")?;
         }
         fposix_socket::StreamSocketRequest::SetTcpQuickAck { value: _, responder } => {
-            responder.send(&mut Ok(())).context("send SetTcpQuickAck response")?;
+            responder.send(Ok(())).context("send SetTcpQuickAck response")?;
         }
         other => {
             error!("got unexpected stream socket request: {:#?}", other);

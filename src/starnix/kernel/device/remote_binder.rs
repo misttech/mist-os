@@ -468,11 +468,11 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                                     tid.into()
                                 );
 
-                                let mut e = e.map_err(|e| {
+                                let e = e.map_err(|e| {
                                     fposix::Errno::from_primitive(e.code.error_code() as i32)
                                         .unwrap_or(fposix::Errno::Einval)
                                 });
-                                responder.send(&mut e)
+                                responder.send(e)
                             }),
                         ),
                     });

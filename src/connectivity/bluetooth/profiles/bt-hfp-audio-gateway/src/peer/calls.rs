@@ -1012,7 +1012,7 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         stream: &mut CallRequestStream,
         expected: DtmfCode,
-        mut response: Result<(), i32>,
+        response: Result<(), i32>,
     ) {
         let expected = expected.into();
         // Get SendDtmfCode request for call
@@ -1025,7 +1025,7 @@ mod tests {
             result => panic!("Unexpected request: {:?}", result),
         };
         // Respond with a call state.
-        responder.send(&mut response).expect("response to succeed");
+        responder.send(response).expect("response to succeed");
     }
 
     /// Get the next CallRequest::WatchState hanging get responder from `stream` and return it.

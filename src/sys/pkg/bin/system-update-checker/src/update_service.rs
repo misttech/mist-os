@@ -57,7 +57,7 @@ impl UpdateService {
                             // Notify the client they provided invalid options and stop serving on
                             // this channel.
                             responder
-                                .send(&mut Err(CheckNotStartedReason::InvalidOptions))
+                                .send(Err(CheckNotStartedReason::InvalidOptions))
                                 .context("error sending CheckNow response")?;
                             return Err(e);
                         }
@@ -71,8 +71,8 @@ impl UpdateService {
                         None
                     };
 
-                    let mut res = self.handle_check_now(options, monitor).await;
-                    responder.send(&mut res).context("error sending CheckNow response")?;
+                    let res = self.handle_check_now(options, monitor).await;
+                    responder.send(res).context("error sending CheckNow response")?;
                 }
 
                 ManagerRequest::PerformPendingReboot { responder } => {

@@ -44,7 +44,7 @@ mod test {
 
         let proxy = setup_fake_keyboard_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             KeyboardRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -68,7 +68,7 @@ mod test {
     async fn validate_keyboard_failure(expected_keyboard: Keyboard) -> Result<()> {
         let proxy = setup_fake_keyboard_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             KeyboardRequest::Watch { responder } => {
                 let _ = responder.send(&KeyboardSettings::from(expected_keyboard));
@@ -104,7 +104,7 @@ mod test {
     async fn validate_keyboard_set_output(expected_keyboard: Keyboard) -> Result<()> {
         let proxy = setup_fake_keyboard_proxy(move |req| match req {
             KeyboardRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             KeyboardRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

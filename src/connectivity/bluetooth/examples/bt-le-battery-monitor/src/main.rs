@@ -408,7 +408,7 @@ mod tests {
             run_while(&mut exec, connect_fut, notification_fut);
         let (_, _notifier, responder) =
             notification_result.unwrap().into_register_characteristic_notifier().unwrap();
-        let _ = responder.send(&mut Ok(()));
+        let _ = responder.send(Ok(()));
 
         let result = exec.run_until_stalled(&mut connect_fut).expect("connect success");
         assert_matches!(result, Ok(_));

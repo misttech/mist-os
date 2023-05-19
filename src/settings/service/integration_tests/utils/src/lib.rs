@@ -124,27 +124,27 @@ async fn cobalt_impl(handles: LocalComponentHandles) -> Result<(), Error> {
                         while let Some(Ok(request)) = stream.next().await {
                             match request {
                                 MetricEventLoggerRequest::LogOccurrence { responder, .. } => {
-                                    let _ = responder.send(&mut Ok(()));
+                                    let _ = responder.send(Ok(()));
                                 }
                                 MetricEventLoggerRequest::LogInteger { responder, .. } => {
-                                    let _ = responder.send(&mut Ok(()));
+                                    let _ = responder.send(Ok(()));
                                 }
                                 MetricEventLoggerRequest::LogIntegerHistogram {
                                     responder, ..
                                 } => {
-                                    let _ = responder.send(&mut Ok(()));
+                                    let _ = responder.send(Ok(()));
                                 }
                                 MetricEventLoggerRequest::LogString { responder, .. } => {
-                                    let _ = responder.send(&mut Ok(()));
+                                    let _ = responder.send(Ok(()));
                                 }
                                 MetricEventLoggerRequest::LogMetricEvents { responder, .. } => {
-                                    let _ = responder.send(&mut Ok(()));
+                                    let _ = responder.send(Ok(()));
                                 }
                             }
                         }
                     })
                     .detach();
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 }
             })
             .detach();

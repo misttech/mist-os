@@ -53,7 +53,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = crate::launch::component::explore_over_pty(
+                        let result = crate::launch::component::explore_over_pty(
                             &moniker, pty, tool_urls, command, ns_layout,
                         )
                         .await
@@ -61,7 +61,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             info!("launched Dash for instance {}", moniker);
                             notify_on_process_exit(p, responder.control_handle().clone());
                         });
-                        let _ = responder.send(&mut result);
+                        let _ = responder.send(result);
                     }
                     LauncherRequest::ExploreComponentOverPty {
                         moniker,
@@ -71,7 +71,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = crate::launch::component::explore_over_pty(
+                        let result = crate::launch::component::explore_over_pty(
                             &moniker, pty, tool_urls, command, ns_layout,
                         )
                         .await
@@ -79,7 +79,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             info!("launched Dash for instance {}", moniker);
                             notify_on_process_exit(p, responder.control_handle().clone());
                         });
-                        let _ = responder.send(&mut result);
+                        let _ = responder.send(result);
                     }
                     // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverSocket`.
                     // Remove it once no ffx binaries depend on it.
@@ -91,7 +91,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = crate::launch::component::explore_over_socket(
+                        let result = crate::launch::component::explore_over_socket(
                             &moniker, socket, tool_urls, command, ns_layout,
                         )
                         .await
@@ -99,7 +99,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             info!("launched Dash for instance {}", moniker);
                             notify_on_process_exit(p, responder.control_handle().clone());
                         });
-                        let _ = responder.send(&mut result);
+                        let _ = responder.send(result);
                     }
                     LauncherRequest::ExploreComponentOverSocket {
                         moniker,
@@ -109,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         ns_layout,
                         responder,
                     } => {
-                        let mut result = crate::launch::component::explore_over_socket(
+                        let result = crate::launch::component::explore_over_socket(
                             &moniker, socket, tool_urls, command, ns_layout,
                         )
                         .await
@@ -117,7 +117,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             info!("launched Dash for instance {}", moniker);
                             notify_on_process_exit(p, responder.control_handle().clone());
                         });
-                        let _ = responder.send(&mut result);
+                        let _ = responder.send(result);
                     }
                 }
             }

@@ -939,7 +939,7 @@ mod tests {
                 },
                 expected_config
             );
-            responder.send(&mut Ok(())).expect("send response");
+            responder.send(Ok(())).expect("send response");
         }
         let remaining = stream
             .map_ok(
@@ -1072,7 +1072,7 @@ mod tests {
                     .expect("get request")
                     .into_start_instance()
                     .expect("unexpected lifecycle controller request");
-                responder.send(&mut Ok(())).expect("send response");
+                responder.send(Ok(())).expect("send response");
                 moniker
             })
             .collect::<Vec<String>>();

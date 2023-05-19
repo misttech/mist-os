@@ -507,8 +507,8 @@ where
                 Ok(responder.send(&mut response)?)
             }
             ListTypefaces { request, iterator, responder } => {
-                let mut response = self.list_typefaces(request, iterator);
-                Ok(responder.send(&mut response)?)
+                let response = self.list_typefaces(request, iterator);
+                Ok(responder.send(response)?)
             }
         }
     }

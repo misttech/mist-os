@@ -404,13 +404,13 @@ async fn handle_control_events<T: FakeClockObserver>(
                 if check_valid_increment(&increment) {
                     let mut mc = mock_clock.lock().unwrap();
                     if mc.is_free_running() {
-                        responder.send(&mut Err(zx::Status::ACCESS_DENIED.into_raw()))
+                        responder.send(Err(zx::Status::ACCESS_DENIED.into_raw()))
                     } else {
                         mc.increment(&increment);
-                        responder.send(&mut Ok(()))
+                        responder.send(Ok(()))
                     }
                 } else {
-                    responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))
+                    responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))
                 }
             }
             FakeClockControlRequest::Pause { responder } => {
@@ -419,12 +419,12 @@ async fn handle_control_events<T: FakeClockObserver>(
             }
             FakeClockControlRequest::ResumeWithIncrements { real, increment, responder } => {
                 if real <= 0 || !check_valid_increment(&increment) {
-                    responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))
+                    responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))
                 } else {
                     // stop free running if we are
                     stop_free_running(&mock_clock);
                     start_free_running(&mock_clock, real.nanos(), increment);
-                    responder.send(&mut Ok(()))
+                    responder.send(Ok(()))
                 }
             }
             FakeClockControlRequest::AddStopPoint {
@@ -436,11 +436,10 @@ async fn handle_control_events<T: FakeClockObserver>(
                 debug!("stop point of type {:?} registered", event_type);
                 let mut mc = mock_clock.lock().unwrap();
                 if mc.is_free_running() {
-                    responder.send(&mut Err(zx::Status::ACCESS_DENIED.into_raw()))
+                    responder.send(Err(zx::Status::ACCESS_DENIED.into_raw()))
                 } else {
                     responder.send(
-                        &mut mc
-                            .set_stop_point(StopPoint { deadline_id, event_type }, on_stop)
+                        mc.set_stop_point(StopPoint { deadline_id, event_type }, on_stop)
                             .map_err(zx::Status::into_raw),
                     )
                 }

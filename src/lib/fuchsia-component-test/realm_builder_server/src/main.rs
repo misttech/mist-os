@@ -163,7 +163,7 @@ impl RealmBuilderFactory {
                     responder,
                 } => {
                     if !is_fragment_only_url(&relative_url) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::UrlIsNotRelative))?;
+                        responder.send(Err(ftest::RealmBuilderError::UrlIsNotRelative))?;
                         continue;
                     }
                     let pkg_dir = match pkg_dir_handle
@@ -172,15 +172,14 @@ impl RealmBuilderFactory {
                     {
                         Ok(pkg_dir) => pkg_dir,
                         Err(err) => {
-                            responder
-                                .send(&mut Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
+                            responder.send(Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
                             return Err(err);
                         }
                     };
                     if let Err(e) = pkg_dir.query().await.context(
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
+                        responder.send(Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
                         return Err(e);
                     }
                     let realm_node = match RealmNode2::load_from_pkg(
@@ -192,7 +191,7 @@ impl RealmBuilderFactory {
                         Ok(realm_node) => realm_node,
                         Err(err) => {
                             warn!(method = "RealmBuilderFactory.CreateFromRelativeUrl", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                             continue;
                         }
                     };
@@ -202,7 +201,7 @@ impl RealmBuilderFactory {
                         realm_server_end,
                         builder_server_end,
                     )?;
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 }
                 ftest::RealmBuilderFactoryRequest::Create {
                     pkg_dir_handle,
@@ -217,7 +216,7 @@ impl RealmBuilderFactory {
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
                         warn!(method = "RealmBuilderFactory.Create", message = %err);
-                        responder.send(&mut Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
+                        responder.send(Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
                         continue;
                     }
 
@@ -227,7 +226,7 @@ impl RealmBuilderFactory {
                         realm_server_end,
                         builder_server_end,
                     )?;
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 }
             }
         }
@@ -394,53 +393,53 @@ impl Realm {
             match req {
                 ftest::RealmRequest::AddChild { name, url, options, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.add_child(name.clone(), url.clone(), options).await {
-                        Ok(()) => responder.send(&mut Ok(()))?,
+                        Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.AddChild", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
                 ftest::RealmRequest::AddChildFromDecl { name, decl, options, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.add_child_from_decl(name.clone(), decl, options).await {
-                        Ok(()) => responder.send(&mut Ok(()))?,
+                        Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.AddChildFromDecl", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
                 ftest::RealmRequest::AddLocalChild { name, options, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.add_local_child(name.clone(), options).await {
-                        Ok(()) => responder.send(&mut Ok(()))?,
+                        Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.AddLocalChild", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
                 ftest::RealmRequest::AddChildRealm { name, options, child_realm, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.add_child_realm(name.clone(), options, child_realm).await {
-                        Ok(()) => responder.send(&mut Ok(()))?,
+                        Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.AddChildRealm", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
@@ -459,14 +458,14 @@ impl Realm {
                 }
                 ftest::RealmRequest::ReplaceComponentDecl { name, component_decl, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.replace_component_decl(name.clone(), component_decl).await {
-                        Ok(()) => responder.send(&mut Ok(()))?,
+                        Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.ReplaceComponentDecl", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
@@ -479,29 +478,29 @@ impl Realm {
                 }
                 ftest::RealmRequest::ReplaceRealmDecl { component_decl, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.replace_realm_decl(component_decl).await {
-                        Ok(()) => responder.send(&mut Ok(()))?,
+                        Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.ReplaceRealmDecl", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
                 ftest::RealmRequest::AddRoute { capabilities, from, to, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.realm_node.route_capabilities(capabilities, from, to).await {
                         Ok(()) => {
-                            responder.send(&mut Ok(()))?;
+                            responder.send(Ok(()))?;
                         }
                         Err(err) => {
                             warn!(method = "Realm.AddRoute", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
@@ -512,22 +511,22 @@ impl Realm {
                     responder,
                 } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.read_only_directory(name, to, directory_contents).await {
                         Ok(()) => {
-                            responder.send(&mut Ok(()))?;
+                            responder.send(Ok(()))?;
                         }
                         Err(err) => {
                             warn!(method = "Realm.ReadOnlyDirectory", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
                 ftest::RealmRequest::InitMutableConfigFromPackage { name, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
 
@@ -539,11 +538,11 @@ impl Realm {
                         .await
                         .config_override_policy = ConfigOverridePolicy::LoadPackagedValuesFirst;
 
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 }
                 ftest::RealmRequest::InitMutableConfigToEmpty { name, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
 
@@ -555,19 +554,19 @@ impl Realm {
                         .await
                         .config_override_policy = ConfigOverridePolicy::RequireAllValuesFromBuilder;
 
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 }
                 ftest::RealmRequest::SetConfigValue { name, key, value, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                     } else {
                         match self.set_config_value(name, key, value).await {
                             Ok(()) => {
-                                responder.send(&mut Ok(()))?;
+                                responder.send(Ok(()))?;
                             }
                             Err(err) => {
                                 warn!(method = "Realm.SetConfigValue", message = %err);
-                                responder.send(&mut Err(err.into()))?;
+                                responder.send(Err(err.into()))?;
                             }
                         }
                     }

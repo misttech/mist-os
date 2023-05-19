@@ -134,7 +134,7 @@ impl Connection {
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::NodeRequest::Close { responder } => {
-                responder.send(&mut Ok(()))?;
+                responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
             fio::NodeRequest::GetConnectionInfo { responder } => {
@@ -143,7 +143,7 @@ impl Connection {
                 responder.send(info)?;
             }
             fio::NodeRequest::Sync { responder } => {
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::GetAttr { responder } => {
                 let attrs = fio::NodeAttributes {
@@ -166,7 +166,7 @@ impl Connection {
             }
             fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::ListExtendedAttributes { iterator, .. } => {
                 iterator.close_with_epitaph(Status::NOT_SUPPORTED)?;
@@ -175,10 +175,10 @@ impl Connection {
                 responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::SetExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::RemoveExtendedAttribute { responder, .. } => {
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;

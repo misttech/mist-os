@@ -646,12 +646,12 @@ impl TestCallManager {
                             // result can be ignored because id was just found in the call map.
                             let _ = self.update_call(id, FidlCallState::TransferredToAg).await;
                         }
-                        None => drop(responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw()))),
+                        None => drop(responder.send(Err(zx::Status::NOT_FOUND.into_raw()))),
                     };
                 } else {
                     // Simulate dialing action and then respond to any outstanding WatchForCall
                     // requests.
-                    let mut result = match {
+                    let result = match {
                         // Only hold onto the lock while using it to "dial" the number.
                         // Holding the lock past this point would cause a deadlock when
                         // calling `outgoing_call`.
@@ -673,7 +673,7 @@ impl TestCallManager {
                     info!("sending result to peer: {:?}", result);
 
                     // Once dialing and hanging gets have been handled, send response.
-                    let _ = responder.send(&mut result);
+                    let _ = responder.send(result);
                 }
             }
             PeerHandlerRequest::QueryOperator { responder, .. } => {
@@ -690,9 +690,9 @@ impl TestCallManager {
                         .get_mut(&id)
                         .ok_or_else(|| format_err!("peer removed: {:?}", id))?;
                     peer.nrec_enabled = enabled;
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                 } else {
-                    responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
                 }
             }
             PeerHandlerRequest::ReportHeadsetBatteryLevel { level, .. } => {
@@ -862,7 +862,7 @@ impl TestCallManager {
                 }
                 Ok(CallRequest::SendDtmfCode { code, responder, .. }) => {
                     state.dtmf_codes.push(code);
-                    if let Err(e) = responder.send(&mut Ok(())) {
+                    if let Err(e) = responder.send(Ok(())) {
                         info!("Call ended: {}", e);
                         break;
                     }

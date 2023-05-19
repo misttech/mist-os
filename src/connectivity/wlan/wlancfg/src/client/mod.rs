@@ -190,7 +190,7 @@ async fn handle_client_requests(
             }
             fidl_policy::ClientControllerRequest::SaveNetwork { config, responder } => {
                 // If there is an error saving the network, log it and convert to a FIDL value.
-                let mut response = handle_client_request_save_network(
+                let response = handle_client_request_save_network(
                     saved_networks.clone(),
                     config,
                     Arc::clone(&iface_manager),
@@ -200,10 +200,10 @@ async fn handle_client_requests(
                     error!("Failed to save network: {:?}", e);
                     fidl_policy::NetworkConfigChangeError::from(e)
                 });
-                responder.send(&mut response)?;
+                responder.send(response)?;
             }
             fidl_policy::ClientControllerRequest::RemoveNetwork { config, responder } => {
-                let mut err = handle_client_request_remove_network(
+                let err = handle_client_request_remove_network(
                     saved_networks.clone(),
                     config,
                     iface_manager.clone(),
@@ -211,7 +211,7 @@ async fn handle_client_requests(
                 .map_err(|_| SaveError::GeneralError)
                 .await;
 
-                responder.send(&mut err)?;
+                responder.send(err)?;
             }
             fidl_policy::ClientControllerRequest::GetSavedNetworks { iterator, .. } => {
                 handle_client_request_get_networks(saved_networks.clone(), iterator).await?;

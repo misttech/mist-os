@@ -139,8 +139,8 @@ where
                 responder.send(&mut response)?;
             }
             AccountHandlerControlRequest::Preload { pre_auth_state, responder } => {
-                let mut response = self.preload(pre_auth_state).await;
-                responder.send(&mut response)?;
+                let response = self.preload(pre_auth_state).await;
+                responder.send(response)?;
             }
             AccountHandlerControlRequest::UnlockAccount { payload, responder } => {
                 let mut response = self.unlock_account(payload.interaction).await;
@@ -151,12 +151,12 @@ where
                 responder.send(&mut response)?;
             }
             AccountHandlerControlRequest::RemoveAccount { responder } => {
-                let mut response = self.remove_account().await;
-                responder.send(&mut response)?;
+                let response = self.remove_account().await;
+                responder.send(response)?;
             }
             AccountHandlerControlRequest::GetAccount { account, responder } => {
-                let mut response = self.get_account(account).await;
-                responder.send(&mut response)?;
+                let response = self.get_account(account).await;
+                responder.send(response)?;
             }
             AccountHandlerControlRequest::Terminate { control_handle } => {
                 self.terminate().await;

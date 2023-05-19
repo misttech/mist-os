@@ -57,7 +57,7 @@ mod test {
         let repos = setup_fake_repos(move |req| match req {
             RepositoryRegistryRequest::AddRepository { name, repository, responder } => {
                 sender.take().unwrap().send((name, repository)).unwrap();
-                responder.send(&mut Ok(())).unwrap();
+                responder.send(Ok(())).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
         });

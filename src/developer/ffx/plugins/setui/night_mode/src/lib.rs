@@ -42,7 +42,7 @@ mod test {
 
         let proxy = setup_fake_night_mode_proxy(move |req| match req {
             NightModeRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             NightModeRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -66,7 +66,7 @@ mod test {
     async fn validate_night_mode_set_output(expected_night_mode_enabled: bool) -> Result<()> {
         let proxy = setup_fake_night_mode_proxy(move |req| match req {
             NightModeRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             NightModeRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

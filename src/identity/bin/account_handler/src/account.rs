@@ -230,8 +230,8 @@ where
                 responder.send(&mut response)?;
             }
             AccountRequest::RegisterAuthListener { payload, responder } => {
-                let mut response = self.register_auth_listener(payload);
-                responder.send(&mut response)?;
+                let response = self.register_auth_listener(payload);
+                responder.send(response)?;
             }
             AccountRequest::GetPersonaIds { responder } => {
                 let response = self.get_persona_ids();
@@ -242,8 +242,8 @@ where
                 responder.send(&mut response)?;
             }
             AccountRequest::GetPersona { id, persona, responder } => {
-                let mut response = self.get_persona(context, id.into(), persona).await;
-                responder.send(&mut response)?;
+                let response = self.get_persona(context, id.into(), persona).await;
+                responder.send(response)?;
             }
             AccountRequest::GetAuthMechanismEnrollments { responder, .. } => {
                 responder.send(&mut Err(ApiError::UnsupportedOperation))?;
@@ -252,19 +252,19 @@ where
                 responder.send(&mut Err(ApiError::UnsupportedOperation))?;
             }
             AccountRequest::RemoveAuthMechanismEnrollment { responder, .. } => {
-                responder.send(&mut Err(ApiError::UnsupportedOperation))?;
+                responder.send(Err(ApiError::UnsupportedOperation))?;
             }
             AccountRequest::StorageLock { responder } => {
-                let mut response = self.storage_lock().await;
-                responder.send(&mut response)?;
+                let response = self.storage_lock().await;
+                responder.send(response)?;
             }
             AccountRequest::InteractionLock { responder } => {
-                let mut response = self.interaction_lock().await;
-                responder.send(&mut response)?;
+                let response = self.interaction_lock().await;
+                responder.send(response)?;
             }
             AccountRequest::GetDataDirectory { data_directory, responder, .. } => {
-                let mut response = self.get_data_directory(data_directory).await;
-                responder.send(&mut response)?;
+                let response = self.get_data_directory(data_directory).await;
+                responder.send(response)?;
             }
         }
         Ok(())

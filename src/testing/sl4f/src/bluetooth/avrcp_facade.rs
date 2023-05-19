@@ -438,7 +438,7 @@ mod tests {
                 ControllerRequest::InformBatteryStatus { battery_status, responder } => {
                     let battery_status_expected: BatteryStatus = input.into();
                     assert_eq!(battery_status_expected, battery_status);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => {}
             })
@@ -448,7 +448,7 @@ mod tests {
             self.push(move |req| match req {
                 ControllerRequest::SetAddressedPlayer { player_id, responder } => {
                     assert_eq!(input, player_id);
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 _ => {}
             })

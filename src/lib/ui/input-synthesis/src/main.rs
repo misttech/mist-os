@@ -78,13 +78,13 @@ async fn main() -> Result<()> {
                         if id >= devices.len() {
                             error!(device_id = id, "unknown");
                             responder
-                                .send(&mut Err(Error::InvalidDeviceId))
+                                .send(Err(Error::InvalidDeviceId))
                                 .expect("send a Error to MouseRequest");
                             // This is intended to ignore the invalid request.
                             continue;
                         }
                         devices[id].mouse(report, event_time).expect("synthesis mouse is sent");
-                        responder.send(&mut Ok({})).expect("send a response to MouseRequest");
+                        responder.send(Ok(())).expect("send a response to MouseRequest");
                     }
                     Err(e) => {
                         error!("could not receive request: {:?}", e);

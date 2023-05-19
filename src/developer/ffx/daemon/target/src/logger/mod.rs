@@ -662,7 +662,7 @@ mod test {
                             fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe
                         );
                         setup_fake_archive_iterator(iterator, iterator_parameters.clone()).unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => panic!("called unexpected diagnostic bridge method"),
                 }
@@ -683,7 +683,7 @@ mod test {
                 match req {
                     RemoteControlRequest::ConnectCapability { server_chan, responder, .. } => {
                         setup_fake_archive_accessor(server_chan, parameters.clone()).unwrap();
-                        responder.send(&mut Ok(())).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     RemoteControlRequest::IdentifyHost { responder } => {
                         responder

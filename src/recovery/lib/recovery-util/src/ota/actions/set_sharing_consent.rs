@@ -86,9 +86,9 @@ mod test {
                 match request {
                     PrivacyRequest::Set { responder, settings: _ } => match will_succeed {
                         Some(will_succeed) => {
-                            let mut response =
+                            let response =
                                 if will_succeed { Ok(()) } else { Err(PrivacyError::Failed) };
-                            responder.send(&mut response).expect("Should not fail");
+                            responder.send(response).expect("Should not fail");
                         }
                         // We haven't been told to succeed or fail so cause a FIDL error
                         None => responder.control_handle().shutdown(),

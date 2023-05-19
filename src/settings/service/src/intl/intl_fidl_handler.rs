@@ -59,7 +59,7 @@ impl ErrorResponder for IntlSetResponder {
     }
 
     fn respond(self: Box<Self>, error: fidl_fuchsia_settings::Error) -> Result<(), fidl::Error> {
-        self.send(&mut Err(error))
+        self.send(Err(error))
     }
 }
 
@@ -77,8 +77,8 @@ impl watch::Responder<IntlSettings, fuchsia_zircon::Status> for IntlWatchRespond
 }
 
 impl request::Responder<Scoped<IntlSetResult>> for IntlSetResponder {
-    fn respond(self, Scoped(mut response): Scoped<IntlSetResult>) {
-        let _ = self.send(&mut response).ok();
+    fn respond(self, Scoped(response): Scoped<IntlSetResult>) {
+        let _ = self.send(response).ok();
     }
 }
 

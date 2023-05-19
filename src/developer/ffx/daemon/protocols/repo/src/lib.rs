@@ -1228,7 +1228,7 @@ impl<
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::ServerStop { responder } => {
-                let mut res = async {
+                let res = async {
                     pkg_config::set_repository_server_enabled(false).await.map_err(|err| {
                         tracing::error!(
                             "failed to save server disabled flag to config: {:#?}",
@@ -1253,7 +1253,7 @@ impl<
                 }
                 .await;
 
-                responder.send(&mut res)?;
+                responder.send(res)?;
 
                 Ok(())
             }
@@ -1271,7 +1271,7 @@ impl<
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::AddRepository { name, repository, responder } => {
-                let mut res = match repository.try_into() {
+                let res = match repository.try_into() {
                     Ok(repo_spec) => {
                         add_repository(&name, &repo_spec, SaveConfig::Save, Arc::clone(&self.inner))
                             .await
@@ -1279,7 +1279,7 @@ impl<
                     Err(err) => Err(err.into()),
                 };
 
-                responder.send(&mut res)?;
+                responder.send(res)?;
 
                 Ok(())
             }
@@ -1297,7 +1297,7 @@ impl<
             } => {
                 let alias_conflict_mode =
                     RepositoryRegistrationAliasConflictMode::try_from(alias_conflict_mode).unwrap();
-                let mut res = match RepositoryTarget::try_from(target_info) {
+                let res = match RepositoryTarget::try_from(target_info) {
                     Ok(target_info) => {
                         self.registrar
                             .register_target(
@@ -1312,7 +1312,7 @@ impl<
                     Err(err) => Err(err.into()),
                 };
 
-                responder.send(&mut res)?;
+                responder.send(res)?;
 
                 metrics::register_repository_event().await;
 
@@ -1323,9 +1323,8 @@ impl<
                 target_identifier,
                 responder,
             } => {
-                responder.send(
-                    &mut self.deregister_target(cx, repository_name, target_identifier).await,
-                )?;
+                responder
+                    .send(self.deregister_target(cx, repository_name, target_identifier).await)?;
 
                 metrics::deregister_repository_event().await;
 
@@ -1337,7 +1336,7 @@ impl<
                 include_fields,
                 responder,
             } => {
-                responder.send(&mut self.list_packages(&name, iterator, include_fields).await)?;
+                responder.send(self.list_packages(&name, iterator, include_fields).await)?;
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::ShowPackage {
@@ -1346,9 +1345,8 @@ impl<
                 iterator,
                 responder,
             } => {
-                responder.send(
-                    &mut self.show_package(&repository_name, &package_name, iterator).await,
-                )?;
+                responder
+                    .send(self.show_package(&repository_name, &package_name, iterator).await)?;
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
@@ -1922,7 +1920,7 @@ mod tests {
             let closure = move |_cx: &Context, req| match req {
                 RepositoryManagerRequest::Add { repo, responder } => {
                     events_closure.lock().unwrap().push(RepositoryManagerEvent::Add { repo });
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                     Ok(())
                 }
                 RepositoryManagerRequest::Remove { repo_url, responder } => {
@@ -1930,7 +1928,7 @@ mod tests {
                         .lock()
                         .unwrap()
                         .push(RepositoryManagerEvent::Remove { repo_url });
-                    responder.send(&mut Ok(()))?;
+                    responder.send(Ok(()))?;
                     Ok(())
                 }
                 _ => panic!("unexpected request: {:?}", req),
@@ -1976,11 +1974,11 @@ mod tests {
             let closure = move |_cx: &Context, req| match req {
                 RepositoryManagerRequest::Add { repo, responder } => {
                     events_closure.lock().unwrap().push(RepositoryManagerEvent::Add { repo });
-                    responder.send(&mut Err(1)).unwrap();
+                    responder.send(Err(1)).unwrap();
                     Ok(())
                 }
                 RepositoryManagerRequest::Remove { repo_url: _, responder } => {
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                     Ok(())
                 }
                 _ => {
@@ -2069,14 +2067,14 @@ mod tests {
                                                 rule: rule.try_into().unwrap(),
                                             },
                                         );
-                                        responder.send(&mut Ok(())).unwrap()
+                                        responder.send(Ok(())).unwrap()
                                     }
                                     EditTransactionRequest::Commit { responder } => {
                                         events_closure
                                             .lock()
                                             .unwrap()
                                             .push(RewriteEngineEvent::EditTransactionCommit);
-                                        responder.send(&mut Ok(())).unwrap()
+                                        responder.send(Ok(())).unwrap()
                                     }
                                 }
                             }
@@ -2124,7 +2122,7 @@ mod tests {
                         Some(TARGET_NODENAME),
                     ) => {
                         events_closure.lock().unwrap().push(RcsEvent::ReverseTcp);
-                        responder.send(&mut Ok(())).unwrap()
+                        responder.send(Ok(())).unwrap()
                     }
                     (req, target) => {
                         panic!("Unexpected request {:?}: {:?}", target, req)

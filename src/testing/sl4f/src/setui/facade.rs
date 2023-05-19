@@ -345,7 +345,7 @@ mod tests {
                             ..Default::default()
                         }
                     );
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("Unexpected stream item: {:?}", other),
             }
@@ -389,7 +389,7 @@ mod tests {
                             ..Default::default()
                         }
                     );
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("Unexpected stream item: {:?}", other),
             }
@@ -452,7 +452,7 @@ mod tests {
                             ..Default::default()
                         }
                     );
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 other => panic!("Unexpected stream item: {:?}", other),
             }

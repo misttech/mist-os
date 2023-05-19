@@ -18,7 +18,6 @@ common_deps = [
   "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
   "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
   "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
-  "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_rust",
   "//src/connectivity/lib/net-declare",
   "//src/connectivity/lib/net-types",
   "//src/connectivity/lib/network-device/rust",

@@ -52,10 +52,9 @@ async fn handle_target_request(
         }
         TargetHandlerRequest::SendCommand { command, pressed, responder } => {
             if let Ok(state) = media_sessions.get_active_session() {
-                responder
-                    .send(&mut state.handle_avc_passthrough_command(command, pressed).await)?;
+                responder.send(state.handle_avc_passthrough_command(command, pressed).await)?;
             } else {
-                responder.send(&mut Err(TargetPassthroughError::CommandRejected))?;
+                responder.send(Err(TargetPassthroughError::CommandRejected))?;
             }
         }
         TargetHandlerRequest::ListPlayerApplicationSettingAttributes { responder } => {
@@ -114,8 +113,8 @@ async fn handle_target_request(
             );
         }
         TargetHandlerRequest::SetAddressedPlayer { player_id, responder } => {
-            let mut response = media_sessions.set_addressed_player(player_id);
-            responder.send(&mut response)?;
+            let response = media_sessions.set_addressed_player(player_id);
+            responder.send(response)?;
         }
         TargetHandlerRequest::GetMediaPlayerItems { responder } => {
             let mut response = media_sessions.get_media_player_items();

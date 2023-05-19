@@ -197,7 +197,7 @@ pub mod hooks {
                         responder.send(status.into_raw())
                     }
                     paver::BootManagerRequest::SetOneShotRecovery { responder, .. } => {
-                        responder.send(&mut Ok(()))
+                        responder.send(Ok(()))
                     }
                     paver::BootManagerRequest::Flush { responder } => {
                         responder.send(status.into_raw())
@@ -668,7 +668,7 @@ impl MockPaverService {
                     responder.send(Status::OK.into_raw())
                 }
                 paver::BootManagerRequest::SetOneShotRecovery { responder, .. } => {
-                    responder.send(&mut Ok(()))
+                    responder.send(Ok(()))
                 }
                 paver::BootManagerRequest::Flush { responder } => {
                     responder.send(Status::OK.into_raw())

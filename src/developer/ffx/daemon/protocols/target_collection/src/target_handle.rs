@@ -88,7 +88,7 @@ impl TargetHandleInner {
                 }
             }
             ffx::TargetRequest::SetPreferredSshAddress { ip, responder } => {
-                let mut result = self
+                let result = self
                     .target
                     .set_preferred_ssh_address(ip.into())
                     .then(|| ())
@@ -98,7 +98,7 @@ impl TargetHandleInner {
                     self.target.maybe_reconnect();
                 }
 
-                responder.send(&mut result).map_err(Into::into)
+                responder.send(result).map_err(Into::into)
             }
             ffx::TargetRequest::ClearPreferredSshAddress { responder } => {
                 self.target.clear_preferred_ssh_address();
@@ -113,12 +113,11 @@ impl TargetHandleInner {
                         // TODO(awdavies): Return this as a specific error to
                         // the client with map_err.
                         c.copy_to_channel(remote_control.into_channel())?;
-                        responder.send(&mut Ok(())).map_err(Into::into)
+                        responder.send(Ok(())).map_err(Into::into)
                     }
-                    Err(e) => responder
-                        .send(&mut Err(e))
-                        .context("sending error response")
-                        .map_err(Into::into),
+                    Err(e) => {
+                        responder.send(Err(e)).context("sending error response").map_err(Into::into)
+                    }
                 }
             }
             ffx::TargetRequest::OpenFastboot { fastboot, .. } => {
@@ -371,7 +370,7 @@ mod tests {
                                             "fuchsia.developer.remotecontrol.RemoteControl"
                                         );
                                         knock_channels.push(server_chan);
-                                        responder.send(&mut Ok(())).unwrap();
+                                        responder.send(Ok(())).unwrap();
                                     }
                                     _ => panic!("unsupported for this test"),
                                 }

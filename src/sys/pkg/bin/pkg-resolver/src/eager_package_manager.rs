@@ -594,7 +594,7 @@ pub async fn run_cup_service<T: Resolver>(
     while let Some(event) = stream.try_next().await? {
         match event {
             CupRequest::Write { url, cup, responder } => {
-                let mut response = match manager.as_ref() {
+                let response = match manager.as_ref() {
                     Some(manager) => {
                         EagerPackageManager::cup_write(manager, &url, cup).await.map_err(|e| {
                             let write_error = (&e).into();
@@ -611,7 +611,7 @@ pub async fn run_cup_service<T: Resolver>(
                         .as_occurrence(1),
                 );
 
-                responder.send(&mut response)?;
+                responder.send(response)?;
             }
             CupRequest::GetInfo { url, responder } => {
                 let mut response = match manager.as_ref() {
@@ -737,7 +737,7 @@ mod tests {
                     if meta_far_blob.blob_id.merkle_root
                         != TEST_HASH.parse::<Hash>().unwrap().as_bytes()
                     {
-                        responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw())).unwrap();
+                        responder.send(Err(zx::Status::NOT_FOUND.into_raw())).unwrap();
                         continue;
                     }
                     let mut needed_blobs = needed_blobs.into_stream().unwrap();
@@ -759,7 +759,7 @@ mod tests {
                             r => panic!("Unexpected request: {r:?}"),
                         }
                     }
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(Ok(())).unwrap();
                 }
                 r => panic!("Unexpected request: {r:?}"),
             }

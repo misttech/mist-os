@@ -43,7 +43,7 @@ impl Mocks for SetupTest {
                             tracing::info!("Request has user reboot request.");
                             recorded_actions_clone.lock().await.push(Action::Reboot);
                             tracing::info!("recorded_actions added Action::Reboot.");
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                             tracing::info!("Responder sent.");
                         }
                     }

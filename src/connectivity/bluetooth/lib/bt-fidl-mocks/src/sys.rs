@@ -58,11 +58,11 @@ impl AccessMock {
     pub async fn expect_disconnect(
         &mut self,
         expected_peer_id: PeerId,
-        mut result: Result<(), AccessError>,
+        result: Result<(), AccessError>,
     ) -> Result<(), Error> {
         expect_call(&mut self.stream, self.timeout, move |req| match req {
             AccessRequest::Disconnect { id, responder } if id == expected_peer_id => {
-                responder.send(&mut result)?;
+                responder.send(result)?;
                 Ok(Status::Satisfied(()))
             }
             _ => Ok(Status::Pending),
@@ -73,11 +73,11 @@ impl AccessMock {
     pub async fn expect_forget(
         &mut self,
         expected_peer_id: PeerId,
-        mut result: Result<(), AccessError>,
+        result: Result<(), AccessError>,
     ) -> Result<(), Error> {
         expect_call(&mut self.stream, self.timeout, move |req| match req {
             AccessRequest::Forget { id, responder } if id == expected_peer_id => {
-                responder.send(&mut result)?;
+                responder.send(result)?;
                 Ok(Status::Satisfied(()))
             }
             _ => Ok(Status::Pending),
@@ -89,13 +89,13 @@ impl AccessMock {
         &mut self,
         expected_peer_id: PeerId,
         expected_options: PairingOptions,
-        mut result: Result<(), AccessError>,
+        result: Result<(), AccessError>,
     ) -> Result<(), Error> {
         expect_call(&mut self.stream, self.timeout, move |req| match req {
             AccessRequest::Pair { id, options, responder }
                 if id == expected_peer_id && options == expected_options =>
             {
-                responder.send(&mut result)?;
+                responder.send(result)?;
                 Ok(Status::Satisfied(()))
             }
             _ => Ok(Status::Pending),

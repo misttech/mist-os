@@ -34,7 +34,7 @@ mod test {
     async fn test_set() {
         let proxy = setup_fake_display_proxy(move |req| match req {
             DisplayRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             DisplayRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -83,7 +83,7 @@ mod test {
     async fn validate_display_set_output(expected_display: SetArgs) -> Result<()> {
         let proxy = setup_fake_display_proxy(move |req| match req {
             DisplayRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             DisplayRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

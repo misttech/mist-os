@@ -37,7 +37,7 @@ mod test {
                 assert!(configuration.session_url.is_some());
                 let session_url = configuration.session_url.unwrap();
                 assert!(session_url == SESSION_URL.to_string());
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
         });
 

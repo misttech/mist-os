@@ -907,7 +907,7 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut stash_server.try_next()),
             Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
-                responder.send(&mut Ok(())).expect("failed to send stash response");
+                responder.send(Ok(())).expect("failed to send stash response");
             }
         );
     }

@@ -205,7 +205,7 @@ mod tests {
             let (configuration, responder) =
                 launch_request.into_launch().expect("Failed to unwrap launch request");
             assert_eq!(configuration.session_url, Some(session_url.to_string()));
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(Ok(()));
         });
 
         assert!(launch_session(&session_url, launcher).await.is_ok());
@@ -224,7 +224,7 @@ mod tests {
                 launcher_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
             let (_, responder) =
                 launch_request.into_launch().expect("Failed to unwrap launch request");
-            let _ = responder.send(&mut Err(fsession::LaunchError::NotFound));
+            let _ = responder.send(Err(fsession::LaunchError::NotFound));
         });
 
         assert!(launch_session(&session_url, launcher).await.is_err());
@@ -242,7 +242,7 @@ mod tests {
                 restarter_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
             let responder =
                 restarter_request.into_restart().expect("Failed to unwrap restarter request");
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(Ok(()));
         });
 
         assert!(restart_session(restarter).await.is_ok());
@@ -260,7 +260,7 @@ mod tests {
                 restarter_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
             let responder =
                 restarter_request.into_restart().expect("Failed to unwrap restarter request");
-            let _ = responder.send(&mut Err(fsession::RestartError::NotFound));
+            let _ = responder.send(Err(fsession::RestartError::NotFound));
         });
 
         assert!(restart_session(restarter).await.is_err());
@@ -278,7 +278,7 @@ mod tests {
                 manager_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
             let felement::ManagerRequest::ProposeElement { spec, responder, .. } = propose_request;
             assert_eq!(spec.component_url, Some(element_url.to_string()));
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(Ok(()));
         });
 
         assert!(add_element(element_url, manager).await.is_ok());
@@ -295,7 +295,7 @@ mod tests {
             let propose_request =
                 manager_server.try_next().await.expect("FIDL Error").expect("Stream terminated");
             let felement::ManagerRequest::ProposeElement { responder, .. } = propose_request;
-            let _ = responder.send(&mut Err(felement::ProposeElementError::InvalidArgs));
+            let _ = responder.send(Err(felement::ProposeElementError::InvalidArgs));
         });
 
         assert!(add_element(element_url, manager).await.is_err());

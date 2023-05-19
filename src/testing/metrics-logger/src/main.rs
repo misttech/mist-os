@@ -248,7 +248,7 @@ impl MetricsLoggerServer {
                 output_stats_to_syslog,
                 responder,
             } => {
-                let mut result = self
+                let result = self
                     .start_logging(
                         &client_id,
                         metrics,
@@ -257,7 +257,7 @@ impl MetricsLoggerServer {
                         Some(duration_ms),
                     )
                     .await;
-                responder.send(&mut result)?;
+                responder.send(result)?;
             }
             MetricsLoggerRequest::StartLoggingForever {
                 client_id,
@@ -266,7 +266,7 @@ impl MetricsLoggerServer {
                 output_stats_to_syslog,
                 responder,
             } => {
-                let mut result = self
+                let result = self
                     .start_logging(
                         &client_id,
                         metrics,
@@ -275,7 +275,7 @@ impl MetricsLoggerServer {
                         None,
                     )
                     .await;
-                responder.send(&mut result)?;
+                responder.send(result)?;
             }
             MetricsLoggerRequest::StopLogging { client_id, responder } => {
                 responder.send(self.client_tasks.borrow_mut().remove(&client_id).is_some())?;

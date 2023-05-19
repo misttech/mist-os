@@ -73,7 +73,7 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                     // to this method call. Calling `send` on the responder exactly once will send
                     // the reply.
                     responder
-                        .send(&mut write_item(&mut store.borrow_mut(), attempt))
+                        .send(write_item(&mut store.borrow_mut(), attempt))
                         .context("error sending reply")?;
                     println!("WriteItem response sent");
                 }

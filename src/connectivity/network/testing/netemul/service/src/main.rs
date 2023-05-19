@@ -612,7 +612,7 @@ impl ManagedRealm {
                     })()
                     .await;
                     with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(&mut response.map_err(zx::Status::into_raw))
+                        r.send(response.map_err(zx::Status::into_raw))
                     })
                     .context("responding to AddDevice request")?;
                 }
@@ -662,7 +662,7 @@ impl ManagedRealm {
                     })()
                     .await;
                     with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(&mut response.map_err(zx::Status::into_raw))
+                        r.send(response.map_err(zx::Status::into_raw))
                     })
                     .context("responding to RemoveDevice request")?;
                 }
@@ -704,7 +704,7 @@ impl ManagedRealm {
                     }
                     .await;
                     with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(&mut response.map_err(zx::Status::into_raw))
+                        r.send(response.map_err(zx::Status::into_raw))
                     })
                     .context("responding to StartChildComponent request")?;
                 }
@@ -743,7 +743,7 @@ impl ManagedRealm {
                     }
                     .await;
                     with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(&mut response.map_err(zx::Status::into_raw))
+                        r.send(response.map_err(zx::Status::into_raw))
                     })
                     .context("responding to StopChildComponent request")?;
                 }

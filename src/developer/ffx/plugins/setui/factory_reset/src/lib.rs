@@ -54,7 +54,7 @@ mod test {
 
         let proxy = setup_fake_factory_reset_proxy(move |req| match req {
             FactoryResetRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             FactoryResetRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
@@ -80,7 +80,7 @@ mod test {
     ) -> Result<()> {
         let proxy = setup_fake_factory_reset_proxy(move |req| match req {
             FactoryResetRequest::Set { responder, .. } => {
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(Ok(()));
             }
             FactoryResetRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");

@@ -57,7 +57,7 @@ impl From<PeerManagerRequest> for Event {
         match src {
             PeerManagerRequest::RegisterTargetHandler { handler, responder, .. } => {
                 let handler = handler.into_proxy().unwrap();
-                responder.send(&mut Ok(())).expect("Failed to respond");
+                responder.send(Ok(())).expect("Failed to respond");
                 Self::Avrcp(Some(handler))
             }
             r => panic!("Expected RegisterTargetHandler but got: {:?}", r),

@@ -58,27 +58,26 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         while let Some(request) = receiver.next().await {
             let result = match request {
                 fuzz::ManagerRequest::Connect { fuzzer_url, controller, responder } => {
-                    let mut response = self
+                    let response = self
                         .connect(&fuzzer_url, controller)
                         .await
                         .map_err(|status| status.into_raw());
-                    responder.send(&mut response)
+                    responder.send(response)
                 }
                 fuzz::ManagerRequest::GetOutput { fuzzer_url, output, socket, responder } => {
                     let result = self.get_output(&fuzzer_url, output, socket).await;
-                    let mut response = match result {
+                    let response = match result {
                         Ok(()) => Ok(()),
                         Err(e) => {
                             let _ = self.stop(&fuzzer_url).await;
                             Err(e.into_raw())
                         }
                     };
-                    responder.send(&mut response)
+                    responder.send(response)
                 }
                 fuzz::ManagerRequest::Stop { fuzzer_url, responder } => {
-                    let mut response =
-                        self.stop(&fuzzer_url).await.map_err(|status| status.into_raw());
-                    responder.send(&mut response)
+                    let response = self.stop(&fuzzer_url).await.map_err(|status| status.into_raw());
+                    responder.send(response)
                 }
             };
             if let Err(e) = result {

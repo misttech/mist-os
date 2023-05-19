@@ -384,7 +384,7 @@ mod tests {
 
         // now send the response back
         responder
-            .send(&mut result.map_err(|e| e.into_raw()))
+            .send(result.map_err(|e| e.into_raw()))
             .expect("fake sme proxy response: send failed");
 
         // and return the stream
@@ -407,7 +407,7 @@ mod tests {
 
         // now send the response back
         responder
-            .send(&mut result.map_err(|e| e.into_raw()))
+            .send(result.map_err(|e| e.into_raw()))
             .expect("fake sme proxy response: send failed")
     }
 
@@ -799,7 +799,7 @@ mod tests {
         };
 
         // now send the response back
-        let _result = responder.send(&mut result.map_err(|e| e.into_raw()));
+        let _result = responder.send(result.map_err(|e| e.into_raw()));
     }
 
     #[test]

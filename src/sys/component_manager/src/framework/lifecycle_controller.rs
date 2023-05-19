@@ -177,26 +177,26 @@ impl LifecycleController {
         while let Ok(Some(operation)) = stream.try_next().await {
             match operation {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    let mut res = self.resolve_instance(&scope_moniker, moniker).await;
-                    responder.send(&mut res).unwrap_or_else(
+                    let res = self.resolve_instance(&scope_moniker, moniker).await;
+                    responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.ResolveInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::UnresolveInstance { moniker, responder } => {
-                    let mut res = self.unresolve_instance(&scope_moniker, moniker).await;
-                    responder.send(&mut res).unwrap_or_else(
+                    let res = self.unresolve_instance(&scope_moniker, moniker).await;
+                    responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.UnresolveInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::StartInstance { moniker, binder, responder } => {
-                    let mut res = self.start_instance(&scope_moniker, moniker, binder).await;
-                    responder.send(&mut res).unwrap_or_else(
+                    let res = self.start_instance(&scope_moniker, moniker, binder).await;
+                    responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.StartInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::StopInstance { moniker, responder } => {
-                    let mut res = self.stop_instance(&scope_moniker, moniker).await;
-                    responder.send(&mut res).unwrap_or_else(
+                    let res = self.stop_instance(&scope_moniker, moniker).await;
+                    responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.StopInstance failed to send"),
                     );
                 }
@@ -207,10 +207,10 @@ impl LifecycleController {
                     args,
                     responder,
                 } => {
-                    let mut res = self
+                    let res = self
                         .create_instance(&scope_moniker, parent_moniker, collection, decl, args)
                         .await;
-                    responder.send(&mut res).unwrap_or_else(
+                    responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.CreateInstance failed to send"),
                     );
                 }
@@ -219,9 +219,8 @@ impl LifecycleController {
                     child,
                     responder,
                 } => {
-                    let mut res =
-                        self.destroy_instance(&scope_moniker, parent_moniker, child).await;
-                    responder.send(&mut res).unwrap_or_else(
+                    let res = self.destroy_instance(&scope_moniker, parent_moniker, child).await;
+                    responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.DestroyInstance failed to send"),
                     );
                 }

@@ -6,7 +6,6 @@ use std::ops::ControlFlow;
 
 use async_utils::stream::OneOrMany;
 use fidl::endpoints::{ControlHandle, RequestStream};
-use fidl_fuchsia_unknown::CloseableCloseResult;
 use futures::StreamExt as _;
 use netstack3_core::SyncCtx;
 use tracing::error;
@@ -73,7 +72,7 @@ pub(crate) trait CloseResponder: Send {
     /// Dispatches the provided response.
     ///
     /// Attempts to send the provided response, returning any error that arises.
-    fn send(self, response: &mut CloseableCloseResult) -> Result<(), fidl::Error>;
+    fn send(self, response: Result<(), i32>) -> Result<(), fidl::Error>;
 }
 
 impl<H: SocketWorkerHandler> SocketWorker<H> {
@@ -145,7 +144,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 ControlFlow::Continue(None) => {}
                 ControlFlow::Break(close_responder) => {
                     let respond_close = move || {
-                        responder_send!(close_responder, &mut Ok(()));
+                        responder_send!(close_responder, Ok(()));
                         request_stream.control_handle().shutdown();
                     };
                     if futures.is_empty() {

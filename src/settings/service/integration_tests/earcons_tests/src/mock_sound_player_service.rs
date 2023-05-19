@@ -55,7 +55,7 @@ pub async fn sound_player_service_mock(
                                  usage",
                             );
                             }
-                            responder.send(&mut Ok(())).unwrap();
+                            responder.send(Ok(())).unwrap();
                         }
                         _ => {}
                     }

@@ -105,11 +105,11 @@ async fn handle_controller<T: Test + 'static>(
 ) -> Result<()> {
     match request {
         ControllerRequest::Setup { responder, device_label, device_path, seed } => {
-            let mut res = test.setup(device_label, device_path, seed).await.map_err(|e| {
+            let res = test.setup(device_label, device_path, seed).await.map_err(|e| {
                 tracing::error!("{}", e);
                 zx::Status::INTERNAL.into_raw()
             });
-            responder.send(&mut res)?;
+            responder.send(res)?;
         }
         ControllerRequest::Test { responder, device_label, device_path, seed, duration } => {
             let test_fut = test.test(device_label, device_path, seed).map_err(|e| {
@@ -121,27 +121,27 @@ async fn handle_controller<T: Test + 'static>(
                 // duration.
                 tracing::info!("starting test and replying in {} seconds...", duration);
                 let timer = fasync::Timer::new(std::time::Duration::from_secs(duration));
-                let mut res = match future::select(test_fut, timer).await {
+                let res = match future::select(test_fut, timer).await {
                     future::Either::Left((res, _)) => res,
                     future::Either::Right((_, test_fut)) => {
                         fasync::Task::spawn(test_fut.map(|_| ())).detach();
                         Ok(())
                     }
                 };
-                responder.send(&mut res)?;
+                responder.send(res)?;
             } else {
                 // If a zero duration is provided, return once the test step is complete.
                 tracing::info!("starting test...");
-                responder.send(&mut test_fut.await)?;
+                responder.send(test_fut.await)?;
             }
         }
         ControllerRequest::Verify { responder, device_label, device_path, seed } => {
-            let mut res = test.verify(device_label, device_path, seed).await.map_err(|e| {
+            let res = test.verify(device_label, device_path, seed).await.map_err(|e| {
                 // The test tries failing on purpose, so only print errors as warnings.
                 tracing::warn!("{}", e);
                 zx::Status::BAD_STATE.into_raw()
             });
-            responder.send(&mut res)?;
+            responder.send(res)?;
         }
     }
 

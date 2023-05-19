@@ -210,7 +210,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::StreamExt;
 
-    fn serve_realm_query(mut result: fsys::RealmQueryOpenResult) -> fsys::RealmQueryProxy {
+    fn serve_realm_query(result: fsys::RealmQueryOpenResult) -> fsys::RealmQueryProxy {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
         fasync::Task::spawn(async move {
@@ -221,7 +221,7 @@ mod tests {
                 _ => panic!("Unexpected RealmQueryRequest"),
             };
             assert_eq!(moniker, ".");
-            responder.send(&mut result).unwrap();
+            responder.send(result).unwrap();
         })
         .detach();
         proxy

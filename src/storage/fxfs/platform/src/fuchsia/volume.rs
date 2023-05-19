@@ -444,8 +444,7 @@ impl FxVolumeAndRoot {
             match request {
                 ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
                     .send(
-                        &mut self
-                            .volume
+                        self.volume
                             .store()
                             .set_project_limit(project_id, bytes, nodes)
                             .await
@@ -455,23 +454,18 @@ impl FxVolumeAndRoot {
                             }),
                     )?,
                 ProjectIdRequest::Clear { responder, project_id } => responder.send(
-                    &mut self.volume.store().clear_project_limit(project_id).await.map_err(
+                    self.volume.store().clear_project_limit(project_id).await.map_err(|error| {
+                        error!(?error, store_id, project_id, "Failed to clear project limit");
+                        map_to_raw_status(error)
+                    }),
+                )?,
+                ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
+                    self.volume.store().set_project_for_node(node_id, project_id).await.map_err(
                         |error| {
-                            error!(?error, store_id, project_id, "Failed to clear project limit");
+                            error!(?error, store_id, node_id, project_id, "Failed to apply node.");
                             map_to_raw_status(error)
                         },
                     ),
-                )?,
-                ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
-                    &mut self
-                        .volume
-                        .store()
-                        .set_project_for_node(node_id, project_id)
-                        .await
-                        .map_err(|error| {
-                            error!(?error, store_id, node_id, project_id, "Failed to apply node.");
-                            map_to_raw_status(error)
-                        }),
                 )?,
                 ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
                     &mut self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
@@ -480,12 +474,10 @@ impl FxVolumeAndRoot {
                     }),
                 )?,
                 ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
-                    &mut self.volume.store().clear_project_for_node(node_id).await.map_err(
-                        |error| {
-                            error!(?error, store_id, node_id, "Failed to clear for node.");
-                            map_to_raw_status(error)
-                        },
-                    ),
+                    self.volume.store().clear_project_for_node(node_id).await.map_err(|error| {
+                        error!(?error, store_id, node_id, "Failed to clear for node.");
+                        map_to_raw_status(error)
+                    }),
                 )?,
                 ProjectIdRequest::List { responder, token } => {
                     responder.send(&mut self.list_projects(&token).await.map_err(|error| {

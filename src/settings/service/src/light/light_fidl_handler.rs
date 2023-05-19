@@ -89,8 +89,8 @@ impl From<Response> for Scoped<LightSetLightGroupValuesResult> {
 impl request::Responder<Scoped<LightSetLightGroupValuesResult>>
     for LightSetLightGroupValuesResponder
 {
-    fn respond(self, Scoped(mut response): Scoped<LightSetLightGroupValuesResult>) {
-        let _ = self.send(&mut response);
+    fn respond(self, Scoped(response): Scoped<LightSetLightGroupValuesResult>) {
+        let _ = self.send(response);
     }
 }
 

@@ -1940,7 +1940,7 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut stash_server.try_next()),
             Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
-                responder.send(&mut Ok(())).expect("failed to send stash response");
+                responder.send(Ok(())).expect("failed to send stash response");
             }
         );
     }
@@ -2033,7 +2033,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
                 }) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
 
                     sme_server
                 }
@@ -2128,7 +2128,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                 }
             );
 
@@ -2279,7 +2279,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
                 }) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
 
                     sme_server
                 }
@@ -3118,7 +3118,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }))) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                 }
             );
 
@@ -3129,7 +3129,7 @@ mod tests {
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
                     iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
                 }))) => {
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                     feature_support_server
                 }
             );
@@ -3156,7 +3156,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }))) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                 }
             );
 
@@ -3611,7 +3611,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }))) => {
                     responder
-                        .send(&mut Ok(()))
+                        .send(Ok(()))
                         .expect("failed to send AP SME response.");
                 }
             );
@@ -3623,7 +3623,7 @@ mod tests {
                 Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
                     iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
                 }))) => {
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                     feature_support_server
                 }
             );
@@ -3687,7 +3687,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }))) => {
                     responder
-                        .send(&mut Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                        .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
                         .expect("failed to send client SME response.");
                 }
             );
@@ -3858,7 +3858,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                 }
             );
 
@@ -3868,7 +3868,7 @@ mod tests {
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
                     iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
                 }) => {
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                     feature_support_server
                 }
             );
@@ -3895,7 +3895,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                 }
             );
 
@@ -3968,7 +3968,7 @@ mod tests {
             );
 
             // Send back a positive acknowledgement.
-            assert!(responder.send(&mut Ok(())).is_ok());
+            assert!(responder.send(Ok(())).is_ok());
 
             // Run the future to completion.
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -4164,7 +4164,7 @@ mod tests {
                 responder,
             }) => {
                 // Send back a positive acknowledgement.
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
             }
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetApSme {
                 iface_id: TEST_AP_IFACE_ID,
@@ -4172,7 +4172,7 @@ mod tests {
                 responder,
             }) => {
                 // Send back a positive acknowledgement.
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
             }
             _ => {}
         }
@@ -4672,7 +4672,7 @@ mod tests {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
             }) => {
                 // Send back a positive acknowledgement.
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
             }
         );
 
@@ -4683,7 +4683,7 @@ mod tests {
             Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
                 iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
             }) => {
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
                 feature_support_server
             }
         );
@@ -4709,7 +4709,7 @@ mod tests {
                 iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
             }) => {
                 // Send back a positive acknowledgement.
-                assert!(responder.send(&mut Ok(())).is_ok());
+                assert!(responder.send(Ok(())).is_ok());
             }
         );
 
@@ -5083,7 +5083,7 @@ mod tests {
                 Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
                 }) => {
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
                     sme_server
                 }
             );
@@ -5436,7 +5436,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
                 }) => {
                     // Send back a positive acknowledgement.
-                    assert!(responder.send(&mut Ok(())).is_ok());
+                    assert!(responder.send(Ok(())).is_ok());
 
                     sme_server
                 }

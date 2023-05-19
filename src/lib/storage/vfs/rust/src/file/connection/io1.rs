@@ -740,7 +740,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "File::Close");
-                responder.send(&mut self.file.close().await.map_err(|status| status.into_raw()))?;
+                responder.send(self.file.close().await.map_err(|status| status.into_raw()))?;
                 return Ok(ConnectionState::Closed);
             }
             fio::FileRequest::Describe { responder } => {
@@ -764,7 +764,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::Sync { responder } => {
                 fuchsia_trace::duration!("storage", "File::Sync");
-                responder.send(&mut self.file.sync().await.map_err(|status| status.into_raw()))?;
+                responder.send(self.file.sync().await.map_err(|status| status.into_raw()))?;
             }
             fio::FileRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetAttr");
@@ -784,7 +784,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::UpdateAttributes");
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "File::ListExtendedAttributes");
@@ -797,15 +797,15 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::SetExtendedAttribute { name, value, responder } => {
                 fuchsia_trace::duration!("storage", "File::SetExtendedAttribute");
-                let mut res =
+                let res =
                     self.handle_set_extended_attribute(name, value).await.map_err(|s| s.into_raw());
-                responder.send(&mut res)?;
+                responder.send(res)?;
             }
             fio::FileRequest::RemoveExtendedAttribute { name, responder } => {
                 fuchsia_trace::duration!("storage", "File::RemoveExtendedAttribute");
-                let mut res =
+                let res =
                     self.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(&mut res)?;
+                responder.send(res)?;
             }
             fio::FileRequest::Read { count, responder } => {
                 fuchsia_trace::duration!("storage", "File::Read", "bytes" => count);
@@ -845,7 +845,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::Resize { length, responder } => {
                 fuchsia_trace::duration!("storage", "File::Resize", "length" => length);
                 let result = self.handle_truncate(length).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::GetFlags { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetFlags");
@@ -863,7 +863,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::AdvisoryLock { request: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::AdvisoryLock");
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::FileRequest::Query { responder } => {
                 responder.send(

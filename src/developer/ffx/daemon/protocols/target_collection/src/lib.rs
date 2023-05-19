@@ -253,7 +253,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     }
                     Err(e) => {
                         return responder
-                            .send(&mut match e {
+                            .send(match e {
                                 ffx::DaemonError::TargetAmbiguous => {
                                     tracing::warn!("Ambiguous Query");
                                     Err(ffx::OpenTargetError::QueryAmbiguous)
@@ -273,7 +273,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     }
                 };
                 self.tasks.spawn(TargetHandle::new(target, cx.clone(), target_handle)?);
-                responder.send(&mut Ok(())).map_err(Into::into)
+                responder.send(Ok(())).map_err(Into::into)
             }
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config, add_target_responder, ..

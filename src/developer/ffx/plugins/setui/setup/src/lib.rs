@@ -47,7 +47,7 @@ mod test {
             SetupRequest::Set { settings, responder, .. } => {
                 if let Some(val) = settings.enabled_configuration_interfaces {
                     assert_eq!(val, INTERFACE);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 } else {
                     panic!("Unexpected call to set");
                 }
@@ -76,7 +76,7 @@ mod test {
             SetupRequest::Set { settings, responder, .. } => {
                 if let Some(val) = settings.enabled_configuration_interfaces {
                     assert_eq!(val, expected_interface);
-                    let _ = responder.send(&mut Ok(()));
+                    let _ = responder.send(Ok(()));
                 } else {
                     panic!("Unexpected call to set");
                 }
