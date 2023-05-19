@@ -70,7 +70,10 @@ zx_status_t SdioControllerDevice::Create(zx_device_t* parent, const SdmmcDevice&
 
 zx_status_t SdioControllerDevice::Probe() {
   fbl::AutoLock lock(&lock_);
+  return ProbeLocked();
+}
 
+zx_status_t SdioControllerDevice::ProbeLocked() {
   zx_status_t st = SdioReset();
 
   if ((st = sdmmc_.SdmmcGoIdle()) != ZX_OK) {
@@ -665,6 +668,30 @@ void SdioControllerDevice::SdioRunDiagnostics() {
   }
 
   zxlogf(INFO, "CCCR:%s", cccr_string);
+}
+
+void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
+                                                void* cookie) {
+  if (dead_) {
+    return callback(cookie, ZX_ERR_CANCELED);
+  }
+
+  fbl::AutoLock lock(&lock_);
+
+  tuned_ = false;
+  funcs_ = {};
+  hw_info_ = {};
+
+  sdmmc_.host().HwReset();
+
+  zx_status_t status = ProbeLocked();
+  if (status == ZX_OK) {
+    zxlogf(INFO, "Reset card successfully");
+  } else {
+    zxlogf(ERROR, "Card reset failed: %s", zx_status_get_string(status));
+  }
+
+  callback(cookie, status);
 }
 
 zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {

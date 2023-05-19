@@ -236,6 +236,8 @@ zx_status_t SdioFunctionDevice::SdioDoRwTxn(const sdio_rw_txn_t* txn) {
 void SdioFunctionDevice::SdioRunDiagnostics() { return sdio_parent_->SdioRunDiagnostics(); }
 
 void SdioFunctionDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
-                                              void* cookie) {}
+                                              void* cookie) {
+  sdio_parent_->SdioRequestCardReset(callback, cookie);
+}
 
 }  // namespace sdmmc

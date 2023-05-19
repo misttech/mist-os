@@ -68,6 +68,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   zx_status_t SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo* out_vmo);
   zx_status_t SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn);
   void SdioRunDiagnostics();
+  void SdioRequestCardReset(sdio_request_card_reset_callback callback, void* cookie) TA_EXCL(lock_);
 
   void InBandInterruptCallback();
 
@@ -95,6 +96,8 @@ class SdioControllerDevice : public SdioControllerDeviceType,
     bool enabled;
     bool intr_enabled;
   };
+
+  zx_status_t ProbeLocked() TA_REQ(lock_);
 
   zx_status_t SdioReset() TA_REQ(lock_);
   // Reads the card common control registers (CCCR) to enumerate the card's capabilities.

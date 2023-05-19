@@ -1502,4 +1502,41 @@ TEST_F(SdioScatterGatherTest, ScatterGatherOverMaxTransferSize) {
   EXPECT_EQ(req3.rw_flag, 1);
 }
 
+TEST_F(SdioControllerDeviceTest, RequestCardReset) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(5) | SDIO_SEND_OP_COND_RESP_S18A;
+  });
+
+  sdmmc_.Write(0x0014, std::vector<uint8_t>{0x07}, 0);
+
+  sdmmc_.set_host_info({
+      .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
+              SDMMC_HOST_CAP_DDR50,
+      .max_transfer_size = 0x1000,
+      .max_transfer_size_non_dma = 0x1000,
+      .prefs = 0,
+  });
+  EXPECT_OK(dut_->Init());
+
+  EXPECT_OK(dut_->Probe());
+
+  EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
+  EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
+  EXPECT_EQ(sdmmc_.bus_freq(), 208'000'000);
+  EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
+
+  zx_status_t status = ZX_ERR_IO;
+  dut_->SdioRequestCardReset(
+      [](void* ctx, zx_status_t reset_status) {
+        *reinterpret_cast<zx_status_t*>(ctx) = reset_status;
+      },
+      &status);
+
+  EXPECT_OK(status);
+  EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
+  EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
+  EXPECT_EQ(sdmmc_.bus_freq(), 208'000'000);
+  EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
+}
+
 }  // namespace sdmmc
