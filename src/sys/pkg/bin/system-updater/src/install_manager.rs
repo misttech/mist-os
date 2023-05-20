@@ -6,7 +6,9 @@ use {
     crate::update::{Config, EnvironmentConnector, RebootController, Updater},
     anyhow::anyhow,
     event_queue::{EventQueue, Notify},
-    fidl_fuchsia_update_installer::{ResumeError, SuspendError, UpdateNotStartedReason},
+    fidl_fuchsia_update_installer::{
+        CancelError, ResumeError, SuspendError, UpdateNotStartedReason,
+    },
     fidl_fuchsia_update_installer_ext::State,
     fuchsia_async as fasync, fuchsia_inspect as inspect,
     fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _},
@@ -18,7 +20,6 @@ use {
         stream::FusedStream,
     },
     std::time::Duration,
-    thiserror::Error,
     tracing::{error, warn},
 };
 
@@ -205,7 +206,7 @@ where
             ControlRequest::Resume(ResumeRequestData { responder, .. }) => {
                 let _ = responder.send(Err(ResumeError::NoUpdateInProgress));
             }
-            ControlRequest::Cancel(responder) => {
+            ControlRequest::Cancel(CancelRequestData { responder, .. }) => {
                 let _ = responder.send(Err(CancelError::NoUpdateInProgress));
             }
         }
@@ -227,6 +228,9 @@ async fn handle_active_control_request<N>(
 ) where
     N: Notify,
 {
+    let attempt_id_mismatch =
+        |request_id: Option<String>| request_id.is_some_and(|request_id| request_id != attempt_id);
+
     match req {
         ControlRequest::Start(StartRequestData {
             responder,
@@ -251,17 +255,11 @@ async fn handle_active_control_request<N>(
             }
             suspend_state.resume();
         }
-        ControlRequest::Monitor(MonitorRequestData {
-            attempt_id: request_id,
-            monitor,
-            responder,
-        }) => {
+        ControlRequest::Monitor(MonitorRequestData { attempt_id, monitor, responder }) => {
             // If an attempt ID is provided, ensure it matches the current attempt.
-            if let Some(request_id) = request_id {
-                if request_id != attempt_id {
-                    let _ = responder.send(false);
-                    return;
-                }
+            if attempt_id_mismatch(attempt_id) {
+                let _ = responder.send(false);
+                return;
             }
 
             if let Err(e) = monitor_queue.add_client(monitor).await {
@@ -269,13 +267,11 @@ async fn handle_active_control_request<N>(
             }
             let _ = responder.send(true);
         }
-        ControlRequest::Suspend(SuspendRequestData { attempt_id: request_id, responder }) => {
+        ControlRequest::Suspend(SuspendRequestData { attempt_id, responder }) => {
             // If an attempt ID is provided, ensure it matches the current attempt.
-            if let Some(request_id) = request_id {
-                if request_id != attempt_id {
-                    let _ = responder.send(Err(SuspendError::AttemptIdMismatch));
-                    return;
-                }
+            if attempt_id_mismatch(attempt_id) {
+                let _ = responder.send(Err(SuspendError::AttemptIdMismatch));
+                return;
             }
 
             if zx::Time::get_monotonic() > suspend_deadline {
@@ -285,21 +281,27 @@ async fn handle_active_control_request<N>(
             suspend_state.suspend();
             let _ = responder.send(Ok(()));
         }
-        ControlRequest::Resume(ResumeRequestData { attempt_id: request_id, responder }) => {
+        ControlRequest::Resume(ResumeRequestData { attempt_id, responder }) => {
             // If an attempt ID is provided, ensure it matches the current attempt.
-            if let Some(request_id) = request_id {
-                if request_id != attempt_id {
-                    let _ = responder.send(Err(ResumeError::AttemptIdMismatch));
-                    return;
-                }
+            if attempt_id_mismatch(attempt_id) {
+                let _ = responder.send(Err(ResumeError::AttemptIdMismatch));
+                return;
             }
 
             suspend_state.resume();
             let _ = responder.send(Ok(()));
         }
-        ControlRequest::Cancel(responder) => {
+        ControlRequest::Cancel(CancelRequestData { attempt_id, responder }) => {
+            // If an attempt ID is provided, ensure it matches the current attempt.
+            if attempt_id_mismatch(attempt_id) {
+                let _ = responder.send(Err(CancelError::AttemptIdMismatch));
+                return;
+            }
+
             let response = match cancel_sender.take() {
-                Some(cancel_sender) => cancel_sender.send(()).map_err(|()| CancelError::TooLate),
+                Some(cancel_sender) => {
+                    cancel_sender.send(()).map_err(|()| CancelError::UpdateCannotBeCanceled)
+                }
                 None => Ok(()),
             };
             let _ = responder.send(response);
@@ -388,11 +390,12 @@ where
     }
 
     /// Forward CancelUpdate requests to the install manager task.
-    // TODO(fxbug.dev/125721): use this
-    #[allow(dead_code)]
-    pub async fn cancel_update(&mut self) -> Result<Result<(), CancelError>, InstallManagerGone> {
+    pub async fn cancel_update(
+        &mut self,
+        attempt_id: Option<String>,
+    ) -> Result<Result<(), CancelError>, InstallManagerGone> {
         let (responder, receive_response) = oneshot::channel();
-        self.0.send(ControlRequest::Cancel(responder)).await?;
+        self.0.send(ControlRequest::Cancel(CancelRequestData { attempt_id, responder })).await?;
         Ok(receive_response.await?)
     }
 }
@@ -406,7 +409,7 @@ where
     Monitor(MonitorRequestData<N>),
     Suspend(SuspendRequestData),
     Resume(ResumeRequestData),
-    Cancel(oneshot::Sender<Result<(), CancelError>>),
+    Cancel(CancelRequestData),
 }
 
 impl<N: Notify> ControlRequest<N> {
@@ -436,8 +439,11 @@ impl<N: Notify> ControlRequest<N> {
                     node.record_string("attempt id", attempt_id);
                 }
             }
-            Self::Cancel(_) => {
+            Self::Cancel(data) => {
                 node.record_string("request", "cancel");
+                if let Some(attempt_id) = &data.attempt_id {
+                    node.record_string("attempt id", attempt_id);
+                }
             }
         }
     }
@@ -472,12 +478,9 @@ struct ResumeRequestData {
     responder: oneshot::Sender<Result<(), ResumeError>>,
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub enum CancelError {
-    #[error("no update in progress")]
-    NoUpdateInProgress,
-    #[error("update has past the point that can be canceled")]
-    TooLate,
+struct CancelRequestData {
+    attempt_id: Option<String>,
+    responder: oneshot::Sender<Result<(), CancelError>>,
 }
 
 enum SuspendState {
@@ -975,7 +978,7 @@ mod tests {
         let _install_manager_task = fasync::Task::local(fut);
 
         assert_eq!(
-            install_manager_ch.cancel_update().await,
+            install_manager_ch.cancel_update(None).await,
             Ok(Err(CancelError::NoUpdateInProgress))
         );
 
@@ -989,12 +992,12 @@ mod tests {
 
         assert_eq!(state_receiver.next().await, Some(State::Prepare));
 
-        assert_eq!(install_manager_ch.cancel_update().await, Ok(Ok(())));
+        assert_eq!(install_manager_ch.cancel_update(Some("my-attempt".into())).await, Ok(Ok(())));
 
         assert_eq!(state_receiver.next().await, Some(State::Canceled));
 
         assert_eq!(
-            install_manager_ch.cancel_update().await,
+            install_manager_ch.cancel_update(Some("my-attempt".into())).await,
             Ok(Err(CancelError::NoUpdateInProgress))
         );
 
@@ -1014,10 +1017,12 @@ mod tests {
                         },
                         "2": {
                             request: "cancel",
+                            "attempt id": "my-attempt",
                             time: AnyProperty,
                         },
                         "3": {
                             request: "cancel",
+                            "attempt id": "my-attempt",
                             time: AnyProperty,
                         },
                     },
@@ -1027,7 +1032,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn cancel_update_too_late() {
+    async fn cancel_update_errors() {
         let (mut install_manager_ch, _install_manager_task, _updater_sender, _state_sender) =
             start_install_manager_with_update_id("my-attempt").await;
 
@@ -1039,7 +1044,14 @@ mod tests {
             Ok(Ok("my-attempt".to_string()))
         );
 
-        assert_eq!(install_manager_ch.cancel_update().await, Ok(Err(CancelError::TooLate)));
+        assert_eq!(
+            install_manager_ch.cancel_update(Some("wrong-id".into())).await,
+            Ok(Err(CancelError::AttemptIdMismatch))
+        );
+        assert_eq!(
+            install_manager_ch.cancel_update(None).await,
+            Ok(Err(CancelError::UpdateCannotBeCanceled))
+        );
     }
 
     #[fasync::run_singlethreaded(test)]

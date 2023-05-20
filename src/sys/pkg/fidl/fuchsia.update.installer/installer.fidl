@@ -94,6 +94,14 @@ closed protocol Installer {
     strict ResumeUpdate(struct {
         attempt_id AttemptId:optional;
     }) -> () error ResumeError;
+
+    /// Cancel a specific update attempt, if it exists.
+    ///
+    /// + request `attempt_id` UUID identifying the requested update attempt. If
+    ///     not given, cancel any active update attempt.
+    strict CancelUpdate(struct {
+        attempt_id AttemptId:optional;
+    }) -> () error CancelError;
 };
 
 /// Controls the timing of the reboot into the updated system.
@@ -184,4 +192,14 @@ type ResumeError = strict enum {
     NO_UPDATE_IN_PROGRESS = 1;
     /// The given attempt id does not match the current update attempt.
     ATTEMPT_ID_MISMATCH = 2;
+};
+
+/// Why cancel failed.
+type CancelError = strict enum {
+    /// There is no update attempt in progress.
+    NO_UPDATE_IN_PROGRESS = 1;
+    /// The update attempt has past the point that can be canceled.
+    UPDATE_CANNOT_BE_CANCELED = 2;
+    /// The given attempt id does not match the current update attempt.
+    ATTEMPT_ID_MISMATCH = 3;
 };

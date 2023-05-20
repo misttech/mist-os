@@ -151,7 +151,8 @@ impl MockUpdateInstallerService {
                 | InstallerRequest::GetUpdateResult { .. }
                 | InstallerRequest::MonitorUpdate { .. }
                 | InstallerRequest::SuspendUpdate { .. }
-                | InstallerRequest::ResumeUpdate { .. } => {
+                | InstallerRequest::ResumeUpdate { .. }
+                | InstallerRequest::CancelUpdate { .. } => {
                     panic!("unexpected request: {req:?}");
                 }
             }

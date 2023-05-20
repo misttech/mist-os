@@ -45,6 +45,7 @@ use {
 };
 
 mod board;
+mod cancel;
 mod cobalt_metrics;
 mod commits_images;
 mod epoch;
