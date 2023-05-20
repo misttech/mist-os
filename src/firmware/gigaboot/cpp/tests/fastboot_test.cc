@@ -11,13 +11,9 @@
 #include <lib/zbitl/view.h>
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
 #include <lib/zircon_boot/zbi_utils.h>
-#include <sparse_format.h>
-
-#undef error  // Macro from sparse_format.h that interferes with other symbols.
 
 #include <algorithm>
 #include <cctype>
-#include <numeric>
 #include <vector>
 
 #include <fbl/vector.h>
@@ -704,25 +700,17 @@ INSTANTIATE_TEST_SUITE_P(VarErrorTests, VarErrorTest,
                            return info.param.test_name;
                          });
 
-constexpr gpt_entry_t GenerateBasicGptEntry(const char* name, size_t partition_size) {
-  gpt_entry_t entry = {
-      // The GUID and flags aren't important for the lookup.
-      .first = kGptFirstUsableBlocks,
-      .last = kGptFirstUsableBlocks + DivideRoundUp(partition_size, kBlockSize),
-  };
-  SetGptEntryName(name, entry);
-  return entry;
-}
-
 TEST_F(FastbootFlashTest, FlashPartition) {
   constexpr size_t partition_size = 0x100;
-  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
-  AddPartition(GenerateBasicGptEntry(GPT_ZIRCON_A_NAME, partition_size));
+
+  mock_zb_ops().AddPartition(GPT_ZIRCON_A_NAME, sizeof(uint8_t) * partition_size);
   Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
 
   // Download some data to flash to the partition.
-  std::vector<uint8_t> download_content(partition_size);
-  std::iota(download_content.begin(), download_content.end(), 0);
+  std::vector<uint8_t> download_content;
+  for (size_t i = 0; i < partition_size; i++) {
+    download_content.push_back(static_cast<uint8_t>(i));
+  }
   ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, download_content));
 
   fastboot::TestTransport transport;
@@ -735,9 +723,8 @@ TEST_F(FastbootFlashTest, FlashPartition) {
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
   uint8_t read_buf[partition_size] = {0};
-  auto gpt_device = FindEfiGptDevice();
-  ASSERT_TRUE(gpt_device.is_ok());
-  ASSERT_TRUE(gpt_device->ReadPartition(GPT_ZIRCON_A_NAME, 0, sizeof(read_buf), read_buf).is_ok());
+  ret = mock_zb_ops().ReadFromPartition(GPT_ZIRCON_A_NAME, 0, sizeof(read_buf), read_buf);
+  ASSERT_TRUE(ret.is_ok());
   ASSERT_TRUE(memcmp(read_buf, download_content.data(), download_content.size()) == 0);
 }
 
@@ -759,7 +746,6 @@ TEST_F(FastbootFlashTest, DownloadTooLarge) {
 
 TEST_F(FastbootFlashTest, FlashPartitionFailedToWritePartition) {
   // Do NOT add any partitions. Write should fail.
-  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
   Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
 
   // Download some data to flash to the partition.
@@ -776,129 +762,6 @@ TEST_F(FastbootFlashTest, FlashPartitionFailedToWritePartition) {
   auto sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
-}
-
-template <typename T>
-void AddBytes(std::vector<uint8_t>& vec, const T& data) {
-  const uint8_t* data_bytes = reinterpret_cast<const uint8_t*>(&data);
-  vec.insert(vec.end(), data_bytes, data_bytes + sizeof(data));
-}
-
-std::vector<uint8_t> SetupSparseImage(size_t partition_size, size_t chunk_blocks) {
-  std::vector<uint8_t> buffer;
-  buffer.reserve((sizeof(sparse_header_t) + sizeof(chunk_header_t) + sizeof(uint32_t)));
-  sparse_header_t header = {
-      SPARSE_HEADER_MAGIC,
-      1,
-      0,
-      sizeof(sparse_header_t),
-      sizeof(chunk_header_t),
-      static_cast<uint32_t>(partition_size),
-      1,
-      1,
-      0xDEADBEEF,
-  };
-  AddBytes(buffer, header);
-  chunk_header_t chunk = {
-      CHUNK_TYPE_FILL,
-      0,
-      static_cast<uint16_t>(chunk_blocks),
-      sizeof(chunk_header_t) + sizeof(uint32_t),
-  };
-  AddBytes(buffer, chunk);
-  uint32_t payload = 0xFAFAFAFA;
-  AddBytes(buffer, payload);
-
-  return buffer;
-}
-
-TEST_F(FastbootFlashTest, FlashSparseImage) {
-  constexpr size_t partition_size = 0x100;
-  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
-  AddPartition(GenerateBasicGptEntry(GPT_ZIRCON_A_NAME, partition_size));
-  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
-
-  std::vector<uint8_t> sparse_image = SetupSparseImage(partition_size, 1);
-
-  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, sparse_image));
-
-  fastboot::TestTransport transport;
-
-  transport.AddInPacket(std::string("flash:") + GPT_ZIRCON_A_NAME);
-  zx::result ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
-
-  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), {"OKAY"}));
-
-  std::vector<uint8_t> actual(partition_size);
-  auto gpt_device = FindEfiGptDevice();
-  ASSERT_TRUE(gpt_device.is_ok());
-  ASSERT_TRUE(
-      gpt_device->ReadPartition(GPT_ZIRCON_A_NAME, 0, actual.size(), actual.data()).is_ok());
-
-  std::vector<uint8_t> expected(partition_size, 0xFA);
-  ASSERT_EQ(actual, expected);
-}
-
-TEST_F(FastbootFlashTest, FlashSparseImageOldName) {
-  constexpr size_t partition_size = 0x100;
-  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
-  AddPartition(GenerateBasicGptEntry(GUID_FVM_NAME, partition_size));
-  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
-
-  std::vector<uint8_t> sparse_image = SetupSparseImage(partition_size, 1);
-
-  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, sparse_image));
-
-  fastboot::TestTransport transport;
-
-  transport.AddInPacket(std::string("flash:") + GPT_FVM_NAME);
-  zx::result ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
-
-  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), {"OKAY"}));
-
-  std::vector<uint8_t> actual(partition_size);
-  auto gpt_device = FindEfiGptDevice();
-  ASSERT_TRUE(gpt_device.is_ok());
-  ASSERT_TRUE(gpt_device->ReadPartition(GUID_FVM_NAME, 0, actual.size(), actual.data()).is_ok());
-
-  std::vector<uint8_t> expected(partition_size, 0xFA);
-  ASSERT_EQ(actual, expected);
-}
-
-TEST_F(FastbootFlashTest, FlashSparseImageNoSuchPartition) {
-  constexpr size_t partition_size = 0x100;
-  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
-  AddPartition(GenerateBasicGptEntry(GPT_ZIRCON_A_NAME, partition_size));
-  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
-
-  std::vector<uint8_t> sparse_image = SetupSparseImage(partition_size, 1);
-
-  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, sparse_image));
-
-  fastboot::TestTransport transport;
-
-  transport.AddInPacket(std::string("flash:") + "nonexistant");
-  zx::result ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_error());
-}
-
-TEST_F(FastbootFlashTest, FlashSparseImageTooBig) {
-  constexpr size_t partition_size = 0x100;
-  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
-  AddPartition(GenerateBasicGptEntry(GPT_ZIRCON_A_NAME, partition_size));
-  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
-
-  std::vector<uint8_t> sparse_image = SetupSparseImage(partition_size, 0x100);
-
-  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, sparse_image));
-
-  fastboot::TestTransport transport;
-
-  transport.AddInPacket(std::string("flash:") + GPT_ZIRCON_A_NAME);
-  zx::result ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_error());
 }
 
 // TODO(b/235489025): Extends `StubBootServices` to cover the mock of efi_runtime_services.

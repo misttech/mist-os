@@ -6,11 +6,9 @@
 #define SRC_FIRMWARE_GIGABOOT_CPP_GPT_H_
 
 #include <lib/fit/result.h>
-#include <lib/storage/gpt_utils.h>
 #include <zircon/hw/gpt.h>
 
 #include <array>
-#include <memory>
 #include <optional>
 #include <string_view>
 
@@ -63,22 +61,6 @@ class EfiGptBlockDevice {
   // suited to a post-boot daemon.
   fit::result<efi_status> Load();
 
-  // Create a FuchsiaFirmwareStorage structure for the firmware SDK storage library.
-  FuchsiaFirmwareStorage GenerateStorageOps() {
-    if (!storage_scratch_) {
-      storage_scratch_ = std::make_unique<uint8_t[]>(BlockSize());
-    }
-
-    return FuchsiaFirmwareStorage{
-        .block_size = BlockSize(),
-        .total_blocks = LastBlock() + 1,
-        .scratch_buffer = storage_scratch_.get(),
-        .ctx = this,
-        .read = RawRead,
-        .write = RawWrite,
-    };
-  }
-
   // Reinitialize device's GPT.
   //
   // Generates the factory default partition table, writes it to disk,
@@ -96,8 +78,6 @@ class EfiGptBlockDevice {
   static uint64_t GENERATION_ID;
   uint64_t generation_id_;
 
-  std::unique_ptr<uint8_t[]> storage_scratch_;
-
   // The parameters we need for reading/writing partitions live in both block and disk io protocols.
   EfiProtocolPtr<efi_block_io_protocol> block_io_protocol_;
   EfiProtocolPtr<efi_disk_io_protocol> disk_io_protocol_;
@@ -113,9 +93,6 @@ class EfiGptBlockDevice {
   // as a single, contiguous chunk.
   fbl::Vector<gpt_entry_t> entries_;
   fbl::Vector<std::array<char, GPT_NAME_LEN / 2>> utf8_names_;
-
-  static bool RawRead(void *ctx, size_t block_offset, size_t blocks_count, void *dest);
-  static bool RawWrite(void *ctx, size_t block_offset, size_t blocks_count, const void *src);
 
   EfiGptBlockDevice() : generation_id_(GENERATION_ID - 1) {}
   efi_status Read(void *buffer, size_t offset, size_t length);

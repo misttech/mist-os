@@ -305,21 +305,6 @@ efi_status EfiGptBlockDevice::Write(const void *data, size_t offset, size_t leng
                                       offset, length, data);
 }
 
-bool EfiGptBlockDevice::RawRead(void *ctx, size_t block_offset, size_t blocks_count, void *dest) {
-  EfiGptBlockDevice *device = reinterpret_cast<EfiGptBlockDevice *>(ctx);
-  size_t offset = block_offset * device->BlockSize();
-  size_t length = blocks_count * device->BlockSize();
-  return device->Read(dest, offset, length) == EFI_SUCCESS;
-}
-
-bool EfiGptBlockDevice::RawWrite(void *ctx, size_t block_offset, size_t blocks_count,
-                                 const void *src) {
-  EfiGptBlockDevice *device = reinterpret_cast<EfiGptBlockDevice *>(ctx);
-  size_t offset = block_offset * device->BlockSize();
-  size_t length = blocks_count * device->BlockSize();
-  return device->Write(src, offset, length) == EFI_SUCCESS;
-}
-
 const gpt_entry_t *EfiGptBlockDevice::FindPartition(std::string_view name) {
   if (generation_id_ != GENERATION_ID) {
     if (!Load().is_ok()) {

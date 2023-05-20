@@ -39,7 +39,6 @@ source_set("lib") {
     "//sdk/lib/zbi-format",
     "//src/firmware/gigaboot/lib:bootbyte",
     "//src/firmware/lib/fastboot:fastboot-base",
-    "//src/firmware/lib/storage",
     "//src/firmware/lib/zbi:in_tree",
     "//src/firmware/lib/zircon_boot:in_tree",
     "//src/lib/utf_conversion",
@@ -63,8 +62,6 @@ source_set("lib") {
     include_dirs = [ "//" ]  # utf_conversion isn't a proper library.
   }
 
-  # UEFI does not require aligned access
-  defines = [ "FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT=1" ]
   public_configs = [ ":board_name" ]
 }
 
@@ -86,7 +83,6 @@ if (is_efi_toolchain) {
       "fastboot_tcp.cc",
       "fastboot_tcp.h",
       "main.cc",
-      "malloc.cc",
       "sysdeps.cc",
       "zircon_boot_ops.cc",
       "zircon_boot_ops.h",

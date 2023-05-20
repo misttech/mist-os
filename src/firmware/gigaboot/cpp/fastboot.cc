@@ -7,9 +7,6 @@
 #include <ctype.h>
 #include <lib/abr/abr.h>
 #include <lib/fastboot/fastboot_base.h>
-#include <lib/storage/gpt_utils.h>
-#include <lib/storage/sparse.h>
-#include <lib/storage/storage.h>
 #include <lib/zircon_boot/zircon_boot.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -406,17 +403,6 @@ zx::result<> Fastboot::GetVarSlotUnbootable(const CommandArgs &args, fastboot::T
   return resp(ResponseType::kOkay, info.is_bootable ? "no" : "yes", transport);
 }
 
-class GptDataHolder {
- public:
-  explicit GptDataHolder(FuchsiaFirmwareStorage &ops) : ops_(ops) {}
-  ~GptDataHolder() { ZX_ASSERT(FuchsiaFirmwareStorageFreeGptData(&ops_, &data_)); }
-  GptData &Data() { return data_; }
-
- private:
-  GptData data_;
-  FuchsiaFirmwareStorage &ops_;
-};
-
 zx::result<> Fastboot::Flash(std::string_view cmd, fastboot::Transport *transport) {
   CommandArgs args;
   ExtractCommandArgs(cmd, ":", args);
@@ -424,34 +410,14 @@ zx::result<> Fastboot::Flash(std::string_view cmd, fastboot::Transport *transpor
     return SendResponse(ResponseType::kFail, "Not enough argument", transport);
   }
 
-  auto device = FindEfiGptDevice();
-  if (device.is_error() || device->Load().is_error()) {
-    return SendResponse(ResponseType::kFail, "Failed to get block device", transport,
-                        zx::error(ZX_ERR_INTERNAL));
-  }
-
   ZX_ASSERT(args.args[1].size() < fastboot::kMaxCommandPacketSize);
-  char part_name_data[fastboot::kMaxCommandPacketSize] = {};
-  memcpy(part_name_data, args.args[1].data(), args.args[1].size());
-  std::string_view part_name = MaybeMapPartitionName(*device, part_name_data);
+  char part_name[fastboot::kMaxCommandPacketSize] = {0};
+  memcpy(part_name, args.args[1].data(), args.args[1].size());
+  size_t write_size;
+  bool res = zb_ops_.write_to_partition(&zb_ops_, part_name, 0, total_download_size(),
+                                        download_buffer_.data(), &write_size);
 
-  FuchsiaFirmwareStorage ops = device->GenerateStorageOps();
-  GptDataHolder gpt_data(ops);
-  if (!FuchsiaFirmwareStorageSyncGpt(&ops, &gpt_data.Data())) {
-    return SendResponse(ResponseType::kFail, "Failed to sync gpt data", transport,
-                        zx::error(ZX_ERR_INTERNAL));
-  }
-
-  bool res;
-  if (FuchsiaIsSparseImage(download_buffer_.data(), total_download_size())) {
-    res = FuchsiaWriteSparseImage(&ops, &gpt_data.Data(), part_name.data(), download_buffer_.data(),
-                                  total_download_size());
-  } else {
-    res = FuchsiaFirmwareStorageGptWrite(&ops, &gpt_data.Data(), part_name.data(), 0,
-                                         total_download_size(), download_buffer_.data());
-  }
-
-  if (!res) {
+  if (!res || write_size != total_download_size()) {
     return SendResponse(ResponseType::kFail, "Failed to write to partition", transport,
                         zx::error(ZX_ERR_INTERNAL));
   }
