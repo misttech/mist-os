@@ -8,6 +8,8 @@ import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/rust/rustc_binary.gni")
 
+is_dart = current_toolchain == dart_toolchain
+
 # HLCPP Compatibility Test
 template("_hlcpp_compat") {
   executable(target_name) {
@@ -32,23 +34,6 @@ template("_llcpp_compat") {
   }
 }
 
-# Go Source Compatibility Test
-template("_go_compat") {
-  go_library("${target_name}_lib") {
-    source_dir = get_path_info(invoker.source, "dir")
-    sources = [ get_path_info(invoker.source, "file") ]
-    deps = [
-      ":${invoker.fidl}_go($go_toolchain)",
-      "//src/lib/component",
-    ]
-  }
-
-  go_binary(target_name) {
-    library = ":${target_name}_lib"
-    output_dir = target_out_dir
-  }
-}
-
 # Rust Source Compatibility Test
 template("_rust_compat") {
   rustc_binary(target_name) {
@@ -69,23 +54,42 @@ template("_rust_compat") {
   }
 }
 
-# Dart Source Compatibility Test
-template("_dart_compat") {
-  copy_target_name = "${target_name}__copy"
-  dest_dir = get_label_info(":${target_name}", "target_gen_dir") +
-             "/${target_name}_dart_package"
-  dest_file = "${dest_dir}/lib/" + invoker.source
-  copy(copy_target_name) {
-    sources = [ invoker.source ]
-    outputs = [ dest_file ]
+# Go Source Compatibility Test
+template("_go_compat") {
+  go_library("${target_name}_lib") {
+    source_dir = get_path_info(invoker.source, "dir")
+    sources = [ get_path_info(invoker.source, "file") ]
+    deps = [
+      ":${invoker.fidl}_go($go_toolchain)",
+      "//src/lib/component",
+    ]
   }
-  dart_library(target_name) {
-    infer_package_name = true
-    package_root = dest_dir
-    sources = [ invoker.source ]
-    deps = [ ":${invoker.fidl}_dart(${dart_toolchain})" ]
-    non_dart_deps = [ ":${copy_target_name}" ]
-    pubspec = "//src/tests/fidl/source_compatibility/pubspec.yaml"
+
+  go_binary(target_name) {
+    library = ":${target_name}_lib"
+    output_dir = target_out_dir
+  }
+}
+
+if (is_dart) {
+  # Dart Source Compatibility Test
+  template("_dart_compat") {
+    copy_target_name = "${target_name}__copy"
+    dest_dir = get_label_info(":${target_name}", "target_gen_dir") +
+               "/${target_name}_dart_package"
+    dest_file = "${dest_dir}/lib/" + invoker.source
+    copy(copy_target_name) {
+      sources = [ invoker.source ]
+      outputs = [ dest_file ]
+    }
+    dart_library(target_name) {
+      infer_package_name = true
+      package_root = dest_dir
+      sources = [ invoker.source ]
+      deps = [ ":${invoker.fidl}_dart(${dart_toolchain})" ]
+      non_dart_deps = [ ":${copy_target_name}" ]
+      pubspec = "//src/tests/fidl/source_compatibility/pubspec.yaml"
+    }
   }
 }
 
@@ -222,20 +226,26 @@ template("source_compatibility_test") {
 
     # Dart
     if (defined(transitions.dart)) {
-      _source_compat_steps("${target_name}_dart") {
-        tmp = transitions.dart
-        starting_fidl = tmp.starting_fidl
-        starting_src = tmp.starting_src
-        steps = tmp.steps
-        template_name = "_dart_compat"
+      if (is_dart) {
+        _source_compat_steps("${target_name}_dart") {
+          tmp = transitions.dart
+          starting_fidl = tmp.starting_fidl
+          starting_src = tmp.starting_src
+          steps = tmp.steps
+          template_name = "_dart_compat"
+        }
       }
-      test_targets += [ ":${target_name}_dart" ]
+      test_targets += [ ":${target_name}_dart($dart_toolchain)" ]
     }
   } else {
     not_needed(invoker, "*")
   }
 
-  group(target_name) {
-    deps = test_targets
+  if (toolchain_variant.base == default_toolchain) {
+    group(target_name) {
+      deps = test_targets
+    }
+  } else {
+    not_needed([ "test_targets" ])
   }
 }
