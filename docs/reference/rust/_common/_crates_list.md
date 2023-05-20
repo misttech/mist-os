@@ -32,13 +32,6 @@
 
     This library contains helpers crates to handle things such as hanging gets.
 
-* [fuchsia_system_alloc](/src/lib/fuchsia-system-alloc/)
-
-    A crate that sets the Rust allocator to the system allocator. This is automatically included
-    for projects that use fuchsia-async, and all Fuchsia binaries should ensure that they take a
-    transitive dependency on this crate (and “use” it, as merely setting it as a dependency in GN
-    is not sufficient to ensure that it is linked in).
-
 * [fuchsia_zircon](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_zircon/index.html)
 
     Rust language bindings for Zircon kernel syscalls.
