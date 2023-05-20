@@ -4850,7 +4850,7 @@ void brcmf_if_stop_capture_frames(net_device* ndev) {
 }
 
 static void brcmf_if_convert_ac_param(const edcf_acparam_t* acparam,
-                                      wlan_wmm_ac_params_t* out_ac_params) {
+                                      wlan_wmm_access_category_parameters_t* out_ac_params) {
   out_ac_params->aifsn = acparam->aci & EDCF_AIFSN_MASK;
   out_ac_params->acm = (acparam->aci & EDCF_ACM_MASK) != 0;
   out_ac_params->ecw_min = acparam->ecw & EDCF_ECWMIN_MASK;

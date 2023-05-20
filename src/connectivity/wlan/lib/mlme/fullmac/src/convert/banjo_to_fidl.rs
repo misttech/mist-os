@@ -388,7 +388,7 @@ pub fn convert_sae_frame(frame: banjo_wlan_fullmac::WlanFullmacSaeFrame) -> fidl
 }
 
 fn convert_wmm_ac_params(
-    params: banjo_wlan_associnfo::WlanWmmAcParams,
+    params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters,
 ) -> fidl_internal::WmmAcParams {
     fidl_internal::WmmAcParams {
         ecw_min: params.ecw_min,

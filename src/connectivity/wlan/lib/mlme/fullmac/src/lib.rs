@@ -2197,28 +2197,28 @@ mod handle_driver_event_tests {
         let status = zx::sys::ZX_OK;
         let wmm_params = banjo_wlan_associnfo::WlanWmmParameters {
             apsd: true,
-            ac_be_params: banjo_wlan_associnfo::WlanWmmAcParams {
+            ac_be_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
                 ecw_min: 1,
                 ecw_max: 2,
                 aifsn: 3,
                 txop_limit: 4,
                 acm: true,
             },
-            ac_bk_params: banjo_wlan_associnfo::WlanWmmAcParams {
+            ac_bk_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
                 ecw_min: 5,
                 ecw_max: 6,
                 aifsn: 7,
                 txop_limit: 8,
                 acm: false,
             },
-            ac_vi_params: banjo_wlan_associnfo::WlanWmmAcParams {
+            ac_vi_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
                 ecw_min: 9,
                 ecw_max: 10,
                 aifsn: 11,
                 txop_limit: 12,
                 acm: true,
             },
-            ac_vo_params: banjo_wlan_associnfo::WlanWmmAcParams {
+            ac_vo_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
                 ecw_min: 13,
                 ecw_max: 14,
                 aifsn: 15,

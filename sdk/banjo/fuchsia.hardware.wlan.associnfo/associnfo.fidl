@@ -14,14 +14,14 @@ type WlanKeyType = strict enum : uint8 {
 
 type WlanWmmParameters = struct {
     apsd bool;
-    ac_be_params WlanWmmAcParams;
-    ac_bk_params WlanWmmAcParams;
-    ac_vi_params WlanWmmAcParams;
-    ac_vo_params WlanWmmAcParams;
+    ac_be_params WlanWmmAccessCategoryParameters;
+    ac_bk_params WlanWmmAccessCategoryParameters;
+    ac_vi_params WlanWmmAccessCategoryParameters;
+    ac_vo_params WlanWmmAccessCategoryParameters;
 };
 
 /// WFA WMM v1.2, 2.2.2
-type WlanWmmAcParams = struct {
+type WlanWmmAccessCategoryParameters = struct {
     /// Lower bound of contention window in exponential form
     /// `cw_min = 2^(ecw_min) - 1`. The unit for contention window is "slot time", which
     /// is different for each standard (e.g. 9 microseconds, 13 microseconds, etc.)
