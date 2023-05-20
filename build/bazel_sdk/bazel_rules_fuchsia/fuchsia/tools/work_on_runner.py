@@ -53,7 +53,8 @@ class Context():
                 try:
                     value = ffx_runner.run(*cmd)
                     if value and len(value) > 0:
-                        return value
+                        # ffx returns the values quoted so remove the quotes
+                        return value.replace('"', '')
                 except:
                     pass
             return default
