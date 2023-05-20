@@ -3986,7 +3986,7 @@ mod tests {
 
         assert_matches::assert_matches!(
             some.merge_from(&mut other, &path::Path::new("some/path")),
-            Err(Error::Validate { err, .. })
+            Err(Error::Validate { schema_name: None, err, .. })
                 if err == "Found conflicting entry for config key `foo` in `some/path`."
         );
     }
@@ -4162,7 +4162,7 @@ mod tests {
     fn test_merge_from_program_error(mut some: Document, mut other: Document, field: &str) {
         assert_matches::assert_matches!(
             some.merge_from(&mut other, &path::Path::new("some/path")),
-            Err(Error::Validate {  err, .. })
+            Err(Error::Validate { schema_name: None, err, .. })
                 if err == format!("manifest include had a conflicting `program.{}`: some/path", field)
         );
     }
@@ -4247,7 +4247,7 @@ mod tests {
     fn test_merge_from_facet_error(mut my: Document, mut other: Document, field: &str) {
         assert_matches::assert_matches!(
             my.merge_from(&mut other, &path::Path::new("some/path")),
-            Err(Error::Validate {  err, .. })
+            Err(Error::Validate { schema_name: None, err, .. })
                 if err == format!("manifest include had a conflicting `{}`: some/path", field)
         );
     }

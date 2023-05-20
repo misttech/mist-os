@@ -18,20 +18,27 @@ rustc_binary("cmc") {
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//src/lib/directed_graph",
     "//src/lib/fidl/rust/fidl",
+    "//src/sys/lib/cm_json",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:strsim",
     "//third_party/rust_crates:structopt",
+    "//third_party/rust_crates:valico",
     "//tools/lib/cml",
     "//tools/lib/reference_doc",
   ]
 
+  # These are only data-deps for the test, but they get included in both
+  data_deps = [ ":cmc_test_schemas" ]
+
   test_deps = [
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:difference",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:tempfile",
   ]
 
@@ -47,12 +54,24 @@ rustc_binary("cmc") {
     "src/util.rs",
     "src/validate.rs",
   ]
+
+  inputs = [
+    "test_block_dev.json",
+    "test_block_shell_feature.json",
+  ]
 }
 
 sdk_host_tool("cmc_sdk") {
   category = "partner"
   output_name = "cmc"
   deps = [ ":cmc" ]
+}
+
+source_set("cmc_test_schemas") {
+  inputs = [
+    "test_block_dev.json",
+    "test_block_shell_feature.json",
+  ]
 }
 
 rustc_test("cmc_integration_test_bin") {

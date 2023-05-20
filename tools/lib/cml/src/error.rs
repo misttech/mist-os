@@ -33,6 +33,7 @@ pub enum Error {
         filename: Option<String>,
     },
     Validate {
+        schema_name: Option<String>,
         err: String,
         filename: Option<String>,
     },
@@ -62,7 +63,15 @@ impl Error {
     }
 
     pub fn validate(err: impl fmt::Display) -> Self {
-        Self::Validate { err: err.to_string(), filename: None }
+        Self::Validate { schema_name: None, err: err.to_string(), filename: None }
+    }
+
+    pub fn validate_schema(schema_name: &str, err: impl Into<String>) -> Self {
+        Self::Validate {
+            schema_name: Some(schema_name.to_string()),
+            err: err.into(),
+            filename: None,
+        }
     }
 
     pub fn duplicate_rights(err: impl Into<String>) -> Self {
@@ -132,7 +141,7 @@ impl fmt::Display for Error {
                     write!(f, "{}", err)
                 }
             }
-            Error::Validate {  err, filename } => {
+            Error::Validate { schema_name: _, err, filename } => {
                 let mut prefix = String::new();
                 if let Some(filename) = filename {
                     prefix.push_str(&format!("{}:", filename));
@@ -194,7 +203,9 @@ impl From<cm_json::Error> for Error {
             cm_json::Error::Parse { err, location, filename } => {
                 Error::Parse { err, location: location.map(|loc| loc.into()), filename }
             }
-            cm_json::Error::Validate { err, filename } => Error::Validate { err, filename },
+            cm_json::Error::Validate { schema_name, err, filename } => {
+                Error::Validate { schema_name, err, filename }
+            }
         }
     }
 }

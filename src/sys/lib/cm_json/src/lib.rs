@@ -5,11 +5,40 @@
 use {
     serde_json,
     serde_json::Value,
+    std::borrow::Cow,
     std::error,
     std::fmt,
-    std::io::{self},
+    std::fs::File,
+    std::io::{self, Read},
     std::path::Path,
 };
+
+#[derive(Debug)]
+pub struct JsonSchema<'a> {
+    // Cow allows us to store either owned values when needed (as in new_from_file) or borrowed
+    // values when lifetimes allow (as in new).
+    pub name: Cow<'a, str>,
+    pub schema: Cow<'a, str>,
+}
+
+impl<'a> JsonSchema<'a> {
+    pub const fn new(name: &'a str, schema: &'a str) -> Self {
+        Self { name: Cow::Borrowed(name), schema: Cow::Borrowed(schema) }
+    }
+
+    pub fn new_from_file(file: &Path) -> Result<Self, Error> {
+        let mut schema_buf = String::new();
+        File::open(&file)?.read_to_string(&mut schema_buf)?;
+        Ok(JsonSchema {
+            name: Cow::Owned(file.to_string_lossy().into_owned()),
+            schema: Cow::Owned(schema_buf),
+        })
+    }
+}
+
+// Directly include schemas in the library. These are used to parse component manifests.
+pub const CMX_SCHEMA: &JsonSchema<'_> =
+    &JsonSchema::new("cmx_schema.json", include_str!("../cmx_schema.json"));
 
 /// The location in the file where an error was detected.
 #[derive(PartialEq, Clone, Debug)]
@@ -21,12 +50,12 @@ pub struct Location {
     pub column: usize,
 }
 
-/// Error encountered when converting a JSON file to a [Value].
+/// Enum type that can represent any error encountered by a cmx operation.
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
     Parse { err: String, location: Option<Location>, filename: Option<String> },
-    Validate { err: String, filename: Option<String> },
+    Validate { schema_name: Option<String>, err: String, filename: Option<String> },
 }
 
 impl error::Error for Error {}
@@ -45,7 +74,7 @@ impl Error {
     }
 
     pub fn validate(err: impl fmt::Display) -> Self {
-        Self::Validate { err: err.to_string(), filename: None }
+        Self::Validate { schema_name: None, err: err.to_string(), filename: None }
     }
 }
 
@@ -75,7 +104,7 @@ impl fmt::Display for Error {
                     write!(f, "{}", err)
                 }
             }
-            Error::Validate { err, filename } => {
+            Error::Validate { schema_name: _, err, filename } => {
                 let mut prefix = String::new();
                 if let Some(filename) = filename {
                     prefix.push_str(&format!("{}:", filename));

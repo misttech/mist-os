@@ -283,19 +283,8 @@ template("fuchsia_component") {
       not_needed(invoker, forwarded)
     }
 
-    # Get the compiled manifest path
-    _manifest_outputs = get_target_outputs(cm_label)
-    _compiled_manifest = _manifest_outputs[0]
-
-    # Check that the manifest includes shards for component dependencies
-    # TODO(fxbug.dev/109012): Default to "true" once cmx support is removed
-    check_includes = get_path_info(_compiled_manifest, "extension") == "cm"
-    if (defined(invoker.check_includes)) {
-      check_includes = invoker.check_includes
-    }
-
-    if (check_includes) {
-      _find_manifest_target = "${target_name}_find_manifest"
+    if (!defined(invoker.check_includes) || invoker.check_includes) {
+      _find_manifest_target = "${target_name}_locate_manifest"
       generated_file(_find_manifest_target) {
         forward_variables_from(invoker, [ "testonly" ])
         visibility = [ ":*" ]
@@ -308,8 +297,8 @@ template("fuchsia_component") {
       }
       _find_manifest_target = ":$_find_manifest_target"
 
-      _check_includes_target = "${target_name}_check_includes"
-      cmc_check_includes(_check_includes_target) {
+      _include_check_target = "${target_name}_check_includes"
+      cmc_check_includes(_include_check_target) {
         forward_variables_from(invoker,
                                [
                                  "deps",
@@ -326,19 +315,23 @@ template("fuchsia_component") {
         }
         deps += [ _find_manifest_target ]
       }
-      _check_includes_target = ":$_check_includes_target"
+      _include_check_target = ":$_include_check_target"
     }
 
     # Check that the files the manifest references are going to be packaged
-    # TODO(fxbug.dev/109012): Default to "true" once cmx support is removed
-    check_references = get_path_info(_compiled_manifest, "extension") == "cm"
+    check_references = true
     if (defined(invoker.check_references)) {
       check_references = invoker.check_references
     }
 
     if (check_references) {
-      _check_references_target = "${target_name}_cmc_validate_references"
-      cmc_validate_references(_check_references_target) {
+      # Get the compiled manifest path
+      manifest_outputs = get_target_outputs(cm_label)
+      compiled_manifest = manifest_outputs[0]
+
+      validate_target = "${target_name}_cmc_validate_references"
+
+      cmc_validate_references(validate_target) {
         forward_variables_from(invoker,
                                [
                                  "deps",
@@ -349,10 +342,11 @@ template("fuchsia_component") {
         }
         deps += [ cm_label ]
         visibility = [ ":*" ]
-        component_manifest = _compiled_manifest
+        component_manifest = compiled_manifest
         label = get_label_info(":$target_name", "label_with_toolchain")
       }
-      _check_references_target = ":$_check_references_target"
+
+      validate_target = ":$validate_target"
     }
 
     component_catalog_target = "${target_name}.component_catalog"
@@ -377,7 +371,7 @@ template("fuchsia_component") {
     # copy them to a new directory.
     copy(target_name) {
       forward_variables_from(invoker, [ "testonly" ])
-      sources = _manifest_outputs
+      sources = get_target_outputs(cm_label)
       outputs = [ "$target_out_dir/${target_name}_component_manifest/{{source_file_part}}" ]
 
       deps = [
@@ -385,10 +379,10 @@ template("fuchsia_component") {
         cm_label,
       ]
       if (check_references) {
-        deps += [ _check_references_target ]
+        deps += [ validate_target ]
       }
-      if (check_includes) {
-        deps += [ _check_includes_target ]
+      if (defined(_include_check_target)) {
+        deps += [ _include_check_target ]
       }
 
       metadata = {

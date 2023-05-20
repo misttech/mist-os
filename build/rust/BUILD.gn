@@ -144,6 +144,28 @@ if (current_toolchain != default_toolchain) {
   }
 }
 
+# When panic=abort, the Rust libtest framework requires sys.process.Launcher in
+# every test manifest. This is so it can launch a subprocess for each unit
+# test.
+#
+# We stick a test_needs_process_launcher flag in metadata so that any
+# package which contains this test automatically has its manifest patched
+# with the sys.process.Launcher capability (this is done in
+# //build/package.gni).
+#
+# This group is included in every Rust test.
+group("rust_test_metadata") {
+  metadata = {
+    cmx_patches_data = [
+      {
+        sandbox = {
+          services = [ "fuchsia.process.Launcher" ]
+        }
+      },
+    ]
+  }
+}
+
 # Multiple integration tests rely on having a Rust toolchain available on the host test
 # runner, and host_test_data does not appear to support multiple definitions of the
 # same output path in the same build, so we provide a central target here to be used

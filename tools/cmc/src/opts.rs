@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::features::Feature;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -26,6 +26,12 @@ pub enum Commands {
         /// files to process
         files: Vec<PathBuf>,
 
+        #[structopt(long = "extra_schema", parse(from_str = "parse_extra_schema_arg"))]
+        /// extra JSON schema files to additionally validate against. A custom error message - to
+        /// be displayed if the schema fails to validate - can be specified by adding a ':'
+        /// separator and the message after the path.
+        extra_schemas: Vec<(PathBuf, Option<String>)>,
+
         #[structopt(long = "must-offer-protocol")]
         /// verifies that all children and collections are offered the given protocols
         ///
@@ -44,7 +50,7 @@ pub enum Commands {
     },
 
     #[structopt(name = "validate-references")]
-    /// validate a component manifest against package manifest.
+    /// validate component manifest {.cmx|.cml} against package manifest.
     ValidateReferences {
         #[structopt(
             name = "Component Manifest",
@@ -71,7 +77,7 @@ pub enum Commands {
     },
 
     #[structopt(name = "merge")]
-    /// merge the listed manifest files. Does NOT validate the resulting manifest.
+    /// merge the listed cml or cmx files. Does NOT validate the resulting manifest.
     ///
     /// The semantics for merging are the same ones used for `include`:
     /// https://fuchsia.dev/reference/cml#include
@@ -170,6 +176,15 @@ pub enum Commands {
         /// file to format
         file: PathBuf,
 
+        #[structopt(short = "p", long = "pretty")]
+        /// whether to pretty-print the results (otherwise minify JSON documents; ignored for JSON5)
+        pretty: bool,
+
+        #[structopt(long = "cml")]
+        /// interpret input file as JSON5 CML, and output in the preferred style, preserving all
+        /// comments (this is the default for `.cml` files; implies `--pretty`)
+        cml: bool,
+
         #[structopt(short = "i", long = "in-place")]
         /// replace the input file with the formatted output (implies `--output <inputfile>`)
         inplace: bool,
@@ -245,4 +260,47 @@ pub enum Commands {
         /// file at the file path provided.
         output: Option<PathBuf>,
     },
+}
+
+fn parse_extra_schema_arg(src: &str) -> (PathBuf, Option<String>) {
+    let v: Vec<&str> = src.splitn(2, ':').collect();
+    (Path::new(v[0]).to_path_buf(), v.get(1).map(|s| s.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! test_parse_extra_schema_arg {
+        (
+            $(
+                $test_name:ident => {
+                    input = $input:expr,
+                    result = $result:expr,
+                },
+            )+
+        ) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    assert_eq!(parse_extra_schema_arg($input), $result)
+                }
+            )+
+        }
+    }
+
+    test_parse_extra_schema_arg! {
+        test_parse_extra_schema_arg_schema_only => {
+            input = "/some/path",
+            result = (Path::new("/some/path").to_path_buf(), None),
+        },
+        test_parse_extra_schema_arg_schema_and_msg => {
+            input = "/some/path:my error message",
+            result = (Path::new("/some/path").to_path_buf(), Some("my error message".to_string())),
+        },
+        test_parse_extra_schema_arg_msg_with_sep => {
+            input = "/some/path:my:error:message",
+            result = (Path::new("/some/path").to_path_buf(), Some("my:error:message".to_string())),
+        },
+    }
 }

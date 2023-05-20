@@ -2,8 +2,162 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/modular/build/fuchsia_module_facet.gni")
 import("//tools/cmc/build/cmc.gni")
 import("//tools/cmc/build/expect_includes.gni")
+
+# Validates a cmx file
+#
+# The cmx_validate template will ensure that a given cmx file is conformant to
+# the cmx schema, as defined by //tools/cmc/schema.json. A stamp file is
+# generated to mark that a given cmx file has passed.
+#
+# Parameters
+#
+#   manifest (required)
+#     [file] The path to the cmx file that is to be validated
+#
+#   deps (optional)
+#   testonly (optional)
+#   visibility (optional)
+template("cmx_validate") {
+  cmc(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "metadata",
+                             "sources",
+                             "testonly",
+                             "visibility",
+                           ])
+
+    stamp_file = "$target_gen_dir/$target_name.verified"
+
+    inputs = [ invoker.manifest ]
+
+    outputs = [ stamp_file ]
+
+    args = [
+      "--stamp",
+      rebase_path(stamp_file, root_build_dir),
+      "validate",
+      rebase_path(invoker.manifest, root_build_dir),
+    ]
+  }
+
+  validate_module_cmx_facet("module_" + target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                             "visibility",
+                           ])
+    cmx = invoker.manifest
+  }
+}
+
+# Processes a cmx file to add includes.
+#
+# The cmx_include template will add contents from any and all files referenced
+# in the given cmx file under the "include" key. Includes of includes are added
+# recursively.
+#
+# Parameters
+#
+#   manifest (required)
+#     [file] The path to the cmx file that is to be processed
+#
+#   output_name (optional)
+#     [path] Name for the output.
+#     If not specified, the target name is used.
+#
+#   deps (optional)
+#   testonly (optional)
+#   visibility (optional)
+#     Standard GN meaning.
+template("cmx_include") {
+  cmc(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "depfile",
+                             "metadata",
+                             "output_name",
+                             "testonly",
+                             "visibility",
+                           ])
+    if (!defined(output_name)) {
+      output_name = target_name
+    }
+
+    output = "${target_out_dir}/${output_name}"
+    inputs = [ invoker.manifest ]
+    outputs = [ output ]
+
+    args = [
+             "include",
+             rebase_path(invoker.manifest, root_build_dir),
+             "--output",
+             rebase_path(output, root_build_dir),
+           ] + include_paths
+
+    if (defined(depfile)) {
+      args += [
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
+    }
+  }
+}
+
+# Formats a cmx file
+#
+# The cmx_format template will minify the given cmx file if is_debug is set to
+# false, and will pretty-print the given cmx file if is_debug is set to true.
+#
+# Parameters
+#
+#   manifest (required)
+#     [file] The path to the cmx file that is to be formatted
+#
+#   output_name (optional)
+#     [path] Name for the output.
+#     If not specified, the target name is used.
+#
+#   deps (optional)
+#   testonly (optional)
+#   visibility (optional)
+#     Standard GN meaning.
+template("cmx_format") {
+  cmc(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "metadata",
+                             "output_name",
+                             "testonly",
+                             "visibility",
+                           ])
+    if (!defined(output_name)) {
+      output_name = target_name
+    }
+
+    formatted_output = "${target_out_dir}/${output_name}"
+    inputs = [ invoker.manifest ]
+    outputs = [ formatted_output ]
+
+    args = [
+      "format",
+      rebase_path(invoker.manifest, root_build_dir),
+      "--output",
+      rebase_path(formatted_output, root_build_dir),
+    ]
+
+    if (is_debug) {
+      args += [ "--pretty" ]
+    }
+  }
+}
 
 # Prepares a cmx file for packaging
 #
@@ -16,30 +170,84 @@ import("//tools/cmc/build/expect_includes.gni")
 #     [path] Name for the output.
 #     If not specified, the target name is used.
 template("cmx") {
-  assert(defined(invoker.manifest), "`manifest` is required")
-
-  if (!defined(invoker.output_name)) {
-    invoker.output_name = target_name
-  }
-
   if (!defined(invoker.deps)) {
     invoker.deps = []
   }
-  if (string_replace(target_out_dir, "vendor/google", "") != target_out_dir) {
-    invoker.deps += [ "//vendor/google/build/components/cmx:cmx_allowlist" ]
-  } else {
-    invoker.deps += [ "//build/components/cmx:cmx_allowlist" ]
+
+  cmx_include("${target_name}_include.cmx") {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "manifest",
+                             "testonly",
+                           ])
+    depfile = "${target_out_dir}/${target_name}.d"
+    visibility = [ ":*" ]
+  }
+  invoker.deps += [ ":${target_name}_include.cmx" ]
+  included = get_target_outputs(":${target_name}_include.cmx")
+  included = included[0]
+
+  cmx_validate("${target_name}_validate") {
+    manifest = included
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+    visibility = [ ":*" ]
+  }
+  invoker.deps += [ ":${target_name}_validate" ]
+
+  patches_name = "${target_name}_patches"
+  cmx_patches = "${target_out_dir}/${target_name}_cmx_patches"
+  generated_file(patches_name) {
+    data_keys = [ "cmx_patches_data" ]
+    walk_keys = [ "cmx_patches_walk" ]
+    outputs = [ cmx_patches ]
+    output_conversion = "json"
+    visibility = [ ":*" ]
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
   }
 
-  copy(target_name) {
+  cmc_merge("${target_name}_merge") {
+    sources = [
+      cmx_patches,
+      included,
+    ]
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+    deps += [ ":${patches_name}" ]
+    visibility = [ ":*" ]
+  }
+  invoker.deps += [ ":${target_name}_merge" ]
+  merged = get_target_outputs(":${target_name}_merge")
+  merged = merged[0]
+
+  cmx_format(target_name) {
+    manifest = merged
     forward_variables_from(invoker,
                            [
                              "deps",
                              "metadata",
+                             "output_name",
                              "testonly",
                              "visibility",
                            ])
-    sources = [ invoker.manifest ]
-    outputs = [ "$target_out_dir/${invoker.output_name}" ]
+    if (!defined(deps)) {
+      deps = []
+    }
+    if (string_replace(target_out_dir, "vendor/google", "") != target_out_dir) {
+      deps += [ "//vendor/google/build/components/cmx:cmx_allowlist" ]
+    } else {
+      deps += [ "//build/components/cmx:cmx_allowlist" ]
+    }
   }
 }
