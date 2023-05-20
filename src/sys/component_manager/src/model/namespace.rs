@@ -261,6 +261,9 @@ async fn add_storage_use(
 /// directory described by `use_`. Once the channel is readable, the future calls
 /// `route_directory` to forward the channel to the source component's outgoing directory and
 /// terminates.
+///
+/// `component` is a weak pointer, which is important because we don't want the directory waiter
+/// closure to hold a strong pointer to this component lest it create a reference cycle.
 fn add_directory_helper(
     ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
     waiters: &mut Vec<BoxFuture<'_, ()>>,
@@ -367,6 +370,9 @@ async fn start_directory_waiters(
 
 /// Adds a service broker in `svc_dirs` for service described by `use_`. The service will be
 /// proxied to the outgoing directory of the source component.
+///
+/// `component` is a weak pointer, which is important because we don't want the VFS
+/// closure to hold a strong pointer to this component lest it create a reference cycle.
 fn add_service_or_protocol_use(
     svc_dirs: &mut HashMap<String, Directory>,
     use_: UseDecl,
