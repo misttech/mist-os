@@ -123,36 +123,35 @@ any new code written continue to follow these guidelines.
 
 At this point, we do not have an automated way (in CQ) for identifying this and
 alerting the CL author prior to submitting the CL. Until then CL author need to
-follow the below instructions every time HoneyDew code is changed:
+follow the below instructions every time HoneyDew code is changed.
+
+#### Install dependencies
+* Below guidelines requires certain dependencies that are not yet available
+  in [Fuchsia third-party]. So for the time being you need to [pip] install
+  each of these dependent module either inside a [python virtual environment]
+  (activate virtual environment and run `pip install <dependency-module>`) or at
+  system level (`pip install --user <dependency-module>`)
+* List of all these dependencies can be found in `guidelines` and `test` lists
+  defined in `[project.optional-dependencies]` section inside the
+  [pyproject.toml](pyproject.toml) file
+
 
 #### formatting
 * Ensure code is formatted using [yapf]
-* `fx format-code` underneath uses [yapf] for formatting the python code
-* So just run `fx format-code`
+* `fx format-code` underneath uses [yapf] for formatting the python code. So
+   just run `fx format-code`
 
 #### linting
 * Ensure code is [pylint] compliant
-* `pylint` module is not yet available under [Fuchsia third-party]. So for the
-  time being you need to [pip] install `pylint` inside a
-  [python virtual environment] (activate virtual environment and run
-  `pip install pylint`) or at system level (`pip install --user pylint`)
 * Verify `pylint` is properly installed by running `pylint --help`
 * Run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `pylint`
 
 #### type-checking
 * Ensure code is [mypy] and [pytype] compliant
 * For `mypy`,
-  * `mypy` module is not yet available under [Fuchsia third-party]. So for the
-    time being you need to [pip] install `mypy` inside a
-    [python virtual environment] (activate virtual environment and run
-    `pip install mypy`) or at system level (`pip install --user mypy`)
   * Verify `mypy` is properly installed by running `mypy --help`
-  * Run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `mypy`
+  * Run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `mypy`
 * For `pytype`,
-  * `pytype` module is not yet available under [Fuchsia third-party]. So for the
-    time being you need to [pip] install `pytype` inside a
-    [python virtual environment] (activate virtual environment and run
-    `pip install pytype`) or at system level (`pip install --user pytype`)
   * Verify `pytype` is properly installed by running `pytype --help`
   * Run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `pytype`
 
@@ -179,22 +178,12 @@ At this point, we do not have an automated way (in CQ) for identifying this and
 alerting the CL author prior to submitting the CL. Until then CL author need to
 follow the below instructions every time HoneyDew code is changed:
 
-* `coverage` module is not yet available under [Fuchsia third-party]. So for the
-  time being you need to [pip] install `coverage` inside a
-  [python virtual environment] (activate virtual environment and run
-  `pip install coverage`) or at system level
-  (`pip install --user coverage`)
 * Verify `coverage` is properly installed by running `coverage --help`
-* Install all the dependencies of HoneyDew unit test code which you can find out
-  from [unit tests BUILD.gn] file
-  * At this point, it is just `parameterized` module.
-  * So [pip] install `parameterized` inside a [python virtual environment]
-    (activate virtual environment and run `pip install parameterized`) or at
-    system level (`pip install --user parameterized`)
-  * Verify `parameterized` is properly installed by running
-    `pip3 show parameterized`
-* Run the below commands sequence
-```sh
+* Verify `parameterized` is properly installed by running
+  `pip show parameterized`
+* Run the below commands sequence and ensure code you have touched has unit test
+  coverage
+```shell
 # For coverage to identify `honeydew` code as it is not pip installed
 # CD to directory where `honeydew` folder exists
 $ cd ${FUCHSIA_DIR}/src/testing/end_to_end
@@ -289,8 +278,8 @@ with the CL reviewers
 
 [Fuchsia third-party]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/
 
-[python virtual environment]: https://realpython.com/python-virtual-environments-a-primer/
+[python virtual environment]: https://docs.python.org/3/tutorial/venv.html
 
 [coverage]: https://coverage.readthedocs.io/
 
-[pip]: https://pip.pypa.io/en/stable/
+[pip]: https://pip.pypa.io/en/stable/getting-started/

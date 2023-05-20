@@ -1,0 +1,9 @@
+# Reference at https://mypy.readthedocs.io/en/stable/config_file.html#example-pyproject-toml
+
+# mypy global options:
+[tool.mypy]
+# Needed because dependency modules such as mobly are not pip installed
+ignore_missing_imports = true
+
+
+# mypy per-module options:

@@ -1,5 +1,5 @@
+# Reference at https://google.github.io/pytype/
 # NOTE: All relative paths are relative to the location of this file.
-
 [tool.pytype]
 
 # Space-separated list of files or directories to exclude.
@@ -19,7 +19,7 @@ keep_going = true
 jobs = 4
 
 # All pytype output goes here.
-output = '.pytype'
+output = './.pytype'
 
 # Platform (e.g., "linux", "win32") that the target code runs on.
 platform = 'linux'

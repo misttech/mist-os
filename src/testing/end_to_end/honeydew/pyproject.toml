@@ -1,0 +1,27 @@
+# Reference at https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
+
+[project]
+name = "honeydew"
+description = "Python module for Host-(Fuchsia)Target interactions"
+version = "1.0.0"
+requires-python = ">=3.8"
+dynamic = ["version"]
+readme = "README.md"
+keywords = ["honeydew", "lacewing", "pye2e", "e2e", "python", "controller"]
+
+dependencies = []
+
+[project.optional-dependencies]
+# Testing related dependencies
+test = [
+    "parameterized",  # required for unit tests
+    "mobly",          # required for fucntional tests
+]
+# Coding guidelines related dependencies
+guidelines = [
+    "coverage",       # required for code measuring coverage using unit tests
+    "pylint",         # required for code linting
+    "mypy",           # required for type checking
+    "pytype",         # required for type checking
+    "yapf",           # required for formatting
+]
