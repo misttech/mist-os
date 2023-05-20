@@ -126,7 +126,7 @@ pub enum Commands {
         /// base path for resolving include paths that start with "//"
         includeroot: PathBuf,
 
-        #[structopt(long = "validate", parse(try_from_str), default_value = "false")]
+        #[structopt(long = "validate", parse(try_from_str), default_value = "true")]
         /// validate the result
         validate: bool,
     },
