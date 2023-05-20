@@ -174,6 +174,13 @@ impl FidlServer {
                 let response = install_manager_ch.suspend_update(attempt_id).await?;
                 responder.send(response)?;
             }
+            InstallerRequest::ResumeUpdate { attempt_id, responder } => {
+                let mut install_manager_ch = self.install_manager_ch.clone();
+
+                // Forward to the install manager to deal with this.
+                let response = install_manager_ch.resume_update(attempt_id).await?;
+                responder.send(response)?;
+            }
         }
         Ok(())
     }

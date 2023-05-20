@@ -6,7 +6,7 @@ use {
     crate::update::{Config, EnvironmentConnector, RebootController, Updater},
     anyhow::anyhow,
     event_queue::{EventQueue, Notify},
-    fidl_fuchsia_update_installer::{SuspendError, UpdateNotStartedReason},
+    fidl_fuchsia_update_installer::{ResumeError, SuspendError, UpdateNotStartedReason},
     fidl_fuchsia_update_installer_ext::State,
     fuchsia_async as fasync, fuchsia_inspect as inspect,
     fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _},
@@ -202,7 +202,7 @@ where
             ControlRequest::Suspend(SuspendRequestData { responder, .. }) => {
                 let _ = responder.send(Err(SuspendError::NoUpdateInProgress));
             }
-            ControlRequest::Resume(responder) => {
+            ControlRequest::Resume(ResumeRequestData { responder, .. }) => {
                 let _ = responder.send(Err(ResumeError::NoUpdateInProgress));
             }
             ControlRequest::Cancel(responder) => {
@@ -285,7 +285,15 @@ async fn handle_active_control_request<N>(
             suspend_state.suspend();
             let _ = responder.send(Ok(()));
         }
-        ControlRequest::Resume(responder) => {
+        ControlRequest::Resume(ResumeRequestData { attempt_id: request_id, responder }) => {
+            // If an attempt ID is provided, ensure it matches the current attempt.
+            if let Some(request_id) = request_id {
+                if request_id != attempt_id {
+                    let _ = responder.send(Err(ResumeError::AttemptIdMismatch));
+                    return;
+                }
+            }
+
             suspend_state.resume();
             let _ = responder.send(Ok(()));
         }
@@ -370,11 +378,12 @@ where
     }
 
     /// Forward ResumeUpdate requests to the install manager task.
-    // TODO(fxbug.dev/125721): use this
-    #[allow(dead_code)]
-    pub async fn resume_update(&mut self) -> Result<Result<(), ResumeError>, InstallManagerGone> {
+    pub async fn resume_update(
+        &mut self,
+        attempt_id: Option<String>,
+    ) -> Result<Result<(), ResumeError>, InstallManagerGone> {
         let (responder, receive_response) = oneshot::channel();
-        self.0.send(ControlRequest::Resume(responder)).await?;
+        self.0.send(ControlRequest::Resume(ResumeRequestData { attempt_id, responder })).await?;
         Ok(receive_response.await?)
     }
 
@@ -396,7 +405,7 @@ where
     Start(StartRequestData<N>),
     Monitor(MonitorRequestData<N>),
     Suspend(SuspendRequestData),
-    Resume(oneshot::Sender<Result<(), ResumeError>>),
+    Resume(ResumeRequestData),
     Cancel(oneshot::Sender<Result<(), CancelError>>),
 }
 
@@ -421,8 +430,11 @@ impl<N: Notify> ControlRequest<N> {
                     node.record_string("attempt id", attempt_id);
                 }
             }
-            Self::Resume(_) => {
+            Self::Resume(data) => {
                 node.record_string("request", "resume");
+                if let Some(attempt_id) = &data.attempt_id {
+                    node.record_string("attempt id", attempt_id);
+                }
             }
             Self::Cancel(_) => {
                 node.record_string("request", "cancel");
@@ -455,10 +467,9 @@ struct SuspendRequestData {
     responder: oneshot::Sender<Result<(), SuspendError>>,
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub enum ResumeError {
-    #[error("no update in progress")]
-    NoUpdateInProgress,
+struct ResumeRequestData {
+    attempt_id: Option<String>,
+    responder: oneshot::Sender<Result<(), ResumeError>>,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -797,7 +808,10 @@ mod tests {
         assert_eq!(exec.run_until_stalled(&mut recv_fut), Poll::Pending);
 
         exec.run_singlethreaded(async {
-            assert_eq!(install_manager_ch.resume_update().await, Ok(Ok(())));
+            assert_eq!(
+                install_manager_ch.resume_update(Some("my-attempt".into())).await,
+                Ok(Ok(()))
+            );
 
             // can send and receive states after resume
             let () = send_fut.await.unwrap();
@@ -821,6 +835,7 @@ mod tests {
                         },
                         "2": {
                             request: "resume",
+                            "attempt id": "my-attempt",
                             time: AnyProperty,
                         },
                     },
@@ -840,7 +855,7 @@ mod tests {
         );
 
         assert_eq!(
-            install_manager_ch.resume_update().await,
+            install_manager_ch.resume_update(None).await,
             Ok(Err(ResumeError::NoUpdateInProgress))
         );
 
@@ -854,8 +869,16 @@ mod tests {
 
         let () = state_sender.send(State::Prepare).await.unwrap();
 
+        assert_eq!(
+            install_manager_ch.suspend_update(Some("wrong-id".into())).await,
+            Ok(Err(SuspendError::AttemptIdMismatch))
+        );
+        assert_eq!(
+            install_manager_ch.resume_update(Some("wrong-id".into())).await,
+            Ok(Err(ResumeError::AttemptIdMismatch))
+        );
         assert_eq!(install_manager_ch.suspend_update(None).await, Ok(Ok(())));
-        assert_eq!(install_manager_ch.resume_update().await, Ok(Ok(())));
+        assert_eq!(install_manager_ch.resume_update(None).await, Ok(Ok(())));
 
         let () =
             state_sender.send(State::FailPrepare(PrepareFailureReason::Internal)).await.unwrap();
@@ -872,7 +895,7 @@ mod tests {
         );
 
         assert_eq!(
-            install_manager_ch.resume_update().await,
+            install_manager_ch.resume_update(None).await,
             Ok(Err(ResumeError::NoUpdateInProgress))
         );
     }
