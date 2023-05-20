@@ -90,6 +90,9 @@ import("//build/rust/rustc_test.gni")
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
 #
+#   disable_rustdoc (optional)
+#     Don't add this target to https://fuchsia.dev/go/rustdoc
+#
 #   original_target_name (optional)
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
@@ -198,6 +201,11 @@ template("rustc_staticlib") {
 
     configs = []
     configs = invoker.configs
+    metadata = {
+      if (defined(invoker.disable_rustdoc)) {
+        disable_rustdoc = [ invoker.disable_rustdoc ]
+      }
+    }
   }
 
   public_hdrs = []

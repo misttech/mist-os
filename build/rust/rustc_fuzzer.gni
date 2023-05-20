@@ -99,6 +99,7 @@ template("rustc_fuzzer") {
     configs = []
     configs = [ ":$fuzzer_cfg" ] + invoker.configs
     original_target_name = _original_target_name
+    disable_rustdoc = true
   }
   staticlib_vars += [ "configs" ]
 
