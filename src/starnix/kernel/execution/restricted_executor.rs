@@ -64,6 +64,93 @@ extern "C" {
     fn breakpoint_for_module_changes();
 }
 
+/// `RestrictedState` manages accesses into the restricted state VMO.
+///
+/// See `zx_restricted_bind_state`.
+pub struct RestrictedState {
+    state_size: usize,
+    bound_state: &'static mut [u8],
+    addr_and_size_for_unmap: Option<(usize, usize)>,
+}
+
+impl RestrictedState {
+    pub fn from_vmo(state_vmo: zx::Vmo) -> Result<Self, Error> {
+        // Map the restricted state VMO and arrange for it to be unmapped later.
+        let state_size = state_vmo.get_size()? as usize;
+        let state_address = fuchsia_runtime::vmar_root_self()
+            .map(0, &state_vmo, 0, state_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
+            .unwrap();
+        let bound_state =
+            unsafe { std::slice::from_raw_parts_mut(state_address as *mut u8, state_size) };
+        Ok(Self {
+            state_size,
+            bound_state,
+            addr_and_size_for_unmap: Some((state_address, state_size)),
+        })
+    }
+
+    /// Takes a tuple of (mapping_size, mapping_address), and by doing so the caller
+    /// is taking responsibility for un-mapping this range when no longer used.
+    ///
+    /// Safety: The caller must guarantee that no more accesses into the state VMO occur
+    /// after this range is unmapped.
+    pub unsafe fn take_addr_and_size_for_unmap(&mut self) -> Option<(usize, usize)> {
+        self.addr_and_size_for_unmap.take()
+    }
+
+    pub fn write_state(&mut self, state: &zx::sys::zx_restricted_state_t) {
+        debug_assert!(self.state_size >= std::mem::size_of::<zx::sys::zx_restricted_state_t>());
+        self.bound_state[0..std::mem::size_of::<zx::sys::zx_restricted_state_t>()]
+            .copy_from_slice(Self::restricted_state_as_bytes(state));
+    }
+
+    pub fn read_state(&self, state: &mut zx::sys::zx_restricted_state_t) {
+        debug_assert!(self.state_size >= std::mem::size_of::<zx::sys::zx_restricted_state_t>());
+        Self::restricted_state_as_bytes_mut(state).copy_from_slice(
+            &self.bound_state[0..std::mem::size_of::<zx::sys::zx_restricted_state_t>()],
+        );
+    }
+
+    /// Returns a mutable reference to `state` as bytes. Used to read and write restricted state from
+    /// the kernel.
+    fn restricted_state_as_bytes_mut(state: &mut zx::sys::zx_restricted_state_t) -> &mut [u8] {
+        unsafe {
+            std::slice::from_raw_parts_mut(
+                (state as *mut zx::sys::zx_restricted_state_t) as *mut u8,
+                std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
+            )
+        }
+    }
+    fn restricted_state_as_bytes(state: &zx::sys::zx_restricted_state_t) -> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                (state as *const zx::sys::zx_restricted_state_t) as *const u8,
+                std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
+            )
+        }
+    }
+}
+
+impl std::ops::Drop for RestrictedState {
+    fn drop(&mut self) {
+        // Safety: We are un-mapping the state VMO. This is safe because we route all access
+        // into this memory region though this struct so it is safe to unmap on Drop.
+        //
+        // If we don't have a mapping size and address here, that means someone has called
+        // `take_addr_and_size_for_unmap` and are taking responsibility for un-mapping for us.
+        // This is specifically needed in the situation where a thread is killed by Zircon
+        // such that we do not get a chance to unwind our stack gracefully. This work-around will
+        // no longer be needed once we are using in-thread exception handling.
+        unsafe {
+            if let Some((mapping_address, mapping_size)) = self.take_addr_and_size_for_unmap() {
+                fuchsia_runtime::vmar_root_self()
+                    .unmap(mapping_address, mapping_size)
+                    .expect("Failed to unmap");
+            }
+        }
+    }
+}
+
 /// Runs the `current_task` to completion.
 ///
 /// The high-level flow of this function looks as follows:
@@ -125,31 +212,21 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     }
 
     // Map the restricted state VMO and arrange for it to be unmapped later.
-    let state_vmo_size = state_vmo.get_size()? as usize;
-    let state_address = fuchsia_runtime::vmar_root_self()
-        .map(0, &state_vmo, 0, state_vmo_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
-        .unwrap();
+    let mut restricted_state = RestrictedState::from_vmo(state_vmo)?;
     // TODO(https://fxbug.dev/117302): Normally, we'd use scopeguard::defer! to unmap as we leave
     // this function, but instead we'll stash the `state_address` and `state_vmo_size` so that
     // `Task::destroy_do_not_use_outside_of_drop_if_possible()` can remove this mapping later.
-    {
+    unsafe {
         let mut task_state = current_task.write();
-        task_state.restricted_state_addr_and_size = Some((state_address, state_vmo_size));
+        task_state.restricted_state_addr_and_size = restricted_state.take_addr_and_size_for_unmap();
     }
-
-    let bound_state = unsafe {
-        std::slice::from_raw_parts_mut(
-            state_address as *mut u8,
-            std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
-        )
-    };
 
     let mut syscall_decl = SyscallDecl::from_number(u64::MAX);
     loop {
         let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.registers);
 
         // Copy the register state into the mapped VMO.
-        bound_state.copy_from_slice(restricted_state_as_bytes(&mut state));
+        restricted_state.write_state(&state);
 
         let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
         trace_duration_begin!(trace_category_starnix!(), trace_name_user_space!());
@@ -181,7 +258,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         );
 
         // Copy the register state out of the VMO.
-        restricted_state_as_bytes(&mut state).copy_from_slice(bound_state);
+        restricted_state.read_state(&mut state);
 
         // Store the new register state in the current task before dispatching the system call.
         current_task.registers = zx::sys::zx_thread_state_general_regs_t::from(&state).into();
@@ -216,17 +293,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             }
             return Ok(exit_status);
         }
-    }
-}
-
-/// Returns a mutable reference to `state` as bytes. Used to read and write restricted state from
-/// the kernel.
-fn restricted_state_as_bytes(state: &mut zx::sys::zx_restricted_state_t) -> &mut [u8] {
-    unsafe {
-        std::slice::from_raw_parts_mut(
-            (state as *mut zx::sys::zx_restricted_state_t) as *mut u8,
-            std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
-        )
     }
 }
 
