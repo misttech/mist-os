@@ -183,6 +183,12 @@ fn main() {
             ]),
             extra_args: vec![],
         },
+        TestCase {
+            manifest_path: vec!["testonly", "Cargo.toml"],
+            golden_expected_filename: vec!["testonly", "BUILD.gn"],
+            sdk_metadata_path: None,
+            extra_args: vec!["--skip-root"],
+        },
     ];
 
     let run_gnaw = |manifest_path: &[&str],

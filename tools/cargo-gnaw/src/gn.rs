@@ -61,6 +61,7 @@ pub fn write_top_level_rule<W: io::Write>(
     pkg: &Package,
     group_visibility: Option<&GroupVisibility>,
     rule_renaming: Option<&RuleRenaming>,
+    testonly: bool,
     has_tests: bool,
 ) -> Result<()> {
     let target_name = if pkg.is_proc_macro() {
@@ -86,7 +87,7 @@ pub fn write_top_level_rule<W: io::Write>(
         dep_name = target_name,
         group_rule_name = group_rule,
         optional_visibility = optional_visibility,
-        optional_testonly = "",
+        optional_testonly = if testonly { "testonly = true" } else { "" },
     )?;
 
     if has_tests {
@@ -325,6 +326,7 @@ pub fn write_rule<W: io::Write>(
     global_target_cfgs: Option<&GlobalTargetCfgs>,
     custom_build: Option<&CombinedTargetCfg<'_>>,
     output_name: Option<&str>,
+    is_testonly: bool,
     is_test: bool,
     renamed_rule: Option<&str>,
 ) -> Result<()> {
@@ -513,7 +515,7 @@ pub fn write_rule<W: io::Write>(
         target_name.push_str("-test");
     }
 
-    let optional_testonly = if is_test { "testonly = true" } else { "" };
+    let optional_testonly = if is_testonly || is_test { "testonly = true" } else { "" };
 
     writeln!(
         output,
@@ -577,11 +579,20 @@ mod tests {
         let prefix = std::env::temp_dir();
 
         let mut output = vec![];
-        assert!(
-            write_rule(&mut output, &target, not_prefix, None, None, None, false, None).is_err()
-        );
-        assert!(write_rule(&mut output, &target, prefix.as_path(), None, None, None, false, None)
-            .is_ok());
+        assert!(write_rule(&mut output, &target, not_prefix, None, None, None, false, false, None)
+            .is_err());
+        assert!(write_rule(
+            &mut output,
+            &target,
+            prefix.as_path(),
+            None,
+            None,
+            None,
+            false,
+            false,
+            None
+        )
+        .is_ok());
     }
 
     #[test]
@@ -614,6 +625,7 @@ mod tests {
             None,
             None,
             None,
+            false,
             false,
             None,
         )
@@ -674,6 +686,7 @@ mod tests {
             None,
             outname,
             false,
+            false,
             None,
         )
         .unwrap();
@@ -733,6 +746,7 @@ mod tests {
             None,
             None,
             outname,
+            false,
             false,
             Some("renamed_rule"),
         )

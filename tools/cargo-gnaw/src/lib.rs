@@ -171,6 +171,8 @@ pub struct PackageCfg {
     /// Visibility list to use for the forwarding group, for use with fixits which seek to remove
     /// the use of a specific crate from the tree.
     group_visibility: Option<GroupVisibility>,
+    /// Whether or not this target my only be used in tests.
+    testonly: Option<bool>,
     /// Build tests for this target.
     tests: bool,
     /// Used to rename the group and target names used to bring this particular package
@@ -398,6 +400,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                                 package,
                                 visibility,
                                 target_renaming,
+                                cfg.and_then(|cfg| cfg.testonly).unwrap_or(false),
                                 cfg.map(|c| c.tests).unwrap_or(false),
                             )
                             .with_context(|| {
@@ -441,12 +444,14 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 if let Some(target_renaming) = target_renaming {
                     write_import_once(&mut output, &mut imported_files, &target_renaming.import)?;
                 }
+
                 gn::write_top_level_rule(
                     &mut output,
                     None,
                     package,
                     visibility,
                     target_renaming,
+                    cfg.and_then(|cfg| cfg.testonly).unwrap_or(false),
                     cfg.map(|c| c.tests).unwrap_or(false),
                 )
                 .with_context(|| "writing top level rule")?;
@@ -483,6 +488,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     // targets, then save off a mapping of GnTarget to the target config.
     let mut target_cfgs = HashMap::<&GnTarget<'_>, CombinedTargetCfg<'_>>::new();
     let mut target_binaries = HashMap::<&GnTarget<'_>, BinaryRenderOptions<'_>>::new();
+    let mut testonly_targets = HashSet::<&GnTarget<'_>>::new();
     let mut targets_with_tests = HashSet::<&GnTarget<'_>>::new();
     let mut reviewed_features_map = HashMap::<&GnTarget<'_>, Option<&[String]>>::new();
     // An entry for each target that needs a renamed rule.  There is no connection between
@@ -513,6 +519,10 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                         .map(|x| x.as_str())
                     {
                         renamed_rules.insert(target, renamed_rule);
+                    }
+
+                    if pkg_cfg.testonly == Some(true) {
+                        testonly_targets.insert(target);
                     }
 
                     if pkg_cfg.tests {
@@ -732,6 +742,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             global_config,
             target_cfg,
             binary_name,
+            testonly_targets.contains(target),
             false,
             renamed_rules.get(target).copied(),
         )
@@ -745,6 +756,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 global_config,
                 target_cfg,
                 binary_name,
+                true,
                 true,
                 renamed_rules.get(&target).copied(),
             )
