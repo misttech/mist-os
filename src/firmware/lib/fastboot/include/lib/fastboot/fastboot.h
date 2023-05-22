@@ -23,7 +23,11 @@
 
 namespace fastboot {
 
-constexpr char kRamDiskString[] = "/ramdisk-";
+// The disk topology prefix that indicates a ramdisk.
+constexpr std::string_view kRamDiskString = "/ramdisk-";
+
+// The magic string that tells `flash gpt-meta` to initialize the default GPT.
+constexpr std::string_view kGptMetaDefault = "default";
 
 class __EXPORT Fastboot : public FastbootBase {
  public:

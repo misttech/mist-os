@@ -405,6 +405,28 @@ zx::result<> Fastboot::Flash(const std::string& command, Transport* transport) {
 
     download_vmo_mapper_.Reset();
     return SendResponse(ResponseType::kOkay, "", transport);
+  } else if (info.partition == "gpt-meta") {
+    // gpt-meta is a pseudo-partition; we don't write the contents directly to the GPT but instead
+    // it provides some higher-level information about what the GPT should look like and it's up to
+    // the device implementation to translate that to an actual GPT.
+
+    if (info.configuration) {
+      return SendResponse(ResponseType::kFail, "gpt-meta doesn't support slots", transport,
+                          zx::error(ZX_ERR_INVALID_ARGS));
+    }
+
+    // For now we only support a single input format of a file containing the word "default", which
+    // means to write the default GPT exactly as `oem init-partition-tables` would. The reason we
+    // provide this alias is to simplify `ffx flash` by tying into the existing partition flash
+    // mechanism rather than having to teach it about the `oem init-partition-tables` command.
+    std::string_view contents(reinterpret_cast<const char*>(download_vmo_mapper_.start()),
+                              download_vmo_mapper_.size());
+    if (contents == kGptMetaDefault) {
+      return OemInitPartitionTables(command, transport);
+    } else {
+      return SendResponse(ResponseType::kFail, "Invalid gpt-meta contents", transport,
+                          zx::error(ZX_ERR_INVALID_ARGS));
+    }
   } else {
     return SendResponse(ResponseType::kFail, "Unsupported partition", transport);
   }
