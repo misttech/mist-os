@@ -16,6 +16,9 @@ declare_args() {
     starnix_restricted_mode = false
   }
 
+  # Whether or not to enable 'in-thread' exception handling for restricted mode.
+  starnix_restricted_in_thread_exceptions = false
+
   # Whether or not logging is disabled globally.
   starnix_disable_logging = false
 
@@ -334,6 +337,9 @@ rustc_binary("starnix_kernel_bin") {
   features = []
   if (starnix_restricted_mode) {
     features += [ "restricted_mode" ]
+  }
+  if (starnix_restricted_in_thread_exceptions) {
+    features += [ "in_thread_exceptions" ]
   }
   if (starnix_disable_logging) {
     features += [ "disable_logging" ]

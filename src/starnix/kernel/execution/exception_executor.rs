@@ -157,8 +157,10 @@ fn run_exception_loop(
                 error_context = Some(new_error_context);
             }
         } else {
-            match current_task.process_exception(&info, &exception, &report) {
-                ExceptionResult::Handled => {}
+            match current_task.process_exception(&report) {
+                ExceptionResult::Handled => {
+                    exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
+                }
                 ExceptionResult::Signal(signal) => {
                     if info.type_ == ZX_EXCP_FATAL_PAGE_FAULT {
                         #[cfg(target_arch = "x86_64")]

@@ -967,13 +967,8 @@ impl Task {
     /// If the exception could not be handled returns Err(())
     // TODO(https://fxbug.dev/117302): Move to CurrentTask when the restricted executor's flow allows the exception handler to
     // access CurrentTask. It does not make sense to handle a Zircon exception for another task.
-    pub fn process_exception(
-        &self,
-        info: &zx::sys::zx_exception_info_t,
-        exception: &zx::Exception,
-        report: &zx::sys::zx_exception_report_t,
-    ) -> ExceptionResult {
-        if info.type_ == zx::sys::ZX_EXCP_FATAL_PAGE_FAULT {
+    pub fn process_exception(&self, report: &zx::sys::zx_exception_report_t) -> ExceptionResult {
+        if report.header.type_ == zx::sys::ZX_EXCP_FATAL_PAGE_FAULT {
             // A page fault may be resolved by extending a growsdown mapping to cover the faulting
             // address. Ask the memory manager if it can extend a mapping to cover the faulting
             // address and if says that it's found a mapping that exists or that can be extended to
@@ -989,9 +984,6 @@ impl Task {
                     decoded.is_write,
                 ) {
                     Ok(true) => {
-                        exception
-                            .set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED)
-                            .unwrap();
                         return ExceptionResult::Handled;
                     }
                     Err(e) => {
@@ -1001,7 +993,7 @@ impl Task {
                 }
             }
         }
-        match info.type_ {
+        match report.header.type_ {
             zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
                 ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
             }
