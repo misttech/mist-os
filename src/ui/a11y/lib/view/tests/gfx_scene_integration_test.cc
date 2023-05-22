@@ -134,7 +134,7 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
 
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
-    config.scene_owner = SceneOwner();
+    config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_,
                                     fuchsia::ui::accessibility::view::Registry::Name_};
     // Use this service to start the a11y manager explicitly.
@@ -202,8 +202,6 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
     RunLoopUntil([&]() { return complete; });
   }
 
-  virtual ui_testing::UITestRealm::SceneOwnerType SceneOwner() = 0;
-
  protected:
   std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
@@ -212,17 +210,7 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
   fxl::WeakPtr<AccessibilityViewRegistryProxy> access_;
 };
 
-class ClientAttachesFirst : public GfxAccessibilitySceneTestBase {
- public:
-  ClientAttachesFirst() = default;
-  ~ClientAttachesFirst() override = default;
-
-  ui_testing::UITestRealm::SceneOwnerType SceneOwner() override {
-    return ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
-  }
-};
-
-TEST_F(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
+TEST_F(GfxAccessibilitySceneTestBase, SceneReconnectedAndClientRefocused) {
   FX_LOGS(INFO) << "Starting test case";
 
   // Attach the client view.
@@ -263,18 +251,8 @@ TEST_F(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
   RunLoopUntil([this] { return ui_test_manager_->ClientViewIsFocused(); });
 }
 
-// Test the case where the a11y view attaches first on scene manager.
-class A11yViewAttachesFirstTest : public GfxAccessibilitySceneTestBase {
- public:
-  A11yViewAttachesFirstTest() = default;
-  ~A11yViewAttachesFirstTest() override = default;
-
-  ui_testing::UITestRealm::SceneOwnerType SceneOwner() override {
-    return ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
-  }
-};
-
-TEST_F(A11yViewAttachesFirstTest, A11yViewAttachesFirst) {
+// Test the case where the a11y view attaches first.
+TEST_F(GfxAccessibilitySceneTestBase, A11yViewAttachesFirst) {
   FX_LOGS(INFO) << "Starting test case";
 
   // Connect to the semantics manager service, and wait for a11y manager to

@@ -49,7 +49,7 @@ class MagnificationPixelTest : public gtest::RealLoopFixture {
   // |testing::Test|
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.use_input = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};

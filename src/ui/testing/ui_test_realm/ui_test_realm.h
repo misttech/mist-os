@@ -63,8 +63,8 @@ constexpr auto kHighResolutionDevicePixelRatio = 2.f;
 // within its own subrealm (see AddSubrealm() below). Important notes on the client
 // subrealm:
 //
-//   (1) A client subrealm should NOT contain any UI services (scenic, root
-//   presenter, scene manager, input pipeline, text manager, or a11y manager).
+//   (1) A client subrealm should NOT contain any UI services (scenic, scene
+//       manager, text manager, or a11y manager).
 //   (2) A client MUST expose fuchsia.ui.app.ViewProvider from its subrealm if
 //       specifies a scene owner.
 //   (3) Clients can consume required ui services from ParentRef(), provided
@@ -74,12 +74,11 @@ constexpr auto kHighResolutionDevicePixelRatio = 2.f;
 //
 // UITestManager enables configurations with or without input.
 //
-// * If clients specify a scene owner via Config::scene_owner and set
-//   Config::use_input = true, then UITestManager assumes input pipeline will
-//   own input for the test scene (either as a standalone component with root
-//   presenter or as part of scene manager).
-// * If a client does not specify a scene owner, but sets Config::use_input = true,
-//  then UITestManager will expose raw scenic input APIs out of the test realm.
+// * If Config::use_scene_owner = true and Config::use_input = true, then
+//   UITestManager assumes input pipeline will own input for the test scene
+//   (via scene manager).
+// * If Config::use_scene_owner = false and Config::use_input = true, then
+//   UITestManager will expose raw scenic input APIs out of the test realm.
 // * If clients set Config::use_input = false, then UITestManager will not
 //   any input APIs out of the test realm.
 //
@@ -95,12 +94,6 @@ constexpr auto kHighResolutionDevicePixelRatio = 2.f;
 // behavior.
 class UITestRealm {
  public:
-  enum class SceneOwnerType {
-    ROOT_PRESENTER = 1,
-
-    SCENE_MANAGER = 2,
-  };
-
   enum class AccessibilityOwnerType {
     // Use the fake a11y manager. Clients should prefer using the fake a11y
     // manager for tests that require a11y services, but do not test a11y
@@ -113,16 +106,12 @@ class UITestRealm {
   };
 
   struct Config {
-    // Specifies the entity that owns the root of the scene, if any.
-    // If std::nullopt, then no scene owner will be present in the test realm.
+    // Specifies whether scene manager owns the root of the scene.
+    // If false, then no scene owner will be present in the test realm.
     //
-    // For now, UITestManager assumes that the entity that input pipeline owns
-    // input if scene_owner is not std::nullopt. We may revisit this assumption
-    // if the need arises.
-    //
-    // Furthermore, if a scene owner is specified, the client promises to expose
+    // Furthermore, if a scene owner is used, the client promises to expose
     // fuchsia.ui.app.ViewProvider from its subrealm.
-    std::optional<SceneOwnerType> scene_owner;
+    bool use_scene_owner = false;
 
     // Specifies the entity that owns accessibility in the test realm, if any.
     // If std::nullopt, then no a11y services will be present in the test realm.
@@ -130,13 +119,13 @@ class UITestRealm {
 
     // Instructs UITestManager to expose input APIs out of the test realm.
     //
-    // If |scene_owner| has a value, input pipeline will own input and
+    // If use_scene_owner is true, scene manager will own input and
     // the top-level realm will expose the following services:
     //   * fuchsia.input.injection.InputDeviceRegistry
     //   * fuchsia.ui.policy.DeviceListenerRegistry
     //   * fuchsia.ui.pointerinjector.configuration.Setup
     //
-    // If |scene_owner| is std::nullopt, the top-level realm exposes the raw scenic
+    // If use_scene_owner is false, the top-level realm exposes the raw scenic
     // input API:
     //   * fuchsia.ui.pointerinjector.Registry
     bool use_input = false;

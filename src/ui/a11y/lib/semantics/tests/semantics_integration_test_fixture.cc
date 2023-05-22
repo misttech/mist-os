@@ -90,7 +90,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
     ui_testing::UITestRealm::Config config;
 
     config.device_pixel_ratio = kDevicePixelRatio;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
 
     config.passthrough_capabilities = passthrough_capabilities;
@@ -103,7 +103,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
 
     config.use_flatland = true;
     config.device_pixel_ratio = kDevicePixelRatio;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::composition::Allocator::Name_,
                                     fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::scenic::Scenic::Name_};

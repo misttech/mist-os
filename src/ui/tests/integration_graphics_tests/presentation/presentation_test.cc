@@ -23,8 +23,6 @@ namespace integration_tests {
 namespace {
 
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
-using component_testing::LocalComponentHandles;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -38,7 +36,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
   // GFX x scene manager
   {
     ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
     configs.push_back(std::move(config));
   }
@@ -47,7 +45,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
   {
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::composition::Allocator::Name_};
     configs.push_back(std::move(config));

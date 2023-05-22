@@ -45,7 +45,7 @@ class AccessibilitySceneTest
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
     config.accessibility_owner = GetParam();
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_,
                                     fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::composition::Allocator::Name_};

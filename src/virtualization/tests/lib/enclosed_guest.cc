@@ -154,7 +154,7 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithUITestManager(
   // UITestRealm. Some of the below config fields will allow us to route capabilities through that
   // realm.
   ui_testing::UITestRealm::Config ui_config;
-  ui_config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+  ui_config.use_scene_owner = true;
   ui_config.use_input = true;
   ui_config.use_flatland = true;
 

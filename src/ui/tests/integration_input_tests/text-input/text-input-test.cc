@@ -188,7 +188,7 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
 
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.passthrough_capabilities = {

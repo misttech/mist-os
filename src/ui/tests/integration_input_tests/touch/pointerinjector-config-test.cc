@@ -77,7 +77,7 @@
 //         |
 //   <created realm root>
 //      /      \
-//   scenic  input-pipeline
+//   scenic  scene_manager
 //
 // For more information about testing v2 components and realm_builder,
 // visit the following links:
@@ -205,7 +205,7 @@ class PointerInjectorConfigTest
 
     ui_testing::UITestRealm::Config config;
     config.display_rotation = test_data.display_rotation;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};

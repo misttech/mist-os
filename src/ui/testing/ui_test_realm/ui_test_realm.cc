@@ -65,8 +65,6 @@ constexpr auto kDisplayUsageNear = "near";
 
 // Base realm urls.
 constexpr auto kScenicOnlyUrl = "#meta/scenic_only.cm";
-constexpr auto kRootPresenterSceneUrl = "#meta/root_presenter_scene.cm";
-constexpr auto kRootPresenterSceneWithInputUrl = "#meta/root_presenter_scene_with_input.cm";
 constexpr auto kSceneManagerSceneWithInputUrl = "#meta/scene_manager_scene_with_input.cm";
 
 // System component urls.
@@ -79,9 +77,7 @@ constexpr auto kClientSubrealmName = "client-subrealm";
 // NOTE: These names must match the names in meta/*.cml.
 constexpr auto kA11yManagerName = "a11y-manager";
 constexpr auto kScenicName = "scenic";
-constexpr auto kRootPresenterName = "root_presenter";
 constexpr auto kSceneManagerName = "scene_manager";
-constexpr auto kInputPipelineName = "input_pipeline";
 constexpr auto kTextManagerName = "text_manager";
 constexpr auto kVirtualKeyboardManagerName = "virtual_keyboard_manager";
 constexpr auto kSceneProviderName = "scene-provider";
@@ -112,18 +108,11 @@ std::vector<std::string> DefaultSystemServices() {
 
 // Returns the name of the scene owner component (if any).
 std::string SceneOwnerName(const UITestRealm::Config& config) {
-  if (!config.scene_owner) {
+  if (!config.use_scene_owner) {
     return "";
   }
 
-  switch (*config.scene_owner) {
-    case UITestRealm::SceneOwnerType::ROOT_PRESENTER:
-      return kRootPresenterName;
-    case UITestRealm::SceneOwnerType::SCENE_MANAGER:
-      return kSceneManagerName;
-    default:
-      return "";
-  }
+  return kSceneManagerName;
 }
 
 // Returns the name of the input owner component (if any).
@@ -132,30 +121,16 @@ std::string InputOwnerName(const UITestRealm::Config& config) {
     return "";
   }
 
-  switch (*config.scene_owner) {
-    case UITestRealm::SceneOwnerType::ROOT_PRESENTER:
-      return kInputPipelineName;
-    case UITestRealm::SceneOwnerType::SCENE_MANAGER:
-      return kSceneManagerName;
-    default:
-      return "";
-  }
+  return kSceneManagerName;
 }
 
 // Returns the name of the virtual keyboard component (if any).
 std::string VirtualKeyboardOwnerName(const UITestRealm::Config& config) {
-  if (!config.scene_owner) {
+  if (!config.use_scene_owner) {
     return "";
   }
 
-  switch (*config.scene_owner) {
-    case UITestRealm::SceneOwnerType::ROOT_PRESENTER:
-      return kRootPresenterName;
-    case UITestRealm::SceneOwnerType::SCENE_MANAGER:
-      return kVirtualKeyboardManagerName;
-    default:
-      return "";
-  }
+  return kVirtualKeyboardManagerName;
 }
 
 // List of scenic services available in the test realm.
@@ -195,19 +170,11 @@ std::vector<std::string> AccessibilityServices(const UITestRealm::Config& config
 
 // List of scene owner services available in the test realm.
 std::vector<std::string> SceneOwnerServices(const UITestRealm::Config& config) {
-  if (!config.scene_owner)
+  if (!config.use_scene_owner)
     return {};
 
-  if (config.scene_owner == UITestRealm::SceneOwnerType::ROOT_PRESENTER) {
-    return {fuchsia::ui::accessibility::view::Registry::Name_,
-            fuchsia::ui::pointerinjector::configuration::Setup::Name_,
-            fuchsia::ui::policy::Presenter::Name_};
-  } else if (config.scene_owner == UITestRealm::SceneOwnerType::SCENE_MANAGER) {
-    return {fuchsia::session::scene::Manager::Name_,
-            fuchsia::ui::accessibility::view::Registry::Name_};
-  }
-
-  return {};
+  return {fuchsia::session::scene::Manager::Name_,
+          fuchsia::ui::accessibility::view::Registry::Name_};
 }
 
 // List of input services available in the test realm.
@@ -216,7 +183,7 @@ std::vector<std::string> InputServices(const UITestRealm::Config& config) {
     return {};
   }
 
-  if (config.scene_owner) {
+  if (config.use_scene_owner) {
     return {fuchsia::input::injection::InputDeviceRegistry::Name_,
             fuchsia::ui::policy::DeviceListenerRegistry::Name_};
   } else {
@@ -264,19 +231,13 @@ std::map<std::string, std::string> GetServiceToComponentMap(UITestRealm::Config 
 UITestRealm::UITestRealm(UITestRealm::Config config) : config_(config) {}
 
 std::string UITestRealm::CalculateBaseRealmUrl() {
-  if (config_.scene_owner == UITestRealm::SceneOwnerType::ROOT_PRESENTER) {
-    return config_.use_input ? kRootPresenterSceneWithInputUrl : kRootPresenterSceneUrl;
-  } else if (config_.scene_owner == UITestRealm::SceneOwnerType::SCENE_MANAGER) {
+  if (config_.use_scene_owner) {
     // Scene manager and input pipeline run in the same monolithic component, so
     // there's no meaningful difference in component topology between the "use
     // input" and "no input" cases.
     return kSceneManagerSceneWithInputUrl;
   } else {
-    // If we have exhausted all potential scene owner options, then scene_owner
-    // should be std::nullopt.
-    FX_CHECK(!config_.scene_owner) << "Unrecognized scene owner";
-
-    // If no scene owner is specified, use the scenic-only realm.
+    // If no scene owner is present, use the scenic-only realm.
     return kScenicOnlyUrl;
   }
 }
@@ -333,7 +294,7 @@ void UITestRealm::ConfigureClientSubrealm() {
   }
 
   // Route ViewProvider to parent if the client specifies a scene owner.
-  if (config_.scene_owner) {
+  if (config_.use_scene_owner) {
     RouteServices({fuchsia::ui::app::ViewProvider::Name_},
                   /* source = */ ChildRef{kClientSubrealmName},
                   /* targets = */ {ParentRef()});
@@ -362,8 +323,7 @@ void UITestRealm::ConfigureAccessibility() {
   if (config_.accessibility_owner == UITestRealm::AccessibilityOwnerType::REAL) {
     a11y_manager_url = kRealA11yManagerUrl;
   } else if (config_.accessibility_owner == UITestRealm::AccessibilityOwnerType::FAKE ||
-             (config_.scene_owner == UITestRealm::SceneOwnerType::SCENE_MANAGER &&
-              config_.use_flatland)) {
+             config_.use_flatland) {
     a11y_manager_url = kFakeA11yManagerUrl;
   } else {
     return;
@@ -383,7 +343,7 @@ void UITestRealm::ConfigureAccessibility() {
                 /* source = */ ChildRef{kA11yManagerName},
                 /* targets = */ {ParentRef()});
 
-  if (config_.scene_owner) {
+  if (config_.use_scene_owner) {
     if (config_.use_flatland) {
       RouteServices({fuchsia::accessibility::scene::Provider::Name_},
                     /* source = */ ChildRef{kA11yManagerName},
@@ -410,7 +370,7 @@ void UITestRealm::RouteConfigData() {
   }
 
   std::string scene_owner_name = SceneOwnerName(config_);
-  if (config_.scene_owner) {
+  if (config_.use_scene_owner) {
     // Supply a default display rotation.
     config_directory_contents.AddFile("display_rotation", std::to_string(config_.display_rotation));
 
@@ -439,23 +399,14 @@ void UITestRealm::RouteConfigData() {
 }
 
 void UITestRealm::ConfigureSceneOwner() {
-  if (!(config_.scene_owner)) {
-    return;
-  }
-
-  std::string config_parent;
-  if (config_.use_input) {
-    config_parent = InputOwnerName(config_);
-  } else if (*config_.scene_owner == UITestRealm::SceneOwnerType::SCENE_MANAGER) {
-    config_parent = kSceneManagerName;
-  } else {
+  if (!config_.use_scene_owner) {
     return;
   }
 
   auto input_config_directory_contents = component_testing::DirectoryContents();
   std::vector<Ref> targets;
 
-  targets.push_back(ChildRef{config_parent});
+  targets.push_back(ChildRef{kSceneManagerName});
   input_config_directory_contents.AddFile("empty.json", "");
   realm_builder_.RouteReadOnlyDirectory("sensor-config", std::move(targets),
                                         std::move(input_config_directory_contents));
@@ -464,7 +415,7 @@ void UITestRealm::ConfigureSceneOwner() {
 void UITestRealm::ConfigureSceneProvider() {
   // The scene provider component will only be present in the test realm if the
   // client specifies a scene owner.
-  if (!config_.scene_owner) {
+  if (!config_.use_scene_owner) {
     return;
   }
 

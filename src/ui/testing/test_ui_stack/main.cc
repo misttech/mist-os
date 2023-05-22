@@ -50,7 +50,7 @@ int run_test_ui_stack(int argc, const char** argv) {
   ui_testing::UITestRealm::Config config;
 
   config.use_flatland = test_ui_stack_config.use_flatland();
-  config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+  config.use_scene_owner = true;
   config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
   config.use_input = true;
   config.display_rotation = test_ui_stack_config.display_rotation();

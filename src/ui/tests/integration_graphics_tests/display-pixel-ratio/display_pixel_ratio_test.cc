@@ -34,7 +34,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
   // GFX x scene manager
   {
     ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = protocols_required;
     for (auto dpr : pixel_densities) {
       config.device_pixel_ratio = dpr;
@@ -46,7 +46,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
   {
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = protocols_required;
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
     for (auto dpr : pixel_densities) {

@@ -112,7 +112,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     ui_testing::UITestRealm::Config config;
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = protocols_required;
     config.passthrough_capabilities = {
         {Protocol{fuchsia::process::Launcher::Name_}, Protocol{fuchsia::sys::Environment::Name_},
@@ -129,7 +129,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.use_input = true;
     config.use_flatland = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.ui_to_client_services = protocols_required;
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Allocator::Name_);

@@ -193,7 +193,6 @@ class GfxAccessibilityViewTest : public gtest::RealLoopFixture {
   ~GfxAccessibilityViewTest() override = default;
 
   void SetUp() override {
-    // Don't specify a scene_owner to force a scenic-only realm.
     ui_testing::UITestRealm::Config config;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
     // Expose the semantics manager service out of the realm. The test fixture

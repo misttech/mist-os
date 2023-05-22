@@ -83,7 +83,7 @@ class VirtioGpuTest : public TestWithDevice,
     using component_testing::Route;
 
     ui_testing::UITestRealm::Config ui_config;
-    ui_config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    ui_config.use_scene_owner = true;
     ui_config.use_flatland = true;
     ui_config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_,
                                        fuchsia::ui::composition::Allocator::Name_};

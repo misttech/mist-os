@@ -68,7 +68,7 @@ void UITestManager::BuildRealm() {
   focus_chain_listener_registry->Register(focus_chain_listener_binding_.NewBinding());
 
   // Register geometry observer.
-  if (realm_.config().scene_owner) {
+  if (realm_.config().use_scene_owner) {
     scene_controller_ =
         realm_.realm_root()->component().Connect<fuchsia::ui::test::scene::Controller>();
     scene_controller_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});

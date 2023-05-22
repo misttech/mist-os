@@ -49,7 +49,7 @@ namespace ui_testing {
 // ```
 // // Configure UITestManger instance.
 // UITestRealm::Config config;
-// config.scene_owner = UITestRealm::SceneOwnerType::ROOT_PRESENTER;
+//  config.use_scene_owner = true;
 // config.ui_to_client_services = { fuchsia::ui::scenic::Scenic::Name_ };
 // UITestManager ui_test_manager(std::move(config));
 //

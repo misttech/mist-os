@@ -31,7 +31,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
   // GFX x scene manager
   {
     ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.device_pixel_ratio = ui_testing::kDefaultDevicePixelRatio;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
     for (const auto rotation : display_rotations) {
@@ -44,7 +44,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
   {
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+    config.use_scene_owner = true;
     config.device_pixel_ratio = ui_testing::kDefaultDevicePixelRatio;
     config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::composition::Allocator::Name_};

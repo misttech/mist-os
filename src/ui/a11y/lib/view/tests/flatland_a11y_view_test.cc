@@ -61,7 +61,6 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
   ~FlatlandAccessibilityViewTest() override = default;
 
   void SetUp() override {
-    // Don't specify a scene_owner to force a scenic-only realm.
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_,
