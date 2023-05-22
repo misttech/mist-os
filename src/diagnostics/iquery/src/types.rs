@@ -68,6 +68,12 @@ pub enum Error {
     #[error("Invalid file pattern: {0}")]
     InvalidFilePattern(String),
 
+    #[error(transparent)]
+    GetManifestError(#[from] component_debug::realm::GetManifestError),
+
+    #[error(transparent)]
+    GetAllInstancesError(#[from] component_debug::realm::GetAllInstancesError),
+
     #[error("Timeout")]
     Timeout,
     #[error(transparent)]

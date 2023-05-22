@@ -171,9 +171,9 @@ impl DiagnosticsProvider for HostArchiveReader {
         self.snapshot_diagnostics_data::<D>(accessor_path, selectors).await
     }
 
-    async fn get_accessor_paths(&self, paths: &Vec<String>) -> Result<Vec<String>, Error> {
+    async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
         let query_proxy = connect_realm_query(&self.rcs_proxy).await?;
-        get_accessor_selectors(&query_proxy, paths).await
+        get_accessor_selectors(&query_proxy).await
     }
 
     async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {

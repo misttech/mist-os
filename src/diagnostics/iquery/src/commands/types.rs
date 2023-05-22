@@ -25,9 +25,8 @@ pub trait DiagnosticsProvider: Send + Sync {
         selectors: &[String],
     ) -> Result<Vec<Data<D>>, Error>;
 
-    /// Lists all ArchiveAccessor files under the provided paths. If no paths are provided, it'll list
-    /// under the current directory.
-    async fn get_accessor_paths(&self, paths: &Vec<String>) -> Result<Vec<String>, Error>;
+    /// Lists all ArchiveAccessor selectors.
+    async fn get_accessor_paths(&self) -> Result<Vec<String>, Error>;
 
     async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error>;
 }

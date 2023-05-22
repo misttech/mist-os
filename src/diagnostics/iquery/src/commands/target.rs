@@ -56,8 +56,9 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
             .map_err(|e| Error::Fetch(e))
     }
 
-    async fn get_accessor_paths(&self, paths: &Vec<String>) -> Result<Vec<String>, Error> {
-        get_accessor_selectors_auto_proxy(paths).await
+    async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
+        let realm_query_proxy = connect_realm_query().await?;
+        get_accessor_selectors(&realm_query_proxy).await
     }
 
     async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {
@@ -79,15 +80,8 @@ pub(crate) async fn connect_realm_query() -> Result<fsys2::RealmQueryProxy, Erro
     Ok(realm_query_proxy)
 }
 
-/// Lists all ArchiveAccessor files under the provided paths. If no paths are provided, it'll list
-/// everything under the Root Realm.
-async fn get_accessor_selectors_auto_proxy(paths: &[String]) -> Result<Vec<String>, Error> {
-    let realm_query_proxy = connect_realm_query().await?;
-    get_accessor_selectors(&realm_query_proxy, paths).await
-}
-
 /// Connect to `fuchsia.sys2.*ArchivistAccessor` with the provided selector string.
-/// The selector string should be in the form of "<relative_moniker>:<expose|out>:<service_name>".
+/// The selector string should be in the form of "<relative_moniker>:expose:<service_name>".
 /// If no selector string is provided, it will try to connect to
 /// `./bootstrap/archivist:expose:fuchsia.sys2.ArchiveAccessor`.
 pub async fn connect_to_archivist_selector_str(
@@ -128,8 +122,7 @@ async fn connect_to_the_first_archivist(
 }
 
 // Use the provided `Selector` and depending on the selector,
-// opens either the `expose` or `out` directory and return the proxy to
-// it.
+// opens the `expose` directory and return the proxy to it.
 async fn get_dir_proxy(
     selector: &Selector,
     proxy: &mut fsys2::RealmQueryProxy,
@@ -192,11 +185,9 @@ async fn get_dir_proxy(
     let full_moniker = full_moniker.as_str().try_into().unwrap();
     let dir_type = if property_node_selector == "expose" {
         OpenDirType::Exposed
-    } else if property_node_selector == "out" {
-        OpenDirType::Outgoing
     } else {
         return Err(Error::InvalidSelector(format!(
-            "directory {} is not valid. Must be one of out|expose.",
+            "directory {} is not valid. Must be expose.",
             &property_node_selector
         )));
     };
@@ -284,7 +275,7 @@ mod test {
             }),
             tree_selector: Some({
                 TreeSelector::PropertySelector(PropertySelector {
-                    node_path: vec![StringSelector::ExactMatch("out".to_owned())],
+                    node_path: vec![StringSelector::ExactMatch("expose".to_owned())],
                     target_properties: StringSelector::ExactMatch(
                         "fuchsia.diagnostics.MagicArchiveAccessor".to_owned(),
                     ),
@@ -310,7 +301,7 @@ mod test {
             }),
             tree_selector: Some({
                 TreeSelector::PropertySelector(PropertySelector {
-                    node_path: vec![StringSelector::ExactMatch("out".to_owned())],
+                    node_path: vec![StringSelector::ExactMatch("expose".to_owned())],
                     target_properties: StringSelector::ExactMatch(
                         "fuchsia.diagnostics.MagicArchiveAccessor".to_owned(),
                     ),

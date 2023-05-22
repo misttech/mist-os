@@ -7,7 +7,9 @@ use fidl::endpoints::ControlHandle;
 use fidl::endpoints::RequestStream;
 use fidl::endpoints::ServerEnd;
 use fidl::endpoints::{create_endpoints, create_proxy};
-use fidl_fuchsia_component_decl::{Component, Expose, ExposeProtocol, ParentRef, Ref, SelfRef};
+use fidl_fuchsia_component_decl::{
+    Capability, Component, Expose, ExposeProtocol, ParentRef, Protocol, Ref, SelfRef,
+};
 use fidl_fuchsia_io::{self as fio, DirectoryMarker};
 use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_async;
@@ -48,8 +50,6 @@ pub struct MockRealmQueryBuilderInner {
     when: String,
     moniker: String,
     exposes: Vec<Expose>,
-    out_dir_entry: Vec<String>,
-    svc_dir_entry: Vec<String>,
     diagnostics_dir_entry: Vec<String>,
     parent: Option<Box<MockRealmQueryBuilder>>,
 }
@@ -64,18 +64,6 @@ impl MockRealmQueryBuilderInner {
     /// Sets the result vector of `Expose`s.
     pub fn exposes(mut self, exposes: Vec<Expose>) -> Self {
         self.exposes = exposes;
-        self
-    }
-
-    /// Add an entry 'out/'.
-    pub fn out_dir_entry(mut self, entry: &str) -> Self {
-        self.out_dir_entry.push(entry.to_owned());
-        self
-    }
-
-    /// Add an entry 'out/svc'.
-    pub fn svc_dir_entry(mut self, entry: &str) -> Self {
-        self.svc_dir_entry.push(entry.to_owned());
         self
     }
 
@@ -97,24 +85,13 @@ impl MockRealmQueryBuilderInner {
     pub fn serve_out_dir(&self, server_end: ServerEnd<DirectoryMarker>) {
         let mut mock_dir_top = MockDir::new("out".to_owned());
         let mut mock_dir_diagnostics = MockDir::new("diagnostics".to_owned());
-        let mut mock_dir_svc = MockDir::new("svc".to_owned());
 
         for entry in &self.diagnostics_dir_entry {
             mock_dir_diagnostics =
                 mock_dir_diagnostics.add_entry(MockFile::new_arc(entry.to_owned()));
         }
 
-        for entry in &self.svc_dir_entry {
-            mock_dir_svc = mock_dir_svc.add_entry(MockFile::new_arc(entry.to_owned()));
-        }
-
-        for entry in &self.out_dir_entry {
-            mock_dir_top = mock_dir_top.add_entry(MockFile::new_arc(entry.to_owned()));
-        }
-
-        mock_dir_top = mock_dir_top
-            .add_entry(Arc::new(mock_dir_diagnostics))
-            .add_entry(Arc::new(mock_dir_svc));
+        mock_dir_top = mock_dir_top.add_entry(Arc::new(mock_dir_diagnostics));
 
         fuchsia_async::Task::local(async move { Arc::new(mock_dir_top).serve(server_end).await })
             .detach();
@@ -133,8 +110,26 @@ impl MockRealmQueryBuilderInner {
         }
     }
 
-    fn to_manifest(&self) -> Component {
-        Component { exposes: Some(self.exposes.clone()), ..Default::default() }
+    fn make_manifest(&self) -> Component {
+        let capabilities = self
+            .exposes
+            .iter()
+            .map(|expose| match expose {
+                Expose::Protocol(ExposeProtocol { source_name: Some(name), .. }) => {
+                    Capability::Protocol(Protocol {
+                        name: Some(name.clone()),
+                        source_path: Some(format!("/svc/{}", name)),
+                        ..Protocol::default()
+                    })
+                }
+                _ => unreachable!("we just add protocols for the test purposes"),
+            })
+            .collect();
+        Component {
+            capabilities: Some(capabilities),
+            exposes: Some(self.exposes.clone()),
+            ..Default::default()
+        }
     }
 }
 
@@ -151,8 +146,6 @@ impl MockRealmQueryBuilder {
             when: at.to_owned(),
             moniker: "".to_owned(),
             exposes: vec![],
-            out_dir_entry: vec![],
-            svc_dir_entry: vec![],
             diagnostics_dir_entry: vec![],
             parent: Some(Box::new(self)),
         }
@@ -179,12 +172,10 @@ impl Default for MockRealmQuery {
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
                 target: Some(Ref::Parent(ParentRef)),
-                source_name: Some("src".to_owned()),
+                source_name: Some("fuchsia.diagnostics.ArchiveAccessor".to_owned()),
                 target_name: Some("fuchsia.diagnostics.ArchiveAccessor".to_owned()),
                 ..Default::default()
             })])
-            .svc_dir_entry("fuchsia.some.GarbageAccessor")
-            .out_dir_entry("fuchsia.diagnostics.WorkingAccessor")
             .diagnostics_dir_entry("fuchsia.inspect.Tree")
             .add()
             .when("other/component")
@@ -206,7 +197,6 @@ impl Default for MockRealmQuery {
                 target_name: Some("fuchsia.io.MagicStuff".to_owned()),
                 ..Default::default()
             })])
-            .svc_dir_entry("fuchsia.diagnostics.MagicArchiveAccessor")
             .diagnostics_dir_entry("fuchsia.inspect.Tree")
             .add()
             .when("foo/component")
@@ -214,7 +204,7 @@ impl Default for MockRealmQuery {
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
                 target: Some(Ref::Parent(ParentRef)),
-                source_name: Some("src".to_owned()),
+                source_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
                 target_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
                 ..Default::default()
             })])
@@ -224,7 +214,7 @@ impl Default for MockRealmQuery {
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
                 target: Some(Ref::Parent(ParentRef)),
-                source_name: Some("src".to_owned()),
+                source_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
                 target_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
                 ..Default::default()
             })])
@@ -262,7 +252,7 @@ impl MockRealmQuery {
                     assert!(moniker.starts_with("./"));
                     let query_moniker = &moniker[2..];
                     let res = self.mapping.get(query_moniker).unwrap();
-                    let manifest = res.to_manifest();
+                    let manifest = res.make_manifest();
                     let manifest = fidl::persist(&manifest).unwrap();
                     let (client_end, server_end) =
                         create_endpoints::<fsys2::ManifestBytesIteratorMarker>();

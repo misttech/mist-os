@@ -1,6 +1,3 @@
 [
-    "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
-    "archivist:out:fuchsia.diagnostics.FeedbackArchiveAccessor",
-    "archivist:out:fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-    "archivist:out:fuchsia.diagnostics.LoWPANArchiveAccessor"
+    "archivist:expose:fuchsia.diagnostics.ArchiveAccessor"
 ]

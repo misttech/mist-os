@@ -10,30 +10,18 @@ use {
     std::fmt,
 };
 
-/// Lists all ArchiveAccessor files under the provided paths. If no paths are provided, it'll list
-/// under the current directory. At the moment v2 components cannot be seen through the filesystem.
-/// Therefore this only outputs ArchiveAccessors exposed by v1 components.
+/// Lists all available ArchiveAccessor in the system and their selector for use in "accessor"
+/// arguments in other sub-commands.
 #[derive(Default, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list-accessors")]
-pub struct ListAccessorsCommand {
-    #[argh(positional)]
-    /// glob paths from where to list files.
-    pub paths: Vec<String>,
-}
+pub struct ListAccessorsCommand {}
 
 #[async_trait]
 impl Command for ListAccessorsCommand {
     type Result = ListAccessorsResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
-        // Filter out the .host accessors since they use a different protocol designed
-        // for ffx.
-        let paths = provider
-            .get_accessor_paths(&self.paths)
-            .await?
-            .into_iter()
-            .filter(|path| !path.contains(".host"))
-            .collect();
+        let paths = provider.get_accessor_paths().await?;
         Ok(ListAccessorsResult(paths))
     }
 }
