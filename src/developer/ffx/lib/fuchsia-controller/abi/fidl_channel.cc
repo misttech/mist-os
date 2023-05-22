@@ -5,6 +5,7 @@
 #include "fidl_channel.h"
 
 #include "convert.h"
+#include "error.h"
 #include "mod.h"
 
 namespace fidl_channel {
@@ -113,7 +114,8 @@ PyObject *FidlChannel_read(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
   auto status = ffx_channel_read(mod::get_module_state()->ctx, self->super.handle, c_buf, c_buf_len,
                                  handles, handles_len, &actual_bytes_count, &actual_handles_count);
   if (status != ZX_OK) {
-    mod::dump_python_err();
+    static_assert(sizeof(long) >= sizeof(status));  // NOLINT
+    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
     return nullptr;
   }
   auto res = PyTuple_New(2);
@@ -143,9 +145,14 @@ PyObject *FidlChannel_read(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
   return res;
 }
 
+PyObject *FidlChannel_as_int(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
+  return PyLong_FromUnsignedLongLong(self->super.handle);
+}
+
 PyMethodDef FidlChannel_methods[] = {
     {"write", reinterpret_cast<PyCFunction>(FidlChannel_write), METH_O, nullptr},
     {"read", reinterpret_cast<PyCFunction>(FidlChannel_read), METH_NOARGS, nullptr},
+    {"as_int", reinterpret_cast<PyCFunction>(FidlChannel_as_int), METH_NOARGS, nullptr},
     {nullptr, nullptr, 0, nullptr}};
 
 DES_MIX PyTypeObject FidlChannelType = {

@@ -27,6 +27,14 @@ int FidlHandle_init(FidlHandle *self, PyObject *args, PyObject *kwds) {
   return 0;
 }
 
+PyObject *FidlHandle_as_int(FidlHandle *self, PyObject *Py_UNUSED(arg)) {
+  return PyLong_FromUnsignedLongLong(self->handle);
+}
+
+PyMethodDef FidlChannel_methods[] = {
+    {"as_int", reinterpret_cast<PyCFunction>(FidlHandle_as_int), METH_NOARGS, nullptr},
+    {nullptr, nullptr, 0, nullptr}};
+
 DES_MIX PyTypeObject FidlHandleType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
 

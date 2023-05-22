@@ -39,3 +39,10 @@ python_host_test("fuchsia_controller_encode_test") {
   libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
   deps = [ ":fuchsia_controller_test_base" ]
 }
+
+python_host_test("fuchsia_controller_errors_test") {
+  main_source = "errors.py"
+  libraries =
+      [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
+  deps = [ ":fuchsia_controller_test_base" ]
+}

@@ -76,6 +76,8 @@ python_c_extension("fidl_codec") {
 python_c_extension("fuchsia_controller_py") {
   sources = [
     "abi/convert.h",
+    "abi/error.cc",
+    "abi/error.h",
     "abi/fidl_channel.cc",
     "abi/fidl_channel.h",
     "abi/fidl_handle.cc",
@@ -118,4 +120,10 @@ group("tests") {
     "tests:fuchsia_controller_encode_test",
     "tests:fuchsia_controller_ir_test",
   ]
+
+  # TODO(fxbug.dev/127523): This test fails on mac builders. This is most likely because of the
+  # infra machines running OSX 10.15
+  if (host_os != "mac") {
+    deps += [ "tests:fuchsia_controller_errors_test" ]
+  }
 }

@@ -14,6 +14,7 @@
 #include <sstream>
 #include <string>
 
+#include "error.h"
 #include "fidl_channel.h"
 #include "fuchsia_controller.h"
 #include "macros.h"
@@ -202,6 +203,12 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
     Py_DECREF(m);
     return nullptr;
   }
+  auto zx_status_type = error::ZxStatusType_Create();
+  if (PyModule_AddObject(m, "ZxStatus", reinterpret_cast<PyObject *>(zx_status_type)) < 0) {
+    Py_DECREF(zx_status_type);
+    Py_DECREF(m);
+    return nullptr;
+  }
   Py_INCREF(&fidl_handle::FidlHandleType);
   if (PyModule_AddObject(m, "FidlHandle",
                          reinterpret_cast<PyObject *>(&fidl_handle::FidlHandleType)) < 0) {
@@ -209,6 +216,7 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
     Py_DECREF(m);
     return nullptr;
   }
+  Py_INCREF(&fidl_channel::FidlChannelType);
   if (PyModule_AddObject(m, "FidlChannel",
                          reinterpret_cast<PyObject *>(&fidl_channel::FidlChannelType)) < 0) {
     Py_DECREF(&fidl_channel::FidlChannelType);
