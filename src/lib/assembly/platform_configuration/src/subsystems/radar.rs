@@ -19,6 +19,14 @@ impl DefineSubsystemConfiguration<()> for RadarSubsystemConfig {
                 .package("radar-proxy")
                 .component("meta/radar-proxy.cm")?
                 .field("proxy_radar_burst_reader", is_eng_or_user_debug)?;
+
+            if matches!(context.feature_set_level, FeatureSupportLevel::Minimal) {
+                if is_eng_or_user_debug {
+                    builder.platform_bundle("radar_proxy_with_injector");
+                } else {
+                    builder.platform_bundle("radar_proxy_without_injector");
+                }
+            }
         }
 
         Ok(())
