@@ -49,6 +49,7 @@ fuchsia_unittest_package("netemul-runner-tests") {
     "//src/connectivity/network/testing/netemul/runner:component",
   ]
   subpackages = [ "//src/sys/test_manager:pkg" ]
+  test_type = "test_arch"
 }
 
 rustc_test("netemul_runner_errors_test") {
@@ -79,6 +80,7 @@ fuchsia_unittest_package("netemul-runner-errors-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "test_arch"
 }
 
 group("tests") {

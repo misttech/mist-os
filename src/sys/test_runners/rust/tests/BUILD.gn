@@ -29,7 +29,7 @@ fuchsia_test_component("rust_runner_integration_test") {
   testonly = true
   manifest = "meta/rust_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
-  test_type = "system"
+  test_type = "test_arch"
 }
 
 rustc_test("stress_tests_bin") {
@@ -54,7 +54,7 @@ rustc_test("stress_tests_bin") {
 fuchsia_test_component("rust_runner_stress_test") {
   manifest = "meta/rust_runner_stress_test.cml"
   deps = [ ":stress_tests_bin" ]
-  test_type = "system"
+  test_type = "test_arch"
 }
 
 fuchsia_test_package("rust-runner-integration-test") {
