@@ -21,7 +21,6 @@ use crate::task::{
 use crate::types::*;
 use anyhow::{format_err, Error};
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::ops::Deref;
 use std::sync::Arc;
 
 #[cfg(not(feature = "in_thread_exceptions"))]
@@ -572,7 +571,7 @@ fn process_completed_exception<E: ExceptionContext>(
 /// This will be handled by the kernel in the future, where the thread will pop out of restricted
 /// mode just like it does on a syscall, but for now this needs to be handled by a separate thread.
 #[cfg(not(feature = "in_thread_exceptions"))]
-fn start_exception_handler_thread<T: Deref<Target = Option<zx::Thread>>>(
+fn start_exception_handler_thread<T: std::ops::Deref<Target = Option<zx::Thread>>>(
     thread: T,
     task: Arc<Task>,
 ) -> Result<(), Error> {
