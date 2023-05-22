@@ -67,14 +67,14 @@ func TestPeriodicallyRequestsPersistence(t *testing.T) {
 	clock := faketime.NewManualClock()
 
 	runPersistClient(client, ctx, clock)
-	expectRequests(t, impl.requests, 1)
+	expectRequests(t, impl.requests, len(tags))
 
 	clock.Advance(3 * persistPeriod)
-	expectRequests(t, impl.requests, 4)
+	expectRequests(t, impl.requests, 4*len(tags))
 
 	clientCancel()
 	clock.Advance(2 * persistPeriod)
-	expectRequests(t, impl.requests, 4)
+	expectRequests(t, impl.requests, 4*len(tags))
 }
 
 func TestExitsAfterRequestChannelFailure(t *testing.T) {
@@ -100,16 +100,16 @@ func TestExitsAfterRequestChannelFailure(t *testing.T) {
 	clock := faketime.NewManualClock()
 
 	runPersistClient(client, ctx, clock)
-	expectRequests(t, impl.requests, 1)
+	expectRequests(t, impl.requests, len(tags))
 
 	// Cancel the server and wait for it to shut down.
 	serveCancelAndWait()
 
 	clock.Advance(persistPeriod)
-	expectRequests(t, impl.requests, 1)
+	expectRequests(t, impl.requests, len(tags))
 
 	clock.Advance(persistPeriod)
-	expectRequests(t, impl.requests, 1)
+	expectRequests(t, impl.requests, len(tags))
 }
 
 func expectRequests(t *testing.T, requests []string, want int) {
@@ -119,7 +119,7 @@ func expectRequests(t *testing.T, requests []string, want int) {
 	}
 
 	for i := 0; i < len(requests); i++ {
-		if got, want := requests[i], "netstack-counters"; got != want {
+		if got, want := requests[i], tags[i%len(tags)]; got != want {
 			t.Errorf("requests[%d] = %s, want %s", i, got, want)
 		}
 	}

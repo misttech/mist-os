@@ -12,12 +12,14 @@ use fidl_fuchsia_netemul as fnetemul;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 use fuchsia_zircon as zx;
 
-use futures::{StreamExt as _, TryStreamExt as _};
+use futures::StreamExt as _;
 use netemul::{TestRealm, TestSandbox};
 use netstack_testing_common::realms::{constants, Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 
 const MOCK_SERVICES_NAME: &str = "mock";
+const CONFIG_PATH: &str = "/pkg/data/netstack.persist";
+const NETSTACK_SERVICE_NAME: &str = "netstack";
 
 fn create_netstack_with_mock_endpoint<'s, RS: RequestStream + 'static, N: Netstack>(
     sandbox: &'s TestSandbox,
@@ -158,30 +160,98 @@ async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
         fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream,
         N,
     >(&sandbox, persist_path, name);
-    assert_persist_called::<N>(fs).await
+
+    let config = persistence_config::load_configuration_files_from(CONFIG_PATH)
+        .expect("load configuration files failed");
+
+    assert_persist_called_for_tags::<N>(fs, &config).await
 }
 
-async fn assert_persist_called<N: Netstack>(
+async fn assert_persist_called_for_tags<N: Netstack>(
     fs: ServiceFs<ServiceObj<'_, fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream>>,
+    config: &persistence_config::Config,
 ) {
-    // And expect that we'll see a connection to profile provider.
-    let (tag, responder) = fs
+    let tags = config.get(NETSTACK_SERVICE_NAME).expect("config missing netstack service");
+    let _: Vec<()> = fs
         .flatten()
-        .try_next()
-        .await
-        .expect("fs failure")
-        .expect("fs terminated unexpectedly")
-        .into_persist()
-        .expect("unexpected request");
-
-    assert_eq!(tag, "netstack-counters");
-    responder
-        .send(fidl_fuchsia_diagnostics_persist::PersistResult::Queued)
-        .expect("failed to respond");
+        .map(|request| {
+            let (tag, responder) =
+                request.expect("fs failure").into_persist().expect("unexpected request");
+            assert!(tags.contains_key(&persistence_config::Tag::new(tag).expect("invalid tag")));
+            responder
+                .send(fidl_fuchsia_diagnostics_persist::PersistResult::Queued)
+                .expect("failed to respond");
+        })
+        .take(tags.len())
+        .collect()
+        .await;
 }
 
 #[netstack_test]
-async fn ns_persist_counters_under_size_limit<N: Netstack>(name: &str) {
+async fn ns_persist_tags_under_size_limits<N: Netstack>(name: &str) {
+    test_persistence::<N, _>(name, |inspect_payload, tag, tag_config| {
+        // Convert inspect payload to a JSON string.
+        let data = serde_json::to_string(&inspect_payload).expect("serialization failed");
+
+        // Assert data to be persisted obeys size constraints specified in
+        // configuration.
+        assert!(data.len() > 0);
+        assert!(
+            data.len() <= tag_config.max_bytes,
+            "{}: data = {}, max = {}",
+            tag,
+            data.len(),
+            tag_config.max_bytes
+        );
+    })
+    .await
+}
+
+#[netstack_test]
+// This test validates that for any given selector in netstack.persist, the root
+// inspect node specified in that selector has been persisted in an archivist
+// payload.
+//
+// TODO(https://fxbug.dev/125664): Note that this test does NOT validate that
+// child nodes specified using wildcards (e.g. `Foo/*/*:*`) are present in the
+// archivist payload, nor that all child nodes of any given selector are
+// persisted. We're still relying on fireteam primaries and netstack developers
+// to keep the persist file in sync with our inspect logic.
+async fn ns_persist_root_inspect_nodes_for_selectors<N: Netstack>(name: &str) {
+    test_persistence::<N, _>(name, |inspect_payload, _tag, tag_config| {
+        for selector in tag_config.selectors.iter() {
+            // Retrieve the root inspect node name from the diagnostics selector.
+            let root_node_name = extract_node_subtree_selector(selector)
+                .split("/")
+                .next()
+                .expect("empty node subtree selector");
+
+            // Assert payload has the node name specified in the selector.
+            assert_eq!(
+                root_node_name,
+                &selectors::sanitize_string_for_selectors(&inspect_payload.name)
+            );
+        }
+    })
+    .await
+}
+
+fn extract_node_subtree_selector(selector: &str) -> &str {
+    // Raw selector strings have the schema
+    // <type>:<component>:<node_subtree>:<property>. Split the selector into its
+    // constituent parts and skip to the node subtree selector.
+    selector.split(":").skip(2).next().expect("raw selector does not follow schema")
+}
+
+async fn test_persistence<N, F>(name: &str, validate_payload: F)
+where
+    N: Netstack,
+    F: Fn(
+        diagnostics_reader::DiagnosticsHierarchy,
+        &persistence_config::Tag,
+        &persistence_config::TagConfig,
+    ) -> (),
+{
     let persist_path = format!(
         "{}-netstack",
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker::PROTOCOL_NAME
@@ -193,18 +263,10 @@ async fn ns_persist_counters_under_size_limit<N: Netstack>(name: &str) {
         N,
     >(&sandbox, persist_path, name);
 
-    assert_persist_called::<N>(fs).await;
-
-    // Load netstack's persistence configuration file.
-    const CONFIG_PATH: &str = "/pkg/data/netstack.persist";
     let config = persistence_config::load_configuration_files_from(CONFIG_PATH)
         .expect("load configuration files failed");
 
-    // Retrieve netstack's persisted Inspect selectors.
-    const NETSTACK_SERVICE_NAME: &str = "netstack";
-    const NETSTACK_COUNTERS_TAG: &str = "netstack-counters";
-    let tags = config.get(NETSTACK_SERVICE_NAME).expect("service not present");
-    let tag_config = tags.get(NETSTACK_COUNTERS_TAG).expect("tag not present");
+    assert_persist_called_for_tags::<N>(fs, &config).await;
 
     // The realm moniker is needed to construct the component part of an Inspect
     // selector.
@@ -213,42 +275,40 @@ async fn ns_persist_counters_under_size_limit<N: Netstack>(name: &str) {
     const SANDBOX_MONIKER: &str = "sandbox";
     const NETSTACK_MONIKER: &str = "netstack";
 
-    // Modify selectors to use test realm moniker.
-    let selectors = tag_config
-        .selectors
-        .iter()
-        // Raw selector strings have the schema
-        // <type>:<component>:<subtree>:<property>. Extract the subtree portion
-        // of the selector, and combine it with a test realm specific component
-        // selector.
-        .map(|v| {
-            diagnostics_reader::ComponentSelector::new(vec![
-                SANDBOX_MONIKER.to_string(),
-                realm_moniker.clone(),
-                NETSTACK_MONIKER.to_string(),
-            ])
-            .with_tree_selector(
-                v.split(":")
-                    .skip(2)
-                    .next()
-                    .expect("raw selector string does not follow schema")
-                    .to_string(),
-            )
-        });
+    let tags = config.get(NETSTACK_SERVICE_NAME).expect("service not present");
+    for (tag, tag_config) in tags {
+        // Modify selectors to use test realm moniker.
+        let selectors = tag_config
+            .selectors
+            .iter()
+            // Raw selector strings have the schema
+            // <type>:<component>:<subtree>:<property>. Extract the subtree portion
+            // of the selector, and combine it with a test realm specific component
+            // selector.
+            .map(|v| {
+                diagnostics_reader::ComponentSelector::new(vec![
+                    SANDBOX_MONIKER.to_string(),
+                    realm_moniker.clone(),
+                    NETSTACK_MONIKER.to_string(),
+                ])
+                .with_tree_selector(extract_node_subtree_selector(v).to_string())
+            });
 
-    // Retrieve the data associated with selectors from the archivist.
-    let mut archive_reader = diagnostics_reader::ArchiveReader::new();
-    let archive_reader = archive_reader.add_selectors(selectors).retry_if_empty(true);
-    let data = archive_reader
-        .snapshot_raw::<diagnostics_reader::Inspect, serde_json::Value>()
-        .await
-        .expect("snapshot raw failed");
+        // Retrieve the inspect payload from the archivist.
+        let mut archive_reader = diagnostics_reader::ArchiveReader::new();
+        let archive_reader = archive_reader.add_selectors(selectors).retry_if_empty(true);
+        let inspect_payload = archive_reader
+            .snapshot::<diagnostics_reader::Inspect>()
+            .await
+            .expect("snapshot failed")
+            .into_iter()
+            .filter_map(|v| v.payload)
+            .next()
+            .expect("no payload in snapshot");
 
-    // Assert data to be persisted obeys size constraints specified in
-    // configuration.
-    let data = data.to_string();
-    assert!(data.len() > 0);
-    assert!(data.len() <= tag_config.max_bytes);
+        // Assert on payload.
+        validate_payload(inspect_payload, tag, tag_config);
+    }
 }
 
 #[netstack_test]

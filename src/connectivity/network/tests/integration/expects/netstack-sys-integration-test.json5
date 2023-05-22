@@ -14,7 +14,8 @@
             matchers: [
                 // Hangs indefinitely.
                 "ns_requests_inspect_persistence_ns3",
-                "ns_persist_counters_under_size_limit_ns3",
+                "ns_persist_tags_under_size_limits_ns3",
+                "ns_persist_root_inspect_nodes_for_selectors_ns3",
                 "ns_sets_thread_profiles_ns3",
             ],
         },

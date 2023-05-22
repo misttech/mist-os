@@ -24,8 +24,18 @@ const (
 
 	// The amount of time to wait after requesting persistence before doing so
 	// again.
-	persistPeriod = time.Minute
+	persistPeriod = 12 * time.Minute
 )
+
+var tags = []string{
+	"counters",
+	"fidl",
+	"memstats",
+	"nics",
+	"routes",
+	"runtime",
+	"sockets",
+}
 
 // startPersistClient attempts to start the persistence polling client. Fatal
 // startup errors will cause this function to panic; any other failures will be
@@ -70,13 +80,15 @@ func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface,
 
 func makePersistenceRequest(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context) error {
 	_ = syslog.DebugTf(persistenceTagName, "requesting persistence for netstack")
-	result, err := persistClientEnd.Persist(ctx, "netstack-counters")
-	if err != nil {
-		return fmt.Errorf("failed to request persistence: %w", err)
-	}
+	for _, tag := range tags {
+		result, err := persistClientEnd.Persist(ctx, tag)
+		if err != nil {
+			return fmt.Errorf("failed to request persistence: %w", err)
+		}
 
-	if want := persist.PersistResultQueued; result != want {
-		_ = syslog.WarnTf(persistenceTagName, "unexpected persist result; expected %s got %s", want, result)
+		if want := persist.PersistResultQueued; result != want {
+			_ = syslog.WarnTf(persistenceTagName, "unexpected persist result; expected %s got %s", want, result)
+		}
 	}
 
 	return nil
