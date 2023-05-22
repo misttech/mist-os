@@ -110,7 +110,7 @@ void Corpus::Pick(Input* out) {
   uint64_t size = inputs_.size();
   FX_DCHECK(size > 0);
   auto shift = 64 - __builtin_clzll(size);
-  FX_DCHECK(size < 64);
+  FX_DCHECK(shift < 64);
   auto mod = 1ULL << shift;
   size_t offset;
   do {
