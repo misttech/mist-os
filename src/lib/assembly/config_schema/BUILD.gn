@@ -3,22 +3,52 @@
 # found in the LICENSE file.
 
 import("//build/host.gni")
+import("//build/icu/config.gni")
 import("//build/rust/rustc_library.gni")
 
 assert(is_host, "Assembly libraries are host-only")
+
+generated_file("git_info_json") {
+  # Prepare the ICU git flavor information for inclusion in the library source.
+  # Write it out in json format, then we'll use `include_str!` to bake it into
+  # the compiled library.
+  outputs = [ "${target_gen_dir}/icu_git_info.json" ]
+  contents = icu_git_info
+  output_conversion = "json"
+}
 
 rustc_library("config_schema") {
   edition = "2021"
   name = "assembly_config_schema"
   with_unit_tests = true
+  _git_info = "${target_gen_dir}/icu_git_info.json"
+  _git_info_path = rebase_path(_git_info, root_out_dir)
+  _root_out_dir_from_here = rebase_path(root_out_dir, "./src/platform_config")
+  rustenv = [
+    # Needed because `include_str!` in rust is relative to
+    # the source dir in which the file using `include_str!` is located. We back out
+    # to `root_build_dir`, then go into `_git_info_path`.
+    # See `src/platform_config/icu_config.rs` for the inclusion details.
+    "ICU_GIT_INFO_JSON_FILE=${_root_out_dir_from_here}/${_git_info_path}",
+  ]
+
+  # The approach in `rustenv` above causes the build dir to "leak", which is not
+  # recommended in remote builds.  We turn off leak detection by using this
+  # config. In general this is suboptimal, but in this particular case we don't
+  # have much choice.
+  configs += [ "//build/config/rust:output_dir_sensitive" ]
+  inputs = [ _git_info ]
   deps = [
     "//src/lib/assembly/package_utils",
     "//src/lib/assembly/util",
     "//src/ui/lib/input-device-constants:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
   ]
+  non_rust_deps = [ ":git_info_json" ]
   test_deps = [
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:serde_json",

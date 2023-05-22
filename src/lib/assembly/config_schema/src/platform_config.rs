@@ -101,9 +101,19 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub virtualization: virtualization_config::PlatformVirtualizationConfig,
 
-    /// Platform configuration options for ICU library choice.
-    #[serde(default)]
-    pub icu: icu_config::ICUConfig,
+    /// Platform configuration options for ICU library choice. If not specified,
+    /// then assembly should use the unflavored components.
+    ///
+    /// Platform components can be 'flavored' by the ICU version they're
+    /// compiled to use, or be 'unflavored' and using the tree's implicit
+    /// ICU version.
+    ///
+    /// If not specified, the 'unflavored' components are used. If the default
+    /// ICU version is specified, then the 'default' flavor is used (which is
+    /// a distinct set of components from the 'unflavored' components).
+    /// Assemblies are being transitioned from the 'unflavored'
+    /// components to 'flavored' components`.
+    pub icu: Option<icu_config::ICUConfig>,
 
     /// Platform configuration options for fonts.
     #[serde(default)]

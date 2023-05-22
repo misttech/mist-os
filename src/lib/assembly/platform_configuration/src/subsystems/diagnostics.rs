@@ -88,7 +88,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
-            board_info: None,
+            ..Default::default()
         };
         let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::Default) };
         let mut builder = ConfigurationBuilderImpl::default();
@@ -138,7 +138,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
-            board_info: None,
+            ..Default::default()
         };
         let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::LowMem) };
         let mut builder = ConfigurationBuilderImpl::default();
@@ -167,6 +167,7 @@ mod tests {
             feature_set_level: &FeatureSupportLevel::Bootstrap,
             build_type: &BuildType::Eng,
             board_info: None,
+            ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
 
@@ -192,6 +193,7 @@ mod tests {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
             board_info: None,
+            ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
 

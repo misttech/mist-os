@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeSet};
 
-use assembly_config_schema::{BoardInformation, BuildType, FileEntry};
+use assembly_config_schema::{BoardInformation, BuildType, FileEntry, ICUConfig};
 use assembly_util::NamedMap;
 
 /// The platform's base service level.
@@ -97,6 +97,33 @@ pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
     pub board_info: Option<&'a BoardInformation>,
+    /// The desired ICU configuration, used to configure subsystems that are
+    /// ICU-flavor aware.
+    ///
+    /// If not set, the, use the unflavored version of the component.
+    pub _icu_config: &'a Option<ICUConfig>,
+}
+
+impl Default for ConfigurationContext<'_> {
+    /// Use e.g. in tests that initialize only relevant fields.
+    ///
+    /// For example:
+    ///
+    /// ```ignore
+    ///  let context = ConfigurationContext {
+    ///      feature_set_level: &FeatureSupportLevel::Minimal,
+    ///      build_type: &BuildType::Eng,
+    ///      ..Default::default()
+    ///  };
+    ///  ```
+    fn default() -> Self {
+        Self {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            board_info: None,
+            _icu_config: &None,
+        }
+    }
 }
 
 /// A struct for collecting multiple kinds of platform configuration.

@@ -64,9 +64,16 @@ pub fn define_configuration(
     if let Some(feature_set_level) = &feature_set_level {
         let build_type = &config.platform.build_type;
 
+        let icu_config = &config.platform.icu;
+
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
-        let context = ConfigurationContext { feature_set_level, build_type, board_info };
+        let context = ConfigurationContext {
+            feature_set_level,
+            build_type,
+            board_info,
+            _icu_config: icu_config,
+        };
 
         // Call the configuration functions for each subsystem.
         configure_subsystems(&context, config, &mut builder)?;
