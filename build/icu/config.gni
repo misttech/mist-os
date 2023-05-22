@@ -50,13 +50,16 @@ icu_fixup_deps = [
   "//src/lib/icu:lib",
 ]
 
+# These can not be directly inserted in the assignments of
+# `icu_flavor_major_versions` below, that is a GN limitation.
 icu_default_config = read_file("//third_party/icu/default/version.json", "json")
+icu_stable_config = read_file("//third_party/icu/stable/version.json", "json")
+icu_latest_config = read_file("//third_party/icu/latest/version.json", "json")
 
-# The major version numbers per each ICU flavor. This should be automatically
-# extracted from the respective configuration files, not manually entered, but
-# for now here we are.
+# The major version numbers per each ICU flavor.
+# Automatically extracted from `version.json` in the ICU repo.
 icu_flavor_major_versions = {
   default = icu_default_config.major_version
-  latest = "72"
-  stable = "72"
+  latest = icu_latest_config.major_version
+  stable = icu_stable_config.major_version
 }
