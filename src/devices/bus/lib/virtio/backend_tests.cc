@@ -303,8 +303,7 @@ TEST_F(VirtioTests, FailureNoCapabilities) {
 TEST_F(VirtioTests, FailureNoBar) {
   SetUpProtocol();
   SetUpModernCapabilities();
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED,
-            virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
+  ASSERT_EQ(ZX_ERR_BAD_STATE, virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
 }
 
 TEST_F(VirtioTests, LegacyInterruptBindSuccess) {
@@ -323,8 +322,7 @@ TEST_F(VirtioTests, FailureOneMsixBind) {
   SetUpModernBars();
   async_state().SyncCall([&](AsyncState* async) { async->fake_pci.AddMsixInterrupt(); });
 
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED,
-            virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
+  ASSERT_EQ(ZX_ERR_BAD_STATE, virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
 }
 
 TEST_F(VirtioTests, TwoMsixBindSuccess) {

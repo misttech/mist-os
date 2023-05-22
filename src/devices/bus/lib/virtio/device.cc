@@ -42,7 +42,7 @@ void Device::IrqWorker() {
   const auto irq_mode = backend_->InterruptMode();
   ZX_DEBUG_ASSERT(irq_mode == fpci::InterruptMode::kLegacy ||
                   irq_mode == fpci::InterruptMode::kMsiX);
-  zxlogf(DEBUG, "%s: starting %s irq worker", tag(),
+  zxlogf(DEBUG, "starting %s irq worker",
          (irq_mode == fpci::InterruptMode::kLegacy) ? "legacy" : "msi-x");
 
   while (backend_->InterruptValid() == ZX_OK) {
@@ -53,7 +53,7 @@ void Device::IrqWorker() {
         continue;
       }
 
-      zxlogf(DEBUG, "%s: error while waiting for interrupt: %s", tag(), result.status_string());
+      zxlogf(DEBUG, "error while waiting for interrupt: %s", result.status_string());
       break;
     }
 
@@ -66,7 +66,7 @@ void Device::IrqWorker() {
     // another interrupt fires and changes the status.
     if (irq_mode == fpci::InterruptMode::kLegacy) {
       uint32_t irq_status = IsrStatus();
-      zxlogf(TRACE, "%s: irq_status: %#x\n", __func__, irq_status);
+      zxlogf(TRACE, "irq_status: %#x\n", irq_status);
 
       // Since we handle both interrupt types here it's possible for a
       // spurious interrupt if they come in sequence and we check IsrStatus
@@ -81,7 +81,7 @@ void Device::IrqWorker() {
       }
     } else {
       // MSI-X
-      zxlogf(TRACE, "%s: irq key: %u\n", __func__, key);
+      zxlogf(TRACE, "irq key: %u\n", key);
       switch (key) {
         case PciBackend::kMsiConfigVector:
           IrqConfigChange();

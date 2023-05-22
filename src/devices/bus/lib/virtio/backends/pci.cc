@@ -31,23 +31,23 @@ PciBackend::PciBackend(ddk::Pci pci, fuchsia_hardware_pci::wire::DeviceInfo info
 
 zx_status_t PciBackend::Bind() {
   zx::interrupt interrupt;
-  zx_status_t st;
-
-  st = zx::port::create(/*options=*/ZX_PORT_BIND_TO_INTERRUPT, &wait_port_);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: cannot create wait port: %s", tag(), zx_status_get_string(st));
-    return st;
+  zx_status_t status = zx::port::create(/*options=*/ZX_PORT_BIND_TO_INTERRUPT, &wait_port_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "cannot create wait port: %s", zx_status_get_string(status));
+    return status;
   }
 
   // enable bus mastering
-  if ((st = pci().SetBusMastering(true)) != ZX_OK) {
-    zxlogf(ERROR, "%s: cannot enable bus master: %s", tag(), zx_status_get_string(st));
-    return st;
+  status = pci().SetBusMastering(true);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "cannot enable bus master: %s", zx_status_get_string(status));
+    return status;
   }
 
-  if ((st = ConfigureInterruptMode()) != ZX_OK) {
-    zxlogf(ERROR, "%s: cannot configure IRQs: %s", tag(), zx_status_get_string(st));
-    return st;
+  status = ConfigureInterruptMode();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "cannot configure IRQs: %s", zx_status_get_string(status));
+    return status;
   }
 
   return Init();
@@ -65,52 +65,52 @@ zx_status_t PciBackend::ConfigureInterruptMode() {
   // This looks a lot like something ConfigureInterruptMode was designed for, but
   // since we have a specific requirement to use MSI-X if and only if we have 2
   // vectors it means rolling it by hand.
-  fuchsia_hardware_pci::wire::InterruptModes modes{};
-  pci().GetInterruptModes(&modes);
-  fuchsia_hardware_pci::InterruptMode mode = fuchsia_hardware_pci::InterruptMode::kLegacy;
-  uint32_t irq_cnt = 1;
-
-  if (modes.msix_count >= 2) {
-    mode = fuchsia_hardware_pci::InterruptMode::kMsiX;
-    irq_cnt = 2;
-  } else if (modes.has_legacy == 0) {
-    zxlogf(ERROR, "No interrupt support found for device!");
-    return ZX_ERR_NOT_SUPPORTED;
+  fpci::InterruptMode mode = fpci::InterruptMode::kMsiX;
+  uint32_t irq_cnt = 2;
+  zx_status_t status = pci().SetInterruptMode(mode, irq_cnt);
+  if (status != ZX_OK) {
+    mode = fpci::InterruptMode::kLegacy;
+    irq_cnt = 1;
+    status = pci().SetInterruptMode(mode, irq_cnt);
+    if (status != ZX_OK) {
+      irq_cnt = 0;
+    }
   }
 
-  zx_status_t st = pci().SetInterruptMode(mode, irq_cnt);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure a virtio IRQ mode: %s", zx_status_get_string(st));
-    return st;
+  if (irq_cnt == 0) {
+    zxlogf(ERROR, "Failed to configure a virtio IRQ mode: %s", zx_status_get_string(status));
+    return status;
   }
 
   // Legacy only supports 1 IRQ, but for MSI-X we only need 2
   for (uint32_t i = 0; i < irq_cnt; i++) {
     zx::interrupt interrupt = {};
-    if ((st = pci().MapInterrupt(i, &interrupt)) != ZX_OK) {
-      zxlogf(ERROR, "Failed to map interrupt %u: %s", i, zx_status_get_string(st));
-      return st;
+    status = pci().MapInterrupt(i, &interrupt);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to map interrupt %u: %s", i, zx_status_get_string(status));
+      return status;
     }
 
     // Use the interrupt index as the key so we can ack the correct interrupt after
     // a port wait.
-    if ((st = interrupt.bind(wait_port_, /*key=*/i, /*options=*/0)) != ZX_OK) {
-      zxlogf(ERROR, "Failed to bind interrupt %u: %s", i, zx_status_get_string(st));
-      return st;
+    status = interrupt.bind(wait_port_, /*key=*/i, /*options=*/0);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to bind interrupt %u: %s", i, zx_status_get_string(status));
+      return status;
     }
     irq_handles().push_back(std::move(interrupt));
   }
   irq_mode() = mode;
-  zxlogf(DEBUG, "%s: using %s IRQ mode (irq_cnt = %u)", tag(),
+  zxlogf(DEBUG, "using %s IRQ mode (irq_cnt = %u)",
          (irq_mode() == fpci::InterruptMode::kMsiX ? "MSI-X" : "legacy"), irq_cnt);
   return ZX_OK;
 }
 
 zx::result<uint32_t> PciBackend::WaitForInterrupt() {
   zx_port_packet packet;
-  zx_status_t st = wait_port_.wait(zx::deadline_after(zx::msec(100)), &packet);
-  if (st != ZX_OK) {
-    return zx::error(st);
+  zx_status_t status = wait_port_.wait(zx::deadline_after(zx::msec(100)), &packet);
+  if (status != ZX_OK) {
+    return zx::error(status);
   }
 
   return zx::ok(packet.key);
