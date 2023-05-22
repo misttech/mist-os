@@ -5,12 +5,15 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_CC_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_CC_H_
 
+#include <lib/sync/cpp/completion.h>
+
 #include <iterator>
 #include <memory>
 #include <vector>
 
 #include "magma_util/macros.h"
 #include "msd_cc.h"
+#include "msd_defs.h"
 #include "platform_buffer.h"
 #include "platform_semaphore.h"
 
@@ -144,6 +147,7 @@ class MsdMockDevice : public msd::Device {
   MsdMockDevice() { magic_ = kMagic; }
   ~MsdMockDevice() override = default;
 
+  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override;
   magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
   magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
   std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override {
@@ -152,9 +156,19 @@ class MsdMockDevice : public msd::Device {
 
   virtual uint32_t GetDeviceId() { return 0; }
 
+  void WaitForMemoryPressureSignal();
+
+  MagmaMemoryPressureLevel memory_pressure_level() const {
+    std::lock_guard lock(level_mutex_);
+    return memory_pressure_level_;
+  }
+
  private:
   static const uint32_t kMagic = 0x6d6b6476;  // "mkdv" (Mock Device)
   uint32_t magic_ = kMagic;
+  mutable std::mutex level_mutex_;
+  MagmaMemoryPressureLevel memory_pressure_level_ = MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
+  libsync::Completion completion_;
 };
 
 class MsdMockDriver : public msd::Driver {

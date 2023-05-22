@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/graphics/lib/magma/tests/mock/mock_msd_cc.h"
 #include "sys_driver_cpp/magma_driver_base.h"
 
 namespace {
@@ -87,48 +88,140 @@ TEST(MagmaDriver, CreateDriver) {
                    }).status_value());
 }
 
-TEST(MagmaDriver, StartTestDriver) {
-  fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherNoDefaultAllowSync};
+class MagmaDriverStarted : public testing::Test {
+ public:
+  void SetUp() override {
+    zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+    EXPECT_EQ(ZX_OK, start_args.status_value());
+
+    ASSERT_TRUE(start_args.is_ok());
+
+    EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_.dispatcher(), [&]() {
+                       test_environment_.emplace();
+                       EXPECT_EQ(ZX_OK,
+                                 test_environment_
+                                     ->Initialize(std::move(start_args->incoming_directory_server))
+                                     .status_value());
+                     }).status_value());
+
+    auto driver = fdf_testing::StartDriver<FakeTestDriver>(std::move(start_args->start_args),
+                                                           driver_dispatcher_, lifecycle_);
+
+    ASSERT_TRUE(driver.is_ok());
+
+    driver_ = std::move(*driver);
+  }
+
+  void TearDown() override {
+    EXPECT_EQ(ZX_OK,
+              fdf_testing::TeardownDriver(driver_, driver_dispatcher_, lifecycle_).status_value());
+    EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_.dispatcher(), [&]() {
+                       test_environment_.reset();
+                     }).status_value());
+  }
+
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
+
+  zx::result<zx::channel> ConnectToChild(const char* child_name) {
+    return node_server().SyncCall([&child_name](fdf_testing::TestNode* root_node) {
+      return root_node->children().at(child_name).ConnectToDevice();
+    });
+  }
+
+ protected:
+  using FakeLifecycle = fdf::Lifecycle<FakeTestDriver>;
+
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
 
   // This dispatcher is used by the test environment, and hosts the incoming
   // directory.
-  fdf::TestSynchronizedDispatcher test_env_dispatcher{{
+  fdf::TestSynchronizedDispatcher test_env_dispatcher_{{
       .is_default_dispatcher = true,
       .options = {},
       .dispatcher_name = "test-env-dispatcher",
   }};
-  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server{
-      test_env_dispatcher.dispatcher(), std::in_place, std::string("root")};
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      test_env_dispatcher_.dispatcher(), std::in_place, std::string("root")};
+  DriverLifecycle lifecycle_{.version = DRIVER_LIFECYCLE_VERSION_3,
+                             .v1 = {.start = nullptr, .stop = FakeLifecycle::Stop},
+                             .v2 = {FakeLifecycle::PrepareStop},
+                             .v3 = {FakeLifecycle::Start}};
+  std::optional<fdf_testing::TestEnvironment> test_environment_;
 
-  zx::result start_args = node_server.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
-  EXPECT_EQ(ZX_OK, start_args.status_value());
+  FakeTestDriver* driver_{};
+};
 
-  ASSERT_TRUE(start_args.is_ok());
+TEST_F(MagmaDriverStarted, TestDriver) {}
 
-  std::optional<fdf_testing::TestEnvironment> test_environment;
-  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher.dispatcher(), [&]() {
-                     test_environment.emplace();
-                     EXPECT_EQ(ZX_OK,
-                               test_environment
-                                   ->Initialize(std::move(start_args->incoming_directory_server))
-                                   .status_value());
+TEST_F(MagmaDriverStarted, Query) {
+  zx::result device_result = ConnectToChild("magma_gpu");
+
+  ASSERT_EQ(ZX_OK, device_result.status_value());
+  fidl::ClientEnd<fuchsia_gpu_magma::Device> device_client_end(std::move(device_result.value()));
+  fidl::WireSyncClient client(std::move(device_client_end));
+  auto result = client->Query(fuchsia_gpu_magma::wire::QueryId::kDeviceId);
+  ASSERT_EQ(ZX_OK, result.status());
+  ASSERT_TRUE(result->is_ok()) << result->error_value();
+  ASSERT_TRUE(result->value()->is_simple_result());
+  EXPECT_EQ(0u, result->value()->simple_result());
+}
+
+TEST_F(MagmaDriverStarted, PerformanceCounters) {
+  zx::result device_result = ConnectToChild("gpu-performance-counters");
+
+  ASSERT_EQ(ZX_OK, device_result.status_value());
+  fidl::ClientEnd<fuchsia_gpu_magma::PerformanceCounterAccess> device_client_end(
+      std::move(device_result.value()));
+  fidl::WireSyncClient client(std::move(device_client_end));
+  auto result = client->GetPerformanceCountToken();
+
+  ASSERT_EQ(ZX_OK, result.status());
+
+  zx_info_handle_basic_t handle_info{};
+  ASSERT_EQ(result->access_token.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info),
+                                          nullptr, nullptr),
+            ZX_OK);
+  EXPECT_EQ(ZX_OBJ_TYPE_EVENT, handle_info.type);
+}
+
+class MemoryPressureProviderServer : public fidl::WireServer<fuchsia_memorypressure::Provider> {
+ public:
+  void RegisterWatcher(fuchsia_memorypressure::wire::ProviderRegisterWatcherRequest* request,
+                       RegisterWatcherCompleter::Sync& completer) override {
+    auto client = fidl::WireSyncClient(std::move(request->watcher));
+    EXPECT_EQ(ZX_OK,
+              client->OnLevelChanged(fuchsia_memorypressure::wire::Level::kWarning).status());
+  }
+};
+
+TEST_F(MagmaDriverStarted, DependencyInjection) {
+  zx::result device_result = ConnectToChild("gpu-dependency-injection");
+
+  ASSERT_EQ(ZX_OK, device_result.status_value());
+  fidl::ClientEnd<fuchsia_gpu_magma::DependencyInjection> device_client_end(
+      std::move(device_result.value()));
+  fidl::WireSyncClient client(std::move(device_client_end));
+
+  auto memory_pressure_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Provider>();
+  ASSERT_EQ(ZX_OK, memory_pressure_endpoints.status_value());
+
+  auto result = client->SetMemoryPressureProvider(std::move(memory_pressure_endpoints->client));
+  ASSERT_EQ(ZX_OK, result.status());
+
+  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_.dispatcher(), [&]() {
+                     auto server = std::make_unique<MemoryPressureProviderServer>();
+                     fidl::BindServer(test_env_dispatcher_.dispatcher(),
+                                      std::move(memory_pressure_endpoints->server),
+                                      std::move(server));
                    }).status_value());
 
-  using FakeLifecycle = fdf::Lifecycle<FakeTestDriver>;
-  DriverLifecycle lifecycle{.version = DRIVER_LIFECYCLE_VERSION_3,
-                            .v1 = {.start = nullptr, .stop = FakeLifecycle::Stop},
-                            .v2 = {FakeLifecycle::PrepareStop},
-                            .v3 = {FakeLifecycle::Start}};
-  auto driver =
-      fdf_testing::StartDriver(std::move(start_args->start_args), driver_dispatcher, lifecycle);
-
-  ASSERT_TRUE(driver.is_ok());
-
-  EXPECT_EQ(ZX_OK,
-            fdf_testing::TeardownDriver(*driver, driver_dispatcher, lifecycle).status_value());
-  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher.dispatcher(), [&]() {
-                     test_environment.reset();
-                   }).status_value());
+  MsdMockDevice* mock_device;
+  {
+    std::lock_guard magma_lock(driver_->magma_mutex());
+    mock_device = static_cast<MsdMockDevice*>(driver_->magma_system_device()->msd_dev());
+  }
+  mock_device->WaitForMemoryPressureSignal();
+  EXPECT_EQ(MAGMA_MEMORY_PRESSURE_LEVEL_WARNING, mock_device->memory_pressure_level());
 }
 
 }  // namespace

@@ -18,6 +18,12 @@ msd::DeviceHandle* GetTestDeviceHandle() { return nullptr; }
 // static
 std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdMockDriver>(); }
 
+void MsdMockDevice::SetMemoryPressureLevel(MagmaMemoryPressureLevel level) {
+  std::lock_guard lock(level_mutex_);
+  memory_pressure_level_ = level;
+  completion_.Signal();
+}
+
 magma_status_t MsdMockDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
   switch (id) {
     case MAGMA_QUERY_DEVICE_ID:
@@ -47,6 +53,8 @@ magma_status_t MsdMockDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_o
   }
   return MAGMA_STATUS_OK;
 }
+
+void MsdMockDevice::WaitForMemoryPressureSignal() { completion_.Wait(); }
 
 std::unique_ptr<msd::Buffer> MsdMockDriver::ImportBuffer(zx::vmo handle, uint64_t client_id) {
   if (!g_bufmgr)

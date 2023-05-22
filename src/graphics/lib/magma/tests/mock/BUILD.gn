@@ -31,6 +31,7 @@ source_set("msd_cpp") {
     "$magma_build_root/src/magma_util/platform:buffer",
     "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/tests/helper:platform_msd_device_helper",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   deps = [ "$magma_build_root/src/magma_util:short_macros" ]
