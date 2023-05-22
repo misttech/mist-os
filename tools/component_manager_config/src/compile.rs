@@ -719,7 +719,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"foo\" is a duplicate \"capability\" name"
             );
         }
@@ -734,7 +734,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"rights\" should be present with \"directory\""
             );
         }
@@ -749,7 +749,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"path\" should be present with \"directory\""
             );
         }
@@ -771,7 +771,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"foo\" is a duplicate \"capability\" name"
             );
         }
@@ -786,7 +786,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"rights\" should be present with \"directory\""
             );
         }
@@ -800,7 +800,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"storage\" is not supported for built-in capabilities"
             );
         }
@@ -815,7 +815,7 @@ mod tests {
         }"#;
             assert_matches!(
                 compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
+                Err(Error::Validate { err, .. } )
                     if &err == "\"path\" should not be present for built-in capabilities"
             );
         }

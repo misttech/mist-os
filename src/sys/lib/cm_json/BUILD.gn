@@ -5,16 +5,10 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-source_set("cmx_schema_json") {
-  inputs = [ "cmx_schema.json" ]
-}
-
 rustc_library("cm_json") {
   with_unit_tests = true
   edition = "2021"
   deps = [ "//third_party/rust_crates:serde_json" ]
-
-  non_rust_deps = [ ":cmx_schema_json" ]
 
   test_deps = [
     "//src/sys/lib/cm_types",
@@ -23,14 +17,10 @@ rustc_library("cm_json") {
   ]
 
   sources = [ "src/lib.rs" ]
-
-  inputs = [ "cmx_schema.json" ]
 }
 
 fuchsia_unittest_package("cm_json_tests") {
   deps = [ ":cm_json_test" ]
-  test_specs = {
-  }
 }
 
 group("tests") {

@@ -41,20 +41,16 @@ fn optional_path_exists(optional_path: Option<&PathBuf>) -> Result<(), Error> {
 fn run_cmc() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
     match opt.cmd {
-        opts::Commands::Validate {
-            files,
-            extra_schemas,
-            must_offer_protocol,
-            must_use_protocol,
-        } => validate::validate(
-            &files,
-            &extra_schemas,
-            &features::FeatureSet::empty(),
-            validate::ProtocolRequirements {
-                must_offer: &must_offer_protocol,
-                must_use: &must_use_protocol,
-            },
-        )?,
+        opts::Commands::Validate { files, must_offer_protocol, must_use_protocol } => {
+            validate::validate(
+                &files,
+                &features::FeatureSet::empty(),
+                &validate::ProtocolRequirements {
+                    must_offer: &must_offer_protocol,
+                    must_use: &must_use_protocol,
+                },
+            )?
+        }
         opts::Commands::ValidateReferences { component_manifest, package_manifest, context } => {
             reference::validate(&component_manifest, &package_manifest, context.as_ref())?
         }
@@ -93,11 +89,15 @@ fn run_cmc() -> Result<(), Error> {
             )?
         }
         opts::Commands::Format { file, pretty, cml, inplace, mut output } => {
+            // TODO(fxbug.dev/109014): stop accepting these flags.
+            let _pretty = pretty;
+            let _cml = cml;
+
             path_exists(&file)?;
             if inplace {
                 output = Some(file.clone());
             }
-            format::format(&file, pretty, cml, output)?;
+            format::format(&file, output)?;
         }
         opts::Commands::Compile {
             file,

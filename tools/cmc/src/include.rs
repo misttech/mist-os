@@ -12,7 +12,6 @@ use {
     serde_json::Value,
     std::{
         collections::HashSet,
-        ffi::OsStr,
         fs,
         io::{BufRead, BufReader, Write},
         iter::FromIterator,
@@ -108,11 +107,6 @@ pub fn check_includes(
     includepath: &Vec<PathBuf>,
     includeroot: &PathBuf,
 ) -> Result<(), Error> {
-    if file.extension() == Some(OsStr::new("cmx")) {
-        // Don't worry about v1 manifests anymore.
-        return Ok(());
-    }
-
     if let Some(path) = fromfile {
         let reader = BufReader::new(fs::File::open(path)?);
         for line in reader.lines() {
@@ -138,7 +132,6 @@ pub fn check_includes(
     {
         if !actual.contains(&expected) {
             return Err(Error::Validate {
-                schema_name: None,
                 err: format!(
                     "{:?} must include {:?}.\nFor more details, see {}",
                     &file, &expected, CHECK_INCLUDES_URL
@@ -366,39 +359,6 @@ mod tests {
     }
 
     #[test]
-    fn test_include_cmx() {
-        let ctx = TestContext::new();
-        let cmx_path = ctx.new_file(
-            "some.cmx",
-            json!({
-                "include": ["shard.cmx"],
-                "program": {
-                    "binary": "bin/hello_world"
-                }
-            }),
-        );
-        let shard_path = ctx.new_include(
-            "shard.cmx",
-            json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Bar"]
-                }
-            }),
-        );
-        ctx.merge_includes(&cmx_path).unwrap();
-
-        ctx.assert_output_eq(json!({
-            "program": {
-                "binary": "bin/hello_world"
-            },
-            "sandbox": {
-                "services": ["fuchsia.foo.Bar"]
-            }
-        }));
-        ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
-    }
-
-    #[test]
     fn test_include_cml() {
         let ctx = TestContext::new();
         let cml_path = ctx.new_file(
@@ -532,7 +492,7 @@ mod tests {
     #[test]
     fn test_include_paths_take_priority_by_order() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_file(
+        let cml_path = ctx.new_file(
             "some.cml",
             json!({
                 "include": ["shard.cml"],
@@ -559,7 +519,7 @@ mod tests {
                 }]
             }),
         );
-        ctx.merge_includes(&cmx_path).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {
@@ -577,7 +537,7 @@ mod tests {
     fn test_include_absolute() {
         let ctx = TestContext::new();
         ctx.new_dir("path/to");
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some.cml",
             json!({
                 "include": ["//path/to/shard.cml"],
@@ -595,7 +555,7 @@ mod tests {
                 }]
             }),
         );
-        ctx.merge_includes(&cmx_path).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {
@@ -612,7 +572,7 @@ mod tests {
     #[test]
     fn test_include_multiple_shards() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some.cml",
             json!({
                 "include": ["shard1.cml", "shard2.cml"],
@@ -638,7 +598,7 @@ mod tests {
                 }]
             }),
         );
-        ctx.merge_includes(&cmx_path).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {
@@ -657,7 +617,7 @@ mod tests {
     #[test]
     fn test_include_recursively() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some.cml",
             json!({
                 "include": ["shard1.cml"],
@@ -684,7 +644,7 @@ mod tests {
                 }]
             }),
         );
-        ctx.merge_includes(&cmx_path).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {
@@ -703,7 +663,7 @@ mod tests {
     #[test]
     fn test_include_nothing() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some.cml",
             json!({
                 "include": [],
@@ -713,7 +673,7 @@ mod tests {
                 }
             }),
         );
-        ctx.merge_includes(&cmx_path).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {
@@ -727,7 +687,7 @@ mod tests {
     #[test]
     fn test_no_includes() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some.cml",
             json!({
                 "program": {
@@ -736,7 +696,7 @@ mod tests {
                 }
             }),
         );
-        ctx.merge_includes(&cmx_path).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {
@@ -750,7 +710,7 @@ mod tests {
     #[test]
     fn test_invalid_include() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some.cml",
             json!({
                 "include": ["doesnt_exist.cml"],
@@ -759,7 +719,7 @@ mod tests {
                 }
             }),
         );
-        let result = ctx.merge_includes(&cmx_path);
+        let result = ctx.merge_includes(&cml_path);
 
         assert_matches!(result, Err(Error::Parse { err, .. })
                         if err.starts_with("Couldn't read include ") && err.contains("doesnt_exist.cml"));
@@ -768,7 +728,7 @@ mod tests {
     #[test]
     fn test_include_detect_cycle() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_include(
+        let cml_path = ctx.new_include(
             "some1.cml",
             json!({
                 "include": ["some2.cml"],
@@ -780,7 +740,7 @@ mod tests {
                 "include": ["some1.cml"],
             }),
         );
-        let result = ctx.merge_includes(&cmx_path);
+        let result = ctx.merge_includes(&cml_path);
         assert_matches!(result, Err(Error::Parse { err, .. }) if err.contains("Includes cycle"));
     }
 
@@ -820,7 +780,7 @@ mod tests {
     #[test]
     fn test_expect_nothing() {
         let ctx = TestContext::new();
-        let cmx1_path = ctx.new_include(
+        let cml1_path = ctx.new_include(
             "some1.cml",
             json!({
                 "program": {
@@ -828,11 +788,11 @@ mod tests {
                 }
             }),
         );
-        assert_matches!(ctx.check_includes(&cmx1_path, vec![]), Ok(()));
+        assert_matches!(ctx.check_includes(&cml1_path, vec![]), Ok(()));
         // Don't generate depfile (or delete existing) if no includes found
         ctx.assert_no_depfile();
 
-        let cmx2_path = ctx.new_include(
+        let cml2_path = ctx.new_include(
             "some2.cml",
             json!({
                 "include": [],
@@ -841,9 +801,9 @@ mod tests {
                 }
             }),
         );
-        assert_matches!(ctx.check_includes(&cmx2_path, vec![]), Ok(()));
+        assert_matches!(ctx.check_includes(&cml2_path, vec![]), Ok(()));
 
-        let cmx3_path = ctx.new_include(
+        let cml3_path = ctx.new_include(
             "some3.cml",
             json!({
                 "include": [ "foo.cml" ],
@@ -852,7 +812,7 @@ mod tests {
                 }
             }),
         );
-        assert_matches!(ctx.check_includes(&cmx3_path, vec![]), Ok(()));
+        assert_matches!(ctx.check_includes(&cml3_path, vec![]), Ok(()));
     }
 
     #[test]

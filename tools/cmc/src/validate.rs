@@ -12,19 +12,14 @@ use {
         one_or_many::OneOrMany,
         util,
     },
-    cm_json::{JsonSchema, CMX_SCHEMA},
     directed_graph::{self, DirectedGraph},
-    serde_json::Value,
     std::{
         collections::{BTreeMap, HashMap, HashSet},
         fmt,
-        fs::File,
         hash::Hash,
-        io::Read,
         iter,
         path::Path,
     },
-    valico::json_schema,
 };
 
 pub struct ProtocolRequirements<'a> {
@@ -32,29 +27,27 @@ pub struct ProtocolRequirements<'a> {
     pub must_use: &'a [String],
 }
 
-/// Read in and parse one or more manifest files. Returns an Err() if any file is not valid
-/// or Ok(()) if all files are valid.
+/// Validates that all given manifest files are correct cml.
 ///
-/// The primary JSON schemas are taken from cm_json, selected based on the file extension,
-/// is used to determine the validity of each input file. Extra schemas to validate against can be
-/// optionally provided.
+/// Returns an Err() if any file is not valid or Ok(()) if all files are valid.
 pub fn validate<P: AsRef<Path>>(
     files: &[P],
-    extra_schemas: &[(P, Option<String>)],
     features: &FeatureSet,
-    protocol_requirements: ProtocolRequirements<'_>,
+    protocol_requirements: &ProtocolRequirements<'_>,
 ) -> Result<(), Error> {
     if files.is_empty() {
         return Err(Error::invalid_args("No files provided"));
     }
 
-    for filename in files {
-        validate_file(filename.as_ref(), extra_schemas, features, &protocol_requirements)?;
+    for file in files {
+        let file = file.as_ref();
+        let document = util::read_cml(file)?;
+        validate_cml(&document, file, features, protocol_requirements)?;
     }
     Ok(())
 }
 
-/// Validates a given cml.
+/// Validates a given cml document.
 pub fn validate_cml(
     document: &cml::Document,
     file: &Path,
@@ -67,81 +60,6 @@ pub fn validate_cml(
         *filename = Some(file.to_string_lossy().into_owned());
     }
     res
-}
-
-/// Read in and parse a single manifest file, and return an Error if the given file is not valid.
-fn validate_file<P: AsRef<Path>>(
-    file: &Path,
-    extra_schemas: &[(P, Option<String>)],
-    features: &FeatureSet,
-    protocol_requirements: &ProtocolRequirements<'_>,
-) -> Result<(), Error> {
-    const BAD_EXTENSION: &str = "Input file does not have a component manifest extension \
-                                 (.cml or .cmx)";
-
-    // Validate based on file extension.
-    let ext = file.extension().and_then(|e| e.to_str());
-    match ext {
-        Some("cmx") => {
-            let mut buffer = String::new();
-            File::open(&file)?.read_to_string(&mut buffer)?;
-            let v = serde_json::from_str(&buffer)?;
-            validate_json(&v, CMX_SCHEMA)?;
-            // Validate against any extra schemas provided.
-            for extra_schema in extra_schemas {
-                let schema = JsonSchema::new_from_file(&extra_schema.0.as_ref())?;
-                validate_json(&v, &schema).map_err(|e| match (&e, &extra_schema.1) {
-                    (Error::Validate { schema_name, err, filename }, Some(extra_msg)) => {
-                        Error::Validate {
-                            schema_name: schema_name.clone(),
-                            err: format!("{}\n{}", err, extra_msg),
-                            filename: filename.clone(),
-                        }
-                    }
-                    _ => e,
-                })?;
-            }
-        }
-        Some("cml") => {
-            let document = util::read_cml(file)?;
-            validate_cml(&document, &file, features, protocol_requirements)?;
-        }
-        _ => {
-            return Err(Error::invalid_args(BAD_EXTENSION));
-        }
-    };
-    Ok(())
-}
-
-/// Validates a JSON document according to the given schema.
-pub fn validate_json(json: &Value, schema: &JsonSchema<'_>) -> Result<(), Error> {
-    // Parse the schema
-    let cmx_schema_json = serde_json::from_str(&schema.schema).map_err(|e| {
-        Error::internal(format!("Couldn't read schema '{}' as JSON: {}", schema.name, e))
-    })?;
-    let mut scope = json_schema::Scope::new();
-    let compiled_schema = scope.compile_and_return(cmx_schema_json, false).map_err(|e| {
-        Error::internal(format!("Couldn't parse schema '{}': {:?}", schema.name, e))
-    })?;
-
-    // Validate the json
-    let res = compiled_schema.validate(json);
-    if !res.is_strictly_valid() {
-        let mut err_msgs = Vec::new();
-        for e in &res.errors {
-            err_msgs.push(format!("{} at {}", e.get_title(), e.get_path()).into_boxed_str());
-        }
-        for u in &res.missing {
-            err_msgs.push(
-                format!("internal error: schema definition is missing URL {}", u).into_boxed_str(),
-            );
-        }
-        // The ordering in which valico emits these errors is unstable.
-        // Sort error messages so that the resulting message is predictable.
-        err_msgs.sort_unstable();
-        return Err(Error::validate_schema(&schema.name.to_string(), err_msgs.join(", ")));
-    }
-    Ok(())
 }
 
 struct ValidationContext<'a> {
@@ -1718,8 +1636,8 @@ mod tests {
         offer_to_all_and_component_diff_protocols_message,
         offer_to_all_and_component_diff_sources_message,
     };
-    use lazy_static::lazy_static;
     use serde_json::json;
+    use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
 
@@ -1762,23 +1680,6 @@ mod tests {
         }
     }
 
-    macro_rules! test_validate_cmx {
-        (
-            $(
-                $test_name:ident($input:expr, $($pattern:tt)+),
-            )+
-        ) => {
-            $(
-                #[test]
-                fn $test_name() {
-                    let input = format!("{}", $input);
-                    let result = write_and_validate("test.cmx", input.as_bytes());
-                    assert_matches!(result, $($pattern)+);
-                }
-            )+
-        }
-    }
-
     fn write_and_validate(filename: &str, input: &[u8]) -> Result<(), Error> {
         write_and_validate_with_features(filename, input, &FeatureSet::empty(), &[], &[])
     }
@@ -1795,9 +1696,8 @@ mod tests {
         File::create(&tmp_file_path).unwrap().write_all(input).unwrap();
         validate(
             &vec![tmp_file_path],
-            &[],
             features,
-            ProtocolRequirements { must_offer: required_offers, must_use: required_uses },
+            &ProtocolRequirements { must_offer: required_offers, must_use: required_uses },
         )
     }
 
@@ -1860,9 +1760,8 @@ mod tests {
         );
 
         assert_matches!(result,
-            Err(Error::Validate { schema_name, err, filename }) => {
+            Err(Error::Validate { err, filename }) => {
                 assert_eq!(err, unused_component_err_message("fuchsia.logger.LogSink"));
-                assert!(schema_name.is_none());
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
         );
@@ -2198,12 +2097,11 @@ mod tests {
 
         // aliased duplications are forbidden
         assert_matches!(result,
-            Err(Error::Validate { schema_name, err, filename }) => {
+            Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
                     offer_to_all_and_component_diff_protocols_message(&["fuchsia.logger.LogSink"], "something"),
                 );
-                assert!(schema_name.is_none());
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
         );
@@ -2243,12 +2141,11 @@ mod tests {
 
         // offering the same protocol without an alias from different sources is forbidden
         assert_matches!(result,
-            Err(Error::Validate { schema_name, err, filename }) => {
+            Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
                     offer_to_all_and_component_diff_sources_message(&["fuchsia.logger.LogSink"], "something"),
                 );
-                assert!(schema_name.is_none());
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
         );
@@ -2294,12 +2191,11 @@ mod tests {
         );
 
         assert_matches!(result,
-            Err(Error::Validate { schema_name, err, filename }) => {
+            Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
                     offer_to_all_diff_sources_message(&["fuchsia.logger.LogSink"]),
                 );
-                assert!(schema_name.is_none());
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
         );
@@ -2402,7 +2298,7 @@ mod tests {
         );
 
         assert_matches!(result,
-            Err(Error::Validate { schema_name, err, filename }) => {
+            Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
                     fail_to_make_required_offer(
@@ -2411,7 +2307,6 @@ mod tests {
                         "something",
                     ),
                 );
-                assert!(schema_name.is_none());
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
         );
@@ -2446,12 +2341,11 @@ mod tests {
         );
 
         assert_matches!(result,
-            Err(Error::Validate { schema_name, err, filename }) => {
+            Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
                     fail_to_make_required_offer("fuchsia.logger.LogSink", "collection", "coll"),
                 );
-                assert!(schema_name.is_none());
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
         );
@@ -2553,7 +2447,7 @@ mod tests {
         ),
         test_cml_program_no_runner(
             json!({"program": { "binary": "bin/app" }}),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err ==
+            Err(Error::Validate { err, .. }) if &err ==
                 "Component has a `program` block defined, but doesn't specify a `runner`. \
                 Components need to use a runner to actually execute code."
         ),
@@ -2787,7 +2681,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "directory \"/foo/bar/baz\" is a prefix of \"use\" target event_stream \"/foo/bar/baz/er\""
+            Err(Error::Validate {  err, .. }) if &err == "directory \"/foo/bar/baz\" is a prefix of \"use\" target event_stream \"/foo/bar/baz/er\""
         ),
         test_cml_use_event_stream_no_from(
             json!({
@@ -2799,7 +2693,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"from\" should be present with \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "\"from\" should be present with \"event_stream\""
         ),
         test_cml_use_event_stream_invalid_path(
             json!({
@@ -2825,43 +2719,43 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"from: self\" cannot be used with \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "\"from: self\" cannot be used with \"event_stream\""
         ),
         test_cml_use_missing_props(
             json!({
                 "use": [ { "path": "/svc/fuchsia.logger.Log" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\""
         ),
         test_cml_use_as_with_protocol(
             json!({
                 "use": [ { "protocol": "foo", "as": "xxx" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" cannot be used with \"protocol\""
+            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"protocol\""
         ),
         test_cml_use_invalid_from_with_directory(
             json!({
                 "use": [ { "directory": "foo", "from": "debug" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
+            Err(Error::Validate { err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
         ),
         test_cml_use_as_with_directory(
             json!({
                 "use": [ { "directory": "foo", "as": "xxx" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" cannot be used with \"directory\""
+            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"directory\""
         ),
         test_cml_use_as_with_storage(
             json!({
                 "use": [ { "storage": "cache", "as": "mystorage" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" cannot be used with \"storage\""
+            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"storage\""
         ),
         test_cml_use_from_with_storage(
             json!({
                 "use": [ { "storage": "cache", "from": "parent" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"from\" cannot be used with \"storage\""
+            Err(Error::Validate { err, .. }) if &err == "\"from\" cannot be used with \"storage\""
         ),
         test_cml_use_invalid_from(
             json!({
@@ -2888,7 +2782,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"path\" can only be specified when one `protocol` is supplied."
+            Err(Error::Validate { err, .. }) if &err == "\"path\" can only be specified when one `protocol` is supplied."
         ),
         test_cml_use_bad_duplicate_target_names(
             json!({
@@ -2897,7 +2791,7 @@ mod tests {
                   { "protocol": "fuchsia.component.Realm" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"/svc/fuchsia.component.Realm\" is a duplicate \"use\" target protocol"
+            Err(Error::Validate { err, .. }) if &err == "\"/svc/fuchsia.component.Realm\" is a duplicate \"use\" target protocol"
         ),
         test_cml_use_empty_protocols(
             json!({
@@ -2941,7 +2835,7 @@ mod tests {
                     { "directory": "foobarbaz", "path": "/foo/bar/baz", "rights": [ "r*" ] },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target directory \"/foo/bar/baz\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target directory \"/foo/bar/baz\""
         ),
         test_cml_use_disallows_nested_dirs_storage(
             json!({
@@ -2950,7 +2844,7 @@ mod tests {
                     { "storage": "foobarbaz", "path": "/foo/bar/baz" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "storage \"/foo/bar\" is a prefix of \"use\" target storage \"/foo/bar/baz\""
+            Err(Error::Validate { err, .. }) if &err == "storage \"/foo/bar\" is a prefix of \"use\" target storage \"/foo/bar/baz\""
         ),
         test_cml_use_disallows_nested_dirs_directory_and_storage(
             json!({
@@ -2959,7 +2853,7 @@ mod tests {
                     { "storage": "foobarbaz", "path": "/foo/bar/baz" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target storage \"/foo/bar/baz\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target storage \"/foo/bar/baz\""
         ),
         test_cml_use_disallows_common_prefixes_service(
             json!({
@@ -2968,7 +2862,7 @@ mod tests {
                     { "protocol": "fuchsia", "path": "/foo/bar/fuchsia" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target protocol \"/foo/bar/fuchsia\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target protocol \"/foo/bar/fuchsia\""
         ),
         test_cml_use_disallows_common_prefixes_protocol(
             json!({
@@ -2977,7 +2871,7 @@ mod tests {
                     { "protocol": "fuchsia", "path": "/foo/bar/fuchsia.2" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target protocol \"/foo/bar/fuchsia.2\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"/foo/bar\" is a prefix of \"use\" target protocol \"/foo/bar/fuchsia.2\""
         ),
         test_cml_use_disallows_pkg_conflicts_for_directories(
             json!({
@@ -2985,7 +2879,7 @@ mod tests {
                     { "directory": "dir", "path": "/pkg/dir", "rights": [ "r*" ] },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "directory \"/pkg/dir\" conflicts with the protected path \"/pkg\", please use this capability with a different path"
+            Err(Error::Validate { err, .. }) if &err == "directory \"/pkg/dir\" conflicts with the protected path \"/pkg\", please use this capability with a different path"
         ),
         test_cml_use_disallows_pkg_conflicts_for_protocols(
             json!({
@@ -2993,7 +2887,7 @@ mod tests {
                     { "protocol": "prot", "path": "/pkg/protocol" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "protocol \"/pkg/protocol\" conflicts with the protected path \"/pkg\", please use this capability with a different path"
+            Err(Error::Validate { err, .. }) if &err == "protocol \"/pkg/protocol\" conflicts with the protected path \"/pkg\", please use this capability with a different path"
         ),
         test_cml_use_disallows_pkg_conflicts_for_storage(
             json!({
@@ -3001,7 +2895,7 @@ mod tests {
                     { "storage": "store", "path": "/pkg/storage" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "storage \"/pkg/storage\" conflicts with the protected path \"/pkg\", please use this capability with a different path"
+            Err(Error::Validate { err, .. }) if &err == "storage \"/pkg/storage\" conflicts with the protected path \"/pkg\", please use this capability with a different path"
         ),
         test_cml_use_disallows_filter_on_non_events(
             json!({
@@ -3009,7 +2903,7 @@ mod tests {
                     { "directory": "foobar", "path": "/foo/bar", "rights": [ "r*" ], "filter": {"path": "/diagnostics"} },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
         ),
         test_cml_availability_not_supported_for_event_streams(
             json!({
@@ -3021,7 +2915,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"availability\" cannot be used with \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "\"availability\" cannot be used with \"event_stream\""
         ),
         test_cml_use_from_child_offer_cycle_strong(
             json!({
@@ -3048,7 +2942,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. })
+            Err(Error::Validate { err, .. })
                 if &err == "Strong dependency cycles were found. Break the cycle by removing a \
                             dependency or marking an offer as weak. Cycles: \
                             {{#child -> self -> #child}}"
@@ -3063,7 +2957,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Only `use` from children can have dependency: \"weak\""
+            Err(Error::Validate { err, .. }) if &err == "Only `use` from children can have dependency: \"weak\""
         ),
         test_cml_use_from_child_offer_cycle_weak(
             json!({
@@ -3171,7 +3065,6 @@ mod tests {
                 ],
             }),
             Err(Error::Validate {
-                schema_name: None,
                 err,
                 ..
             }) if &err ==
@@ -3257,7 +3150,7 @@ mod tests {
                     { "protocol": "fuchsia.logger.Log", "from": "#missing" },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#missing\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#missing\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_expose_duplicate_target_names(
             json!({
@@ -3275,7 +3168,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"thing\" is a duplicate \"expose\" target capability for \"parent\""
+            Err(Error::Validate { err, .. }) if &err == "\"thing\" is a duplicate \"expose\" target capability for \"parent\""
         ),
         test_cml_expose_invalid_multiple_from(
             json!({
@@ -3295,7 +3188,7 @@ mod tests {
                         },
                     ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"protocol\" capabilities cannot have multiple \"from\" clauses"
+            Err(Error::Validate { err, .. }) if &err == "\"protocol\" capabilities cannot have multiple \"from\" clauses"
         ),
         test_cml_expose_from_missing_named_source(
             json!({
@@ -3306,7 +3199,7 @@ mod tests {
                         },
                     ],
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#does-not-exist\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#does-not-exist\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_expose_bad_from(
             json!({
@@ -3333,7 +3226,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" can only be specified when one `protocol` is supplied."
+            Err(Error::Validate { err, .. }) if &err == "\"as\" can only be specified when one `protocol` is supplied."
         ),
         test_cml_expose_empty_protocols(
             json!({
@@ -3390,7 +3283,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "`subdir` is not supported for expose to framework. Directly expose the subdirectory instead."
+            Err(Error::Validate { err, .. }) if &err == "`subdir` is not supported for expose to framework. Directly expose the subdirectory instead."
         ),
         test_cml_expose_from_self(
             json!({
@@ -3452,7 +3345,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Protocol \"pkg_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Protocol \"pkg_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_expose_protocol_from_self_missing_multiple(
             json!({
@@ -3463,7 +3356,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Protocol \"foo_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Protocol \"foo_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_expose_directory_from_self_missing(
             json!({
@@ -3474,7 +3367,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Directory \"pkg_directory\" is exposed from self, so it must be declared as a \"directory\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Directory \"pkg_directory\" is exposed from self, so it must be declared as a \"directory\" in \"capabilities\""
         ),
         test_cml_expose_runner_from_self_missing(
             json!({
@@ -3485,7 +3378,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Runner \"dart\" is exposed from self, so it must be declared as a \"runner\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Runner \"dart\" is exposed from self, so it must be declared as a \"runner\" in \"capabilities\""
         ),
         test_cml_expose_resolver_from_self_missing(
             json!({
@@ -3496,7 +3389,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Resolver \"pkg_resolver\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Resolver \"pkg_resolver\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\""
         ),
         test_cml_expose_protocol_from_collection_invalid(
             json!({
@@ -3508,7 +3401,7 @@ mod tests {
                     { "protocol": "fuchsia.logger.Log", "from": "#coll" },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_expose_directory_from_collection_invalid(
             json!({
@@ -3520,7 +3413,7 @@ mod tests {
                     { "directory": "temp", "from": "#coll" },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\""
         ),
         test_cml_expose_runner_from_collection_invalid(
             json!({
@@ -3532,7 +3425,7 @@ mod tests {
                     { "runner": "elf", "from": "#coll" },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\""
         ),
         test_cml_expose_resolver_from_collection_invalid(
             json!({
@@ -3544,7 +3437,7 @@ mod tests {
                     { "resolver": "base", "from": "#coll" },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#coll\" does not appear in \"children\""
         ),
         test_cml_expose_to_framework_ok(
             json!({
@@ -3587,7 +3480,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Expose to framework can only be done from self."
+            Err(Error::Validate { err, .. }) if &err == "Expose to framework can only be done from self."
         ),
 
         // offer
@@ -3753,7 +3646,7 @@ mod tests {
                         },
                     ],
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#missing\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#missing\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_storage_offer_from_child(
             json!({
@@ -3775,7 +3668,7 @@ mod tests {
                         },
                     ],
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Storage \"cache\" is offered from a child, but storage capabilities cannot be exposed"
+            Err(Error::Validate { err, .. }) if &err == "Storage \"cache\" is offered from a child, but storage capabilities cannot be exposed"
         ),
         test_cml_offer_bad_from(
             json!({
@@ -3807,7 +3700,7 @@ mod tests {
                         },
                     ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"protocol\" capabilities cannot have multiple \"from\" clauses"
+            Err(Error::Validate { err, .. }) if &err == "\"protocol\" capabilities cannot have multiple \"from\" clauses"
         ),
         test_cml_offer_from_missing_named_source(
             json!({
@@ -3825,7 +3718,7 @@ mod tests {
                         },
                     ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#does-not-exist\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#does-not-exist\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_offer_protocol_from_collection_invalid(
             json!({
@@ -3841,7 +3734,7 @@ mod tests {
                     { "protocol": "fuchsia.logger.Log", "from": "#coll", "to": [ "#echo_server" ] },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_offer_directory_from_collection_invalid(
             json!({
@@ -3857,7 +3750,7 @@ mod tests {
                     { "directory": "temp", "from": "#coll", "to": [ "#echo_server" ] },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
         ),
         test_cml_offer_storage_from_collection_invalid(
             json!({
@@ -3873,7 +3766,7 @@ mod tests {
                     { "storage": "cache", "from": "#coll", "to": [ "#echo_server" ] },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Storage \"cache\" is offered from a child, but storage capabilities cannot be exposed"
+            Err(Error::Validate { err, .. }) if &err == "Storage \"cache\" is offered from a child, but storage capabilities cannot be exposed"
         ),
         test_cml_offer_runner_from_collection_invalid(
             json!({
@@ -3889,7 +3782,7 @@ mod tests {
                     { "runner": "elf", "from": "#coll", "to": [ "#echo_server" ] },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
         ),
         test_cml_offer_resolver_from_collection_invalid(
             json!({
@@ -3905,7 +3798,7 @@ mod tests {
                     { "resolver": "base", "from": "#coll", "to": [ "#echo_server" ] },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
         ),
         test_cml_offer_empty_targets(
             json!({
@@ -3957,7 +3850,7 @@ mod tests {
                     "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
                 } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"#missing\" is an \"offer\" target from \"#logger\" but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#missing\" is an \"offer\" target from \"#logger\" but it does not appear in \"children\" or \"collections\""
         ),
         test_cml_offer_target_bad_to(
             json!({
@@ -3999,7 +3892,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Offer target \"#child\" is same as source"
+            Err(Error::Validate { err, .. }) if &err == "Offer target \"#child\" is same as source"
         ),
         test_cml_offer_target_equals_from_weak(
             json!({
@@ -4044,7 +3937,7 @@ mod tests {
                     "storage_id": "static_instance_id_or_moniker",
                 } ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Storage offer target \"#logger\" is same as source"
+            Err(Error::Validate { err, .. }) if &err == "Storage offer target \"#logger\" is same as source"
         ),
         test_cml_offer_duplicate_target_names(
             json!({
@@ -4077,7 +3970,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"thing\" is a duplicate \"offer\" target capability for \"#echo_server\""
+            Err(Error::Validate { err, .. }) if &err == "\"thing\" is a duplicate \"offer\" target capability for \"#echo_server\""
         ),
         test_cml_offer_duplicate_storage_names(
             json!({
@@ -4104,7 +3997,7 @@ mod tests {
                     "url": "fuchsia-pkg://fuchsia.com/echo/stable#meta/echo_server.cm"
                 } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"cache\" is a duplicate \"offer\" target capability for \"#echo_server\""
+            Err(Error::Validate { err, .. }) if &err == "\"cache\" is a duplicate \"offer\" target capability for \"#echo_server\""
         ),
         // if "as" is specified, only 1 array item is allowed.
         test_cml_offer_bad_as(
@@ -4124,7 +4017,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" can only be specified when one `protocol` is supplied."
+            Err(Error::Validate { err, .. }) if &err == "\"as\" can only be specified when one `protocol` is supplied."
         ),
         test_cml_offer_bad_subdir(
             json!({
@@ -4223,7 +4116,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Protocol \"pkg_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Protocol \"pkg_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_offer_protocol_from_self_missing_multiple(
             json!({
@@ -4241,7 +4134,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Protocol \"foo_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Protocol \"foo_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_offer_directory_from_self_missing(
             json!({
@@ -4259,7 +4152,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Directory \"pkg_directory\" is offered from self, so it must be declared as a \"directory\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Directory \"pkg_directory\" is offered from self, so it must be declared as a \"directory\" in \"capabilities\""
         ),
         test_cml_offer_runner_from_self_missing(
             json!({
@@ -4277,7 +4170,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Runner \"dart\" is offered from self, so it must be declared as a \"runner\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Runner \"dart\" is offered from self, so it must be declared as a \"runner\" in \"capabilities\""
         ),
         test_cml_offer_resolver_from_self_missing(
             json!({
@@ -4295,7 +4188,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Resolver \"pkg_resolver\" is offered from self, so it must be declared as a \"resolver\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Resolver \"pkg_resolver\" is offered from self, so it must be declared as a \"resolver\" in \"capabilities\""
         ),
         test_cml_offer_storage_from_self_missing(
             json!({
@@ -4313,7 +4206,7 @@ mod tests {
                         },
                     ],
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Storage \"cache\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Storage \"cache\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\""
         ),
         test_cml_offer_dependency_on_wrong_type(
             json!({
@@ -4328,7 +4221,7 @@ mod tests {
                         "url": "fuchsia-pkg://fuchsia.com/echo/stable#meta/echo_server.cm",
                     } ],
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Dependency can only be provided for protocol and directory capabilities"
+            Err(Error::Validate { err, .. }) if &err == "Dependency can only be provided for protocol and directory capabilities"
         ),
         test_cml_offer_dependency_cycle(
             json!({
@@ -4380,7 +4273,6 @@ mod tests {
                     ]
                 }),
             Err(Error::Validate {
-                schema_name: None,
                 err,
                 ..
             }) if &err ==
@@ -4422,7 +4314,6 @@ mod tests {
                 ],
             }),
             Err(Error::Validate {
-                schema_name: None,
                 err,
                 ..
             }) if &err ==
@@ -4476,7 +4367,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
         ),
 
         // children
@@ -4516,7 +4407,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"children\" and once in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"children\" and once in \"children\""
         ),
         test_cml_children_bad_startup(
             json!({
@@ -4566,7 +4457,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"foo_env\" does not appear in \"environments\""
+            Err(Error::Validate { err, .. }) if &err == "\"foo_env\" does not appear in \"environments\""
         ),
         test_cml_children_environment(
             json!({
@@ -4607,7 +4498,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"foo_env\" does not appear in \"environments\""
+            Err(Error::Validate { err, .. }) if &err == "\"foo_env\" does not appear in \"environments\""
         ),
         test_cml_collections_environment(
             json!({
@@ -4790,7 +4681,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"duplicate\" is defined twice, once in \"collections\" and once in \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "identifier \"duplicate\" is defined twice, once in \"collections\" and once in \"collections\""
         ),
         test_cml_collections_bad_durability(
             json!({
@@ -4964,7 +4855,7 @@ mod tests {
                         "storage_id": "static_instance_id_or_moniker",
                     } ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"capabilities\" source \"#missing\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"capabilities\" source \"#missing\" does not appear in \"children\""
         ),
         test_cml_storage_missing_path_or_backing_dir(
             json!({
@@ -4974,7 +4865,7 @@ mod tests {
                         "storage_id": "static_instance_id_or_moniker",
                     } ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"backing_dir\" should be present with \"storage\""
+            Err(Error::Validate { err, .. }) if &err == "\"backing_dir\" should be present with \"storage\""
 
         ),
         test_cml_storage_missing_storage_id(
@@ -4985,7 +4876,7 @@ mod tests {
                         "backing_dir": "storage",
                     }, ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"storage_id\" should be present with \"storage\""
+            Err(Error::Validate { err, .. }) if &err == "\"storage_id\" should be present with \"storage\""
         ),
         test_cml_storage_path(
             json!({
@@ -4996,7 +4887,7 @@ mod tests {
                         "storage_id": "static_instance_id_or_moniker",
                     } ]
                 }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"path\" can not be present with \"storage\", use \"backing_dir\""
+            Err(Error::Validate { err, .. }) if &err == "\"path\" can not be present with \"storage\", use \"backing_dir\""
         ),
         test_cml_runner(
             json!({
@@ -5083,7 +4974,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"pkg_resolver\" is defined twice, once in \"resolvers\" and once in \"runners\""
+            Err(Error::Validate { err, .. }) if &err == "identifier \"pkg_resolver\" is defined twice, once in \"resolvers\" and once in \"runners\""
         ),
 
         // environments
@@ -5116,7 +5007,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err ==
+            Err(Error::Validate { err, .. }) if &err ==
                 "'__stop_timeout_ms' must be provided if the environment does not extend \
                 another environment"
         ),
@@ -5236,7 +5127,7 @@ mod tests {
                     }
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Duplicate runners registered under name \"dart\": \"other-dart\" and \"dart\"."
+            Err(Error::Validate { err, .. }) if &err == "Duplicate runners registered under name \"dart\": \"other-dart\" and \"dart\"."
         ),
         test_cml_environment_with_runner_from_missing_child(
             json!({
@@ -5253,7 +5144,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"elf\" runner source \"#missing_child\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"elf\" runner source \"#missing_child\" does not appear in \"children\""
         ),
         test_cml_environment_with_runner_cycle(
             json!({
@@ -5278,7 +5169,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { err, schema_name: None, .. }) if &err ==
+            Err(Error::Validate { err, .. }) if &err ==
                     "Strong dependency cycles were found. Break the cycle by removing a \
                     dependency or marking an offer as weak. Cycles: \
                     {{#child -> #my_env -> #child}}"
@@ -5340,7 +5231,7 @@ mod tests {
                     }
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "scheme \"fuchsia-pkg\" for resolver \"base_resolver\" is already registered; previously registered to resolver \"pkg_resolver\"."
+            Err(Error::Validate { err, .. }) if &err == "scheme \"fuchsia-pkg\" for resolver \"base_resolver\" is already registered; previously registered to resolver \"pkg_resolver\"."
         ),
         test_cml_environment_with_resolver_from_missing_child(
             json!({
@@ -5358,7 +5249,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"pkg_resolver\" resolver source \"#missing_child\" does not appear in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "\"pkg_resolver\" resolver source \"#missing_child\" does not appear in \"children\""
         ),
         test_cml_environment_with_resolver_cycle(
             json!({
@@ -5383,7 +5274,7 @@ mod tests {
                     }
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err ==
+            Err(Error::Validate { err, .. }) if &err ==
                     "Strong dependency cycles were found. Break the cycle by removing a \
                     dependency or marking an offer as weak. \
                     Cycles: {{#child -> #my_env -> #child}}"
@@ -5423,7 +5314,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err ==
+            Err(Error::Validate { err, .. }) if &err ==
                 "Strong dependency cycles were found. Break the cycle by removing a dependency \
                 or marking an offer as weak. \
                 Cycles: {{#a -> #b -> #my_env -> #a}}"
@@ -5534,7 +5425,7 @@ mod tests {
                   },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"read_bytes\" is duplicated in the rights clause."
+            Err(Error::Validate { err, .. }) if &err == "\"read_bytes\" is duplicated in the rights clause."
         ),
         test_cml_rights_alias_star_expansion_collision(
             json!({
@@ -5546,7 +5437,7 @@ mod tests {
                   },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"x*\" is duplicated in the rights clause."
+            Err(Error::Validate { err, .. }) if &err == "\"x*\" is duplicated in the rights clause."
         ),
         test_cml_rights_use_invalid(
             json!({
@@ -5554,7 +5445,7 @@ mod tests {
                   { "directory": "mydir", "path": "/mydir" },
                 ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "This use statement requires a `rights` field. Refer to: https://fuchsia.dev/go/components/directory#consumer."
+            Err(Error::Validate { err, .. }) if &err == "This use statement requires a `rights` field. Refer to: https://fuchsia.dev/go/components/directory#consumer."
         ),
         test_cml_path(
             json!({
@@ -5815,7 +5706,7 @@ mod tests {
                    }
                ]
            }),
-           Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"collections\" and once in \"children\""
+           Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"collections\" and once in \"children\""
         ),
         test_cml_duplicate_identifiers_children_storage(
            json!({
@@ -5833,7 +5724,7 @@ mod tests {
                     }
                 ]
            }),
-           Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"storage\" and once in \"children\""
+           Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"storage\" and once in \"children\""
         ),
         test_cml_duplicate_identifiers_collection_storage(
            json!({
@@ -5851,7 +5742,7 @@ mod tests {
                     }
                 ]
            }),
-           Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"storage\" and once in \"collections\""
+           Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"storage\" and once in \"collections\""
         ),
         test_cml_duplicate_identifiers_children_runners(
            json!({
@@ -5868,7 +5759,7 @@ mod tests {
                     }
                 ]
            }),
-           Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"runners\" and once in \"children\""
+           Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"runners\" and once in \"children\""
         ),
         test_cml_duplicate_identifiers_environments(
             json!({
@@ -5884,7 +5775,7 @@ mod tests {
                      }
                  ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"environments\" and once in \"children\""
+            Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"environments\" and once in \"children\""
         ),
 
         // deny unknown fields
@@ -5937,7 +5828,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
         ),
         test_offer_source_availability_omitted(
             json!({
@@ -5955,7 +5846,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
         ),
         test_cml_use_invalid_availability(
             json!({
@@ -5966,7 +5857,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"availability: same_as_target\" cannot be used with use declarations"
+            Err(Error::Validate { err, .. }) if &err == "\"availability: same_as_target\" cannot be used with use declarations"
         ),
         test_offer_source_void_availability_required(
             json!({
@@ -5985,7 +5876,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
         ),
         test_offer_source_void_availability_same_as_target(
             json!({
@@ -6004,7 +5895,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
         ),
         test_offer_source_missing_availability_required(
             json!({
@@ -6024,7 +5915,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
         ),
         test_offer_source_missing_availability_same_as_target(
             json!({
@@ -6044,7 +5935,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
         ),
         test_expose_source_availability_unknown(
             json!({
@@ -6069,7 +5960,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
         ),
         test_expose_source_availability_omitted(
             json!({
@@ -6080,7 +5971,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"expose\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "\"expose\" source \"#bar\" does not appear in \"children\" or \"capabilities\""
         ),
         test_expose_source_void_availability_required(
             json!({
@@ -6092,7 +5983,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
         ),
         test_expose_source_void_availability_same_as_target(
             json!({
@@ -6104,7 +5995,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
         ),
         test_expose_source_missing_availability_required(
             json!({
@@ -6117,7 +6008,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
         ),
         test_expose_source_missing_availability_same_as_target(
             json!({
@@ -6130,7 +6021,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
         ),
     }
 
@@ -6149,13 +6040,13 @@ mod tests {
             json!({
                 "use": [ { "service": "foo", "as": "xxx" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" cannot be used with \"service\""
+            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"service\""
         ),
         test_cml_use_invalid_from_with_service(
             json!({
                 "use": [ { "service": "foo", "from": "debug" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
+            Err(Error::Validate { err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
         ),
         test_cml_validate_offer_service(
             json!({
@@ -6253,7 +6144,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Service \"pkg_service\" is offered from self, so it must be declared as a \"service\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Service \"pkg_service\" is offered from self, so it must be declared as a \"service\" in \"capabilities\""
         ),
         test_cml_validate_expose_service(
             json!(
@@ -6311,7 +6202,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Service \"pkg_service\" is exposed from self, so it must be declared as a \"service\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "Service \"pkg_service\" is exposed from self, so it must be declared as a \"service\" in \"capabilities\""
         ),
         test_cml_expose_service_from_collection_ok(
             json!({
@@ -6842,211 +6733,4 @@ mod tests {
             Ok(())
         ),
     }}
-
-    test_validate_cmx! {
-        test_cmx_err_empty_json(
-            json!({}),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "This property is required at /program"
-        ),
-        test_cmx_program(
-            json!({"program": { "binary": "bin/app" }}),
-            Ok(())
-        ),
-        test_cmx_program_no_binary(
-            json!({ "program": {}}),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "OneOf conditions are not met at /program"
-        ),
-        test_cmx_bad_program(
-            json!({"prigram": { "binary": "bin/app" }}),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Property conditions are not met at , This property is required at /program"
-        ),
-        test_cmx_sandbox(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": { "dev": [ "class/camera" ] }
-            }),
-            Ok(())
-        ),
-        test_cmx_facets(
-            json!({
-                "program": { "binary": "bin/app" },
-                "facets": {
-                    "fuchsia.test": {
-                         "system-services": [ "fuchsia.logger.LogSink" ]
-                    }
-                }
-            }),
-            Ok(())
-        ),
-        test_cmx_block_system_data(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "data" ]
-                }
-            }),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Not condition is not met at /sandbox/system/0"
-        ),
-        test_cmx_block_system_data_stem(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "data-should-pass" ]
-                }
-            }),
-            Ok(())
-        ),
-        test_cmx_block_system_data_leading_slash(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "/data" ]
-                }
-            }),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Not condition is not met at /sandbox/system/0"
-        ),
-        test_cmx_block_system_data_subdir(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "data/should-fail" ]
-                }
-            }),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Not condition is not met at /sandbox/system/0"
-        ),
-        test_cmx_block_system_deprecated_data(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "deprecated-data" ]
-                }
-            }),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Not condition is not met at /sandbox/system/0"
-        ),
-        test_cmx_block_system_deprecated_data_stem(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "deprecated-data-should-pass" ]
-                }
-            }),
-            Ok(())
-        ),
-        test_cmx_block_system_deprecated_data_leading_slash(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "/deprecated-data" ]
-                }
-            }),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Not condition is not met at /sandbox/system/0"
-        ),
-        test_cmx_block_system_deprecated_data_subdir(
-            json!({
-                "program": { "binary": "bin/app" },
-                "sandbox": {
-                    "system": [ "deprecated-data/should-fail" ]
-                }
-            }),
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if s == *CMX_SCHEMA.name && &err == "Not condition is not met at /sandbox/system/0"
-        ),
-    }
-
-    // We can't simply using JsonSchema::new here and create a temp file with the schema content
-    // to pass to validate() later because the path in the errors in the expected results below
-    // need to include the whole path, since that's what you get in the Error::Validate.
-    lazy_static! {
-        static ref BLOCK_SHELL_FEATURE_SCHEMA: JsonSchema<'static> = str_to_json_schema(
-            "block_shell_feature.json",
-            include_str!("../test_block_shell_feature.json")
-        );
-    }
-    lazy_static! {
-        static ref BLOCK_DEV_SCHEMA: JsonSchema<'static> =
-            str_to_json_schema("block_dev.json", include_str!("../test_block_dev.json"));
-    }
-
-    fn str_to_json_schema<'a, 'b>(name: &'a str, content: &'a str) -> JsonSchema<'b> {
-        lazy_static! {
-            static ref TEMPDIR: TempDir = TempDir::new().unwrap();
-        }
-
-        let tmp_path = TEMPDIR.path().join(name);
-        File::create(&tmp_path).unwrap().write_all(content.as_bytes()).unwrap();
-        JsonSchema::new_from_file(&tmp_path).unwrap()
-    }
-
-    macro_rules! test_validate_extra_schemas {
-        (
-            $(
-                $test_name:ident($input:expr, $extra_schemas:expr, $($pattern:tt)+),
-            )+
-        ) => {
-            $(
-                #[test]
-                fn $test_name() -> Result<(), Error> {
-                    let tmp_dir = TempDir::new()?;
-                    let tmp_cmx_path = tmp_dir.path().join("test.cmx");
-                    let input = format!("{}", $input);
-                    File::create(&tmp_cmx_path)?.write_all(input.as_bytes())?;
-                    let extra_schemas: &[(&JsonSchema<'_>, Option<String>)] = $extra_schemas;
-                    let extra_schema_paths: Vec<_> = extra_schemas
-                        .iter()
-                        .map(|i| (Path::new(&*i.0.name), i.1.clone()))
-                        .collect();
-                    let result = validate(
-                        &[tmp_cmx_path.as_path()],
-                        &extra_schema_paths,
-                        &FeatureSet::empty(),
-                        ProtocolRequirements { must_offer: &[], must_use: &[] },
-                    );
-                    assert_matches!(result, $($pattern)+);
-                    Ok(())
-                }
-            )+
-        }
-    }
-
-    test_validate_extra_schemas! {
-        test_validate_extra_schemas_empty_json(
-            json!({"program": {"binary": "a"}}),
-            &[(&BLOCK_SHELL_FEATURE_SCHEMA, None)],
-            Ok(())
-        ),
-        test_validate_extra_schemas_empty_features(
-            json!({"sandbox": {"features": []}, "program": {"binary": "a"}}),
-            &[(&BLOCK_SHELL_FEATURE_SCHEMA, None)],
-            Ok(())
-        ),
-        test_validate_extra_schemas_feature_not_present(
-            json!({"sandbox": {"features": ["isolated-persistent-storage"]}, "program": {"binary": "a"}}),
-            &[(&BLOCK_SHELL_FEATURE_SCHEMA, None)],
-            Ok(())
-        ),
-        test_validate_extra_schemas_feature_present(
-            json!({"sandbox": {"features" : ["deprecated-shell"]}, "program": {"binary": "a"}}),
-            &[(&BLOCK_SHELL_FEATURE_SCHEMA, None)],
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if *s == BLOCK_SHELL_FEATURE_SCHEMA.name && &err == "Not condition is not met at /sandbox/features/0"
-        ),
-        test_validate_extra_schemas_block_dev(
-            json!({"dev": ["misc"], "program": {"binary": "a"}}),
-            &[(&BLOCK_DEV_SCHEMA, None)],
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if *s == BLOCK_DEV_SCHEMA.name && &err == "Not condition is not met at /dev"
-        ),
-        test_validate_multiple_extra_schemas_valid(
-            json!({"sandbox": {"features": ["isolated-persistent-storage"]}, "program": {"binary": "a"}}),
-            &[(&BLOCK_SHELL_FEATURE_SCHEMA, None), (&BLOCK_DEV_SCHEMA, None)],
-            Ok(())
-        ),
-        test_validate_multiple_extra_schemas_invalid(
-            json!({"dev": ["misc"], "sandbox": {"features": ["isolated-persistent-storage"]}, "program": {"binary": "a"}}),
-            &[(&BLOCK_SHELL_FEATURE_SCHEMA, None), (&BLOCK_DEV_SCHEMA, None)],
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if *s == BLOCK_DEV_SCHEMA.name && &err == "Not condition is not met at /dev"
-        ),
-        test_validate_extra_error(
-            json!({"dev": ["misc"], "program": {"binary": "a"}}),
-            &[(&BLOCK_DEV_SCHEMA, Some("Extra error".to_string()))],
-            Err(Error::Validate { schema_name: Some(s), err, .. }) if *s == BLOCK_DEV_SCHEMA.name && &err == "Not condition is not met at /dev\nExtra error"
-        ),
-    }
 }

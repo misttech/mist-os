@@ -15,10 +15,7 @@ import("//tools/cmc/build/cmc.gni")
 # Parameters
 #
 #   includes (required)
-#     Contents of component manifest includes to expect in dependant
-#     components.
-#     Includes with .cmx or .cml extensions will only be checked against
-#     component manifests with a matching cmx/cml extension.
+#     Contents of component manifest includes to expect in dependant components.
 #     Type: list of strings
 #
 #   enforce (optional)
@@ -43,30 +40,18 @@ template("expect_includes") {
                              "testonly",
                              "visibility",
                            ])
-    includes_cmx = []
     includes_cml = []
     foreach(include, includes) {
       ext = get_path_info(include, "extension")
-      if (ext == "cmx") {
-        includes_cmx += [ "//" + rebase_path(include, "//") ]
-      } else if (ext == "cml") {
-        includes_cml += [ "//" + rebase_path(include, "//") ]
-      } else {
-        assert(false, "Unexpected include extension for " + include)
-      }
+      assert(ext == "cml", "Unexpected include extension for " + include)
+      includes_cml += [ "//" + rebase_path(include, "//") ]
     }
     metadata = {
       if (!defined(invoker.enforce) || invoker.enforce) {
-        cmc_expected_includes_cmx = includes_cmx
         cmc_expected_includes_cml = includes_cml
       }
 
       # Used by the fuchsia_test_component_manifest() template.
-      test_component_manifest_cmx = [
-        {
-          include = includes_cmx
-        },
-      ]
       test_component_manifest_cml = [
         {
           include = includes_cml
@@ -83,7 +68,7 @@ template("expect_includes") {
 # Parameters
 #
 #   manifest (required)
-#     [file] The path to the cmx file that will be checked.
+#     [file] The path to the cml file that will be checked.
 #
 #   deps
 #   testonly

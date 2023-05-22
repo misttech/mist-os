@@ -75,15 +75,6 @@ pub fn write_depfile(
     Ok(())
 }
 
-/// Read .cmx file and parse into JSON object.
-pub fn read_cmx(file: &Path) -> Result<serde_json::Value, Error> {
-    let mut buffer = String::new();
-    fs::File::open(&file)?.read_to_string(&mut buffer)?;
-    serde_json::from_str(&buffer).map_err(|e| {
-        Error::parse(format!("Couldn't parse file {:?}: {}", file, e), None, Some(file))
-    })
-}
-
 /// Read .cml file and parse into a cml::Document.
 pub fn read_cml(file: &Path) -> Result<cml::Document, Error> {
     let mut buffer = String::new();

@@ -26,7 +26,7 @@ template("cmc") {
   }
 }
 
-# Merges together cmx/cml files
+# Merges together component manifest files
 #
 # Parameters
 #
