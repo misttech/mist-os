@@ -272,10 +272,10 @@ group("fastboot_credentials") {
 }
 flash_image_deps += [ ":fastboot_credentials" ]
 
-fuchsia_bootloader_partitions = bootloader_parts
+# Bootstrap partitions are the lowest-level images and must come first.
+fuchsia_bootloader_partitions = bootstrap_parts + bootloader_parts
 fuchsia_requires_unlock = false
 if (bootstrap_parts != []) {
-  fuchsia_bootloader_partitions += bootstrap_parts
   fuchsia_requires_unlock = true
 }
 
@@ -320,7 +320,9 @@ if (bootstrap_parts != []) {
     {
       name = "bootstrap"
       requires_unlock = true
-      bootloader_partitions = bootloader_parts + bootstrap_parts
+
+      # Bootstrap partitions are the lowest-level images and must come first.
+      bootloader_partitions = bootstrap_parts + bootloader_parts
     },
   ]
 }
@@ -435,10 +437,12 @@ action("flash_script_archive") {
 }
 
 fastboot_manifest_archive_file = "$root_build_dir/flash_archive.json"
-archive_fuchsia_bootloader_partitions = archive_bootloader_parts
+
+# Bootstrap partitions are the lowest-level images and must come first.
+archive_fuchsia_bootloader_partitions =
+    archive_bootstrap_parts + archive_bootloader_parts
 archive_fuchsia_requires_unlock = false
 if (archive_bootstrap_parts != []) {
-  archive_fuchsia_bootloader_partitions += archive_bootstrap_parts
   archive_fuchsia_requires_unlock = true
 }
 archive_flash_manifest_products = [
@@ -468,6 +472,8 @@ if (archive_bootstrap_parts != []) {
     {
       name = "bootstrap"
       requires_unlock = true
+
+      # Bootstrap partitions are the lowest-level images and must come first.
       bootloader_partitions = archive_bootstrap_parts + archive_bootloader_parts
       partitions = []
     },

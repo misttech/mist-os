@@ -165,21 +165,25 @@ impl FlashManifestVersion {
             }
         }
 
-        // Copy the bootloader partitions from the partitions config to the flash manifest. Join them
-        // with the bootloader partitions, because they are always flashed together.
-        let mut all_bootloader_partitions = bootloader_partitions.clone();
+        // Copy the bootstrap partitions from the partitions config to the flash manifest.
+        let mut bootstrap_partitions = vec![];
         for p in &product_bundle.partitions.bootstrap_partitions {
             let condition = if let Some(c) = &p.condition {
                 Some(v3::Condition { variable: c.variable.to_string(), value: c.value.to_string() })
             } else {
                 None
             };
-            all_bootloader_partitions.push(v3::Partition {
+            bootstrap_partitions.push(v3::Partition {
                 name: p.name.to_string(),
                 path: p.image.to_string(),
                 condition,
             });
         }
+        // Append the bootloader partitions, bootstrapping a device means flashing any initial
+        // bootstrap images plus a working bootloader. The bootstrap partitions should always come
+        // first as the lowest-level items so that the higher-level bootloader images can depend on
+        // bootstrapping being done.
+        bootstrap_partitions.extend_from_slice(bootloader_partitions.as_slice());
 
         // Create a map from slot to available images by name (zbi, vbmeta, fvm).
         let mut image_map: ImageMap = BTreeMap::new();
@@ -219,7 +223,7 @@ impl FlashManifestVersion {
         });
         products.push(v3::Product {
             name: "fuchsia".into(),
-            bootloader_partitions: all_bootloader_partitions.clone(),
+            bootloader_partitions: bootstrap_partitions.clone(),
             partitions: get_mapped_partitions(
                 &product_bundle.partitions.partitions,
                 &image_map,
@@ -231,7 +235,7 @@ impl FlashManifestVersion {
         if !product_bundle.partitions.bootstrap_partitions.is_empty() {
             products.push(v3::Product {
                 name: "bootstrap".into(),
-                bootloader_partitions: all_bootloader_partitions.clone(),
+                bootloader_partitions: bootstrap_partitions.clone(),
                 partitions: vec![],
                 oem_files: vec![],
                 requires_unlock: true,
@@ -564,6 +568,8 @@ impl<F: FileResolver + Sync> FlashManifest<F> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use assembly_partitions_config::{BootloaderPartition, BootstrapPartition, PartitionsConfig};
+    use camino::Utf8PathBuf;
     use maplit::btreemap;
     use serde_json::from_str;
     use std::io::BufReader;
@@ -827,5 +833,56 @@ mod test {
                 v3::Partition { name: "part6".into(), path: "vbmeta_r".into(), condition: None },
             ]
         );
+    }
+
+    #[test]
+    fn test_from_product_bundle_bootstrap_partitions() {
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: String::default(),
+            product_version: String::default(),
+            partitions: PartitionsConfig {
+                bootstrap_partitions: vec![BootstrapPartition {
+                    name: "bootstrap_part".into(),
+                    condition: None,
+                    image: Utf8PathBuf::from("bootstrap_image"),
+                }],
+                bootloader_partitions: vec![BootloaderPartition {
+                    name: Some("bootloader_part".into()),
+                    image: Utf8PathBuf::from("bootloader_image"),
+                    partition_type: "".into(),
+                }],
+                partitions: vec![],
+                hardware_revision: String::default(),
+                unlock_credentials: vec![],
+            },
+            sdk_version: String::default(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        let manifest = match FlashManifestVersion::from_product_bundle(&pb).unwrap() {
+            FlashManifestVersion::V3(manifest) => manifest,
+            _ => panic!("Expected a V3 FlashManifest"),
+        };
+        let bootstrap_product = manifest.products.iter().find(|&p| p.name == "bootstrap").unwrap();
+        // The important piece here is that the bootstrap partition comes first.
+        assert_eq!(
+            bootstrap_product.bootloader_partitions,
+            vec![
+                v3::Partition {
+                    name: "bootstrap_part".into(),
+                    path: "bootstrap_image".into(),
+                    condition: None
+                },
+                v3::Partition {
+                    name: "bootloader_part".into(),
+                    path: "bootloader_image".into(),
+                    condition: None
+                },
+            ]
+        )
     }
 }
