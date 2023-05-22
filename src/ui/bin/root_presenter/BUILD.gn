@@ -5,24 +5,14 @@
 import("//build/components.gni")
 import("//build/config.gni")
 
-fuchsia_component("component_v2") {
-  component_name = "root_presenter"
-  manifest = "meta/root_presenter.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("virtual_keyboard_component_v2") {
+fuchsia_component("virtual_keyboard_component") {
   component_name = "virtual_keyboard_manager"
   manifest = "meta/virtual_keyboard_manager.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_package("root_presenter") {
-  deps = [ ":component_v2" ]
-}
-
 fuchsia_package("virtual_keyboard_manager") {
-  deps = [ ":virtual_keyboard_component_v2" ]
+  deps = [ ":virtual_keyboard_component" ]
 }
 
 group("tests") {
@@ -32,7 +22,7 @@ group("tests") {
 }
 
 executable("bin") {
-  output_name = "root_presenter"
+  output_name = "virtual_keyboard_manager"
 
   sources = [ "main.cc" ]
 

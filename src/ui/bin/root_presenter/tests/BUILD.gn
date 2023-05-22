@@ -9,7 +9,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":focus_dispatcher_unittests",
-    ":root_presenter_tests",
+    ":virtual_keyboard_tests",
   ]
 }
 
@@ -17,13 +17,13 @@ fuchsia_unittest_component("focus_dispatcher_unittests") {
   deps = [ ":focus_dispatcher_unittests_bin" ]
 }
 
-fuchsia_unittest_component("root_presenter_unittests") {
-  deps = [ ":root_presenter_unittests_bin" ]
+fuchsia_unittest_component("virtual_keyboard_unittests") {
+  deps = [ ":virtual_keyboard_unittests_bin" ]
 }
 
-fuchsia_test_package("root_presenter_tests") {
+fuchsia_test_package("virtual_keyboard_tests") {
   test_components = [
-    ":root_presenter_unittests",
+    ":virtual_keyboard_unittests",
     ":focus_dispatcher_unittests",
   ]
   test_specs = {
@@ -34,9 +34,9 @@ fuchsia_test_package("root_presenter_tests") {
   }
 }
 
-executable("root_presenter_unittests_bin") {
+executable("virtual_keyboard_unittests_bin") {
   testonly = true
-  output_name = "root_presenter_unittests"
+  output_name = "virtual_keyboard_unittests"
 
   sources = [
     "virtual_keyboard_controller_unittest.cc",

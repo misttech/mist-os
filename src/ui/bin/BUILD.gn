@@ -7,7 +7,6 @@ group("bin") {
   deps = [
     "brightness_manager",
     "clipboard",
-    "root_presenter",
     "root_presenter:virtual_keyboard_manager",
     "scene_manager",
     "text:text_manager",
