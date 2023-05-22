@@ -123,6 +123,12 @@ fuchsia_test_package("socket-benchmarks-with-tracing-pkg") {
     ":socket-benchmarks-with-tracing",
     ":socket-benchmarks-with-fast-udp-tracing",
   ]
+
+  # Prevent this test from being run as a target-side test, since it's kicked
+  # off by the dart wrapper.
+  test_specs = {
+    environments = []
+  }
 }
 
 fuchsia_unittest_package("udp-serde-benchmarks") {
