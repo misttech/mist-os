@@ -127,12 +127,6 @@ internal bytes representing the file without actually undergoing the cost of a
 round-trip IPC message. This feature makes mmap an attractive option for
 clients attempting high-throughput on filesystem interaction.
 
-At the time of writing, on-demand paging is not supported by the
-kernel, and has not been wired into filesystems. As a result, if a client
-writes to a “memory-mapped” region, the filesystem cannot reasonably identify
-which pages have and have not been touched. To cope with this restriction, mmap
-has only been implemented on **read-only filesystems**, such as blobfs.
-
 ### Other Operations acting on paths
 
 In addition to the “open” operation, there are a couple other path-based
