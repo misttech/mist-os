@@ -28,7 +28,7 @@ use std::{
 
 // The selector that identifies the component running the bridge protocol on the
 // device.
-const SL4F_BRIDGE_SELECTOR: &str = "core/sl4f_bridge_server:expose:fuchsia.sl4f.ffx.Sl4fBridge";
+const SL4F_BRIDGE_MONIKER: &str = "/core/sl4f_bridge_server";
 
 // The host-side server port for the SL4F server running in the ffx daemon.
 const SERVER_PORT: u16 = 8034;
@@ -103,7 +103,7 @@ impl FidlProtocol for Sl4fBridge {
         let listener = TcpListener::bind(&addr).await?;
         tracing::info!("host-side SL4F proxy server listening on: {:?}", addr);
 
-        let proxy = cx.open_target_proxy::<Sl4fBridgeMarker>(None, SL4F_BRIDGE_SELECTOR).await?;
+        let proxy = cx.open_target_proxy::<Sl4fBridgeMarker>(None, SL4F_BRIDGE_MONIKER).await?;
         let proxy = Arc::new(proxy);
         let target: Option<String> =
             ffx_config::get(TARGET_DEFAULT_KEY).await.expect("couldn't read default target");

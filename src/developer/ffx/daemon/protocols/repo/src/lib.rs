@@ -50,8 +50,7 @@ use {
 mod metrics;
 mod tunnel;
 
-const REPOSITORY_MANAGER_SELECTOR: &str = "core/pkg-resolver:expose:fuchsia.pkg.RepositoryManager";
-const REWRITE_PROTOCOL_SELECTOR: &str = "core/pkg-resolver:expose:fuchsia.pkg.rewrite.Engine";
+const PKG_RESOLVER_MONIKER: &str = "/core/pkg-resolver";
 
 const TARGET_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
@@ -337,7 +336,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         let (target, proxy) = futures::select! {
             res = cx.open_target_proxy_with_info::<RepositoryManagerMarker>(
                 target_info.target_identifier.clone(),
-                REPOSITORY_MANAGER_SELECTOR,
+                PKG_RESOLVER_MONIKER,
             ).fuse() => {
                 res.map_err(|err| {
                     tracing::error!(
@@ -778,7 +777,7 @@ async fn create_aliases_fidl(
     let rewrite_proxy = match cx
         .open_target_proxy::<RewriteEngineMarker>(
             Some(target_nodename.to_string()),
-            REWRITE_PROTOCOL_SELECTOR,
+            PKG_RESOLVER_MONIKER,
         )
         .await
     {

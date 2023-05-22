@@ -229,7 +229,6 @@ mod test {
     use async_trait::async_trait;
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx as ffx;
-    use fidl_fuchsia_diagnostics as diagnostics;
     use fidl_fuchsia_ffx_test as ffx_test;
 
     #[derive(Default, Clone)]
@@ -244,7 +243,8 @@ mod test {
         async fn open_target_proxy(
             &self,
             _target_identifier: Option<String>,
-            _protocol_selector: diagnostics::Selector,
+            _moniker: &str,
+            _capability_name: &str,
         ) -> Result<fidl::Channel> {
             unimplemented!()
         }
@@ -252,7 +252,8 @@ mod test {
         async fn open_target_proxy_with_info(
             &self,
             _target_identifier: Option<String>,
-            _protocol_selector: diagnostics::Selector,
+            _moniker: &str,
+            _capability_name: &str,
         ) -> Result<(ffx::TargetInfo, fidl::Channel)> {
             unimplemented!()
         }

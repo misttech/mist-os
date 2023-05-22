@@ -6,7 +6,7 @@ use crate::{
     Context, DaemonProtocolProvider, FidlProtocol, NameToStreamHandlerMap, ProtocolRegister,
     StreamHandler,
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_daemon_events::TargetInfo;
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
@@ -16,7 +16,6 @@ use fidl::{
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol as rcs;
-use fidl_fuchsia_diagnostics as diagnostics;
 use futures::{future::LocalBoxFuture, prelude::*};
 use std::{
     cell::{Cell, RefCell},
@@ -187,29 +186,20 @@ impl DaemonProtocolProvider for FakeDaemon {
     async fn open_target_proxy(
         &self,
         target_identifier: Option<String>,
-        protocol_selector: diagnostics::Selector,
+        moniker: &str,
+        protocol_name: &str,
     ) -> Result<fidl::Channel> {
         let (_, res) =
-            self.open_target_proxy_with_info(target_identifier, protocol_selector).await?;
+            self.open_target_proxy_with_info(target_identifier, moniker, protocol_name).await?;
         Ok(res)
     }
 
     async fn open_target_proxy_with_info(
         &self,
         target_identifier: Option<String>,
-        protocol_selector: diagnostics::Selector,
+        _moniker: &str,
+        protocol_name: &str,
     ) -> Result<(ffx::TargetInfo, fidl::Channel)> {
-        // TODO(awdavies): This is likely very fragile. Explore more edge cases
-        // to make sure tests don't panic unnecessarily.
-        let protocol_name: String =
-            match protocol_selector.tree_selector.ok_or(anyhow!("expected tree selector"))? {
-                diagnostics::TreeSelector::PropertySelector(p) => match p.target_properties {
-                    diagnostics::StringSelector::StringPattern(s) => s,
-                    diagnostics::StringSelector::ExactMatch(s) => s,
-                    _ => bail!("unknown target properties"),
-                },
-                _ => bail!("invalid selector"),
-            };
         // This could cause some issues if we're building tests that expect targets that
         // are or aren't supposed to be connected. That would require using the
         // `get_connected` function here. For the time being there seems to be the
@@ -217,7 +207,7 @@ impl DaemonProtocolProvider for FakeDaemon {
         // a test.
         Ok((
             self.get_target_info(target_identifier).await?,
-            self.open_protocol(protocol_name).await?,
+            self.open_protocol(protocol_name.to_string()).await?,
         ))
     }
 

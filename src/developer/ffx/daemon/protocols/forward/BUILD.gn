@@ -29,8 +29,6 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
 
-    test_deps = [ "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust" ]
-
     sources = [ "src/lib.rs" ]
   }
 }

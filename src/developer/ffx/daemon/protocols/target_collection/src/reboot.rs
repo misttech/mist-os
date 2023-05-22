@@ -12,14 +12,17 @@ use ffx_daemon_target::{
     zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
 };
 use ffx_ssh::ssh::get_ssh_key_paths;
-use fidl::{endpoints::ServerEnd, Error};
+use fidl::{
+    endpoints::{ProtocolMarker, ServerEnd},
+    Error,
+};
 use fidl_fuchsia_developer_ffx::{
     self as ffx, RebootListenerRequest, TargetRebootError, TargetRebootResponder, TargetRebootState,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
+use fidl_fuchsia_io::OpenFlags;
 use futures::{try_join, TryFutureExt, TryStreamExt};
-use selectors::{self, VerboseError};
 use std::net::IpAddr;
 use std::process::Command;
 use std::rc::Rc;
@@ -31,8 +34,7 @@ use tasks::TaskManager;
 /// when it is in product mode
 const USE_SSH_FOR_REBOOT_FROM_PRODUCT: &'static str = "product.reboot.use_dm";
 
-const ADMIN_SELECTOR: &'static str =
-    "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";
+const ADMIN_MONIKER: &'static str = "/bootstrap/power_manager";
 
 pub(crate) struct RebootController {
     target: Rc<Target>,
@@ -74,10 +76,14 @@ impl RebootController {
     async fn init_admin_proxy(&self) -> Result<AdminProxy> {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
-        let selector = selectors::parse_selector::<VerboseError>(ADMIN_SELECTOR)?;
         self.get_remote_proxy()
             .await?
-            .connect(&selector, server_end.into_channel())
+            .connect_capability(
+                ADMIN_MONIKER,
+                AdminMarker::DEBUG_NAME,
+                server_end.into_channel(),
+                OpenFlags::RIGHT_READABLE,
+            )
             .await?
             .map(|_| proxy)
             .map_err(|_| anyhow!("could not get admin proxy"))
@@ -361,9 +367,7 @@ mod tests {
     use fidl_fuchsia_developer_ffx::{
         FastbootMarker, FastbootProxy, FastbootRequest, TargetMarker, TargetProxy, TargetRequest,
     };
-    use fidl_fuchsia_developer_remotecontrol::{
-        RemoteControlMarker, RemoteControlRequest, ServiceMatch,
-    };
+    use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
     use fidl_fuchsia_hardware_power_statecontrol::{AdminRequest, AdminRequestStream};
     use std::time::Instant;
 
@@ -416,15 +420,9 @@ mod tests {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    RemoteControlRequest::Connect { selector: _, service_chan, responder } => {
-                        setup_admin(service_chan).unwrap();
-                        responder
-                            .send(&mut Ok(ServiceMatch {
-                                moniker: vec![],
-                                subdir: String::default(),
-                                service: String::default(),
-                            }))
-                            .unwrap();
+                    RemoteControlRequest::ConnectCapability { server_chan, responder, .. } => {
+                        setup_admin(server_chan).unwrap();
+                        responder.send(Ok(())).unwrap();
                     }
                     _ => assert!(false),
                 }

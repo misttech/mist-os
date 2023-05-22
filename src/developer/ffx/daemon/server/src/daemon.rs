@@ -27,6 +27,7 @@ use fidl_fuchsia_developer_ffx::{
     RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet::{Peer, ServiceProviderRequest, ServiceProviderRequestStream};
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fuchsia_async::{Task, TimeoutExt, Timer};
@@ -191,10 +192,11 @@ impl DaemonProtocolProvider for Daemon {
     async fn open_target_proxy(
         &self,
         target_identifier: Option<String>,
-        protocol_selector: fidl_fuchsia_diagnostics::Selector,
+        moniker: &str,
+        capability_name: &str,
     ) -> Result<fidl::Channel> {
         let (_, channel) =
-            self.open_target_proxy_with_info(target_identifier, protocol_selector).await?;
+            self.open_target_proxy_with_info(target_identifier, moniker, capability_name).await?;
         Ok(channel)
     }
 
@@ -215,7 +217,8 @@ impl DaemonProtocolProvider for Daemon {
     async fn open_target_proxy_with_info(
         &self,
         target_identifier: Option<String>,
-        protocol_selector: fidl_fuchsia_diagnostics::Selector,
+        moniker: &str,
+        capability_name: &str,
     ) -> Result<(ffx::TargetInfo, fidl::Channel)> {
         let target = self.get_rcs_ready_target(target_identifier).await?;
         let rcs = target
@@ -226,7 +229,7 @@ impl DaemonProtocolProvider for Daemon {
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
-            .connect(&protocol_selector, server)
+            .connect_capability(moniker, capability_name, server, OpenFlags::RIGHT_READABLE)
             .await
             .context("FIDL connection")?
             .map_err(|e| anyhow!("{:#?}", e))

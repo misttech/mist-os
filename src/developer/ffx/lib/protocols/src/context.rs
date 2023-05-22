@@ -10,8 +10,6 @@ use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_diagnostics as diagnostics;
-use selectors::{self, VerboseError};
 use std::rc::Rc;
 
 #[async_trait(?Send)]
@@ -22,7 +20,8 @@ pub trait DaemonProtocolProvider {
     async fn open_target_proxy(
         &self,
         target_identifier: Option<String>,
-        protocol_selector: diagnostics::Selector,
+        moniker: &str,
+        capability_name: &str,
     ) -> Result<fidl::Channel>;
 
     async fn open_remote_control(
@@ -36,7 +35,8 @@ pub trait DaemonProtocolProvider {
     async fn open_target_proxy_with_info(
         &self,
         target_identifier: Option<String>,
-        protocol_selector: diagnostics::Selector,
+        moniker: &str,
+        capability_name: &str,
     ) -> Result<(ffx::TargetInfo, fidl::Channel)>;
 
     async fn get_target_info(&self, target_identifier: Option<String>) -> Result<ffx::TargetInfo>;
@@ -74,29 +74,26 @@ impl Context {
     pub async fn open_target_proxy<P>(
         &self,
         target_identifier: Option<String>,
-        selector: &'static str,
+        moniker: &'static str,
     ) -> Result<P::Proxy>
     where
         P: fidl::endpoints::DiscoverableProtocolMarker,
     {
-        let (_, proxy) = self.open_target_proxy_with_info::<P>(target_identifier, selector).await?;
+        let (_, proxy) = self.open_target_proxy_with_info::<P>(target_identifier, moniker).await?;
         Ok(proxy)
     }
 
     pub async fn open_target_proxy_with_info<P>(
         &self,
         target_identifier: Option<String>,
-        selector: &'static str,
+        moniker: &'static str,
     ) -> Result<(ffx::TargetInfo, P::Proxy)>
     where
         P: fidl::endpoints::DiscoverableProtocolMarker,
     {
         let (info, channel) = self
             .inner
-            .open_target_proxy_with_info(
-                target_identifier,
-                selectors::parse_selector::<VerboseError>(selector)?,
-            )
+            .open_target_proxy_with_info(target_identifier, moniker, P::PROTOCOL_NAME)
             .await?;
         let proxy = P::Proxy::from_channel(
             fidl::AsyncChannel::from_channel(channel).context("making async channel")?,

@@ -317,7 +317,6 @@ impl FidlProtocol for Forward {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_diagnostics as diagnostics;
     use protocols::testing::FakeDaemonBuilder;
 
     #[derive(Default, Clone)]
@@ -359,7 +358,8 @@ mod tests {
         async fn open_target_proxy(
             &self,
             _target_identifier: Option<String>,
-            _protocol_selector: diagnostics::Selector,
+            _moniker: &str,
+            _capability_name: &str,
         ) -> Result<fidl::Channel> {
             unimplemented!()
         }
@@ -367,7 +367,8 @@ mod tests {
         async fn open_target_proxy_with_info(
             &self,
             _target_identifier: Option<String>,
-            _protocol_selector: diagnostics::Selector,
+            _moniker: &str,
+            _capability_name: &str,
         ) -> Result<(ffx::TargetInfo, fidl::Channel)> {
             unimplemented!()
         }
