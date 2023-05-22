@@ -732,9 +732,8 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
         ZX_ASSERT(ep->req_offset == ep->req_length);
         HandleEp0Status(false);
       } else {
-        // Timeout was due to lost ACK.
-        ep0_state_ = Ep0State::IDLE;
-        StartEp0();
+        // Timeout was due to lost ACK. Prepare the core to receive STATUS data.
+        HandleEp0Status(false);
       }
       break;
     }
