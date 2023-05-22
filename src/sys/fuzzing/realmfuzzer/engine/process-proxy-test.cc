@@ -39,7 +39,7 @@ std::unique_ptr<ProcessProxy> ProcessProxyTest::CreateAndConnectProxy(zx::proces
   zx_info_handle_basic_t info;
   auto status = process.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   FX_CHECK(status == ZX_OK) << zx_status_get_string(status);
-  InstrumentedProcessV2 instrumented = {
+  InstrumentedProcess instrumented = {
       .eventpair = std::move(eventpair),
       .process = std::move(process),
   };

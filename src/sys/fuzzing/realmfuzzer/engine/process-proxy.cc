@@ -33,7 +33,7 @@ ProcessProxy::~ProcessProxy() {
 
 void ProcessProxy::Configure(const OptionsPtr& options) { options_ = options; }
 
-zx_status_t ProcessProxy::Connect(uint64_t target_id, InstrumentedProcessV2& instrumented) {
+zx_status_t ProcessProxy::Connect(uint64_t target_id, InstrumentedProcess& instrumented) {
   if (target_id_ != kInvalidTargetId) {
     FX_LOGS(WARNING) << "Failed to connect process proxy: already connected.";
     return ZX_ERR_BAD_STATE;

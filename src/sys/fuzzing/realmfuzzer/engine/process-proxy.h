@@ -29,7 +29,7 @@
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::InstrumentedProcessV2;
+using ::fuchsia::fuzzer::InstrumentedProcess;
 using ::fuchsia::fuzzer::ProcessStats;
 
 // This class presents an interface to the engine for a instrumented target process. It tracks the
@@ -46,7 +46,7 @@ class ProcessProxy final {
   void Configure(const OptionsPtr& options);
 
   // ControllerDataCollector-related methods.
-  __WARN_UNUSED_RESULT zx_status_t Connect(uint64_t target_id, InstrumentedProcessV2& instrumented);
+  __WARN_UNUSED_RESULT zx_status_t Connect(uint64_t target_id, InstrumentedProcess& instrumented);
   __WARN_UNUSED_RESULT zx_status_t AddInline8bitCounters(zx::vmo& inline_8bit_counters);
 
   // Signals the associated process that a fuzzing run is starting and if it should |detect_leaks|.

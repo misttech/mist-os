@@ -21,22 +21,22 @@
 
 namespace fuzzing {
 
-using fuchsia::fuzzer::CoverageDataCollectorV2;
-using fuchsia::fuzzer::CoverageDataProviderV2;
-using fuchsia::fuzzer::CoverageDataV2;
+using fuchsia::fuzzer::CoverageData;
+using fuchsia::fuzzer::CoverageDataCollector;
+using fuchsia::fuzzer::CoverageDataProvider;
 
 // This class represents a simplified fuzz coverage component. Unlike the real version (located at
 // src/sys/test_manager/fuzz_coverage), this version for testing accepts only a single collector
 // connection and a single provider connection, and does not use event streams.
-class FakeCoverage final : public CoverageDataCollectorV2, CoverageDataProviderV2 {
+class FakeCoverage final : public CoverageDataCollector, CoverageDataProvider {
  public:
   explicit FakeCoverage(ExecutorPtr executor);
   ~FakeCoverage() = default;
 
   OptionsPtr options() const { return options_; }
 
-  fidl::InterfaceRequestHandler<CoverageDataCollectorV2> GetCollectorHandler();
-  fidl::InterfaceRequestHandler<CoverageDataProviderV2> GetProviderHandler();
+  fidl::InterfaceRequestHandler<CoverageDataCollector> GetCollectorHandler();
+  fidl::InterfaceRequestHandler<CoverageDataProvider> GetProviderHandler();
 
   // CoverageDataCollector FIDL methods.
   void Initialize(zx::eventpair eventpair, zx::process process,
@@ -50,17 +50,17 @@ class FakeCoverage final : public CoverageDataCollectorV2, CoverageDataProviderV
 
   // Additional methods that allow direct access to the underlying `AsyncDeque` for more flexible
   // testing.
-  void Send(CoverageDataV2 coverage_data);
-  Result<CoverageDataV2> TryReceive();
-  Promise<CoverageDataV2> Receive();
+  void Send(CoverageData coverage_data);
+  Result<CoverageData> TryReceive();
+  Promise<CoverageData> Receive();
 
  private:
-  fidl::Binding<CoverageDataCollectorV2> collector_;
-  fidl::Binding<CoverageDataProviderV2> provider_;
+  fidl::Binding<CoverageDataCollector> collector_;
+  fidl::Binding<CoverageDataProvider> provider_;
   ExecutorPtr executor_;
   OptionsPtr options_;
-  AsyncSender<CoverageDataV2> sender_;
-  AsyncReceiver<CoverageDataV2> receiver_;
+  AsyncSender<CoverageData> sender_;
+  AsyncReceiver<CoverageData> receiver_;
   bool first_ = false;
   zx_koid_t target_id_ = ZX_KOID_INVALID;
   Scope scope_;

@@ -17,9 +17,9 @@
 
 namespace fuzzing {
 
-using fuchsia::fuzzer::CoverageDataProviderV2;
-using fuchsia::fuzzer::CoverageDataProviderV2Ptr;
-using fuchsia::fuzzer::CoverageDataV2;
+using fuchsia::fuzzer::CoverageData;
+using fuchsia::fuzzer::CoverageDataProvider;
+using fuchsia::fuzzer::CoverageDataProviderPtr;
 
 // This class encapsulates a client of |fuchsia.fuzzer.CoverageDataProvider|.
 class CoverageDataProviderClient final {
@@ -30,16 +30,16 @@ class CoverageDataProviderClient final {
   void Configure(const OptionsPtr& options);
 
   // FIDL methods.
-  using RequestHandler = fidl::InterfaceRequestHandler<CoverageDataProviderV2>;
+  using RequestHandler = fidl::InterfaceRequestHandler<CoverageDataProvider>;
   void Bind(RequestHandler handler);
-  Promise<CoverageDataV2> GetCoverageData();
+  Promise<CoverageData> GetCoverageData();
 
  private:
   ExecutorPtr executor_;
   OptionsPtr options_;
-  CoverageDataProviderV2Ptr provider_;
-  AsyncSender<CoverageDataV2> sender_;
-  AsyncReceiver<CoverageDataV2> receiver_;
+  CoverageDataProviderPtr provider_;
+  AsyncSender<CoverageData> sender_;
+  AsyncReceiver<CoverageData> receiver_;
   Scope scope_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(CoverageDataProviderClient);

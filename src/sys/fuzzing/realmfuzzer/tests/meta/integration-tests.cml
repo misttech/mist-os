@@ -33,7 +33,7 @@
             from: "#fuzzer",
         },
         {
-            protocol: "fuchsia.fuzzer.CoverageDataProviderV2",
+            protocol: "fuchsia.fuzzer.CoverageDataProvider",
             from: "#coverage",
         },
         {
@@ -43,7 +43,7 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.fuzzer.CoverageDataCollectorV2",
+            protocol: "fuchsia.fuzzer.CoverageDataCollector",
             from: "#coverage",
             to: "#fuzzer",
         },

@@ -11,7 +11,7 @@ ZxResult<RunnerPtr> MakeRealmFuzzerRunnerPtr(ComponentContext& context) {
   auto runner = RealmFuzzerRunner::MakePtr(context.executor());
   auto runner_impl = std::static_pointer_cast<RealmFuzzerRunner>(runner);
   runner_impl->SetAdapterHandler(context.MakeRequestHandler<TargetAdapter>());
-  runner_impl->SetProviderHandler(context.MakeRequestHandler<CoverageDataProviderV2>());
+  runner_impl->SetProviderHandler(context.MakeRequestHandler<CoverageDataProvider>());
   return fpromise::ok(std::move(runner));
 }
 

@@ -30,7 +30,7 @@
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::CoverageDataProviderV2Ptr;
+using ::fuchsia::fuzzer::CoverageDataProviderPtr;
 using ::fuchsia::fuzzer::Data;
 using ::fuchsia::fuzzer::Options;
 
@@ -69,7 +69,7 @@ class ProcessTest : public AsyncTest {
   // Tests typically need to call |WatchForProcess| and |WatchForModule| for this promise to
   // complete.
   ZxPromise<> Connect(Process* process) {
-    fidl::InterfaceHandle<CoverageDataCollectorV2> collector;
+    fidl::InterfaceHandle<CoverageDataCollector> collector;
     auto collector_handler = coverage_->GetCollectorHandler();
     collector_handler(collector.NewRequest());
     auto eventpair = std::make_shared<AsyncEventPair>(executor());
@@ -121,7 +121,7 @@ class ProcessTest : public AsyncTest {
   // with an error if the next coverage event is for an LLVM module.
   Promise<> WatchForProcess() {
     return coverage_->Receive()
-        .and_then([this](CoverageDataV2& coverage) -> Result<> {
+        .and_then([this](CoverageData& coverage) -> Result<> {
           if (!coverage.data.is_instrumented()) {
             return fpromise::error();
           }
@@ -137,7 +137,7 @@ class ProcessTest : public AsyncTest {
   // with an error if the next coverage event is for an instrumented process.
   Promise<> WatchForModule() {
     return coverage_->Receive()
-        .and_then([this](CoverageDataV2& coverage) -> Result<> {
+        .and_then([this](CoverageData& coverage) -> Result<> {
           if (coverage.target_id != target_id_) {
             FX_LOGS(WARNING) << "Target ID does not match: " << coverage.target_id << " vs. "
                              << target_id_;
@@ -171,7 +171,7 @@ class ProcessTest : public AsyncTest {
   std::unique_ptr<FakeCoverage> coverage_;
   std::shared_ptr<AsyncEventPair> eventpair_;
   ModulePoolPtr pool_;
-  CoverageDataProviderV2Ptr provider_;
+  CoverageDataProviderPtr provider_;
   uint64_t target_id_ = kInvalidTargetId;
   std::unordered_map<std::string, FakeRealmFuzzerModule> modules_;
   std::vector<SharedMemory> added_;

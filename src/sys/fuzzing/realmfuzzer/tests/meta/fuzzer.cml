@@ -12,7 +12,7 @@
     },
     use: [
         {
-            protocol: "fuchsia.fuzzer.CoverageDataCollectorV2",
+            protocol: "fuchsia.fuzzer.CoverageDataCollector",
 
             // TODO(103610): from: "debug",
         },

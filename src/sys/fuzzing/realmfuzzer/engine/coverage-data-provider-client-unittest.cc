@@ -23,7 +23,7 @@
 namespace fuzzing {
 
 using fuchsia::fuzzer::Data;
-using fuchsia::fuzzer::InstrumentedProcessV2;
+using fuchsia::fuzzer::InstrumentedProcess;
 
 // Test fixtures.
 
@@ -42,7 +42,7 @@ class CoverageDataProviderClientTest : public AsyncTest {
 
   OptionsPtr GetOptions() const { return coverage_->options(); }
 
-  void Pend(CoverageDataV2 coverage_data) { coverage_->Send(std::move(coverage_data)); }
+  void Pend(CoverageData coverage_data) { coverage_->Send(std::move(coverage_data)); }
 
  private:
   std::unique_ptr<FakeCoverage> coverage_;
@@ -63,7 +63,7 @@ TEST_F(CoverageDataProviderClientTest, SetOptions) {
 
 TEST_F(CoverageDataProviderClientTest, GetProcess) {
   auto provider_client = GetProviderClient();
-  CoverageDataV2 coverage;
+  CoverageData coverage;
   FUZZING_EXPECT_OK(provider_client->GetCoverageData(), &coverage);
 
   auto self = zx::process::self();
@@ -74,9 +74,9 @@ TEST_F(CoverageDataProviderClientTest, GetProcess) {
   zx::process process;
   EXPECT_EQ(self->duplicate(ZX_RIGHT_SAME_RIGHTS, &process), ZX_OK);
   AsyncEventPair eventpair(executor());
-  Pend(CoverageDataV2{
+  Pend(CoverageData{
       .target_id = zx_koid_t(1),
-      .data = Data::WithInstrumented(InstrumentedProcessV2{
+      .data = Data::WithInstrumented(InstrumentedProcess{
           .eventpair = eventpair.Create(),
           .process = std::move(process),
       }),
@@ -95,7 +95,7 @@ TEST_F(CoverageDataProviderClientTest, GetProcess) {
 
 TEST_F(CoverageDataProviderClientTest, GetModule) {
   auto provider_client = GetProviderClient();
-  CoverageDataV2 coverage;
+  CoverageData coverage;
 
   zx::vmo counters;
   char name[ZX_MAX_NAME_LEN];
@@ -103,14 +103,14 @@ TEST_F(CoverageDataProviderClientTest, GetModule) {
   // Send multiple, and verify they arrive in order.
   FakeRealmFuzzerModule module1(1);
   EXPECT_EQ(module1.Share(&counters), ZX_OK);
-  Pend(CoverageDataV2{
+  Pend(CoverageData{
       .target_id = zx_koid_t(1),
       .data = Data::WithInline8bitCounters(std::move(counters)),
   });
 
   FakeRealmFuzzerModule module2(1);
   EXPECT_EQ(module2.Share(&counters), ZX_OK);
-  Pend(CoverageDataV2{
+  Pend(CoverageData{
       .target_id = zx_koid_t(2),
       .data = Data::WithInline8bitCounters(std::move(counters)),
   });
@@ -137,7 +137,7 @@ TEST_F(CoverageDataProviderClientTest, GetModule) {
     auto dropped = provider_client->GetCoverageData();
     RunOnce();
     EXPECT_EQ(module3.Share(&counters), ZX_OK);
-    Pend(CoverageDataV2{
+    Pend(CoverageData{
         .target_id = zx_koid_t(3),
         .data = Data::WithInline8bitCounters(std::move(counters)),
     });

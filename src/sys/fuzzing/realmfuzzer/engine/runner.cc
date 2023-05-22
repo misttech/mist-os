@@ -438,33 +438,33 @@ void RealmFuzzerRunner::StartWorkflow(Scope& scope) {
   pulse_start_ = start_ + zx::sec(2);
   stopped_ = false;
   // Handle coverage data produced during the workflow.
-  auto task = fpromise::make_promise([this, fut = Future<CoverageDataV2>()](
-                                         Context& context) mutable -> Result<> {
-                while (true) {
-                  if (!fut) {
-                    fut = provider_.GetCoverageData();
-                  }
-                  if (!fut(context)) {
-                    return fpromise::pending();
-                  }
-                  if (fut.is_error()) {
-                    return fpromise::error();
-                  }
-                  auto coverage = fut.take_value();
-                  switch (coverage.data.Which()) {
-                    case Data::Tag::kInstrumented:
-                      ConnectProcess(std::move(coverage));
-                      break;
-                    case Data::Tag::kInline8bitCounters:
-                      AddInline8bitCounters(std::move(coverage));
-                      break;
-                    default:
-                      FX_LOGS(WARNING)
-                          << "Unrecgonized coverage data type: " << coverage.data.Which();
-                      return fpromise::error();
-                  }
-                }
-              }).wrap_with(scope);
+  auto task =
+      fpromise::make_promise([this,
+                              fut = Future<CoverageData>()](Context& context) mutable -> Result<> {
+        while (true) {
+          if (!fut) {
+            fut = provider_.GetCoverageData();
+          }
+          if (!fut(context)) {
+            return fpromise::pending();
+          }
+          if (fut.is_error()) {
+            return fpromise::error();
+          }
+          auto coverage = fut.take_value();
+          switch (coverage.data.Which()) {
+            case Data::Tag::kInstrumented:
+              ConnectProcess(std::move(coverage));
+              break;
+            case Data::Tag::kInline8bitCounters:
+              AddInline8bitCounters(std::move(coverage));
+              break;
+            default:
+              FX_LOGS(WARNING) << "Unrecgonized coverage data type: " << coverage.data.Which();
+              return fpromise::error();
+          }
+        }
+      }).wrap_with(scope);
   executor()->schedule_task(std::move(task));
   UpdateMonitors(UpdateReason::INIT);
 }
@@ -879,7 +879,7 @@ Promise<bool, FuzzResult> RealmFuzzerRunner::RunOne(const Input& input) {
       .or_else([this](const uint64_t& target_id) { return GetFuzzResult(target_id); });
 }
 
-void RealmFuzzerRunner::ConnectProcess(CoverageDataV2 coverage) {
+void RealmFuzzerRunner::ConnectProcess(CoverageData coverage) {
   auto process_proxy = std::make_unique<ProcessProxy>(executor(), pool_);
   process_proxy->Configure(options());
   if (auto status = process_proxy->Connect(coverage.target_id, coverage.data.instrumented());
@@ -894,7 +894,7 @@ void RealmFuzzerRunner::ConnectProcess(CoverageDataV2 coverage) {
   suspended_.resume_task();
 }
 
-void RealmFuzzerRunner::AddInline8bitCounters(CoverageDataV2 coverage) {
+void RealmFuzzerRunner::AddInline8bitCounters(CoverageData coverage) {
   auto iter = process_proxies_.find(coverage.target_id);
   if (iter == process_proxies_.end()) {
     FX_LOGS(WARNING) << "Failed to add module: no such target_id: " << coverage.target_id;

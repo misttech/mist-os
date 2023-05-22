@@ -15,8 +15,8 @@ mod aggregator;
 mod options;
 
 enum IncomingService {
-    CoverageDataCollector(fuzz::CoverageDataCollectorV2RequestStream),
-    CoverageDataProvider(fuzz::CoverageDataProviderV2RequestStream),
+    CoverageDataCollector(fuzz::CoverageDataCollectorRequestStream),
+    CoverageDataProvider(fuzz::CoverageDataProviderRequestStream),
 }
 
 #[fuchsia::main(logging = true)]

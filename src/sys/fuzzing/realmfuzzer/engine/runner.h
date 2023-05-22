@@ -28,7 +28,7 @@
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::CoverageDataV2;
+using ::fuchsia::fuzzer::CoverageData;
 
 // The concrete implementation of |Runner| for the realmfuzzer engine.
 class RealmFuzzerRunner final : public Runner {
@@ -167,11 +167,11 @@ class RealmFuzzerRunner final : public Runner {
 
   // Adds a new process proxy for the process represented by the given `coverage` data. The coverage
   // data must be of the `instrumented` variant.
-  void ConnectProcess(CoverageDataV2 instrumented);
+  void ConnectProcess(CoverageData instrumented);
 
   // Adds the given sanitizer `coverage` data. The coverage data must be of the
   // `inline_8bit_counters` variant.
-  void AddInline8bitCounters(CoverageDataV2 inline_8bit_counters);
+  void AddInline8bitCounters(CoverageData inline_8bit_counters);
 
   // Returns a promise to determine the cause of an error in the target process identified by the
   // given |target_id|. In the case of multiple errors, only the first error is reported. However,

@@ -10,7 +10,6 @@ fidl("fuchsia.fuzzer") {
     "controller.fidl",
     "corpus.fidl",
     "coverage.fidl",
-    "coverage_v2.fidl",
     "manager.fidl",
     "options.fidl",
     "overview.fidl",

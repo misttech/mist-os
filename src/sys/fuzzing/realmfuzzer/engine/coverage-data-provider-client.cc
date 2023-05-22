@@ -34,11 +34,11 @@ void CoverageDataProviderClient::Bind(RequestHandler handler) {
   provider_->SetOptions(CopyOptions(*options_));
   // |WatchCoverageData| futures may be abandoned. To prevent coverage data being dropped, a
   // separate future, scoped to this object, should handle the FIDL requests and responses.
-  auto task = fpromise::make_promise([this, fut = Future<std::vector<CoverageDataV2>>()](
+  auto task = fpromise::make_promise([this, fut = Future<std::vector<CoverageData>>()](
                                          Context& context) mutable -> Result<> {
                 while (true) {
                   if (!fut) {
-                    Bridge<std::vector<CoverageDataV2>> bridge;
+                    Bridge<std::vector<CoverageData>> bridge;
                     provider_->WatchCoverageData(bridge.completer.bind());
                     fut = bridge.consumer.promise_or(fpromise::error());
                   }
@@ -60,8 +60,6 @@ void CoverageDataProviderClient::Bind(RequestHandler handler) {
   executor_->schedule_task(std::move(task));
 }
 
-Promise<CoverageDataV2> CoverageDataProviderClient::GetCoverageData() {
-  return receiver_.Receive();
-}
+Promise<CoverageData> CoverageDataProviderClient::GetCoverageData() { return receiver_.Receive(); }
 
 }  // namespace fuzzing

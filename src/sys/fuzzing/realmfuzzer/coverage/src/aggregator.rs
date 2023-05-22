@@ -31,17 +31,17 @@ use {
 ///
 pub struct Aggregator {
     options: AsyncOptions,
-    sender: mpsc::UnboundedSender<fuzz::CoverageDataV2>,
-    receiver: Mutex<mpsc::UnboundedReceiver<fuzz::CoverageDataV2>>,
+    sender: mpsc::UnboundedSender<fuzz::CoverageData>,
+    receiver: Mutex<mpsc::UnboundedReceiver<fuzz::CoverageData>>,
     cancelation: RefCell<oneshot::Sender<()>>,
-    cached: RefCell<HashMap<u64, Vec<fuzz::CoverageDataV2>>>,
+    cached: RefCell<HashMap<u64, Vec<fuzz::CoverageData>>>,
 }
 
 impl Aggregator {
     /// Creates an `Aggregator` suitable to be passed to [`collect_data`] and [`provide_data`].
     pub fn new() -> Self {
         let options = AsyncOptions::new();
-        let (sender, receiver) = mpsc::unbounded::<fuzz::CoverageDataV2>();
+        let (sender, receiver) = mpsc::unbounded::<fuzz::CoverageData>();
         let receiver = Mutex::new(receiver);
         let (cancelation, _) = oneshot::channel::<()>();
         let cancelation = RefCell::new(cancelation);
@@ -61,9 +61,9 @@ impl Aggregator {
     ) -> Result<(u64, fuzz::Options)> {
         let koid = process.get_koid().context("failed to get koid for instrumented process")?;
         let target_id = koid.raw_koid();
-        let instrumented = fuzz::InstrumentedProcessV2 { eventpair, process };
+        let instrumented = fuzz::InstrumentedProcess { eventpair, process };
         let coverage_data =
-            fuzz::CoverageDataV2 { target_id, data: fuzz::Data::Instrumented(instrumented) };
+            fuzz::CoverageData { target_id, data: fuzz::Data::Instrumented(instrumented) };
         let coverage_data_dup =
             duplicate_data(&coverage_data).context("failed to cache coverage data")?;
         self.cached.borrow_mut().entry(target_id).or_insert(Vec::new()).push(coverage_data_dup);
@@ -81,7 +81,7 @@ impl Aggregator {
         inline_8bit_counters: zx::Vmo,
         target_id: u64,
     ) -> Result<()> {
-        let coverage_data = fuzz::CoverageDataV2 {
+        let coverage_data = fuzz::CoverageData {
             target_id,
             data: fuzz::Data::Inline8bitCounters(inline_8bit_counters),
         };
@@ -115,7 +115,7 @@ impl Aggregator {
     async fn watch_coverage_data(
         &self,
         first_rc: &RefCell<bool>,
-    ) -> Result<Vec<fuzz::CoverageDataV2>> {
+    ) -> Result<Vec<fuzz::CoverageData>> {
         // Typically, only one client at a time is expected. If a second call is made concurrently
         // with another, it should take over from the first. It achieves this by replacing the
         // cancelation channel before trying to acquire the lock on the receiver:
@@ -186,7 +186,7 @@ impl Aggregator {
 ///
 /// The returned coverage data will contain duplicates of the handles in the original.
 ///
-fn duplicate_data(coverage: &fuzz::CoverageDataV2) -> Result<fuzz::CoverageDataV2> {
+fn duplicate_data(coverage: &fuzz::CoverageData) -> Result<fuzz::CoverageData> {
     let target_id = coverage.target_id;
     match &coverage.data {
         fuzz::Data::Instrumented(instrumented) => {
@@ -198,14 +198,14 @@ fn duplicate_data(coverage: &fuzz::CoverageDataV2) -> Result<fuzz::CoverageDataV
                 .process
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .context("failed to duplicate process")?;
-            let instrumented = fuzz::InstrumentedProcessV2 { eventpair, process };
-            Ok(fuzz::CoverageDataV2 { target_id, data: fuzz::Data::Instrumented(instrumented) })
+            let instrumented = fuzz::InstrumentedProcess { eventpair, process };
+            Ok(fuzz::CoverageData { target_id, data: fuzz::Data::Instrumented(instrumented) })
         }
         fuzz::Data::Inline8bitCounters(inline_8bit_counters) => {
             let inline_8bit_counters = inline_8bit_counters
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .context("failed to duplicate VMO")?;
-            Ok(fuzz::CoverageDataV2 {
+            Ok(fuzz::CoverageData {
                 target_id,
                 data: fuzz::Data::Inline8bitCounters(inline_8bit_counters),
             })
@@ -220,7 +220,7 @@ fn duplicate_data(coverage: &fuzz::CoverageDataV2) -> Result<fuzz::CoverageDataV
 /// provided to it by clients is saved and forwarded via the given `aggregator`.
 ///
 pub async fn collect_data(
-    stream: fuzz::CoverageDataCollectorV2RequestStream,
+    stream: fuzz::CoverageDataCollectorRequestStream,
     aggregator: &Aggregator,
 ) -> Result<()> {
     let target_id_rc = &RefCell::new(0);
@@ -230,7 +230,7 @@ pub async fn collect_data(
         })
         .try_for_each(|request| async move {
             match request {
-                fuzz::CoverageDataCollectorV2Request::Initialize {
+                fuzz::CoverageDataCollectorRequest::Initialize {
                     eventpair,
                     process,
                     responder,
@@ -244,7 +244,7 @@ pub async fn collect_data(
                         .send(&response)
                         .context("failed to send response: CoverageDataCollector.Initialize")?;
                 }
-                fuzz::CoverageDataCollectorV2Request::AddInline8bitCounters {
+                fuzz::CoverageDataCollectorRequest::AddInline8bitCounters {
                     inline_8bit_counters,
                     responder,
                 } => {
@@ -270,7 +270,7 @@ pub async fn collect_data(
 /// to retrieve coverage data from the given `aggregator`.
 ///
 pub async fn provide_data(
-    stream: fuzz::CoverageDataProviderV2RequestStream,
+    stream: fuzz::CoverageDataProviderRequestStream,
     aggregator: &Aggregator,
 ) -> Result<()> {
     let first_rc = &RefCell::new(true);
@@ -280,10 +280,10 @@ pub async fn provide_data(
         })
         .try_for_each(|request| async move {
             match request {
-                fuzz::CoverageDataProviderV2Request::SetOptions { options, .. } => {
+                fuzz::CoverageDataProviderRequest::SetOptions { options, .. } => {
                     aggregator.set_options(options);
                 }
-                fuzz::CoverageDataProviderV2Request::WatchCoverageData { responder } => {
+                fuzz::CoverageDataProviderRequest::WatchCoverageData { responder } => {
                     let response = aggregator
                         .watch_coverage_data(first_rc)
                         .await
@@ -314,10 +314,7 @@ mod tests {
     // Test fixtures.
 
     // Connect and get the options. Wait for a signal and then add the given number of modules.
-    async fn producer(
-        proxy: &fuzz::CoverageDataCollectorV2Proxy,
-        num_modules: usize,
-    ) -> Result<()> {
+    async fn producer(proxy: &fuzz::CoverageDataCollectorProxy, num_modules: usize) -> Result<()> {
         let (local, eventpair) = zx::EventPair::create();
         let process =
             process_self().duplicate(zx::Rights::SAME_RIGHTS).context("failed to get process")?;
@@ -344,7 +341,7 @@ mod tests {
 
     // Set the options, and then wait until the given number of modules have been added, signaling
     // any producers as they connect.
-    async fn consumer(proxy: &fuzz::CoverageDataProviderV2Proxy, num_modules: usize) -> Result<()> {
+    async fn consumer(proxy: &fuzz::CoverageDataProviderProxy, num_modules: usize) -> Result<()> {
         let options = fuzz::Options { runs: Some(1000), ..Default::default() };
         proxy.set_options(&options).context("CoverageDataProvider.SetOptions")?;
         let mut modules_added = 0;
@@ -381,7 +378,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_collector_initialize() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorV2Marker>()
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()
             .context("failed to create proxy and/or stream")?;
 
         // Send a fake instrumented process and get the options.
@@ -414,7 +411,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_collector_add_inline_8bit_counters() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorV2Marker>()
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()
             .context("failed to create proxy and/or stream")?;
 
         // Send a fake inline 8 bit counters.
@@ -435,7 +432,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_provider_set_options() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderV2Marker>()
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()
             .context("failed to create proxy and/or stream")?;
 
         // Set the options.
@@ -467,7 +464,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_provider_watch_coverage_data() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderV2Marker>()
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()
             .context("failed to create proxy and/or stream")?;
 
         // The initial "hanging-get" returns an empty vector immediately.
@@ -488,8 +485,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_coverage_single_producer_and_consumer() -> Result<()> {
         let aggregator = Aggregator::new();
-        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorV2Marker>()?;
-        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderV2Marker>()?;
+        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
+        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
 
         // Wrap the futures in `async move` to ensure the streams are dropped on completion.
         let produce_data = async move { producer(&proxy1, 2).await };
@@ -507,9 +504,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_coverage_multiple_producers_single_consumer() -> Result<()> {
         let aggregator = Aggregator::new();
-        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorV2Marker>()?;
-        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataCollectorV2Marker>()?;
-        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderV2Marker>()?;
+        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
+        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
+        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
 
         // Wrap the futures in `async move` to ensure the streams are dropped on completion.
         let produce_data1 = async move { producer(&proxy1, 1).await };
@@ -530,8 +527,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_coverage_multiple_producers_serial_consumers() -> Result<()> {
         let aggregator = Aggregator::new();
-        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorV2Marker>()?;
-        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderV2Marker>()?;
+        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
+        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
 
         // Wrap the last future in `async move` to ensure its stream is dropped on completion.
         let produce_fut = producer(&proxy1, 2).fuse();
@@ -554,7 +551,7 @@ mod tests {
         }
 
         // Now reconnect. The consumer should get the same results from the connected producers.
-        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderV2Marker>()?;
+        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
         let provide_fut = provide_data(stream3, &aggregator).fuse();
         let consume_fut = async move { consumer(&proxy3, 2).await };
         let consume_fut = consume_fut.fuse();

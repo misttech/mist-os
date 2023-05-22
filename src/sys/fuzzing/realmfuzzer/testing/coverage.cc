@@ -10,7 +10,7 @@
 namespace fuzzing {
 
 using fuchsia::fuzzer::Data;
-using fuchsia::fuzzer::InstrumentedProcessV2;
+using fuchsia::fuzzer::InstrumentedProcess;
 
 FakeCoverage::FakeCoverage(ExecutorPtr executor)
     : collector_(this),
@@ -25,8 +25,8 @@ FakeCoverage::FakeCoverage(ExecutorPtr executor)
   target_id_ = info.koid;
 }
 
-fidl::InterfaceRequestHandler<CoverageDataCollectorV2> FakeCoverage::GetCollectorHandler() {
-  return [this](fidl::InterfaceRequest<CoverageDataCollectorV2> request) {
+fidl::InterfaceRequestHandler<CoverageDataCollector> FakeCoverage::GetCollectorHandler() {
+  return [this](fidl::InterfaceRequest<CoverageDataCollector> request) {
     if (auto status = collector_.Bind(request.TakeChannel(), executor_->dispatcher());
         status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to bind fuchsia.fuzzer.CoverageDataCollector request: "
@@ -35,8 +35,8 @@ fidl::InterfaceRequestHandler<CoverageDataCollectorV2> FakeCoverage::GetCollecto
   };
 }
 
-fidl::InterfaceRequestHandler<CoverageDataProviderV2> FakeCoverage::GetProviderHandler() {
-  return [this](fidl::InterfaceRequest<CoverageDataProviderV2> request) {
+fidl::InterfaceRequestHandler<CoverageDataProvider> FakeCoverage::GetProviderHandler() {
+  return [this](fidl::InterfaceRequest<CoverageDataProvider> request) {
     if (auto status = provider_.Bind(std::move(request), executor_->dispatcher());
         status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to bind fuchsia.fuzzer.CoverageDataProvider request: "
@@ -47,7 +47,7 @@ fidl::InterfaceRequestHandler<CoverageDataProviderV2> FakeCoverage::GetProviderH
 
 void FakeCoverage::Initialize(zx::eventpair eventpair, zx::process process,
                               InitializeCallback callback) {
-  CoverageDataV2 coverage_data = {
+  CoverageData coverage_data = {
       .target_id = target_id_,
       .data = Data::WithInstrumented({
           .eventpair = std::move(eventpair),
@@ -64,7 +64,7 @@ void FakeCoverage::Initialize(zx::eventpair eventpair, zx::process process,
 
 void FakeCoverage::AddInline8bitCounters(zx::vmo inline_8bit_counters,
                                          AddInline8bitCountersCallback callback) {
-  CoverageDataV2 coverage_data = {
+  CoverageData coverage_data = {
       .target_id = target_id_,
       .data = Data::WithInline8bitCounters(std::move(inline_8bit_counters)),
   };
@@ -79,46 +79,46 @@ void FakeCoverage::AddInline8bitCounters(zx::vmo inline_8bit_counters,
 void FakeCoverage::SetOptions(Options options) { ::fuzzing::SetOptions(options_.get(), options); }
 
 void FakeCoverage::WatchCoverageData(WatchCoverageDataCallback callback) {
-  auto task = fpromise::make_promise([this, callback = std::move(callback),
-                                      coverage_data = std::vector<CoverageDataV2>(),
-                                      fut = Future<CoverageDataV2>()](
-                                         Context& context) mutable -> Result<> {
-                while (true) {
-                  if (!fut) {
-                    while (true) {
-                      auto result = receiver_.TryReceive();
-                      if (result.is_error()) {
-                        break;
-                      }
-                      coverage_data.emplace_back(result.take_value());
-                    }
-                    if (first_ || !coverage_data.empty()) {
-                      callback(std::move(coverage_data));
-                      first_ = false;
-                      return fpromise::ok();
-                    }
-                    fut = receiver_.Receive();
-                  }
-                  if (!fut(context)) {
-                    return fpromise::pending();
-                  }
-                  if (fut.is_error()) {
-                    FX_LOGS(WARNING) << "Failed to receive coverage data";
-                    return fpromise::error();
-                  }
-                  coverage_data.emplace_back(fut.take_value());
-                }
-              }).wrap_with(scope_);
+  auto task =
+      fpromise::make_promise([this, callback = std::move(callback),
+                              coverage_data = std::vector<CoverageData>(),
+                              fut = Future<CoverageData>()](Context& context) mutable -> Result<> {
+        while (true) {
+          if (!fut) {
+            while (true) {
+              auto result = receiver_.TryReceive();
+              if (result.is_error()) {
+                break;
+              }
+              coverage_data.emplace_back(result.take_value());
+            }
+            if (first_ || !coverage_data.empty()) {
+              callback(std::move(coverage_data));
+              first_ = false;
+              return fpromise::ok();
+            }
+            fut = receiver_.Receive();
+          }
+          if (!fut(context)) {
+            return fpromise::pending();
+          }
+          if (fut.is_error()) {
+            FX_LOGS(WARNING) << "Failed to receive coverage data";
+            return fpromise::error();
+          }
+          coverage_data.emplace_back(fut.take_value());
+        }
+      }).wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
 
-void FakeCoverage::Send(CoverageDataV2 coverage_data) {
+void FakeCoverage::Send(CoverageData coverage_data) {
   auto status = sender_.Send(std::move(coverage_data));
   FX_CHECK(status == ZX_OK) << zx_status_get_string(status);
 }
 
-Result<CoverageDataV2> FakeCoverage::TryReceive() { return receiver_.TryReceive(); }
+Result<CoverageData> FakeCoverage::TryReceive() { return receiver_.TryReceive(); }
 
-Promise<CoverageDataV2> FakeCoverage::Receive() { return receiver_.Receive(); }
+Promise<CoverageData> FakeCoverage::Receive() { return receiver_.Receive(); }
 
 }  // namespace fuzzing

@@ -29,7 +29,7 @@
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::CoverageDataCollectorV2Ptr;
+using ::fuchsia::fuzzer::CoverageDataCollectorPtr;
 
 // Specializes the generic |RunnerTest| for |RealmFuzzerRunner|. Encapsulates a fake target adapter,
 // fake target process, and fake coverage component.
@@ -72,7 +72,7 @@ class RealmFuzzerRunnerTest : public RunnerTest {
   RunnerPtr runner_;
   std::unique_ptr<FakeTargetAdapter> target_adapter_;
   std::unique_ptr<FakeCoverage> coverage_;
-  CoverageDataCollectorV2Ptr collector_;
+  CoverageDataCollectorPtr collector_;
   std::unique_ptr<AsyncEventPair> eventpair_;
   FakeRealmFuzzerModule module_;
   std::unique_ptr<TestTarget> target_;

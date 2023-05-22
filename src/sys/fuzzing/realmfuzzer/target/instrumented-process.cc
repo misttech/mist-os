@@ -14,7 +14,7 @@
 
 namespace fuzzing {
 
-using fuchsia::fuzzer::CoverageDataCollectorV2;
+using fuchsia::fuzzer::CoverageDataCollector;
 
 // This class extends |Process| by automatically connecting in a public default constructor. The
 // class is instantiated as a singleton below, and lives as long as the process. All other
@@ -25,7 +25,7 @@ class InstrumentedProcess final {
     Process::InstallHooks();
     context_ = ComponentContext::CreateAuxillary();
     process_ = std::make_unique<Process>(context_->executor());
-    fidl::InterfaceHandle<CoverageDataCollectorV2> collector;
+    fidl::InterfaceHandle<CoverageDataCollector> collector;
     if (auto status = context_->Connect(collector.NewRequest()); status != ZX_OK) {
       FX_LOGS(FATAL) << "Failed to connect to coverage data collector: "
                      << zx_status_get_string(status);

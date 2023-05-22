@@ -207,7 +207,7 @@ void Process::InstallHooks() {
   std::atexit([]() { ExitHook(); });
 }
 
-ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollectorV2> collector,
+ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollector> collector,
                              zx::eventpair eventpair) {
   Bridge<Options> bridge;
   return fpromise::make_promise([this, collector = std::move(collector)]() mutable -> ZxResult<> {
