@@ -211,6 +211,9 @@ struct Inner {
     // Indicates the journal has been terminated.
     terminate: bool,
 
+    // Latched error indicating reason for journal termination if not graceful.
+    terminate_reason: Option<Error>,
+
     // Disable compactions.
     disable_compactions: bool,
 
@@ -235,8 +238,19 @@ struct Inner {
 }
 
 impl Inner {
-    fn terminate(&mut self) {
+    fn terminate(&mut self, reason: Option<Error>) {
         self.terminate = true;
+
+        if let Some(e) = reason {
+            error!(error = e.as_value(), "Terminating journal with error");
+            // Log previous error if one was already set, otherwise latch the error.
+            if let Some(e) = self.terminate_reason.as_ref() {
+                error!(error = e.as_value(), "Journal previously terminated with error");
+            } else {
+                self.terminate_reason = Some(e);
+            }
+        }
+
         if let Some(waker) = self.flush_waker.take() {
             waker.wake();
         }
@@ -318,6 +332,7 @@ impl Journal {
                 output_reset_version: false,
                 flush_waker: None,
                 terminate: false,
+                terminate_reason: None,
                 disable_compactions: false,
                 compaction_running: false,
                 sync_waker: None,
@@ -1118,7 +1133,9 @@ impl Journal {
                 let _sync_guard = debug_assert_not_too_long!(self.sync_mutex.lock());
                 _write_guard = debug_assert_not_too_long!(self.writer_mutex.lock());
                 let result = self.pad_to_block()?;
-                self.flush_device(result.0.file_offset).await?;
+                self.flush_device(result.0.file_offset)
+                    .await
+                    .context("flush failed when writing superblock")?;
                 result
             };
 
@@ -1181,7 +1198,7 @@ impl Journal {
         };
 
         if options.flush_device {
-            self.flush_device(checkpoint.file_offset).await?;
+            self.flush_device(checkpoint.file_offset).await.context("sync: flush failed")?;
         }
 
         Ok(Some((checkpoint, borrowed)))
@@ -1209,7 +1226,12 @@ impl Journal {
             if inner.flushed_offset >= checkpoint_offset {
                 Poll::Ready(Ok(()))
             } else if inner.terminate {
-                Poll::Ready(Err(FxfsError::JournalFlushError))
+                let context = inner
+                    .terminate_reason
+                    .as_ref()
+                    .map(|e| format!("Journal closed with error: {}", e.as_value()))
+                    .unwrap_or("Journal closed".to_string());
+                Poll::Ready(Err(anyhow!(FxfsError::JournalFlushError).context(context)))
             } else {
                 inner.sync_waker = Some(ctx.waker().clone());
                 Poll::Pending
@@ -1264,7 +1286,12 @@ impl Journal {
                 if inner.terminate {
                     // If the flush error is set, this will never make progress, since we can't
                     // extend the journal any more.
-                    break Err(anyhow!(FxfsError::JournalFlushError).context("Journal closed"));
+                    let context = inner
+                        .terminate_reason
+                        .as_ref()
+                        .map(|e| format!("Journal closed with error: {}", e.as_value()))
+                        .unwrap_or("Journal closed".to_string());
+                    break Err(anyhow!(FxfsError::JournalFlushError).context(context));
                 }
                 if self.objects.last_end_offset()
                     - inner.super_block_header.journal_checkpoint.file_offset
@@ -1273,7 +1300,9 @@ impl Journal {
                     break Ok(());
                 }
                 if inner.disable_compactions {
-                    break Err(anyhow!(FxfsError::JournalFlushError).context("Journal closed"));
+                    break Err(
+                        anyhow!(FxfsError::JournalFlushError).context("Compactions disabled")
+                    );
                 }
                 self.reclaim_event.listen()
             });
@@ -1372,8 +1401,7 @@ impl Journal {
             if let Some(fut) = flush_fut.as_mut() {
                 if let Poll::Ready(result) = fut.poll_unpin(ctx) {
                     if let Err(e) = result {
-                        info!(error = e.as_value(), "Flush error");
-                        self.inner.lock().unwrap().terminate();
+                        self.inner.lock().unwrap().terminate(Some(e.context("Flush error")));
                         self.reclaim_event.notify(usize::MAX);
                         flush_error = true;
                     }
@@ -1385,8 +1413,7 @@ impl Journal {
                 if let Poll::Ready(result) = fut.poll_unpin(ctx) {
                     let mut inner = self.inner.lock().unwrap();
                     if let Err(e) = result {
-                        info!(error = e.as_value(), "Compaction error");
-                        inner.terminate();
+                        inner.terminate(Some(e.context("Compaction error")));
                     }
                     compact_fut = None;
                     inner.compaction_running = false;
@@ -1485,7 +1512,7 @@ impl Journal {
 
     /// Terminate all journal activity.
     pub fn terminate(&self) {
-        self.inner.lock().unwrap().terminate();
+        self.inner.lock().unwrap().terminate(/*reason*/ None);
         self.reclaim_event.notify(usize::MAX);
     }
 }
