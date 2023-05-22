@@ -8,7 +8,9 @@ use {
         copier::recursive_copy,
         crypt::{
             fxfs::{self, CryptService},
+            get_policy,
             zxcrypt::{UnsealOutcome, ZxcryptDevice},
+            Policy,
         },
         device::{
             constants::{
@@ -587,6 +589,27 @@ impl Environment for FshostEnvironment {
             DiskFormat::F2fs => DiskFormat::F2fs,
             _ => DiskFormat::Minfs,
         };
+
+        // Rotate hardware derived key before formatting if we follow a Tee policy
+        if get_policy().await? != Policy::Null {
+            tracing::info!("Rotate hardware derived key before formatting");
+            // Hardware derived keys are not rotatable on certain devices.
+            // TODO(b/271166111): Assert hard fail when we know rotating the key should work.
+            match kms_stateless::rotate_hardware_derived_key(kms_stateless::KeyInfo::new("zxcrypt"))
+                .await
+            {
+                Ok(()) => {}
+                Err(kms_stateless::Error::TeeCommandNotSupported(
+                    kms_stateless::TaKeysafeCommand::RotateHardwareDerivedKey,
+                )) => {
+                    tracing::warn!("The device does not support rotatable hardware keys.")
+                }
+                Err(e) => {
+                    tracing::warn!("Rotate hardware key failed with error {:?}.", e)
+                }
+            }
+        }
+
         self.format_data_with_disk_format(format, device).await
     }
 

@@ -12,14 +12,15 @@ use anyhow::{bail, Context, Error};
 pub mod fxfs;
 pub mod zxcrypt;
 
-enum Policy {
+#[derive(PartialEq)]
+pub enum Policy {
     Null,
     TeeRequired,
     TeeTransitional,
     TeeOpportunistic,
 }
 
-async fn get_policy() -> Result<Policy, Error> {
+pub async fn get_policy() -> Result<Policy, Error> {
     let policy = fuchsia_fs::file::read_in_namespace_to_string("/pkg/config/zxcrypt").await?;
     match policy.as_ref() {
         "null" => Ok(Policy::Null),
