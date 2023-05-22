@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//src/sys/core/build/core_shard.gni")
 
 _common_deps = [
   ":config",
@@ -84,11 +85,14 @@ fuchsia_package("radar-proxy-without-injector") {
   deps = [ ":radar-proxy-component-without-injector" ]
 }
 
-# TODO(fxbug.dev/100020): Remove these once the board file no longer depends on them.
-group("radar-proxy") {
+# TODO(fxbug.dev/100020): Make platform configuration include one of the above packages and remove
+# this.
+fuchsia_package("radar-proxy") {
+  deps = [ ":radar-proxy-component-without-injector" ]
 }
 
-group("radar-proxy-shard") {
+core_shard("radar-proxy-shard") {
+  shard_file = "meta/radar-proxy.core_shard.cml"
 }
 
 test("radar-proxy-test-bin") {
