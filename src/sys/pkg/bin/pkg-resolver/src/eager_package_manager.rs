@@ -614,7 +614,7 @@ pub async fn run_cup_service<T: Resolver>(
                 responder.send(response)?;
             }
             CupRequest::GetInfo { url, responder } => {
-                let mut response = match manager.as_ref() {
+                let response = match manager.as_ref() {
                     Some(manager) => manager.read().await.cup_get_info(&url).await.map_err(|e| {
                         let get_info_error = (&e).into();
                         error!(url = %url.url, "cup_get_info failed: {:#}", anyhow!(e));
@@ -629,7 +629,10 @@ pub async fn run_cup_service<T: Resolver>(
                         .as_occurrence(1),
                 );
 
-                responder.send(&mut response)?;
+                responder.send(match response {
+                    Ok((ref version, ref channel)) => Ok((version, channel)),
+                    Err(e) => Err(e),
+                })?;
             }
         }
     }

@@ -6087,10 +6087,7 @@ impl WithErrorSyntaxResponseAsStructResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut WithErrorSyntaxResponseAsStructResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<(i64, i64, i64), u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -6103,24 +6100,21 @@ impl WithErrorSyntaxResponseAsStructResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut WithErrorSyntaxResponseAsStructResult,
+        mut result: Result<(i64, i64, i64), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut WithErrorSyntaxResponseAsStructResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<(i64, i64, i64), u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|(a, b, c)| (*a, *b, *c)),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

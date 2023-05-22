@@ -480,16 +480,22 @@ impl FxVolumeAndRoot {
                     }),
                 )?,
                 ProjectIdRequest::List { responder, token } => {
-                    responder.send(&mut self.list_projects(&token).await.map_err(|error| {
-                        error!(?error, store_id, ?token, "Failed to list projects.");
-                        map_to_raw_status(error)
-                    }))?
+                    responder.send(match self.list_projects(&token).await {
+                        Ok((ref entries, ref next_token)) => Ok((entries, next_token.as_ref())),
+                        Err(error) => {
+                            error!(?error, store_id, ?token, "Failed to list projects.");
+                            Err(map_to_raw_status(error))
+                        }
+                    })?
                 }
                 ProjectIdRequest::Info { responder, project_id } => {
-                    responder.send(&mut self.project_info(project_id).await.map_err(|error| {
-                        error!(?error, store_id, project_id, "Failed to get project info.");
-                        map_to_raw_status(error)
-                    }))?
+                    responder.send(match self.project_info(project_id).await {
+                        Ok((ref limit, ref usage)) => Ok((limit, usage)),
+                        Err(error) => {
+                            error!(?error, store_id, project_id, "Failed to get project info.");
+                            Err(map_to_raw_status(error))
+                        }
+                    })?
                 }
             }
         }
@@ -510,7 +516,7 @@ impl FxVolumeAndRoot {
     async fn list_projects(
         &self,
         last_token: &Option<Box<ProjectIterToken>>,
-    ) -> Result<(Vec<u64>, Option<Box<ProjectIterToken>>), Error> {
+    ) -> Result<(Vec<u64>, Option<ProjectIterToken>), Error> {
         let (entries, token) = self
             .volume
             .store()
@@ -522,7 +528,7 @@ impl FxVolumeAndRoot {
                 Self::MAX_PROJECT_ENTRIES,
             )
             .await?;
-        Ok((entries, token.map(|value| Box::new(ProjectIterToken { value }))))
+        Ok((entries, token.map(|value| ProjectIterToken { value })))
     }
 
     async fn project_info(&self, project_id: u64) -> Result<(BytesAndNodes, BytesAndNodes), Error> {

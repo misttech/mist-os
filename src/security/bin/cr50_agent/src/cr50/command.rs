@@ -276,7 +276,7 @@ mod tests {
                         } => {
                             assert_eq!(command_code, 0);
                             assert_eq!(data, self.received);
-                            responder.send(&mut Ok((0, self.response.clone()))).expect("Reply ok");
+                            responder.send(Ok((0, &self.response))).expect("Reply ok");
                         }
                         _ => unreachable!(),
                     }

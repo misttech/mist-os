@@ -68,20 +68,29 @@ impl Cr50 {
     pub async fn handle_cr50_stream(&self, mut stream: Cr50RequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading from stream")? {
             match request {
-                Cr50Request::CcdGetInfo { responder } => responder
-                    .send(&mut Self::make_response(
-                        "CcdGetInfo",
-                        self.get_info().await.map(|v| Some(Box::new(v))),
-                        None,
-                    ))
-                    .context("Replying to request")?,
-                Cr50Request::WpGetState { responder } => responder
-                    .send(&mut Self::make_response(
+                Cr50Request::CcdGetInfo { responder } => {
+                    let response =
+                        Self::make_response("CcdGetInfo", self.get_info().await.map(Some), None);
+                    responder
+                        .send(match response {
+                            Ok((ref rc, ref info)) => Ok((rc, info.as_ref())),
+                            Err(e) => Err(e),
+                        })
+                        .context("Replying to request")?;
+                }
+                Cr50Request::WpGetState { responder } => {
+                    let response = Self::make_response(
                         "WpGetState",
                         self.wp_get_state().await,
                         WpState::empty(),
-                    ))
-                    .context("Replying to request")?,
+                    );
+                    responder
+                        .send(match response {
+                            Ok((ref rc, state)) => Ok((rc, state)),
+                            Err(e) => Err(e),
+                        })
+                        .context("Replying to request")?;
+                }
                 Cr50Request::CcdLock { responder } => responder
                     .send(
                         &mut Self::make_response(
@@ -458,9 +467,9 @@ mod tests {
         async fn serve(self: Arc<Self>, mut stream: TpmDeviceRequestStream) {
             while let Some(req) = stream.try_next().await.expect("Getting requests") {
                 match req {
-                    TpmDeviceRequest::GetDeviceId { responder } => responder
-                        .send(&mut Ok((0x1ae0, 0x0028, 0x00)))
-                        .expect("Responding to request"),
+                    TpmDeviceRequest::GetDeviceId { responder } => {
+                        responder.send(Ok((0x1ae0, 0x0028, 0x00))).expect("Responding to request")
+                    }
                     TpmDeviceRequest::ExecuteVendorCommand { .. } => todo!(),
                     TpmDeviceRequest::ExecuteCommand { .. } => todo!(),
                 }

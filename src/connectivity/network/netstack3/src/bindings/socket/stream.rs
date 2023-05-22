@@ -1304,7 +1304,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetLinger { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetReusePort { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1479,7 +1479,7 @@ where
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             // Note for the following two options:
             // Nagle enabled means TCP delays sending segment, thus meaning

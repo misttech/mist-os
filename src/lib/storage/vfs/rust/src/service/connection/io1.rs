@@ -162,7 +162,7 @@ impl Connection {
             }
             fio::NodeRequest::GetAttributes { query: _, responder } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.

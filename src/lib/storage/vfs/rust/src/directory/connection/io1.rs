@@ -203,7 +203,7 @@ where
             fio::DirectoryRequest::GetAttributes { query: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttributes");
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::UpdateAttributes");

@@ -1582,13 +1582,18 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::RecvMsg {
                 want_addr,
                 data_len,
+                // TODO(brunodalbo) handle control
                 want_control: _,
                 flags,
                 responder,
-            } => {
-                // TODO(brunodalbo) handle control
-                responder_send!(responder, &mut self.recv_msg(want_addr, data_len as usize, flags));
-            }
+            } => responder_send!(
+                responder,
+                match self.recv_msg(want_addr, data_len as usize, flags) {
+                    Ok((ref addr, ref data, ref control, truncated)) =>
+                        Ok((addr.as_ref(), data.as_slice(), control, truncated)),
+                    Err(err) => Err(err),
+                }
+            ),
             fposix_socket::SynchronousDatagramSocketRequest::SendMsg {
                 addr,
                 data,
@@ -1600,7 +1605,7 @@ where
                 responder_send!(responder, &mut self.send_msg(addr.map(|addr| *addr), data));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetInfo { responder } => {
-                responder_send!(responder, &mut self.get_sock_info())
+                responder_send!(responder, self.get_sock_info())
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetTimestamp { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1700,7 +1705,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetLinger { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetOutOfBandInline {
                 value: _,
@@ -2212,12 +2217,7 @@ where
         data_len: usize,
         recv_flags: fposix_socket::RecvMsgFlags,
     ) -> Result<
-        (
-            Option<Box<fnet::SocketAddress>>,
-            Vec<u8>,
-            fposix_socket::DatagramSocketRecvControlData,
-            u32,
-        ),
+        (Option<fnet::SocketAddress>, Vec<u8>, fposix_socket::DatagramSocketRecvControlData, u32),
         fposix::Errno,
     > {
         let Self { ctx: _, data: BindingData { peer_event: _, info, messages } } = self;
@@ -2233,37 +2233,23 @@ where
             if let SocketState::BoundConnect { shutdown_read, .. } = info.state {
                 if shutdown_read {
                     // Return empty data to signal EOF.
-                    return Ok((
-                        None,
-                        Vec::new(),
-                        fposix_socket::DatagramSocketRecvControlData::default(),
-                        0,
-                    ));
+                    return Ok((None, Vec::new(), Default::default(), 0));
                 }
             }
             return Err(fposix::Errno::Eagain);
         };
-        let addr = if want_addr {
-            Some(Box::new(
-                I::SocketAddress::new(
-                    SpecifiedAddr::new(available.source_addr).map(ZonedAddr::Unzoned),
-                    available.source_port,
-                )
-                .into_sock_addr(),
-            ))
-        } else {
-            None
-        };
+        let addr = want_addr.then(|| {
+            I::SocketAddress::new(
+                SpecifiedAddr::new(available.source_addr).map(ZonedAddr::Unzoned),
+                available.source_port,
+            )
+            .into_sock_addr()
+        });
         let mut data = available.data;
         let truncated = data.len().saturating_sub(data_len);
         data.truncate(data_len);
 
-        Ok((
-            addr,
-            data,
-            fposix_socket::DatagramSocketRecvControlData::default(),
-            truncated.try_into().unwrap_or(u32::MAX),
-        ))
+        Ok((addr, data, Default::default(), truncated.try_into().unwrap_or(u32::MAX)))
     }
 
     fn send_msg(

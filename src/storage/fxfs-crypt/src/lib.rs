@@ -138,10 +138,17 @@ impl CryptService {
                 while let Some(request) = stream.try_next().await.context("Reading request")? {
                     match request {
                         CryptRequest::CreateKey { owner, purpose, responder } => {
-                            let mut response = self.create_key(owner, purpose);
-                            responder.send(&mut response).unwrap_or_else(|e| {
-                                error!(error = e.as_value(), "Failed to send CreateKey response")
-                            });
+                            responder
+                                .send(match self.create_key(owner, purpose) {
+                                    Ok((id, ref wrapped, ref key)) => Ok((id, wrapped, key)),
+                                    Err(e) => Err(e),
+                                })
+                                .unwrap_or_else(|e| {
+                                    error!(
+                                        error = e.as_value(),
+                                        "Failed to send CreateKey response"
+                                    )
+                                });
                         }
                         CryptRequest::UnwrapKey { wrapping_key_id, owner, key, responder } => {
                             let mut response = self.unwrap_key(wrapping_key_id, owner, key);

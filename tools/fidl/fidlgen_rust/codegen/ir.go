@@ -1335,7 +1335,8 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		migrate := innerType.DeclType == fidlgen.TableDeclType ||
 			innerType.DeclType == fidlgen.UnionDeclType ||
 			innerType.IsResourceType() ||
-			len(c.structs[innerType.Identifier].Members) == 0
+			len(c.structs[innerType.Identifier].Members) == 0 ||
+			len(c.structs[innerType.Identifier].Members) > 1
 		if migrate {
 			okParamType := "()"
 			if len(inner.Parameters) > 0 {

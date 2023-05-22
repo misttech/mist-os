@@ -88,15 +88,15 @@ where
                 let stream = match Self::stream_from_ipse(interaction) {
                     Ok(stream) => stream,
                     Err(e) => {
-                        return responder.send(&mut Err(e));
+                        return responder.send(Err(e));
                     }
                 };
 
                 match self.enroll(stream).await {
                     Ok((enrollment_data, prekey)) => {
-                        responder.send(&mut Ok((enrollment_data.0, prekey.0)))
+                        responder.send(Ok((&enrollment_data.0, &prekey.0)))
                     }
-                    Err(e) => responder.send(&mut Err(e)),
+                    Err(e) => responder.send(Err(e)),
                 }
             }
         }

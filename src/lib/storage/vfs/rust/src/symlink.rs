@@ -147,7 +147,7 @@ impl Connection {
             }
             fio::SymlinkRequest::GetAttributes { query: _, responder } => {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;

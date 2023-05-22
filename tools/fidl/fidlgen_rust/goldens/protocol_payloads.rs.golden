@@ -1712,10 +1712,10 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_local_with_error(
         &self,
-        mut result: &mut MainProtocolOnLocalWithErrorResult,
+        mut result: Result<(u32, u32), u32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<LocalStructPayload, u32>, false>(
-            result.as_mut().map_err(|e| *e).map(|(a, b)| (*a, *b)),
+            result,
             0,
             0x4ecd4b3982e221af,
             fidl::encoding::DynamicFlags::empty(),
@@ -1753,11 +1753,11 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_anon_with_error(
         &self,
-        mut result: &mut MainProtocolOnAnonWithErrorResult,
+        mut result: Result<(u32, u32), u32>,
     ) -> Result<(), fidl::Error> {
         self.inner
             .send::<fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>, false>(
-                result.as_mut().map_err(|e| *e).map(|(a, b)| (*a, *b)),
+                result,
                 0,
                 0x45bc24ef47b44a02,
                 fidl::encoding::DynamicFlags::empty(),
@@ -2049,10 +2049,7 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut MainProtocolTwoWayLocalWithErrorResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<(u32, u32), u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -2065,24 +2062,21 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut MainProtocolTwoWayLocalWithErrorResult,
+        mut result: Result<(u32, u32), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut MainProtocolTwoWayLocalWithErrorResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<(u32, u32), u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|(a, b)| (*a, *b)),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -2384,10 +2378,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut MainProtocolTwoWayAnonWithErrorResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<(u32, u32), u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -2400,24 +2391,21 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut MainProtocolTwoWayAnonWithErrorResult,
+        mut result: Result<(u32, u32), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut MainProtocolTwoWayAnonWithErrorResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<(u32, u32), u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|(a, b)| (*a, *b)),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

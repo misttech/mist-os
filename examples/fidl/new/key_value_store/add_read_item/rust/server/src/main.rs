@@ -83,10 +83,10 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
 
                     // Read the item from the store, returning the appropriate error if it could not be found.
                     responder
-                        .send(&mut match store.borrow().get(&key) {
+                        .send(match store.borrow().get(&key) {
                             Some(found) => {
                                 println!("Read value at key: {}", key);
-                                Ok((key, found.clone()))
+                                Ok((&key, found))
                             }
                             None => {
                                 println!("Read error: NOT_FOUND, For key: {}", key);

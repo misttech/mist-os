@@ -74,8 +74,7 @@ impl StorageUnlockMechanism {
                 responder.send(&mut response)
             }
             StorageUnlockMechanismRequest::Enroll { interaction, responder } => {
-                let mut response = self.enroll(interaction).await;
-                responder.send(&mut response)
+                responder.send(self.enroll(interaction).await)
             }
         }
     }
@@ -121,11 +120,9 @@ impl StorageUnlockMechanism {
     async fn enroll(
         &self,
         interaction: InteractionProtocolServerEnd,
-    ) -> Result<(Vec<u8>, Vec<u8>), ApiError> {
+    ) -> Result<(&[u8], &[u8]), ApiError> {
         match interaction {
-            InteractionProtocolServerEnd::Test(_) => {
-                Ok((FIXED_ENROLLMENT_DATA.to_vec(), MAGIC_PREKEY.to_vec()))
-            }
+            InteractionProtocolServerEnd::Test(_) => Ok((&FIXED_ENROLLMENT_DATA, &MAGIC_PREKEY)),
             _ => {
                 warn!("Unsupported InteractionProtocolServerEnd: Only Test is supported");
                 Err(ApiError::InvalidRequest)

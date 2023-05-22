@@ -7633,7 +7633,13 @@ impl ProtocolErrorBasicResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut result: &mut ProtocolErrorBasicResult) -> Result<(), fidl::Error> {
+    pub fn send(
+        self,
+        mut result: Result<
+            (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, &str, Option<&str>),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -7646,51 +7652,30 @@ impl ProtocolErrorBasicResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorBasicResult,
+        mut result: Result<
+            (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, &str, Option<&str>),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut result: &mut ProtocolErrorBasicResult) -> Result<(), fidl::Error> {
+    fn send_raw(
+        &self,
+        mut result: Result<
+            (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, &str, Option<&str>),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(
-                    uint8,
-                    uint16,
-                    uint32,
-                    uint64,
-                    int8,
-                    int16,
-                    int32,
-                    int64,
-                    float32,
-                    float64,
-                    string,
-                    opt_string,
-                )| {
-                    (
-                        *uint8,
-                        *uint16,
-                        *uint32,
-                        *uint64,
-                        *int8,
-                        *int16,
-                        *int32,
-                        *int64,
-                        *float32,
-                        *float64,
-                        string.as_str(),
-                        opt_string.as_deref(),
-                    )
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -7847,7 +7832,13 @@ impl ProtocolErrorCompoundResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut result: &mut ProtocolErrorCompoundResult) -> Result<(), fidl::Error> {
+    pub fn send(
+        self,
+        mut result: Result<
+            (Bits, Enum, &Struct, &Table, &Union, Option<&Struct>, Option<&Union>),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -7860,33 +7851,30 @@ impl ProtocolErrorCompoundResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorCompoundResult,
+        mut result: Result<
+            (Bits, Enum, &Struct, &Table, &Union, Option<&Struct>, Option<&Union>),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut result: &mut ProtocolErrorCompoundResult) -> Result<(), fidl::Error> {
+    fn send_raw(
+        &self,
+        mut result: Result<
+            (Bits, Enum, &Struct, &Table, &Union, Option<&Struct>, Option<&Union>),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(bits, enum_, struct_, table, union, opt_struct, opt_union)| {
-                    (
-                        *bits,
-                        *enum_,
-                        &*struct_,
-                        &*table,
-                        &*union,
-                        opt_struct.as_deref(),
-                        opt_union.as_deref(),
-                    )
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8097,7 +8085,26 @@ impl ProtocolErrorArrayBasicResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut result: &mut ProtocolErrorArrayBasicResult) -> Result<(), fidl::Error> {
+    pub fn send(
+        self,
+        mut result: Result<
+            (
+                &[u8; 5],
+                &[u16; 5],
+                &[u32; 5],
+                &[u64; 5],
+                &[i8; 5],
+                &[i16; 5],
+                &[i32; 5],
+                &[i64; 5],
+                &[f32; 5],
+                &[f64; 5],
+                &[String; 5],
+                &[Option<String>; 5],
+            ),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -8110,51 +8117,56 @@ impl ProtocolErrorArrayBasicResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorArrayBasicResult,
+        mut result: Result<
+            (
+                &[u8; 5],
+                &[u16; 5],
+                &[u32; 5],
+                &[u64; 5],
+                &[i8; 5],
+                &[i16; 5],
+                &[i32; 5],
+                &[i64; 5],
+                &[f32; 5],
+                &[f64; 5],
+                &[String; 5],
+                &[Option<String>; 5],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut result: &mut ProtocolErrorArrayBasicResult) -> Result<(), fidl::Error> {
+    fn send_raw(
+        &self,
+        mut result: Result<
+            (
+                &[u8; 5],
+                &[u16; 5],
+                &[u32; 5],
+                &[u64; 5],
+                &[i8; 5],
+                &[i16; 5],
+                &[i32; 5],
+                &[i64; 5],
+                &[f32; 5],
+                &[f64; 5],
+                &[String; 5],
+                &[Option<String>; 5],
+            ),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(
-                    array_uint8,
-                    array_uint16,
-                    array_uint32,
-                    array_uint64,
-                    array_int8,
-                    array_int16,
-                    array_int32,
-                    array_int64,
-                    array_float32,
-                    array_float64,
-                    array_string,
-                    array_opt_string,
-                )| {
-                    (
-                        &*array_uint8,
-                        &*array_uint16,
-                        &*array_uint32,
-                        &*array_uint64,
-                        &*array_int8,
-                        &*array_int16,
-                        &*array_int32,
-                        &*array_int64,
-                        &*array_float32,
-                        &*array_float64,
-                        &*array_string,
-                        &*array_opt_string,
-                    )
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8307,7 +8319,7 @@ impl ProtocolErrorArrayCompoundResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut ProtocolErrorArrayCompoundResult,
+        mut result: Result<(&[Bits; 5], &[Enum; 5], &[Struct; 5], &[Table; 5], &[Union; 5]), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -8321,7 +8333,7 @@ impl ProtocolErrorArrayCompoundResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorArrayCompoundResult,
+        mut result: Result<(&[Bits; 5], &[Enum; 5], &[Struct; 5], &[Table; 5], &[Union; 5]), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -8330,7 +8342,7 @@ impl ProtocolErrorArrayCompoundResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut ProtocolErrorArrayCompoundResult,
+        mut result: Result<(&[Bits; 5], &[Enum; 5], &[Struct; 5], &[Table; 5], &[Union; 5]), u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -8338,11 +8350,7 @@ impl ProtocolErrorArrayCompoundResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(array_bits, array_enum, array_struct, array_table, array_union)| {
-                    (&*array_bits, &*array_enum, &*array_struct, &*array_table, &*array_union)
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8555,7 +8563,26 @@ impl ProtocolErrorVectorBasicResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut result: &mut ProtocolErrorVectorBasicResult) -> Result<(), fidl::Error> {
+    pub fn send(
+        self,
+        mut result: Result<
+            (
+                &[u8],
+                &[u16],
+                &[u32],
+                &[u64],
+                &[i8],
+                &[i16],
+                &[i32],
+                &[i64],
+                &[f32],
+                &[f64],
+                &[String],
+                &[Option<String>],
+            ),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -8568,51 +8595,56 @@ impl ProtocolErrorVectorBasicResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorVectorBasicResult,
+        mut result: Result<
+            (
+                &[u8],
+                &[u16],
+                &[u32],
+                &[u64],
+                &[i8],
+                &[i16],
+                &[i32],
+                &[i64],
+                &[f32],
+                &[f64],
+                &[String],
+                &[Option<String>],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut result: &mut ProtocolErrorVectorBasicResult) -> Result<(), fidl::Error> {
+    fn send_raw(
+        &self,
+        mut result: Result<
+            (
+                &[u8],
+                &[u16],
+                &[u32],
+                &[u64],
+                &[i8],
+                &[i16],
+                &[i32],
+                &[i64],
+                &[f32],
+                &[f64],
+                &[String],
+                &[Option<String>],
+            ),
+            u32,
+        >,
+    ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(
-                    vector_uint8,
-                    vector_uint16,
-                    vector_uint32,
-                    vector_uint64,
-                    vector_int8,
-                    vector_int16,
-                    vector_int32,
-                    vector_int64,
-                    vector_float32,
-                    vector_float64,
-                    vector_string,
-                    vector_opt_string,
-                )| {
-                    (
-                        vector_uint8.as_slice(),
-                        vector_uint16.as_slice(),
-                        vector_uint32.as_slice(),
-                        vector_uint64.as_slice(),
-                        vector_int8.as_slice(),
-                        vector_int16.as_slice(),
-                        vector_int32.as_slice(),
-                        vector_int64.as_slice(),
-                        vector_float32.as_slice(),
-                        vector_float64.as_slice(),
-                        vector_string.as_slice(),
-                        vector_opt_string.as_slice(),
-                    )
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8797,7 +8829,18 @@ impl ProtocolErrorVectorCompoundResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut ProtocolErrorVectorCompoundResult,
+        mut result: Result<
+            (
+                &[Bits],
+                &[Enum],
+                &[Struct],
+                &[Table],
+                &[Union],
+                &[Option<Box<Struct>>],
+                &[Option<Box<Union>>],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -8811,7 +8854,18 @@ impl ProtocolErrorVectorCompoundResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorVectorCompoundResult,
+        mut result: Result<
+            (
+                &[Bits],
+                &[Enum],
+                &[Struct],
+                &[Table],
+                &[Union],
+                &[Option<Box<Struct>>],
+                &[Option<Box<Union>>],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -8820,7 +8874,18 @@ impl ProtocolErrorVectorCompoundResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut ProtocolErrorVectorCompoundResult,
+        mut result: Result<
+            (
+                &[Bits],
+                &[Enum],
+                &[Struct],
+                &[Table],
+                &[Union],
+                &[Option<Box<Struct>>],
+                &[Option<Box<Union>>],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -8828,27 +8893,7 @@ impl ProtocolErrorVectorCompoundResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(
-                    vector_bits,
-                    vector_enum,
-                    vector_struct,
-                    vector_table,
-                    vector_union,
-                    vector_opt_struct,
-                    vector_opt_union,
-                )| {
-                    (
-                        vector_bits.as_slice(),
-                        vector_enum.as_slice(),
-                        vector_struct.as_slice(),
-                        vector_table.as_slice(),
-                        vector_union.as_slice(),
-                        vector_opt_struct.as_slice(),
-                        vector_opt_union.as_slice(),
-                    )
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -9010,7 +9055,10 @@ impl ProtocolErrorVectorOptionalResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut ProtocolErrorVectorOptionalResult,
+        mut result: Result<
+            (Option<&[u8]>, Option<&[String]>, Option<&[Struct]>, Option<&[Option<Box<Struct>>]>),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -9024,7 +9072,10 @@ impl ProtocolErrorVectorOptionalResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorVectorOptionalResult,
+        mut result: Result<
+            (Option<&[u8]>, Option<&[String]>, Option<&[Struct]>, Option<&[Option<Box<Struct>>]>),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -9033,7 +9084,10 @@ impl ProtocolErrorVectorOptionalResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut ProtocolErrorVectorOptionalResult,
+        mut result: Result<
+            (Option<&[u8]>, Option<&[String]>, Option<&[Struct]>, Option<&[Option<Box<Struct>>]>),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -9041,21 +9095,7 @@ impl ProtocolErrorVectorOptionalResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(
-                    opt_vector_uint8,
-                    opt_vector_string,
-                    opt_vector_struct,
-                    opt_vector_opt_struct,
-                )| {
-                    (
-                        opt_vector_uint8.as_deref(),
-                        opt_vector_string.as_deref(),
-                        opt_vector_struct.as_deref(),
-                        opt_vector_opt_struct.as_deref(),
-                    )
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -9201,7 +9241,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: &mut ProtocolErrorArrayVectorNestedResult,
+        mut result: Result<(&[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -9215,7 +9255,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: &mut ProtocolErrorArrayVectorNestedResult,
+        mut result: Result<(&[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -9224,7 +9264,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
 
     fn send_raw(
         &self,
-        mut result: &mut ProtocolErrorArrayVectorNestedResult,
+        mut result: Result<(&[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -9232,11 +9272,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(
-                |(vector_array_uint8, vector_vector_uint8)| {
-                    (vector_array_uint8.as_slice(), vector_vector_uint8.as_slice())
-                },
-            ),
+            body: result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

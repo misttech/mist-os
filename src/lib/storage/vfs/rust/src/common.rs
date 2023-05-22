@@ -175,10 +175,10 @@ pub async fn extended_attributes_sender(
         stream.next().await
     {
         let (chunk, last) = match chunks.next() {
-            Some(chunk) => (chunk.to_vec(), chunks.peek().is_none()),
-            None => (Vec::new(), true),
+            Some(chunk) => (chunk, chunks.peek().is_none()),
+            None => (&[][..], true),
         };
-        responder.send(&mut Ok((chunk, last))).unwrap_or_else(|error| {
+        responder.send(Ok((chunk, last))).unwrap_or_else(|error| {
             tracing::error!(?error, "list extended attributes failed to send a chunk");
         });
         if last {

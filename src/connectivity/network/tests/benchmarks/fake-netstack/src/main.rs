@@ -651,14 +651,9 @@ async fn handle_datagram_request(
             let want_len = data_len.try_into().unwrap();
             let truncated = data.len().saturating_sub(want_len);
             data.truncate(want_len);
-            let from = want_addr.then(|| Box::new(from));
+            let from = want_addr.then_some(&from);
             responder
-                .send(&mut Ok((
-                    from,
-                    data,
-                    fposix_socket::DatagramSocketRecvControlData::default(),
-                    truncated.try_into().unwrap(),
-                )))
+                .send(Ok((from, &data, &Default::default(), truncated.try_into().unwrap())))
                 .context("send RecvMsg response")?;
         }
         other => error!("got unexpected datagram socket request: {:#?}", other),

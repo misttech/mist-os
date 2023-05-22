@@ -534,7 +534,10 @@ async fn run_index_server(
                 }
                 DriverIndexRequest::AddCompositeNodeSpec { payload, responder } => {
                     responder
-                        .send(&mut indexer.add_composite_node_spec(payload))
+                        .send(match indexer.add_composite_node_spec(payload) {
+                            Ok((ref driver, ref names)) => Ok((driver, names)),
+                            Err(e) => Err(e),
+                        })
                         .or_else(ignore_peer_closed)
                         .context("error responding to AddCompositeNodeSpec")?;
                 }

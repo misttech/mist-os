@@ -499,7 +499,7 @@ impl BlockServer {
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetAttributes { query: _, responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;

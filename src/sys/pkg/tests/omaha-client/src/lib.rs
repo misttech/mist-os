@@ -775,8 +775,8 @@ pub mod fuchsia_pkg_cup {
                         responder.send(Ok(())).unwrap();
                     }
                     CupRequest::GetInfo { url, responder } => {
-                        let response = self.info_map[&url.url.parse().unwrap()].clone();
-                        responder.send(&mut Ok(response)).unwrap();
+                        let (version, channel) = &self.info_map[&url.url.parse().unwrap()];
+                        responder.send(Ok((version, channel))).unwrap();
                     }
                 }
             }

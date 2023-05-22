@@ -716,13 +716,11 @@ mod tests {
                 match request {
                     Ok(CupRequest::GetInfo { url, responder }) => {
                         let response = match url.url.as_str() {
-                            "fuchsia-pkg://example.com/package" => ("1.2.3".into(), "beta".into()),
-                            "fuchsia-pkg://example.com/package2" => {
-                                ("4.5.6".into(), "stable".into())
-                            }
+                            "fuchsia-pkg://example.com/package" => ("1.2.3", "beta"),
+                            "fuchsia-pkg://example.com/package2" => ("4.5.6", "stable"),
                             url => panic!("unexpected url {url}"),
                         };
-                        responder.send(&mut Ok(response)).unwrap();
+                        responder.send(Ok(response)).unwrap();
                     }
                     request => panic!("Unexpected request: {request:?}"),
                 }
@@ -760,7 +758,7 @@ mod tests {
             match stream.next().await.unwrap() {
                 Ok(CupRequest::GetInfo { url, responder }) => {
                     assert_eq!(url.url, "fuchsia-pkg://example.com/package");
-                    responder.send(&mut Ok(("abc".into(), "beta".into()))).unwrap();
+                    responder.send(Ok(("abc", "beta"))).unwrap();
                 }
                 request => panic!("Unexpected request: {request:?}"),
             }
@@ -794,7 +792,7 @@ mod tests {
             match stream.next().await.unwrap() {
                 Ok(CupRequest::GetInfo { url, responder }) => {
                     assert_eq!(url.url, "fuchsia-pkg://example.com/package");
-                    responder.send(&mut Err(GetInfoError::NotAvailable)).unwrap();
+                    responder.send(Err(GetInfoError::NotAvailable)).unwrap();
                 }
                 request => panic!("Unexpected request: {request:?}"),
             }

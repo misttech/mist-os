@@ -304,7 +304,7 @@ impl<'a> RequestHandler<'a> {
     fn get_info(
         self,
     ) -> Result<
-        (fppacket::Kind, Option<Box<fppacket::ProtocolAssociation>>, fppacket::BoundInterface),
+        (fppacket::Kind, Option<fppacket::ProtocolAssociation>, fppacket::BoundInterface),
         fposix::Errno,
     > {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
@@ -322,11 +322,9 @@ impl<'a> RequestHandler<'a> {
             ),
         };
 
-        let protocol = protocol.map(|p| {
-            Box::new(match p {
-                Protocol::All => fppacket::ProtocolAssociation::All(fppacket::Empty),
-                Protocol::Specific(p) => fppacket::ProtocolAssociation::Specified(p.get()),
-            })
+        let protocol = protocol.map(|p| match p {
+            Protocol::All => fppacket::ProtocolAssociation::All(fppacket::Empty),
+            Protocol::Specific(p) => fppacket::ProtocolAssociation::Specified(p.get()),
         });
 
         Ok((kind, protocol, interface))
@@ -455,7 +453,7 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetLinger { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetReusePort { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
@@ -484,9 +482,13 @@ impl<'a> RequestHandler<'a> {
             fppacket::SocketRequest::Bind { protocol, bound_interface_id, responder } => {
                 responder_send!(responder, self.bind(protocol, bound_interface_id))
             }
-            fppacket::SocketRequest::GetInfo { responder } => {
-                responder_send!(responder, &mut self.get_info());
-            }
+            fppacket::SocketRequest::GetInfo { responder } => responder_send!(
+                responder,
+                match self.get_info() {
+                    Ok((kind, ref protocol, ref iface)) => Ok((kind, protocol.as_ref(), iface)),
+                    Err(e) => Err(e),
+                }
+            ),
             fppacket::SocketRequest::RecvMsg {
                 want_packet_info,
                 data_len,
@@ -495,8 +497,15 @@ impl<'a> RequestHandler<'a> {
                 responder,
             } => {
                 let params = RecvMsgParams { want_packet_info, data_len, want_control, flags };
-                let response = self.receive();
-                responder_send!(responder, &mut response.map(|r| params.apply_to(r)))
+                responder_send!(
+                    responder,
+                    match self.receive().map(|r| params.apply_to(r)) {
+                        Ok((ref packet_info, ref data, ref control, truncated)) => {
+                            Ok((packet_info.as_ref(), data.as_slice(), control, truncated))
+                        }
+                        Err(e) => Err(e),
+                    }
+                )
             }
             fppacket::SocketRequest::SendMsg { packet_info, data, control, flags, responder } => {
                 if ![
@@ -616,7 +625,7 @@ impl RecvMsgParams {
     fn apply_to(
         self,
         response: Message,
-    ) -> (Option<Box<fppacket::RecvPacketInfo>>, Vec<u8>, fppacket::RecvControlData, u32) {
+    ) -> (Option<fppacket::RecvPacketInfo>, Vec<u8>, fppacket::RecvControlData, u32) {
         let Self { want_packet_info, data_len, want_control, flags } = self;
         let data_len = data_len.try_into().unwrap_or(usize::MAX);
 
@@ -635,7 +644,7 @@ impl RecvMsgParams {
                 },
             };
 
-            Box::new(fppacket::RecvPacketInfo { packet_type, interface_type, packet_info })
+            fppacket::RecvPacketInfo { packet_type, interface_type, packet_info }
         });
 
         // TODO(https://fxbug.dev/106735): Return control data and flags.

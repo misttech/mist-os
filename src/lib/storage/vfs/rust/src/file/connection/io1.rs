@@ -779,7 +779,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::GetAttributes { query: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::GetAttributes");
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::UpdateAttributes");
