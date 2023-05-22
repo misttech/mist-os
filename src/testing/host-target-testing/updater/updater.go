@@ -50,7 +50,9 @@ type Updater interface {
 
 func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
 	logger.Infof(ctx, "Checking system log for errors")
-	cmd := []string{"log_listener", "--tag", "system-updater", "--dump_logs"}
+	// Some older devices have different version of 'log_listener' and it expects
+	// '--dump_logs yes' options instead of '--dump_logs'
+	cmd := []string{"log_listener", "--tag", "system-updater", "--dump_logs", "yes"}
 
 	var stdout bytes.Buffer
 
