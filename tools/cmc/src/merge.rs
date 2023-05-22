@@ -65,17 +65,6 @@ pub fn merge(
         serde_json::to_string_pretty(&res)?
     };
 
-    let mut res = json!({});
-    for filename in &files {
-        let v: Value = json_or_json5_from_file(filename)?;
-        merge_json(&mut res, &v).map_err(|e| {
-            Error::parse(
-                format!("Multiple manifests set the same key: {}", e),
-                None,
-                Some(filename.as_path()),
-            )
-        })?;
-    }
     if let Some(output_path) = &output {
         util::ensure_directory_exists(output_path)?;
         fs::OpenOptions::new()
@@ -85,7 +74,7 @@ pub fn merge(
             .open(output_path)?
             .write_all(json_str.as_bytes())?;
     } else {
-        println!("{:#}", res);
+        println!("{}", json_str);
     }
 
     // Write files to depfile
