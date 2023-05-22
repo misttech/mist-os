@@ -50,7 +50,7 @@ legacy_cache_package_labels += [
   "//src/graphics/display/testing/coordinator-provider",
 ]
 
-# End to end (E2E) `dart_inspect_benchmarks` test requires the dart runner.
+# End to end (E2E) The `fuchsia.fidl_microbenchmarks.dart` require the dart runner.
 core_realm_shards += [ "//src/dart:dart_runner_core_shard" ]
 
 # Build with both JIT and AOT non-product dart runners. JIT is used for debug

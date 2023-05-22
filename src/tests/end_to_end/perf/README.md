@@ -9,9 +9,6 @@ This directory contains the following performance tests:
 *   `audio_mixer_profiler_test` - SL4F wrapper for profiling the different
     steps in the audio mixing process.
 
-*   `dart_inspect_benchmarks_test` - Tests the performance of the [Inspect]
-    API from Dart.
-
 *   `fidl_microbenchmarks_test` - SL4F wrapper for running FIDL
     microbenchmarks which test FIDL bindings for multiple languages.
 
