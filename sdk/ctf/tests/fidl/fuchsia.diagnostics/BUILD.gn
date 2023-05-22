@@ -40,6 +40,43 @@ ctf_fuchsia_component("diagnostics-test") {
   ]
 }
 
+ctf_executable("diagnostics-log-test-bin") {
+  output_name = "diagnostics-log-test"
+  testonly = true
+
+  sources = [ "logging_test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zxtest",
+  ]
+
+  non_cts_deps = [
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
+    "//sdk/lib/inspect/contrib/cpp:archive_reader",
+
+    # TODO(81398): Include this in the SDK.
+    "//sdk/lib/sys/component/cpp/testing:cpp",
+    "//third_party/rapidjson",
+    "//third_party/re2",
+  ]
+}
+
+ctf_fuchsia_component("diagnostics-log-test") {
+  manifest = "meta/diagnostics-log-test.cml"
+  testonly = true
+
+  deps = [
+    ":diagnostics-log-test-bin",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+  ]
+}
+
 ctf_executable("inspect-publisher-bin") {
   output_name = "inspect-publisher"
   testonly = true
@@ -63,7 +100,10 @@ ctf_fuchsia_component("inspect-publisher") {
 ctf_fuchsia_test_package("fuchsia-diagnostics-tests") {
   plasa_element = "fidl/fuchsia.diagnostics/ArchiveAccessor"
   package_name = "fuchsia-diagnostics-tests"
-  test_components = [ ":diagnostics-test" ]
+  test_components = [
+    ":diagnostics-test",
+    ":diagnostics-log-test",
+  ]
   deps = [ ":inspect-publisher" ]
 }
 
