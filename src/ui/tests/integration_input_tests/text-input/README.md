@@ -1,3 +1,22 @@
+## Setting up for running the tests
+
+The following is the command line to use if you want to run an integration
+input test on a product that is not natively graphical.  You must include
+both the test and `web_engine`.  If you do not, the tests may fail in ways
+that don't obviously point at the absence of `web_engine`.
+
+The `fx set` command for running the test under the QEMU emulator
+is as follows below:
+
+```
+fx set core.qemu-x64 \
+  --goma --auto-dir \
+  --with=//src/ui/tests/integration_input_tests \
+  --with=//src/chromium:web_engine
+```
+
+From here, you can compile and run the test as usual.
+
 ## Debugging Chromium tests using remote devtools
 
 TODO(fxbug.dev/109739): Automate the Chromium remote devtools setup.
