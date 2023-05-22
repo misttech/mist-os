@@ -82,7 +82,6 @@ class MediaButtonsListenerTest : public gtest::RealLoopFixture {
 
     ui_testing::UITestRealm::Config config;
     config.use_scene_owner = true;
-    config.use_input = true;
     ui_test_manager_.emplace(std::move(config));
 
     ui_test_manager_->BuildRealm();

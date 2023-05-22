@@ -189,7 +189,6 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
     config.use_scene_owner = true;
-    config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.passthrough_capabilities = {
         {// Uncomment the configuration below if you want to run Chrome remote

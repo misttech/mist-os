@@ -155,7 +155,6 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithUITestManager(
   // realm.
   ui_testing::UITestRealm::Config ui_config;
   ui_config.use_scene_owner = true;
-  ui_config.use_input = true;
   ui_config.use_flatland = true;
 
   // These are services that we need to expose from the UITestRealm.

@@ -45,11 +45,8 @@ using component_testing::Capability;
 using component_testing::ChildRef;
 using component_testing::ConfigValue;
 using component_testing::Directory;
-using component_testing::LocalComponent;
-using component_testing::LocalComponentHandles;
 using component_testing::ParentRef;
 using component_testing::Protocol;
-using component_testing::RealmBuilder;
 using component_testing::Ref;
 using component_testing::Route;
 using component_testing::Storage;
@@ -106,33 +103,6 @@ std::vector<std::string> DefaultSystemServices() {
           fuchsia::vulkan::loader::Loader::Name_};
 }
 
-// Returns the name of the scene owner component (if any).
-std::string SceneOwnerName(const UITestRealm::Config& config) {
-  if (!config.use_scene_owner) {
-    return "";
-  }
-
-  return kSceneManagerName;
-}
-
-// Returns the name of the input owner component (if any).
-std::string InputOwnerName(const UITestRealm::Config& config) {
-  if (!config.use_input) {
-    return "";
-  }
-
-  return kSceneManagerName;
-}
-
-// Returns the name of the virtual keyboard component (if any).
-std::string VirtualKeyboardOwnerName(const UITestRealm::Config& config) {
-  if (!config.use_scene_owner) {
-    return "";
-  }
-
-  return kVirtualKeyboardManagerName;
-}
-
 // List of scenic services available in the test realm.
 std::vector<std::string> ScenicServices(const UITestRealm::Config& config) {
   if (config.use_flatland) {
@@ -170,25 +140,14 @@ std::vector<std::string> AccessibilityServices(const UITestRealm::Config& config
 
 // List of scene owner services available in the test realm.
 std::vector<std::string> SceneOwnerServices(const UITestRealm::Config& config) {
-  if (!config.use_scene_owner)
-    return {};
-
-  return {fuchsia::session::scene::Manager::Name_,
-          fuchsia::ui::accessibility::view::Registry::Name_};
-}
-
-// List of input services available in the test realm.
-std::vector<std::string> InputServices(const UITestRealm::Config& config) {
-  if (!config.use_input) {
-    return {};
-  }
-
-  if (config.use_scene_owner) {
-    return {fuchsia::input::injection::InputDeviceRegistry::Name_,
-            fuchsia::ui::policy::DeviceListenerRegistry::Name_};
-  } else {
+  if (!config.use_scene_owner) {
     return {fuchsia::ui::pointerinjector::Registry::Name_};
   }
+
+  return {fuchsia::session::scene::Manager::Name_,
+          fuchsia::ui::accessibility::view::Registry::Name_,
+          fuchsia::input::injection::InputDeviceRegistry::Name_,
+          fuchsia::ui::policy::DeviceListenerRegistry::Name_};
 }
 
 // Returns a mapping from ui service name to the component that vends the
@@ -205,22 +164,17 @@ std::map<std::string, std::string> GetServiceToComponentMap(UITestRealm::Config 
   }
 
   for (const auto& service : SceneOwnerServices(config)) {
-    service_to_component[service] = SceneOwnerName(config);
+    service_to_component[service] = kSceneManagerName;
   }
 
-  for (const auto& service : InputServices(config)) {
-    service_to_component[service] = InputOwnerName(config);
-  }
-
-  // Additional input services.
-  if (config.use_input) {
+  // Additional input services specific to the scene_manager scene.
+  if (config.use_scene_owner) {
     service_to_component[fuchsia::ui::input::ImeService::Name_] = kTextManagerName;
     service_to_component[fuchsia::ui::input3::Keyboard::Name_] = kTextManagerName;
-
     service_to_component[fuchsia::input::virtualkeyboard::ControllerCreator::Name_] =
-        VirtualKeyboardOwnerName(config);
+        kVirtualKeyboardManagerName;
     service_to_component[fuchsia::input::virtualkeyboard::Manager::Name_] =
-        VirtualKeyboardOwnerName(config);
+        kVirtualKeyboardManagerName;
   }
 
   return service_to_component;
@@ -347,11 +301,11 @@ void UITestRealm::ConfigureAccessibility() {
     if (config_.use_flatland) {
       RouteServices({fuchsia::accessibility::scene::Provider::Name_},
                     /* source = */ ChildRef{kA11yManagerName},
-                    /* targets = */ {ChildRef{SceneOwnerName(config_)}});
+                    /* targets = */ {ChildRef{kSceneManagerName}});
     } else {
       RouteServices({fuchsia::accessibility::Magnifier::Name_},
                     /* source = */ ChildRef{kA11yManagerName},
-                    /* targets = */ {ChildRef{SceneOwnerName(config_)}});
+                    /* targets = */ {ChildRef{kSceneManagerName}});
     }
   }
 }
@@ -369,7 +323,6 @@ void UITestRealm::RouteConfigData() {
     targets.push_back(ChildRef{kScenicName});
   }
 
-  std::string scene_owner_name = SceneOwnerName(config_);
   if (config_.use_scene_owner) {
     // Supply a default display rotation.
     config_directory_contents.AddFile("display_rotation", std::to_string(config_.display_rotation));
@@ -389,7 +342,7 @@ void UITestRealm::RouteConfigData() {
     config_directory_contents.AddFile("display_pixel_density",
                                       std::to_string(display_pixel_density));
 
-    targets.push_back(ChildRef{scene_owner_name});
+    targets.push_back(ChildRef{kSceneManagerName});
   }
 
   if (!targets.empty()) {
@@ -406,33 +359,23 @@ void UITestRealm::ConfigureSceneOwner() {
   auto input_config_directory_contents = component_testing::DirectoryContents();
   std::vector<Ref> targets;
 
+  // Configure light sensor in Scene Manager.
   targets.push_back(ChildRef{kSceneManagerName});
   input_config_directory_contents.AddFile("empty.json", "");
   realm_builder_.RouteReadOnlyDirectory("sensor-config", std::move(targets),
                                         std::move(input_config_directory_contents));
-}
 
-void UITestRealm::ConfigureSceneProvider() {
-  // The scene provider component will only be present in the test realm if the
-  // client specifies a scene owner.
-  if (!config_.use_scene_owner) {
-    return;
-  }
+  // Configure Activity Service in Scene Manager.
+  realm_builder_.InitMutableConfigFromPackage(kSceneManagerName);
+  realm_builder_.SetConfigValue(kSceneManagerName, "idle_threshold_minutes",
+                                ConfigValue::Uint64(config_.idle_threshold_minutes));
 
-  // scene-provider has more config fields than we set here, load the defaults.
+  // Configure scene provider, which will only be present in the test realm if
+  // the client specifies a scene owner. Note: scene-provider has more config
+  // fields than we set here, load the defaults.
   realm_builder_.InitMutableConfigFromPackage(kSceneProviderName);
   realm_builder_.SetConfigValue(kSceneProviderName, "use_flatland",
                                 ConfigValue::Bool(config_.use_flatland));
-}
-
-void UITestRealm::ConfigureActivityService() {
-  if (!config_.use_input) {
-    return;
-  }
-
-  realm_builder_.InitMutableConfigFromPackage(InputOwnerName(config_));
-  realm_builder_.SetConfigValue(InputOwnerName(config_), "idle_threshold_minutes",
-                                ConfigValue::Uint64(config_.idle_threshold_minutes));
 }
 
 void UITestRealm::Build() {
@@ -441,31 +384,28 @@ void UITestRealm::Build() {
   //
   // NOTE: We opt to configure accessibility dynamically, rather then in the
   // .cml for the base realms, because there are three different a11y
-  // configurations (fake, real, none), which can each apply to scenes
-  // with/without input. The a11y service routing is also different for gfx and
-  // flatland, so it would be unwieldy to create a separate static declaration
-  // for every a11y configuration tested.
+  // configurations (fake, real, none), which can each apply to scenic-only or
+  // scene_manager-controlled scenes. The a11y service routing is also different
+  // for gfx and flatland, so it would be unwieldy to create a separate static
+  // declaration for every a11y configuration tested.
   ConfigureAccessibility();
 
   // Route config data directories to appropriate recipients (currently, scenic,
   // scene manager, and root presenter are the only use cases for config files.
   RouteConfigData();
 
-  // Route input pipeline config data directories to input manager (either
-  // input-pipeline or scene-manager).
+  // Configure Scene Manager if it is in use as the scene owner. This includes:
+  // * routing input pipeline config data directories to Scene Manager
+  // * overriding component config to specify how long the idle threshold
+  //   timeout should be for the
+  // activity service
+  // * overriding component config for scene provider to specify which API to
+  //   use to attach the client view to the scene.
   ConfigureSceneOwner();
 
   // This step needs to come after ConfigureAccessibility(), because the a11y
   // manager component needs to be added to the realm first.
   ConfigureClientSubrealm();
-
-  // Override component config for scene provider to specify which API to use to
-  // attach the client view to the scene.
-  ConfigureSceneProvider();
-
-  // Override component config for input owner to specify how long the idle
-  // threshold timeout should be.
-  ConfigureActivityService();
 
   realm_builder_.AddRoute(Route{
       .capabilities = {Storage{"tmp"}}, .source = ParentRef(), .targets = {ChildRef{kScenicName}}});

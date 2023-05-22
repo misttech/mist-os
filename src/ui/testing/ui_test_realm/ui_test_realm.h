@@ -109,26 +109,24 @@ class UITestRealm {
     // Specifies whether scene manager owns the root of the scene.
     // If false, then no scene owner will be present in the test realm.
     //
-    // Furthermore, if a scene owner is used, the client promises to expose
+    // UITestManager assumes that scene manager serves input via input pipeline
+    // in addition to managing scene ownership. Therefore it exposes the
+    // following services out of the test from the top-level realm:
+    //   * fuchsia.input.injection.InputDeviceRegistry
+    //   * fuchsia.ui.policy.DeviceListenerRegistry
+    //   * fuchsia.ui.pointerinjector.configuration.Setup
+    //
+    // Furthermore, if |use_scene_owner| is true, the client promises to expose
     // fuchsia.ui.app.ViewProvider from its subrealm.
+    //
+    // If |use_scene_owner| is false, the top-level realm exposes the raw scenic
+    // input API:
+    //   * fuchsia.ui.pointerinjector.Registry
     bool use_scene_owner = false;
 
     // Specifies the entity that owns accessibility in the test realm, if any.
     // If std::nullopt, then no a11y services will be present in the test realm.
     std::optional<AccessibilityOwnerType> accessibility_owner;
-
-    // Instructs UITestManager to expose input APIs out of the test realm.
-    //
-    // If use_scene_owner is true, scene manager will own input and
-    // the top-level realm will expose the following services:
-    //   * fuchsia.input.injection.InputDeviceRegistry
-    //   * fuchsia.ui.policy.DeviceListenerRegistry
-    //   * fuchsia.ui.pointerinjector.configuration.Setup
-    //
-    // If use_scene_owner is false, the top-level realm exposes the raw scenic
-    // input API:
-    //   * fuchsia.ui.pointerinjector.Registry
-    bool use_input = false;
 
     // List of ui services required by components in the client subrealm.
     // UITestManager will route these services from the ui layer component to the
@@ -193,8 +191,6 @@ class UITestRealm {
   void ConfigureAccessibility();
   void RouteConfigData();
   void ConfigureSceneOwner();
-  void ConfigureSceneProvider();
-  void ConfigureActivityService();
 
   // Helper method to route a set of services from the specified source to the
   // spceified targets.
