@@ -84,9 +84,6 @@ pub struct Mount {
     /// A unique identifier for this mount reported in /proc/pid/mountinfo.
     id: u64,
 
-    /// If this is a bind mount, the mount of what it was bind mounted from, otherwise None.
-    origin_mount: Option<MountHandle>,
-
     // Lock ordering: mount -> submount
     state: RwLock<MountState>,
     // Mount used to contain a Weak<Namespace>. It no longer does because since the mount point
@@ -149,19 +146,15 @@ static NEXT_PEER_GROUP_ID: AtomicU64 = AtomicU64::new(1);
 impl Mount {
     fn new(what: WhatToMount, flags: MountFlags) -> MountHandle {
         match what {
-            WhatToMount::Fs(fs) => Self::new_with_root(fs.root().clone(), None, flags),
+            WhatToMount::Fs(fs) => Self::new_with_root(fs.root().clone(), flags),
             WhatToMount::Bind(node) => {
                 let mount = node.mount.expect("can't bind mount from an anonymous node");
-                mount.clone_mount(&node.entry, Some(&mount), flags)
+                mount.clone_mount(&node.entry, flags)
             }
         }
     }
 
-    fn new_with_root(
-        root: DirEntryHandle,
-        origin_mount: Option<MountHandle>,
-        flags: MountFlags,
-    ) -> MountHandle {
+    fn new_with_root(root: DirEntryHandle, flags: MountFlags) -> MountHandle {
         let known_flags = MountFlags::STORED_FLAGS | MountFlags::SILENT;
         assert!(
             !flags.intersects(!known_flags),
@@ -172,7 +165,6 @@ impl Mount {
         Arc::new(Self {
             id: NEXT_MOUNT_ID.fetch_add(1, Ordering::Relaxed),
             root,
-            origin_mount,
             flags,
             fs,
             state: Default::default(),
@@ -241,14 +233,12 @@ impl Mount {
     fn clone_mount(
         self: &MountHandle,
         new_root: &DirEntryHandle,
-        new_origin: Option<&MountHandle>,
         flags: MountFlags,
     ) -> MountHandle {
         assert!(new_root.is_descendant_of(&self.root));
         // According to mount(2) on bind mounts, all flags other than MS_REC are ignored when doing
         // a bind mount.
-        let clone =
-            Self::new_with_root(Arc::clone(new_root), new_origin.map(Arc::clone), self.flags);
+        let clone = Self::new_with_root(Arc::clone(new_root), self.flags);
 
         if flags.contains(MountFlags::REC) {
             // This is two steps because the alternative (locking clone.state while iterating over
@@ -278,7 +268,7 @@ impl Mount {
     /// Do a clone of the full mount hierarchy below this mount. Used for creating mount
     /// namespaces and creating copies to use for propagation.
     fn clone_mount_recursive(self: &MountHandle) -> MountHandle {
-        self.clone_mount(&self.root, self.origin_mount.as_ref(), MountFlags::REC)
+        self.clone_mount(&self.root, MountFlags::REC)
     }
 
     pub fn change_propagation(self: &MountHandle, flag: MountFlags, recursive: bool) {
@@ -594,6 +584,21 @@ impl ProcMountinfoFile {
 }
 impl DynamicFileSource for ProcMountinfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        // Returns path to the `dir` from the root of the file system.
+        fn path_from_fs_root(dir: &DirEntryHandle) -> FsString {
+            let mut path = PathBuilder::new();
+            if dir.is_dead() {
+                // Return `/foo/dir//deleted` if the dir was deleted.
+                path.prepend_element(b"/deleted");
+            }
+            let mut current = dir.clone();
+            while let Some(next) = current.parent() {
+                path.prepend_element(&current.local_name());
+                current = next
+            }
+            path.build()
+        }
+
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
@@ -608,15 +613,13 @@ impl DynamicFileSource for ProcMountinfoFile {
             }
             // Can't fail, mountpoint() and root() can't return a NamespaceNode with no mount
             let parent = mountpoint.mount.as_ref().unwrap();
-            let origin =
-                NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
             write!(
                 sink,
                 "{} {} {} {} {} {}",
                 mount.id,
                 parent.id,
                 mount.root.node.fs().dev_id,
-                String::from_utf8_lossy(&origin.path(&task)),
+                String::from_utf8_lossy(&path_from_fs_root(&mount.root)),
                 String::from_utf8_lossy(&mountpoint.path(&task)),
                 mount.flags.to_string(),
             )?;
@@ -1002,38 +1005,29 @@ impl NamespaceNode {
             return PathWithReachability::Reachable(self.entry.local_name().to_vec());
         }
 
-        fn build_path(mut components: Vec<FsString>) -> FsString {
-            if components.is_empty() {
-                return b"/".to_vec();
-            }
-            components.push(vec![]);
-            components.reverse();
-            components.join(&b'/')
-        }
-
-        let mut components = vec![];
+        let mut path = PathBuilder::new();
         let mut current = self.escape_mount();
         if let Some(root) = root {
             // The current node is expected to intersect with the custom root as we travel up the tree.
             let root = root.escape_mount();
             while current != root {
                 if let Some(parent) = current.parent() {
-                    components.push(current.entry.local_name().to_vec());
+                    path.prepend_element(&current.entry.local_name());
                     current = parent.escape_mount();
                 } else {
                     // This node hasn't intersected with the custom root and has reached the namespace root.
-                    return PathWithReachability::Unreachable(build_path(components));
+                    return PathWithReachability::Unreachable(path.build());
                 }
             }
         } else {
             // No custom root, so travel up the tree to the namespace root.
             while let Some(parent) = current.parent() {
-                components.push(current.entry.local_name().to_vec());
+                path.prepend_element(&current.entry.local_name());
                 current = parent.escape_mount();
             }
         }
 
-        PathWithReachability::Reachable(build_path(components))
+        PathWithReachability::Reachable(path.build())
     }
 
     pub fn mount(&self, what: WhatToMount, flags: MountFlags) -> Result<(), Errno> {

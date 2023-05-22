@@ -336,7 +336,6 @@
                 "MountTest.TmpfsSizePartialWriteMultiplePages",
                 "MountTest.ReuseGroupIDs",
                 "MountTest.PropagateUmountEvent",
-                "MountTest.MountInfoHasRoot",
 
                 // msgqueue_test
                 "MsgqueueTest.MsgCtlIpcSet",

@@ -179,6 +179,7 @@
                 "MountTest.MakePrivate",
                 "MountTest.MakeShared",
                 "MountTest.MountBadFilesystem",
+                "MountTest.MountInfoHasRoot",
                 "MountTest.MountNoAtime",
                 "MountTest.MountOverBusy",
                 "MountTest.MountPermDenied",
