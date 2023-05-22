@@ -258,11 +258,6 @@ void VmObject::NotifyOneChild() {
   }
 }
 
-void VmObject::ReplaceChildLocked(VmObject* old, VmObject* new_child) {
-  canary_.Assert();
-  children_list_.replace(*old, new_child);
-}
-
 void VmObject::DropChildLocked(VmObject* c) {
   canary_.Assert();
   DEBUG_ASSERT(children_list_len_ > 0);

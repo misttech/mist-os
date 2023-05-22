@@ -622,7 +622,7 @@ class VmObject : public VmHierarchyBase,
   // Drops |c| from the child list without going through the full removal
   // process. ::RemoveChild is probably what you want here.
   void DropChildLocked(VmObject* c) TA_REQ(lock());
-  void ReplaceChildLocked(VmObject* old, VmObject* new_child) TA_REQ(lock());
+
   uint32_t num_children() const;
 
   // Calls the provided |func(const VmObject&)| on every VMO in the system,
