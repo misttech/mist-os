@@ -16,22 +16,21 @@ import (
 )
 
 type config struct {
-	archiveConfig              *cli.ArchiveConfig
-	installerConfig            *cli.InstallerConfig
-	deviceConfig               *cli.DeviceConfig
-	chainedBuildConfig         *cli.RepeatableBuildConfig
-	downgradeBuildConfig       *cli.BuildConfig
-	upgradeBuildConfig         *cli.BuildConfig
-	paveTimeout                time.Duration
-	cycleCount                 uint
-	cycleTimeout               time.Duration
-	beforeInitScript           string
-	afterInitScript            string
-	afterTestScript            string
-	useFlash                   bool
-	downgradeOTAAttempts       uint
-	bootfsCompression          string
-	buildExpectUnknownFirmware bool
+	archiveConfig        *cli.ArchiveConfig
+	installerConfig      *cli.InstallerConfig
+	deviceConfig         *cli.DeviceConfig
+	chainedBuildConfig   *cli.RepeatableBuildConfig
+	downgradeBuildConfig *cli.BuildConfig
+	upgradeBuildConfig   *cli.BuildConfig
+	paveTimeout          time.Duration
+	cycleCount           uint
+	cycleTimeout         time.Duration
+	beforeInitScript     string
+	afterInitScript      string
+	afterTestScript      string
+	useFlash             bool
+	downgradeOTAAttempts uint
+	bootfsCompression    string
 }
 
 func newConfig(fs *flag.FlagSet) (*config, error) {
@@ -63,7 +62,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
 	fs.UintVar(&c.downgradeOTAAttempts, "downgrade-ota-attempts", 1, "Number of times to try to OTA from the downgrade build to the upgrade build before failing.")
 	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd", "compress storage images, default is zstd")
-	fs.BoolVar(&c.buildExpectUnknownFirmware, "build-expect-unknown-firmware", false, "Ignore 'Unknown Firmware' during OTAs")
 	return c, nil
 }
 
