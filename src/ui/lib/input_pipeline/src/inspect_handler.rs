@@ -7,9 +7,13 @@ use crate::input_handler::InputHandler;
 use async_trait::async_trait;
 use fuchsia_inspect::{self as inspect, Inspector, NumericProperty, Property};
 use fuchsia_zircon as zx;
+use futures::lock::Mutex;
 use futures::FutureExt;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+use std::sync::Arc;
+
+const MAX_RECENT_EVENT_LOG_SIZE: usize = 125;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 enum EventType {
@@ -101,6 +105,27 @@ impl EventCounters {
     }
 }
 
+struct CircularBuffer {
+    // Size of CircularBuffer
+    _size: usize,
+    // VecDeque of recent events with capacity of `size`
+    _events: VecDeque<InputEvent>,
+}
+
+impl CircularBuffer {
+    fn new(size: usize) -> Self {
+        let events = VecDeque::with_capacity(size);
+        CircularBuffer { _size: size, _events: events }
+    }
+
+    fn _push(&mut self, event: InputEvent) {
+        if self._events.len() >= self._size {
+            std::mem::drop(self._events.pop_front());
+        }
+        self._events.push_back(event);
+    }
+}
+
 /// A [InputHandler] that records various metrics about the flow of events.
 /// All events are passed through unmodified.  Some properties of those events
 /// may be exposed in the metrics.  No PII information should ever be exposed
@@ -162,8 +187,10 @@ impl InspectHandler {
 
         let _recent_events_log = match displays_recent_events {
             true => {
+                let recent_events =
+                    Arc::new(Mutex::new(CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE)));
                 Self::record_lazy_recent_events(&node);
-                Some(())
+                Some(recent_events)
             }
             false => None,
         };
@@ -208,6 +235,45 @@ mod tests {
 
     fn fixed_now() -> zx::Time {
         zx::Time::ZERO + zx::Duration::from_nanos(42)
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn check_circular_buffer() {
+        let mut circular_buffer = CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE);
+        assert_eq!(circular_buffer._size, MAX_RECENT_EVENT_LOG_SIZE);
+
+        let first_event_time = zx::Time::get_monotonic();
+        circular_buffer._push(testing_utilities::create_fake_input_event(first_event_time));
+        let second_event_time = zx::Time::get_monotonic();
+        circular_buffer._push(testing_utilities::create_fake_input_event(second_event_time));
+
+        // Fill up `events` VecDeque
+        for _i in 2..MAX_RECENT_EVENT_LOG_SIZE {
+            let curr_event_time = zx::Time::get_monotonic();
+            circular_buffer._push(testing_utilities::create_fake_input_event(curr_event_time));
+            match circular_buffer._events.back() {
+                Some(event) => assert_eq!(event.event_time, curr_event_time),
+                None => assert!(false),
+            }
+        }
+
+        // Verify first event at the front
+        match circular_buffer._events.front() {
+            Some(event) => assert_eq!(event.event_time, first_event_time),
+            None => assert!(false),
+        }
+
+        // CircularBuffer `events` should be full, pushing another event should remove the first event.
+        let last_event_time = zx::Time::get_monotonic();
+        circular_buffer._push(testing_utilities::create_fake_input_event(last_event_time));
+        match circular_buffer._events.front() {
+            Some(event) => assert_eq!(event.event_time, second_event_time),
+            None => assert!(false),
+        }
+        match circular_buffer._events.back() {
+            Some(event) => assert_eq!(event.event_time, last_event_time),
+            None => assert!(false),
+        }
     }
 
     #[fasync::run_singlethreaded(test)]
