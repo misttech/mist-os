@@ -15,6 +15,7 @@
 #include <object/handle.h>
 #include <object/job_dispatcher.h>
 #include <object/profile_dispatcher.h>
+#include <object/vm_address_region_dispatcher.h>
 
 KCOUNTER(profile_create, "profile.create")
 KCOUNTER(profile_set, "profile.set")
@@ -68,13 +69,7 @@ zx_status_t sys_object_set_profile(zx_handle_t handle, zx_handle_t profile_handl
                                    uint32_t options) {
   auto up = ProcessDispatcher::GetCurrent();
 
-  // TODO(cpu): support more than thread objects, and actually do something.
-
-  fbl::RefPtr<ThreadDispatcher> thread;
-  auto status =
-      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_MANAGE_THREAD, &thread);
-  if (status != ZX_OK)
-    return status;
+  kcounter_add(profile_set, 1);
 
   fbl::RefPtr<ProfileDispatcher> profile;
   zx_status_t result = up->handle_table().GetDispatcherWithRights(*up, profile_handle,
@@ -82,7 +77,24 @@ zx_status_t sys_object_set_profile(zx_handle_t handle, zx_handle_t profile_handl
   if (result != ZX_OK)
     return result;
 
-  kcounter_add(profile_set, 1);
+  fbl::RefPtr<Dispatcher> disp;
+  zx_rights_t rights;
+  result = up->handle_table().GetDispatcherWithRights(*up, handle, 0, &disp, &rights);
+  if (result != ZX_OK)
+    return result;
 
-  return profile->ApplyProfile(ktl::move(thread));
+  if (fbl::RefPtr<ThreadDispatcher> thread = DownCastDispatcher<ThreadDispatcher>(&disp)) {
+    if (!(rights & ZX_RIGHT_MANAGE_THREAD)) {
+      return ZX_ERR_ACCESS_DENIED;
+    }
+    return profile->ApplyProfile(ktl::move(thread));
+  }
+  if (fbl::RefPtr<VmAddressRegionDispatcher> vmar =
+          DownCastDispatcher<VmAddressRegionDispatcher>(&disp)) {
+    if (!(rights & ZX_RIGHT_OP_CHILDREN)) {
+      return ZX_ERR_ACCESS_DENIED;
+    }
+    return profile->ApplyProfile(ktl::move(vmar));
+  }
+  return ZX_ERR_WRONG_TYPE;
 }

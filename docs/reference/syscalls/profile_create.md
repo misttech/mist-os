@@ -39,6 +39,7 @@ fields of *profile* are shown below. *options* must be zero.
 #define ZX_PROFILE_INFO_FLAG_CPU_MASK (1 << 1)
 #define ZX_PROFILE_INFO_FLAG_DEADLINE (1 << 2)
 #define ZX_PROFILE_INFO_FLAG_NO_INHERIT (1 << 3)
+#define ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY (1 << 4)
 
 typedef struct zx_profile_info {
   // A bitmask of ZX_PROFILE_INFO_FLAG_* values. Controls overall profile
@@ -50,7 +51,8 @@ typedef struct zx_profile_info {
 
   union {
     struct {
-      // Scheduling priority. |flags| must have ZX_PROFILE_INFO_FLAG_PRIORITY set.
+      // Scheduling priority. |flags| must have ZX_PROFILE_INFO_FLAG_PRIORITY or
+      // ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY set.
       int32_t priority;
       uint8_t padding2[20];
     };
@@ -75,6 +77,12 @@ additional fields are added in future.
 `scheduling discipline` for the profile, either "fair scheduling" (for
 `PRIORITY`) or "deadline scheduling" (for `DEADLINE`.  No more than one of these
 disciplines may be selected at the same time.
+
+`ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY` allows for creating a profile that can be applied to
+VMARs and is incompatible with any flags related scheduling. When selecting a memory
+priority only `ZX_PRIORITY_DEFAULT` and `ZX_PRIORITY_HIGH` currently have meaning, with the
+former being the default all VMARs initially have, and the latter indicating that all kernel
+initiated reclamation on objects the profile is applied to should be avoided.
 
 By default, profiles participate in profile inheritance when assigned to a
 thread which blocks in a futex with an assigned owner (see `zx_futex_wait()`).
@@ -114,11 +122,12 @@ right, or *root_job* is not a handle to the root job.
 
   * *profile* or *out* was an invalid pointer
   * *flags* contains an unknown option
-  * *flags* either failed to specify a scheduling discipline, or a cpu
-            affinity mask.
+  * *flags* either failed to specify a scheduling discipline, a cpu affinity mask, or a
+            memory priority.
   * *flags* specified more than one scheduling discipline at once.
   * *flags* specified the scheduling discipline as deadline, but the profile
             was also marked as "no inherit".
+  * *flags* specified a scheduling discipline and a memory priority.
   * *options* was not zero
   * *priority* was an invalid priority
 

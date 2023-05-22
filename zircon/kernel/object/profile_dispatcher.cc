@@ -16,6 +16,7 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/bit.h>
 #include <object/thread_dispatcher.h>
+#include <object/vm_address_region_dispatcher.h>
 
 #include <ktl/enforce.h>
 
@@ -87,16 +88,34 @@ static zx::result<SchedulerState::BaseProfile> validate_and_create_profile(
   }
 }
 
+static zx::result<VmAddressRegion::MemoryPriority> parse_memory_priority(
+    const zx_profile_info_t& info) {
+  if (info.priority == ZX_PRIORITY_HIGH) {
+    return zx::ok(VmAddressRegion::MemoryPriority::HIGH);
+  }
+  if (info.priority == ZX_PRIORITY_DEFAULT) {
+    return zx::ok(VmAddressRegion::MemoryPriority::DEFAULT);
+  }
+  return zx::error(ZX_ERR_INVALID_ARGS);
+}
+
 zx_status_t ProfileDispatcher::Create(const zx_profile_info_t& info,
                                       KernelHandle<ProfileDispatcher>* handle,
                                       zx_rights_t* rights) {
   // A profile must specify at least a set of scheduling parameters, or a cpu
-  // affinity mask (or both).
+  // affinity mask, or a memory priority.
   constexpr uint32_t kSchedFlags = ZX_PROFILE_INFO_FLAG_PRIORITY | ZX_PROFILE_INFO_FLAG_DEADLINE;
   constexpr uint32_t kAffinityFlags = ZX_PROFILE_INFO_FLAG_CPU_MASK;
-  constexpr uint32_t kRequiredFlags = kSchedFlags | kAffinityFlags;
+  constexpr uint32_t kThreadFlags = kSchedFlags | kAffinityFlags;
+  constexpr uint32_t kMemoryFlags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY;
+  constexpr uint32_t kRequiredFlags = kThreadFlags | kMemoryFlags;
 
   if ((info.flags & kRequiredFlags) == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // Memory flags are incompatible with thread related flags.
+  if ((info.flags & kMemoryFlags) != 0 && (info.flags & kThreadFlags) != 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -122,8 +141,19 @@ zx_status_t ProfileDispatcher::Create(const zx_profile_info_t& info,
     cpu_mask = maybe_mask.value();
   }
 
+  ktl::optional<VmAddressRegion::MemoryPriority> memory_priority;
+  if ((info.flags & kMemoryFlags) != 0) {
+    zx::result<VmAddressRegion::MemoryPriority> maybe_memory_priority = parse_memory_priority(info);
+
+    if (maybe_memory_priority.is_error()) {
+      return maybe_memory_priority.error_value();
+    }
+    memory_priority = maybe_memory_priority.value();
+  }
+
   fbl::AllocChecker ac;
-  KernelHandle new_handle(fbl::AdoptRef(new (&ac) ProfileDispatcher(profile, cpu_mask)));
+  KernelHandle new_handle(
+      fbl::AdoptRef(new (&ac) ProfileDispatcher(profile, cpu_mask, memory_priority)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -133,9 +163,11 @@ zx_status_t ProfileDispatcher::Create(const zx_profile_info_t& info,
   return ZX_OK;
 }
 
-ProfileDispatcher::ProfileDispatcher(const ktl::optional<SchedulerState::BaseProfile>& profile,
-                                     const ktl::optional<cpu_mask_t>& cpu_mask)
-    : profile_(profile), cpu_mask_(cpu_mask) {
+ProfileDispatcher::ProfileDispatcher(
+    const ktl::optional<SchedulerState::BaseProfile>& profile,
+    const ktl::optional<cpu_mask_t>& cpu_mask,
+    const ktl::optional<VmAddressRegion::MemoryPriority>& memory_priority)
+    : profile_(profile), cpu_mask_(cpu_mask), memory_priority_(memory_priority) {
   kcounter_add(dispatcher_profile_create_count, 1);
 }
 
@@ -154,5 +186,12 @@ zx_status_t ProfileDispatcher::ApplyProfile(fbl::RefPtr<ThreadDispatcher> thread
     return thread->SetSoftAffinity(cpu_mask_.value());
   }
 
+  return ZX_OK;
+}
+
+zx_status_t ProfileDispatcher::ApplyProfile(fbl::RefPtr<VmAddressRegionDispatcher> vmar) {
+  if (memory_priority_.has_value()) {
+    return vmar->SetMemoryPriority(memory_priority_.value());
+  }
   return ZX_OK;
 }

@@ -44,6 +44,8 @@ class VmAddressRegionDispatcher final
 
   zx_status_t Unmap(vaddr_t base, size_t len, VmAddressRegionOpChildren op_children);
 
+  zx_status_t SetMemoryPriority(VmAddressRegion::MemoryPriority priority);
+
   const fbl::RefPtr<VmAddressRegion>& vmar() const { return vmar_; }
 
   // Check if the given flags define an allowed combination of RWX

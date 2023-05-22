@@ -269,6 +269,13 @@ zx_status_t VmAddressRegionDispatcher::Unmap(vaddr_t base, size_t len,
   return vmar_->Unmap(base, len, op_children);
 }
 
+zx_status_t VmAddressRegionDispatcher::SetMemoryPriority(
+    VmAddressRegion::MemoryPriority memory_priority) {
+  canary_.Assert();
+
+  return vmar_->SetMemoryPriority(memory_priority);
+}
+
 bool VmAddressRegionDispatcher::is_valid_mapping_protection(uint32_t flags) {
   if (!(flags & ZX_VM_PERM_READ)) {
     // No way to express non-readable mappings that are also writeable or

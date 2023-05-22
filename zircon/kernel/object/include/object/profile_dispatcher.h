@@ -24,13 +24,16 @@ class ProfileDispatcher final
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_PROFILE; }
 
   zx_status_t ApplyProfile(fbl::RefPtr<ThreadDispatcher> thread);
+  zx_status_t ApplyProfile(fbl::RefPtr<VmAddressRegionDispatcher> vmar);
 
  private:
   explicit ProfileDispatcher(const ktl::optional<SchedulerState::BaseProfile>& profile,
-                             const ktl::optional<cpu_mask_t>& cpu_mask);
+                             const ktl::optional<cpu_mask_t>& cpu_mask,
+                             const ktl::optional<VmAddressRegion::MemoryPriority>& memory_priority);
 
   const ktl::optional<SchedulerState::BaseProfile> profile_;
   const ktl::optional<cpu_mask_t> cpu_mask_;
+  const ktl::optional<VmAddressRegion::MemoryPriority> memory_priority_;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PROFILE_DISPATCHER_H_

@@ -33,11 +33,12 @@ The parameter *profile* is a handle to a [profile] object created with [`zx_prof
 
 *options* is currently ignored, and should be set to `0` by callers.
 
-Currently, the the only supported *target* object type is [thread]. Other object types may be
-supported in the future.
+Currently, the the only two supported *target* object types are [thread] and [vmar]. Other
+object types may be supported in the future.
 
 [profile]: /docs/reference/kernel_objects/profile.md
 [thread]: /docs/reference/kernel_objects/thread.md
+[vmar]: /docs/reference/kernel_objects/vm_address_region.md
 
 ## Rights
 
@@ -53,12 +54,13 @@ Returns **ZX_OK** on success. In the event of failure, a negative error value is
 
 **ZX_ERR_BAD_HANDLE**  *target* is not a valid handle.
 
-**ZX_ERR_WRONG_TYPE**  *target* is not a thread handle.
+**ZX_ERR_WRONG_TYPE**  *target* is not a thread or vmar handle.
 
 **ZX_ERR_ACCESS_DENIED**  *target* does not have **ZX_RIGHT_MANAGE_THREAD** right.
 
 **ZX_ERR_BAD_STATE**  When *target* is a thread that is still being created, is dying, or dead, and
-cannot have a *profile* applied to it.
+cannot have a *profile* applied to it, or *target* is a VMAR and *profile* contains an
+invalid priority.
 
 ## See also
 

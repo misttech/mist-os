@@ -4,6 +4,7 @@
 
 #include <lib/standalone-test/standalone.h>
 #include <lib/zx/job.h>
+#include <lib/zx/pager.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <zircon/errors.h>
@@ -42,6 +43,13 @@ zx_profile_info_t MakeCpuMaskProfile(uint64_t mask) {
   zx_profile_info_t info = {};
   info.flags = ZX_PROFILE_INFO_FLAG_CPU_MASK;
   info.cpu_affinity_mask.mask[0] = mask;
+  return info;
+}
+
+zx_profile_info_t MakeMemoryPriorityProfile(int32_t priority) {
+  zx_profile_info_t info = {};
+  info.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY;
+  info.priority = priority;
   return info;
 }
 
@@ -353,6 +361,103 @@ TEST(CpuMaskProfile, ApplyProfile) {
       return ZX_OK;
     }));
   }
+}
+
+TEST(MemoryPriorityProfile, InvalidPriorities) {
+  constexpr int32_t kBadPriorities[] = {ZX_PRIORITY_LOWEST, ZX_PRIORITY_LOW, ZX_PRIORITY_HIGHEST};
+
+  for (const int32_t prio : kBadPriorities) {
+    zx::profile profile;
+
+    zx_profile_info_t profile_info = MakeMemoryPriorityProfile(prio);
+    EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx::profile::create(*GetRootJob(), 0u, &profile_info, &profile));
+  }
+}
+
+TEST(MemoryPriorityProfile, MemoryOrThread) {
+  const uint32_t kInvalidWith[] = {ZX_PROFILE_INFO_FLAG_PRIORITY, ZX_PROFILE_INFO_FLAG_CPU_MASK,
+                                   ZX_PROFILE_INFO_FLAG_DEADLINE};
+  zx::unowned_job root_job(zx::job::default_job());
+  ASSERT_TRUE(root_job->is_valid());
+
+  for (const uint32_t invalid_with : kInvalidWith) {
+    zx_profile_info_t profile_info = {};
+    profile_info.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY | invalid_with;
+    zx::profile profile;
+
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx::profile::create(*root_job, 0u, &profile_info, &profile));
+  }
+}
+
+TEST(MemoryPriorityProfile, ApplyProfile) {
+  // Create the two profiles we will need.
+  zx::profile profile_high, profile_default;
+  zx_profile_info_t profile_info = MakeMemoryPriorityProfile(ZX_PRIORITY_HIGH);
+  ASSERT_OK(zx::profile::create(*GetRootJob(), 0u, &profile_info, &profile_high));
+  profile_info = MakeMemoryPriorityProfile(ZX_PRIORITY_DEFAULT);
+  ASSERT_OK(zx::profile::create(*GetRootJob(), 0u, &profile_info, &profile_default));
+
+  // To ensure there are some candidate reclaimable pages, create and map in a pager backed VMO.
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+  zx::vmo pager_vmo;
+  ASSERT_OK(pager.create_vmo(0, port, 0, zx_system_get_page_size(), &pager_vmo));
+  zx_vaddr_t addr;
+  ASSERT_OK(zx::vmar::root_self()->map(0, 0, pager_vmo, 0, zx_system_get_page_size(), &addr));
+
+  // Helper to supply pages to the VMO. Since these pages are reclaimable there is a small chance
+  // that they get evicted during the execution of the test so we re-supply at a few different
+  // points.
+  auto supply = [&]() {
+    zx::vmo aux_vmo;
+    ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &aux_vmo));
+    uint64_t val = 42;
+    EXPECT_OK(aux_vmo.write(&val, 0, sizeof(val)));
+    EXPECT_OK(pager.supply_pages(pager_vmo, 0, zx_system_get_page_size(), aux_vmo, 0));
+  };
+
+  // Start with the pages supplied so that they are there for the initial query.
+  supply();
+
+  zx_info_kmem_stats_extended_t stats;
+  EXPECT_OK(standalone::GetRootResource()->get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats,
+                                                    sizeof(stats), nullptr, nullptr));
+
+  const uint64_t prev = stats.vmo_reclaim_disabled_bytes;
+
+  EXPECT_OK(zx::vmar::root_self()->set_profile(profile_high, 0));
+
+  // Applying the profile should have caused our pages to no longer be reclaimable. The pager backed
+  // VMO we mapped means we know it's definitely non-zero, but we do not know if there are more.
+  // In between the previous supply and setting the profile, the pages could have been evicted, so
+  // re-supply them.
+  supply();
+  EXPECT_OK(standalone::GetRootResource()->get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats,
+                                                    sizeof(stats), nullptr, nullptr));
+  EXPECT_GT(stats.vmo_reclaim_disabled_bytes, prev);
+
+  // Applying the default priority should undo the reclamation change.
+  EXPECT_OK(zx::vmar::root_self()->set_profile(profile_default, 0));
+
+  EXPECT_OK(standalone::GetRootResource()->get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats,
+                                                    sizeof(stats), nullptr, nullptr));
+  EXPECT_EQ(stats.vmo_reclaim_disabled_bytes, prev);
+}
+
+TEST(MemoryPriorityProfile, Rights) {
+  zx::profile profile;
+  zx_profile_info_t profile_info = MakeMemoryPriorityProfile(ZX_PRIORITY_DEFAULT);
+  ASSERT_OK(zx::profile::create(*GetRootJob(), 0u, &profile_info, &profile));
+
+  // Duplicate the vmar handle to have valid and invalid permissions.
+  zx::vmar vmar_valid, vmar_invalid;
+  ASSERT_OK(zx::vmar::root_self()->duplicate(ZX_RIGHT_OP_CHILDREN, &vmar_valid));
+  ASSERT_OK(zx::vmar::root_self()->duplicate(0, &vmar_invalid));
+
+  EXPECT_OK(vmar_valid.set_profile(profile, 0));
+  EXPECT_EQ(ZX_ERR_ACCESS_DENIED, vmar_invalid.set_profile(profile, 0));
 }
 
 }  // namespace
