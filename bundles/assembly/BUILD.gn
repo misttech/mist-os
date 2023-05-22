@@ -476,6 +476,42 @@ assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
   ]
 }
 
+assembly_input_bundle("radar_proxy_with_injector") {
+  base_packages =
+      [ "//src/devices/radar/bin/radar-proxy:radar-proxy-with-injector" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("radar_proxy_without_injector") {
+  base_packages =
+      [ "//src/devices/radar/bin/radar-proxy:radar-proxy-without-injector" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 ########
 #
 # The "minimal" AIBs

@@ -66,12 +66,14 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "fonts",
+    "radar_proxy_without_injector",
 ]
 
 USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",
+    "radar_proxy_with_injector",
 ]
 
 # The names of all of the platform's Assembly Input Bundles.

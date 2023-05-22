@@ -111,6 +111,9 @@ user_platform_aib_names =
       "ui_user_and_userdebug",
       "ui_package_user_and_userdebug",
       "ui_legacy_package_user_and_userdebug",
+
+      # Drivers
+      "radar_proxy_without_injector",
     ]
 
 # LINT.ThenChange(platform_aib_names.bzl)
@@ -123,6 +126,7 @@ _userdebug_aib_names = [
   "core_realm_development_access",
   "core_realm_development_access_rcs_no_usb",
   "core_realm_development_access_rcs_usb",
+  "radar_proxy_with_injector",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)
