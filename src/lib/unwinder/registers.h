@@ -12,7 +12,8 @@
 
 namespace unwinder {
 
-// The DWARF ID for each register.
+// The DWARF ID for each register. It's NOT exhaustive and |Registers| class may store some register
+// ids not listed here.
 enum class RegisterID : uint8_t {
   // x86_64. https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf Page 57
   // NOTE: the order is not RAX, RBX, RCX, RDX as in zx_x86_64_thread_state_general_regs_t.
@@ -118,6 +119,7 @@ enum class RegisterID : uint8_t {
   kInvalid = static_cast<uint8_t>(-1),
 };
 
+// Holds the register values. It's possible to get and set a register id that is not listed above.
 class Registers {
  public:
   enum class Arch {
@@ -150,7 +152,7 @@ class Registers {
   void Clear() { regs_.clear(); }
 
  private:
-  const char* GetRegName(RegisterID reg_id) const;
+  std::string GetRegName(RegisterID reg_id) const;
 
   Arch arch_;
   std::map<RegisterID, uint64_t> regs_;

@@ -303,7 +303,7 @@ const RegisterInfo kRegisterInfo[] = {
     {.id = RegisterID::kX64_r13, .name = "r13", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_r13, .bits = 64, .dwarf_id = 13},
     {.id = RegisterID::kX64_r14, .name = "r14", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_r14, .bits = 64, .dwarf_id = 14},
     {.id = RegisterID::kX64_r15, .name = "r15", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_r15, .bits = 64, .dwarf_id = 15},
-    {.id = RegisterID::kX64_rip, .name = "rip", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_rip, .bits = 64, .format = RegisterFormat::kVoidAddress},
+    {.id = RegisterID::kX64_rip, .name = "rip", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_rip, .bits = 64, .dwarf_id = 16, .format = RegisterFormat::kVoidAddress},
 
     {.id = RegisterID::kX64_rflags, .name = "rflags", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_rflags, .bits = 64, .dwarf_id = 49, .format = RegisterFormat::kSpecial},
     // See "DWARF notes" below on these weird segment registers.
@@ -501,6 +501,8 @@ const RegisterInfo kRegisterInfo[] = {
 // selectors into an internal table and aren't generally useful. When user-code uses fs-relative
 // addressing, this is implicitly using the fs selector to look up into a table to get "fs.base"
 // which is what people actually care about. The same goes for the gs register.
+//
+// On x64, we use 16 (return address) to represent rip, which matches the unwinder's behavior.
 //
 // We don't have definitions yet of the following x86 DWARF registers:
 //

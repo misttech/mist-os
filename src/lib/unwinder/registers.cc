@@ -41,7 +41,7 @@ RegisterID GetSpReg(Registers::Arch arch) {
 Error Registers::Get(RegisterID reg_id, uint64_t& val) const {
   auto it = regs_.find(reg_id);
   if (it == regs_.end()) {
-    return Error("register %s is undefined", GetRegName(reg_id));
+    return Error("register %s is undefined", GetRegName(reg_id).c_str());
   }
   val = it->second;
   return Success();
@@ -79,7 +79,7 @@ std::string Registers::Describe() const {
   return s;
 }
 
-const char* Registers::GetRegName(RegisterID reg_id) const {
+std::string Registers::GetRegName(RegisterID reg_id) const {
   static const char* x64_names[] = {
       "rax", "rdx", "rcx", "rbx", "rsi", "rdi", "rbp", "rsp", "r8",
       "r9",  "r10", "r11", "r12", "r13", "r14", "r15", "rip",
@@ -116,7 +116,7 @@ const char* Registers::GetRegName(RegisterID reg_id) const {
     return names[static_cast<size_t>(reg_id)];
   }
 
-  return "<unknown>";
+  return std::to_string(static_cast<size_t>(reg_id));
 }
 
 }  // namespace unwinder

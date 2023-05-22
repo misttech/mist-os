@@ -20,8 +20,7 @@ namespace {
 // Read a RegisterID in ULEB128 encoding.
 //
 // Unwind tables could encode rules for registers that we don't support, e.g. float point or vector
-// registers. It's safe to just set them to some invalid RegisterID (but don't overflow them),
-// as Registers::Set will deny any unknown registers.
+// registers. It's safe to save them in the Registers class.
 Error ReadRegisterIDAndAdvance(Memory* elf, uint64_t& addr, RegisterID& reg) {
   uint64_t reg_id;
   if (auto err = elf->ReadULEB128AndAdvance(addr, reg_id); err.has_err()) {

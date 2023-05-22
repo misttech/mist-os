@@ -27,7 +27,7 @@ struct Frame {
     kContext,  // From the input / context, most reliable.
   };
 
-  // Register status at each return site. Only known values will be included.
+  // Register status at each return site. Unknown registers may be included.
   Registers regs;
 
   // Trust level of the frame.
