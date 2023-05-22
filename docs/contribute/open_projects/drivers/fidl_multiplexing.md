@@ -79,17 +79,37 @@ zx::result client_end = component::Connect<fidl_my_protocol::Protocol>(dev_path)
 
 #### Fixing fuchsia.device/Controller
 
-If this multiplexing is removed, code that uses `fuchsia.device/Controller` will
+If this multiplexing is removed, code that connects to `fuchsia.device/Controller` will
 break. These locations might be easier to find because it is possible to grep
 for uses of this protocol in any component that is broken.
 
 Code that looks like the following will be suspect:
 ```
+component::ConnectAt<fuchsia_device::Controller>(caller.directory(), device_path);
+```
+
+The fix is to open the path to the device controller, which is always the path to the device
+plus `/device_controller`.
+
+For example this would be the updated code:
+```
+std::string device_controller_path = device_path + "/device_controller";
+component::ConnectAt<fuchsia_device::Controller>(caller.directory(), device_controller_path);
+```
+
+This works on both class paths and topological paths, for example:
+```
+/dev/class/input/000/device_controller
+/dev/sys/platform/usb/usb-hid/device_controller
+```
+
+You should also be wary of code that casts a channel to the device controller:
+```
 fidl::WireCall<fuchsia_device::Controller>(channel)->Rebind();
 ```
 
-The fix is to update the component to get a non-multiplexed controller channel.
-These can be opened at `/dev/class/{protocol}/{instance}/device_controller`.
+You will have to figure out where the code receives `channel` and update that to connect to the
+device controller.
 
 Code that casts a single channel back and forth will need to be updated to carry
 around two channels.
@@ -100,7 +120,21 @@ Once your CL passes CQ, it should be good to merge! Thank you for your help.
 
 ## Examples
 
-TODO(https://fxbug.dev/121802)
+* [Updating hidbus](https://fuchsia-review.googlesource.com/c/fuchsia/+/811377)
+
+## Debugging
+
+If you remove a class while there is still code that relies on the multiplexing you will
+see the following error message:
+
+```
+{$TOPOLOGICAL_PATH} ({$PROTOCOL_ID}): Failed to send message with ordinal={$ORDINAL} to device: FIDL endpoint was unbound due to unexpected message, status: ZX_ERR_NOT_SUPPORTED (-2), detail: unknown ordinal
+It is possible that this message relied on deprecated FIDL multiplexing.
+For more information see https://fuchsia.dev/fuchsia-src/contribute/open_projects/drivers/fidl_multiplexing
+```
+
+The Topological path and the protocol id are good hints as to what device and FIDL protocol are
+still relying on the multiplexing.
 
 ## Sponsors
 
