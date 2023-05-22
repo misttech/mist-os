@@ -112,7 +112,7 @@ zx_status_t ProcessProxy::AddInline8bitCounters(zx::vmo& vmo) {
 
 ZxPromise<> ProcessProxy::Start(bool detect_leaks) {
   return fpromise::make_promise([this, detect_leaks] {
-           return AsZxResult(eventpair_.SignalPeer(0, detect_leaks ? kStart : kStartLeakCheck));
+           return AsZxResult(eventpair_.SignalPeer(0, detect_leaks ? kStartLeakCheck : kStart));
          })
       .and_then(eventpair_.WaitFor(kStart))
       .and_then([this](const zx_signals_t& observed) {
