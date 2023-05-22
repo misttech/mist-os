@@ -22,6 +22,8 @@ use {
     tracing::{error, warn},
 };
 
+use crate::NETLINK_LOG_TAG;
+
 /// Contains the asynchronous work related to RTM_ROUTE messages.
 ///
 /// Connects to the route watcher and can respond to RTM_ROUTE
@@ -120,6 +122,7 @@ impl EventLoop {
                         // Recoverable errors that should not crash the event loop.
                         Err(fnet_routes_ext::WatchError::EmptyEventBatch) => {
                             error!(
+                                tag = NETLINK_LOG_TAG,
                                 "{:?}",
                                 RoutesEventLoopError::Fidl(anyhow!("empty batch error {}", ctx))
                             );
@@ -127,6 +130,7 @@ impl EventLoop {
                         }
                         Err(fnet_routes_ext::WatchError::Conversion(e)) => {
                             error!(
+                                tag = NETLINK_LOG_TAG,
                                 "{:?}",
                                 RoutesEventLoopError::Netstack(anyhow!(
                                     "type conversion error {}: {:?}",
@@ -148,10 +152,18 @@ impl EventLoop {
                         // Recoverable errors that do not affect the processing of further events.
                         Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route))
                         | Err(RouteEventHandlerError::NonExistentRouteDeletion(route)) => {
-                            error!("observed no-op route modification: {:?}", route);
+                            error!(
+                                tag = NETLINK_LOG_TAG,
+                                "observed no-op route modification: {:?}",
+                                route
+                            );
                         }
                         Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(event)) => {
-                            error!("observed no-op route event: {:?}", event);
+                            error!(
+                                tag = NETLINK_LOG_TAG,
+                                "observed no-op route event: {:?}",
+                                event
+                            );
                         }
                     }
                 }
@@ -230,11 +242,17 @@ impl NetlinkRouteMessage {
         match route.try_into() {
             Ok(route) => Some(route),
             Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding) => {
-                warn!("Unexpected non-forwarding route in routing table: {:?}", route);
+                warn!(
+                    tag = NETLINK_LOG_TAG,
+                    "Unexpected non-forwarding route in routing table: {:?}", route
+                );
                 None
             }
             Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(id)) => {
-                warn!("Invalid interface id found in routing table route: {:?}", id);
+                warn!(
+                    tag = NETLINK_LOG_TAG,
+                    "Invalid interface id found in routing table route: {:?}", id
+                );
                 None
             }
         }

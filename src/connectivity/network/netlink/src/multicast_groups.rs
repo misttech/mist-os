@@ -25,6 +25,9 @@
 use std::marker::PhantomData;
 
 use bit_set::BitSet;
+use tracing::{info, warn};
+
+use crate::NETLINK_LOG_TAG;
 
 /// A modern (non-legacy) multicast group. Interpreted as a single group.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -117,9 +120,11 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
     ) -> Result<(), InvalidModernGroupError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
         if !F::is_valid_group(&group) {
+            warn!(tag = NETLINK_LOG_TAG, "failed to join invalid group: {:?}", group);
             return Err(InvalidModernGroupError);
         }
         let _was_absent: bool = memberships.insert(group.into());
+        info!(tag = NETLINK_LOG_TAG, "joined group: {:?}", group);
         return Ok(());
     }
 
@@ -130,9 +135,11 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
     ) -> Result<(), InvalidModernGroupError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
         if !F::is_valid_group(&group) {
+            warn!(tag = NETLINK_LOG_TAG, "failed to leave invalid group: {:?}", group);
             return Err(InvalidModernGroupError);
         }
         let _was_present: bool = memberships.remove(group.into());
+        info!(tag = NETLINK_LOG_TAG, "left group: {:?}", group);
         return Ok(());
     }
 
@@ -165,7 +172,15 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
             mutations[i] = match (modern_group, is_member_of_group) {
                 (Some(modern_group), true) => Mutation::Add(modern_group),
                 (Some(modern_group), false) => Mutation::Del(modern_group),
-                (None, true) => return Err(InvalidLegacyGroupsError),
+                (None, true) => {
+                    warn!(
+                        tag = NETLINK_LOG_TAG,
+                        "failed to join legacy groups ({:?}) because of invalid group: {:?}",
+                        requested_groups,
+                        legacy_group
+                    );
+                    return Err(InvalidLegacyGroupsError);
+                }
                 (None, false) => Mutation::None,
             };
         }
@@ -174,10 +189,12 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
             match mutation {
                 Mutation::None => {}
                 Mutation::Add(group) => {
+                    info!(tag = NETLINK_LOG_TAG, "joined group: {:?}", group);
                     let _was_absent: bool = memberships.insert(group.into());
                 }
                 Mutation::Del(group) => {
                     let _was_present: bool = memberships.remove(group.into());
+                    info!(tag = NETLINK_LOG_TAG, "left group: {:?}", group);
                 }
             }
         }
