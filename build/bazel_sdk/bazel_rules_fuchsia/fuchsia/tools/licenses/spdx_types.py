@@ -165,8 +165,8 @@ class SpdxExtractedLicensingInfo:
 
     def from_json_dict(input: DictReader):
         license_id = input.get("licenseId")
+        name = input.get("name")
         # TODO(fxb/117652#c2): Remove fallback to license_id once Fuchsia produces names for all licenses.
-        name = input.get_or("name", license_id)
         return SpdxExtractedLicensingInfo(
             license_id=license_id,
             name=name,
