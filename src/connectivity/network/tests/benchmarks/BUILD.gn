@@ -15,6 +15,7 @@ group("benchmarks") {
     ":socket-benchmarks-tests",
     ":socket-benchmarks-with-tracing-pkg",
     ":udp-serde-benchmarks",
+    "resource-usage:tests",
   ]
 }
 
@@ -141,6 +142,7 @@ group("tests") {
   deps = [
     ":socket-benchmarks-tests",
     ":udp-serde-benchmarks",
+    "resource-usage:tests",
   ]
   if (host_os == "linux") {
     deps += [ ":socket_benchmarks($host_toolchain)" ]

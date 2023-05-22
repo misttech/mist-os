@@ -198,6 +198,8 @@ if (is_host) {
     "fuchsia.netstack.iperf_benchmarks.ethernet_udp_send.txt",
     "fuchsia.netstack.iperf_benchmarks.localhost_tcp.txt",
     "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
+    "fuchsia.netstack.resource_usage.netstack3.txt",
+    "fuchsia.netstack.resource_usage.txt",
     "fuchsia.netstack3.core.txt",
     "fuchsia.network.device.txt",
     "fuchsia.network.socket.loopback.fake_netstack.txt",

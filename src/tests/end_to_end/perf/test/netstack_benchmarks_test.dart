@@ -103,4 +103,19 @@ void main() {
       () => runSocketBenchmarksWithTracing(
           'socket-benchmarks-with-fast-udp-tracing'),
       timeout: Timeout.none);
+
+  test('resource_usage_benchmarks', () async {
+    await runTestComponent(
+        packageName: 'resource-usage-benchmarks',
+        componentName: 'resource-usage-benchmark-netstack2.cm',
+        expectedMetricNamesFile: 'fuchsia.netstack.resource_usage.txt');
+  }, timeout: Timeout.none);
+
+  test('resource_usage_benchmarks_with_netstack3', () async {
+    await runTestComponent(
+        packageName: 'resource-usage-benchmarks',
+        componentName: 'resource-usage-benchmark-netstack3.cm',
+        expectedMetricNamesFile:
+            'fuchsia.netstack.resource_usage.netstack3.txt');
+  }, timeout: Timeout.none);
 }
