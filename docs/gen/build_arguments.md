@@ -7849,7 +7849,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:20
+From //src/starnix/kernel/BUILD.gn:23
 
 ### starnix_disable_tracing
 
@@ -7857,7 +7857,15 @@ Whether or not tracing is disabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:23
+From //src/starnix/kernel/BUILD.gn:26
+
+### starnix_restricted_in_thread_exceptions
+
+Whether or not to enable 'in-thread' exception handling for restricted mode.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:20
 
 ### starnix_restricted_mode
 
