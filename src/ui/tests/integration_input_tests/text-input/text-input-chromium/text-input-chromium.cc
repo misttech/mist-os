@@ -70,13 +70,13 @@ class NavListener : public fuchsia::web::NavigationEventListener {
     }
     if (nav_state.has_title()) {
       FX_LOGS(INFO) << "nav_state.title = " << nav_state.title();
-      if (nav_state.title() == "about:blank") {
+      if (nav_state.title().find("about:blank") != std::string::npos) {
         loaded_about_blank_ = true;
       }
-      if (nav_state.title() == "window_resized") {
+      if (nav_state.title().find("window_resized") != std::string::npos) {
         window_resized_ = true;
       }
-      if (nav_state.title() == "text_input_focused") {
+      if (nav_state.title().find("text_input_focused") != std::string::npos) {
         text_input_focused_ = true;
       }
     }
@@ -200,7 +200,7 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     window.onresize = function(event) {
       if (window.innerWidth != 0) {
         console.info('size: ', window.innerWidth, window.innerHeight);
-        document.title = 'window_resized';
+        document.title = [document.title, 'window_resized'].join(' ');
       }
     };
 
@@ -269,7 +269,7 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     // easiest way to do that is to change the document title. There is a
     // navigation listener which will get notified of the title change.
     $input.addEventListener('focus', function (e) {
-      document.title = 'text_input_focused';
+      document.title = [document.title, 'text_input_focused'].join(' ');
     });
 
     window.addEventListener('message', receiveMessage, false);
