@@ -87,6 +87,7 @@ type Version = String;
 /// Per-target metadata in the Cargo.toml for Rust crates that
 /// require extra information to in the BUILD.gn
 #[derive(Default, Clone, Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct TargetCfg {
     /// Config flags for rustc. Ex: --cfg=std
     rustflags: Option<Vec<String>>,
@@ -105,6 +106,7 @@ pub struct TargetCfg {
 
 /// Configuration for a single GN executable target to generate from a Cargo binary target.
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct BinaryCfg {
     /// Name to use as both the top-level GN group target and the executable's output name.
     output_name: String,
@@ -119,6 +121,7 @@ pub struct BinaryCfg {
 
 /// Visibility list to use for a forwarding group
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct GroupVisibility {
     /// .gni file to import which defines the variable
     import: String,
@@ -131,6 +134,7 @@ pub struct GroupVisibility {
 /// Some external crates require additional post-processing. For those we define custom rules,
 /// and force a rename of the rule and the group so that post-processing can be done by GN.
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct RuleRenaming {
     /// The label of the `.gni` file used to make the group and target renaming
     /// available.
@@ -149,7 +153,7 @@ pub struct RuleRenaming {
 /// Configuration for a Cargo package. Contains configuration for its (single) library target at the
 /// top level and optionally zero or more binaries to generate.
 #[derive(Default, Clone, Serialize, Deserialize, Debug)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PackageCfg {
     /// Library target configuration for all platforms.
     #[serde(flatten)]
@@ -179,6 +183,7 @@ pub struct PackageCfg {
 
 /// Configs added to all GN targets in the BUILD.gn
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct GlobalTargetCfgs {
     remove_cfgs: Vec<String>,
     add_cfgs: Vec<String>,
@@ -187,6 +192,7 @@ pub struct GlobalTargetCfgs {
 /// Extra metadata in the Cargo.toml file that feeds into the
 /// BUILD.gn file.
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 struct GnBuildMetadata {
     /// global configs
     config: Option<GlobalTargetCfgs>,
@@ -211,6 +217,7 @@ struct BuildMetadata {
 /// Used for identifying 3p owners via reverse dependencies. Ties together several pieces of
 /// metadata needed to associate a GN target with an OWNERS file and vice versa.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CrateOutputMetadata {
     /// Name of the crate as specified in Cargo.toml.
     pub name: String,
