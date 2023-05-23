@@ -26,11 +26,20 @@ class FuchsiaDevice(abc.ABC):
     # List all the persistent properties in alphabetical order
     @properties.PersistentProperty
     @abc.abstractmethod
-    def device_type(self) -> str:
-        """Returns the device type.
+    def device_name(self) -> str:
+        """Returns the name of the device.
 
         Returns:
-            Device type.
+            Name of the device.
+        """
+
+    @properties.PersistentProperty
+    @abc.abstractmethod
+    def device_type(self) -> str:
+        """Returns the type of the device.
+
+        Returns:
+            Type of the device.
         """
 
     @properties.PersistentProperty
@@ -39,7 +48,7 @@ class FuchsiaDevice(abc.ABC):
         """Returns the manufacturer of the device.
 
         Returns:
-            Manufacturer of device.
+            Manufacturer of the device.
         """
 
     @properties.PersistentProperty
@@ -48,7 +57,7 @@ class FuchsiaDevice(abc.ABC):
         """Returns the model of the device.
 
         Returns:
-            Model of device.
+            Model of the device.
         """
 
     @properties.PersistentProperty
@@ -66,7 +75,7 @@ class FuchsiaDevice(abc.ABC):
         """Returns the serial number of the device.
 
         Returns:
-            Serial number of device.
+            Serial number of the device.
         """
 
     # List all the dynamic properties in alphabetical order
@@ -76,7 +85,7 @@ class FuchsiaDevice(abc.ABC):
         """Returns the firmware version of the device.
 
         Returns:
-            Firmware version of device.
+            Firmware version of the device.
         """
 
     # List all the affordances in alphabetical order
@@ -111,6 +120,10 @@ class FuchsiaDevice(abc.ABC):
     @abc.abstractmethod
     def close(self) -> None:
         """Clean up method."""
+
+    @abc.abstractmethod
+    def health_check(self) -> None:
+        """Ensure device is healthy."""
 
     @abc.abstractmethod
     def log_message_to_device(

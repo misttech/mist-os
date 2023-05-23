@@ -8,7 +8,6 @@ import enum
 import logging
 from typing import List
 
-from honeydew.device_classes import fuchsia_device_base
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
@@ -118,29 +117,18 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             "Collecting snapshots of all the FuchsiaDevice objects in '%s'...",
             self.snapshot_on.name)
         for fx_device in self.fuchsia_devices:
-            # type narrowing
-            # (https://mypy.readthedocs.io/en/stable/type_narrowing.html)
-            # fx_device object to FuchsiaDeviceBase - needed for code completion
-            # to work in vscode IDE
-            assert isinstance(fx_device, fuchsia_device_base.FuchsiaDeviceBase)
-
             try:
                 fx_device.snapshot(directory=directory)
             except Exception:  # pylint: disable=broad-except
-                _LOGGER.warning("Unable to take snapshot of %s", fx_device.name)
+                _LOGGER.warning(
+                    "Unable to take snapshot of %s", fx_device.device_name)
 
     def _health_check(self) -> None:
         """Ensure all FuchsiaDevice objects are healthy."""
         _LOGGER.info(
             "Performing health checks on all the FuchsiaDevice objects...")
         for fx_device in self.fuchsia_devices:
-            # type narrowing
-            # (https://mypy.readthedocs.io/en/stable/type_narrowing.html)
-            # fx_device object to FuchsiaDeviceBase - needed for code completion
-            # to work in vscode IDE
-            assert isinstance(fx_device, fuchsia_device_base.FuchsiaDeviceBase)
-
-            fx_device.sl4f.check_connection()
+            fx_device.health_check()
 
     def _process_user_params(self) -> None:
         """Reads, processes and stores the test params used by this module."""

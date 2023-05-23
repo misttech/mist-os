@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Mobly test for affordances/bluetooth_default.py."""
+"""Mobly test for Bluetooth affordance."""
 
 import logging
 
@@ -15,8 +15,8 @@ from mobly import test_runner
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class BluetoothCapabilityTests(fuchsia_base_test.FuchsiaBaseTest):
-    """Bluetooth capability tests"""
+class BluetoothAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
+    """Bluetooth affordance tests"""
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.

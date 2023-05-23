@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Component capability default implementation."""
+"""Component affordance implementation using SL4F."""
 
 from typing import Any, Dict, List
 
@@ -16,8 +16,8 @@ _SL4F_METHODS: Dict[str, str] = {
 }
 
 
-class ComponentDefault(component.Component):
-    """Default implementation for Component affordance.
+class Component(component.Component):
+    """Component affordance implementation using SL4F.
 
     Args:
         device_name: Device name returned by `ffx target list`.

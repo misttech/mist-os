@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Mobly test for device_classes/fuchsia_device_base.py."""
+"""Mobly test for fuchsia_device.py device class."""
 
 import logging
 import os
@@ -10,7 +10,7 @@ import tempfile
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew import custom_types
-from honeydew.device_classes import fuchsia_device_base
+from honeydew.device_classes.sl4f import fuchsia_device as sl4f_fuchsia_device
 from honeydew.interfaces.device_classes import bluetooth_capable_device
 from honeydew.interfaces.device_classes import component_capable_device
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -20,8 +20,8 @@ from mobly import test_runner
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaDeviceBaseTests(fuchsia_base_test.FuchsiaBaseTest):
-    """FuchsiaDeviceBase tests run using an X64 device"""
+class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
+    """FuchsiaDevice tests"""
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.
@@ -33,9 +33,9 @@ class FuchsiaDeviceBaseTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
     def test_device_instance(self) -> None:
-        """Test case to make sure DUT is a FuchsiaDeviceBase"""
+        """Test case to make sure DUT is a FuchsiaDevice"""
         asserts.assert_is_instance(
-            self.device, fuchsia_device_base.FuchsiaDeviceBase)
+            self.device, sl4f_fuchsia_device.FuchsiaDevice)
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""

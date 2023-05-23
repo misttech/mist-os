@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Bluetooth capability default implementation."""
+"""Bluetooth affordance implementation using SL4F."""
 
 from typing import Dict
 
@@ -15,8 +15,8 @@ _SL4F_METHODS: Dict[str, str] = {
 }
 
 
-class BluetoothDefault(bluetooth.Bluetooth):
-    """Default implementation for Bluetooth affordance.
+class Bluetooth(bluetooth.Bluetooth):
+    """Bluetooth affordance implementation using SL4F.
 
     Args:
         device_name: Device name returned by `ffx target list`.

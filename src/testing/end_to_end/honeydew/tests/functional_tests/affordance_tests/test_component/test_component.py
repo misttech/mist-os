@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Mobly test for affordances/component_default.py."""
+"""Mobly test for Component affordance."""
 
 import logging
 from typing import List
@@ -21,8 +21,8 @@ UNKNOWN_COMPONENT_NAME = "unknown.cm"
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class ComponentCapabilityTests(fuchsia_base_test.FuchsiaBaseTest):
-    """Component capability tests"""
+class ComponentAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
+    """Component affordance tests"""
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.

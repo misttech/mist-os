@@ -2,17 +2,16 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.affordances.tracing_default.py."""
+"""Unit tests for honeydew.affordances.sl4f.tracing.py."""
 
 import base64
 import tempfile
-import unittest
-
 from typing import Any, Dict
+import unittest
 from unittest import mock
 
 from honeydew import errors
-from honeydew.affordances import tracing_default
+from honeydew.affordances.sl4f import tracing as sl4f_tracing
 from honeydew.transports import sl4f as sl4f_transport
 from parameterized import parameterized
 
@@ -28,13 +27,13 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 
 
 # pylint: disable=protected-access
-class TracingDefaultTests(unittest.TestCase):
-    """Unit tests for honeydew.affordances.tracing_default.py."""
+class TracingSL4FTests(unittest.TestCase):
+    """Unit tests for honeydew.affordances.sl4f.tracing.py."""
 
     def setUp(self) -> None:
         super().setUp()
         self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
-        self.tracing_obj = tracing_default.TracingDefault(
+        self.tracing_obj = sl4f_tracing.Tracing(
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
         self.sl4f_obj.reset_mock()
 
@@ -57,7 +56,7 @@ class TracingDefaultTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     def test_initialize(self, parameterized_dict) -> None:
-        """Test for TracingDefault.initialize() method."""
+        """Test for Tracing.initialize() method."""
         self.tracing_obj.initialize(
             categories=parameterized_dict.get("categories"),
             buffer_size=parameterized_dict.get("buffer_size"))
@@ -84,7 +83,7 @@ class TracingDefaultTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     def test_start(self, parameterized_dict) -> None:
-        """Test for TracingDefault.start() method."""
+        """Test for Tracing.start() method."""
         if not parameterized_dict.get("session_initialized"):
             with self.assertRaises(errors.FuchsiaStateError):
                 self.tracing_obj.start()
@@ -115,7 +114,7 @@ class TracingDefaultTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     def test_stop(self, parameterized_dict) -> None:
-        """Test for TracingDefault.stop() method."""
+        """Test for Tracing.stop() method."""
         if not parameterized_dict.get("session_initialized"):
             with self.assertRaises(errors.FuchsiaStateError):
                 self.tracing_obj.stop()
@@ -142,7 +141,7 @@ class TracingDefaultTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     def test_terminate(self, parameterized_dict) -> None:
-        """Test for TracingDefault.terminate() method."""
+        """Test for Tracing.terminate() method."""
 
         if not parameterized_dict.get("session_initialized"):
             with self.assertRaises(errors.FuchsiaStateError):
@@ -186,7 +185,7 @@ class TracingDefaultTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     def test_terminate_and_download(self, parameterized_dict) -> None:
-        """Test for TracingDefault.terminate_and_download() method."""
+        """Test for Tracing.terminate_and_download() method."""
 
         with tempfile.TemporaryDirectory() as tmpdir:
             if not parameterized_dict.get("session_initialized"):

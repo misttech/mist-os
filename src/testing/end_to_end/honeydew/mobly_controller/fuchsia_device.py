@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, List
 
 import honeydew
+from honeydew import transports
 from honeydew.interfaces.device_classes import \
     fuchsia_device as fuchsia_device_interface
 from honeydew.utils import properties
@@ -33,6 +34,8 @@ def create(
             * ssh_key - Absolute path to the SSH private key file needed to SSH
                 into fuchsia device.
             * ssh_user - Username to be used to SSH into fuchsia device.
+            * transport - Transport to be used to perform the host-target
+                interactions.
 
     Returns:
         A list of FuchsiaDevice objects.
@@ -43,12 +46,13 @@ def create(
 
     fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
-        device_config: Dict[str, str] = _get_device_config(config)
+        device_config: Dict[str, Any] = _get_device_config(config)
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=device_config["name"],
                 ssh_private_key=device_config.get("ssh_private_key"),
-                ssh_user=device_config.get("ssh_user")))
+                ssh_user=device_config.get("ssh_user"),
+                transport=device_config.get("transport")))
     return fuchsia_devices
 
 
@@ -132,15 +136,6 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
         config)
 
-    device_config: Dict[str, Any] = {
-        "name":
-            "",
-        "ssh_private_key":
-            config.get("ssh_private_key") or config.get("ssh_key"),
-        "ssh_user":
-            config.get("ssh_user"),
-    }
-
     # Sample testbed file format for FuchsiaDevice controller used in infra...
     # - Controllers:
     #     FuchsiaDevice:
@@ -149,6 +144,9 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
     #       nodename: botanist-target-qemu
     #       serial_socket: ''
     #       ssh_key: private_key
+    device_config: Dict[str, Any] = {
+        "ssh_user": config.get("ssh_user"),
+    }
 
     if config.get("name"):
         device_config["name"] = config["name"]
@@ -157,7 +155,26 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
     else:
         raise RuntimeError("Missing fuchsia device name in the config")
 
+    if config.get("ssh_private_key"):
+        device_config["ssh_private_key"] = config["ssh_private_key"]
+    elif config.get("nodename"):
+        device_config["ssh_private_key"] = config["ssh_key"]
+
+    if config.get("transport"):
+        transport: str = config["transport"].upper()
+
+        if transport == "SL4F":
+            device_config["transport"] = transports.TRANSPORT.SL4F
+        elif transport in ["FUCHSIA_CONTROLLER", "FUCHSIA-CONTROLLER", "FC"]:
+            device_config["transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
+        else:
+            raise ValueError(
+                f"Invalid transport '{transport}' passed for " \
+                f"{device_config['name']}"
+            )
+
     _LOGGER.debug(
         "Updated FuchsiaDevice controller config after the validation is '%s'",
         config)
+
     return device_config

@@ -2,15 +2,15 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Mobly test for device_classes/x64.py."""
+"""Mobly test for x64.py device class."""
 
-from honeydew.device_classes import x64
+from honeydew.device_classes.sl4f import x64
 from mobly import asserts
 from mobly import test_runner
-from test_fuchsia_device_base import test_fuchsia_device_base
+from test_fuchsia_device import test_fuchsia_device
 
 
-class X64Tests(test_fuchsia_device_base.FuchsiaDeviceBaseTests):
+class X64Tests(test_fuchsia_device.FuchsiaDeviceTests):
     """X64 device tests"""
 
     def test_device_instance(self) -> None:

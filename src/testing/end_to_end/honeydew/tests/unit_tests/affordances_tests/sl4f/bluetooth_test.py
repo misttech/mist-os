@@ -2,13 +2,13 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.affordances.bluetooth_default.py."""
+"""Unit tests for honeydew.affordances.sl4f.bluetooth.py."""
 
 from typing import Any, Dict
 import unittest
 from unittest import mock
 
-from honeydew.affordances import bluetooth_default
+from honeydew.affordances.sl4f import bluetooth as sl4f_bluetooth
 from honeydew.transports import sl4f as sl4f_transport
 from parameterized import parameterized
 
@@ -24,21 +24,21 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 
 
 # pylint: disable=protected-access
-class BluetoothDefaultTests(unittest.TestCase):
-    """Unit tests for honeydew.affordances.bluetooth_default.py."""
+class BluetoothSL4FTests(unittest.TestCase):
+    """Unit tests for honeydew.affordances.sl4f.bluetooth.py."""
 
     def setUp(self) -> None:
         super().setUp()
 
         self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
-        self.bluetooth_obj = bluetooth_default.BluetoothDefault(
+        self.bluetooth_obj = sl4f_bluetooth.Bluetooth(
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
 
         self.sl4f_obj.run.assert_called()
         self.sl4f_obj.reset_mock()
 
     def test_sys_init(self) -> None:
-        """Test for BluetoothDefault.sys_init() method."""
+        """Test for Bluetooth.sys_init() method."""
         self.bluetooth_obj.sys_init()
 
         self.sl4f_obj.run.assert_called()
@@ -56,7 +56,7 @@ class BluetoothDefaultTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     def test_request_discovery(self, parameterized_dict) -> None:
-        """Test for BluetoothDefault.request_discovery() method."""
+        """Test for Bluetooth.request_discovery() method."""
         self.bluetooth_obj.request_discovery(
             discovery=parameterized_dict["discovery"])
 

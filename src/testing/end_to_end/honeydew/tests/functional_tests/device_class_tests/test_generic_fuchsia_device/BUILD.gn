@@ -10,7 +10,7 @@ if (is_host) {
 
     libraries = [
       "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device_base:test_fuchsia_device_base_lib",
+      "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device:test_fuchsia_device_lib",
     ]
 
     params_source = "params.yaml"

@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Mobly test for affordances/tracing_default.py."""
+"""Mobly test for Tracing affordance."""
 
 import logging
 import os
@@ -10,15 +10,16 @@ import tempfile
 import time
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import (
-    tracing_capable_device, fuchsia_device)
-from mobly import asserts, test_runner
+from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.interfaces.device_classes import tracing_capable_device
+from mobly import asserts
+from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class TracingCapabilityTests(fuchsia_base_test.FuchsiaBaseTest):
-    """Tracing capability tests"""
+class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
+    """Tracing affordance tests"""
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.

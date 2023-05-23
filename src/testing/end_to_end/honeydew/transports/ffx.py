@@ -105,8 +105,8 @@ class FFX:
             timeout: Timeout to wait for the ffx command to return.
 
         Raises:
-            errors.FFXCommandError: If device is connected to the host according
-                to FFX.
+            errors.FFXCommandError: If device is not connected to the host
+                according to FFX.
         """
         if self.is_target_connected(timeout=timeout):
             return

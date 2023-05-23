@@ -6,7 +6,7 @@ if (is_host) {
   group("tests") {
     testonly = true
     public_deps = [
-      "test_fuchsia_device_base:fuchsia_device_base_test($host_toolchain)",
+      "test_fuchsia_device:fuchsia_device_test($host_toolchain)",
       "test_generic_fuchsia_device:generic_fuchsia_device_test($host_toolchain)",
       "test_x64:x64_test($host_toolchain)",
     ]

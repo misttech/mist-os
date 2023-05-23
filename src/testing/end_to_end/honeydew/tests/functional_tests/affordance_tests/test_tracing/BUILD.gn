@@ -5,8 +5,8 @@
 import("//build/python/python_mobly_test.gni")
 
 if (is_host) {
-  python_mobly_test("tracing_default_test") {
-    main_source = "test_tracing_default.py"
+  python_mobly_test("tracing_test") {
+    main_source = "test_tracing.py"
 
     libraries = [
       "//src/testing/end_to_end/honeydew",

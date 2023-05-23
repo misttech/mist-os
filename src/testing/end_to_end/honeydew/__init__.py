@@ -13,7 +13,10 @@ import types
 from typing import Any, List, Optional, Set, Type
 
 from honeydew import device_classes
-from honeydew.device_classes import generic_fuchsia_device
+from honeydew import errors
+from honeydew import transports
+from honeydew.device_classes.sl4f import \
+    generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
@@ -27,9 +30,11 @@ _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
 # pytype: disable=not-instantiable
 # List all the public methods in alphabetical order
 def create_device(
-        device_name: str,
-        ssh_private_key: Optional[str] = None,
-        ssh_user: Optional[str] = None) -> fuchsia_device.FuchsiaDevice:
+    device_name: str,
+    ssh_private_key: Optional[str] = None,
+    ssh_user: Optional[str] = None,
+    transport: Optional[transports.TRANSPORT] = None
+) -> fuchsia_device.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
     This method will look at all the device class implementations available, and
@@ -45,19 +50,32 @@ def create_device(
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
 
+        transport: Transport to use to perform host-target interactions.
+            If not set, transports.DEFAULT_TRANSPORT will be used.
+
     Returns:
         Fuchsia device object
 
     Raises:
         errors.FuchsiaDeviceError: Failed to create Fuchsia device object.
     """
-    device_class = _get_device_class(device_name)
-    device_class_args = (device_name, ssh_private_key, ssh_user)
+    if transport is None:
+        transport = transports.DEFAULT_TRANSPORT
 
-    return device_class(*device_class_args)  # type: ignore[call-arg]
+    try:
+        device_class: Type[fuchsia_device.FuchsiaDevice] = _get_device_class(
+            device_name, transport)
+        return device_class(
+            device_name, ssh_private_key, ssh_user)  # type: ignore[call-arg]
+    except Exception as err:
+        raise errors.FuchsiaDeviceError(
+            f"Failed to create device for '{device_name}'") from err
 
 
-def get_all_affordances(device_name: str) -> List[str]:
+def get_all_affordances(
+    device_name: str,
+    transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT
+) -> List[str]:
     """Returns list of all affordances implemented for this device class.
 
     Please note that this method returns list of affordances implemented for
@@ -66,10 +84,14 @@ def get_all_affordances(device_name: str) -> List[str]:
     Args:
         device_name: Device name returned by `ffx target list`.
 
+        transport: Transport to use to perform host-target interactions.
+            If not set, transports.DEFAULT_TRANSPORT will be used.
+
     Returns:
         List of affordances implemented for this device class.
     """
-    device_class = _get_device_class(device_name)
+    device_class: Type[fuchsia_device.FuchsiaDevice] = _get_device_class(
+        device_name, transport)
 
     affordances: List[str] = []
     for attr in dir(device_class):
@@ -107,12 +129,16 @@ def get_device_classes(
         set of all device classes
     """
     fuchsia_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
-    for _, module_name, _ in pkgutil.iter_modules([device_classes_path]):
+    for _, module_name, ispkg in pkgutil.walk_packages(
+        [device_classes_path], device_classes_module_name + "."):
+        if ispkg:
+            continue
+
         if module_name.startswith("__"):
             continue
 
         module: types.ModuleType = importlib.import_module(
-            "." + module_name, package=device_classes_module_name)
+            module_name, package=device_classes_module_name)
 
         # Iterate items inside imported python file
         for item in dir(module):
@@ -167,26 +193,47 @@ def _get_all_register_device_classes(
     return all_device_classes
 
 
-def _get_device_class(device_name: str) -> Type[fuchsia_device.FuchsiaDevice]:
-    """Returns device class associated with the device.
+def _get_device_class(
+        device_name: str,
+        transport: transports.TRANSPORT) -> Type[fuchsia_device.FuchsiaDevice]:
+    """Returns device class associated with the device for specified transport.
 
     Args:
         device_name: Device name returned by `ffx target list`.
+        transport: Transport to use to perform host-target interactions.
 
     Returns:
         Device class type.
+
+    Raises:
+        RuntimeError: if device class not found.
     """
     ffx: ffx_transport.FFX = ffx_transport.FFX(target=device_name)
     product_type: str = ffx.get_target_type()
 
     for device_class in _get_all_register_device_classes():
-        if product_type.lower() == device_class.__name__.lower():
+        if product_type.lower() == device_class.__name__.lower() \
+            and transport.value in device_class.__module__:
             _LOGGER.info(
                 "Found matching device class implementation for '%s' as '%s'",
                 device_name, device_class.__name__)
             return device_class
     _LOGGER.info(
-        "Didn't find any matching device class implementation for '%s'. "
-        "So returning '%s'", device_name,
-        generic_fuchsia_device.GenericFuchsiaDevice.__name__)
-    return generic_fuchsia_device.GenericFuchsiaDevice
+        "Didn't find any matching device class implementation for '%s'",
+        device_name)
+
+    if transport == transports.TRANSPORT.SL4F:
+        default_device_class: Type[fuchsia_device.FuchsiaDevice] = \
+        sl4f_generic_fuchsia_device.GenericFuchsiaDevice
+        _LOGGER.info(
+            "Returning '%s' which is the default implementation for '%s' " \
+            "using '%s' transport",
+            default_device_class.__name__, device_name, transport.value)
+        return default_device_class
+    else:  # transports.TRANSPORT.FUCHSIA_CONTROLLER
+        _LOGGER.info(
+            "No default implementation exist for '%s' using transport '%s'",
+            device_name, transport)
+        raise RuntimeError(
+            f"Didn't find any implementation '{device_name}' using " \
+            f"'{transport.value}' transport")

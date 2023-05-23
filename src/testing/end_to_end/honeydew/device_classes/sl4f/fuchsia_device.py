@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Default implementation of FuchsiaDevice abstract base class."""
+"""FuchsiaDevice abstract base class implementation using SL4F."""
 
 import base64
 from datetime import datetime
@@ -14,9 +14,9 @@ from typing import Any, Dict, Optional
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.affordances import bluetooth_default
-from honeydew.affordances import component_default
-from honeydew.affordances import tracing_default
+from honeydew.affordances.sl4f import bluetooth as bluetooth_sl4f
+from honeydew.affordances.sl4f import component as component_sl4f
+from honeydew.affordances.sl4f import tracing as tracing_sl4f
 from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
 from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
@@ -52,14 +52,11 @@ _TIMEOUTS: Dict[str, float] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
-                        component_capable_device.ComponentCapableDevice,
-                        bluetooth_capable_device.BluetoothCapableDevice,
-                        tracing_capable_device.TracingCapableDevice):
-    """Default implementation of Fuchsia device abstract base class.
-
-    This class contains methods that are supported by every device running
-    Fuchsia irrespective of the device type.
+class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
+                    component_capable_device.ComponentCapableDevice,
+                    bluetooth_capable_device.BluetoothCapableDevice,
+                    tracing_capable_device.TracingCapableDevice):
+    """FuchsiaDevice abstract base class implementation using SL4F.
 
     Args:
         device_name: Device name returned by `ffx target list`.
@@ -68,11 +65,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
 
-    Attributes:
-        name: Device name.
-        sl4f: Object pointing to sl4f.SL4F class.
-        ssh: Object pointing to ssh.SSH class
-
     Raises:
         errors.FuchsiaDeviceError: Failed to instantiate.
     """
@@ -80,19 +72,25 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
     def __init__(
             self,
             device_name: str,
-            ssh_private_key: Optional[str],
+            ssh_private_key: Optional[str] = None,
             ssh_user: Optional[str] = None) -> None:
-        self.name: str = device_name
+        self._name: str = device_name
 
         self._ssh_private_key: Optional[str] = ssh_private_key
         self._ssh_user: Optional[str] = ssh_user
 
-        if self._ssh_private_key:
-            self.ssh.check_connection()
-        self.ffx.check_connection()
-        self.sl4f.check_connection()
+        self.health_check()
 
     # List all the persistent properties in alphabetical order
+    @properties.PersistentProperty
+    def device_name(self) -> str:
+        """Returns the device name.
+
+        Returns:
+            Device name.
+        """
+        return self._name
+
     @properties.PersistentProperty
     def device_type(self) -> str:
         """Returns the device type.
@@ -181,7 +179,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.Sl4fError: Failed to instantiate.
         """
-        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(target=self.name)
+        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(target=self.device_name)
         return ffx_obj
 
     @properties.Transport
@@ -195,7 +193,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             errors.Sl4fError: Failed to instantiate.
         """
         sl4f_obj: sl4f_transport.SL4F = sl4f_transport.SL4F(
-            device_name=self.name)
+            device_name=self.device_name)
         return sl4f_obj
 
     @properties.Transport
@@ -212,7 +210,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             )
 
         ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
-            device_name=self.name,
+            device_name=self.device_name,
             username=self._ssh_user,
             private_key=self._ssh_private_key)
         return ssh_obj
@@ -226,8 +224,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Returns:
             bluetooth.Bluetooth object
         """
-        return bluetooth_default.BluetoothDefault(
-            device_name=self.name, sl4f=self.sl4f)
+        return bluetooth_sl4f.Bluetooth(
+            device_name=self.device_name, sl4f=self.sl4f)
 
     @properties.Affordance
     def component(self) -> component_interface.Component:
@@ -236,8 +234,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Returns:
             component.Component object
         """
-        return component_default.ComponentDefault(
-            device_name=self.name, sl4f=self.sl4f)
+        return component_sl4f.Component(
+            device_name=self.device_name, sl4f=self.sl4f)
 
     @properties.Affordance
     def tracing(self) -> tracing_interface.Tracing:
@@ -246,13 +244,26 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Returns:
             tracing.Tracing object
         """
-        return tracing_default.TracingDefault(
-            device_name=self.name, sl4f=self.sl4f)
+        return tracing_sl4f.Tracing(
+            device_name=self.device_name, sl4f=self.sl4f)
 
     # List all the public methods in alphabetical order
     def close(self) -> None:
         """Clean up method."""
         return
+
+    def health_check(self) -> None:
+        """Ensure device is healthy.
+
+        Raises:
+            errors.SSHCommandError: if SSH connection check fails
+            errors.FFXCommandError: if FFX connection check fails
+            errors.Sl4fError: if SL4F connection check fails
+        """
+        if self._ssh_private_key:
+            self.ssh.check_connection()
+        self.ffx.check_connection()
+        self.sl4f.check_connection()
 
     def log_message_to_device(
             self, message: str, level: custom_types.LEVEL) -> None:
@@ -281,22 +292,25 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             power_switch: Implementation of PowerSwitch interface.
             outlet (int): If required by power switch hardware, outlet on
                 power switch hardware where this fuchsia device is connected.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
         """
-        _LOGGER.info("Power cycling %s...", self.name)
+        _LOGGER.info("Power cycling %s...", self.device_name)
         self.log_message_to_device(
-            message=f"Powering cycling {self.name}...",
+            message=f"Powering cycling {self.device_name}...",
             level=custom_types.LEVEL.INFO)
 
-        _LOGGER.info("Powering off %s...", self.name)
+        _LOGGER.info("Powering off %s...", self.device_name)
         power_switch.power_off(outlet)
         self._wait_for_offline()
 
-        _LOGGER.info("Powering on %s...", self.name)
+        _LOGGER.info("Powering on %s...", self.device_name)
         power_switch.power_on(outlet)
         self._wait_for_bootup_complete()
 
         self.log_message_to_device(
-            message=f"Successfully power cycled {self.name}...",
+            message=f"Successfully power cycled {self.device_name}...",
             level=custom_types.LEVEL.INFO)
 
     def reboot(self) -> None:
@@ -305,16 +319,17 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        _LOGGER.info("Rebooting %s...", self.name)
+        _LOGGER.info("Rebooting %s...", self.device_name)
         self.log_message_to_device(
-            message=f"Rebooting {self.name}...", level=custom_types.LEVEL.INFO)
+            message=f"Rebooting {self.device_name}...",
+            level=custom_types.LEVEL.INFO)
         self.sl4f.run(
             method=_SL4F_METHODS["Reboot"],
             exceptions_to_skip=[RemoteDisconnected])
         self._wait_for_offline()
         self._wait_for_bootup_complete()
         self.log_message_to_device(
-            message=f"Successfully rebooted {self.name}...",
+            message=f"Successfully rebooted {self.device_name}...",
             level=custom_types.LEVEL.INFO)
 
     def snapshot(
@@ -344,10 +359,10 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
 
         if not snapshot_file:
             timestamp: str = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
-            snapshot_file = f"Snapshot_{self.name}_{timestamp}.zip"
+            snapshot_file = f"Snapshot_{self.device_name}_{timestamp}.zip"
         snapshot_file_path: str = os.path.join(directory, snapshot_file)
 
-        _LOGGER.info("Collecting snapshot on %s...", self.name)
+        _LOGGER.info("Collecting snapshot on %s...", self.device_name)
 
         snapshot_resp: Dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["Snapshot"], timeout=_TIMEOUTS["SNAPSHOT"])
@@ -409,17 +424,17 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: If device is not offline.
         """
-        _LOGGER.info("Waiting for %s to go offline...", self.name)
+        _LOGGER.info("Waiting for %s to go offline...", self.device_name)
         start_time: float = time.time()
         end_time: float = start_time + timeout
         while time.time() < end_time:
             if not self.ffx.is_target_connected():
-                _LOGGER.info("%s is offline.", self.name)
+                _LOGGER.info("%s is offline.", self.device_name)
                 break
             time.sleep(.5)
         else:
             raise errors.FuchsiaDeviceError(
-                f"'{self.name}' failed to go offline in {timeout}sec.")
+                f"'{self.device_name}' failed to go offline in {timeout}sec.")
 
     def _wait_for_online(self, timeout: float = _TIMEOUTS["ONLINE"]) -> None:
         """Wait for Fuchsia device to go online.
@@ -430,14 +445,14 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: If device is not online.
         """
-        _LOGGER.info("Waiting for %s to go online...", self.name)
+        _LOGGER.info("Waiting for %s to go online...", self.device_name)
         start_time: float = time.time()
         end_time: float = start_time + timeout
         while time.time() < end_time:
             if self.ffx.is_target_connected():
-                _LOGGER.info("%s is online.", self.name)
+                _LOGGER.info("%s is online.", self.device_name)
                 break
             time.sleep(.5)
         else:
             raise errors.FuchsiaDeviceError(
-                f"'{self.name}' failed to go online in {timeout}sec.")
+                f"'{self.device_name}' failed to go online in {timeout}sec.")

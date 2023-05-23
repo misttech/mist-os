@@ -108,7 +108,7 @@ $ fx set core.x64 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth_default:bluetooth_default_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_test --e2e --output
 ```
 
 ### Component tests
@@ -122,7 +122,7 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop && ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component_default:component_default_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component:component_test --e2e --output
 ```
 
 ### Tracing tests
@@ -136,7 +136,7 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop && ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing_default:tracing_default_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing:tracing_test --e2e --output
 ```
 
 [Intel NUC]: https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc

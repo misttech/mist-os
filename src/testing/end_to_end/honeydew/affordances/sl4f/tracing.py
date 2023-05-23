@@ -2,12 +2,12 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Tracing capability default implementation."""
+"""Tracing affordance implementation using SL4F."""
 
-import os
-import logging
 import base64
 from datetime import datetime
+import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from honeydew import errors
@@ -24,8 +24,8 @@ _SL4F_METHODS: Dict[str, str] = {
 }
 
 
-class TracingDefault(tracing.Tracing):
-    """Default implementation for Tracing affordance.
+class Tracing(tracing.Tracing):
+    """Tracing affordance implementation using SL4F.
 
     Args:
         device_name: Device name returned by `ffx target list`.
