@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
 from itertools import zip_longest
@@ -23,13 +24,11 @@ def file_sha1(path):
     return sha1.hexdigest()
 
 
-def get_file_hash(path, root_dir, extra_files_read):
+def get_file_hash(path):
     """Get a SHA1 hash value of a file, and update extra_files_read"""
-    p = os.path.join(root_dir, path)
-    hash_value = file_sha1(p)
+    hash_value = file_sha1(path)
     # Follow links for depfile entry. See https://fxbug.dev/122513.
-    p = os.path.relpath(os.path.realpath(p))
-    extra_files_read.append(p)
+    p = os.path.relpath(os.path.realpath(path))
     return hash_value
 
 
@@ -48,20 +47,55 @@ def strip_manifest_path(package):
     return package
 
 
+def vbmeta_info_no_hash(python_path, avbtool_path, image_path):
+    cmd = [python_path, avbtool_path, "info_image", "--image", image_path]
+    res = subprocess.run(cmd, text=True, capture_output=True)
+
+    if res.returncode != 0:
+        cmd_str = " ".join(cmd)
+        raise Exception(
+            f"Failed to run `{cmd_str}`\nstdout:\n{res.stdout}\nstderr:\n{res.stderr}"
+        )
+
+    info = res.stdout.splitlines()
+
+    if not info:
+        raise ValueError(f"Got empty vbmeta info from {image_path}")
+
+    def is_salt_or_digest_line(line):
+        return (
+            line.strip().startswith("Salt:") or
+            line.strip().startswith("Digest:"))
+
+    return "\n".join(line for line in info if not is_salt_or_digest_line(line))
+
+
 def normalize(
-        config, root_dir, exclude_packages, exclude_images, extra_files_read):
-    """
-    Clean up the input for diffing.
-    """
+    config,
+    root_dir,
+    exclude_packages,
+    exclude_images,
+    extra_files_read,
+    python_path,
+    avbtool_path,
+):
+    """Clean up the input for diffing."""
     for image in config:
         if not image["path"]:
             raise ValueError(
                 "Paths should not be missing from images.json entries",
-                json.dumps(image))
+                json.dumps(image),
+            )
 
         if os.path.basename(image["path"]) not in exclude_images:
-            image["path_hash"] = get_file_hash(
-                image["path"], root_dir, extra_files_read)
+            full_path = os.path.join(root_dir, image["path"])
+            extra_files_read.append(full_path)
+
+            if image["type"] == "vbmeta":
+                image["vbmeta_info"] = vbmeta_info_no_hash(
+                    python_path, avbtool_path, full_path)
+            else:
+                image["path_hash"] = get_file_hash(full_path)
 
         # Replace with the full path to the basename of the file. This is because
         # an images.json may list multiple filesystems of the same type
@@ -72,7 +106,7 @@ def normalize(
 
         if image.get("name") == "blob":
             pkgs = image["contents"]["packages"]
-            for pkg_set in ('base', 'cache'):
+            for pkg_set in ("base", "cache"):
                 # Sort the blobs in-place for when we print the file for
                 # debugging.
                 pkgs[pkg_set].sort(key=package_key)
@@ -91,8 +125,7 @@ def normalize(
 
 
 def json_format(x):
-    """
-    JSON format an object with default parameters
+    """JSON format an object with default parameters
 
     This is just for readability, as we need this for diffing and printing
     things nicely in our file.
@@ -101,8 +134,7 @@ def json_format(x):
 
 
 def get_diffs(items1, items2, keyf):
-    """
-    Sort the input arrays (nlogn) and diff them in linear time.
+    """Sort the input arrays (nlogn) and diff them in linear time.
 
     This is instead of using difflib which is worst-case quadratic and is
     in practice too slow on the images file.
@@ -122,7 +154,8 @@ def get_diffs(items1, items2, keyf):
             diffs.append(
                 (
                     json_format(items1[idx1]) if key1 < key2 else "{}",
-                    json_format(items2[idx2]) if key2 < key1 else "{}"))
+                    json_format(items2[idx2]) if key2 < key1 else "{}",
+                ))
 
             if key1 < key2:
                 idx1 += 1
@@ -154,8 +187,9 @@ def get_first(predicate, sequence):
 def format_diffs(diffs):
     """Format found diffs for printing"""
     formatted_diffs = list(map("\n---\n".join, diffs))
-    return "Diffs found:\n" + "<<<<\n" + \
-        "\n>>>>\n<<<<\n".join(formatted_diffs) + "\n>>>>"
+    return (
+        "Diffs found:\n" + "<<<<\n" + "\n>>>>\n<<<<\n".join(formatted_diffs) +
+        "\n>>>>")
 
 
 def main():
@@ -167,6 +201,8 @@ def main():
         "--images_manifest_bzl", type=argparse.FileType("r"), required=True)
     parser.add_argument(
         "--path-mapping", type=argparse.FileType("r"), required=True)
+    parser.add_argument("--python-path", required=True)
+    parser.add_argument("--avbtool-path", required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
     parser.add_argument("--output1", type=argparse.FileType("w"), required=True)
     parser.add_argument("--output2", type=argparse.FileType("w"), required=True)
@@ -190,17 +226,29 @@ def main():
     bazel_images_manifest_dir = ""
     for line in args.path_mapping:
         gn_path, bazel_path = line.split(":")
-        if gn_path.endswith('_create_system'):
+        if gn_path.endswith("_create_system"):
             bazel_images_manifest_dir = bazel_path
             break
 
     normalize(
-        images_manifest_gn, os.path.dirname(args.images_manifest_gn.name),
-        exclude_packages, exclude_images, extra_files_read)
+        images_manifest_gn,
+        os.path.dirname(args.images_manifest_gn.name),
+        exclude_packages,
+        exclude_images,
+        extra_files_read,
+        args.python_path,
+        args.avbtool_path,
+    )
 
     normalize(
-        images_manifest_bzl, bazel_images_manifest_dir, exclude_packages,
-        exclude_images, extra_files_read)
+        images_manifest_bzl,
+        bazel_images_manifest_dir,
+        exclude_packages,
+        exclude_images,
+        extra_files_read,
+        args.python_path,
+        args.avbtool_path,
+    )
 
     images_manifest_gn_str = json_format(images_manifest_gn)
     images_manifest_bzl_str = json_format(images_manifest_bzl)
@@ -225,7 +273,8 @@ def main():
             blob1["contents"]["packages"]["cache"],
             blob2["contents"]["packages"]["base"] +
             blob2["contents"]["packages"]["cache"],
-            keyf=lambda package: package["name"])
+            keyf=lambda package: package["name"],
+        )
 
         if diffs:
             print(format_diffs(diffs))
@@ -246,8 +295,8 @@ def main():
         if line_pair[0] != line_pair[1]:
             print(f"Unexpected diff found: {line_pair}")
             print(
-                f"Please check {args.output1.name} and {args.output2.name} to compare the normalized outputs."
-            )
+                f"Please check {args.output1.name} and {args.output2.name} to compare"
+                " the normalized outputs.")
             return 1
 
     return 0

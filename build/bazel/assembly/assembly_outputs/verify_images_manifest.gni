@@ -67,10 +67,14 @@ template("verify_images_manifest") {
 
     depfile = "${target_out_dir}/${target_name}.d"
 
+    _avbtool_path = "//third_party/android/platform/external/avb/avbtool.py"
+
     inputs = [
-      _gn_assembled_system_file,
+      python_exe_src,
+      _avbtool_path,
       _bazel_assembled_system_file,
       _bazel_assembled_system_path_mapping,
+      _gn_assembled_system_file,
     ]
 
     # The images configs after cleanup by the script for diffing.
@@ -96,6 +100,10 @@ template("verify_images_manifest") {
       rebase_path(_bazel_assembled_system_file, root_build_dir),
       "--path-mapping",
       rebase_path(_bazel_assembled_system_path_mapping, root_build_dir),
+      "--python-path",
+      rebase_path(python_exe_src, root_build_dir),
+      "--avbtool-path",
+      rebase_path(_avbtool_path, root_build_dir),
       "--depfile",
       rebase_path(depfile, root_build_dir),
       "--output1",
