@@ -20,6 +20,7 @@ rustc_binary("service-routing-branch-bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
@@ -28,8 +29,13 @@ rustc_binary("service-routing-branch-bin") {
   sources = [ "src/branch.rs" ]
 }
 
-fuchsia_test_component("service-routing-branch") {
-  manifest = "meta/service-routing-branch.cml"
+fuchsia_test_component("service-routing-branch-onecoll") {
+  manifest = "meta/service-routing-branch-onecoll.cml"
+  deps = [ ":service-routing-branch-bin" ]
+}
+
+fuchsia_test_component("service-routing-branch-twocoll") {
+  manifest = "meta/service-routing-branch-twocoll.cml"
   deps = [ ":service-routing-branch-bin" ]
 }
 
@@ -46,7 +52,9 @@ rustc_test("service-routing-test-bin") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/sys/lib/component-events",
+    "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -133,7 +141,8 @@ fuchsia_test_package("component-manager-services-tests") {
   deps = [
     ":echo-service-client",
     ":multi-instance-echo-provider",
-    ":service-routing-branch",
+    ":service-routing-branch-onecoll",
+    ":service-routing-branch-twocoll",
     "//src/sys/component_manager/testing/services_provider:provider-a-cmp",
     "//src/sys/component_manager/testing/services_provider:provider-b-cmp",
   ]

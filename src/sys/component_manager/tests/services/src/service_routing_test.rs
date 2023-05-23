@@ -14,29 +14,56 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
     fuchsia_component::client,
     fuchsia_component_test::ScopedInstance,
+    moniker::{ChildMoniker, ChildMonikerBase},
+    test_case::test_case,
     tracing::*,
 };
 
-/// Name of the collection that contains branch components.
 const BRANCHES_COLLECTION: &str = "branches";
+const BRANCH_ONECOLL_COMPONENT_URL: &str = "#meta/service-routing-branch-onecoll.cm";
+const BRANCH_TWOCOLL_COMPONENT_URL: &str = "#meta/service-routing-branch-twocoll.cm";
+const A_ONECOLL_MONIKER: &str = "account_providers:a";
+const B_ONECOLL_MONIKER: &str = "account_providers:b";
+const A_TWOCOLL_MONIKER: &str = "account_providers_1:a";
+const B_TWOCOLL_MONIKER: &str = "account_providers_2:b";
 
-/// Component URL of the branch component.
-const BRANCH_COMPONENT_URL: &str = "#meta/service-routing-branch.cm";
+struct TestInput {
+    url: &'static str,
+    provider_a_moniker: &'static str,
+    provider_b_moniker: &'static str,
+}
 
-/// Name of the collection in the branch component that contains BankAccount service providers.
-const ACCOUNT_PROVIDERS_COLLECTION: &str = "account_providers";
+impl TestInput {
+    fn new(test_type: TestType) -> Self {
+        match test_type {
+            TestType::OneCollection => Self {
+                url: BRANCH_ONECOLL_COMPONENT_URL,
+                provider_a_moniker: A_ONECOLL_MONIKER,
+                provider_b_moniker: B_ONECOLL_MONIKER,
+            },
+            TestType::TwoCollections => Self {
+                url: BRANCH_TWOCOLL_COMPONENT_URL,
+                provider_a_moniker: A_TWOCOLL_MONIKER,
+                provider_b_moniker: B_TWOCOLL_MONIKER,
+            },
+        }
+    }
+}
 
-/// Name of the provider-a.cm child component in the branch.
-const PROVIDER_A_NAME: &str = "a";
+#[derive(Debug, Clone, Copy)]
+enum TestType {
+    OneCollection,
+    TwoCollections,
+}
 
-/// Name of the provider-b.cm child component in the branch.
-const PROVIDER_B_NAME: &str = "b";
-
+#[test_case(TestType::OneCollection)]
+#[test_case(TestType::TwoCollections)]
 #[fuchsia::test]
-async fn list_instances_test() {
-    let branch = start_branch().await.expect("failed to start branch component");
-    start_provider(&branch, PROVIDER_A_NAME).await.expect("failed to start provider a");
-    start_provider(&branch, PROVIDER_B_NAME).await.expect("failed to start provider b");
+async fn list_instances_test(test_type: TestType) {
+    let input = TestInput::new(test_type);
+    let branch = start_branch(&input).await.expect("failed to start branch component");
+    start_provider(&branch, input.provider_a_moniker).await.expect("failed to start provider a");
+    start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
     let service_dir = fuchsia_fs::directory::open_directory(
@@ -56,11 +83,14 @@ async fn list_instances_test() {
     verify_instances(instances, 2);
 }
 
+#[test_case(TestType::OneCollection)]
+#[test_case(TestType::TwoCollections)]
 #[fuchsia::test]
-async fn connect_to_instances_test() {
-    let branch = start_branch().await.expect("failed to start branch component");
-    start_provider(&branch, PROVIDER_A_NAME).await.expect("failed to start provider a");
-    start_provider(&branch, PROVIDER_B_NAME).await.expect("failed to start provider b");
+async fn connect_to_instances_test(test_type: TestType) {
+    let input = TestInput::new(test_type);
+    let branch = start_branch(&input).await.expect("failed to start branch component");
+    start_provider(&branch, input.provider_a_moniker).await.expect("failed to start provider a");
+    start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
     let service_dir = fuchsia_fs::directory::open_directory(
@@ -97,11 +127,14 @@ async fn connect_to_instances_test() {
     }
 }
 
+#[test_case(TestType::OneCollection)]
+#[test_case(TestType::TwoCollections)]
 #[fuchsia::test]
-async fn create_destroy_instance_test() {
-    let branch = start_branch().await.expect("failed to start branch component");
-    start_provider(&branch, PROVIDER_A_NAME).await.expect("failed to start provider a");
-    start_provider(&branch, PROVIDER_B_NAME).await.expect("failed to start provider b");
+async fn create_destroy_instance_test(test_type: TestType) {
+    let input = TestInput::new(test_type);
+    let branch = start_branch(&input).await.expect("failed to start branch component");
+    start_provider(&branch, input.provider_a_moniker).await.expect("failed to start provider a");
+    start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
     let service_dir = fuchsia_fs::directory::open_directory(
@@ -123,7 +156,9 @@ async fn create_destroy_instance_test() {
     verify_instances(instances, 2);
 
     // Destroy provider a.
-    destroy_provider(&branch, PROVIDER_A_NAME).await.expect("failed to destroy provider a");
+    destroy_provider(&branch, input.provider_a_moniker)
+        .await
+        .expect("failed to destroy provider a");
 
     let instances: Vec<String> = fuchsia_fs::directory::readdir(&service_dir)
         .await
@@ -137,15 +172,14 @@ async fn create_destroy_instance_test() {
 }
 
 /// Starts a branch child component.
-async fn start_branch() -> Result<ScopedInstance, Error> {
+async fn start_branch(input: &TestInput) -> Result<ScopedInstance, Error> {
     let event_stream = EventStream::open_at_path("/events/discovered")
         .await
         .context("failed to subscribe to EventSource")?;
 
-    let branch =
-        ScopedInstance::new(BRANCHES_COLLECTION.to_string(), BRANCH_COMPONENT_URL.to_string())
-            .await
-            .context("failed to create branch component instance")?;
+    let branch = ScopedInstance::new(BRANCHES_COLLECTION.to_string(), input.url.to_string())
+        .await
+        .context("failed to create branch component instance")?;
     branch.start_with_binder_sync().await?;
 
     // Wait for the providers to be discovered (created) to ensure that
@@ -154,18 +188,16 @@ async fn start_branch() -> Result<ScopedInstance, Error> {
         .has_subset(
             vec![
                 EventMatcher::ok().r#type(Discovered::TYPE).moniker(format!(
-                    "./{}:{}/{}:{}",
+                    "./{}:{}/{}",
                     BRANCHES_COLLECTION,
                     branch.child_name(),
-                    ACCOUNT_PROVIDERS_COLLECTION,
-                    PROVIDER_A_NAME,
+                    input.provider_a_moniker,
                 )),
                 EventMatcher::ok().r#type(Discovered::TYPE).moniker(format!(
-                    "./{}:{}/{}:{}",
+                    "./{}:{}/{}",
                     BRANCHES_COLLECTION,
                     branch.child_name(),
-                    ACCOUNT_PROVIDERS_COLLECTION,
-                    PROVIDER_B_NAME,
+                    input.provider_b_moniker,
                 )),
             ],
             Ordering::Unordered,
@@ -178,7 +210,7 @@ async fn start_branch() -> Result<ScopedInstance, Error> {
 }
 
 /// Starts the provider with the name `child_name` in the branch component.
-async fn start_provider(branch: &ScopedInstance, child_name: &str) -> Result<(), Error> {
+async fn start_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<(), Error> {
     let lifecycle_controller_proxy =
         client::connect_to_protocol::<fsys2::LifecycleControllerMarker>()
             .context("failed to connect to LifecycleController")?;
@@ -187,13 +219,8 @@ async fn start_provider(branch: &ScopedInstance, child_name: &str) -> Result<(),
         .await
         .context("failed to subscribe to EventSource")?;
 
-    let provider_moniker = format!(
-        "./{}:{}/{}:{}",
-        BRANCHES_COLLECTION,
-        branch.child_name(),
-        ACCOUNT_PROVIDERS_COLLECTION,
-        child_name,
-    );
+    let provider_moniker =
+        format!("./{}:{}/{}", BRANCHES_COLLECTION, branch.child_name(), child_moniker);
 
     let (_, binder_server) = fidl::endpoints::create_endpoints();
 
@@ -217,8 +244,8 @@ async fn start_provider(branch: &ScopedInstance, child_name: &str) -> Result<(),
 }
 
 /// Destroys a BankAccount provider component with the name `child_name`.
-async fn destroy_provider(branch: &ScopedInstance, child_name: &str) -> Result<(), Error> {
-    info!(%child_name, "destroying BankAccount provider");
+async fn destroy_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<(), Error> {
+    info!(%child_moniker, "destroying BankAccount provider");
 
     let lifecycle_controller_proxy =
         client::connect_to_protocol::<fsys2::LifecycleControllerMarker>()
@@ -228,22 +255,18 @@ async fn destroy_provider(branch: &ScopedInstance, child_name: &str) -> Result<(
         .await
         .context("failed to subscribe to EventSource")?;
 
-    let provider_moniker = format!(
-        "./{}:{}/{}:{}",
-        BRANCHES_COLLECTION,
-        branch.child_name(),
-        ACCOUNT_PROVIDERS_COLLECTION,
-        child_name
-    );
+    let provider_moniker =
+        format!("./{}:{}/{}", BRANCHES_COLLECTION, branch.child_name(), child_moniker);
     let parent_moniker = format!("./{}:{}", BRANCHES_COLLECTION, branch.child_name());
 
     // Destroy the provider child.
+    let child_moniker = ChildMoniker::parse(child_moniker).unwrap();
     lifecycle_controller_proxy
         .destroy_instance(
             &parent_moniker,
             &fdecl::ChildRef {
-                name: child_name.to_string(),
-                collection: Some(ACCOUNT_PROVIDERS_COLLECTION.to_string()),
+                name: child_moniker.name().into(),
+                collection: child_moniker.collection().map(|c| c.into()),
             },
         )
         .await?
@@ -252,7 +275,7 @@ async fn destroy_provider(branch: &ScopedInstance, child_name: &str) -> Result<(
     // Wait for the provider to be destroyed.
     EventSequence::new()
         .has_subset(
-            vec![EventMatcher::ok().r#type(Destroyed::TYPE).moniker_regex(provider_moniker)],
+            vec![EventMatcher::ok().r#type(Destroyed::TYPE).moniker(provider_moniker)],
             Ordering::Unordered,
         )
         .expect(event_stream)
