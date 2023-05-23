@@ -29,7 +29,7 @@ pub mod route {
     };
 
     /// An implementation of the Netlink Route protocol family.
-    pub(crate) struct NetlinkRoute {}
+    pub(crate) enum NetlinkRoute {}
 
     impl MulticastCapableNetlinkFamily for NetlinkRoute {
         fn legacy_to_modern(group: SingleLegacyGroup) -> Option<ModernGroup> {
@@ -140,7 +140,6 @@ pub mod route {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-    use std::collections::HashMap;
 
     pub(crate) const LEGACY_GROUP1: u32 = 0x00000001;
     pub(crate) const LEGACY_GROUP2: u32 = 0x00000010;
@@ -152,7 +151,7 @@ pub(crate) mod testutil {
     pub(crate) const INVALID_MODERN_GROUP: ModernGroup = ModernGroup(20);
 
     #[derive(Debug)]
-    pub(crate) struct FakeProtocolFamily(HashMap<SingleLegacyGroup, ModernGroup>);
+    pub(crate) enum FakeProtocolFamily {}
 
     impl MulticastCapableNetlinkFamily for FakeProtocolFamily {
         fn legacy_to_modern(legacy_group: SingleLegacyGroup) -> Option<ModernGroup> {
