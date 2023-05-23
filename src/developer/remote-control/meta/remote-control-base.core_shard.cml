@@ -53,12 +53,6 @@
             to: "#remote-control",
         },
         {
-            directory: "config-data",
-            from: "parent",
-            to: "#remote-control",
-            subdir: "remote-control",
-        },
-        {
             protocol: [
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",

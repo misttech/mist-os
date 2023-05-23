@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
@@ -20,10 +19,9 @@ group("remote-control") {
   ]
 }
 
-config_data_for_assembly("maps") {
-  for_pkg = "remote-control"
+resource("maps") {
   sources = [ "data/selector-maps.json" ]
-  outputs = [ "selector-maps.json" ]
+  outputs = [ "data/selector-maps.json" ]
 }
 
 group("tests") {
@@ -156,6 +154,7 @@ fuchsia_component("remote-control-component") {
 fuchsia_package("remote-control-package") {
   package_name = "remote-control"
   deps = [
+    ":maps",
     ":remote-control-component",
     "//src/developer/remote-control/runner:bin",
   ]

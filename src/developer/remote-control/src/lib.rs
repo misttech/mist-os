@@ -47,7 +47,7 @@ struct Client {
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
         let f = match fuchsia_fs::file::open_in_namespace(
-            "/config/data/selector-maps.json",
+            "/pkg/data/selector-maps.json",
             io::OpenFlags::RIGHT_READABLE,
         ) {
             Ok(f) => f,

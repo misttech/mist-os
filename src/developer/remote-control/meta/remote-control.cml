@@ -13,11 +13,6 @@
     ],
     use: [
         {
-            directory: "config-data",
-            rights: [ "r*" ],
-            path: "/config/data",
-        },
-        {
             directory: "dev-overnet-usb",
             rights: [ "r*" ],
             path: "/dev/class/overnet-usb",
