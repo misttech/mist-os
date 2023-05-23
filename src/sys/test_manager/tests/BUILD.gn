@@ -92,16 +92,12 @@ rustc_test("test_manager_legacy_test_bin") {
   ]
 }
 
-fuchsia_test_component("test_manager_test_component") {
-  component_name = "test_manager_test"
+fuchsia_unittest_package("test_manager_test") {
   manifest = "meta/test_manager_test.cml"
-  deps = [ ":test_manager_test_bin" ]
-  test_type = "test_arch"
-}
-
-fuchsia_test_package("test_manager_test") {
-  test_components = [ ":test_manager_test_component" ]
-  deps = [ "test_data" ]
+  deps = [
+    ":test_manager_test_bin",
+    "test_data",
+  ]
 
   subpackages = [ "//src/sys/test_manager:pkg" ]
 
@@ -119,17 +115,10 @@ fuchsia_component("test_realm") {
   manifest = "meta/test_realm.cml"
 }
 
-fuchsia_test_component("test_manager_specified_realm_test_component") {
-  component_name = "test_manager_specified_realm_test"
+fuchsia_unittest_package("test_manager_specified_realm_test") {
   manifest = "meta/test_manager_specified_realm_test.cml"
-  deps = [ ":test_manager_specified_realm_bin" ]
-
-  test_type = "test_arch"
-}
-
-fuchsia_test_package("test_manager_specified_realm_test") {
-  test_components = [ ":test_manager_specified_realm_test_component" ]
   deps = [
+    ":test_manager_specified_realm_bin",
     ":test_realm",
     "test_data:debug_data_write_test",
     "test_data:echo_test_client",
@@ -141,34 +130,22 @@ fuchsia_test_package("test_manager_specified_realm_test") {
   subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
-fuchsia_test_component("test_manager_stress_test_component") {
-  component_name = "test_manager_stress_test"
+fuchsia_unittest_package("test_manager_stress_test") {
   manifest = "meta/test_manager_stress_test.cml"
   deps = [
     ":test_manager_stress_test_bin",
     "test_data:debug_data_spam_test",
   ]
 
-  test_type = "test_arch"
-}
-
-fuchsia_test_package("test_manager_stress_test") {
-  test_components = [ ":test_manager_stress_test_component" ]
-  deps = [ "test_data:debug_data_spam_test" ]
-
   subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
-fuchsia_test_component("test_manager_legacy_test_component") {
-  component_name = "test_manager_legacy_test"
+fuchsia_unittest_package("test_manager_legacy_test") {
   manifest = "meta/test_manager_legacy_test.cml"
-  deps = [ ":test_manager_legacy_test_bin" ]
-  test_type = "test_arch"
-}
-
-fuchsia_test_package("test_manager_legacy_test") {
-  test_components = [ ":test_manager_legacy_test_component" ]
-  deps = [ "test_data:test_data_v1" ]
+  deps = [
+    ":test_manager_legacy_test_bin",
+    "test_data:test_data_v1",
+  ]
 
   subpackages = [ "//src/sys/test_manager:pkg" ]
 

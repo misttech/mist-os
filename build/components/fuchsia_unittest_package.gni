@@ -84,11 +84,6 @@ import("fuchsia_unittest_component.gni")
 #     details.
 #     Type: list of targets
 #
-#   test_type (optional)
-#     Maps to the moniker to run the test component in.
-#     Type: string
-#     TODO(https://fxbug.dev/127535: Document various types)
-#
 #   data_deps
 #   deps
 #   visibility
@@ -106,7 +101,6 @@ template("fuchsia_unittest_package") {
                                "required_uses",
                                "restricted_features",
                                "deprecated_legacy_test_execution",
-                               "test_type",
                              ])
       if (!defined(component_name)) {
         if (defined(invoker.package_name)) {

@@ -28,10 +28,10 @@ rustc_test("tests_bin") {
   inputs = [ "../test_data/sample_tests_golden_events.rsf" ]
 }
 
-fuchsia_test_component("gtest_runner_integration_test") {
+fuchsia_component("gtest_runner_integration_test") {
+  testonly = true
   manifest = "meta/gtest_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
-  test_type = "test_arch"
 }
 
 rustc_test("stress_tests_bin") {
@@ -53,10 +53,10 @@ rustc_test("stress_tests_bin") {
   ]
 }
 
-fuchsia_test_component("gtest_runner_stress_test") {
+fuchsia_component("gtest_runner_stress_test") {
+  testonly = true
   manifest = "meta/gtest_runner_stress_test.cml"
   deps = [ ":stress_tests_bin" ]
-  test_type = "test_arch"
 }
 
 fuchsia_test_package("gtest-runner-integration-test") {

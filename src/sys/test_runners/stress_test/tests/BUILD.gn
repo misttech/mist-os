@@ -22,10 +22,10 @@ rustc_test("tests_bin") {
   sources = [ "main.rs" ]
 }
 
-fuchsia_test_component("stress_runner_integration_test") {
+fuchsia_component("stress_runner_integration_test") {
+  testonly = true
   manifest = "meta/stress_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
-  test_type = "test_arch"
 }
 
 fuchsia_test_package("stress-runner-integration-test") {

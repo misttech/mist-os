@@ -6,7 +6,6 @@
 {
     include: [
         "//src/sys/testing/meta/system-tests.shard.cml",
-        "//src/sys/testing/meta/test-arch-tests.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],

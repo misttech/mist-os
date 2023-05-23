@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/sys/test_runners/gtest/tests/meta/common.shard.cml" ],
+    include: [
+        "//src/sys/test_runners/gtest/tests/meta/common.shard.cml",
+        "sys/testing/system-test.shard.cml",
+    ],
     program: {
         binary: "bin/gtest_runner_stress_test",
     },

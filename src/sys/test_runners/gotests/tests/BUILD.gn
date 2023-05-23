@@ -23,10 +23,10 @@ rustc_test("tests_bin") {
   sources = [ "main.rs" ]
 }
 
-fuchsia_test_component("go_runner_integration_test") {
+fuchsia_component("go_runner_integration_test") {
+  testonly = true
   manifest = "meta/go_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
-  test_type = "test_arch"
 }
 
 fuchsia_test_package("go-runner-integration-test") {

@@ -27,10 +27,10 @@ rustc_test("tests_bin") {
   ]
 }
 
-fuchsia_test_component("gunit_runner_integration_test") {
+fuchsia_component("gunit_runner_integration_test") {
+  testonly = true
   manifest = "meta/gunit_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
-  test_type = "test_arch"
 }
 
 fuchsia_test_package("gunit-runner-integration-test") {

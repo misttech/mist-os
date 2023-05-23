@@ -33,7 +33,6 @@ rustc_test("bin") {
 fuchsia_test_component("integration-test") {
   manifest = "meta/fuzz_test_runner_integration_test.cml"
   deps = [ ":bin" ]
-  test_type = "test_arch"
 }
 
 fuchsia_test_package("integration-test-pkg") {

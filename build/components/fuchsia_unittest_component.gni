@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("fuchsia_test_component.gni")
+import("fuchsia_component.gni")
 import("fuchsia_test_component_manifest.gni")
 
 # Defines a component that launches a test.
@@ -88,11 +88,6 @@ import("fuchsia_test_component_manifest.gni")
 #     but in some cases may offer faster test execution.
 #     Type: boolean
 #
-#   test_type (optional)
-#     Maps to the moniker to run the test component in.
-#     Type: string
-#     TODO(https://fxbug.dev/127535: Document various types)
-#
 #   data_deps
 #   deps
 #   visibility
@@ -113,7 +108,7 @@ template("fuchsia_unittest_component") {
       manifest = manifest[0]
     }
 
-    fuchsia_test_component(target_name) {
+    fuchsia_component(target_name) {
       forward_variables_from(invoker,
                              [
                                "data_deps",
@@ -124,7 +119,6 @@ template("fuchsia_unittest_component") {
                                "required_uses",
                                "restricted_features",
                                "visibility",
-                               "test_type",
                              ])
       if (defined(invoker.deprecated_legacy_test_execution) &&
           invoker.deprecated_legacy_test_execution) {
@@ -134,6 +128,7 @@ template("fuchsia_unittest_component") {
       if (defined(invoker.component_name)) {
         component_name = invoker.component_name
       }
+      testonly = true
 
       if (defined(generated_target)) {
         if (!defined(manifest_deps)) {
