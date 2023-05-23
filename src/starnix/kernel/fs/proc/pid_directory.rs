@@ -11,6 +11,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::mm::{
     MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatmFile, ProcStatusFile,
+    StatsScope,
 };
 use crate::selinux::selinux_proc_attrs;
 use crate::task::{CurrentTask, Task, TaskStateCode, ThreadGroup};
@@ -18,7 +19,8 @@ use crate::types::*;
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
 pub fn pid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
-    let mut dir = static_directory_builder_with_common_task_entries(fs, task);
+    let mut dir =
+        static_directory_builder_with_common_task_entries(fs, task, StatsScope::ThreadGroup);
     dir.entry_creds(task.as_fscred());
     dir.entry(
         b"task",
@@ -30,7 +32,7 @@ pub fn pid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/task/<tid>` directory for `task`.
 fn tid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
-    static_directory_builder_with_common_task_entries(fs, task).build()
+    static_directory_builder_with_common_task_entries(fs, task, StatsScope::Task).build()
 }
 
 /// Creates a [`StaticDirectoryBuilder`] and pre-populates it with files that are present in both
@@ -38,6 +40,7 @@ fn tid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
 fn static_directory_builder_with_common_task_entries<'a>(
     fs: &'a FileSystemHandle,
     task: &Arc<Task>,
+    scope: StatsScope,
 ) -> StaticDirectoryBuilder<'a> {
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.entry_creds(task.as_fscred());
@@ -72,7 +75,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
         mode!(IFLNK, 0o777),
     );
     dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
-    dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"stat", ProcStatFile::new_node(task, scope), mode!(IFREG, 0o444));
     dir.entry(b"statm", ProcStatmFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));

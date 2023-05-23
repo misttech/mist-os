@@ -1986,20 +1986,29 @@ impl SequenceFileSource for ProcSmapsFile {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum StatsScope {
+    Task,
+    ThreadGroup,
+}
+
 #[derive(Clone)]
-pub struct ProcStatFile(Arc<Task>);
+pub struct ProcStatFile {
+    task: Arc<Task>,
+    scope: StatsScope,
+}
 impl ProcStatFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
+    pub fn new_node(task: &Arc<Task>, scope: StatsScope) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { task: task.clone(), scope })
     }
 }
 impl DynamicFileSource for ProcStatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let command = self.0.command();
+        let command = self.task.command();
         let command = command.as_c_str().to_str().unwrap_or("unknown");
         let mut stats = [0u64; 48];
         {
-            let thread_group = self.0.thread_group.read();
+            let thread_group = self.task.thread_group.read();
             stats[0] = thread_group.get_ppid() as u64;
             stats[1] = thread_group.process_group.leader as u64;
             stats[2] = thread_group.process_group.session.leader as u64;
@@ -2023,22 +2032,25 @@ impl DynamicFileSource for ProcStatFile {
             stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
         }
 
-        let time_stats = self.0.thread_group.time_stats();
+        let time_stats = match self.scope {
+            StatsScope::Task => self.task.time_stats(),
+            StatsScope::ThreadGroup => self.task.thread_group.time_stats(),
+        };
         stats[10] = duration_to_scheduler_clock(time_stats.user_time) as u64;
         stats[11] = duration_to_scheduler_clock(time_stats.system_time) as u64;
 
-        let info = self.0.thread_group.process.info().map_err(|_| errno!(EIO))?;
+        let info = self.task.thread_group.process.info().map_err(|_| errno!(EIO))?;
         stats[18] =
             duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
                 as u64;
 
-        let mem_stats = self.0.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let mem_stats = self.task.mm.get_stats().map_err(|_| errno!(EIO))?;
         let page_size = *PAGE_SIZE as usize;
         stats[19] = mem_stats.vm_size as u64;
         stats[20] = (mem_stats.vm_rss / page_size) as u64;
 
         {
-            let mm_state = self.0.mm.state.read();
+            let mm_state = self.task.mm.state.read();
             stats[24] = mm_state.stack_start.ptr() as u64;
             stats[44] = mm_state.argv_start.ptr() as u64;
             stats[45] = mm_state.argv_end.ptr() as u64;
@@ -2050,9 +2062,9 @@ impl DynamicFileSource for ProcStatFile {
         writeln!(
             sink,
             "{} ({}) {} {}",
-            self.0.get_pid(),
+            self.task.get_pid(),
             command,
-            self.0.state_code().code_char(),
+            self.task.state_code().code_char(),
             stat_str
         )?;
 

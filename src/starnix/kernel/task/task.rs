@@ -1007,6 +1007,19 @@ impl Task {
             TaskStateCode::Running
         }
     }
+
+    pub fn time_stats(&self) -> TaskTimeStats {
+        let info = match &*self.thread.read() {
+            Some(thread) => zx::Task::get_runtime_info(thread).expect("Failed to get thread stats"),
+            None => return TaskTimeStats::default(),
+        };
+
+        TaskTimeStats {
+            user_time: zx::Duration::from_nanos(info.cpu_time),
+            // TODO: How can we calculate system time?
+            system_time: zx::Duration::default(),
+        }
+    }
 }
 
 impl CurrentTask {
