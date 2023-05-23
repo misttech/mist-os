@@ -250,10 +250,10 @@ struct WlantapMacImpl : WlantapMac,
     }
   }
 
-  virtual void ReportTxStatus(const wlan_common::WlanTxStatus& ts) override {
+  virtual void ReportTxResult(const wlan_common::WlanTxResult& tr) override {
     std::lock_guard<std::mutex> guard(lock_);
     auto arena = fdf::Arena::Create(0, 0);
-    auto result = wlan_softmac_ifc_client_.sync().buffer(*arena)->ReportTxStatus(ts);
+    auto result = wlan_softmac_ifc_client_.sync().buffer(*arena)->ReportTxResult(tr);
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to report tx status up. Status: %d\n", result.status());
     }

@@ -3,6 +3,12 @@
 // found in the LICENSE file.
 library fuchsia.wlan.common;
 
+using fuchsia.wlan.ieee80211;
+
+@namespaced
+@available(removed=13)
+const WLAN_TX_STATUS_MAX_ENTRY uint32 = 8;
+
 /// PHY types supporting different MCS and payload data rates.
 /// Based off of dot11PHYType from IEEE 802.11-2016/2020 Annex C + Amendments
 @available(removed=13)
@@ -91,4 +97,26 @@ type WlanTxResult = strict enum : uint8 {
     FAILED = 0x0;
     /// ACK was received from peer.
     SUCCESS = 0x1;
+};
+
+/// TX status reports are used by the Minstrel rate selection algorithm
+/// Tests should use the default value in //src/connectivity/wlan/testing/hw-sim/src/lib.rs
+@available(removed=13)
+type WlanTxStatus = struct {
+    /// up to 8 different tx_vector for one PPDU frame.
+    /// WLAN_TX_VECTOR_IDX_INVALID indicates no more entries.
+    tx_status_entry array<WlanTxStatusEntry, WLAN_TX_STATUS_MAX_ENTRY>;
+    /// Destination mac address, or addr1 in packet header.
+    peer_addr fuchsia.wlan.ieee80211.MacAddr;
+    result WlanTxResult;
+};
+
+/// One entry in a WlanTxStatus report. Indicates a number of attempted transmissions on
+/// a particular tx vector, but does not imply successful transmission.
+@available(removed=13)
+type WlanTxStatusEntry = struct {
+    tx_vector_idx uint16;
+    /// Number of total attempts with this specific tx vector, including successful attempts.
+    /// DDK assumes the number of attempts per packet will not exceed 255. (typically <= 8)
+    attempts uint8;
 };

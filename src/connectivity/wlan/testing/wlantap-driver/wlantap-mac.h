@@ -32,7 +32,7 @@ class WlantapMac {
 
   virtual void Rx(const fidl::VectorView<uint8_t>& data, const wlan_tap::WlanRxInfo& rx_info) = 0;
 
-  virtual void ReportTxStatus(const wlan_common::WlanTxStatus& ts) = 0;
+  virtual void ReportTxResult(const wlan_common::WlanTxResult& tr) = 0;
 
   virtual void ScanComplete(uint64_t scan_id, int32_t status) = 0;
   virtual void RemoveDevice() = 0;

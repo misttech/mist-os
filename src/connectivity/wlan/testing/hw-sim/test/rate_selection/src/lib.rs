@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxStatus, WlanTxStatusEntry},
+    fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxResultCode, WlanTxResultEntry},
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap::{WlantapPhyConfig, WlantapPhyEvent, WlantapPhyProxy},
     fuchsia_async::Interval,
@@ -33,8 +33,8 @@ const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;
 
 const BSS_MINSTL: Bssid = Bssid([0x6d, 0x69, 0x6e, 0x73, 0x74, 0x0a]);
 
-fn create_wlan_tx_status_entry(tx_vec_idx: u16) -> WlanTxStatusEntry {
-    WlanTxStatusEntry { tx_vector_idx: tx_vec_idx, attempts: 1 }
+fn create_wlan_tx_result_entry(tx_vec_idx: u16) -> WlanTxResultEntry {
+    WlanTxResultEntry { tx_vector_idx: tx_vec_idx, attempts: 1 }
 }
 
 fn send_tx_status_report(
@@ -43,22 +43,23 @@ fn send_tx_status_report(
     is_successful: bool,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), Error> {
-    let result = if is_successful { WlanTxResult::Success } else { WlanTxResult::Failed };
-    let ts = WlanTxStatus {
+    let result_code =
+        if is_successful { WlanTxResultCode::Success } else { WlanTxResultCode::Failed };
+    let tr = WlanTxResult {
         peer_addr: bssid.0,
-        result,
-        tx_status_entry: [
-            create_wlan_tx_status_entry(tx_vec_idx),
-            create_wlan_tx_status_entry(0),
-            create_wlan_tx_status_entry(0),
-            create_wlan_tx_status_entry(0),
-            create_wlan_tx_status_entry(0),
-            create_wlan_tx_status_entry(0),
-            create_wlan_tx_status_entry(0),
-            create_wlan_tx_status_entry(0),
+        result_code,
+        tx_result_entry: [
+            create_wlan_tx_result_entry(tx_vec_idx),
+            create_wlan_tx_result_entry(0),
+            create_wlan_tx_result_entry(0),
+            create_wlan_tx_result_entry(0),
+            create_wlan_tx_result_entry(0),
+            create_wlan_tx_result_entry(0),
+            create_wlan_tx_result_entry(0),
+            create_wlan_tx_result_entry(0),
         ],
     };
-    proxy.report_tx_status(&ts)?;
+    proxy.report_tx_result(&tr)?;
     Ok(())
 }
 

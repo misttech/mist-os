@@ -60,7 +60,8 @@ static constexpr wlan_softmac::WlanProtection kFakeFidlProtection =
     wlan_softmac::WlanProtection::kRxTx;
 static constexpr wlan_associnfo::WlanKeyType kFakeFidlKeyType = wlan_associnfo::WlanKeyType::kGroup;
 static constexpr wlan_common::BssType kFakeFidlBssType = wlan_common::BssType::kMesh;
-static constexpr wlan_common::WlanTxResult kFakeFidlTxResult = wlan_common::WlanTxResult::kSuccess;
+static constexpr wlan_common::WlanTxResultCode kFakeFidlTxResultCode =
+    wlan_common::WlanTxResultCode::kSuccess;
 static constexpr wlan_common::DataPlaneType kFakeFidlDataPlaneType =
     wlan_common::DataPlaneType::kEthernetDevice;
 static constexpr wlan_common::MacImplementationType kFakeFidlMacImplementationType =
@@ -80,7 +81,7 @@ static constexpr uint32_t kFakeBanjoChannelBandwidth = CHANNEL_BANDWIDTH_CBW160;
 static constexpr uint8_t kFakeBanjoProtection = WLAN_PROTECTION_RX_TX;
 static constexpr uint8_t kFakeBanjoKeyType = WLAN_KEY_TYPE_GROUP;
 static constexpr uint32_t kFakeBanjoBssType = BSS_TYPE_MESH;
-static constexpr uint8_t kFakeBanjoTxResult = WLAN_TX_RESULT_SUCCESS;
+static constexpr uint8_t kFakeBanjoTxResultCode = WLAN_TX_RESULT_CODE_SUCCESS;
 static constexpr uint8_t kFakeBanjoDataPlaneType = DATA_PLANE_TYPE_ETHERNET_DEVICE;
 static constexpr uint8_t kFakeBanjoMacImplementationType = MAC_IMPLEMENTATION_TYPE_FULLMAC;
 
@@ -322,32 +323,32 @@ TEST_F(ConvertTest, ToBanjoRxPacket) {
 
 TEST_F(ConvertTest, ToBanjoTxStatus) {
   log::Instance::Init(0);
-  // Populate wlan_common::WlanTxStatus
-  wlan_common::WlanTxStatus in = {
-      .result = kFakeFidlTxResult,
+  // Populate wlan_common::WlanTxResult
+  wlan_common::WlanTxResult in = {
+      .result_code = kFakeFidlTxResultCode,
   };
-  for (size_t i = 0; i < wlan_common::kWlanTxStatusMaxEntry; i++) {
-    in.tx_status_entry[i].tx_vector_idx = kRandomPopulaterUint16;
-    in.tx_status_entry[i].attempts = kRandomPopulaterUint8;
+  for (size_t i = 0; i < wlan_common::kWlanTxResultMaxEntry; i++) {
+    in.tx_result_entry[i].tx_vector_idx = kRandomPopulaterUint16;
+    in.tx_result_entry[i].attempts = kRandomPopulaterUint8;
   }
   for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
     in.peer_addr[i] = kFakeMacAddr[i];
   }
 
   // Conduct conversion
-  wlan_tx_status_t out;
+  wlan_tx_result_t out;
   EXPECT_EQ(ZX_OK, ConvertTxStatus(in, &out));
 
   // Verify outputs
-  for (size_t i = 0; i < wlan_common::kWlanTxStatusMaxEntry; i++) {
-    EXPECT_EQ(kRandomPopulaterUint16, out.tx_status_entry[i].tx_vector_idx);
-    EXPECT_EQ(kRandomPopulaterUint8, out.tx_status_entry[i].attempts);
+  for (size_t i = 0; i < wlan_common::kWlanTxResultMaxEntry; i++) {
+    EXPECT_EQ(kRandomPopulaterUint16, out.tx_result_entry[i].tx_vector_idx);
+    EXPECT_EQ(kRandomPopulaterUint8, out.tx_result_entry[i].attempts);
   }
 
   for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
     EXPECT_EQ(kFakeMacAddr[i], out.peer_addr[i]);
   }
-  EXPECT_EQ(kFakeBanjoTxResult, out.result);
+  EXPECT_EQ(kFakeBanjoTxResultCode, out.result_code);
 }
 
 // banjo to FIDL types tests.

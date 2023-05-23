@@ -150,11 +150,13 @@ type PowerSaveType = strict enum : uint32 {
 @namespaced
 const WLAN_TX_VECTOR_IDX_INVALID uint16 = 0;
 @namespaced
-const WLAN_TX_STATUS_MAX_ENTRY uint32 = 8;
+@available(added=13)
+const WLAN_TX_RESULT_MAX_ENTRY uint32 = 8;
 
-/// One entry in a WlanTxStatus report. Indicates a number of attempted transmissions on
+/// One entry in a WlanTxResult report. Indicates a number of attempted transmissions on
 /// a particular tx vector, but does not imply successful transmission.
-type WlanTxStatusEntry = struct {
+@available(added=13)
+type WlanTxResultEntry = struct {
     tx_vector_idx uint16;
     /// Number of total attempts with this specific tx vector, including successful attempts.
     /// DDK assumes the number of attempts per packet will not exceed 255. (typically <= 8)
@@ -163,7 +165,7 @@ type WlanTxStatusEntry = struct {
 
 /// Outcome of a packet transmission.
 @available(added=13)
-type WlanTxResult = flexible enum : uint8 {
+type WlanTxResultCode = flexible enum : uint8 {
     /// ACK was not received or transmission otherwise failed.
     FAILED = 0x0;
     /// ACK was received from peer.
@@ -172,13 +174,14 @@ type WlanTxResult = flexible enum : uint8 {
 
 /// TX status reports are used by the Minstrel rate selection algorithm
 /// Tests should use the default value in //src/connectivity/wlan/testing/hw-sim/src/lib.rs
-type WlanTxStatus = struct {
+@available(added=13)
+type WlanTxResult = struct {
     /// up to 8 different tx_vector for one PPDU frame.
     /// WLAN_TX_VECTOR_IDX_INVALID indicates no more entries.
-    tx_status_entry array<WlanTxStatusEntry, WLAN_TX_STATUS_MAX_ENTRY>;
+    tx_result_entry array<WlanTxResultEntry, WLAN_TX_RESULT_MAX_ENTRY>;
     /// Destination mac address, or addr1 in packet header.
     peer_addr fuchsia.wlan.ieee80211.MacAddr;
-    result WlanTxResult;
+    result_code WlanTxResultCode;
 };
 
 type WlanSoftmacHardwareCapabilityBit = strict enum : uint32 {

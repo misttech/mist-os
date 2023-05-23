@@ -30,8 +30,8 @@ void ConvertSpectrumManagementSupport(
     spectrum_management_support_t* out);
 zx_status_t ConvertRxPacket(const fuchsia_wlan_softmac::wire::WlanRxPacket& in,
                             wlan_rx_packet_t* out, uint8_t* rx_packet_buffer);
-zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxStatus& in,
-                            wlan_tx_status_t* out);
+zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxResult& in,
+                            wlan_tx_result_t* out);
 
 // banjo to FIDL conversions.
 zx_status_t ConvertMacRole(const wlan_mac_role_t& in, fuchsia_wlan_common::wire::WlanMacRole* out);

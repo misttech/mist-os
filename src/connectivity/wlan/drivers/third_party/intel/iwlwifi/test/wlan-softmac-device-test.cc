@@ -159,8 +159,8 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     recv_called_ = true;
     completer.buffer(arena).Reply();
   }
-  void ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
-                      ReportTxStatusCompleter::Sync& completer) override {
+  void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
+                      ReportTxResultCompleter::Sync& completer) override {
     // Overriding the virtual function, not being used at this point.
     completer.buffer(arena).Reply();
   }

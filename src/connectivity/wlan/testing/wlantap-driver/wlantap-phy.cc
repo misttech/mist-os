@@ -102,9 +102,9 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
                        name.c_str(), info.FormatDescription().c_str());
               }
 
-              if (report_tx_status_count_) {
+              if (report_tx_result_count_) {
                 zxlogf(INFO, "Tx Status Reports sent during device lifetime: %zu",
-                       report_tx_status_count_);
+                       report_tx_result_count_);
               }
 
               zxlogf(INFO, "%s: Removing PHY device asynchronously.", name.c_str());
@@ -223,11 +223,11 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     zxlogf(DEBUG, "%s: Rx done", name_.c_str());
   }
 
-  void ReportTxStatus(ReportTxStatusRequestView request,
-                      ReportTxStatusCompleter::Sync& completer) override {
+  void ReportTxResult(ReportTxResultRequestView request,
+                      ReportTxResultCompleter::Sync& completer) override {
     std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
-    if (!phy_config_->quiet || report_tx_status_count_ < 32) {
-      zxlogf(INFO, "%s: ReportTxStatus %zu", name_.c_str(), report_tx_status_count_);
+    if (!phy_config_->quiet || report_tx_result_count_ < 32) {
+      zxlogf(INFO, "%s: ReportTxResult %zu", name_.c_str(), report_tx_result_count_);
     }
 
     if (!wlantap_mac_) {
@@ -235,11 +235,11 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
       return;
     }
 
-    ++report_tx_status_count_;
-    wlantap_mac_->ReportTxStatus(request->txs);
+    ++report_tx_result_count_;
+    wlantap_mac_->ReportTxResult(request->txr);
     zxlogf(DEBUG, "%s: ScanComplete done", name_.c_str());
-    if (!phy_config_->quiet || report_tx_status_count_ <= 32) {
-      zxlogf(DEBUG, "%s: ReportTxStatus %zu done", name_.c_str(), report_tx_status_count_);
+    if (!phy_config_->quiet || report_tx_result_count_ <= 32) {
+      zxlogf(DEBUG, "%s: ReportTxResult %zu done", name_.c_str(), report_tx_result_count_);
     }
   }
 
@@ -276,9 +276,9 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
 
   virtual void WlantapMacQueueTx(const fuchsia_wlan_softmac::wire::WlanTxPacket& pkt) override {
     size_t pkt_size = pkt.mac_frame.count();
-    if (!phy_config_->quiet || report_tx_status_count_ < 32) {
+    if (!phy_config_->quiet || report_tx_result_count_ < 32) {
       zxlogf(INFO, "%s: WlantapMacQueueTx, size=%zu, tx_report_count=%zu", name_.c_str(), pkt_size,
-             report_tx_status_count_);
+             report_tx_result_count_);
     }
 
     std::lock_guard<std::mutex> guard(fidl_server_lock_);
@@ -292,9 +292,9 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
       zxlogf(ERROR, "%s: Tx() failed", status.status_string());
       return;
     }
-    if (!phy_config_->quiet || report_tx_status_count_ < 32) {
+    if (!phy_config_->quiet || report_tx_result_count_ < 32) {
       zxlogf(DEBUG, "%s: WlantapMacQueueTx done(%zu bytes), tx_report_count=%zu", name_.c_str(),
-             pkt_size, report_tx_status_count_);
+             pkt_size, report_tx_result_count_);
     }
   }
 
@@ -384,7 +384,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
   bool fidl_server_unbound_ = false;
   const std::chrono::seconds kFidlServerShutdownTimeout = std::chrono::seconds(1);
   bool shutdown_called_ = false;
-  size_t report_tx_status_count_ = 0;
+  size_t report_tx_result_count_ = 0;
 };
 
 class WlanPhyImplDevice

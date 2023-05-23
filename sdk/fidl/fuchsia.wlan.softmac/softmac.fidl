@@ -145,7 +145,7 @@ type WlanTxInfo = struct {
     /// must be zero. Values for fields not indicated by a flag may be chosen at the discretion of
     /// the softmac driver.
     valid_fields uint32;
-    // Will be sent back in wlan_tx_status_t if Minstrel is enabled for the device, indicated by
+    // Will be sent back in wlan_tx_result_t if Minstrel is enabled for the device, indicated by
     // WLAN_TX_INFO_VALID_TX_VECTOR_IDX.
     tx_vector_idx uint16;
     // The PHY format to be used to transmit this packet.
@@ -209,10 +209,12 @@ protocol WlanSoftmacIfc {
         packet WlanRxPacket;
     }) -> ();
 
-    /// Reports the status of an attempted transmission.
-    /// |tx_status|: contains status info of one transmitted packet to one peer at one specific rate.
-    ReportTxStatus(struct {
-        tx_status fuchsia.wlan.common.WlanTxStatus;
+    /// Reports the result of an attempted transmission.
+    ///
+    /// A device driver indicates support for `ReportTxResult()` using
+    /// `fuchsia.wlan.common/DeviceExtension.report_tx_result_supported`.
+    ReportTxResult(struct {
+        tx_result fuchsia.wlan.common.WlanTxResult;
     }) -> ();
 
     /// Reports completion of a scan associated with the unique `scan_id`. `status`

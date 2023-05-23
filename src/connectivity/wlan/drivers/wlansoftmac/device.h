@@ -111,8 +111,8 @@ class Device : public DeviceInterface,
   const spectrum_management_support_t& GetSpectrumManagementSupport() const final;
 
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
-  void ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
-                      ReportTxStatusCompleter::Sync& completer) override;
+  void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
+                      ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
                           NotifyScanCompleteCompleter::Sync& completer) override;
 

@@ -97,7 +97,7 @@ pub enum DriverEvent {
     // Reports a scan is complete.
     ScanComplete { status: zx::Status, scan_id: u64 },
     // Reports the result of an attempted frame transmission.
-    TxStatusReport { tx_status: banjo_common::WlanTxStatus },
+    TxResultReport { tx_result: banjo_common::WlanTxResult },
 }
 
 fn should_enable_minstrel(mac_sublayer: &banjo_common::MacSublayerSupport) -> bool {
@@ -210,9 +210,9 @@ async fn main_loop_impl<T: MlmeImpl>(
                     DriverEvent::ScanComplete { status, scan_id } => {
                         mlme_impl.handle_scan_complete(status, scan_id)
                     },
-                    DriverEvent::TxStatusReport { tx_status } => {
+                    DriverEvent::TxResultReport { tx_result } => {
                         if let Some(minstrel) = minstrel.as_ref() {
-                            minstrel.lock().handle_tx_status_report(&tx_status)
+                            minstrel.lock().handle_tx_result_report(&tx_result)
                         }
                     }
                 },

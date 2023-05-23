@@ -54,7 +54,7 @@ exclude = [
     "WlanRxInfo",
     "WlanTxInfo",
     "WlanTxPacket",
-    "WlanTxStatus",
+    "WlanTxResult",
 
     # Voided types.
     "DriverEventSink",
@@ -87,7 +87,7 @@ exclude = [
 "WlanRxInfo" = "wlan_rx_info_t"
 "WlanTxPacket" = "wlan_tx_packet_t"
 "WlanTxInfo" = "wlan_tx_info_t"
-"WlanTxStatus" = "wlan_tx_status_t"
+"WlanTxResult" = "wlan_tx_result_t"
 "WlanWmmParams" = "wlan_wmm_params_t"
 
 # fuchsia-zircon types

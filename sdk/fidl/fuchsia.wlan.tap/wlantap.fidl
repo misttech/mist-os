@@ -113,8 +113,8 @@ protocol WlantapPhy {
     });
     /// For rate selection (Minstrel), the device's last frame transmission is a success/failure,
     /// with a certain number of retries.
-    ReportTxStatus(struct {
-        txs fuchsia.wlan.common.WlanTxStatus;
+    ReportTxResult(struct {
+        txr fuchsia.wlan.common.WlanTxResult;
     });
 
     ScanComplete(struct {

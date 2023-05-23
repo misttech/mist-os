@@ -642,7 +642,7 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   // called in the handler functions of FIDL server end.
   wlan_softmac_ifc_protocol_ops_.reset(new wlan_softmac_ifc_protocol_ops_t{
       .recv = ifc->ops->recv,
-      .report_tx_status = ifc->ops->report_tx_status,
+      .report_tx_result = ifc->ops->report_tx_result,
       .notify_scan_complete = ifc->ops->scan_complete,
   });
 
@@ -1025,16 +1025,16 @@ void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Syn
   completer.buffer(arena).Reply();
 }
 
-void Device::ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
-                            ReportTxStatusCompleter::Sync& completer) {
+void Device::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
+                            ReportTxResultCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
-  wlan_tx_status_t tx_status;
+  wlan_tx_result_t tx_result;
 
-  if ((status = ConvertTxStatus(request->tx_status, &tx_status)) != ZX_OK) {
+  if ((status = ConvertTxStatus(request->tx_result, &tx_result)) != ZX_OK) {
     lerror("TxStatus conversion failed: %s", zx_status_get_string(status));
   }
 
-  wlan_softmac_ifc_protocol_->ops->report_tx_status(wlan_softmac_ifc_protocol_->ctx, &tx_status);
+  wlan_softmac_ifc_protocol_->ops->report_tx_result(wlan_softmac_ifc_protocol_->ctx, &tx_result);
 
   completer.buffer(arena).Reply();
 }

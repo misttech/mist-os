@@ -173,9 +173,9 @@ impl Peer {
         Ok(peer)
     }
 
-    fn handle_tx_status_report(&mut self, tx_status: &banjo_common::WlanTxStatus) {
+    fn handle_tx_result_report(&mut self, tx_result: &banjo_common::WlanTxResult) {
         let mut last_attempted_idx = None;
-        for status_entry in &tx_status.tx_status_entry[..] {
+        for status_entry in &tx_result.tx_result_entry[..] {
             let idx = match TxVecIdx::new(status_entry.tx_vector_idx) {
                 Some(idx) => idx,
                 None => break,
@@ -197,7 +197,7 @@ impl Peer {
             }
         }
         if let Some(idx) = last_attempted_idx {
-            if tx_status.result == banjo_common::WlanTxResult::SUCCESS {
+            if tx_result.result_code == banjo_common::WlanTxResultCode::SUCCESS {
                 // last_attempted_idx will always have a corresponding tx_stats_map entry.
                 self.tx_stats_map.get_mut(&idx).unwrap().success_cur += 1;
             }
@@ -531,16 +531,16 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
         }
     }
 
-    pub fn handle_tx_status_report(&mut self, tx_status: &banjo_common::WlanTxStatus) {
-        match self.peer_map.get_mut(&tx_status.peer_addr) {
+    pub fn handle_tx_result_report(&mut self, tx_result: &banjo_common::WlanTxResult) {
+        match self.peer_map.get_mut(&tx_result.peer_addr) {
             Some(peer) => {
-                peer.handle_tx_status_report(tx_status);
-                self.outdated_peers.insert(tx_status.peer_addr);
+                peer.handle_tx_result_report(tx_result);
+                self.outdated_peers.insert(tx_result.peer_addr);
             }
             None => {
                 debug!(
                     "Peer {:?} received tx status report after it was removed.",
-                    &tx_status.peer_addr
+                    &tx_result.peer_addr
                 );
             }
         }
@@ -862,36 +862,36 @@ mod tests {
         assert!(minstrel.get_fidl_peer_stats(&peer2.bssid.unwrap()).is_ok());
     }
 
-    /// Helper fn to easily create tx status reports.
-    fn make_tx_status(entries: Vec<(u16, u8)>, success: bool) -> banjo_common::WlanTxStatus {
+    /// Helper fn to easily create tx result reports.
+    fn make_tx_result(entries: Vec<(u16, u8)>, success: bool) -> banjo_common::WlanTxResult {
         assert!(entries.len() <= 8);
-        let mut tx_status_entry =
-            [banjo_common::WlanTxStatusEntry { tx_vector_idx: 0, attempts: 0 }; 8];
-        tx_status_entry[0..entries.len()].copy_from_slice(
+        let mut tx_result_entry =
+            [banjo_common::WlanTxResultEntry { tx_vector_idx: 0, attempts: 0 }; 8];
+        tx_result_entry[0..entries.len()].copy_from_slice(
             &entries
                 .into_iter()
-                .map(|(tx_vector_idx, attempts)| banjo_common::WlanTxStatusEntry {
+                .map(|(tx_vector_idx, attempts)| banjo_common::WlanTxResultEntry {
                     tx_vector_idx,
                     attempts,
                 })
-                .collect::<Vec<banjo_common::WlanTxStatusEntry>>()[..],
+                .collect::<Vec<banjo_common::WlanTxResultEntry>>()[..],
         );
-        let result = if success {
-            banjo_common::WlanTxResult::SUCCESS
+        let result_code = if success {
+            banjo_common::WlanTxResultCode::SUCCESS
         } else {
-            banjo_common::WlanTxResult::FAILED
+            banjo_common::WlanTxResultCode::FAILED
         };
-        banjo_common::WlanTxStatus { tx_status_entry, peer_addr: TEST_MAC_ADDR, result }
+        banjo_common::WlanTxResult { tx_result_entry, peer_addr: TEST_MAC_ADDR, result_code }
     }
 
     #[test]
-    fn handle_tx_status_reports() {
+    fn handle_tx_result_reports() {
         // Indicate that we failed to transmit on rates 16-14 and succeeded on 13.
-        let tx_status = make_tx_status(vec![(16, 1), (15, 1), (14, 1), (13, 1)], true);
+        let tx_result = make_tx_result(vec![(16, 1), (15, 1), (14, 1), (13, 1)], true);
 
         let (mut minstrel, _timer) = mock_minstrel();
         minstrel.add_peer(&ht_assoc_cfg()).expect("Failed to add peer.");
-        minstrel.handle_tx_status_report(&tx_status);
+        minstrel.handle_tx_result_report(&tx_result);
 
         // Stats are not updated until after the timer fires.
         let peer_stats =
@@ -904,10 +904,10 @@ mod tests {
         assert_eq!(peer_stats.max_tp, 13);
         assert_eq!(peer_stats.max_probability, 13);
 
-        let tx_status = make_tx_status(vec![(13, 1), (9, 1)], true);
+        let tx_result = make_tx_result(vec![(13, 1), (9, 1)], true);
 
         for _ in 0..10 {
-            minstrel.handle_tx_status_report(&tx_status);
+            minstrel.handle_tx_result_report(&tx_result);
             minstrel.handle_timeout();
             let peer_stats =
                 minstrel.get_fidl_peer_stats(&TEST_MAC_ADDR).expect("Failed to get peer stats");
@@ -922,7 +922,7 @@ mod tests {
 
     #[test]
     fn ht_rates_preferred() {
-        let ht_tx_status_failed = make_tx_status(
+        let ht_tx_result_failed = make_tx_result(
             vec![
                 (HT_START_IDX + 15, 1),
                 (HT_START_IDX + 14, 1),
@@ -935,7 +935,7 @@ mod tests {
             ],
             false,
         );
-        let ht_tx_status_success = make_tx_status(
+        let ht_tx_result_success = make_tx_result(
             vec![
                 (HT_START_IDX + 7, 1),
                 (HT_START_IDX + 6, 1),
@@ -951,14 +951,14 @@ mod tests {
             true,
         );
         // Highest ERP rate succeeds with 100% probability.
-        let erp_tx_status_success =
-            make_tx_status(vec![(ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 1, 1)], true);
+        let erp_tx_result_success =
+            make_tx_result(vec![(ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 1, 1)], true);
 
         let (mut minstrel, _timer) = mock_minstrel();
         minstrel.add_peer(&ht_assoc_cfg()).expect("Failed to add peer.");
-        minstrel.handle_tx_status_report(&ht_tx_status_failed);
-        minstrel.handle_tx_status_report(&ht_tx_status_success);
-        minstrel.handle_tx_status_report(&erp_tx_status_success);
+        minstrel.handle_tx_result_report(&ht_tx_result_failed);
+        minstrel.handle_tx_result_report(&ht_tx_result_success);
+        minstrel.handle_tx_result_report(&erp_tx_result_success);
         minstrel.handle_timeout();
 
         let peer_stats =
@@ -986,8 +986,8 @@ mod tests {
         assert!(!peer_stats.entries.iter().any(|entry| entry.tx_vector_idx == rate_108));
 
         // Fail transmission at unsupported rate 108, then succeed at 72.
-        let tx_status = make_tx_status(vec![(rate_108, 1), (rate_72, 1)], true);
-        minstrel.handle_tx_status_report(&tx_status);
+        let tx_result = make_tx_result(vec![(rate_108, 1), (rate_72, 1)], true);
+        minstrel.handle_tx_result_report(&tx_result);
         // Despite failure, we should now have stats for rate 108.
         let peer_stats =
             minstrel.get_fidl_peer_stats(&TEST_MAC_ADDR).expect("Failed to get peer stats");
@@ -1036,10 +1036,10 @@ mod tests {
     fn skip_seen_probes() {
         let (mut minstrel, _timer) = mock_minstrel();
         minstrel.add_peer(&ht_assoc_cfg()).expect("Failed to add peer.");
-        let tx_status = make_tx_status(vec![(16, 1), (15, 1), (14, 1)], true);
-        minstrel.handle_tx_status_report(&tx_status);
-        let tx_status = make_tx_status(vec![(13, 1)], true);
-        minstrel.handle_tx_status_report(&tx_status);
+        let tx_result = make_tx_result(vec![(16, 1), (15, 1), (14, 1)], true);
+        minstrel.handle_tx_result_report(&tx_result);
+        let tx_result = make_tx_result(vec![(13, 1)], true);
+        minstrel.handle_tx_result_report(&tx_result);
 
         // We skip rates 13-16 since we've recently attempted tx on them.
         const UPDATED_PROBES: [u16; 19] = [
@@ -1066,8 +1066,8 @@ mod tests {
     fn dead_probe_cycle_count() {
         let (mut minstrel, _timer) = mock_minstrel();
         minstrel.add_peer(&ht_assoc_cfg()).expect("Failed to add peer.");
-        let tx_status = make_tx_status(vec![(16, 1), (15, 1), (14, 1)], true);
-        minstrel.handle_tx_status_report(&tx_status);
+        let tx_result = make_tx_result(vec![(16, 1), (15, 1), (14, 1)], true);
+        minstrel.handle_tx_result_report(&tx_result);
         minstrel.handle_timeout();
 
         // Probe rates 15 and 16 now have low probability and will not be probed.
@@ -1096,7 +1096,7 @@ mod tests {
         let (mut minstrel, _timer) = mock_minstrel();
         minstrel.add_peer(&ht_assoc_cfg()).expect("Failed to add peer.");
         // Rate 16 is max_tp, max_probability, and 100% success rate.
-        minstrel.handle_tx_status_report(&make_tx_status(vec![(16, 1)], true));
+        minstrel.handle_tx_result_report(&make_tx_result(vec![(16, 1)], true));
         minstrel.handle_timeout();
 
         const EXPECTED_PROBES: [u16; 22] = [
@@ -1106,7 +1106,7 @@ mod tests {
         for _ in 0..MAX_SLOW_PROBE {
             // Probe rate 1 MAX_SLOW_PROBE times, incrementing num_probe_cycles_done as we go.
             expect_probe_order(&mut minstrel, &EXPECTED_PROBES[..]);
-            minstrel.handle_tx_status_report(&make_tx_status(vec![(1, 1)], true));
+            minstrel.handle_tx_result_report(&make_tx_result(vec![(1, 1)], true));
         }
 
         // We should no longer probe rate 1 since it is slow compared to our selected rate 16.

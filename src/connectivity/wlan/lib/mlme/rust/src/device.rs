@@ -6,7 +6,7 @@ use {
     crate::{banjo_buffer_to_slice, banjo_list_to_slice, buffer::OutBuf, common::mac::WlanGi, key},
     banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_common::JoinBssRequest,
-    banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxStatus},
+    banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxResult},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_softmac::{
         self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacQueryResponse, WlanTxPacket,
@@ -354,7 +354,7 @@ pub struct WlanSoftmacIfcProtocolOps {
         status: i32,
     ),
     report_tx_status:
-        extern "C" fn(ctx: &mut crate::DriverEventSink, tx_status: *const WlanTxStatus),
+        extern "C" fn(ctx: &mut crate::DriverEventSink, tx_status: *const WlanTxResult),
     scan_complete: extern "C" fn(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64),
 }
 
@@ -378,13 +378,13 @@ extern "C" fn handle_complete_tx(
 #[no_mangle]
 extern "C" fn handle_report_tx_status(
     ctx: &mut crate::DriverEventSink,
-    tx_status: *const WlanTxStatus,
+    tx_result_in: *const WlanTxResult,
 ) {
-    if tx_status.is_null() {
+    if tx_result_in.is_null() {
         return;
     }
-    let tx_status = unsafe { *tx_status };
-    let _ = ctx.0.unbounded_send(crate::DriverEvent::TxStatusReport { tx_status });
+    let tx_result = unsafe { *tx_result_in };
+    let _ = ctx.0.unbounded_send(crate::DriverEvent::TxResultReport { tx_result });
 }
 #[no_mangle]
 extern "C" fn handle_scan_complete(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64) {
