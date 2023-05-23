@@ -10,6 +10,7 @@ source_set("include") {
   public_configs = [ ":msd_include_config" ]
   sources = [
     "magma_arm_mali_types.h",
+    "magma_arm_mali_vendor_id.h",
     "magma_vendor_queries.h",
   ]
   public_deps = [ "//src/graphics/lib/magma/include:magma_common" ]

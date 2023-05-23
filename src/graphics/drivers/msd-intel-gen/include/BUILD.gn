@@ -8,6 +8,9 @@ config("msd_include_config") {
 
 source_set("include") {
   public_configs = [ ":msd_include_config" ]
-  sources = [ "magma_intel_gen_defs.h" ]
+  sources = [
+    "magma_intel_gen_defs.h",
+    "magma_intel_gen_vendor_id.h",
+  ]
   public_deps = [ "//src/graphics/lib/magma/include:magma_common" ]
 }

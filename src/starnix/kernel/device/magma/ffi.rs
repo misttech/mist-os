@@ -6,11 +6,12 @@ use std::sync::Arc;
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use magma::*;
+use std::mem::ManuallyDrop;
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::device::{
     magma::{
-        file::{BufferInfo, ConnectionMap},
+        file::{BufferInfo, ConnectionMap, DeviceMap, MagmaDevice},
         magma::create_drm_image,
     },
     wayland::image_file::{ImageFile, ImageInfo},
@@ -119,6 +120,51 @@ pub fn create_image(
     Ok(BufferInfo::Image(ImageInfo { info, token }))
 }
 
+/// Attempts to open a device at a path. Fails if the device is not a supported one.
+///
+/// # Parameters
+///   - 'path': The filesystem path to open.
+///
+/// SAFETY: Makes FFI calls to import and query devices.
+fn attempt_open_path(path: std::path::PathBuf) -> Result<MagmaDevice, Errno> {
+    let path = path.into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
+    let (client_channel, server_channel) = zx::Channel::create();
+
+    fdio::service_connect(&path, server_channel).map_err(|_| errno!(EINVAL))?;
+    // `magma_device_import` takes ownership of the channel, so don't drop it again.
+    let client_channel = ManuallyDrop::new(client_channel);
+    let device_channel = client_channel.raw_handle();
+
+    let mut device_out: u64 = 0;
+    let result = unsafe { magma_device_import(device_channel, &mut device_out as *mut u64) };
+
+    if result != MAGMA_STATUS_OK {
+        return Err(errno!(EINVAL));
+    }
+    let magma_device = MagmaDevice { handle: device_out };
+
+    let mut result_out = 0;
+    let mut result_buffer_out = 0;
+    let query_result = unsafe {
+        magma_device_query(
+            device_out,
+            MAGMA_QUERY_VENDOR_ID,
+            &mut result_buffer_out,
+            &mut result_out,
+        )
+    };
+    if query_result != MAGMA_STATUS_OK {
+        return Err(errno!(EINVAL));
+    }
+
+    let supported_gpu_vendors = [MAGMA_VENDOR_ID_MALI as u64, MAGMA_VENDOR_ID_INTEL as u64];
+
+    if !supported_gpu_vendors.contains(&result_out) {
+        return Err(errno!(EINVAL));
+    }
+    Ok(magma_device)
+}
+
 /// Imports a device to magma.
 ///
 /// # Parameters
@@ -130,33 +176,22 @@ pub fn create_image(
 pub fn device_import(
     _control: virtio_magma_device_import_ctrl_t,
     response: &mut virtio_magma_device_import_resp_t,
-) -> Result<zx::Channel, Errno> {
-    let (client_channel, server_channel) = zx::Channel::create();
-    // TODO(fxbug.dev/100454): This currently picks the first available device, but multiple devices should
-    // probably be exposed to clients.
-    let entry = std::fs::read_dir("/dev/class/gpu")
-        .map_err(|_| errno!(EINVAL))?
+) -> Result<MagmaDevice, Errno> {
+    // TODO(fxbug.dev/100454): This currently picks the first available device in the allowlist, but
+    // multiple devices should probably be exposed to clients.
+    let entries =
+        std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
+
+    let magma_device = entries
+        .filter_map(|entry| attempt_open_path(entry.path()).ok())
         .next()
-        .ok_or_else(|| errno!(EINVAL))?
-        .map_err(|_| errno!(EINVAL))?;
+        .ok_or_else(|| errno!(EINVAL))?;
+    response.result_return = MAGMA_STATUS_OK as u64;
 
-    let path = entry.path().into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
-
-    fdio::service_connect(&path, server_channel).map_err(|_| errno!(EINVAL))?;
-
-    // TODO(fxbug.dev/12731): The device import should take ownership of the channel, at which point
-    // this can be converted to `into_raw()`, and the return value of this function can be changed
-    // to be `()`.
-    let device_channel = client_channel.raw_handle();
-
-    let mut device_out: u64 = 0;
-    response.result_return =
-        unsafe { magma_device_import(device_channel, &mut device_out as *mut u64) as u64 };
-
-    response.device_out = device_out;
+    response.device_out = magma_device.handle;
     response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_IMPORT as u32;
 
-    Ok(client_channel)
+    Ok(magma_device)
 }
 
 /// Releases a magma device.
@@ -164,14 +199,14 @@ pub fn device_import(
 /// # Parameters
 ///  - `control`: The control message that contains the device to release.
 ///  - `response`: The response message that will be updated to write back to user space.
-///
-/// SAFETY: Makes an FFI call to populate the fields of `response`. The FFI function is expected to
-/// handle an invalid device id.
 pub fn device_release(
     control: virtio_magma_device_release_ctrl_t,
     response: &mut virtio_magma_device_release_resp_t,
+    devices: &mut DeviceMap,
 ) {
-    unsafe { magma_device_release(control.device) };
+    let device = control.device as magma_device_t;
+    // Dropping the device will call magma_device_release.
+    devices.remove(&device);
     response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_RELEASE as u32;
 }
 

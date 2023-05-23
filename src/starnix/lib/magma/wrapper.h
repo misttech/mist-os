@@ -10,4 +10,8 @@
 #include <libmagma_virt/virtmagma.h>
 #include <virtio/virtio_magma.h>
 
+#include "missing_includes.h"
+#include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_vendor_id.h"
+#include "src/graphics/drivers/msd-intel-gen/include/magma_intel_gen_vendor_id.h"
+
 #endif  // SRC_STARNIX_LIB_MAGMA_WRAPPER_H_

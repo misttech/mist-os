@@ -7,7 +7,8 @@
 
 #include <lib/magma/magma_common_defs.h>
 
-#define MAGMA_VENDOR_ID_INTEL 0x8086
+#include "magma_intel_gen_vendor_id.h"
+
 #define MAGMA_VENDOR_VERSION_INTEL 1
 
 enum MagmaIntelGenQuery {

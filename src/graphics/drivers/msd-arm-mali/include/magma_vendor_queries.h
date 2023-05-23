@@ -6,7 +6,7 @@
 
 #include <lib/magma/magma_common_defs.h>
 
-#define MAGMA_VENDOR_ID_MALI 0x13B5
+#include "magma_arm_mali_vendor_id.h"
 
 // All queries return a simple result except where indicated.
 enum MsdArmVendorQuery {

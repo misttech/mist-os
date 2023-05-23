@@ -31,14 +31,28 @@ pub enum BufferInfo {
 /// A `MagmaConnection` is an internal representation of a `magma_connection_t`.
 type MagmaConnection = u64;
 
+/// A `MagmaDevice` is an RAII wrapper around a `magma_device_t`.
+pub struct MagmaDevice {
+    pub handle: magma_device_t,
+}
+
+impl Drop for MagmaDevice {
+    /// SAFETY: Makes an FFI call to release a handle that was imported using `magma_device_import`.
+    fn drop(&mut self) {
+        unsafe { magma_device_release(self.handle) }
+    }
+}
+
 /// A `BufferMap` stores all the magma buffers for a given connection.
 type BufferMap = HashMap<magma_buffer_t, BufferInfo>;
 
 /// A `ConnectionMap` stores the `BufferMap`s associated with each magma connection.
 pub type ConnectionMap = HashMap<MagmaConnection, BufferMap>;
+
+pub type DeviceMap = HashMap<magma_device_t, MagmaDevice>;
+
 pub struct MagmaFile {
-    // TODO(fxbug.dev/12731): The lifecycle of the device channels should be handled by magma.
-    devices: Arc<Mutex<Vec<zx::Channel>>>,
+    devices: Arc<Mutex<DeviceMap>>,
     connections: Arc<Mutex<ConnectionMap>>,
 }
 
@@ -50,7 +64,7 @@ impl MagmaFile {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(Self {
-            devices: Arc::new(Mutex::new(vec![])),
+            devices: Arc::new(Mutex::new(HashMap::new())),
             connections: Arc::new(Mutex::new(HashMap::new())),
         }))
     }
@@ -126,7 +140,8 @@ impl FileOps for MagmaFile {
         match command_type {
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_IMPORT => {
                 let (control, mut response) = read_control_and_response(current_task, &command)?;
-                (*self.devices.lock()).push(device_import(control, &mut response)?);
+                let device = device_import(control, &mut response)?;
+                (*self.devices.lock()).insert(device.handle, device);
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
@@ -156,7 +171,7 @@ impl FileOps for MagmaFile {
                     virtio_magma_device_release_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
-                device_release(control, &mut response);
+                device_release(control, &mut response, &mut self.devices.lock());
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }

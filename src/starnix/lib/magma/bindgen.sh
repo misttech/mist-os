@@ -14,26 +14,48 @@ readonly RAW_LINES="// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes};"
 
-// TODO: BEGIN remove these hardcoded values when bindgen is fixed
-pub const MAGMA_STATUS_OK: i32 = 0;
-pub const MAGMA_STATUS_INVALID_ARGS: i32 = -2;
-pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;
-pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: u32 = 2;
-pub const MAGMA_MAX_IMAGE_PLANES: u32 = 4;
-pub const MAGMA_COHERENCY_DOMAIN_CPU: u32 = 0;
-pub const MAGMA_COHERENCY_DOMAIN_RAM: u32 = 1;
-pub const MAGMA_COHERENCY_DOMAIN_INACCESSIBLE: u32 = 2;
-pub const MAGMA_POLL_TYPE_SEMAPHORE: u32 = 1;
-pub const MAGMA_POLL_TYPE_HANDLE: u32 = 2;
-pub const MAGMA_CACHE_POLICY_CACHED: u32 = 0;
-pub const MAGMA_CACHE_POLICY_WRITE_COMBINING: u32 = 1;
-pub const MAGMA_CACHE_POLICY_UNCACHED: u32 = 2;
+# Type/define pairs, used to generate a list of variables to work around
+# https://github.com/rust-lang/rust-bindgen/issues/316
+readonly define_list=(
+magma_status_t,MAGMA_STATUS_OK
+magma_status_t,MAGMA_STATUS_INVALID_ARGS
+uint32_t,MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE
+uint32_t,MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE
+uint32_t,MAGMA_MAX_IMAGE_PLANES
+magma_coherency_domain_t,MAGMA_COHERENCY_DOMAIN_CPU
+magma_coherency_domain_t,MAGMA_COHERENCY_DOMAIN_RAM
+magma_coherency_domain_t,MAGMA_COHERENCY_DOMAIN_INACCESSIBLE
+uint32_t,MAGMA_POLL_TYPE_SEMAPHORE
+uint32_t,MAGMA_POLL_TYPE_HANDLE
+magma_cache_policy_t,MAGMA_CACHE_POLICY_CACHED
+magma_cache_policy_t,MAGMA_CACHE_POLICY_WRITE_COMBINING
+magma_cache_policy_t,MAGMA_CACHE_POLICY_UNCACHED
+magma_query_t,MAGMA_QUERY_VENDOR_ID
+)
 
-// TODO: END remove these hardcoded values when bindgen is fixed
-"
+define_text=""
+for define in ${define_list[@]}; do
+  TYPE=${define%,*};
+  NAME=${define#*,};
 
+  # Create a variable with the same name as the define, so bindgen can use its value.
+  define_text+="
+const $TYPE _$NAME = $NAME;
+#undef $NAME
+const $TYPE $NAME = _$NAME;"
+done
+
+temp_include_dir=$(mktemp -d)
+
+function cleanup {
+  rm -rf "$temp_include_dir"
+}
+
+trap cleanup EXIT
+
+echo "$define_text" > $temp_include_dir/missing_includes.h
 PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
 ./prebuilt/third_party/rust_bindgen/linux-x64/bindgen \
   --no-layout-tests \
@@ -47,7 +69,9 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   -I $(scripts/fx get-build-dir)/linux_x64/gen/src/graphics/lib/magma/include \
   -I src/graphics/lib/magma/src \
   -I src/graphics/lib/magma/include \
-  -I sdk/lib/magma_client/include
+  -I sdk/lib/magma_client/include \
+  -I $temp_include_dir \
+  -I $(pwd)
 
 # TODO: Figure out how to get bindgen to derive AsBytes and FromBytes.
 #       See https://github.com/rust-lang/rust-bindgen/issues/1089
