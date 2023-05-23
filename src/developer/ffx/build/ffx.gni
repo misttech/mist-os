@@ -41,20 +41,16 @@ template("ffx") {
     original_target_name = _original_target_name
 
     if (_large_binary_optimizations) {
-      # As ffx is a tool that's used by subsequent build actions, speeding up its
-      # compilation allows other tasks to be started more quickly, lowering
-      # overall drag on the graph.
-
-      # FFX build on RBE disabled because of the impact on overall build performance.
-      disable_rbe = true
-
-      # Since RBE is disabled, this runs locally and is known to require
-      # massive memory.  Until RBE is re-enabled for this target,
-      # we must limit its concurrency with other memory-intensive jobs.
+      # ffx is known to be a massive, time/resource-consuming target.
+      # When running locally (including RBE local and racing strategies),
+      # limit its concurrency with other memory-intensive jobs.
       # See https://fxbug.dev/111094 for context.
-      if (disable_rbe) {
-        pool = "//build/config:highmem($default_toolchain)"
-      }
+      pool = "//build/config:highmem($default_toolchain)"
+
+      # Since remote workers tend to be slightly slower than the local
+      # machine, and ffx is frequently on critical path, race local against
+      # remote execution, which stll lets it remotely cache.
+      configs += [ "//build/config/rust:rbe_strategy_racing" ]
 
       # Use up to 16 threads for codegen
       configs += [ "//build/config/rust:codegen_units_16" ]
