@@ -23,14 +23,25 @@ async fn set_in_isolate(
 ) -> Result<()> {
     let val: Option<String> = context.get(config_key).await?;
     if let Some(s) = val {
-        isolate
-            .env_context()
-            .query(config_key)
-            .level(Some(ffx_config::ConfigLevel::User))
-            .set(Value::String(s))
-            .await?;
+        set_value_in_isolate(&isolate, config_key, Value::String(s)).await?;
     }
     Ok(())
+}
+
+// Set a config value
+// (Note that due to interior mutability, the isolate will
+// be changed even though it's not &mut)
+async fn set_value_in_isolate(
+    isolate: &ffx_isolate::Isolate,
+    config_key: &str,
+    value: Value,
+) -> Result<()> {
+    isolate
+        .env_context()
+        .query(config_key)
+        .level(Some(ffx_config::ConfigLevel::User))
+        .set(value)
+        .await
 }
 
 /// Create a new ffx isolate. This method relies on the environment provided by
@@ -40,6 +51,7 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     let context = global_env_context().context("No global context")?;
     let isolate = ffx_isolate::Isolate::new_with_sdk(name, ssh_key, &context).await?;
     set_in_isolate(&context, &isolate, "overnet.cso").await?;
+    set_value_in_isolate(&isolate, "watchdogs.host_pipe.enabled", true.into()).await?;
     Ok(isolate)
 }
 
