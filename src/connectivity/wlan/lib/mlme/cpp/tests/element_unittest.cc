@@ -67,13 +67,13 @@ TEST(HtCapabilities, DdkConversion) {
 }
 
 TEST(HtOperation, DdkConversion) {
-  wlan_ht_op ddk{
-      .primary_channel = 123,
-      .head = 0x01020304,
-      .tail = 0x05,
-      .mcs_set = {0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00,
-                  0x00, 0x00, 0x00},
-  };
+  ht_operation_t ddk{.bytes = {
+                         123,                     // primary channel
+                         0x04, 0x03, 0x02, 0x01,  // head
+                         0x05,                    // tail
+                         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xff,
+                         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // mcs_set
+                     }};
 
   auto ieee = HtOperation::FromDdk(ddk);
   EXPECT_EQ(123U, ieee.primary_channel);
@@ -84,12 +84,7 @@ TEST(HtOperation, DdkConversion) {
   EXPECT_EQ(expected_mcs_set, ieee.basic_mcs_set.val());
 
   auto ddk2 = ieee.ToDdk();
-  EXPECT_EQ(ddk.primary_channel, ddk2.primary_channel);
-  EXPECT_EQ(ddk.head, ddk2.head);
-  EXPECT_EQ(ddk.tail, ddk2.tail);
-  for (size_t i = 0; i < sizeof(ddk.mcs_set); i++) {
-    EXPECT_EQ(ddk.mcs_set[i], ddk2.mcs_set[i]);
-  }
+  EXPECT_EQ(0, memcmp(ddk.bytes, ddk2.bytes, sizeof(ddk.bytes)));
 }
 
 TEST(VhtCapabilities, DdkConversion) {

@@ -290,37 +290,6 @@ type WlanSoftmacStartActiveScanRequest = table {
     9: max_probes_per_channel uint8;
 };
 
-// IEEE Std 802.11-2016, 9.4.2.57
-type WlanHtOp = struct {
-    primary_channel uint8;
-
-    /// First 8 bits of HT Operation:
-    /// - Secondary Channel Offset: 2 bits
-    /// - STA Channel Width: 1 bit
-    /// - RIFS Mode: 1 bit
-    /// - Reserved: 4 bits
-    /// - HT Protection: 2 bits
-    /// - Nongreenfield HT STAs Present: 1 bit
-    /// - Reserved: 1 bit
-    /// - OBSS Non-HT STAs Present: 1 bit
-    /// - Channel Center Frequency Segment 2: 8 bits (spec says "11 bits": that can't be correct)
-    /// - Reserved: 3 bits (spec says "2 bits": can't be correct either)
-    /// - Reserved: 6 bits
-    /// - Dual Beacon: 1 bit
-    /// - Dual CTS Protection: 1 bit
-    head uint32;
-
-    /// Next 8 bits of HT Operation:
-    /// - STBC Beacon: 1 bit
-    /// - L-SIG TXOP Protection Full Support: 1 bit
-    /// - PCO Active: 1 bit
-    /// - PCO Phase: 1 bit
-    /// - Reserved: 4 bits
-    tail uint8;
-
-    mcs_set array<uint8, 16>;
-};
-
 const WLAN_MAC_MAX_RATES uint32 = 263; // (8 + 255)
 
 /// Argument table to be passed as the single argument to
@@ -354,7 +323,7 @@ type WlanAssociationConfig = table {
     /// Rx MCS Bitmask in Supported MCS Set field represents the set of MCS
     /// the peer can receive at from this device, considering this device's Tx capability.
     9: ht_cap ieee80211.HtCapabilities;
-   10: ht_op WlanHtOp;
+   10: ht_op ieee80211.HtOperation;
 
     /// IEEE Std 802.11-2016, 9.4.2.158, 159
    11: vht_cap ieee80211.VhtCapabilities;

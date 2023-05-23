@@ -8,7 +8,6 @@ use {
         unaligned_view::UnalignedView,
     },
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
     ieee80211::MacAddr,
     static_assertions::const_assert_eq,
     std::mem::size_of,
@@ -548,14 +547,11 @@ pub struct HtOperation {
     pub basic_ht_mcs_set: SupportedMcsSet, // u128
 }
 
-impl From<HtOperation> for fidl_softmac::WlanHtOp {
+impl From<HtOperation> for fidl_ieee80211::HtOperation {
     fn from(op: HtOperation) -> Self {
-        Self {
-            primary_channel: op.primary_channel,
-            head: *&{ op.ht_op_info_head }.raw(),
-            tail: *&{ op.ht_op_info_tail }.raw(),
-            mcs_set: op.basic_ht_mcs_set.0.to_be_bytes(),
-        }
+        let mut ht_op = Self { bytes: Default::default() };
+        ht_op.bytes.copy_from_slice(&op.as_bytes()[..]);
+        ht_op
     }
 }
 
@@ -1437,14 +1433,8 @@ mod tests {
     #[test]
     fn successfully_convert_ht_operation_to_fidl() {
         let ht_op = crate::ie::fake_ies::fake_ht_operation();
-        let fidl_ht_op: fidl_softmac::WlanHtOp = ht_op.into();
-        // Local reference to avoid referring to an unaligned_reference
-        let ht_op_ptr_head_0 = ht_op.ht_op_info_head.0;
-
-        assert_eq!(ht_op.primary_channel, fidl_ht_op.primary_channel);
-        assert_eq!(ht_op_ptr_head_0, fidl_ht_op.head);
-        assert_eq!(ht_op.ht_op_info_tail.0, fidl_ht_op.tail);
-        assert_eq!(ht_op.basic_ht_mcs_set.0.to_be_bytes(), fidl_ht_op.mcs_set);
+        let ddk: fidl_ieee80211::HtOperation = ht_op.into();
+        assert_eq!(ht_op.as_bytes(), ddk.bytes);
     }
 
     #[test]

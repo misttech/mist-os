@@ -574,22 +574,18 @@ struct HtOperation {
   HtOpInfoTail tail;
   SupportedMcsSet basic_mcs_set;
 
-  static HtOperation FromDdk(const wlan_ht_op_t& ddk) {
+  static HtOperation FromDdk(const ht_operation_t& ddk) {
     HtOperation dst{};
-    dst.primary_channel = ddk.primary_channel;
-    dst.head.set_val(ddk.head);
-    dst.tail.set_val(ddk.tail);
-    memcpy(dst.basic_mcs_set.mut_val()->data(), ddk.mcs_set, sizeof(ddk.mcs_set));
+    static_assert(sizeof(dst) == sizeof(ddk.bytes));
+    memcpy(&dst, ddk.bytes, sizeof(ddk.bytes));
     return dst;
   }
 
-  wlan_ht_op_t ToDdk() const {
-    wlan_ht_op_t ddk{};
-    ddk.primary_channel = primary_channel;
-    ddk.head = head.val();
-    ddk.tail = tail.val();
-    memcpy(ddk.mcs_set, basic_mcs_set.val().data(), sizeof(ddk.mcs_set));
-    return ddk;
+  ht_operation_t ToDdk() const {
+    ht_operation_t dst{};
+    static_assert(sizeof(dst.bytes) == sizeof(*this));
+    memcpy(&dst.bytes, this, sizeof(dst.bytes));
+    return dst;
   }
 
 } __PACKED;
