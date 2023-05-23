@@ -8,10 +8,8 @@ use std::cmp;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::fmt;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use ubpf::converter::{bpf_addressing_mode, bpf_class};
-use ubpf::program::EbpfProgram;
 
 use crate::arch::{registers::RegisterState, task::decode_page_fault_exception_report};
 use crate::auth::*;
@@ -21,7 +19,7 @@ use crate::loader::*;
 use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::{self, *};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
-use crate::signals::{send_signal, types::*, SignalInfo};
+use crate::signals::{types::*, SignalInfo};
 use crate::syscalls::{decls::Syscall, SyscallResult};
 use crate::task::*;
 use crate::types::*;
@@ -34,8 +32,6 @@ use crate::types::*;
 //
 // See https://man7.org/linux/man-pages/man2/setpriority.2.html#NOTES
 const DEFAULT_TASK_PRIORITY: u8 = 20;
-
-const SECCOMP_MAX_INSNS_PER_PATH: u16 = 32768;
 
 pub struct CurrentTask {
     pub task: Arc<Task>,
@@ -228,14 +224,8 @@ pub struct TaskMutableState {
     /// for this field ensure this property.
     no_new_privs: bool,
 
-    /// List of currently installed seccomp_filters; most recently added is last.
-    pub seccomp_filters: Vec<SeccompFilter>,
-
-    // The total length of the provided seccomp filters, which cannot
-    // exceed SECCOMP_MAX_INSNS_PER_PATH - 4 * the number of filters.  This is stored
-    // instead of computed because we store seccomp filters in an
-    // expanded form, and it is impossible to get the original length.
-    pub seccomp_provided_instructions: u16,
+    /// List of currently installed seccomp_filters
+    pub seccomp_filters: SeccompFilterContainer,
 }
 
 impl TaskMutableState {
@@ -353,7 +343,7 @@ pub struct Task {
 
     /// Variable that can tell you whether there are currently seccomp
     /// filters without holding a lock
-    pub has_seccomp_filters: AtomicU8,
+    pub seccomp_filter_state: SeccompState,
 
     /// Used to ensure that all logs related to this task carry the same metadata about the task.
     logging_span: logging::Span,
@@ -392,9 +382,8 @@ impl Task {
         priority: u8,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
-        has_seccomp_filters: AtomicU8,
-        seccomp_filters: Vec<SeccompFilter>,
-        seccomp_provided_instructions: u16,
+        seccomp_filter_state: SeccompState,
+        seccomp_filters: SeccompFilterContainer,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -429,10 +418,9 @@ impl Task {
                 restricted_state_addr_and_size: None,
                 no_new_privs,
                 seccomp_filters,
-                seccomp_provided_instructions,
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
-            has_seccomp_filters,
+            seccomp_filter_state,
             logging_span,
         };
         #[cfg(any(test, debug_assertions))]
@@ -577,9 +565,8 @@ impl Task {
             DEFAULT_TASK_PRIORITY,
             kernel.root_uts_ns.clone(),
             false,
-            std::sync::atomic::AtomicU8::new(0),
-            vec![],
-            0,
+            SeccompState::default(),
+            SeccompFilterContainer::default(),
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -671,13 +658,11 @@ impl Task {
         let uts_ns;
         let no_new_privs;
         let seccomp_filters;
-        let seccomp_provided_instructions;
         {
             let state = self.read();
 
             no_new_privs = state.no_new_privs;
             seccomp_filters = state.seccomp_filters.clone();
-            seccomp_provided_instructions = state.seccomp_provided_instructions;
         }
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -746,9 +731,8 @@ impl Task {
             priority,
             uts_ns,
             no_new_privs,
-            AtomicU8::new(self.has_seccomp_filters.load(Ordering::Acquire)),
+            SeccompState::from(&self.seccomp_filter_state),
             seccomp_filters,
-            seccomp_provided_instructions,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child
@@ -1005,29 +989,8 @@ impl Task {
         }
     }
 
-    pub fn set_seccomp_state(&self, state: SeccompFilterState) -> Result<(), Errno> {
-        let ustate: u8 = state as u8;
-        loop {
-            let seccomp_filter_status = self.has_seccomp_filters.load(Ordering::Acquire);
-            if seccomp_filter_status == ustate {
-                return Ok(());
-            }
-            if seccomp_filter_status != SeccompFilterState::None as u8 {
-                return Err(errno!(EINVAL));
-            }
-            if self
-                .has_seccomp_filters
-                .compare_exchange(
-                    seccomp_filter_status,
-                    ustate,
-                    Ordering::Release,
-                    Ordering::Acquire,
-                )
-                .is_ok()
-            {
-                return Ok(());
-            }
-        }
+    pub fn set_seccomp_state(&self, state: SeccompStateValue) -> Result<(), Errno> {
+        self.seccomp_filter_state.set(&state)
     }
 
     pub fn logging_span(&self) -> logging::Span {
@@ -1465,19 +1428,6 @@ impl CurrentTask {
         Ok(())
     }
 
-    fn seccomp_tsync_error(id: i32, flags: u32) -> Result<SyscallResult, Errno> {
-        // By default, TSYNC indicates failure state by returning the first thread
-        // id not to be able to sync, rather than by returning -1 and setting
-        // errno.  However, if TSYNC_ESRCH is set, it returns ESRCH.  This
-        // prevents conflicts with fact that SECCOMP_FILTER_FLAG_NEW_LISTENER
-        // makes seccomp return an fd.
-        if flags & SECCOMP_FILTER_FLAG_TSYNC_ESRCH != 0 {
-            Err(errno!(ESRCH))
-        } else {
-            Ok(id.into())
-        }
-    }
-
     pub fn add_seccomp_filter(
         &mut self,
         bpf_filter: UserAddress,
@@ -1492,279 +1442,88 @@ impl CurrentTask {
         let mut code: Vec<sock_filter> = vec![Default::default(); fprog.len as usize];
         self.read_objects(UserRef::new(UserAddress::from_ptr(fprog.filter)), code.as_mut_slice())?;
 
-        // If an instruction loads from / stores to an absolute address, that address has to be
-        // 32-bit aligned and inside the struct seccomp_data passed in.
-        for insn in &code {
-            if (bpf_class(insn) == BPF_LD || bpf_class(insn) == BPF_ST)
-                && (bpf_addressing_mode(insn) == BPF_ABS)
-                && (insn.k & 0x3 != 0 || std::mem::size_of::<seccomp_data>() < insn.k as usize)
-            {
-                return Err(errno!(EINVAL));
-            }
-        }
+        let new_filter = SeccompFilter::from_cbpf(
+            &code,
+            self.thread_group.next_seccomp_filter_id.fetch_add(1, Ordering::SeqCst),
+        )?;
 
-        match EbpfProgram::from_cbpf(&code) {
-            Ok(program) => {
-                let state = self.thread_group.write();
-                if flags & SECCOMP_FILTER_FLAG_TSYNC != 0 {
-                    // TSYNC synchronizes all filters for all threads in the current process to
-                    // the current thread's
+        let state = self.thread_group.write();
+        if flags & SECCOMP_FILTER_FLAG_TSYNC != 0 {
+            // TSYNC synchronizes all filters for all threads in the current process to
+            // the current thread's
 
-                    // We collect the filters for the current task upfront to save us acquiring
-                    // the task's lock a lot of times below.
-                    let mut filters: Vec<SeccompFilter> = self.read().seccomp_filters.clone();
+            // We collect the filters for the current task upfront to save us acquiring
+            // the task's lock a lot of times below.
+            let mut filters: SeccompFilterContainer = self.read().seccomp_filters.clone();
 
-                    // For TSYNC to work, all of the other thread filters in this process have to
-                    // be a prefix of this thread's filters, and none of them can be in
-                    // strict mode.
-                    let tasks = state.tasks().collect::<Vec<_>>();
-                    for task in &tasks {
-                        let other_task_state = task.mutable_state.read();
-                        let maybe_new_length =
-                            other_task_state.seccomp_provided_instructions + fprog.len + 4;
+            // For TSYNC to work, all of the other thread filters in this process have to
+            // be a prefix of this thread's filters, and none of them can be in
+            // strict mode.
+            let tasks = state.tasks().collect::<Vec<_>>();
+            for task in &tasks {
+                if task.id == self.id {
+                    continue;
+                }
+                let other_task_state = task.mutable_state.read();
 
-                        if maybe_new_length > SECCOMP_MAX_INSNS_PER_PATH {
-                            return Self::seccomp_tsync_error(task.id, flags);
-                        }
-
-                        // All threads need to do the length check, but only other threads need
-                        // the prefix check.
-                        if task.id == self.id {
-                            continue;
-                        }
-
-                        // Target threads cannot be in SECCOMP_MODE_STRICT
-                        if task.has_seccomp_filters.load(Ordering::Acquire)
-                            & SeccompFilterState::Strict as u8
-                            != 0
-                        {
-                            return Self::seccomp_tsync_error(task.id, flags);
-                        }
-
-                        // Check that target thread's filters are a prefix of this thread's
-                        // filters.
-                        if other_task_state.seccomp_filters.len() > filters.len() {
-                            return Self::seccomp_tsync_error(task.id, flags);
-                        }
-                        for (filter, other_filter) in
-                            filters.iter().zip(other_task_state.seccomp_filters.iter())
-                        {
-                            if other_filter.unique_id != filter.unique_id {
-                                return Self::seccomp_tsync_error(task.id, flags);
-                            }
-                        }
-                    }
-                    // Now that we're sure we're allowed to do so, add the filter to all threads.
-                    let new_length = self.read().seccomp_provided_instructions + fprog.len + 4;
-                    filters.push(SeccompFilter {
-                        program,
-                        unique_id: self
-                            .thread_group
-                            .next_seccomp_filter_id
-                            .fetch_add(1, Ordering::SeqCst),
-                    });
-
-                    for task in &tasks {
-                        let mut other_task_state = task.mutable_state.write();
-
-                        other_task_state.enable_no_new_privs();
-                        other_task_state.seccomp_provided_instructions = new_length;
-                        other_task_state.seccomp_filters = filters.clone();
-                        task.set_seccomp_state(SeccompFilterState::UserDefined)?;
-                    }
-                } else {
-                    let mut task_state = self.mutable_state.write();
-                    let maybe_new_length = task_state.seccomp_provided_instructions + fprog.len + 4;
-                    if maybe_new_length > SECCOMP_MAX_INSNS_PER_PATH {
-                        return Err(errno!(ENOMEM));
-                    }
-
-                    task_state.seccomp_provided_instructions = maybe_new_length;
-                    task_state.seccomp_filters.push(SeccompFilter {
-                        program,
-                        unique_id: self
-                            .thread_group
-                            .next_seccomp_filter_id
-                            .fetch_add(1, Ordering::SeqCst),
-                    });
-                    self.set_seccomp_state(SeccompFilterState::UserDefined)?;
+                // Target threads cannot be in SECCOMP_MODE_STRICT
+                if task.seccomp_filter_state.get() == SeccompStateValue::Strict {
+                    return Self::seccomp_tsync_error(task.id, flags);
                 }
 
-                self.set_seccomp_state(SeccompFilterState::UserDefined)?;
+                // Target threads' filters must be a subsequence of this thread's
+                if !other_task_state.seccomp_filters.can_sync_to(&filters) {
+                    return Self::seccomp_tsync_error(task.id, flags);
+                }
             }
-            Err(errmsg) => log_warn!("{}", errmsg),
+
+            // Now that we're sure we're allowed to do so, add the filter to all threads.
+            filters.add_filter(new_filter, fprog.len)?;
+
+            for task in &tasks {
+                let mut other_task_state = task.mutable_state.write();
+
+                other_task_state.enable_no_new_privs();
+                other_task_state.seccomp_filters = filters.clone();
+                task.set_seccomp_state(SeccompStateValue::UserDefined)?;
+            }
+        } else {
+            let mut task_state = self.mutable_state.write();
+
+            task_state.seccomp_filters.add_filter(new_filter, fprog.len)?;
+            self.set_seccomp_state(SeccompStateValue::UserDefined)?;
         }
+
+        self.set_seccomp_state(SeccompStateValue::UserDefined)?;
 
         Ok(().into())
     }
 
-    // NB: Allow warning below so that it is clear what we are doing on KILL_PROCESS
-    #[allow(clippy::wildcard_in_or_patterns)]
     pub fn run_seccomp_filters(&self, syscall: &Syscall) -> Option<Errno> {
         // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
         // from user-defined seccomp filters.
-        if self.has_seccomp_filters.load(Ordering::Acquire) & SeccompFilterState::Strict as u8 != 0
-            && syscall.decl.number as u32 != __NR_exit
-            && syscall.decl.number as u32 != __NR_read
-            && syscall.decl.number as u32 != __NR_write
-        {
-            send_signal(self, SignalInfo::default(SIGKILL));
-            return Some(errno_from_code!(0));
+        if self.seccomp_filter_state.get() == SeccompStateValue::Strict {
+            return SeccompState::do_strict(self, syscall);
         }
 
-        // After that is done, execute any other seccomp filters.
-        #[cfg(target_arch = "x86_64")]
-        let arch_val = AUDIT_ARCH_X86_64;
-        #[cfg(target_arch = "aarch64")]
-        let arch_val = AUDIT_ARCH_AARCH64;
+        // Run user-defined seccomp filters
+        let result = self.mutable_state.read().seccomp_filters.run_all(self, syscall);
 
-        // VDSO calls can't be caught by seccomp, so most seccomp filters forget to declare them.
-        // But our VDSO implementation is incomplete, and most of the calls forward to the actual
-        // syscalls. So seccomp should ignore them until they're implemented correctly in the VDSO.
-        #[cfg(target_arch = "x86_64")] // The set of VDSO calls is arch dependent.
-        #[allow(non_upper_case_globals)]
-        if let __NR_clock_gettime | __NR_getcpu | __NR_gettimeofday | __NR_time =
-            syscall.decl.number as u32
-        {
-            return None;
-        }
-        #[cfg(target_arch = "aarch64")]
-        #[allow(non_upper_case_globals)]
-        if let __NR_clock_gettime | __NR_clock_getres | __NR_gettimeofday =
-            syscall.decl.number as u32
-        {
-            return None;
-        }
+        SeccompState::do_user_defined(result, self, syscall)
+    }
 
-        let mut data = seccomp_data {
-            nr: syscall.decl.number as i32,
-            arch: arch_val,
-            instruction_pointer: self.registers.instruction_pointer_register(),
-            args: [
-                syscall.arg0,
-                syscall.arg1,
-                syscall.arg2,
-                syscall.arg3,
-                syscall.arg4,
-                syscall.arg5,
-            ],
-        };
-
-        let mut result = SECCOMP_RET_ALLOW;
-        {
-            let filters = &self.mutable_state.read().seccomp_filters;
-
-            // Filters are executed in reverse order of addition
-            for filter in filters.iter().rev() {
-                let mut new_result = SECCOMP_RET_ALLOW;
-                if let Ok(r) = filter.program.run(&mut data) {
-                    new_result = r as u32
-                }
-                if ((new_result & SECCOMP_RET_ACTION_FULL) as i32)
-                    < ((result & SECCOMP_RET_ACTION_FULL) as i32)
-                {
-                    result = new_result;
-                }
-            }
-        }
-
-        match result & !SECCOMP_RET_DATA {
-            SECCOMP_RET_ALLOW => None,
-            SECCOMP_RET_ERRNO => {
-                // Linux kernel compatibility: if errno exceeds 0xfff, it is capped at 0xfff.
-                Some(errno_from_code!(std::cmp::min(result & 0xffff, 0xfff) as i16))
-            }
-
-            SECCOMP_RET_KILL_THREAD => {
-                let siginfo = SignalInfo::default(SIGSYS);
-
-                let is_last_thread = self.thread_group.read().tasks.len() == 1;
-                let mut task_state = self.write();
-
-                if is_last_thread {
-                    task_state.dump_on_exit = true;
-                    task_state.exit_status.get_or_insert(ExitStatus::CoreDump(siginfo));
-                } else {
-                    task_state.exit_status.get_or_insert(ExitStatus::Kill(siginfo));
-                }
-                Some(errno_from_code!(0))
-            }
-            SECCOMP_RET_LOG => {
-                let creds = self.creds();
-                let uid = creds.uid;
-                let gid = creds.gid;
-                let comm_r = self.command();
-                let comm = if let Ok(c) = comm_r.to_str() { c } else { "???" };
-
-                let arch = if cfg!(target_arch = "x86_64") {
-                    "x86_64"
-                } else if cfg!(target_arch = "aarch64") {
-                    "aarch64"
-                } else {
-                    "unknown"
-                };
-                crate::logging::log_info!(
-                    "uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
-                    uid,
-                    gid,
-                    self.thread_group.leader,
-                    comm,
-                    syscall.decl.number,
-                    self.registers.instruction_pointer_register(),
-                    arch,
-                    syscall.decl.name
-                );
-                None
-            }
-            SECCOMP_RET_TRACE => {
-                // TODO(fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
-                Some(errno!(ENOSYS))
-            }
-            SECCOMP_RET_TRAP => {
-                let siginfo = SignalInfo {
-                    signal: SIGSYS,
-                    errno: (result & SECCOMP_RET_DATA) as i32,
-                    code: SYS_SECCOMP as i32,
-                    detail: SignalDetail::SigSys {
-                        call_addr: self.registers.instruction_pointer_register() as usize,
-                        syscall: syscall.decl.number as i32,
-                        arch: arch_val,
-                    },
-                    force: true,
-                };
-
-                send_signal(self, siginfo);
-                Some(errno_from_code!(-(syscall.decl.number as i16)))
-            }
-            SECCOMP_RET_KILL_PROCESS | _ => {
-                // from seccomp(2): If an action value other than one of the above is specified,
-                // then the filter action is treated as [...] SECCOMP_RET_KILL_PROCESS.
-                self.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
-                Some(errno_from_code!(0))
-            }
+    fn seccomp_tsync_error(id: i32, flags: u32) -> Result<SyscallResult, Errno> {
+        // By default, TSYNC indicates failure state by returning the first thread
+        // id not to be able to sync, rather than by returning -1 and setting
+        // errno.  However, if TSYNC_ESRCH is set, it returns ESRCH.  This
+        // prevents conflicts with fact that SECCOMP_FILTER_FLAG_NEW_LISTENER
+        // makes seccomp return an fd.
+        if flags & SECCOMP_FILTER_FLAG_TSYNC_ESRCH != 0 {
+            Err(errno!(ESRCH))
+        } else {
+            Ok(id.into())
         }
     }
-}
-
-/// Possible values for the current status of the seccomp filters for
-/// this process.
-#[repr(u8)]
-pub enum SeccompFilterState {
-    None = 0,
-    UserDefined = 1,
-    Strict = 2,
-}
-
-#[derive(Clone)]
-pub struct SeccompFilter {
-    /// The BPF program associated with this filter.
-    program: EbpfProgram,
-
-    /// The unique-to-this-process id of this filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
-    /// threads in this process have filters that are a prefix of the filters of the thread
-    /// attempting to do the TSYNC. Identical filters attached in separate seccomp calls are treated
-    /// as different from each other for this purpose, so we need a way of distinguishing them.
-    unique_id: u64,
 }
 
 impl fmt::Debug for Task {

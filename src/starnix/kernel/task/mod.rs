@@ -9,6 +9,7 @@ mod kernel;
 mod kernel_threads;
 mod pid_table;
 mod process_group;
+mod seccomp;
 mod session;
 #[allow(clippy::module_inception)]
 mod task;
@@ -24,6 +25,7 @@ pub use kernel::*;
 pub use kernel_threads::*;
 pub use pid_table::*;
 pub use process_group::*;
+pub use seccomp::*;
 pub use session::*;
 pub use task::*;
 pub use thread_group::*;
