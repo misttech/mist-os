@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::AsBytes;
-
 use crate::syscalls::decls::{Syscall, SyscallDecl};
 use crate::task::CurrentTask;
 
@@ -76,15 +74,4 @@ impl Syscall {
             arg5: current_task.registers.r9,
         }
     }
-}
-
-pub fn generate_interrupt_instructions(current_task: &CurrentTask) -> Vec<u8> {
-    const INTERRUPT_AND_JUMP: [u8; 7] = [
-        0xcc, // int 3
-        0xff, 0x25, 0x00, 0x00, 0x00, 0x00, // jmp *0x0(%rip)
-    ];
-    let mut instruction_pointer = current_task.registers.rip.as_bytes().to_owned();
-    let mut instructions = INTERRUPT_AND_JUMP.to_vec();
-    instructions.append(&mut instruction_pointer);
-    instructions
 }

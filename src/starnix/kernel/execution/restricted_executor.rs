@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #![allow(non_camel_case_types)]
-#![cfg(feature = "restricted_mode")]
 
 use super::shared::{execute_syscall, process_completed_syscall, TaskInfo};
 use crate::arch::{

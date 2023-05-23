@@ -44,12 +44,6 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     }
 }
 
-pub fn force_signal(current_task: &CurrentTask, mut siginfo: SignalInfo) {
-    log_trace!("forced signal {:?}", siginfo);
-    siginfo.force = true;
-    send_signal(current_task, siginfo)
-}
-
 /// Represents the action to take when signal is delivered.
 ///
 /// See https://man7.org/linux/man-pages/man7/signal.7.html.

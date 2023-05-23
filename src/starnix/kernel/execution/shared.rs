@@ -317,12 +317,3 @@ pub fn read_channel_sync(chan: &zx::Channel, buf: &mut zx::MessageBuf) -> Result
         res
     }
 }
-
-/// Converts a `zx::MessageBuf` into an exception info by transmuting a copy of the bytes.
-// TODO: Should we move this code into fuchsia_zircon? It seems like part of a better abstraction
-// for exception channels.
-pub fn as_exception_info(buffer: &zx::MessageBuf) -> zx::sys::zx_exception_info_t {
-    let mut tmp = [0; std::mem::size_of::<zx::sys::zx_exception_info_t>()];
-    tmp.clone_from_slice(buffer.bytes());
-    unsafe { std::mem::transmute(tmp) }
-}

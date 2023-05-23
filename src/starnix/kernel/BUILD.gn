@@ -9,13 +9,6 @@ import("//build/rust/rustc_test.gni")
 import("//src/starnix/kernel/starnix.gni")
 
 declare_args() {
-  # Restricted mode is currently only supported by Zircon on x64.
-  if (target_cpu == "x64" || target_cpu == "arm64") {
-    starnix_restricted_mode = true
-  } else {
-    starnix_restricted_mode = false
-  }
-
   # Whether or not to enable 'in-thread' exception handling for restricted mode.
   starnix_restricted_in_thread_exceptions = false
 
@@ -185,7 +178,6 @@ rustc_binary("starnix_kernel_bin") {
     "dynamic_thread_pool.rs",
     "execution/component_runner.rs",
     "execution/container.rs",
-    "execution/exception_executor.rs",
     "execution/mod.rs",
     "execution/restricted_executor.rs",
     "execution/serve_protocols.rs",
@@ -335,9 +327,6 @@ rustc_binary("starnix_kernel_bin") {
   }
 
   features = []
-  if (starnix_restricted_mode) {
-    features += [ "restricted_mode" ]
-  }
   if (starnix_restricted_in_thread_exceptions) {
     features += [ "in_thread_exceptions" ]
   }
