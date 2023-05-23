@@ -58,8 +58,10 @@ impl FileOps for EventFdFileObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || {
@@ -91,8 +93,10 @@ impl FileOps for EventFdFileObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || {

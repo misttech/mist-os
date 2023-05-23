@@ -103,9 +103,8 @@ where
 /// }
 /// impl FileOps for WritableProcFile {
 ///     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-///     fileops_impl_seekable_write!();
 ///
-///     fn write_at(
+///     fn write(
 ///         &self,
 ///         _file: &FileObject,
 ///         _current_task: &CurrentTask,
@@ -134,20 +133,21 @@ impl<Source: SequenceFileSource + Clone> DynamicFile<Source> {
 }
 
 impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
-    fileops_impl_seekable_read!();
-    fileops_impl_seekable_write!();
+    fn is_seekable(&self) -> bool {
+        true
+    }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        self.state.lock().read_at(offset, data)
+        self.state.lock().read(offset, data)
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -161,27 +161,20 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        let mut current_offset = file.offset.lock();
+        let new_offset = default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))?;
 
-        // Only allow absolute and relative forward seek.
-        let new_offset = (match whence {
-            SeekOrigin::Set => Some(offset),
-            SeekOrigin::Cur if offset < 0 => None,
-            SeekOrigin::Cur => (*current_offset).checked_add(offset),
-            SeekOrigin::End => None,
-        })
-        .ok_or_else(|| errno!(EINVAL))?;
-
-        // Call `read_at(0)` to ensure the data is generated now instead of later (except, when
+        // Call `read(0)` to ensure the data is generated now instead of later (except, when
         // seeking to the start of the file).
-        let mut dummy_buf = VecOutputBuffer::new(0);
-        self.read_at(file, current_task, new_offset as usize, &mut dummy_buf)?;
+        if new_offset > 0 {
+            let mut dummy_buf = VecOutputBuffer::new(0);
+            self.read(file, current_task, new_offset as usize, &mut dummy_buf)?;
+        }
 
-        *current_offset = new_offset;
-        Ok(*current_offset)
+        Ok(new_offset)
     }
 }
 
@@ -225,7 +218,7 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
         self.byte_offset = 0;
     }
 
-    fn read_at(&mut self, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    fn read(&mut self, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         if offset != self.byte_offset {
             self.reset();
         }
@@ -350,7 +343,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_read_at() -> Result<(), Errno> {
+    async fn test_read() -> Result<(), Errno> {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
         let (current_task, file) = create_test_file(TestFileSource { counter });
         let read_at = |offset: usize, length: usize| -> Result<Vec<u8>, Errno> {

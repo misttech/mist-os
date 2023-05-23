@@ -12,9 +12,8 @@ use std::sync::{Arc, Weak};
 use crate::auth::FsCred;
 use crate::fs::buffers::InputBuffer;
 use crate::fs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_seekable_write, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
-    MemoryDirectoryFile,
+    fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf, DynamicFileSource,
+    FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use crate::lock::Mutex;
 use crate::task::{CurrentTask, Task};
@@ -163,9 +162,8 @@ impl ControlGroupFile {
 
 impl FileOps for ControlGroupFile {
     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-    fileops_impl_seekable_write!();
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,

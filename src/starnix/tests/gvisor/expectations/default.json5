@@ -154,7 +154,6 @@
                 // inotify_test
                 "Inotify.AddWatchOnInvalidPathFails",
                 "Inotify.ReadingFileGeneratesAccessEvent",
-                "Inotify.IllegalPwrite",
                 "Inotify.MultipleInotifyInstancesAndWatchesAllGetEvents",
                 "Inotify.RemovingWatchGeneratesEvent",
                 "Inotify.AddWatchOnInvalidFdFails",

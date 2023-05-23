@@ -20,8 +20,10 @@ impl FileOps for SocketFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         // The behavior of recv differs from read: recv will block if given a zero-size buffer when
         // there's no data available, but read will immediately return 0.
         if data.available() == 0 {
@@ -35,8 +37,10 @@ impl FileOps for SocketFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         self.sendmsg(current_task, file, data, None, vec![], SocketMessageFlags::empty())
     }
 

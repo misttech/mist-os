@@ -57,7 +57,7 @@ impl<Ops: BytesFileOps> BytesFile<Ops> {
 impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
     fileops_impl_seekable!();
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
@@ -67,7 +67,7 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
         data.write(&self.0.read(current_task)?[offset..])
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,

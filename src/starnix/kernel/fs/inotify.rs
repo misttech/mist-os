@@ -27,8 +27,10 @@ impl FileOps for InotifyFileObject {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EINVAL)
     }
 
@@ -36,8 +38,10 @@ impl FileOps for InotifyFileObject {
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         not_implemented!("InotifyFileObject.read() is stubbed.");
         Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
         error!(EAGAIN)

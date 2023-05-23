@@ -154,8 +154,10 @@ impl FileOps for AccessFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         // Format is allowed decided autitallow auditdeny seqno flags
         // Everything but seqno must be in hexadecimal format and represents a bits field.
         let content = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
@@ -166,8 +168,10 @@ impl FileOps for AccessFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         Ok(data.drain())
     }
 }

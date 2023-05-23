@@ -225,6 +225,7 @@ impl FileOps for PanickingFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        _offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         panic!("write called on TestFile")
@@ -234,6 +235,7 @@ impl FileOps for PanickingFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        _offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         panic!("read called on TestFile")

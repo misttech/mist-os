@@ -32,8 +32,10 @@ impl FileOps for SignalFd {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || {
@@ -125,8 +127,10 @@ impl FileOps for SignalFd {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EINVAL)
     }
 }

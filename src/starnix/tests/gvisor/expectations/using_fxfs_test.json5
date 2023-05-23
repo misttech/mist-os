@@ -517,9 +517,6 @@
                 "UnlinkTest.Rmdir",
                 "UnlinkTest.UnlinkAtEmptyPath",
 
-                // write test
-                "WriteTest.WriteIncrementOffsetAppend",
-
                 // xattr_test
                 "XattrTest.GetXattr",
                 "XattrTest.GetXattrNonexistentName",

@@ -43,16 +43,20 @@ impl FileOps for BpfHandle {
         &self,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
+        offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EINVAL) // TODO
     }
     fn write(
         &self,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EINVAL) // TODO
     }
 }

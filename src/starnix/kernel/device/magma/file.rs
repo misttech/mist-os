@@ -765,8 +765,10 @@ impl FileOps for MagmaFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EINVAL)
     }
 
@@ -774,8 +776,10 @@ impl FileOps for MagmaFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EINVAL)
     }
 }

@@ -81,34 +81,30 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// released.
     fn flush(&self, _file: &FileObject) {}
 
-    /// Read from the file without an offset. If your file is seekable, consider implementing this
-    /// with [`fileops_impl_seekable`].
+    /// Returns whether the file has meaningful seek offsets. Returning `false` is only
+    /// optimization and will makes `FileObject` never hold the offset lock when calling `read` and
+    /// `write`.
+    fn has_persistent_offsets(&self) -> bool {
+        self.is_seekable()
+    }
+
+    /// Returns whether the file is seekable.
+    fn is_seekable(&self) -> bool;
+
+    /// Read from the file at an offset. If the file does not have persistent offsets (either
+    /// directly, or because it is not seekable), offset will be 0 and can be ignored.
+    /// Returns the number of bytes read.
     fn read(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno>;
-    /// Read from the file at an offset. If your file is seekable, consider implementing this with
-    /// [`fileops_impl_nonseekable`].
-    fn read_at(
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>;
-    /// Write to the file without an offset. If your file is seekable, consider implementing this
-    /// with [`fileops_impl_seekable`].
+    /// Write to the file with an offset. If the file does not have persistent offsets (either
+    /// directly, or because it is not seekable), offset will be 0 and can be ignored.
+    /// Returns the number of bytes written.
     fn write(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno>;
-    /// Write to the file at a offset. If your file is nonseekable, consider implementing this with
-    /// [`fileops_impl_nonseekable`].
-    fn write_at(
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
@@ -116,12 +112,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>;
 
-    /// Adjust the seek offset if the file is seekable.
+    /// Adjust the `current_offset` if the file is seekable.
     fn seek(
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno>;
 
@@ -264,35 +261,119 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 }
 
+/// Implement the seek method for a file. The computation from the end of the file must be provided
+/// through a callback.
+///
+/// Errors if `whence` is invalid, or the calculated offset is invalid.
+///
+/// - `offset`: The target offset from `whence`.
+/// - `whence`: The location from which to compute the updated offset.
+/// - `compute_end`: Compute the new offset from the end. Return an error if the operation is not
+///                  supported.
+pub fn default_seek<F>(
+    current_offset: off_t,
+    new_offset: off_t,
+    whence: SeekOrigin,
+    compute_end: F,
+) -> Result<off_t, Errno>
+where
+    F: FnOnce(off_t) -> Result<off_t, Errno>,
+{
+    let new_offset = match whence {
+        SeekOrigin::Set => Some(new_offset),
+        SeekOrigin::Cur => current_offset.checked_add(new_offset),
+        SeekOrigin::End => Some(compute_end(new_offset)?),
+    }
+    .ok_or_else(|| errno!(EINVAL))?;
+
+    if new_offset < 0 {
+        return error!(EINVAL);
+    }
+
+    Ok(new_offset)
+}
+
+/// Implement the seek method for a file without an upper bound on the resulting offset.
+///
+/// This is useful for files without a defined size.
+///
+/// Errors if `whence` is invalid, or the calculated offset is invalid.
+///
+/// - `offset`: The target offset from `whence`.
+/// - `whence`: The location from which to compute the updated offset.
+pub fn unbounded_seek(
+    current_offset: off_t,
+    new_offset: off_t,
+    whence: SeekOrigin,
+) -> Result<off_t, Errno> {
+    default_seek(current_offset, new_offset, whence, |_| Ok(MAX_LFS_FILESIZE as off_t))
+}
+
+macro_rules! fileops_impl_delegate_read_and_seek {
+    ($self:ident, $delegate:expr) => {
+        fn is_seekable(&self) -> bool {
+            true
+        }
+
+        fn read(
+            &$self,
+            file: &FileObject,
+            current_task: &crate::task::CurrentTask,
+            offset: usize,
+            data: &mut dyn crate::fs::buffers::OutputBuffer,
+        ) -> Result<usize, crate::types::Errno> {
+            $delegate.read(file, current_task, offset, data)
+        }
+
+        fn seek(
+            &$self,
+            file: &FileObject,
+            current_task: &crate::task::CurrentTask,
+            current_offset: crate::types::off_t,
+            new_offset: off_t,
+            whence: crate::fs::SeekOrigin,
+        ) -> Result<off_t, crate::types::Errno> {
+            $delegate.seek(file, current_task, current_offset, new_offset, whence)
+        }
+    };
+}
+
+/// Implements [`FileOps::seek`] in a way that makes sense for seekable files.
+macro_rules! fileops_impl_seekable {
+    () => {
+        fn is_seekable(&self) -> bool {
+            true
+        }
+
+        fn seek(
+            &self,
+            file: &crate::fs::FileObject,
+            _current_task: &crate::task::CurrentTask,
+            current_offset: crate::types::off_t,
+            new_offset: crate::types::off_t,
+            whence: crate::fs::SeekOrigin,
+        ) -> Result<crate::types::off_t, crate::types::Errno> {
+            crate::fs::default_seek(current_offset, new_offset, whence, |offset| {
+                let file_size = file.node().stat()?.st_size as off_t;
+                offset.checked_add(file_size).ok_or_else(|| errno!(EINVAL))
+            })
+        }
+    };
+}
+
 /// Implements [`FileOps`] methods in a way that makes sense for non-seekable files.
-/// You must implement [`FileOps::read`] and [`FileOps::write`].
 macro_rules! fileops_impl_nonseekable {
     () => {
-        fn read_at(
-            &self,
-            _file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
-            _offset: usize,
-            _data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            use crate::types::errno::*;
-            error!(ESPIPE)
+        fn is_seekable(&self) -> bool {
+            false
         }
-        fn write_at(
-            &self,
-            _file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
-            _offset: usize,
-            _data: &mut dyn crate::fs::buffers::InputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            use crate::types::errno::*;
-            error!(ESPIPE)
-        }
+
         fn seek(
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
-            _offset: crate::types::off_t,
+            _current_offset: crate::types::off_t,
+            _new_offset: crate::types::off_t,
             _whence: crate::fs::SeekOrigin,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
             use crate::types::errno::*;
@@ -301,146 +382,24 @@ macro_rules! fileops_impl_nonseekable {
     };
 }
 
-/// Implements [`FileOps::read`] that calls [`FileOps::read_at`] with the current position.
-macro_rules! fileops_impl_seekable_read {
-    () => {
-        fn read(
-            &self,
-            file: &crate::fs::FileObject,
-            current_task: &crate::task::CurrentTask,
-            data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            let mut offset = file.offset.lock();
-            let size = self.read_at(file, current_task, *offset as usize, data)?;
-            *offset += size as crate::types::off_t;
-            Ok(size)
-        }
-    };
-}
-
-/// Implements [`FileOps::write`] that calls [`FileOps::write_at`] with the current position.
-macro_rules! fileops_impl_seekable_write {
-    () => {
-        fn write(
-            &self,
-            file: &crate::fs::FileObject,
-            current_task: &crate::task::CurrentTask,
-            data: &mut dyn crate::fs::buffers::InputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            let mut offset = file.offset.lock();
-            if file.flags().contains(OpenFlags::APPEND) {
-                *offset = file.node().info().size as crate::types::off_t;
-            }
-            let size = self.write_at(file, current_task, *offset as usize, data)?;
-            *offset += size as crate::types::off_t;
-            Ok(size)
-        }
-    };
-}
-
-pub fn default_seek(
-    file: &FileObject,
-    _current_task: &CurrentTask,
-    offset: off_t,
-    whence: SeekOrigin,
-) -> Result<off_t, Errno> {
-    let mut current_offset = file.offset.lock();
-    let new_offset = match whence {
-        SeekOrigin::Set => Some(offset),
-        SeekOrigin::Cur => (*current_offset).checked_add(offset),
-        SeekOrigin::End => {
-            let stat = file.node().stat()?;
-            offset.checked_add(stat.st_size as off_t)
-        }
-    }
-    .ok_or_else(|| errno!(EINVAL))?;
-
-    if new_offset < 0 {
-        return error!(EINVAL);
-    }
-
-    *current_offset = new_offset;
-    Ok(*current_offset)
-}
-
-/// Implements [`FileOps`] methods in a way that makes sense for seekable files.
-/// You must implement [`FileOps::read_at`] and [`FileOps::write_at`].
-macro_rules! fileops_impl_seekable {
-    () => {
-        fileops_impl_seekable_read!();
-        fileops_impl_seekable_write!();
-
-        fn seek(
-            &self,
-            file: &crate::fs::FileObject,
-            current_task: &crate::task::CurrentTask,
-            offset: crate::types::off_t,
-            whence: crate::fs::SeekOrigin,
-        ) -> Result<crate::types::off_t, crate::types::Errno> {
-            crate::fs::default_seek(file, current_task, offset, whence)
-        }
-    };
-}
-
-macro_rules! fileops_impl_delegate_read_and_seek {
-    ($self:ident, $delegate:expr) => {
-        fn read(
-            &$self,
-            file: &FileObject,
-            current_task: &crate::task::CurrentTask,
-            data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            $delegate.read(file, current_task, data)
-        }
-
-        fn read_at(
-            &$self,
-            file: &FileObject,
-            current_task: &crate::task::CurrentTask,
-            offset: usize,
-            data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            $delegate.read_at(file, current_task, offset, data)
-        }
-
-        fn seek(
-            &$self,
-            file: &FileObject,
-            current_task: &crate::task::CurrentTask,
-            offset: off_t,
-            whence: crate::fs::SeekOrigin,
-        ) -> Result<off_t, crate::types::Errno> {
-            $delegate.seek(file, current_task, offset, whence)
-        }
-    };
-}
-
-/// Implements [`FileOps`] methods in a way that makes sense for files that ignore
+/// Implements [`FileOps::seek`] methods in a way that makes sense for files that ignore
 /// seeking operations and always read/write at offset 0.
-/// You must implement [`FileOps::read_at`] and [`FileOps::write_at`].
 macro_rules! fileops_impl_seekless {
     () => {
-        fn read(
-            &self,
-            file: &crate::fs::FileObject,
-            current_task: &crate::task::CurrentTask,
-            data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            self.read_at(file, current_task, 0, data)
+        fn has_persistent_offsets(&self) -> bool {
+            false
         }
-        fn write(
-            &self,
-            file: &crate::fs::FileObject,
-            current_task: &crate::task::CurrentTask,
-            data: &mut dyn crate::fs::buffers::InputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            self.write_at(file, current_task, 0, data)
+
+        fn is_seekable(&self) -> bool {
+            true
         }
+
         fn seek(
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
-            _offset: crate::types::off_t,
+            _current_offset: crate::types::off_t,
+            _new_offset: crate::types::off_t,
             _whence: crate::fs::SeekOrigin,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
             Ok(0)
@@ -452,17 +411,11 @@ macro_rules! fileops_impl_seekless {
 /// [`FileOps::seek`] and [`FileOps::readdir`].
 macro_rules! fileops_impl_directory {
     () => {
-        fn read(
-            &self,
-            _file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
-            _data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            use crate::types::errno::*;
-            error!(EISDIR)
+        fn is_seekable(&self) -> bool {
+            true
         }
 
-        fn read_at(
+        fn read(
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
@@ -474,16 +427,6 @@ macro_rules! fileops_impl_directory {
         }
 
         fn write(
-            &self,
-            _file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
-            _data: &mut dyn crate::fs::buffers::InputBuffer,
-        ) -> Result<usize, crate::types::Errno> {
-            use crate::types::errno::*;
-            error!(EISDIR)
-        }
-
-        fn write_at(
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
@@ -502,8 +445,6 @@ pub(crate) use fileops_impl_delegate_read_and_seek;
 pub(crate) use fileops_impl_directory;
 pub(crate) use fileops_impl_nonseekable;
 pub(crate) use fileops_impl_seekable;
-pub(crate) use fileops_impl_seekable_read;
-pub(crate) use fileops_impl_seekable_write;
 pub(crate) use fileops_impl_seekless;
 
 pub fn default_ioctl(request: u32) -> Result<SyscallResult, Errno> {
@@ -530,15 +471,13 @@ impl OPathOps {
 }
 
 impl FileOps for OPathOps {
-    fn read(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EBADF)
+    fn has_persistent_offsets(&self) -> bool {
+        false
     }
-    fn read_at(
+    fn is_seekable(&self) -> bool {
+        true
+    }
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -551,14 +490,6 @@ impl FileOps for OPathOps {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EBADF)
-    }
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
         _offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -568,7 +499,8 @@ impl FileOps for OPathOps {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _offset: off_t,
+        _current_offset: off_t,
+        _new_offset: off_t,
         _whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
         error!(EBADF)
@@ -781,21 +713,36 @@ impl FileObject {
         }
     }
 
+    /// Common implementation for `read` and `read_at`.
+    fn read_internal<R>(&self, read: R) -> Result<usize, Errno>
+    where
+        R: FnOnce() -> Result<usize, Errno>,
+    {
+        if !self.can_read() {
+            return error!(EBADF);
+        }
+        let bytes_read = read()?;
+        // TODO(steveaustin) - omit updating time_access to allow info to be immutable
+        // and thus allow simultaneous reads.
+        self.name.update_atime();
+        Ok(bytes_read)
+    }
+
     pub fn read(
         &self,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        if !self.can_read() {
-            return error!(EBADF);
-        }
+        self.read_internal(|| {
+            if !self.ops().has_persistent_offsets() {
+                return self.ops.read(self, current_task, 0, data);
+            }
 
-        let bytes_read = self.ops().read(self, current_task, data)?;
-
-        // TODO(steveaustin) - omit updating time_access to allow info to be immutable
-        // and thus allow simultaneous reads.
-        self.name.update_atime();
-        Ok(bytes_read)
+            let mut offset = self.offset.lock();
+            let read = self.ops.read(self, current_task, *offset as usize, data)?;
+            *offset += read as off_t;
+            Ok(read)
+        })
     }
 
     pub fn read_at(
@@ -804,10 +751,24 @@ impl FileObject {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        if !self.can_read() {
+        if !self.ops().is_seekable() {
+            return error!(ESPIPE);
+        }
+        self.read_internal(|| self.ops.read(self, current_task, offset, data))
+    }
+
+    /// Common implementation for `write` and `write_at`.
+    fn write_internal<W>(&self, current_task: &CurrentTask, write: W) -> Result<usize, Errno>
+    where
+        W: FnOnce() -> Result<usize, Errno>,
+    {
+        if !self.can_write() {
             return error!(EBADF);
         }
-        self.ops().read_at(self, current_task, offset, data)
+        self.node().clear_suid_and_sgid_bits(current_task);
+        let bytes_written = write()?;
+        self.node().update_ctime_mtime();
+        Ok(bytes_written)
     }
 
     pub fn write(
@@ -815,19 +776,23 @@ impl FileObject {
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        if !self.can_write() {
-            return error!(EBADF);
-        }
-        self.node().clear_suid_and_sgid_bits(current_task);
-        let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
-            let _guard = self.node().append_lock.write(current_task)?;
-            self.ops().write(self, current_task, data)?
-        } else {
-            let _guard = self.node().append_lock.read(current_task)?;
-            self.ops().write(self, current_task, data)?
-        };
-        self.node().update_ctime_mtime();
-        Ok(bytes_written)
+        self.write_internal(current_task, || {
+            if !self.ops().has_persistent_offsets() {
+                return self.ops().write(self, current_task, 0, data);
+            }
+
+            let mut offset = self.offset.lock();
+            let written = if self.flags().contains(OpenFlags::APPEND) {
+                let _guard = self.node().append_lock.write(current_task)?;
+                *offset = self.ops().seek(self, current_task, *offset, 0, SeekOrigin::End)?;
+                self.ops().write(self, current_task, *offset as usize, data)
+            } else {
+                let _guard = self.node().append_lock.read(current_task)?;
+                self.ops().write(self, current_task, *offset as usize, data)
+            }?;
+            *offset += written as off_t;
+            Ok(written)
+        })
     }
 
     pub fn write_at(
@@ -836,16 +801,13 @@ impl FileObject {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        if !self.can_write() {
-            return error!(EBADF);
+        if !self.ops().is_seekable() {
+            return error!(ESPIPE);
         }
-        self.node().clear_suid_and_sgid_bits(current_task);
-        let bytes_written = {
+        self.write_internal(current_task, || {
             let _guard = self.node().append_lock.read(current_task)?;
-            self.ops().write_at(self, current_task, offset, data)?
-        };
-        self.node().update_ctime_mtime();
-        Ok(bytes_written)
+            self.ops().write(self, current_task, offset, data)
+        })
     }
 
     pub fn seek(
@@ -854,7 +816,18 @@ impl FileObject {
         offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        self.ops().seek(self, current_task, offset, whence)
+        if !self.ops().is_seekable() {
+            return error!(ESPIPE);
+        }
+
+        if !self.ops().has_persistent_offsets() {
+            return self.ops().seek(self, current_task, 0, offset, whence);
+        }
+
+        let mut offset_guard = self.offset.lock();
+        let new_offset = self.ops().seek(self, current_task, *offset_guard, offset, whence)?;
+        *offset_guard = new_offset;
+        Ok(new_offset)
     }
 
     pub fn get_vmo(
@@ -1032,32 +1005,6 @@ impl FileObject {
     /// The events currently active on this file.
     pub fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
         add_equivalent_fd_events(self.ops().query_events(current_task))
-    }
-
-    //
-    /// Updates the file's seek offset without an upper bound on the resulting offset.
-    ///
-    /// This is useful for files without a defined size.
-    ///
-    /// Errors if `whence` is invalid, or the calculated offset is invalid.
-    ///
-    /// - `offset`: The target offset from `whence`.
-    /// - `whence`: The location from which to compute the updated offset.
-    pub fn unbounded_seek(&self, offset: off_t, whence: SeekOrigin) -> Result<off_t, Errno> {
-        let mut current_offset = self.offset.lock();
-        let new_offset = match whence {
-            SeekOrigin::Set => Some(offset),
-            SeekOrigin::Cur => (*current_offset).checked_add(offset),
-            SeekOrigin::End => Some(MAX_LFS_FILESIZE as i64),
-        }
-        .ok_or_else(|| errno!(EINVAL))?;
-
-        if new_offset < 0 {
-            return error!(EINVAL);
-        }
-
-        *current_offset = new_offset;
-        Ok(*current_offset)
     }
 
     pub fn record_lock(

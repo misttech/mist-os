@@ -408,9 +408,8 @@ impl CommFile {
 
 impl FileOps for CommFile {
     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-    fileops_impl_seekable_write!();
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
@@ -513,23 +512,22 @@ impl MemFile {
 }
 
 impl FileOps for MemFile {
-    fileops_impl_seekable_read!();
-    fileops_impl_seekable_write!();
+    fn is_seekable(&self) -> bool {
+        true
+    }
 
     fn seek(
         &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        current_offset: off_t,
         offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        match whence {
-            SeekOrigin::End => error!(EINVAL),
-            _ => default_seek(file, current_task, offset, whence),
-        }
+        default_seek(current_offset, offset, whence, |_| error!(EINVAL))
     }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -551,7 +549,7 @@ impl FileOps for MemFile {
         }
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,

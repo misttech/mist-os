@@ -545,9 +545,8 @@ impl ProcMountsFile {
 
 impl FileOps for ProcMountsFile {
     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-    fileops_impl_seekable_write!();
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -1039,12 +1038,18 @@ impl NamespaceNode {
 
     /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
     pub fn unmount(&self) -> Result<(), Errno> {
-        // TODO(fxbug.dev/115333): Propagate unmounts the same way we propagate mounts
-        let mountpoint = self.enter_mount().mountpoint().ok_or_else(|| errno!(EINVAL))?;
-        let mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
-        let mut mount_state = mount.state.write();
-        // TODO(tbodt): EBUSY
-        mount_state.submounts.remove(mountpoint.mount_hash_key()).ok_or_else(|| errno!(EINVAL))?;
+        // Drop submount outside of this state lock to ensure it is not done while holding a lock.
+        let _submount = {
+            // TODO(fxbug.dev/115333): Propagate unmounts the same way we propagate mounts
+            let mountpoint = self.enter_mount().mountpoint().ok_or_else(|| errno!(EINVAL))?;
+            let mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
+            let mut mount_state = mount.state.write();
+            // TODO(tbodt): EBUSY
+            mount_state
+                .submounts
+                .remove(mountpoint.mount_hash_key())
+                .ok_or_else(|| errno!(EINVAL))?
+        };
         Ok(())
     }
 

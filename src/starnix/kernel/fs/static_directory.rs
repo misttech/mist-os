@@ -4,8 +4,9 @@
 
 use crate::auth::FsCred;
 use crate::fs::{
-    emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink,
-    FileObject, FileOps, FileSystem, FileSystemHandle, FsNode, FsNodeOps, FsStr, SeekOrigin,
+    emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
+    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
+    FsNodeOps, FsStr, SeekOrigin,
 };
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -152,12 +153,13 @@ impl FileOps for Arc<StaticDirectory> {
 
     fn seek(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         _current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        file.unbounded_seek(offset, whence)
+        unbounded_seek(current_offset, new_offset, whence)
     }
 
     fn readdir(

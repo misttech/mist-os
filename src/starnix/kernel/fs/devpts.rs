@@ -281,8 +281,10 @@ impl FileOps for DevPtmxFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || self.terminal.main_read(current_task, data).map(BlockableOpsResult::Done),
@@ -295,8 +297,10 @@ impl FileOps for DevPtmxFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || self.terminal.main_write(current_task, data).map(BlockableOpsResult::Done),
@@ -374,8 +378,10 @@ impl FileOps for DevPtsFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || self.terminal.replica_read(current_task, data).map(BlockableOpsResult::Done),
@@ -388,8 +394,10 @@ impl FileOps for DevPtsFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || self.terminal.replica_write(current_task, data).map(BlockableOpsResult::Done),

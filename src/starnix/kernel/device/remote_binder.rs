@@ -4,7 +4,7 @@
 
 use crate::device::{DeviceOps, RemoteBinderConnection};
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::{FdEvents, FileObject, FileOps, FsNode, NamespaceNode, SeekOrigin};
+use crate::fs::{fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode};
 use crate::lock::Mutex;
 use crate::logging::{log_error, log_warn};
 use crate::mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags};
@@ -13,8 +13,8 @@ use crate::task::{CurrentTask, ThreadGroup, WaitQueue, Waiter};
 use crate::types::{
     errno,
     errno::{EAGAIN, EINTR},
-    errno_from_code, error, off_t, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags,
-    UserAddress, UserCString, UserRef, PATH_MAX,
+    errno_from_code, error, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags, UserAddress,
+    UserCString, UserRef, PATH_MAX,
 };
 use anyhow::Error;
 use derivative::Derivative;
@@ -93,6 +93,8 @@ impl RemoteBinderFileOps {
 }
 
 impl FileOps for RemoteBinderFileOps {
+    fileops_impl_nonseekable!();
+
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::empty()
     }
@@ -140,8 +142,10 @@ impl FileOps for RemoteBinderFileOps {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EOPNOTSUPP)
     }
 
@@ -149,38 +153,10 @@ impl FileOps for RemoteBinderFileOps {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn seek(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: off_t,
-        _whence: SeekOrigin,
-    ) -> Result<off_t, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         error!(EOPNOTSUPP)
     }
 }

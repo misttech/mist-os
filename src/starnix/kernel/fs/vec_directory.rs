@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::fs::{
-    emit_dotdot, fileops_impl_directory, DirectoryEntryType, DirentSink, FileObject, FileOps,
-    FsString, SeekOrigin,
+    emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
+    FileObject, FileOps, FsString, SeekOrigin,
 };
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -36,12 +36,13 @@ impl FileOps for VecDirectory {
 
     fn seek(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         _current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        file.unbounded_seek(offset, whence)
+        unbounded_seek(current_offset, new_offset, whence)
     }
 
     fn readdir(

@@ -59,24 +59,24 @@ impl ImageFile {
 impl FileOps for ImageFile {
     fileops_impl_seekable!();
 
-    fn read_at(
+    fn read(
         &self,
         file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read_at(&self.vmo, file, offset, data)
+        VmoFileObject::read(&self.vmo, file, offset, data)
     }
 
-    fn write_at(
+    fn write(
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::write_at(&self.vmo, file, current_task, offset, data, None)
+        VmoFileObject::write(&self.vmo, file, current_task, offset, data, None)
     }
 
     fn get_vmo(

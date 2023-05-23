@@ -161,8 +161,10 @@ impl FileOps for TimerFile {
         &self,
         file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         // The expected error seems to vary depending on the open flags..
         if file.flags().contains(OpenFlags::NONBLOCK) {
             error!(EINVAL)
@@ -175,8 +177,10 @@ impl FileOps for TimerFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || {

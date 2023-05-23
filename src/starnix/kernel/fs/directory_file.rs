@@ -59,28 +59,17 @@ impl FileOps for MemoryDirectoryFile {
         &self,
         file: &FileObject,
         _current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        let mut current_offset = file.offset.lock();
-        let new_offset = match whence {
-            SeekOrigin::Set => Some(offset),
-            SeekOrigin::Cur => (*current_offset).checked_add(offset),
-            SeekOrigin::End => None,
-        }
-        .ok_or_else(|| errno!(EINVAL))?;
-
-        if new_offset < 0 {
-            return error!(EINVAL);
-        }
-
+        let new_offset = default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))?;
         // Nothing to do.
-        if *current_offset == new_offset {
+        if current_offset == new_offset {
             return Ok(new_offset);
         }
 
         let mut readdir_position = self.readdir_position.lock();
-        *current_offset = new_offset;
 
         // We use 0 and 1 for "." and ".."
         if new_offset <= 2 {
@@ -96,7 +85,7 @@ impl FileOps for MemoryDirectoryFile {
             });
         }
 
-        Ok(*current_offset)
+        Ok(new_offset)
     }
 
     fn readdir(

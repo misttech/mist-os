@@ -24,8 +24,10 @@ impl FileOps for SyslogFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         data.read_each(&mut |bytes| {
             log!(level = info, tag = "stdio", "{}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())
@@ -36,8 +38,10 @@ impl FileOps for SyslogFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         Ok(0)
     }
 

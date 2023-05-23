@@ -107,12 +107,13 @@ impl FileOps for Arc<ProcDirectory> {
 
     fn seek(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         _current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        file.unbounded_seek(offset, whence)
+        unbounded_seek(current_offset, new_offset, whence)
     }
 
     fn readdir(
@@ -181,7 +182,7 @@ impl FileOps for ProcKmsgFile {
         FdEvents::empty()
     }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
@@ -193,7 +194,7 @@ impl FileOps for ProcKmsgFile {
         error!(EAGAIN)
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -288,10 +289,9 @@ impl PressureFile {
 
 impl FileOps for PressureFile {
     fileops_impl_delegate_read_and_seek!(self, self.0);
-    fileops_impl_seekable_write!();
 
     /// Pressure notifications are configured by writing to the file.
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,

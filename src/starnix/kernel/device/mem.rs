@@ -29,7 +29,7 @@ pub fn new_null_file(kernel: &Kernel, flags: OpenFlags) -> FileHandle {
 impl FileOps for DevNull {
     fileops_impl_seekless!();
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -55,7 +55,7 @@ impl FileOps for DevNull {
         Ok(bytes_logged + data.drain())
     }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -120,7 +120,7 @@ impl FileOps for DevZero {
         Ok(MappedVmo::new(vmo, addr))
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -130,7 +130,7 @@ impl FileOps for DevZero {
         Ok(data.drain())
     }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -148,7 +148,7 @@ struct DevFull;
 impl FileOps for DevFull {
     fileops_impl_seekless!();
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -158,7 +158,7 @@ impl FileOps for DevFull {
         error!(ENOSPC)
     }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -176,7 +176,7 @@ struct DevRandom;
 impl FileOps for DevRandom {
     fileops_impl_seekless!();
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -186,7 +186,7 @@ impl FileOps for DevRandom {
         Ok(data.drain())
     }
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -204,7 +204,7 @@ struct DevKmsg;
 impl FileOps for DevKmsg {
     fileops_impl_seekless!();
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -214,7 +214,7 @@ impl FileOps for DevKmsg {
         Ok(0)
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,

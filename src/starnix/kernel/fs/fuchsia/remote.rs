@@ -455,25 +455,15 @@ impl FileOps for RemoteDirectoryObject {
 
     fn seek(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         _current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        let mut current_offset = file.offset.lock();
         let mut iterator = self.iterator.lock();
-        let new_offset = match whence {
-            SeekOrigin::Set => Some(offset),
-            SeekOrigin::Cur => (*current_offset).checked_add(offset),
-            SeekOrigin::End => None,
-        }
-        .ok_or_else(|| errno!(EINVAL))?;
-
-        if new_offset < 0 {
-            return error!(EINVAL);
-        }
-
-        let mut iterator_position = *current_offset;
+        let new_offset = default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))?;
+        let mut iterator_position = current_offset;
 
         if new_offset < iterator_position {
             // Our iterator only goes forward, so reset it here.
@@ -496,15 +486,12 @@ impl FileOps for RemoteDirectoryObject {
                     // Note that failing the seek here would also cause the iterator and the
                     // offset to not be in sync, because the iterator has already moved from
                     // where it was.
-                    *current_offset = i;
-                    return Ok(*current_offset);
+                    return Ok(i);
                 }
             }
         }
 
-        *current_offset = new_offset;
-
-        Ok(*current_offset)
+        Ok(new_offset)
     }
 
     fn readdir(
@@ -568,7 +555,7 @@ impl RemoteFileObject {
 impl FileOps for RemoteFileObject {
     fileops_impl_seekable!();
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -578,7 +565,7 @@ impl FileOps for RemoteFileObject {
         zxio_read_at(&self.zxio, offset, data)
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
@@ -655,8 +642,10 @@ impl FileOps for RemotePipeObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || zxio_read(&self.zxio, data).map(BlockableOpsResult::Done),
@@ -669,8 +658,10 @@ impl FileOps for RemotePipeObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         file.blocking_op(
             current_task,
             || zxio_write(&self.zxio, current_task, data).map(BlockableOpsResult::Done),

@@ -73,18 +73,19 @@ impl FileOps for LayeredFsRootNodeOps {
 
     fn seek(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        let new_offset = file.unbounded_seek(offset, whence)?;
+        let mut new_offset = unbounded_seek(current_offset, new_offset, whence)?;
         if new_offset >= self.fs.mappings.len() as off_t {
-            self.root_file.seek(
-                current_task,
-                new_offset - self.fs.mappings.len() as off_t,
-                SeekOrigin::Set,
-            )?;
+            new_offset = self
+                .root_file
+                .seek(current_task, new_offset - self.fs.mappings.len() as off_t, SeekOrigin::Set)?
+                .checked_add(self.fs.mappings.len() as off_t)
+                .ok_or_else(|| errno!(EINVAL))?;
         }
         Ok(new_offset)
     }

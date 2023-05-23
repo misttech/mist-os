@@ -157,7 +157,7 @@ impl VmoFileObject {
         VmoFileObject { vmo, seals: Some(seals) }
     }
 
-    pub fn read_at(
+    pub fn read(
         vmo: &zx::Vmo,
         file: &FileObject,
         offset: usize,
@@ -185,7 +185,7 @@ impl VmoFileObject {
         Ok(actual)
     }
 
-    pub fn write_at(
+    pub fn write(
         vmo: &zx::Vmo,
         file: &FileObject,
         _current_task: &CurrentTask,
@@ -285,24 +285,24 @@ impl VmoFileObject {
 impl FileOps for VmoFileObject {
     fileops_impl_seekable!();
 
-    fn read_at(
+    fn read(
         &self,
         file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read_at(&self.vmo, file, offset, data)
+        VmoFileObject::read(&self.vmo, file, offset, data)
     }
 
-    fn write_at(
+    fn write(
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::write_at(&self.vmo, file, current_task, offset, data, self.seals.as_ref())
+        VmoFileObject::write(&self.vmo, file, current_task, offset, data, self.seals.as_ref())
     }
 
     fn get_vmo(

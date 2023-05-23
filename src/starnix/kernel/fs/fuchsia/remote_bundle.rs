@@ -158,22 +158,13 @@ impl FileOps for DirectoryObject {
 
     fn seek(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         _current_task: &CurrentTask,
-        offset: off_t,
+        current_offset: off_t,
+        new_offset: off_t,
         whence: SeekOrigin,
     ) -> Result<off_t, Errno> {
-        let mut current_offset = file.offset.lock();
-        let new_offset = match whence {
-            SeekOrigin::Set => offset,
-            SeekOrigin::Cur => current_offset.checked_add(offset).ok_or(errno!(EINVAL))?,
-            SeekOrigin::End => return error!(EINVAL),
-        };
-        if new_offset < 0 {
-            return error!(EINVAL);
-        }
-        *current_offset = new_offset;
-        Ok(new_offset)
+        default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))
     }
 
     fn readdir(

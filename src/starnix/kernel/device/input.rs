@@ -309,8 +309,10 @@ impl FileOps for Arc<InputFile> {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         let event = self.inner.lock().events.pop_front();
         match event {
             Some(event) => {
@@ -331,8 +333,10 @@ impl FileOps for Arc<InputFile> {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
+        offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
         not_implemented!("write() on input device");
         error!(EOPNOTSUPP)
     }
@@ -607,7 +611,7 @@ mod test {
     ) -> Vec<uapi::input_event> {
         std::iter::from_fn(|| {
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
-            match file.read(file_object, task, &mut event_bytes) {
+            match file.read(file_object, task, 0, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(
                     uapi::input_event::read_from(Vec::from(event_bytes).as_slice())
                         .ok_or(anyhow!("failed to read input_event from buffer")),

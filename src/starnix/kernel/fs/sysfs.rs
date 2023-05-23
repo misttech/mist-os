@@ -84,7 +84,7 @@ impl UEventFile {
 impl FileOps for UEventFile {
     fileops_impl_seekable!();
 
-    fn read_at(
+    fn read(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
@@ -108,7 +108,7 @@ impl FileOps for UEventFile {
         }
     }
 
-    fn write_at(
+    fn write(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
