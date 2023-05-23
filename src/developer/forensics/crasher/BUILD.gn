@@ -23,15 +23,12 @@ fuchsia_package("crasher") {
   ]
 }
 
-fuchsia_unittest_package("crasher_test") {
+# By not declare the package as a test_package, it won't appear in the tests.json file and won't
+# be run by any build bots.
+fuchsia_package("crasher_test") {
+  testonly = true
   deps = [
     "//src/developer/forensics/crasher/cpp:cpp_crasher_test",
     "//src/developer/forensics/crasher/rust:rust_crasher_test",
   ]
-
-  # Never run these tests on build bots as by construction they would be crashing and reported as
-  # failures.
-  test_specs = {
-    environments = []
-  }
 }
