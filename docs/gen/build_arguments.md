@@ -2653,17 +2653,6 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 From //zircon/kernel/params.gni:78
 
-### disable_package_validation
-
-Packages to exclude from validation during assembly.  This is a list of
-package names.
-
-This exists to enable the transition to validating all packages.
-
-**Current value (from the default):** `[]`
-
-From //build/images/fuchsia/BUILD.gn:34
-
 ### dont_profile_source_files
 
 List of GN paths to source files to NOT instrument by `profile` variants.
@@ -7855,7 +7844,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:23
+From //src/starnix/kernel/BUILD.gn:16
 
 ### starnix_disable_tracing
 
@@ -7863,7 +7852,7 @@ Whether or not tracing is disabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:26
+From //src/starnix/kernel/BUILD.gn:19
 
 ### starnix_restricted_in_thread_exceptions
 
@@ -7871,13 +7860,7 @@ Whether or not to enable 'in-thread' exception handling for restricted mode.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:20
-
-### starnix_restricted_mode
-
-**Current value (from the default):** `true`
-
-From //src/starnix/kernel/BUILD.gn:14
+From //src/starnix/kernel/BUILD.gn:13
 
 ### target_cpu
 
