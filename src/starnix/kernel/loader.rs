@@ -406,7 +406,7 @@ pub fn load_executable(
     )?;
     let stack = stack_base + (stack_size - 8);
 
-    let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso {
+    let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso.vmo {
         let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
         let map_result = current_task.mm.map(
@@ -466,6 +466,8 @@ pub fn load_executable(
     mm_state.argv_end = stack.argv_end;
     mm_state.environ_start = stack.environ_start;
     mm_state.environ_end = stack.environ_end;
+
+    mm_state.vdso_base = UserAddress::from(vdso_base);
 
     Ok(ThreadStartInfo { entry, stack: stack.stack_pointer })
 }

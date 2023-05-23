@@ -4,15 +4,11 @@
 
 use fuchsia_zircon as zx;
 
-use std::sync::Arc;
-
 use crate::arch::registers::RegisterState;
 use crate::mm::vmo::round_up_to_increment;
-use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags, PAGE_SIZE};
 use crate::signals::*;
 use crate::task::*;
 use crate::types::*;
-use crate::vmex_resource::VMEX_RESOURCE;
 
 /// The size of the red zone.
 // TODO(fxbug.dev/121659): Determine whether or not this is the correct red zone size for aarch64.
@@ -68,43 +64,15 @@ impl SignalStackFrame {
             ..Default::default()
         };
 
-        // Since we don't yet have a vDSO for aarch64 (which is where the signal trampoline lives),
-        // we inject a trampoline manually.
-        let instruction_pointer = {
-            let mut trampoline = task.signal_trampoline.lock();
-            if trampoline.is_null() {
-                let instructions = {
-                    const SIGRETURN: [u8; 8] = [
-                        0x68, 0x11, 0x80, 0xd2, // mov x8, #__NR_rt_sigreturn
-                        0x01, 0x00, 0x00, 0xd4, // svc #0
-                    ];
-                    SIGRETURN.to_vec()
-                };
-
-                let vmo = Arc::new(
-                    zx::Vmo::create(*PAGE_SIZE)
-                        .and_then(|vmo| vmo.replace_as_executable(&VMEX_RESOURCE))
-                        .expect("Failed to create signal trampoline vmo."),
-                );
-                vmo.write(&instructions, 0).expect("Failed to write signal trampoline vmo.");
-                let prot_flags = ProtectionFlags::EXEC | ProtectionFlags::READ;
-                *trampoline = task
-                    .mm
-                    .map(
-                        DesiredAddress::Hint(UserAddress::default()),
-                        vmo,
-                        0,
-                        instructions.len(),
-                        prot_flags,
-                        prot_flags.to_vmar_flags(),
-                        MappingOptions::empty(),
-                        MappingName::None,
-                    )
-                    .expect("Failed to map signal trampoline vmo.");
-            }
-            *trampoline
+        let vdso_sigreturn_offset = task.thread_group.kernel.vdso.sigreturn_offset.expect(
+            "The offset for vDSO sigreturn implementation must be known on this architecture.",
+        );
+        let sigreturn_addr = {
+            let mm_state = task.mm.state.read();
+            mm_state.vdso_base.ptr() as u64 + vdso_sigreturn_offset
         };
-        registers.lr = instruction_pointer.ptr() as u64;
+
+        registers.lr = sigreturn_addr;
 
         SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() }
     }

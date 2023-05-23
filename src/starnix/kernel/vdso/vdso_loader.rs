@@ -5,9 +5,27 @@
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 
-use crate::arch::vdso::{set_vdso_constants, HAS_VDSO};
+use crate::arch::vdso::{get_sigreturn_offset, set_vdso_constants, HAS_VDSO};
 use crate::types::{errno, from_status_like_fdio, Errno};
 use crate::vmex_resource::VMEX_RESOURCE;
+
+#[derive(Default)]
+pub struct Vdso {
+    pub vmo: Option<Arc<zx::Vmo>>,
+    pub sigreturn_offset: Option<u64>,
+}
+
+impl Vdso {
+    pub fn new() -> Self {
+        let vdso_vmo = load_vdso_from_file().expect("Couldn't read vDSO from disk");
+        let sigreturn = match vdso_vmo.as_ref() {
+            Some(vdso) => get_sigreturn_offset(vdso),
+            None => Ok(None),
+        }
+        .expect("Couldn't find signal trampoline code in vDSO");
+        Self { vmo: vdso_vmo, sigreturn_offset: sigreturn }
+    }
+}
 
 fn sync_open_in_namespace(
     path: &str,

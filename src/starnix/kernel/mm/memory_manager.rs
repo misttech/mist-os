@@ -238,6 +238,9 @@ pub struct MemoryManagerState {
     pub argv_end: UserAddress,
     pub environ_start: UserAddress,
     pub environ_end: UserAddress,
+
+    /// vDSO location
+    pub vdso_base: UserAddress,
 }
 
 impl MemoryManagerState {
@@ -1201,6 +1204,7 @@ impl MemoryManager {
                 argv_end: UserAddress::NULL,
                 environ_start: UserAddress::NULL,
                 environ_end: UserAddress::NULL,
+                vdso_base: UserAddress::NULL,
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.
@@ -1385,6 +1389,7 @@ impl MemoryManager {
         target_state.brk = state.brk;
         target_state.executable_node = state.executable_node.clone();
         *target.dumpable.lock() = *self.dumpable.lock();
+        target_state.vdso_base = state.vdso_base;
 
         Ok(())
     }

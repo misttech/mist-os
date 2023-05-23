@@ -287,7 +287,7 @@ pub enum Elf64DynTag {
     Hiproc = 0x7fffffff,
 }
 
-#[derive(AsBytes, FromBytes, Default, Debug, Eq, PartialEq)]
+#[derive(AsBytes, Copy, Clone, FromBytes, Default, Debug, Eq, PartialEq)]
 #[repr(C)]
 pub struct Elf64Dyn {
     pub tag: u64,
@@ -299,6 +299,23 @@ impl Elf64Dyn {
         Elf64DynTag::from_u64(self.tag).ok_or(self.tag)
     }
 }
+
+pub type Elf64Addr = u64;
+pub type Elf64Half = u16;
+pub type Elf64Word = u32;
+pub type Elf64Xword = u64;
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct elf64_sym {
+    pub st_name: Elf64Word,
+    pub st_info: u8,
+    pub st_other: u8,
+    pub st_shndx: Elf64Half,
+    pub st_value: Elf64Addr,
+    pub st_size: Elf64Xword,
+}
+pub type Elf64Sym = elf64_sym;
 
 #[derive(FromPrimitive, Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -477,6 +494,36 @@ impl Elf64Headers {
     }
 }
 
+pub struct Elf64DynSection {
+    dyn_entries: Box<[Elf64Dyn]>,
+}
+impl Elf64DynSection {
+    pub fn from_vmo(vmo: &zx::Vmo) -> Result<Elf64DynSection, ElfParseError> {
+        let headers = Elf64Headers::from_vmo(vmo)?;
+        const ENTRY_SIZE: usize = std::mem::size_of::<Elf64Dyn>();
+        if let Some(dynamic_header) = headers.program_header_with_type(SegmentType::Dynamic)? {
+            let dyn_entries_size = dynamic_header.filesz as usize / ENTRY_SIZE;
+            let mut entries = vec![Elf64Dyn::default(); dyn_entries_size];
+            vmo.read(entries.as_bytes_mut(), dynamic_header.offset as u64)
+                .map_err(|s| ElfParseError::ReadError(s))?;
+            let dyn_entries = entries.into_boxed_slice();
+            return Ok(Elf64DynSection { dyn_entries });
+        }
+        Err(ElfParseError::ParseError("Dynamic header not found"))
+    }
+
+    pub fn dynamic_entries(&self) -> &[Elf64Dyn] {
+        &*self.dyn_entries
+    }
+
+    pub fn dynamic_entry_with_tag(&self, tag: Elf64DynTag) -> Option<&Elf64Dyn> {
+        self.dynamic_entries().iter().find(move |x| match x.tag() {
+            Ok(t) => t == tag,
+            _ => false,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, anyhow::Error, assert_matches::assert_matches, fdio, std::fs::File};
@@ -559,6 +606,16 @@ mod tests {
         assert!(headers.program_header_with_type(SegmentType::Interp)?.is_some());
         assert!(headers.program_headers_with_type(SegmentType::Dynamic).count() == 1);
         assert!(headers.program_headers_with_type(SegmentType::Load).count() > 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_dynamic_section() -> Result<(), Error> {
+        let file = File::open("/pkg/bin/process_builder_lib_test")?;
+        let vmo = fdio::get_vmo_copy_from_file(&file)?;
+
+        let dynamic_section = Elf64DynSection::from_vmo(&vmo)?;
+        assert!(dynamic_section.dynamic_entries().len() > 0);
         Ok(())
     }
 

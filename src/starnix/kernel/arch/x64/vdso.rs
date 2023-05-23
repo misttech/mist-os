@@ -40,3 +40,7 @@ pub fn set_vdso_constants(vdso_vmo: &zx::Vmo) -> Result<(), Errno> {
         .map_err(|status| from_status_like_fdio!(status))?;
     Ok(())
 }
+
+pub fn get_sigreturn_offset(_vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {
+    Ok(None)
+}

@@ -21,7 +21,7 @@ use crate::mm::FutexTable;
 use crate::task::*;
 use crate::types::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
-use crate::vdso::vdso_loader::load_vdso_from_file;
+use crate::vdso::vdso_loader::Vdso;
 
 pub struct Kernel {
     /// The Zircon job object that holds the processes running in this kernel.
@@ -105,8 +105,8 @@ pub struct Kernel {
     /// the UTS namespace handle of the task, which may/may not point to this one.
     pub root_uts_ns: UtsNamespaceHandle,
 
-    /// A VMO containing a vDSO implementation, if implemented for a given architecture.
-    pub vdso: Option<Arc<zx::Vmo>>,
+    /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
+    pub vdso: Vdso,
 }
 
 impl Kernel {
@@ -147,7 +147,7 @@ impl Kernel {
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
-            vdso: load_vdso_from_file().expect("Couldn't read vDSO from disk"),
+            vdso: Vdso::new(),
         }))
     }
 
