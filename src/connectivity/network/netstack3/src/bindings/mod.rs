@@ -25,13 +25,17 @@ mod timers;
 mod util;
 mod verifier_worker;
 
-use std::collections::HashMap;
-use std::convert::TryFrom as _;
-use std::future::Future;
-use std::num::NonZeroU16;
-use std::ops::Deref;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    convert::TryFrom as _,
+    future::Future,
+    num::NonZeroU16,
+    ops::Deref,
+    // TODO(https://fxbug.dev/125488): Use RC types exported from Core, after
+    // we make sockets reference-backed.
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
 use either::{self, Either};
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
@@ -153,8 +157,10 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
     udp_sockets: UdpSockets,
     tcp_v4_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
     tcp_v6_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
-    tcp_v4_connections: CoreMutex<IdMap<crate::bindings::socket::stream::ConnectionStatus>>,
-    tcp_v6_connections: CoreMutex<IdMap<crate::bindings::socket::stream::ConnectionStatus>>,
+    tcp_v4_connections:
+        CoreMutex<IdMap<(crate::bindings::socket::stream::ConnectionStatus, Weak<zx::Socket>)>>,
+    tcp_v6_connections:
+        CoreMutex<IdMap<(crate::bindings::socket::stream::ConnectionStatus, Weak<zx::Socket>)>>,
     route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
 }
 

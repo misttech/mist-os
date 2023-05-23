@@ -8,7 +8,7 @@ use std::{
     convert::Infallible as Never,
     num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
     ops::ControlFlow,
-    sync::Arc,
+    sync::{Arc, Weak},
     time::Duration,
 };
 
@@ -86,7 +86,7 @@ enum SocketId<I: Ip> {
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum ConnectionStatus {
     InProgress,
     Connected { reported: bool },
@@ -156,14 +156,34 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` is already registered.
-    fn register_connection<I: Ip>(&self, id: ConnectionId<I>, status: ConnectionStatus) {
+    fn register_connection<I: Ip>(
+        &self,
+        id: ConnectionId<I>,
+        status: ConnectionStatus,
+        socket: Arc<zx::Socket>,
+    ) {
         match I::VERSION {
             IpVersion::V4 => {
-                assert_matches!(self.tcp_v4_connections.lock().insert(id.into(), status), None)
+                assert_matches!(
+                    self.tcp_v4_connections
+                        .lock()
+                        .insert(id.into(), (status, Arc::downgrade(&socket))),
+                    None
+                )
             }
             IpVersion::V6 => {
-                assert_matches!(self.tcp_v6_connections.lock().insert(id.into(), status), None)
+                assert_matches!(
+                    self.tcp_v6_connections
+                        .lock()
+                        .insert(id.into(), (status, Arc::downgrade(&socket))),
+                    None
+                )
             }
+        }
+        if matches!(status, ConnectionStatus::Connected { reported: _ }) {
+            socket
+                .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
+                .expect("failed to signal that the connection is established");
         }
     }
 
@@ -174,7 +194,10 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` is non-existent.
-    fn unregister_connection<I: Ip>(&self, id: ConnectionId<I>) -> ConnectionStatus {
+    fn unregister_connection<I: Ip>(
+        &self,
+        id: ConnectionId<I>,
+    ) -> (ConnectionStatus, Weak<zx::Socket>) {
         let status = match I::VERSION {
             IpVersion::V4 => {
                 self.tcp_v4_connections.lock().remove(id.into()).expect("invalid v4 ConnectionId")
@@ -192,22 +215,22 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` does not correspond to a connection.
-    fn with_connection_mut<I: Ip, O, F: FnOnce(&mut ConnectionStatus) -> O>(
+    fn with_connection_mut<I: Ip, O, F: FnOnce(&mut ConnectionStatus, &Weak<zx::Socket>) -> O>(
         &self,
         id: ConnectionId<I>,
         cb: F,
     ) -> O {
         match I::VERSION {
-            IpVersion::V4 => cb(self
-                .tcp_v4_connections
-                .lock()
-                .get_mut(id.into())
-                .expect("invalid v4 ConnectionId")),
-            IpVersion::V6 => cb(self
-                .tcp_v6_connections
-                .lock()
-                .get_mut(id.into())
-                .expect("invalid v6 ConnectionId")),
+            IpVersion::V4 => {
+                let mut guard = self.tcp_v4_connections.lock();
+                let (status, socket) = guard.get_mut(id.into()).expect("invalid v4 ConnectionId");
+                cb(status, socket)
+            }
+            IpVersion::V6 => {
+                let mut guard = self.tcp_v6_connections.lock();
+                let (status, socket) = guard.get_mut(id.into()).expect("invalid v6 ConnectionId");
+                cb(status, socket)
+            }
         }
     }
 }
@@ -226,9 +249,6 @@ impl IntoBuffers<ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket>
     ) -> (ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket) {
         let Self(socket, notifier) = self;
         let BufferSizes { send, receive } = buffer_sizes;
-        socket
-            .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
-            .expect("failed to signal that the connection is established");
         notifier.schedule();
         (
             ReceiveBufferWithZirconSocket::new(Arc::clone(&socket), receive),
@@ -287,11 +307,20 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
         connection: ConnectionId<I>,
         update: ConnectionStatusUpdate,
     ) {
-        self.with_connection_mut(connection, |status| {
+        self.with_connection_mut(connection, |status, socket| {
             match status {
                 ConnectionStatus::InProgress => match update {
                     ConnectionStatusUpdate::Connected => {
-                        *status = ConnectionStatus::Connected { reported: false }
+                        if let Some(socket) = socket.upgrade() {
+                            *status = ConnectionStatus::Connected { reported: false };
+                            socket
+                                .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
+                                .expect("failed to signal that the connection is established");
+                        } else {
+                            // If the socket has gone, it means the state machine
+                            // is gone, and we do expect a later status update that
+                            // tells us the reason, so do nothing here.
+                        }
                     }
                     ConnectionStatusUpdate::Aborted(err) => {
                         *status = ConnectionStatus::Rejected { error_to_report: Some(err) }
@@ -645,7 +674,8 @@ where
             SocketId::Bound(bound, _) => remove_bound::<I, _>(sync_ctx, bound),
             SocketId::Connection(conn) => {
                 close_conn::<I, _>(sync_ctx, non_sync_ctx, conn);
-                let _: ConnectionStatus = non_sync_ctx.unregister_connection(conn);
+                let _: (ConnectionStatus, Weak<zx::Socket>) =
+                    non_sync_ctx.unregister_connection(conn);
             }
             SocketId::Listener(listener) => {
                 let bound = shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
@@ -847,7 +877,7 @@ where
             }
             SocketId::Listener(_) => Err(fposix::Errno::Einval),
             SocketId::Connection(id) => {
-                non_sync_ctx.with_connection_mut(id, |status| match status {
+                non_sync_ctx.with_connection_mut(id, |status, _socket| match status {
                     ConnectionStatus::Connected { reported } => {
                         if !*reported {
                             *reported = true;
@@ -866,7 +896,11 @@ where
         // It's safe to register the connection as in-progress because it can't
         // complete without sending and receiving packets, which can't be done
         // while the lock around the Ctx is held.
-        non_sync_ctx.register_connection(connection, ConnectionStatus::InProgress);
+        non_sync_ctx.register_connection(
+            connection,
+            ConnectionStatus::InProgress,
+            Arc::clone(&socket),
+        );
         spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, connection);
         *id = SocketId::Connection(connection);
         Err(fposix::Errno::Einprogress)
@@ -976,13 +1010,16 @@ where
                 let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
                 let (accepted, addr, peer) = accept::<I, _>(sync_ctx, non_sync_ctx, listener)
                     .map_err(IntoErrno::into_errno)?;
-                non_sync_ctx
-                    .register_connection(accepted, ConnectionStatus::Connected { reported: true });
                 let addr = addr
                     .try_into_fidl_with_ctx(&non_sync_ctx)
                     .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
                     .into_sock_addr();
                 let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
+                non_sync_ctx.register_connection(
+                    accepted,
+                    ConnectionStatus::Connected { reported: true },
+                    Arc::clone(&socket),
+                );
                 let (client, request_stream) = crate::bindings::socket::create_request_stream();
                 spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, accepted);
                 spawn_connected_socket_task(ns_ctx.clone(), accepted, peer, request_stream);
@@ -1001,7 +1038,7 @@ where
             SocketId::Connection(conn_id) => {
                 let mut ctx = ctx.clone();
                 let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                non_sync_ctx.with_connection_mut(conn_id, |status| match status {
+                non_sync_ctx.with_connection_mut(conn_id, |status, _socket| match status {
                     ConnectionStatus::InProgress => Err(fposix::Errno::Einprogress),
                     ConnectionStatus::Connected { reported: _ } => {
                         match get_connection_error(sync_ctx, conn_id) {
