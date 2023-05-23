@@ -494,6 +494,24 @@ impl InputEvent {
     pub fn is_handled(&self) -> bool {
         self.handled == Handled::Yes
     }
+
+    // Returns event type as string.
+    pub fn get_event_type(&self) -> &str {
+        match self.device_event {
+            InputDeviceEvent::Keyboard(_) => "keyboard_event",
+            InputDeviceEvent::LightSensor(_) => "light_sensor_event",
+            InputDeviceEvent::ConsumerControls(_) => "consumer_controls_event",
+            InputDeviceEvent::Mouse(_) => "mouse_event",
+            InputDeviceEvent::TouchScreen(_) => "touch_screen_event",
+            InputDeviceEvent::Touchpad(_) => "touchpad_event",
+            #[cfg(test)]
+            InputDeviceEvent::Fake => "fake_event",
+        }
+    }
+
+    pub fn record_inspect(&self, _node: &fuchsia_inspect::Node) {
+        // TODO(fxbug.dev/127462): Implement record_inspect according to event type.
+    }
 }
 
 #[cfg(test)]

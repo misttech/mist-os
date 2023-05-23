@@ -124,6 +124,18 @@ impl CircularBuffer {
         }
         self._events.push_back(event);
     }
+
+    fn _record_all_lazy_inspect(&self, inspector: inspect::Inspector) -> inspect::Inspector {
+        self._events.iter().enumerate().for_each(|(i, &ref event)| {
+            let event_clone = event.clone();
+            inspector
+                .root()
+                .record_child(format!("{}_{}", event_clone.get_event_type(), i), move |node| {
+                    event_clone.record_inspect(node)
+                });
+        });
+        inspector
+    }
 }
 
 /// A [InputHandler] that records various metrics about the flow of events.
@@ -229,16 +241,22 @@ impl InspectHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing_utilities;
+    use crate::{
+        input_device::InputDeviceDescriptor,
+        keyboard_binding::KeyboardDeviceDescriptor,
+        mouse_binding::{MouseDeviceDescriptor, MouseLocation, MousePhase},
+        testing_utilities,
+    };
     use fuchsia_async as fasync;
     use fuchsia_inspect::assert_data_tree;
+    use std::collections::HashSet;
 
     fn fixed_now() -> zx::Time {
         zx::Time::ZERO + zx::Duration::from_nanos(42)
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn check_circular_buffer() {
+    async fn circular_buffer_no_overflow() {
         let mut circular_buffer = CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE);
         assert_eq!(circular_buffer._size, MAX_RECENT_EVENT_LOG_SIZE);
 
@@ -274,6 +292,69 @@ mod tests {
             Some(event) => assert_eq!(event.event_time, last_event_time),
             None => assert!(false),
         }
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn circular_buffer_record_inspect() {
+        let mut inspector = fuchsia_inspect::Inspector::default();
+        let mut recent_events_log = CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE);
+
+        let keyboard_descriptor = InputDeviceDescriptor::Keyboard(KeyboardDeviceDescriptor {
+            keys: vec![fidl_fuchsia_input::Key::A, fidl_fuchsia_input::Key::B],
+            ..Default::default()
+        });
+        let mouse_descriptor = InputDeviceDescriptor::Mouse(MouseDeviceDescriptor {
+            device_id: 1 as u32, // Value does not matter
+            absolute_x_range: None,
+            absolute_y_range: None,
+            wheel_v_range: None,
+            wheel_h_range: None,
+            buttons: None,
+            counts_per_mm: 12 as u32, // Value does not matter
+        });
+        let recent_events = vec![
+            testing_utilities::create_keyboard_event(
+                fidl_fuchsia_input::Key::A,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                &keyboard_descriptor,
+                None,
+            ),
+            testing_utilities::create_consumer_controls_event(
+                vec![fidl_fuchsia_input_report::ConsumerControlButton::VolumeUp],
+                zx::Time::get_monotonic(),
+                &testing_utilities::consumer_controls_device_descriptor(),
+            ),
+            testing_utilities::create_mouse_event(
+                MouseLocation::Relative(Default::default()),
+                None,
+                None,
+                None,
+                MousePhase::Down,
+                HashSet::from_iter(vec![].into_iter()),
+                HashSet::from_iter(vec![].into_iter()),
+                zx::Time::get_monotonic(),
+                &mouse_descriptor,
+            ),
+            testing_utilities::create_keyboard_event(
+                fidl_fuchsia_input::Key::B,
+                fidl_fuchsia_ui_input3::KeyEventType::Pressed,
+                None,
+                &keyboard_descriptor,
+                None,
+            ),
+        ];
+
+        for event in recent_events.iter() {
+            recent_events_log._push(event.clone());
+        }
+        inspector = recent_events_log._record_all_lazy_inspect(inspector);
+        assert_data_tree!(inspector, root: {
+            keyboard_event_0: {},
+            consumer_controls_event_1: {},
+            mouse_event_2: {},
+            keyboard_event_3: {},
+        });
     }
 
     #[fasync::run_singlethreaded(test)]
