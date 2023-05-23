@@ -9,6 +9,7 @@ import("//build/go/go_library.gni")
 import("//build/rust/rustc_binary.gni")
 
 is_dart = current_toolchain == dart_toolchain
+is_go = current_toolchain == go_toolchain
 
 # HLCPP Compatibility Test
 template("_hlcpp_compat") {
@@ -54,20 +55,22 @@ template("_rust_compat") {
   }
 }
 
-# Go Source Compatibility Test
-template("_go_compat") {
-  go_library("${target_name}_lib") {
-    source_dir = get_path_info(invoker.source, "dir")
-    sources = [ get_path_info(invoker.source, "file") ]
-    deps = [
-      ":${invoker.fidl}_go($go_toolchain)",
-      "//src/lib/component",
-    ]
-  }
+if (is_go) {
+  # Go Source Compatibility Test
+  template("_go_compat") {
+    go_library("${target_name}_lib") {
+      source_dir = get_path_info(invoker.source, "dir")
+      sources = [ get_path_info(invoker.source, "file") ]
+      deps = [
+        ":${invoker.fidl}_go($go_toolchain)",
+        "//src/lib/component",
+      ]
+    }
 
-  go_binary(target_name) {
-    library = ":${target_name}_lib"
-    output_dir = target_out_dir
+    go_binary(target_name) {
+      library = ":${target_name}_lib"
+      output_dir = target_out_dir
+    }
   }
 }
 
@@ -200,16 +203,18 @@ template("source_compatibility_test") {
       test_targets += [ ":${target_name}_cpp_wire" ]
     }
 
-    # Go
-    if (defined(transitions.go)) {
-      _source_compat_steps("${target_name}_go") {
-        tmp = transitions.go
-        starting_fidl = tmp.starting_fidl
-        starting_src = tmp.starting_src
-        steps = tmp.steps
-        template_name = "_go_compat"
+    if (is_go) {
+      # Go
+      if (defined(transitions.go)) {
+        _source_compat_steps("${target_name}_go") {
+          tmp = transitions.go
+          starting_fidl = tmp.starting_fidl
+          starting_src = tmp.starting_src
+          steps = tmp.steps
+          template_name = "_go_compat"
+        }
+        test_targets += [ ":${target_name}_go($go_toolchain)" ]
       }
-      test_targets += [ ":${target_name}_go" ]
     }
 
     # Rust
