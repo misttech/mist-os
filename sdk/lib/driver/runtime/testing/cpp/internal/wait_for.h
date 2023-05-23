@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_TESTING_RUNTIME_INTERNAL_WAIT_FOR_H_
-#define LIB_DRIVER_RUNTIME_TESTING_RUNTIME_INTERNAL_WAIT_FOR_H_
+#ifndef LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_WAIT_FOR_H_
+#define LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_WAIT_FOR_H_
 
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
@@ -25,4 +25,4 @@ zx::result<> CheckManagedThreadOrWaitUntil(fit::function<bool()> condition);
 
 }  // namespace fdf::internal
 
-#endif  // LIB_DRIVER_RUNTIME_TESTING_RUNTIME_INTERNAL_WAIT_FOR_H_
+#endif  // LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_WAIT_FOR_H_

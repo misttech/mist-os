@@ -83,7 +83,7 @@ test("usb-device") {
   sources = [ "tests/usb-device.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/driver/runtime/testing/runtime:runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk:mock-ddk",
     "//src/lib/utf_conversion",

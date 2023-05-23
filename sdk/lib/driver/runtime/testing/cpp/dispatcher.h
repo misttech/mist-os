@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_TESTING_RUNTIME_DISPATCHER_H_
-#define LIB_DRIVER_RUNTIME_TESTING_RUNTIME_DISPATCHER_H_
+#ifndef LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
+#define LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
 
-#include <lib/driver/runtime/testing/runtime/internal/wait_for.h>
+#include <lib/driver/runtime/testing/cpp/internal/wait_for.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/testing.h>
 #include <lib/sync/cpp/completion.h>
@@ -145,4 +145,4 @@ extern const TestSynchronizedDispatcher::DispatcherType kDispatcherManaged;
 
 }  // namespace fdf
 
-#endif  // LIB_DRIVER_RUNTIME_TESTING_RUNTIME_DISPATCHER_H_
+#endif  // LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_

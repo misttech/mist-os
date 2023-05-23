@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
-
 #include <lib/async/cpp/task.h>
-#include <lib/driver/runtime/testing/runtime/internal/wait_for.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/internal/wait_for.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdf/testing.h>
 

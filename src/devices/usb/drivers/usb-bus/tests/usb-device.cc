@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.usb.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 
 #include <thread>

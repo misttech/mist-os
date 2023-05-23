@@ -177,7 +177,7 @@ executable("unittests") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp:test_node",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

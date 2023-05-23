@@ -105,7 +105,7 @@ test("usb-composite-test-bin") {
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb:fuchsia.hardware.usb_cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime/testing/runtime:runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/testing/mock-ddk",

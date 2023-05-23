@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.hardware.gpu.amlogic/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/zx/vmo.h>
 
 #include <zxtest/zxtest.h>

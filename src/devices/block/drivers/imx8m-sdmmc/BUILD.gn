@@ -78,7 +78,7 @@ test("imx8m-sdmmc-test-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/block/drivers/sdhci:dma-descriptor-builder",

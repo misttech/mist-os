@@ -68,7 +68,7 @@ executable("aml-gpu-test-bin") {
   sources = [ "aml-gpu-test.cc" ]
   deps = [
     ":sources",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/driver-runtime-main:zxtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

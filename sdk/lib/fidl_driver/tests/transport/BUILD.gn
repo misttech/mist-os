@@ -94,7 +94,7 @@ test("fidl_driver_api_test_bin") {
     ":test.transport_cpp_driver",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_testing",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/fidl_driver",
     "//sdk/lib/fidl_driver:fidl_driver_natural",
     "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp_driver",

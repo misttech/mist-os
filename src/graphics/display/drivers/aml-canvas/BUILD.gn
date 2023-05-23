@@ -57,7 +57,7 @@ test("aml-canvas-test") {
   deps = [
     ":common_srcs",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",

@@ -13,7 +13,7 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/ddk/metadata.h"
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/i2c/drivers/i2c/i2c-child.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 

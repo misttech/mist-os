@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
-#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
 #include <lib/inspect/cpp/reader.h>

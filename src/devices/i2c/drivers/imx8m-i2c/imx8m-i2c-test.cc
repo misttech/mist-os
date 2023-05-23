@@ -25,7 +25,7 @@
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 

@@ -29,7 +29,7 @@
 #include <gtest/gtest.h>
 #include <mock-boot-arguments/server.h>
 
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/misc/drivers/compat/v1_test.h"
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"

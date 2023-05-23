@@ -63,7 +63,7 @@ test("power-test-bin") {
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",

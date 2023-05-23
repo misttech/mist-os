@@ -13,7 +13,7 @@
 
 #include "i2c.h"
 #include "lib/ddk/metadata.h"
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace i2c {

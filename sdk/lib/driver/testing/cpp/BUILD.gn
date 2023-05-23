@@ -37,7 +37,7 @@ source_set("cpp") {
     ":test_node",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/component/cpp",
-    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/bin/driver_runtime",
   ]
 }

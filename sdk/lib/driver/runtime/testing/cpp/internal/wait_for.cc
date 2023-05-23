@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_RUNTIME_TESTING_RUNTIME_INTERNAL_WAIT_FOR_H_
 #define LIB_DRIVER_RUNTIME_TESTING_RUNTIME_INTERNAL_WAIT_FOR_H_
 
-#include <lib/driver/runtime/testing/runtime/internal/wait_for.h>
+#include <lib/driver/runtime/testing/cpp/internal/wait_for.h>
 #include <lib/fdf/testing.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>

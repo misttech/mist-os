@@ -7,7 +7,7 @@
 #include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/c/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
-#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 
 #include <memory>
 

@@ -100,7 +100,7 @@ test("radar-proxy-test-bin") {
     "reader-instance.cc",
   ]
   deps = [
-           "//sdk/lib/driver/runtime/testing/runtime",
+           "//sdk/lib/driver/runtime/testing/cpp",
            "//src/devices/bin/driver_runtime",
            "//zircon/system/ulib/sync",
            "//zircon/system/ulib/zxtest",

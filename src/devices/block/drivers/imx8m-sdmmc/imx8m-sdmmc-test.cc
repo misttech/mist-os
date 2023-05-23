@@ -12,7 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fdf/env.h>
 #include <lib/fdf/testing.h>

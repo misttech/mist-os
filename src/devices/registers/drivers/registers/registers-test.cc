@@ -6,7 +6,7 @@
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
-#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
 
 #include <fbl/alloc_checker.h>

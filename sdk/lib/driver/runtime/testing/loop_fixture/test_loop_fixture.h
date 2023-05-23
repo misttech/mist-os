@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 
 namespace gtest {
 // An extension of Test class which sets up a driver runtime message loop for

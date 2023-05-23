@@ -16,7 +16,7 @@
 
 #include "radar-provider-proxy.h"
 #include "radar-reader-proxy.h"
-#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+#include "sdk/lib/driver/runtime/testing/cpp/dispatcher.h"
 
 namespace radar {
 namespace {
