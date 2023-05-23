@@ -80,27 +80,33 @@ impl Peers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        async_test_helpers::run_while, async_utils::PollExt, fuchsia_async as fasync,
-        futures::pin_mut,
-    };
+    use crate::test_profile_server;
+    use {async_test_helpers::run_while, async_utils::PollExt, fuchsia_async as fasync};
 
     #[fuchsia::test]
     fn search_result_creates_peer_task() {
         // Set up peers.
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, client, mut server) = test_profile_server::setup_profile_and_test_server();
+        let test_profile_server::TestProfileServerEndpoints { proxy, client, mut test_server } =
+            test_profile_server::new(
+                None,                                                             // Advertisement
+                Some(bredr::ServiceClassProfileIdentifier::HumanInterfaceDevice), // Search
+            );
         let mut peers = Peers::new(client, proxy);
 
         assert_eq!(peers.get_peer_map().inner().len(), 0);
 
         // A service found event causes a task to be added to the peers map.
         {
-            let peers_fut = peers.run();
-            pin_mut!(peers_fut);
+            let peers_fut = Box::pin(peers.run());
 
-            run_while(&mut exec, &mut peers_fut, server.complete_registration());
-            run_while(&mut exec, &mut peers_fut, server.service_found(PeerId(1), None, Vec::new()));
+            let (_, peers_fut) = run_while(&mut exec, peers_fut, test_server.expect_search());
+            let (service_found_result, mut peers_fut) = run_while(
+                &mut exec,
+                peers_fut,
+                test_server.send_service_found(PeerId(1), None, Vec::new()),
+            );
+            service_found_result.expect("Service found result");
 
             exec.run_until_stalled(&mut peers_fut).expect_pending("Handling connected first 1");
         }
@@ -108,10 +114,14 @@ mod tests {
 
         // A second service found event for the same peer doesn't add a new task to the peers map.
         {
-            let peers_fut = peers.run();
-            pin_mut!(peers_fut);
+            let peers_fut = Box::pin(peers.run());
 
-            run_while(&mut exec, &mut peers_fut, server.service_found(PeerId(1), None, Vec::new()));
+            let (service_found_result, mut peers_fut) = run_while(
+                &mut exec,
+                peers_fut,
+                test_server.send_service_found(PeerId(1), None, Vec::new()),
+            );
+            service_found_result.expect("Service found result");
 
             exec.run_until_stalled(&mut peers_fut).expect_pending("Handling connected second 1");
         }
@@ -119,83 +129,17 @@ mod tests {
 
         // A service found event for a second peer causes a task to be added to the peers map.
         {
-            let peers_fut = peers.run();
-            pin_mut!(peers_fut);
+            let peers_fut = Box::pin(peers.run());
 
-            run_while(&mut exec, &mut peers_fut, server.service_found(PeerId(2), None, Vec::new()));
+            let (service_found_result, mut peers_fut) = run_while(
+                &mut exec,
+                peers_fut,
+                test_server.send_service_found(PeerId(2), None, Vec::new()),
+            );
+            service_found_result.expect("Service found result");
 
             exec.run_until_stalled(&mut peers_fut).expect_pending("Handling connected 2");
         }
         assert_eq!(peers.get_peer_map().inner().len(), 2);
-    }
-}
-
-// TODO(84459) Move this to a common location for all BT profiles.
-#[cfg(test)]
-pub(crate) mod test_profile_server {
-    use fidl;
-    use {super::*, fidl_fuchsia_bluetooth_bredr as bredr, futures::StreamExt};
-
-    /// Register a new Profile object, and create an associated test server.
-    pub(crate) fn setup_profile_and_test_server(
-    ) -> (bredr::ProfileProxy, ProfileClient, LocalProfileTestServer) {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Create new profile connection");
-
-        // Create a profile that does no advertising.
-        let mut client = ProfileClient::new(proxy.clone());
-
-        // Register a search for remote peers that support BR/EDR HID.
-        client
-            .add_search(bredr::ServiceClassProfileIdentifier::HumanInterfaceDevice, &[])
-            .expect("Failed to search for peers.");
-
-        (proxy, client, stream.into())
-    }
-
-    /// Holds all the server side resources associated with a `Profile`'s connection to
-    /// fuchsia.bluetooth.bredr.Profile. Provides helper methods for common test related tasks.
-    /// Some fields are optional because they are not populated until the Profile has completed
-    /// registration.
-    pub(crate) struct LocalProfileTestServer {
-        profile_request_stream: bredr::ProfileRequestStream,
-        search_results: Option<bredr::SearchResultsProxy>,
-    }
-
-    impl From<bredr::ProfileRequestStream> for LocalProfileTestServer {
-        fn from(profile_request_stream: bredr::ProfileRequestStream) -> Self {
-            Self { profile_request_stream, search_results: None }
-        }
-    }
-
-    impl LocalProfileTestServer {
-        /// Run through the registration process of a new `Profile`.
-        pub async fn complete_registration(&mut self) {
-            let request = self.profile_request_stream.next().await;
-            match request {
-                Some(Ok(bredr::ProfileRequest::Search { results, .. })) => {
-                    self.search_results = Some(results.into_proxy().unwrap());
-                }
-                _ => panic!("unexpected result on profile request stream: {:?}", request),
-            }
-        }
-
-        pub async fn service_found(
-            &mut self,
-            peer_id: PeerId,
-            mut protocol: Option<Vec<bredr::ProtocolDescriptor>>,
-            mut attributes: Vec<bredr::Attribute>,
-        ) {
-            let mut protocol = protocol.as_mut().map(|v| v.iter_mut());
-            let protocol = protocol
-                .as_mut()
-                .map(|i| i as &mut dyn ExactSizeIterator<Item = &mut bredr::ProtocolDescriptor>);
-            self.search_results
-                .as_ref()
-                .expect("Search result proxy")
-                .service_found(&mut (peer_id).into(), protocol, &mut attributes.iter_mut())
-                .await
-                .expect("Service found");
-        }
     }
 }

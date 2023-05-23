@@ -286,14 +286,14 @@ impl PeerTaskInner {
             flush_timeout: Some(0xFFFF),
             ..Default::default()
         };
-        let mut connect_parameters = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
+        let connect_parameters = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(psm),
             parameters: Some(channel_parameters),
             ..Default::default()
         });
 
         let connect_result_result =
-            self.profile_proxy.connect(&mut self.peer_id.into(), &mut connect_parameters).await;
+            self.profile_proxy.connect(&self.peer_id.into(), &connect_parameters).await;
         match connect_result_result {
             Ok(Ok(chan)) => match chan.try_into() {
                 Ok(chan) => {
