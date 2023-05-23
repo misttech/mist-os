@@ -10,6 +10,10 @@ python_library("honeydew") {
   sources = [
     "__init__.py",
     "affordances/__init__.py",
+    "affordances/fuchsia_controller/__init__.py",
+    "affordances/fuchsia_controller/bluetooth.py",
+    "affordances/fuchsia_controller/component.py",
+    "affordances/fuchsia_controller/tracing.py",
     "affordances/sl4f/__init__.py",
     "affordances/sl4f/bluetooth.py",
     "affordances/sl4f/component.py",
