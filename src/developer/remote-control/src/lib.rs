@@ -21,7 +21,7 @@ use {
     moniker::{RelativeMoniker, RelativeMonikerBase},
     selector_maps::{MappingError, SelectorMappingList},
     selectors::{StringSelector, TreeSelector},
-    std::{borrow::Borrow, cell::RefCell, net::SocketAddr, rc::Rc, rc::Weak},
+    std::{borrow::Borrow, cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, rc::Weak},
     tracing::*,
 };
 
@@ -32,6 +32,7 @@ pub struct RemoteControlService {
     id_allocator: fn() -> Result<HostIdentifier>,
     connector: Box<dyn Fn(fidl::Socket)>,
     maps: SelectorMappingList,
+    moniker_map: HashMap<String, String>,
 }
 
 struct Client {
@@ -46,6 +47,38 @@ struct Client {
 
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
+        let (list, moniker_map) = join(Self::load_selector_map(), Self::load_moniker_map()).await;
+        Self::new_with_allocator_and_maps(connector, || HostIdentifier::new(), list, moniker_map)
+    }
+
+    async fn load_moniker_map() -> HashMap<String, String> {
+        let f = match fuchsia_fs::file::open_in_namespace(
+            "/pkg/data/moniker-map.json",
+            io::OpenFlags::RIGHT_READABLE,
+        ) {
+            Ok(f) => f,
+            Err(e) => {
+                error!(%e, "failed to open moniker maps json file");
+                return HashMap::default();
+            }
+        };
+        let bytes = match fuchsia_fs::file::read(&f).await {
+            Ok(b) => b,
+            Err(e) => {
+                error!(?e, "failed to read bytes from moniker map json");
+                return HashMap::default();
+            }
+        };
+        match serde_json::from_slice(bytes.as_slice()) {
+            Ok(m) => m,
+            Err(e) => {
+                error!(?e, "failed to parse moniker map json");
+                HashMap::default()
+            }
+        }
+    }
+
+    async fn load_selector_map() -> SelectorMappingList {
         let f = match fuchsia_fs::file::open_in_namespace(
             "/pkg/data/selector-maps.json",
             io::OpenFlags::RIGHT_READABLE,
@@ -53,49 +86,38 @@ impl RemoteControlService {
             Ok(f) => f,
             Err(e) => {
                 error!(%e, "failed to open selector maps json file");
-                return Self::new_with_allocator_and_maps(
-                    connector,
-                    || HostIdentifier::new(),
-                    SelectorMappingList::default(),
-                );
+                return SelectorMappingList::default();
             }
         };
         let bytes = match fuchsia_fs::file::read(&f).await {
             Ok(b) => b,
             Err(e) => {
                 error!(?e, "failed to read bytes from selector maps json");
-                return Self::new_with_allocator_and_maps(
-                    connector,
-                    || HostIdentifier::new(),
-                    SelectorMappingList::default(),
-                );
+                return SelectorMappingList::default();
             }
         };
-        let list: SelectorMappingList = match serde_json::from_slice(bytes.as_slice()) {
+        match serde_json::from_slice(bytes.as_slice()) {
             Ok(m) => m,
             Err(e) => {
                 error!(?e, "failed to parse selector map json");
-                return Self::new_with_allocator_and_maps(
-                    connector,
-                    || HostIdentifier::new(),
-                    SelectorMappingList::default(),
-                );
+                SelectorMappingList::default()
             }
-        };
-        return Self::new_with_allocator_and_maps(connector, || HostIdentifier::new(), list);
+        }
     }
 
     pub(crate) fn new_with_allocator_and_maps(
         connector: impl Fn(fidl::Socket) + 'static,
         id_allocator: fn() -> Result<HostIdentifier>,
         maps: SelectorMappingList,
+        moniker_map: HashMap<String, String>,
     ) -> Self {
-        return Self {
+        Self {
             id_allocator,
             ids: Default::default(),
             connector: Box::new(connector),
             maps,
-        };
+            moniker_map,
+        }
     }
 
     // Some of the ID-lists may be gone because old clients have shut down.
@@ -363,6 +385,10 @@ impl RemoteControlService {
         Ok(())
     }
 
+    fn map_moniker(self: &Rc<Self>, moniker: String) -> String {
+        self.moniker_map.get(&moniker).cloned().unwrap_or(moniker)
+    }
+
     pub(crate) fn map_selector(
         self: &Rc<Self>,
         selector: Selector,
@@ -432,6 +458,7 @@ impl RemoteControlService {
         flags: io::OpenFlags,
         server_end: zx::Channel,
     ) -> Result<(), rcs::ConnectCapabilityError> {
+        let moniker = self.map_moniker(moniker);
         // Connect to the root LifecycleController protocol
         let lifecycle = connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
             "/svc/fuchsia.sys2.LifecycleController.root",
@@ -882,10 +909,13 @@ mod tests {
     }
 
     fn make_rcs() -> Rc<RemoteControlService> {
-        make_rcs_with_maps(vec![])
+        make_rcs_with_maps(vec![], HashMap::default())
     }
 
-    fn make_rcs_with_maps(maps: Vec<(&str, &str)>) -> Rc<RemoteControlService> {
+    fn make_rcs_with_maps(
+        maps: Vec<(&str, &str)>,
+        moniker_map: HashMap<String, String>,
+    ) -> Rc<RemoteControlService> {
         Rc::new(RemoteControlService::new_with_allocator_and_maps(
             |_| (),
             || {
@@ -900,6 +930,7 @@ mod tests {
             SelectorMappingList::new(
                 maps.iter().map(|s| (s.0.to_string(), s.1.to_string())).collect(),
             ),
+            moniker_map,
         ))
     }
 
@@ -966,7 +997,7 @@ mod tests {
         .unwrap()
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_extract_moniker_protocol() -> Result<()> {
         let selector =
             parse_selector::<VerboseError>("core/my_component:expose:fuchsia.foo.bar").unwrap();
@@ -991,14 +1022,14 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_relative_moniker() {
         assert!(relative_moniker("/core/foo".to_string()).is_some());
         assert!(relative_moniker("./core/foo".to_string()).is_some());
         assert!(relative_moniker("core/foo".to_string()).is_none());
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_connect_to_exposed_capability() -> Result<()> {
         let (_client, server) = zx::Channel::create();
         let lifecycle = setup_fake_lifecycle_controller();
@@ -1016,7 +1047,7 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_connect_to_capability_not_exposed() -> Result<()> {
         let (_client, server) = zx::Channel::create();
         let lifecycle = setup_fake_lifecycle_controller();
@@ -1035,7 +1066,7 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_identify_host() -> Result<()> {
         let rcs_proxy = setup_rcs_proxy();
 
@@ -1066,7 +1097,7 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ids_in_host_identify() -> Result<()> {
         let rcs_proxy = setup_rcs_proxy();
 
@@ -1093,17 +1124,23 @@ mod tests {
         parse_selector::<VerboseError>(MAPPED_SERVICE_SELECTOR).unwrap()
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_map_selector() -> Result<()> {
-        let service = make_rcs_with_maps(vec![(FAKE_SERVICE_SELECTOR, MAPPED_SERVICE_SELECTOR)]);
+        let service = make_rcs_with_maps(
+            vec![(FAKE_SERVICE_SELECTOR, MAPPED_SERVICE_SELECTOR)],
+            HashMap::default(),
+        );
 
         assert_eq!(service.map_selector(service_selector()).unwrap(), mapped_service_selector());
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_map_selector_broken_mapping() -> Result<()> {
-        let service = make_rcs_with_maps(vec![(FAKE_SERVICE_SELECTOR, "not_a_selector:::::")]);
+        let service = make_rcs_with_maps(
+            vec![(FAKE_SERVICE_SELECTOR, "not_a_selector:::::")],
+            HashMap::default(),
+        );
 
         assert_matches!(
             service.map_selector(service_selector()).unwrap_err(),
@@ -1112,12 +1149,15 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_map_selector_unbounded_mapping() -> Result<()> {
-        let service = make_rcs_with_maps(vec![
-            (FAKE_SERVICE_SELECTOR, MAPPED_SERVICE_SELECTOR),
-            (MAPPED_SERVICE_SELECTOR, FAKE_SERVICE_SELECTOR),
-        ]);
+        let service = make_rcs_with_maps(
+            vec![
+                (FAKE_SERVICE_SELECTOR, MAPPED_SERVICE_SELECTOR),
+                (MAPPED_SERVICE_SELECTOR, FAKE_SERVICE_SELECTOR),
+            ],
+            HashMap::default(),
+        );
 
         assert_matches!(
             service.map_selector(service_selector()).unwrap_err(),
@@ -1126,12 +1166,27 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_map_selector_no_matches() -> Result<()> {
-        let service =
-            make_rcs_with_maps(vec![("not/a/match:out:some.Service", MAPPED_SERVICE_SELECTOR)]);
+        let service = make_rcs_with_maps(
+            vec![("not/a/match:out:some.Service", MAPPED_SERVICE_SELECTOR)],
+            HashMap::default(),
+        );
 
         assert_eq!(service.map_selector(service_selector()).unwrap(), service_selector());
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_map_moniker() -> Result<()> {
+        let map = [(FAKE_SERVICE_SELECTOR.to_string(), MAPPED_SERVICE_SELECTOR.to_string())]
+            .into_iter()
+            .collect();
+        let service = make_rcs_with_maps(vec![], map);
+        assert_eq!(service.map_moniker(FAKE_SERVICE_SELECTOR.to_string()), MAPPED_SERVICE_SELECTOR);
+
+        let service = make_rcs_with_maps(vec![], HashMap::new());
+        assert_eq!(service.map_moniker(FAKE_SERVICE_SELECTOR.to_string()), FAKE_SERVICE_SELECTOR);
         Ok(())
     }
 
@@ -1165,7 +1220,7 @@ mod tests {
         (tcp_stream, zx_socket, forward_task)
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_forward_traffic_tcp_closes_first() {
         let (mut tcp_stream, mut zx_socket, forward_task) = create_forward_tunnel().await;
 
@@ -1195,7 +1250,7 @@ mod tests {
         assert_matches!(forward_task.await, Ok(()));
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_forward_traffic_zx_socket_closes_first() {
         let (mut tcp_stream, mut zx_socket, forward_task) = create_forward_tunnel().await;
 

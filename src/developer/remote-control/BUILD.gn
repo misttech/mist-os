@@ -19,9 +19,14 @@ group("remote-control") {
   ]
 }
 
-resource("maps") {
+resource("selector-maps") {
   sources = [ "data/selector-maps.json" ]
   outputs = [ "data/selector-maps.json" ]
+}
+
+resource("moniker-map") {
+  sources = [ "data/moniker-map.json" ]
+  outputs = [ "data/moniker-map.json" ]
 }
 
 group("tests") {
@@ -71,6 +76,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
   ]
 
@@ -129,6 +135,11 @@ fuchsia_test_package("remote-control-lib-tests") {
     ":lib_test-test-driver",
     "//src/connectivity/network/netstack:component",
   ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_package_with_single_component("pkg-diagnostics-bridge") {
@@ -154,8 +165,9 @@ fuchsia_component("remote-control-component") {
 fuchsia_package("remote-control-package") {
   package_name = "remote-control"
   deps = [
-    ":maps",
+    ":moniker-map",
     ":remote-control-component",
+    ":selector-maps",
     "//src/developer/remote-control/runner:bin",
   ]
 }
