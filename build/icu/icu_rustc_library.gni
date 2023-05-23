@@ -23,10 +23,18 @@ set_defaults("icu_rustc_library") {
 # Refer to icu_source_set.gni for detailed comments on some constructs below,
 # the ideas of which are commonly reused in all icu_* templates.
 template("icu_rustc_library") {
+  _main_target_name = target_name
+  if (defined(invoker.name)) {
+    _main_target_name = invoker.name
+  }
   foreach(icu_flavor, icu_flavors) {
     _icu_target_name =
         "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
     rustc_library(_icu_target_name) {
+      # All flavored crates must have the same name as the unflavored crate.
+      # However, their output files will have flavored names.
+      # The `rustc_library` template uses the `name` parameter to achieve this.
+      name = _main_target_name
       configs = []
       configs = invoker.configs
       if (defined(invoker.test_configs)) {

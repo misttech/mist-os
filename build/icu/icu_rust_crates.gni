@@ -55,9 +55,17 @@ template("icu_group") {
 
 # An ICU-aware rust-library, for use in //third_party/rust_crates.
 template("icu_rust_library") {
+  _main_target_name = target_name
+  if (defined(invoker.name)) {
+    _main_target_name = name
+  }
   foreach(icu_flavor, icu_flavors) {
     rust_library(
         "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+      # The `rust_library` template uses the `crate_name` parameter to set
+      # the crate name (in contrast to e.g. `rustc_library` which uses
+      # `name`).
+      crate_name = _main_target_name
       forward_variables_from(invoker,
                              "*",
                              [
