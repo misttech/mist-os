@@ -62,7 +62,7 @@ constexpr auto kDisplayUsageNear = "near";
 
 // Base realm urls.
 constexpr auto kScenicOnlyUrl = "#meta/scenic_only.cm";
-constexpr auto kSceneManagerSceneWithInputUrl = "#meta/scene_manager_scene_with_input.cm";
+constexpr auto kSceneManagerSceneUrl = "#meta/scene_manager_scene.cm";
 
 // System component urls.
 constexpr auto kRealA11yManagerUrl = "#meta/a11y-manager.cm";
@@ -189,7 +189,7 @@ std::string UITestRealm::CalculateBaseRealmUrl() {
     // Scene manager and input pipeline run in the same monolithic component, so
     // there's no meaningful difference in component topology between the "use
     // input" and "no input" cases.
-    return kSceneManagerSceneWithInputUrl;
+    return kSceneManagerSceneUrl;
   } else {
     // If no scene owner is present, use the scenic-only realm.
     return kScenicOnlyUrl;

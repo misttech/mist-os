@@ -3,10 +3,24 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/ui/meta/scene_manager_base_routes.shard.cml",
+        "//src/ui/testing/ui_test_realm/meta/scene_provider.shard.cml",
         "//src/ui/testing/ui_test_realm/meta/text_manager.shard.cml",
         "//src/ui/testing/ui_test_realm/meta/virtual_keyboard_manager.shard.cml",
     ],
     children: [
+        {
+            name: "scene_manager",
+            url: "#meta/scene_manager.cm",
+
+            // Known missing capabilities:
+            //
+            // fuchsia.settings.Keyboard: should be non-essential so long as
+            // the tests don't require changing keyboard settings.
+            //
+            // dev-input-report: this should be turned off, but no such
+            // test component exists yet.
+        },
         {
             // TODO(fxbug.dev/107054): Remove use of input-synthesis.
             name: "input-synthesis",
@@ -18,6 +32,11 @@
         },
     ],
     offer: [
+        {
+            protocol: [ "fuchsia.session.scene.Manager" ],
+            from: "#scene_manager",
+            to: [ "#scene-provider" ],
+        },
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
