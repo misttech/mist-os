@@ -208,6 +208,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   const Collection& collection() const { return collection_; }
   DevfsDevice& devfs_device() { return devfs_device_; }
 
+  // Exposed for testing.
+  bool has_driver_component() { return driver_component_.has_value(); }
+
+  // Exposed for testing.
+  NodeState node_state() const { return node_state_; }
+
   void set_collection(Collection collection);
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
     offers_ = std::move(offers);
@@ -229,6 +235,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     fidl::WireClient<fuchsia_driver_host::Driver> driver;
     std::string driver_url;
   };
+
   // This is called when fuchsia_driver_framework::Driver is closed.
   void on_fidl_error(fidl::UnbindInfo error) override;
   // fidl::WireServer<fuchsia_component_runner::ComponentController>

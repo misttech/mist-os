@@ -500,6 +500,14 @@ void Node::CompleteBind(zx::result<> result) {
   if (completer.has_value()) {
     completer.value()(result);
   }
+
+  // Remove() might be call while binding is in progress. If bind fails and the node is in the
+  // state where it's waiting for the driver to stop, transition to the next step of the removal
+  // process.
+  if (!driver_component_ && this->node_state_ == NodeState::kWaitingOnDriver) {
+    this->node_state_ = NodeState::kWaitingOnDriverComponent;
+    this->FinishRemoval();
+  }
 }
 
 void Node::AddToParents() {

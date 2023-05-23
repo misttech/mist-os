@@ -120,6 +120,23 @@ executable("composite_node_spec_v2_test") {
   ]
 }
 
+fuchsia_unittest_component("node-test") {
+  deps = [ ":node_test" ]
+}
+
+executable("node_test") {
+  testonly = true
+  sources = [ "node_test.cc" ]
+
+  deps = [
+    ":driver_runner",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
 fuchsia_unittest_component("composite-node-spec-v2-test") {
   deps = [ ":composite_node_spec_v2_test" ]
 }
@@ -148,6 +165,7 @@ fuchsia_test_package("driver-runner-tests") {
 
   test_components = [
     ":composite-node-spec-v2-test",
+    ":node-test",
     ":driver-runner-test",
     ":composite-assembler-test",
     ":node-removal-tracker-test",
