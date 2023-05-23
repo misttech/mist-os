@@ -1,18 +1,20 @@
 ## Audio driver tests
 
 The `audio_driver_tests` suite validates implementations of `fuchsia.hardware.audio.StreamConfig`,
-`fuchsia.hardware.audio.RingBuffer` and `fuchsia.hardware.audio.Dai` interfaces.
+`fuchsia.hardware.audio.RingBuffer`, `fuchsia.hardware.audio.Dai`,
+`fuchsia.hardware.audio.Composite` and `fuchsia.hardware.audio.signalprocessing` interfaces.
 When the suite runs, it detects, initializes and tests all audio device drivers that are
 registered with devfs and thus appear under `/dev/class/audio-input`, `/dev/class/audio-output`,
-and `/dev/class/dai`. These drivers are tested non-hermetically, as system instances may be backed
-by actual audio hardware.
+`/dev/class/dai` and `/dev/class/audio-composite`. These drivers are tested non-hermetically,
+as system instances may be backed by actual audio hardware.
 
 The suite also hermetically creates and tests an instance of the Bluetooth a2dp library (see
 `//src/connectivity/bluetooth/tests/audio-device-output-harness`); this can be disabled by
 specifying `--devfs-only`. Note: all flags mentioned here are _suite-specific_. Any `fx test`
 command that includes them must include a leading "`-- `".
 
-By design, only one client may connect to an audio driver's `RingBuffer` interface at any time.
+By design, clients of `fuchsia.hardware.audio.StreamConfig` and `fuchsia.hardware.audio.Dai`
+may connect to only one audio driver's `RingBuffer` interface at any time.
 In most non-core product builds, `audio_core` is demand-started early in the bootup process,
 triggering device initialization and configuration. Restated: on these products, `audio_core` will
 connect to the `RingBuffer` of every audio device it detects, before the test gets a chance to run.

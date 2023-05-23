@@ -383,6 +383,13 @@
         {
             directory: "dev-class",
             from: "parent",
+            as: "dev-composite",
+            to: "#test_manager",
+            subdir: "audio-composite",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
             as: "dev-input",
             to: "#test_manager",
             subdir: "input",

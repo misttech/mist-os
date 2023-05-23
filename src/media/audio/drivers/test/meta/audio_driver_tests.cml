@@ -36,6 +36,11 @@
             rights: [ "r*" ],
             path: "/dev/class/dai",
         },
+        {
+            directory: "dev-composite",
+            rights: [ "r*" ],
+            path: "/dev/class/audio-composite",
+        },
 
         // This is used to enable (and then test) virtual_audio driver instances.
         {

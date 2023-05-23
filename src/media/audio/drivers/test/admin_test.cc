@@ -54,7 +54,23 @@ void AdminTest::RequestRingBufferChannel() {
   format.set_pcm_format(ring_buffer_pcm_format_);
 
   fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer> ring_buffer_handle;
-  if (device_entry().isDai()) {
+  if (device_entry().isComposite()) {
+    RequestTopologies();
+
+    // If there is a ring buffer id request it, not an error if a driver does not have a
+    // ring buffer.
+    if (ring_buffer_id().has_value()) {
+      composite()->CreateRingBuffer(
+          ring_buffer_id().value(), std::move(format), ring_buffer_handle.NewRequest(),
+          AddCallback("CreateRingBuffer",
+                      [](fuchsia::hardware::audio::Composite_CreateRingBuffer_Result result) {
+                        EXPECT_FALSE(result.is_err());
+                      }));
+      if (!composite().is_bound()) {
+        FAIL() << "Composite failed to get ring buffer channel";
+      }
+    }
+  } else if (device_entry().isDai()) {
     fuchsia::hardware::audio::DaiFormat dai_format = {};
     EXPECT_EQ(fuchsia::hardware::audio::Clone(dai_format_, &dai_format), ZX_OK);
     dai()->CreateRingBuffer(std::move(dai_format), std::move(format),

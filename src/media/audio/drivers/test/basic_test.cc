@@ -393,6 +393,9 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   WaitForError();
 });
 
+// Verify that a valid toplogy is successfully received.
+DEFINE_BASIC_TEST_CLASS(Topology, { RequestTopologies(); });
+
 // Register separate test case instances for each enumerated device
 //
 // See googletest/docs/advanced.md for details
@@ -414,10 +417,14 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   }
+  if (device_entry.isComposite()) {
+    REGISTER_BASIC_TEST(Topology, device_entry);
+  }
   // TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
   // GetProperties, GetDaiFormats, and GetRingBufferFormats).
   // TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
   // TODO(fxbug.dev/126733): Add testing for Health methods.
+  // TODO(fxbug.dev/124865): Add testing for Composite protocol methods.
 }
 
 }  // namespace media::audio::drivers::test

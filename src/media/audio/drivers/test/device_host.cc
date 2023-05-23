@@ -45,6 +45,7 @@ static const struct {
     {.path = "/dev/class/audio-input", .driver_type = DriverType::StreamConfigInput},
     {.path = "/dev/class/audio-output", .driver_type = DriverType::StreamConfigOutput},
     {.path = "/dev/class/dai", .driver_type = DriverType::Dai},
+    {.path = "/dev/class/audio-composite", .driver_type = DriverType::Composite},
 };
 
 // Our thread and dispatcher must exist during the entirety of test execution; create it now.

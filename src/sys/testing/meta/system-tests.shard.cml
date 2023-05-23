@@ -207,11 +207,12 @@
             rights: [ "r*" ],
         },
 
-        // audio_driver_tests requires access to audio input and output.
+        // audio_driver_tests requires access to audio drivers.
         {
             directory: [
                 "dev-audio-input",
                 "dev-audio-output",
+                "dev-composite",
                 "dev-dai",
             ],
             from: "parent",

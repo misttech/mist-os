@@ -301,6 +301,13 @@
         {
             directory: "dev-class",
             from: "parent",
+            as: "dev-composite",
+            to: "#testing",
+            subdir: "audio-composite",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
             as: "dev-input",
             to: "#testing",
             subdir: "input",

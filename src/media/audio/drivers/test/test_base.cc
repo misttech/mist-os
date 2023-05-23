@@ -44,6 +44,9 @@ void TestBase::SetUp() {
       case DriverType::Dai:
         ConnectToDaiDevice(device_entry());
         break;
+      case DriverType::Composite:
+        ConnectToCompositeDevice(device_entry());
+        break;
       case DriverType::StreamConfigInput:
         [[fallthrough]];
       case DriverType::StreamConfigOutput:
@@ -56,6 +59,7 @@ void TestBase::SetUp() {
 void TestBase::TearDown() {
   stream_config_.Unbind();
   dai_.Unbind();
+  composite_.Unbind();
 
   if (realm_.has_value()) {
     // We're about to shut down the realm; unbind to unhook the error handler.
@@ -165,6 +169,30 @@ void TestBase::ConnectToDaiDevice(const DeviceEntry& device_entry) {
   CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai>(std::move(channel)));
 }
 
+void TestBase::ConnectToCompositeDevice(const DeviceEntry& device_entry) {
+  fuchsia::hardware::audio::CompositeConnectorPtr device;
+  ASSERT_EQ(device_entry.dir.index(), 1u);
+  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
+                                    device_entry.filename.c_str(),
+                                    device.NewRequest().TakeChannel().release()),
+            ZX_OK);
+
+  device.set_error_handler([](zx_status_t status) {
+    FAIL() << status << "Err " << status << ", failed to open channel to audio composite";
+  });
+  fidl::InterfaceHandle<fuchsia::hardware::audio::Composite> composite_client;
+  fidl::InterfaceRequest<fuchsia::hardware::audio::Composite> composite_server =
+      composite_client.NewRequest();
+  device->Connect(std::move(composite_server));
+
+  auto channel = composite_client.TakeChannel();
+  FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename
+                 << "' for composite audio driver";
+
+  CreateCompositeFromChannel(
+      fidl::InterfaceHandle<fuchsia::hardware::audio::Composite>(std::move(channel)));
+}
+
 void TestBase::CreateStreamConfigFromChannel(
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel) {
   stream_config_ = channel.Bind();
@@ -186,9 +214,60 @@ void TestBase::CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::aud
   AddErrorHandler(dai_, "DAI");
 }
 
+void TestBase::CreateCompositeFromChannel(
+    fidl::InterfaceHandle<fuchsia::hardware::audio::Composite> channel) {
+  composite_ = channel.Bind();
+
+  // If no device was enumerated, don't waste further time.
+  if (!composite_.is_bound()) {
+    FAIL() << "Failed to get composite channel for this device";
+  }
+  AddErrorHandler(composite_, "Composite");
+}
+
 // Request that the driver return the format ranges that it supports.
 void TestBase::RequestFormats() {
-  if (device_entry().isDai()) {
+  if (device_entry().isComposite()) {
+    RequestTopologies();
+
+    // If there is a ring buffer id, request the ring buffer formats for this endpoint.
+    // "No ring buffer" is also valid; do nothing in that case.
+    if (ring_buffer_id_.has_value()) {
+      composite()->GetRingBufferFormats(
+          ring_buffer_id_.value(),
+          AddCallback(
+              "GetRingBufferFormats",
+              [this](fuchsia::hardware::audio::Composite_GetRingBufferFormats_Result result) {
+                EXPECT_FALSE(result.is_err());
+                auto& supported_formats = result.response().ring_buffer_formats;
+                EXPECT_FALSE(supported_formats.empty());
+
+                for (size_t i = 0; i < supported_formats.size(); ++i) {
+                  SCOPED_TRACE(testing::Message() << "Composite supported_formats[" << i << "]");
+                  ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
+                  auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
+                  ring_buffer_pcm_formats_.push_back(std::move(format_set));
+                }
+              }));
+    }
+    // If there is a dai id, request the DAI formats for this endpoint.
+    // "No DAI" is also valid; do nothing in that case.
+    if (dai_id_.has_value()) {
+      composite()->GetDaiFormats(
+          dai_id_.value(),
+          AddCallback("GetDaiFormats",
+                      [this](fuchsia::hardware::audio::Composite_GetDaiFormats_Result result) {
+                        EXPECT_FALSE(result.is_err());
+                        auto& supported_formats = result.response().dai_formats;
+                        EXPECT_FALSE(supported_formats.empty());
+
+                        for (size_t i = 0; i < supported_formats.size(); ++i) {
+                          SCOPED_TRACE(testing::Message() << "DAI supported_formats[" << i << "]");
+                          dai_formats_.push_back(std::move(supported_formats[i]));
+                        }
+                      }));
+    }
+  } else if (device_entry().isDai()) {
     dai()->GetRingBufferFormats(
         AddCallback("GetRingBufferFormats",
                     [this](fuchsia::hardware::audio::Dai_GetRingBufferFormats_Result result) {
@@ -425,6 +504,67 @@ void TestBase::SetMinMaxDaiFormats() {
       };
     }
   }
+}
+
+void TestBase::SignalProcessingConnect() {
+  if (sp_.is_bound()) {
+    return;  // Already connected.
+  }
+  fidl::InterfaceHandle<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_client;
+  fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_server =
+      sp_client.NewRequest();
+  composite()->SignalProcessingConnect(std::move(sp_server));
+  sp_ = sp_client.Bind();
+}
+
+void TestBase::RequestTopologies() {
+  SignalProcessingConnect();
+  zx_status_t status = ZX_OK;
+  sp_->GetElements(AddCallback(
+      "Composite::GetElements",
+      [this,
+       &status](fuchsia::hardware::audio::signalprocessing::Reader_GetElements_Result result) {
+        status = result.is_err() ? result.err() : ZX_OK;
+        if (status == ZX_OK) {
+          elements_ = std::move(result.response().processing_elements);
+          ring_buffer_id_.reset();
+          dai_id_.reset();
+          for (auto& element : elements_) {
+            if (element.type() ==
+                fuchsia::hardware::audio::signalprocessing::ElementType::ENDPOINT) {
+              if (element.type_specific().endpoint().type() ==
+                  fuchsia::hardware::audio::signalprocessing::EndpointType::RING_BUFFER) {
+                ring_buffer_id_.emplace(element.id());  // Override any previous.
+              } else if (element.type_specific().endpoint().type() ==
+                         fuchsia::hardware::audio::signalprocessing::EndpointType::
+                             DAI_INTERCONNECT) {
+                dai_id_.emplace(element.id());  // Override any previous.
+              }
+            }
+          }
+        }
+      }));
+  ExpectCallbacks();
+
+  // Either we get elements or the API method is not supported.
+  ASSERT_TRUE(status == ZX_OK || status == ZX_ERR_NOT_SUPPORTED);
+  // We don't check for topologies if GetElements is not supported.
+  if (status == ZX_ERR_NOT_SUPPORTED) {
+    return;
+  }
+  // If supported, GetElements must return at least one element.
+  ASSERT_TRUE(elements_.size() > 0);
+
+  sp_->GetTopologies(AddCallback(
+      "Composite::GetTopologies",
+      [this](fuchsia::hardware::audio::signalprocessing::Reader_GetTopologies_Result result) {
+        ASSERT_TRUE(!result.is_err());
+        topologies_ = std::move(result.response().topologies);
+      }));
+  ExpectCallbacks();
+
+  // We only call GetTopologies if we have elements, so we must have at least one topology.
+  ASSERT_TRUE(topologies_.size() > 0);
 }
 
 }  // namespace media::audio::drivers::test

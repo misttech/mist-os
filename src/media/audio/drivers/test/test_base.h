@@ -31,7 +31,12 @@ namespace media::audio::drivers::test {
     }                                                      \
   } while (0)
 
-enum DriverType : uint16_t { StreamConfigInput = 0, StreamConfigOutput = 1, Dai = 2 };
+enum DriverType : uint16_t {
+  StreamConfigInput = 0,
+  StreamConfigOutput = 1,
+  Dai = 2,
+  Composite = 3
+};
 inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
   switch (dev_dir) {
     case DriverType::StreamConfigInput:
@@ -40,6 +45,8 @@ inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
       return (out << "StreamConfig(Out)");
     case DriverType::Dai:
       return (out << "Dai");
+    case DriverType::Composite:
+      return (out << "Composite");
   }
 }
 
@@ -67,6 +74,7 @@ struct DeviceEntry {
            driver_type == DriverType::StreamConfigOutput;
   }
   bool isDai() const { return driver_type == DriverType::Dai; }
+  bool isComposite() const { return driver_type == DriverType::Composite; }
 
   bool operator<(const DeviceEntry& rhs) const {
     return std::tie(dir, filename, driver_type, device_type) <
@@ -78,7 +86,7 @@ struct DeviceEntry {
 //
 // See googletest/docs/advanced.md for details
 //
-// Devices are displayed in the 'audio-output/000' format, or simply the filename, if the
+// Devices are displayed in the 'audio-output/<8-digit-hex>' format, or simply the filename, if the
 // special dir_fd value is observed (an example might be 'Bluetooth-A2DP' for Bluetooth devices).
 std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
   std::string device_name =
@@ -91,6 +99,8 @@ std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
       return "audio-output/" + device_name;
     case DriverType::Dai:
       return "dai/" + device_name;
+    case DriverType::Composite:
+      return "audio-composite/" + device_name;
   }
 }
 std::string inline TestNameForEntry(const std::string& test_class_name,
@@ -108,18 +118,26 @@ class TestBase : public media::audio::test::TestFixture {
 
   void ConnectToStreamConfigDevice(const DeviceEntry& device_entry);
   void ConnectToDaiDevice(const DeviceEntry& device_entry);
+  void ConnectToCompositeDevice(const DeviceEntry& device_entry);
   void ConnectToBluetoothDevice();
   void CreateStreamConfigFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel);
   void CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel);
+  void CreateCompositeFromChannel(
+      fidl::InterfaceHandle<fuchsia::hardware::audio::Composite> channel);
 
   const DeviceEntry& device_entry() const { return device_entry_; }
   DriverType driver_type() const { return device_entry_.driver_type; }
   DeviceType device_type() const { return device_entry_.device_type; }
 
-  // "Basic" (stream-config channel) tests and "Admin" (ring-buffer channel) tests both need to know
+  // "Basic" (nonringbuffer) tests and "Admin" (ringbuffer) tests both need to know
   // the supported formats, so this is implemented in the shared base class.
   void RequestFormats();
+
+  // "Basic" (nonringbuffer) tests and "Admin" (ringbuffer) tests both need to know
+  // the supported topologies, so this is implemented in the shared base class.
+  void SignalProcessingConnect();
+  void RequestTopologies();
 
   // TODO(fxbug.dev/83972): Consider a more functional style when validating formats
   const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& ring_buffer_pcm_formats()
@@ -131,6 +149,7 @@ class TestBase : public media::audio::test::TestFixture {
     return stream_config_;
   }
   fidl::InterfacePtr<fuchsia::hardware::audio::Dai>& dai() { return dai_; }
+  fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
 
   const fuchsia::hardware::audio::PcmFormat& min_ring_buffer_format() const {
     return min_ring_buffer_format_;
@@ -156,6 +175,7 @@ class TestBase : public media::audio::test::TestFixture {
   void WaitForError(zx::duration wait_duration = kWaitForErrorDuration) {
     RunLoopWithTimeoutOrUntil([]() { return HasFailure() || IsSkipped(); }, wait_duration);
   }
+  std::optional<uint64_t>& ring_buffer_id() { return ring_buffer_id_; }
 
  private:
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
@@ -171,6 +191,7 @@ class TestBase : public media::audio::test::TestFixture {
 
   fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig> stream_config_;
   fidl::InterfacePtr<fuchsia::hardware::audio::Dai> dai_;
+  fidl::InterfacePtr<fuchsia::hardware::audio::Composite> composite_;
 
   std::vector<fuchsia::hardware::audio::PcmSupportedFormats> ring_buffer_pcm_formats_;
   std::vector<fuchsia::hardware::audio::DaiSupportedFormats> dai_formats_;
@@ -179,6 +200,13 @@ class TestBase : public media::audio::test::TestFixture {
   fuchsia::hardware::audio::PcmFormat max_ring_buffer_format_;
   fuchsia::hardware::audio::DaiFormat min_dai_format_;
   fuchsia::hardware::audio::DaiFormat max_dai_format_;
+
+  fidl::InterfacePtr<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_;
+  std::vector<fuchsia::hardware::audio::signalprocessing::Topology> topologies_;
+  std::vector<fuchsia::hardware::audio::signalprocessing::Element> elements_;
+
+  std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
+  std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
 };
 
 }  // namespace media::audio::drivers::test
