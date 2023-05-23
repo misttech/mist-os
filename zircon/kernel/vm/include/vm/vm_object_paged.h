@@ -93,6 +93,9 @@ class VmObjectPaged final : public VmObject {
     if (is_slice()) {
       return ChildType::kSlice;
     }
+    if (is_reference()) {
+      return ChildType::kReference;
+    }
     Guard<CriticalMutex> guard{lock()};
     return parent_ ? ChildType::kCowClone : ChildType::kNotChild;
   }

@@ -564,7 +564,10 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  enum ChildType { kNotChild, kCowClone, kSlice };
+  // Extend this enum when new child types are supported with zx_vmo_create_child().
+  // All SNAPSHOT* types are reported as kCowClone, because they all implement CoW semantics, albeit
+  // in different ways to provide different guarantees.
+  enum ChildType { kNotChild, kCowClone, kSlice, kReference };
   virtual ChildType child_type() const = 0;
 
   virtual uint64_t HeapAllocationBytes() const { return 0; }

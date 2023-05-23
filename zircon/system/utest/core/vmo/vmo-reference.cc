@@ -795,4 +795,22 @@ TEST(VmoReference, MappingUpdateNestedRootDestroy) {
   EXPECT_EQ(0u, *buf);
 }
 
+// Tests that a reference is not reported as a CoW child.
+TEST(VmoReference, GetInfo) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+
+  zx::vmo ref;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_REFERENCE, 0, 0, &ref));
+
+  zx_info_vmo_t parent_info;
+  ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &parent_info, sizeof(parent_info), nullptr, nullptr));
+
+  zx_info_vmo_t ref_info;
+  ASSERT_OK(ref.get_info(ZX_INFO_VMO, &ref_info, sizeof(ref_info), nullptr, nullptr));
+
+  EXPECT_EQ(parent_info.koid, ref_info.parent_koid);
+  EXPECT_EQ(0u, ref_info.flags & ZX_INFO_VMO_IS_COW_CLONE);
+}
+
 }  // namespace
