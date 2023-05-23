@@ -131,8 +131,6 @@ class HidDeviceTest : public zxtest::Test {
  public:
   HidDeviceTest() = default;
   void SetUp() override {
-    ASSERT_EQ(ZX_OK, dispatcher_.StartAsDefault({}, "hid-test-dispatcher").status_value());
-
     // TODO(fxb/124464): Migrate test to use dispatcher integration.
     fake_root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     client_ = ddk::HidbusProtocolClient(fake_hidbus_.GetProto());
@@ -143,6 +141,9 @@ class HidDeviceTest : public zxtest::Test {
 
   void TearDown() override {
     auto child = fake_root_->GetLatestChild();
+    ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [child]() {
+                       child->UnbindOp();
+                     }).status_value());
     child->UnbindOp();
     EXPECT_EQ(ZX_OK, child->WaitUntilUnbindReplyCalled());
     EXPECT_TRUE(child->UnbindReplyCalled());
@@ -166,7 +167,14 @@ class HidDeviceTest : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
     ASSERT_OK(endpoints.status_value());
 
-    ASSERT_OK(device_->CreateInstance(dispatcher_.dispatcher(), std::move(endpoints->server)));
+    ASSERT_EQ(
+        ZX_OK,
+        fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [dispatcher = dispatcher_.dispatcher(),
+                                                            server = std::move(endpoints->server),
+                                                            device = device_]() mutable {
+          ASSERT_OK(device->CreateInstance(dispatcher, std::move(server)));
+        }).status_value());
+
     sync_client_ = fidl::WireSyncClient(std::move(endpoints->client));
 
     auto result = sync_client_->GetReportsEvent();
@@ -203,7 +211,7 @@ class HidDeviceTest : public zxtest::Test {
 
  protected:
   fdf_testing::DriverRuntimeEnv managed_runtime_env_;
-  fdf::TestSynchronizedDispatcher dispatcher_;
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
 
   fidl::WireSyncClient<fuchsia_hardware_input::Device> sync_client_;
   zx::event report_event_;

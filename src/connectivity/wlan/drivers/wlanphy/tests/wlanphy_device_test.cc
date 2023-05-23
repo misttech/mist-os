@@ -70,14 +70,6 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     client_phy_ = fidl::WireSharedClient<fuchsia_wlan_device::Phy>(std::move(endpoints_phy->client),
                                                                    client_dispatcher_phy_);
 
-    // Create the server dispatcher of fuchsia_wlan_phyimpl::WlanPhyImpl protocol, its lifecycle
-    // will be maintained by this test class.
-    auto server_dispatcher_phy_impl_status = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan-phy-test",
-        [&](fdf_dispatcher_t*) { server_dispatcher_phy_impl_completion_.Signal(); });
-    ASSERT_FALSE(server_dispatcher_phy_impl_status.is_error());
-    server_dispatcher_phy_impl_ = std::move(*server_dispatcher_phy_impl_status);
-
     libsync::Completion wlanphy_created;
     async::PostTask(driver_dispatcher_.dispatcher(), [&]() {
       wlanphy_device_ =
@@ -101,7 +93,8 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     EXPECT_OK(status);
     EXPECT_NOT_NULL(wlanphy_device_);
 
-    fdf::BindServer(server_dispatcher_phy_impl_.get(), std::move(endpoints_phy_impl->server), this);
+    fdf::BindServer(server_dispatcher_phy_impl_.driver_dispatcher().get(),
+                    std::move(endpoints_phy_impl->server), this);
 
     // Initialize struct to avoid random values.
     memset(static_cast<void*>(&create_iface_req_), 0, sizeof(create_iface_req_));
@@ -110,8 +103,6 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   ~WlanphyDeviceTest() {
     // Mock DDK will delete wlanphy_device_.
     mock_ddk::ReleaseFlaggedDevices(wlanphy_device_->zxdev());
-    server_dispatcher_phy_impl_.ShutdownAsync();
-    server_dispatcher_phy_impl_completion_.Wait();
   }
 
   // Server end handler functions for fuchsia_wlan_phyimpl::WlanPhyImpl.
@@ -215,6 +206,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   void* dummy_ctx_;
 
  private:
+  fdf_testing::DriverRuntimeEnv managed_env_;
   async::Loop client_loop_phy_;
 
   // Dispatcher for the FIDL client sending requests to wlanphy device.
@@ -222,17 +214,13 @@ class WlanphyDeviceTest : public ::zxtest::Test,
 
   // Dispatcher for being a driver transport FIDL server to receive and dispatch requests from
   // wlanphy device.
-  fdf::Dispatcher server_dispatcher_phy_impl_;
+  fdf::TestSynchronizedDispatcher server_dispatcher_phy_impl_{fdf::kDispatcherManaged};
+  // The driver dispatcher used for testing.
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherManaged};
 
   // fake zx_device as the the parent of wlanphy device.
   std::shared_ptr<MockDevice> fake_wlan_phy_impl_device_;
   Device* wlanphy_device_;
-
-  // The completion to ensure server_dispatcher_phy_impl_'s shutdown before destroy.
-  libsync::Completion server_dispatcher_phy_impl_completion_;
-
-  // The driver dispatcher used for testing.
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
 };
 
 TEST_F(WlanphyDeviceTest, GetSupportedMacRoles) {

@@ -7,6 +7,7 @@
 
 #include <lib/driver/runtime/testing/runtime/internal/wait_for.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/fdf/testing.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <future>
@@ -38,6 +39,21 @@ zx::result<T> WaitFor(std::future<T> future) {
   return zx::ok(future.get());
 }
 
+class TestDispatcherBuilder {
+ public:
+  // Creates a testing synchronized dispatcher. This dispatcher is not ran on the managed driver
+  // runtime thread pool.
+  static zx::result<fdf::SynchronizedDispatcher> CreateTestingSynchronizedDispatcher(
+      const void* driver, fdf::SynchronizedDispatcher::Options options, cpp17::string_view name,
+      fdf::Dispatcher::ShutdownHandler shutdown_handler);
+
+  // Creates a testing unsynchronized dispatcher. This dispatcher is not ran on the managed driver
+  // runtime thread pool.
+  static zx::result<fdf::UnsynchronizedDispatcher> CreateTestingUnsynchronizedDispatcher(
+      const void* driver, fdf::UnsynchronizedDispatcher::Options options, cpp17::string_view name,
+      fdf::Dispatcher::ShutdownHandler shutdown_handler);
+};
+
 class DefaultDispatcherSetting {
  public:
   explicit DefaultDispatcherSetting(fdf_dispatcher_t* dispatcher);
@@ -67,6 +83,8 @@ class TestSynchronizedDispatcher {
   // Start the dispatcher. Once this returns successfully the dispatcher is available to be
   // used for queueing and running tasks.
   //
+  // This dispatcher will be ran on the managed driver runtime thread pool.
+  //
   // This MUST be called from the main test thread.
   zx::result<> Start(fdf::SynchronizedDispatcher::Options options,
                      std::string_view dispatcher_name);
@@ -74,15 +92,12 @@ class TestSynchronizedDispatcher {
   // Start the dispatcher, and set it as the default dispatcher for the driver runtime.
   // Once this returns successfully the dispatcher is available to be used for queueing and running
   // tasks.
-  // Default dispatchers are not supported alongside driver runtime managed threads.
-  // FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS causes the driver runtime to spin up managed threads,
-  // therefore default dispatchers are not supported alongside that option.
+  //
+  // This dispatcher is not going to run on the managed driver runtime thread pool,
+  // therefore it must be manually ran using |fdf_testing_run_until_idle|, or any of the helpers
+  // that wrap that behavior (eg: |RunOnDispatcherSync|, |WaitFor|).
   //
   // This MUST be called from the main test thread.
-  //
-  // Returns ZX_ERR_INVALID_ARGS if options contains FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS.
-  // Returns ZX_ERR_BAD_STATE if the driver runtime is managing any threads, which will happen if
-  // there are any existing dispatchers with the FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS option.
   zx::result<> StartAsDefault(fdf::SynchronizedDispatcher::Options options,
                               std::string_view dispatcher_name);
 
@@ -102,9 +117,19 @@ class TestSynchronizedDispatcher {
   libsync::Completion dispatcher_shutdown_;
 };
 
+// Starts a driver dispatcher that becomes the default driver dispatcher for the current thread.
+// This dispatcher is not handled by the managed driver runtime thread pool, but instead must be
+// manually told to run using the |fdf_testing_run_until_idle| call, or the provided helpers.
 extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault;
-extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefault;
-extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefaultAllowSync;
+
+// Starts a driver dispatcher that is handled by the managed driver runtime thread pool.
+// It is good practice to create an |fdf_testing::DriverRuntimeEnv| instance before
+// creating managed dispatchers. This serves 3 purposes:
+// - It serves as a visual reminder to test authors that the driver runtime is managing
+//   the managed thread-pool.
+// - An initial thread is created on the thread pool to avoid deadlocking in some scenarios.
+// - Exercises the cleanup path during teardown.
+extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherManaged;
 
 }  // namespace fdf
 

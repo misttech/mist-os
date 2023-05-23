@@ -54,6 +54,9 @@ class DriverProtocolServer : public fdf::WireServer<fuchsia_driver_component_tes
 // Sets up the environment to have both Zircon and Driver transport services.
 class TestIncomingAndOutgoingFidls : public ::testing::Test {
  public:
+  explicit TestIncomingAndOutgoingFidls(bool set_driver_dispatcher_default)
+      : set_driver_dispatcher_default_(set_driver_dispatcher_default) {}
+
   void SetUp() override {
     // Create start args
     zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
@@ -98,8 +101,6 @@ class TestIncomingAndOutgoingFidls : public ::testing::Test {
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
-  // This MUST be accessed from the driver_dispatcher().
-  // TODO(fxb/123068): Remove above comment.
   TestDriver* driver() { return driver_; }
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
@@ -120,19 +121,17 @@ class TestIncomingAndOutgoingFidls : public ::testing::Test {
   async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_.dispatcher(); }
 
  private:
+  bool set_driver_dispatcher_default_;
   // This starts up the initial managed thread. It must come before the dispatcher.
   fdf_testing::DriverRuntimeEnv managed_runtime_env_;
 
-  // Driver dispatcher, managed by driver runtime threads because it has allow_sync_calls option.
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
+  // Driver dispatcher, either set as the test's default dispatcher, or set to be managed by the
+  // driver runtime threadpool, depending on the |set_driver_dispatcher_default|.
+  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{
+      set_driver_dispatcher_default_ ? fdf::kDispatcherDefault : fdf::kDispatcherManaged};
 
-  // Env dispatcher. Managed by driver runtime threads because the test_driver_dispatcher has
-  // allow_sync_calls option.
-  fdf::TestSynchronizedDispatcher test_env_dispatcher_{{
-      .is_default_dispatcher = false,
-      .options = {},
-      .dispatcher_name = "test-env-dispatcher",
-  }};
+  // Env dispatcher. Managed by driver runtime threads.
+  fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
 
   // Servers for the incoming FIDLs to the driver.
   async_patterns::TestDispatcherBound<ZirconProtocolServer> zircon_proto_server_{env_dispatcher(),
@@ -153,18 +152,27 @@ class TestIncomingAndOutgoingFidls : public ::testing::Test {
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
 };
 
-TEST_F(TestIncomingAndOutgoingFidls, ValidateDriverIncomingServices) {
-  // TODO(fxb/123068): Access directly from test thread.
-  ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher(), [this]() {
-                     zx::result result = driver()->ValidateIncomingDriverService();
-                     ASSERT_EQ(ZX_OK, result.status_value());
-                     result = driver()->ValidateIncomingZirconService();
-                     ASSERT_EQ(ZX_OK, result.status_value());
-                   }).status_value());
+// Set the driver dispatcher to default so we can access |driver()| directly.
+class TestIncomingAndOutgoingFidlsDefaultDriver : public TestIncomingAndOutgoingFidls {
+ public:
+  TestIncomingAndOutgoingFidlsDefaultDriver() : TestIncomingAndOutgoingFidls(true) {}
+};
+
+// Set the driver dispatcher to be managed so that we can make sync client calls into the driver
+// hosted services.
+class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoingFidls {
+ public:
+  TestIncomingAndOutgoingFidlsManagedDriver() : TestIncomingAndOutgoingFidls(false) {}
+};
+
+TEST_F(TestIncomingAndOutgoingFidlsDefaultDriver, ValidateDriverIncomingServices) {
+  zx::result result = driver()->ValidateIncomingDriverService();
+  ASSERT_EQ(ZX_OK, result.status_value());
+  result = driver()->ValidateIncomingZirconService();
+  ASSERT_EQ(ZX_OK, result.status_value());
 }
 
-TEST_F(TestIncomingAndOutgoingFidls, ConnectWithDevfs) {
-  // TODO(fxb/123068): Access directly from test thread.
+TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithDevfs) {
   ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher(), [this]() {
                      zx::result result = driver()->ExportDevfsNodeSync();
                      ASSERT_EQ(ZX_OK, result.status_value());
@@ -185,8 +193,7 @@ TEST_F(TestIncomingAndOutgoingFidls, ConnectWithDevfs) {
   ASSERT_EQ(true, result.value().is_ok());
 }
 
-TEST_F(TestIncomingAndOutgoingFidls, ConnectWithZirconService) {
-  // TODO(fxb/123068): Access directly from test thread.
+TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithZirconService) {
   ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher(), [this]() {
                      zx::result result = driver()->ServeZirconService();
                      ASSERT_EQ(ZX_OK, result.status_value());
@@ -202,8 +209,7 @@ TEST_F(TestIncomingAndOutgoingFidls, ConnectWithZirconService) {
   ASSERT_EQ(true, wire_result.value().is_ok());
 }
 
-TEST_F(TestIncomingAndOutgoingFidls, ConnectWithDriverService) {
-  // TODO(fxb/123068): Access directly from test thread.
+TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithDriverService) {
   ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher(), [this]() {
                      zx::result result = driver()->ServeDriverService();
                      ASSERT_EQ(ZX_OK, result.status_value());

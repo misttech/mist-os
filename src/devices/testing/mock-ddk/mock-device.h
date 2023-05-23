@@ -111,7 +111,7 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // threads managed by the driver runtime. The 'op' call will block until the op handler finishes.
   static std::shared_ptr<MockDevice> FakeRootParentWithDriverRuntime() {
     // Using `new` to access a non-public constructor.
-    return std::shared_ptr<MockDevice>(new MockDevice(true, fdf::kDispatcherNoDefaultAllowSync));
+    return std::shared_ptr<MockDevice>(new MockDevice(true, fdf::kDispatcherManaged));
   }
 
   // DEPRECATED!

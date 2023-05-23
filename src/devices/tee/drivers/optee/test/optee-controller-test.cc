@@ -229,7 +229,7 @@ class FakeTeeService : public fidl::WireServer<fuchsia_hardware_tee::DeviceConne
   void ConnectToDeviceInfo(ConnectToDeviceInfoRequestView request,
                            ConnectToDeviceInfoCompleter::Sync& completer) override {}
 
-  void WaitForClientConnected() { client_connected_.Wait(); }
+  void WaitForClientConnected() { ZX_ASSERT(fdf::WaitFor(client_connected_).is_ok()); }
 
  private:
   fdf::UnownedDispatcher dispatcher_;
@@ -278,13 +278,10 @@ class FakeDdkOptee : public zxtest::Test {
   FakeSysmem sysmem_;
   FakeRpmbService rpmb_service_;
 
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  // Also fix the default dispatcher + managed runtime discrepancy.
-  // Using the runtime as well as attaching dispatchers as default can lead to false positives
-  // in the synchronization_checker (i.e. passes synchronization check even though managed threads
-  // can race vs main test thread).
   fdf_testing::DriverRuntimeEnv runtime_;
   fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
+
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
   std::shared_ptr<MockDevice> parent_ =
       MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   OpteeController* optee_ = nullptr;
@@ -309,10 +306,10 @@ TEST_F(FakeDdkOptee, RpmbTest) { EXPECT_EQ(optee_->RpmbConnectServer().status_va
 
 TEST_F(FakeDdkOptee, MultiThreadTest) {
   fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[2];
-  sync_completion_t completion1;
-  sync_completion_t completion2;
-  sync_completion_t smc_completion;
-  sync_completion_t smc_completion1;
+  libsync::Completion completion1;
+  libsync::Completion completion2;
+  libsync::Completion smc_completion;
+  libsync::Completion smc_completion1;
   zx_status_t status;
 
   for (auto& i : tee_app_client) {
@@ -332,8 +329,8 @@ TEST_F(FakeDdkOptee, MultiThreadTest) {
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
-      sync_completion_signal(&smc_completion1);
-      sync_completion_wait(&smc_completion, ZX_TIME_INFINITE);
+      sync_completion_signal(smc_completion1.get());
+      sync_completion_wait(smc_completion.get(), ZX_TIME_INFINITE);
       out->arg0 = optee::kReturnOk;
     });
   }
@@ -346,12 +343,12 @@ TEST_F(FakeDdkOptee, MultiThreadTest) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion1);
+              sync_completion_signal(completion1.get());
             });
   }
-  status = sync_completion_wait(&completion1, ZX_SEC(1));
+  status = sync_completion_wait(completion1.get(), ZX_SEC(1));
   EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
-  sync_completion_wait(&smc_completion1, ZX_TIME_INFINITE);
+  ASSERT_OK(fdf::WaitFor(smc_completion1));
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
@@ -367,20 +364,20 @@ TEST_F(FakeDdkOptee, MultiThreadTest) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion2);
+              sync_completion_signal(completion2.get());
             });
   }
-  sync_completion_wait(&completion2, ZX_TIME_INFINITE);
-  sync_completion_signal(&smc_completion);
-  sync_completion_wait(&completion1, ZX_TIME_INFINITE);
+  ASSERT_OK(fdf::WaitFor(completion2));
+  sync_completion_signal(smc_completion.get());
+  ASSERT_OK(fdf::WaitFor(completion1));
   EXPECT_EQ(call_with_args_count, 2);
 }
 
 TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
   fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[2];
-  sync_completion_t completion1;
-  sync_completion_t completion2;
-  sync_completion_t smc_completion;
+  libsync::Completion completion1;
+  libsync::Completion completion2;
+  libsync::Completion smc_completion;
   zx_status_t status;
 
   for (auto& i : tee_app_client) {
@@ -400,7 +397,7 @@ TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
-      sync_completion_signal(&smc_completion);
+      sync_completion_signal(smc_completion.get());
       out->arg0 = optee::kReturnEThreadLimit;
     });
   }
@@ -413,12 +410,12 @@ TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion1);
+              sync_completion_signal(completion1.get());
             });
   }
 
-  sync_completion_wait(&smc_completion, ZX_TIME_INFINITE);
-  status = sync_completion_wait(&completion1, ZX_SEC(1));
+  ASSERT_OK(fdf::WaitFor(smc_completion));
+  status = sync_completion_wait(completion1.get(), ZX_SEC(1));
   EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
   EXPECT_EQ(call_with_args_count, 1);
   EXPECT_EQ(optee_->CommandQueueSize(), 1);
@@ -437,12 +434,12 @@ TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion2);
+              sync_completion_signal(completion2.get());
             });
   }
 
-  sync_completion_wait(&completion2, ZX_TIME_INFINITE);
-  sync_completion_wait(&completion1, ZX_TIME_INFINITE);
+  ASSERT_OK(fdf::WaitFor(completion2));
+  ASSERT_OK(fdf::WaitFor(completion1));
   EXPECT_EQ(call_with_args_count, 3);
   EXPECT_EQ(optee_->CommandQueueSize(), 0);
   EXPECT_EQ(optee_->CommandQueueWaitSize(), 0);
@@ -450,11 +447,11 @@ TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
 
 TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
   fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[3];
-  sync_completion_t completion1;
-  sync_completion_t completion2;
-  sync_completion_t completion3;
-  sync_completion_t smc_completion;
-  sync_completion_t smc_sleep_completion;
+  libsync::Completion completion1;
+  libsync::Completion completion2;
+  libsync::Completion completion3;
+  libsync::Completion smc_completion;
+  libsync::Completion smc_sleep_completion;
 
   for (auto& i : tee_app_client) {
     auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
@@ -474,8 +471,8 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
-      sync_completion_signal(&smc_completion);
-      sync_completion_wait(&smc_sleep_completion, ZX_TIME_INFINITE);
+      sync_completion_signal(smc_completion.get());
+      sync_completion_wait(smc_sleep_completion.get(), ZX_TIME_INFINITE);
       out->arg0 = optee::kReturnOk;
     });
   }
@@ -488,18 +485,18 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion1);
+              sync_completion_signal(completion1.get());
             });
   }
 
-  sync_completion_wait(&smc_completion, ZX_TIME_INFINITE);
-  EXPECT_FALSE(sync_completion_signaled(&completion1));
+  ASSERT_OK(fdf::WaitFor(smc_completion));
+  EXPECT_FALSE(sync_completion_signaled(completion1.get()));
   EXPECT_EQ(call_with_args_count, 1);
-  sync_completion_reset(&smc_completion);
+  sync_completion_reset(smc_completion.get());
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
-      sync_completion_signal(&smc_completion);
+      sync_completion_signal(smc_completion.get());
       out->arg0 = optee::kReturnEThreadLimit;
     });
   }
@@ -512,12 +509,12 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion2);
+              sync_completion_signal(completion2.get());
             });
   }
 
-  sync_completion_wait(&smc_completion, ZX_TIME_INFINITE);
-  EXPECT_FALSE(sync_completion_signaled(&completion2));
+  ASSERT_OK(fdf::WaitFor(smc_completion));
+  EXPECT_FALSE(sync_completion_signaled(completion2.get()));
   EXPECT_EQ(call_with_args_count, 2);
   EXPECT_EQ(optee_->CommandQueueSize(), 2);
 
@@ -535,27 +532,27 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion3);
+              sync_completion_signal(completion3.get());
             });
   }
 
-  sync_completion_wait(&completion3, ZX_TIME_INFINITE);
-  sync_completion_wait(&completion2, ZX_TIME_INFINITE);
+  ASSERT_OK(fdf::WaitFor(completion3));
+  ASSERT_OK(fdf::WaitFor(completion2));
   EXPECT_EQ(call_with_args_count, 4);
-  sync_completion_signal(&smc_sleep_completion);
-  sync_completion_wait(&completion1, ZX_TIME_INFINITE);
+  sync_completion_signal(smc_sleep_completion.get());
+  ASSERT_OK(fdf::WaitFor(completion1));
   EXPECT_EQ(optee_->CommandQueueSize(), 0);
   EXPECT_EQ(optee_->CommandQueueWaitSize(), 0);
 }
 
 TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
   fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[3];
-  sync_completion_t completion1;
-  sync_completion_t completion2;
-  sync_completion_t completion3;
-  sync_completion_t smc_completion;
-  sync_completion_t smc_sleep_completion1;
-  sync_completion_t smc_sleep_completion2;
+  libsync::Completion completion1;
+  libsync::Completion completion2;
+  libsync::Completion completion3;
+  libsync::Completion smc_completion;
+  libsync::Completion smc_sleep_completion1;
+  libsync::Completion smc_sleep_completion2;
 
   for (auto& i : tee_app_client) {
     auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
@@ -575,8 +572,8 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
-      sync_completion_signal(&smc_completion);
-      sync_completion_wait(&smc_sleep_completion1, ZX_TIME_INFINITE);
+      sync_completion_signal(smc_completion.get());
+      sync_completion_wait(smc_sleep_completion1.get(), ZX_TIME_INFINITE);
       out->arg0 = optee::kReturnEThreadLimit;
     });
   }
@@ -589,19 +586,19 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion1);
+              sync_completion_signal(completion1.get());
             });
   }
 
-  sync_completion_wait(&smc_completion, ZX_TIME_INFINITE);
-  EXPECT_FALSE(sync_completion_signaled(&completion1));
+  ASSERT_OK(fdf::WaitFor(smc_completion));
+  EXPECT_FALSE(sync_completion_signaled(completion1.get()));
   EXPECT_EQ(call_with_args_count, 1);
-  sync_completion_reset(&smc_completion);
+  sync_completion_reset(smc_completion.get());
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
-      sync_completion_signal(&smc_completion);
-      sync_completion_wait(&smc_sleep_completion2, ZX_TIME_INFINITE);
+      sync_completion_signal(smc_completion.get());
+      sync_completion_wait(smc_sleep_completion2.get(), ZX_TIME_INFINITE);
       out->arg0 = optee::kReturnOk;
     });
   }
@@ -614,12 +611,12 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion2);
+              sync_completion_signal(completion2.get());
             });
   }
 
-  sync_completion_wait(&smc_completion, ZX_TIME_INFINITE);
-  EXPECT_FALSE(sync_completion_signaled(&completion2));
+  ASSERT_OK(fdf::WaitFor(smc_completion));
+  EXPECT_FALSE(sync_completion_signaled(completion2.get()));
   EXPECT_EQ(call_with_args_count, 2);
   EXPECT_EQ(optee_->CommandQueueSize(), 2);
 
@@ -637,17 +634,17 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
                 FAIL("OpenSession2 failed: %s", result.error().FormatDescription().c_str());
                 return;
               }
-              sync_completion_signal(&completion3);
+              sync_completion_signal(completion3.get());
             });
   }
-  sync_completion_wait(&completion3, ZX_TIME_INFINITE);
+  ASSERT_OK(fdf::WaitFor(completion3));
   EXPECT_EQ(call_with_args_count, 3);
 
-  sync_completion_signal(&smc_sleep_completion2);
-  sync_completion_wait(&completion2, ZX_TIME_INFINITE);
+  sync_completion_signal(smc_sleep_completion2.get());
+  ASSERT_OK(fdf::WaitFor(completion2));
   EXPECT_EQ(call_with_args_count, 3);
-  sync_completion_signal(&smc_sleep_completion1);
-  sync_completion_wait(&completion1, ZX_TIME_INFINITE);
+  sync_completion_signal(smc_sleep_completion1.get());
+  ASSERT_OK(fdf::WaitFor(completion1));
   EXPECT_EQ(call_with_args_count, 4);
 
   EXPECT_EQ(optee_->CommandQueueSize(), 0);

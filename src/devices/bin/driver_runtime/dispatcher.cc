@@ -419,6 +419,24 @@ zx_status_t Dispatcher::Create(uint32_t options, std::string_view name,
       observer, out_dispatcher);
 }
 
+zx_status_t Dispatcher::CreateUnmanagedDispatcher(
+    uint32_t options, std::string_view name, fdf_dispatcher_shutdown_observer_t* shutdown_observer,
+    Dispatcher** out_dispatcher) {
+  auto unmanaged_thread_pool = GetDispatcherCoordinator().unmanaged_thread_pool();
+  return CreateWithAdder(
+      options, name, ThreadPool::kNoSchedulerRole, driver_context::GetCurrentDriver(),
+      unmanaged_thread_pool, unmanaged_thread_pool->loop()->dispatcher(),
+      []() {
+        // We want the Test dispatchers to have the allow_sync option on them which leads to this
+        // adder being called. So we return success even though this is a no-op.
+        LOGF(
+            INFO,
+            "ALLOW_SYNC_CALLS enabled on unmanaged dispatcher, ensure sync calls are handled on a managed dispatcher.");
+        return ZX_OK;
+      },
+      shutdown_observer, out_dispatcher);
+}
+
 // static
 Dispatcher* Dispatcher::DowncastAsyncDispatcher(async_dispatcher_t* dispatcher) {
   auto ret = static_cast<Dispatcher*>(dispatcher);
@@ -1431,12 +1449,14 @@ void DispatcherCoordinator::WaitUntilDispatchersDestroyed() {
 }
 
 // static
-zx_status_t DispatcherCoordinator::RunUntilIdle() {
-  auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
-  if (thread_pool->num_threads() > 0) {
-    return ZX_ERR_BAD_STATE;
+zx_status_t DispatcherCoordinator::TestingRunUntilIdle() {
+  std::optional<Dispatcher::ThreadPool>& unmanaged_thread_pool =
+      GetDispatcherCoordinator().unmanaged_thread_pool_;
+  if (unmanaged_thread_pool.has_value()) {
+    return unmanaged_thread_pool.value().loop()->RunUntilIdle();
   }
-  return thread_pool->loop()->RunUntilIdle();
+
+  return ZX_ERR_BAD_STATE;
 }
 
 // static
@@ -1592,7 +1612,9 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   ZX_ASSERT(driver_state != drivers_.end());
 
   auto thread_pool = dispatcher.thread_pool();
-  thread_pool->OnDispatcherRemoved(dispatcher);
+  bool is_unmanaged =
+      unmanaged_thread_pool_.has_value() ? thread_pool == &unmanaged_thread_pool_.value() : false;
+  thread_pool->OnDispatcherRemoved(dispatcher, is_unmanaged);
   if (thread_pool->num_dispatchers() == 0) {
     DestroyThreadPool(thread_pool);
   }
@@ -1632,6 +1654,10 @@ void DispatcherCoordinator::Reset() {
   }
 
   default_thread_pool()->Reset();
+  if (unmanaged_thread_pool_.has_value()) {
+    unmanaged_thread_pool_.value().Reset();
+  }
+  unmanaged_thread_pool_.reset();
 }
 
 zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::GetOrCreateThreadPool(
@@ -1653,6 +1679,10 @@ zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::GetOrCreateThreadPool
 
 void DispatcherCoordinator::DestroyThreadPool(Dispatcher::ThreadPool* thread_pool) {
   if (thread_pool == default_thread_pool()) {
+    return;
+  }
+
+  if (unmanaged_thread_pool_.has_value() && thread_pool == &unmanaged_thread_pool_.value()) {
     return;
   }
 
@@ -1746,11 +1776,11 @@ void Dispatcher::ThreadPool::OnDispatcherAdded() {
   num_dispatchers_++;
 }
 
-void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher) {
+void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher, bool is_unmanaged) {
   fbl::AutoLock lock(&lock_);
 
   // We need to check the process shared dispatcher matches as tests inject their own.
-  if (dispatcher.allow_sync_calls() &&
+  if (!is_unmanaged && dispatcher.allow_sync_calls() &&
       dispatcher.process_shared_dispatcher() == loop()->dispatcher()) {
     ZX_ASSERT(dispatcher_threads_needed_ > 0);
     dispatcher_threads_needed_--;

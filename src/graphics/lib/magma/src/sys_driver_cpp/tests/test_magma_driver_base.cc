@@ -62,30 +62,23 @@ class FakeDriver : public MagmaProductionDriverBase {
 // Check that the test driver class can be instantiated (not started).
 TEST(MagmaDriver, CreateTestDriver) {
   fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherDefault};
-  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server{
-      driver_dispatcher.dispatcher(), std::in_place, std::string("root")};
+  fdf_testing::TestNode node_server("root");
 
-  zx::result start_args = node_server.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+  zx::result start_args = node_server.CreateStartArgsAndServe();
   EXPECT_EQ(ZX_OK, start_args.status_value());
-
-  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(), [&]() {
-                     FakeDriver driver{std::move(start_args->start_args),
-                                       driver_dispatcher.driver_dispatcher().borrow()};
-                   }).status_value());
+  FakeTestDriver driver{std::move(start_args->start_args),
+                        driver_dispatcher.driver_dispatcher().borrow()};
 }
 
 // Check that the driver class can be instantiated (not started).
 TEST(MagmaDriver, CreateDriver) {
   fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherDefault};
-  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server{
-      driver_dispatcher.dispatcher(), std::in_place, std::string("root")};
+  fdf_testing::TestNode node_server("root");
 
-  zx::result start_args = node_server.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+  zx::result start_args = node_server.CreateStartArgsAndServe();
   EXPECT_EQ(ZX_OK, start_args.status_value());
-  EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(), [&]() {
-                     FakeDriver driver{std::move(start_args->start_args),
-                                       driver_dispatcher.driver_dispatcher().borrow()};
-                   }).status_value());
+  FakeDriver driver{std::move(start_args->start_args),
+                    driver_dispatcher.driver_dispatcher().borrow()};
 }
 
 class MagmaDriverStarted : public testing::Test {
@@ -96,13 +89,10 @@ class MagmaDriverStarted : public testing::Test {
 
     ASSERT_TRUE(start_args.is_ok());
 
-    EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_.dispatcher(), [&]() {
-                       test_environment_.emplace();
-                       EXPECT_EQ(ZX_OK,
-                                 test_environment_
-                                     ->Initialize(std::move(start_args->incoming_directory_server))
-                                     .status_value());
-                     }).status_value());
+    zx::result result =
+        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+                                   std::move(start_args->incoming_directory_server));
+    EXPECT_EQ(ZX_OK, result.status_value());
 
     auto driver = fdf_testing::StartDriver<FakeTestDriver>(std::move(start_args->start_args),
                                                            driver_dispatcher_, lifecycle_);
@@ -115,9 +105,6 @@ class MagmaDriverStarted : public testing::Test {
   void TearDown() override {
     EXPECT_EQ(ZX_OK,
               fdf_testing::TeardownDriver(driver_, driver_dispatcher_, lifecycle_).status_value());
-    EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_.dispatcher(), [&]() {
-                       test_environment_.reset();
-                     }).status_value());
   }
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
@@ -131,22 +118,18 @@ class MagmaDriverStarted : public testing::Test {
  protected:
   using FakeLifecycle = fdf::Lifecycle<FakeTestDriver>;
 
-  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
+  fdf_testing::DriverRuntimeEnv managed_env;
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherManaged};
+  fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
 
-  // This dispatcher is used by the test environment, and hosts the incoming
-  // directory.
-  fdf::TestSynchronizedDispatcher test_env_dispatcher_{{
-      .is_default_dispatcher = true,
-      .options = {},
-      .dispatcher_name = "test-env-dispatcher",
-  }};
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       test_env_dispatcher_.dispatcher(), std::in_place, std::string("root")};
   DriverLifecycle lifecycle_{.version = DRIVER_LIFECYCLE_VERSION_3,
                              .v1 = {.start = nullptr, .stop = FakeLifecycle::Stop},
                              .v2 = {FakeLifecycle::PrepareStop},
                              .v3 = {FakeLifecycle::Start}};
-  std::optional<fdf_testing::TestEnvironment> test_environment_;
+  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+      test_env_dispatcher_.dispatcher(), std::in_place};
 
   FakeTestDriver* driver_{};
 };

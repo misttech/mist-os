@@ -32,6 +32,55 @@ zx::result<> WaitFor(libsync::Completion& completion) {
   return zx::ok();
 }
 
+zx::result<fdf::SynchronizedDispatcher> TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+    const void* driver, fdf::SynchronizedDispatcher::Options options, std::string_view name,
+    fdf::Dispatcher::ShutdownHandler shutdown_handler) {
+  ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+                    FDF_DISPATCHER_OPTION_SYNCHRONIZED,
+                "options.value=%u, needs to have FDF_DISPATCHER_OPTION_SYNCHRONIZED",
+                options.value);
+
+  // We need to create an additional shutdown context in addition to the fdf::Dispatcher
+  // object, as the fdf::Dispatcher may be destructed before the shutdown handler
+  // is called. This can happen if the raw pointer is released from the fdf::Dispatcher.
+  auto dispatcher_shutdown_context =
+      std::make_unique<fdf::Dispatcher::DispatcherShutdownContext>(std::move(shutdown_handler));
+  fdf_dispatcher_t* dispatcher;
+  zx_status_t status =
+      fdf_testing_create_unmanaged_dispatcher(driver, options.value, name.data(), name.size(),
+                                              dispatcher_shutdown_context->observer(), &dispatcher);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  [[maybe_unused]] auto released = dispatcher_shutdown_context.release();
+  return zx::ok(fdf::SynchronizedDispatcher(dispatcher));
+}
+
+zx::result<fdf::UnsynchronizedDispatcher>
+TestDispatcherBuilder::CreateTestingUnsynchronizedDispatcher(
+    const void* driver, fdf::UnsynchronizedDispatcher::Options options, std::string_view name,
+    fdf::Dispatcher::ShutdownHandler shutdown_handler) {
+  ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+                    FDF_DISPATCHER_OPTION_UNSYNCHRONIZED,
+                "options.value=%u, needs to have FDF_DISPATCHER_OPTION_UNSYNCHRONIZED",
+                options.value);
+
+  // We need to create an additional shutdown context in addition to the fdf::Dispatcher
+  // object, as the fdf::Dispatcher may be destructed before the shutdown handler
+  // is called. This can happen if the raw pointer is released from the fdf::Dispatcher.
+  auto dispatcher_shutdown_context =
+      std::make_unique<fdf::Dispatcher::DispatcherShutdownContext>(std::move(shutdown_handler));
+  fdf_dispatcher_t* dispatcher;
+  zx_status_t status =
+      fdf_testing_create_unmanaged_dispatcher(driver, options.value, name.data(), name.size(),
+                                              dispatcher_shutdown_context->observer(), &dispatcher);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  [[maybe_unused]] auto released = dispatcher_shutdown_context.release();
+  return zx::ok(fdf::UnsynchronizedDispatcher(dispatcher));
+}
+
 DefaultDispatcherSetting::DefaultDispatcherSetting(fdf_dispatcher_t* dispatcher) {
   zx_status_t status = fdf_testing_set_default_dispatcher(dispatcher);
   ZX_ASSERT_MSG(ZX_OK == status, "Failed to set default dispatcher setting: %s",
@@ -76,15 +125,14 @@ zx::result<> TestSynchronizedDispatcher::Start(fdf::SynchronizedDispatcher::Opti
 
 zx::result<> TestSynchronizedDispatcher::StartAsDefault(
     fdf::SynchronizedDispatcher::Options options, std::string_view dispatcher_name) {
-  bool allow_sync_calls = options.value & FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS;
-  if (allow_sync_calls) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
+  // Create a testing dispatcher that runs separately from the managed runtime thread pool.
+  auto dispatcher = TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+      this, options, dispatcher_name,
+      [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
+  if (dispatcher.is_error()) {
+    return dispatcher.take_error();
   }
-
-  if (zx::result result = Start(options, dispatcher_name); result.is_error()) {
-    return result.take_error();
-  }
-
+  dispatcher_ = std::move(dispatcher.value());
   default_dispatcher_setting_.emplace(dispatcher_.get());
   return zx::ok();
 }
@@ -98,20 +146,14 @@ zx::result<> TestSynchronizedDispatcher::Stop() {
 
 const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault = {
     .is_default_dispatcher = true,
-    .options = {},
-    .dispatcher_name = "test-fdf-dispatcher-default",
+    .options = fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+    .dispatcher_name = "fdf-default",
 };
 
-const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefault = {
-    .is_default_dispatcher = false,
-    .options = {},
-    .dispatcher_name = "test-fdf-dispatcher",
-};
-
-const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefaultAllowSync = {
+const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherManaged = {
     .is_default_dispatcher = false,
     .options = fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-    .dispatcher_name = "test-fdf-dispatcher-allow-sync",
+    .dispatcher_name = "fdf-managed",
 };
 
 }  // namespace fdf

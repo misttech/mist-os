@@ -69,7 +69,6 @@ executable("wlanphy_device_test") {
   sources = wlanphy_sources + [ "tests/wlanphy_device_test.cc" ]
 
   deps = wlanphy_deps + [
-           "//src/devices/testing/driver-runtime-main:zxtest",
            "//src/devices/testing/mock-ddk",
            "//zircon/system/ulib/sync:sync-cpp",
            "//zircon/system/ulib/zxtest",

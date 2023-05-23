@@ -108,8 +108,8 @@ class RegistersDeviceTest : public zxtest::Test {
 
     std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios;
     for (uint32_t i = 0; i < mmio_count; i++) {
-      mock_mmio_.push_back(std::make_unique<ddk_mock::MockMmioRegRegion>(sizeof(T),
-                                                                         kRegSize / sizeof(T)));
+      mock_mmio_.push_back(
+          std::make_unique<ddk_mock::MockMmioRegRegion>(sizeof(T), kRegSize / sizeof(T)));
 
       std::vector<fbl::Mutex> locks(kRegSize / sizeof(T));
       mmios.emplace(i, std::make_shared<MmioInfo>(MmioInfo{
@@ -136,7 +136,7 @@ class RegistersDeviceTest : public zxtest::Test {
   // This dispatcher must be separate from the test as the test calls synchronously into
   // this FIDL protocol.
   fdf_testing::DriverRuntimeEnv managed_runtime_env_;
-  fdf::TestSynchronizedDispatcher registers_dispatcher_{fdf::kDispatcherNoDefault};
+  fdf::TestSynchronizedDispatcher registers_dispatcher_{fdf::kDispatcherManaged};
 
   std::vector<std::unique_ptr<ddk_mock::MockMmioRegRegion>> mock_mmio_;
   fidl::Arena<2048> allocator_;

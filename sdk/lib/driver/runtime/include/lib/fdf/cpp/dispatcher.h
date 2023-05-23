@@ -22,6 +22,9 @@ class DispatcherBuilder;
 
 namespace fdf {
 
+// Forward declaration to support friend declaration.
+class TestDispatcherBuilder;
+
 // C++ wrapper for a dispatcher, with RAII semantics. Automatically shuts down
 // the dispatcher when it goes out of scope.
 //
@@ -144,6 +147,7 @@ class Dispatcher {
  protected:
   // Friend declaration is needed because the |DispatcherShutdownContext| is private.
   friend class fdf_env::DispatcherBuilder;
+  friend class fdf::TestDispatcherBuilder;
 
   class DispatcherShutdownContext {
    public:

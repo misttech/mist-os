@@ -125,7 +125,7 @@ class Dispatcher : public async_dispatcher_t,
 
     void OnDispatcherAdded();
     // Updates the number of threads needed in the thread pool.
-    void OnDispatcherRemoved(Dispatcher& dispatcher);
+    void OnDispatcherRemoved(Dispatcher& dispatcher, bool is_unmanaged);
     // Requests the profile provider set the role profile.
     zx_status_t SetRoleProfile();
 
@@ -305,6 +305,14 @@ class Dispatcher : public async_dispatcher_t,
   static zx_status_t Create(uint32_t options, std::string_view name,
                             std::string_view scheduler_role, fdf_dispatcher_shutdown_observer_t*,
                             Dispatcher** out_dispatcher);
+
+  // fdf_dispatcher_t implementation
+  // Returns ownership of the dispatcher in |out_dispatcher|. The caller should call
+  // |Destroy| once they are done using the dispatcher. Once |Destroy| is called,
+  // the dispatcher will be deleted once all callbacks cancelled or completed by the dispatcher.
+  static zx_status_t CreateUnmanagedDispatcher(
+      uint32_t options, std::string_view name,
+      fdf_dispatcher_shutdown_observer_t* shutdown_observer, Dispatcher** out_dispatcher);
 
   // |dispatcher| must have been retrieved via `GetAsyncDispatcher`.
   static Dispatcher* DowncastAsyncDispatcher(async_dispatcher_t* dispatcher);
@@ -741,7 +749,7 @@ class DispatcherCoordinator {
   static void DestroyAllDispatchers();
   static void WaitUntilDispatchersIdle();
   static void WaitUntilDispatchersDestroyed();
-  static zx_status_t RunUntilIdle();
+  static zx_status_t TestingRunUntilIdle();
   static zx_status_t ShutdownDispatchersAsync(const void* driver,
                                               fdf_env_driver_shutdown_observer_t* observer);
 
@@ -774,6 +782,15 @@ class DispatcherCoordinator {
   void DestroyThreadPool(Dispatcher::ThreadPool* thread_pool) __TA_REQUIRES(&lock_);
 
   Dispatcher::ThreadPool* default_thread_pool() { return &default_thread_pool_; }
+
+  // Returns the unmanaged thread pool. Creates it first if it doesn't exist.
+  Dispatcher::ThreadPool* unmanaged_thread_pool() {
+    if (!unmanaged_thread_pool_.has_value()) {
+      unmanaged_thread_pool_.emplace();
+    }
+
+    return &unmanaged_thread_pool_.value();
+  }
 
  private:
   // Tracks the dispatchers owned by a driver.
@@ -877,6 +894,8 @@ class DispatcherCoordinator {
   // This must come after |role_thread_pools_|, so that we shutdown the loop first,
   // in case we have any scheduled tasks to delete thread pools.
   Dispatcher::ThreadPool default_thread_pool_;
+  // Thread pool that is not managed.
+  std::optional<Dispatcher::ThreadPool> unmanaged_thread_pool_;
 
   TokenManager token_manager_;
 };

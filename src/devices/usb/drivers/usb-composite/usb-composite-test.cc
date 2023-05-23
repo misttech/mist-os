@@ -26,8 +26,6 @@ template <auto* descriptors>
 class UsbCompositeTest : public zxtest::Test {
  public:
   void SetUp() override {
-    EXPECT_TRUE(dispatcher_.Start({}, "usb-composite-test-dispatcher").is_ok());
-
     fake_parent_->AddProtocol(ZX_PROTOCOL_USB, usb_.GetProto()->ops, usb_.GetProto()->ctx);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -115,7 +113,8 @@ class UsbCompositeTest : public zxtest::Test {
  private:
   void ExpectConfigureEndpoints();
 
-  fdf::TestSynchronizedDispatcher dispatcher_;
+  fdf_testing::DriverRuntimeEnv managed_env_;
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
 };
 

@@ -208,7 +208,7 @@ class AmlCanvasTest : public testing::Test {
   }
 
   fdf_testing::DriverRuntimeEnv env_;
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
   std::vector<uint8_t> canvas_indices_;
 
   constexpr static int kMmioRangeSize = 0x100;

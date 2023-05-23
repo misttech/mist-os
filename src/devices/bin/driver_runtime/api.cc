@@ -239,7 +239,7 @@ __EXPORT bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher) 
 }
 
 __EXPORT zx_status_t fdf_testing_run_until_idle() {
-  return driver_runtime::DispatcherCoordinator::RunUntilIdle();
+  return driver_runtime::DispatcherCoordinator::TestingRunUntilIdle();
 }
 
 __EXPORT void fdf_testing_push_driver(const void* driver) { driver_context::PushDriver(driver); }
@@ -260,5 +260,21 @@ __EXPORT zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispat
   }
 
   driver_context::SetDefaultTestingDispatcher(static_cast<driver_runtime::Dispatcher*>(dispatcher));
+  return ZX_OK;
+}
+
+__EXPORT zx_status_t fdf_testing_create_unmanaged_dispatcher(
+    const void* driver, uint32_t options, const char* name, size_t name_len,
+    fdf_dispatcher_shutdown_observer_t* observer, fdf_dispatcher_t** out_dispatcher) {
+  driver_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+
+  driver_runtime::Dispatcher* dispatcher;
+  auto status = driver_runtime::Dispatcher::CreateUnmanagedDispatcher(
+      options, std::string_view(name, name_len), observer, &dispatcher);
+  if (status != ZX_OK) {
+    return status;
+  }
+  *out_dispatcher = static_cast<fdf_dispatcher*>(dispatcher);
   return ZX_OK;
 }
