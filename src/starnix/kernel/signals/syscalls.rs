@@ -1446,6 +1446,7 @@ mod tests {
             pgid: child.thread_group.read().process_group.leader,
             uid: 0,
             exit_status: ExitStatus::Exit(1),
+            time_stats: Default::default(),
         };
         child.thread_group.exit(ExitStatus::Exit(1));
         std::mem::drop(child);

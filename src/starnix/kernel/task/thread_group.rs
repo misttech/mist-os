@@ -90,6 +90,9 @@ pub struct ThreadGroupMutableState {
 
     /// The resource limits for this thread group.
     pub limits: ResourceLimits,
+
+    /// Time statistics accumulated from the children.
+    pub children_time_stats: TaskTimeStats,
 }
 
 pub struct ThreadGroup {
@@ -157,6 +160,9 @@ pub struct ZombieProcess {
     pub uid: uid_t,
     pub exit_status: ExitStatus,
     pub exit_signal: Option<Signal>,
+
+    /// Cumulative time stats for the process and its children.
+    pub time_stats: TaskTimeStats,
 }
 
 impl ZombieProcess {
@@ -172,6 +178,7 @@ impl ZombieProcess {
             uid: credentials.uid,
             exit_status,
             exit_signal,
+            time_stats: Default::default(),
         }
     }
 
@@ -223,6 +230,7 @@ impl ThreadGroup {
                 terminating: false,
                 selinux: Default::default(),
                 limits: Default::default(),
+                children_time_stats: Default::default(),
             }),
         });
 
@@ -285,6 +293,7 @@ impl ThreadGroup {
                 uid: task.creds().uid,
                 exit_status,
                 exit_signal: task.exit_signal,
+                time_stats: Default::default(),
             });
         }
 
@@ -325,9 +334,15 @@ impl ThreadGroup {
             }
 
             if let Some(ref parent) = parent {
+                let time_stats = self.time_stats();
+
                 let mut parent = parent.write();
                 let mut state = self.write();
-                let zombie = state.zombie_leader.take().expect("Failed to capture zombie leader.");
+                let mut zombie =
+                    state.zombie_leader.take().expect("Failed to capture zombie leader.");
+
+                zombie.time_stats += time_stats;
+                zombie.time_stats += state.children_time_stats;
 
                 parent.children.remove(&state.leader());
 
@@ -678,6 +693,28 @@ impl ThreadGroup {
         }
         Ok(old_limit)
     }
+
+    pub fn time_stats(&self) -> TaskTimeStats {
+        let process: &zx::Process = if zx::AsHandleRef::as_handle_ref(&self.process).is_invalid() {
+            // `process` must be valid for all tasks, except `kthreads`. In that case get the
+            // stats from starnix process.
+            assert_eq!(
+                self as *const ThreadGroup,
+                Arc::as_ptr(&self.kernel.kthreads.system_task().task.thread_group)
+            );
+            &self.kernel.kthreads.starnix_process
+        } else {
+            &self.process
+        };
+
+        let info =
+            zx::Task::get_runtime_info(process).expect("Failed to get starnix process stats");
+        TaskTimeStats {
+            user_time: zx::Duration::from_nanos(info.cpu_time),
+            // TODO: How can we calculate system time?
+            system_time: zx::Duration::default(),
+        }
+    }
 }
 
 #[apply(state_implementation!)]
@@ -759,7 +796,9 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             if options.keep_waitable_state {
                 self.zombie_children[position].clone()
             } else {
-                self.zombie_children.remove(position)
+                let result = self.zombie_children.remove(position);
+                self.children_time_stats += result.time_stats;
+                result
             }
         })
     }

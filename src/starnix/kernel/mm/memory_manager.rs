@@ -2014,9 +2014,18 @@ impl DynamicFileSource for ProcStatFile {
                     .unwrap_or(0);
             }
 
+            stats[12] =
+                duration_to_scheduler_clock(thread_group.children_time_stats.user_time) as u64;
+            stats[13] =
+                duration_to_scheduler_clock(thread_group.children_time_stats.system_time) as u64;
+
             stats[16] = thread_group.tasks.len() as u64;
             stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
         }
+
+        let time_stats = self.0.thread_group.time_stats();
+        stats[10] = duration_to_scheduler_clock(time_stats.user_time) as u64;
+        stats[11] = duration_to_scheduler_clock(time_stats.system_time) as u64;
 
         let info = self.0.thread_group.process.info().map_err(|_| errno!(EIO))?;
         stats[18] =
