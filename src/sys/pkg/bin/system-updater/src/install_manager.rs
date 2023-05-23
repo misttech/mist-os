@@ -26,6 +26,8 @@ use {
 const INSPECT_STATUS_NODE_NAME: &str = "status";
 // Suspend is allowed at most 7 days, after that update will automatically resume.
 const MAX_SUSPEND_DURATION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+// Cancel is allowed 100 times per boot.
+const MAX_NUM_CANCEL_REQUESTS: usize = 100;
 
 /// Start a install manager task that:
 ///  * Runs an update attempt in a seperate task.
@@ -58,6 +60,8 @@ async fn run<N, U, E>(
     let eq_task = fasync::Task::spawn(monitor_queue_fut);
 
     let mut requests_node = BoundedListNode::new(node.create_child("requests"), 100);
+
+    let mut num_cancel_requests = 0;
 
     // Each iteration of this loop is one update attempt.
     loop {
@@ -147,6 +151,7 @@ async fn run<N, U, E>(
                         &mut suspend_state,
                         suspend_deadline,
                         &mut cancel_sender,
+                        &mut num_cancel_requests,
                     )
                     .await
                 }
@@ -225,6 +230,7 @@ async fn handle_active_control_request<N>(
     suspend_state: &mut SuspendState,
     suspend_deadline: zx::Time,
     cancel_sender: &mut Option<oneshot::Sender<()>>,
+    num_cancel_requests: &mut usize,
 ) where
     N: Notify,
 {
@@ -300,6 +306,11 @@ async fn handle_active_control_request<N>(
 
             let response = match cancel_sender.take() {
                 Some(cancel_sender) => {
+                    if *num_cancel_requests >= MAX_NUM_CANCEL_REQUESTS {
+                        let _ = responder.send(Err(CancelError::CancelLimitExceeded));
+                        return;
+                    }
+                    *num_cancel_requests += 1;
                     cancel_sender.send(()).map_err(|()| CancelError::UpdateCannotBeCanceled)
                 }
                 None => Ok(()),
@@ -957,8 +968,9 @@ mod tests {
         ) -> (String, Self::UpdateStream) {
             let stream = async_generator::generate(move |mut co| async move {
                 co.yield_(State::Prepare).await;
-                let () = cancel_receiver.await.unwrap();
-                co.yield_(State::Canceled).await;
+                if let Ok(()) = cancel_receiver.await {
+                    co.yield_(State::Canceled).await;
+                }
             })
             .into_yielded();
             ("my-attempt".to_string(), Box::pin(stream))
@@ -1028,6 +1040,45 @@ mod tests {
                     },
                 }
             }
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn cancel_update_limit() {
+        let inspector = Inspector::default();
+        let node = inspector.root().create_child("current_attempt");
+        let (mut install_manager_ch, fut) = start_install_manager::<
+            FakeStateNotifier,
+            CancelableUpdater,
+            StubEnvironmentConnector,
+        >(CancelableUpdater, node)
+        .await;
+        let _install_manager_task = fasync::Task::local(fut);
+
+        for _ in 0..MAX_NUM_CANCEL_REQUESTS {
+            let (notifier, mut state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+            assert_eq!(
+                install_manager_ch
+                    .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                    .await,
+                Ok(Ok("my-attempt".to_string()))
+            );
+            assert_eq!(state_receiver.next().await, Some(State::Prepare));
+            assert_eq!(install_manager_ch.cancel_update(None).await, Ok(Ok(())));
+            assert_eq!(state_receiver.next().await, Some(State::Canceled));
+        }
+
+        let (notifier, mut state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+        assert_eq!(
+            install_manager_ch
+                .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                .await,
+            Ok(Ok("my-attempt".to_string()))
+        );
+        assert_eq!(state_receiver.next().await, Some(State::Prepare));
+        assert_eq!(
+            install_manager_ch.cancel_update(None).await,
+            Ok(Err(CancelError::CancelLimitExceeded))
         );
     }
 

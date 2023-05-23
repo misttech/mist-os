@@ -202,4 +202,6 @@ type CancelError = strict enum {
     UPDATE_CANNOT_BE_CANCELED = 2;
     /// The given attempt id does not match the current update attempt.
     ATTEMPT_ID_MISMATCH = 3;
+    /// The number of cancel requests has exceeded the limit.
+    CANCEL_LIMIT_EXCEEDED = 4;
 };
