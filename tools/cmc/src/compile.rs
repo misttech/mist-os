@@ -348,17 +348,17 @@ mod tests {
                             "my.service.Service",
                             "my.service.Service2",
                         ],
-                        "from": ["#logger", "self"],
+                        "from": "self",
                         "to": [ "#netstack" ]
                     },
                     {
                         "service": "my.service.CollectionService",
-                        "from": ["#coll"],
-                        "to": [ "#netstack" ],
+                        "from": "#coll",
+                        "to": "#netstack",
                     },
                     {
-                        "service": "my.service.CollectionService2",
-                        "from": ["#coll"],
+                        "service": "agg.service.CollectionService",
+                        "from": [ "#coll", "#other_coll" ],
                         "to": [ "#netstack" ],
                         "availability": "same_as_target",
                     },
@@ -384,6 +384,10 @@ mod tests {
                 "collections": [
                     {
                         "name": "coll",
+                        "durability": "transient",
+                    },
+                    {
+                        "name": "other_coll",
                         "durability": "transient",
                     },
                 ],
@@ -417,38 +421,6 @@ mod tests {
                                 name: "coll".to_string(),
                             })),
                             target_name: Some("fuchsia.logger.Log2".to_string()),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("my.service.Service".to_string()),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service2".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("my.service.Service2".to_string()),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
@@ -495,12 +467,25 @@ mod tests {
                     fdecl::Offer::Service (
                         fdecl::OfferService {
                             source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "coll".to_string() })),
-                            source_name: Some("my.service.CollectionService2".to_string()),
+                            source_name: Some("agg.service.CollectionService".to_string()),
                             target: Some(fdecl::Ref::Child(fdecl::ChildRef {
                                 name: "netstack".to_string(),
                                 collection: None,
                             })),
-                            target_name: Some("my.service.CollectionService2".to_string()),
+                            target_name: Some("agg.service.CollectionService".to_string()),
+                            availability: Some(fdecl::Availability::SameAsTarget),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Service (
+                        fdecl::OfferService {
+                            source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "other_coll".to_string() })),
+                            source_name: Some("agg.service.CollectionService".to_string()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "netstack".to_string(),
+                                collection: None,
+                            })),
+                            target_name: Some("agg.service.CollectionService".to_string()),
                             availability: Some(fdecl::Availability::SameAsTarget),
                             ..Default::default()
                         }
@@ -548,7 +533,15 @@ mod tests {
                         allowed_offers: None,
                         allow_long_names: None,
                         ..Default::default()
-                    }
+                    },
+                    fdecl::Collection {
+                        name: Some("other_coll".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        environment: None,
+                        allowed_offers: None,
+                        allow_long_names: None,
+                        ..Default::default()
+                    },
                 ]),
                 ..Default::default()
             },
@@ -566,11 +559,15 @@ mod tests {
                             "my.service.Service",
                             "my.service.Service2",
                         ],
-                        "from": ["#logger", "self"],
+                        "from": "self",
                     },
                     {
                         "service": "my.service.CollectionService",
-                        "from": ["#coll"],
+                        "from": "#coll",
+                    },
+                    {
+                        "service": "agg.service.CollectionService",
+                        "from": [ "#coll", "#other_coll" ],
                     },
                 ],
                 "capabilities": [
@@ -592,6 +589,10 @@ mod tests {
                         "name": "coll",
                         "durability": "transient",
                     },
+                    {
+                        "name": "other_coll",
+                        "durability": "transient",
+                    },
                 ],
             }),
             output = fdecl::Component {
@@ -611,35 +612,9 @@ mod tests {
                     ),
                     fdecl::Expose::Service (
                         fdecl::ExposeService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service".to_string()),
-                            target_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::Service (
-                        fdecl::ExposeService {
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                             source_name: Some("my.service.Service".to_string()),
                             target_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::Service (
-                        fdecl::ExposeService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service2".to_string()),
-                            target_name: Some("my.service.Service2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
@@ -660,6 +635,26 @@ mod tests {
                             source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "coll".to_string() })),
                             source_name: Some("my.service.CollectionService".to_string()),
                             target_name: Some("my.service.CollectionService".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "coll".to_string() })),
+                            source_name: Some("agg.service.CollectionService".to_string()),
+                            target_name: Some("agg.service.CollectionService".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "other_coll".to_string() })),
+                            source_name: Some("agg.service.CollectionService".to_string()),
+                            target_name: Some("agg.service.CollectionService".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
@@ -700,6 +695,14 @@ mod tests {
                         allowed_offers: None,
                         allow_long_names: None,
                         ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("other_coll".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        environment: None,
+                        allowed_offers: None,
+                        allow_long_names: None,
+                        ..Default::default()
                     }
                 ]),
                 ..Default::default()
@@ -725,7 +728,7 @@ mod tests {
                             "my.service.Service",
                             "my.service.Service2",
                         ],
-                        "from": ["#logger", "self"],
+                        "from": "self",
                         "availability": "optional",
                     },
                     {
@@ -791,35 +794,9 @@ mod tests {
                     ),
                     fdecl::Expose::Service (
                         fdecl::ExposeService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service".to_string()),
-                            target_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            availability: Some(fdecl::Availability::Optional),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::Service (
-                        fdecl::ExposeService {
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                             source_name: Some("my.service.Service".to_string()),
                             target_name: Some("my.service.Service".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            availability: Some(fdecl::Availability::Optional),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::Service (
-                        fdecl::ExposeService {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("my.service.Service2".to_string()),
-                            target_name: Some("my.service.Service2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             availability: Some(fdecl::Availability::Optional),
                             ..Default::default()

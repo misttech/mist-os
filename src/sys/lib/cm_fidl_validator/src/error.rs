@@ -72,6 +72,10 @@ pub enum Error {
 
     #[error("Invalid aggregate offer: {0}")]
     InvalidAggregateOffer(String),
+
+    #[error("{} for {1} is an aggregate, but one of the sources is not a collection. \
+            Aggregation from non-collection sources in not currently supported.", .0.field)]
+    ServiceAggregateNotCollection(DeclField, String),
 }
 
 impl Error {
@@ -248,6 +252,17 @@ impl Error {
 
     pub fn invalid_aggregate_offer(info: impl Into<String>) -> Self {
         Error::InvalidAggregateOffer(info.into())
+    }
+
+    pub fn service_aggregate_not_collection(
+        decl_type: impl Into<String>,
+        keyword: impl Into<String>,
+        target_name: impl Into<String>,
+    ) -> Self {
+        Error::ServiceAggregateNotCollection(
+            DeclField { decl: decl_type.into(), field: keyword.into() },
+            target_name.into(),
+        )
     }
 }
 

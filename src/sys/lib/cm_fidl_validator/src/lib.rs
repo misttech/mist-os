@@ -190,6 +190,18 @@ pub fn validate_values_data_todo_fxb_126609(data: &fconfig::ValuesData) -> Resul
     }
 }
 
+// `fdecl::Ref` is not hashable, so define this equivalent type for use in maps
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum RefKey<'a> {
+    Parent,
+    Self_,
+    Child(&'a str),
+    Collection(&'a str),
+    Framework,
+    Capability,
+    Debug,
+}
+
 /// Validates a Component.
 ///
 /// The Component may ultimately originate from a CM file, or be directly constructed by the
@@ -418,6 +430,7 @@ impl<'a> ValidationContext<'a> {
             for expose in exposes.iter() {
                 self.validate_expose_decl(&expose, &mut target_ids);
             }
+            self.validate_expose_group(&exposes);
         }
 
         // Validate "offers".
@@ -425,14 +438,14 @@ impl<'a> ValidationContext<'a> {
             for dynamic_offer in dynamic_offers.iter() {
                 self.validate_offers_decl(&dynamic_offer, OfferType::Dynamic);
             }
-            self.validate_offer_group(&dynamic_offers);
+            self.validate_offer_group(&dynamic_offers, OfferType::Dynamic);
         }
 
         if let Some(offers) = decl.offers.as_ref() {
             for offer in offers.iter() {
                 self.validate_offers_decl(&offer, OfferType::Static);
             }
-            self.validate_offer_group(&offers);
+            self.validate_offer_group(&offers, OfferType::Static);
         }
 
         // Validate "environments" after all other declarations are processed.
@@ -1368,6 +1381,69 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
+    /// Return a key that can be used in `HashMap` to group aggregate declarations.
+    ///
+    /// Returns `None` if the input resembles an invalid declaration.
+    fn make_group_key(
+        target_name: Option<&'a String>,
+        target: Option<&'a fdecl::Ref>,
+    ) -> Option<(&'a str, RefKey<'a>)> {
+        if target_name.is_none() {
+            return None;
+        }
+        let target_name = target_name.unwrap().as_str();
+        if target.is_none() {
+            return None;
+        }
+        let target = match target.unwrap() {
+            fdecl::Ref::Parent(_) => RefKey::Parent,
+            fdecl::Ref::Self_(_) => RefKey::Self_,
+            fdecl::Ref::Child(r) => RefKey::Child(r.name.as_str()),
+            fdecl::Ref::Collection(r) => RefKey::Collection(r.name.as_str()),
+            fdecl::Ref::Framework(_) => RefKey::Framework,
+            fdecl::Ref::Capability(_) => RefKey::Capability,
+            fdecl::Ref::Debug(_) => RefKey::Debug,
+            fdecl::RefUnknown!() => {
+                return None;
+            }
+        };
+        Some((target_name, target))
+    }
+
+    // Checks a group of expose decls to confirm that any duplicate exposes are
+    // valid aggregate expose declarations.
+    fn validate_expose_group(&mut self, exposes: &'a Vec<fdecl::Expose>) {
+        let mut expose_groups: HashMap<_, Vec<fdecl::ExposeService>> = HashMap::new();
+        let service_exposes = exposes.into_iter().filter_map(|o| {
+            if let fdecl::Expose::Service(s) = o {
+                Some(s)
+            } else {
+                None
+            }
+        });
+        for expose in service_exposes {
+            let key = Self::make_group_key(expose.target_name.as_ref(), expose.target.as_ref());
+            if let Some(key) = key {
+                expose_groups.entry(key).or_insert_with(|| vec![]).push(expose.clone());
+            }
+        }
+        for (p, expose_group) in expose_groups {
+            if expose_group.len() == 1 {
+                // If there is not multiple exposes for a (target_name, target) pair then there are
+                // no aggregation conditions to check.
+                continue;
+            }
+            let (target_name, _) = p;
+            if !expose_group.iter().all(|e| matches!(e.source, Some(fdecl::Ref::Collection(_)))) {
+                self.errors.push(Error::service_aggregate_not_collection(
+                    "ExposeServiceDecl",
+                    "source",
+                    target_name,
+                ));
+            }
+        }
+    }
+
     fn validate_expose_decl(
         &mut self,
         expose: &'a fdecl::Expose,
@@ -1610,8 +1686,8 @@ impl<'a> ValidationContext<'a> {
 
     // Checks a group of offer decls to confirm that any duplicate offers are
     // valid aggregate offer declarations.
-    fn validate_offer_group(&mut self, offers: &Vec<fdecl::Offer>) {
-        let mut offer_groups: HashMap<String, Vec<fdecl::OfferService>> = HashMap::new();
+    fn validate_offer_group(&mut self, offers: &'a Vec<fdecl::Offer>, offer_type: OfferType) {
+        let mut offer_groups: HashMap<_, Vec<fdecl::OfferService>> = HashMap::new();
         let service_offers = offers.into_iter().filter_map(|o| {
             if let fdecl::Offer::Service(s) = o {
                 Some(s)
@@ -1620,26 +1696,33 @@ impl<'a> ValidationContext<'a> {
             }
         });
         for offer in service_offers {
-            let offer_group_key = format!("{:?}_{:?}", offer.target_name, offer.target);
-            offer_groups.entry(offer_group_key).or_insert_with(|| vec![]).push(offer.clone());
+            let key = Self::make_group_key(offer.target_name.as_ref(), offer.target.as_ref());
+            if let Some(key) = key {
+                offer_groups.entry(key).or_insert_with(|| vec![]).push(offer.clone());
+            }
         }
-        for (_, offer_group) in offer_groups {
+        for (p, offer_group) in offer_groups {
             if offer_group.len() == 1 {
                 // If there is not multiple offers for a  target_name, target pair then there are no
                 // aggregation conditions to check.
                 continue;
             }
+            let (target_name, _) = p;
+            if offer_type == OfferType::Static
+                && !offer_group.iter().all(|o| matches!(o.source, Some(fdecl::Ref::Collection(_))))
+            {
+                self.errors.push(Error::service_aggregate_not_collection(
+                    "OfferServiceDecl",
+                    "source",
+                    target_name,
+                ));
+            }
             let mut source_instance_filter_entries: HashSet<String> = HashSet::new();
             let mut service_source_names: HashSet<String> = HashSet::new();
             for o in offer_group {
                 // Currently only service capabilities can be aggregated
-                match o.source_instance_filter {
-                    None => {
-                        self.errors.push(Error::invalid_aggregate_offer(
-                            "source_instance_filter must be set for all aggregate service offers",
-                        ));
-                    }
-                    Some(source_instance_filter) => {
+                match (o.source_instance_filter, offer_type) {
+                    (Some(source_instance_filter), _) => {
                         for instance_name in source_instance_filter {
                             if !source_instance_filter_entries.insert(instance_name.clone()) {
                                 // If the source instance in the filter has been seen before this means there is a conflicting
@@ -1647,6 +1730,14 @@ impl<'a> ValidationContext<'a> {
                                 self.errors.push(Error::invalid_aggregate_offer(format!("Conflicting source_instance_filter in aggregate service offer, instance_name '{}' seen in filter lists multiple times", instance_name)));
                             }
                         }
+                    }
+                    (None, OfferType::Static) => {}
+                    (None, OfferType::Dynamic) => {
+                        // Dynamic offers must include a filter.
+                        self.errors.push(Error::invalid_aggregate_offer(
+                            "source_instance_filter must be set for dynamic aggregate service \
+                            offers",
+                        ));
                     }
                 }
                 service_source_names.insert(
@@ -4829,14 +4920,18 @@ mod tests {
                 let mut decl = new_component_decl();
                 decl.exposes = Some(vec![
                     fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll".into(),
+                        })),
                         source_name: Some("netstack".to_string()),
                         target_name: Some("fuchsia.net.Stack".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         ..Default::default()
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll2".into(),
+                        })),
                         source_name: Some("netstack2".to_string()),
                         target_name: Some("fuchsia.net.Stack".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -4902,6 +4997,18 @@ mod tests {
                         target_name: Some("pkg".to_string()),
                         ..Default::default()
                     }),
+                ]);
+                decl.collections = Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll".into()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("coll2".into()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
                 ]);
                 decl.capabilities = Some(vec![
                     fdecl::Capability::Service(fdecl::Service {
@@ -5949,7 +6056,9 @@ mod tests {
                 let mut decl = new_component_decl();
                 decl.offers = Some(vec![
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "modular".into()
+                        })),
                         source_name: Some("logger".to_string()),
                         target: Some(fdecl::Ref::Child(
                         fdecl::ChildRef {
@@ -5958,11 +6067,12 @@ mod tests {
                         }
                         )),
                         target_name: Some("fuchsia.logger.Log".to_string()),
-                        source_instance_filter: Some(vec!["instance_0".to_string()]),
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "modular".into()
+                        })),
                         source_name: Some("logger".to_string()),
                         target: Some(fdecl::Ref::Child(
                         fdecl::ChildRef {
@@ -5971,7 +6081,6 @@ mod tests {
                         }
                         )),
                         target_name: Some("fuchsia.logger.Log".to_string()),
-                        source_instance_filter: Some(vec!["instance_1".to_string()]),
                         ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -6652,7 +6761,9 @@ mod tests {
                 let mut decl = new_component_decl();
                 decl.offers = Some(vec![
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_a".to_string(), collection: None})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_a".to_string()
+                        })),
                         source_name: Some("fuchsia.logger.Log".to_string()),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -6661,11 +6772,13 @@ mod tests {
                             }
                         )),
                         target_name: Some("fuchsia.logger.Log".to_string()),
-                        source_instance_filter: Some(vec!["default".to_string()]),
+                        source_instance_filter: None,
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_b".to_string(), collection: None})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_b".to_string()
+                        })),
                         source_name: Some("fuchsia.logger.Log".to_string()),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -6680,27 +6793,21 @@ mod tests {
                 ]);
                 decl.children = Some(vec![
                     fdecl::Child {
-                        name: Some("child_a".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                    fdecl::Child {
-                        name: Some("child_b".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                    fdecl::Child {
                         name: Some("child_c".to_string()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
+                        ..Default::default()
+                    },
+                ]);
+                decl.collections = Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll_a".into()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("coll_b".into()),
+                        durability: Some(fdecl::Durability::Transient),
                         ..Default::default()
                     },
                 ]);
@@ -7724,76 +7831,14 @@ mod tests {
             ])),
         },
 
-        test_validate_invalid_service_aggregation_missing_filter => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.offers = Some(vec![
-                    fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_a".to_string(), collection: None})),
-                        source_name: Some("fuchsia.logger.Log".to_string()),
-                        target: Some(fdecl::Ref::Child(
-                            fdecl::ChildRef {
-                                name: "child_c".to_string(),
-                                collection: None,
-                            }
-                        )),
-                        target_name: Some("fuchsia.logger.Log".to_string()),
-                        source_instance_filter: Some(vec!["default".to_string()]),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_b".to_string(), collection: None})),
-                        source_name: Some("fuchsia.logger.Log".to_string()),
-                        target: Some(fdecl::Ref::Child(
-                            fdecl::ChildRef {
-                                name: "child_c".to_string(),
-                                collection: None,
-                            }
-                        )),
-                        target_name: Some("fuchsia.logger.Log".to_string()),
-                        source_instance_filter: None,
-                        ..Default::default()
-                    }),
-                ]);
-                decl.children = Some(vec![
-                    fdecl::Child {
-                        name: Some("child_a".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                    fdecl::Child {
-                        name: Some("child_b".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                    fdecl::Child {
-                        name: Some("child_c".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_aggregate_offer("source_instance_filter must be set for all aggregate service offers"),
-            ])),
-        },
-
         test_validate_invalid_service_aggregation_conflicting_filter => {
             input = {
                 let mut decl = new_component_decl();
                 decl.offers = Some(vec![
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_a".to_string(), collection: None})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_a".to_string()
+                        })),
                         source_name: Some("fuchsia.logger.Log".to_string()),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -7806,7 +7851,9 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_b".to_string(), collection: None})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_b".to_string()
+                        })),
                         source_name: Some("fuchsia.logger.Log".to_string()),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -7819,29 +7866,23 @@ mod tests {
                         ..Default::default()
                     }),
                 ]);
+                decl.collections = Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll_a".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("coll_b".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                ]);
                 decl.children = Some(vec![
-                    fdecl::Child {
-                        name: Some("child_a".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                    fdecl::Child {
-                        name: Some("child_b".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
                     fdecl::Child {
                         name: Some("child_c".to_string()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
                         ..Default::default()
                     },
                 ]);
@@ -7857,7 +7898,9 @@ mod tests {
                 let mut decl = new_component_decl();
                 decl.offers = Some(vec![
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_a".to_string(), collection: None})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_a".into()
+                        })),
                         source_name: Some("fuchsia.logger.Log".to_string()),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -7870,7 +7913,9 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "child_b".to_string(), collection: None})),
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_b".into()
+                        })),
                         source_name: Some("fuchsia.logger.LogAlt".to_string()),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -7883,23 +7928,19 @@ mod tests {
                         ..Default::default()
                     })
                 ]);
+                decl.collections = Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll_a".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("coll_b".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                ]);
                 decl.children = Some(vec![
-                    fdecl::Child {
-                        name: Some("child_a".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
-                    fdecl::Child {
-                        name: Some("child_b".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        on_terminate: None,
-                        environment: None,
-                        ..Default::default()
-                    },
                     fdecl::Child {
                         name: Some("child_c".to_string()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
@@ -8724,6 +8765,156 @@ mod tests {
                 }
             ),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn test_validate_dynamic_offers_valid_service_aggregation() {
+        assert_eq!(
+            validate_dynamic_offers(
+                &vec![
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_a".to_string(),
+                            collection: None
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_c".to_string(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        source_instance_filter: Some(vec!["default".to_string()]),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_b".to_string(),
+                            collection: None
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_c".to_string(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        source_instance_filter: Some(vec!["a_different_default".to_string()]),
+                        ..Default::default()
+                    })
+                ],
+                &fdecl::Component {
+                    children: Some(vec![
+                        fdecl::Child {
+                            name: Some("child_a".to_string()),
+                            url: Some(
+                                "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                                    .to_string()
+                            ),
+                            startup: Some(fdecl::StartupMode::Lazy),
+                            on_terminate: None,
+                            environment: None,
+                            ..Default::default()
+                        },
+                        fdecl::Child {
+                            name: Some("child_b".to_string()),
+                            url: Some(
+                                "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                                    .to_string()
+                            ),
+                            startup: Some(fdecl::StartupMode::Lazy),
+                            on_terminate: None,
+                            environment: None,
+                            ..Default::default()
+                        },
+                        fdecl::Child {
+                            name: Some("child_c".to_string()),
+                            url: Some(
+                                "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                                    .to_string()
+                            ),
+                            startup: Some(fdecl::StartupMode::Lazy),
+                            on_terminate: None,
+                            environment: None,
+                            ..Default::default()
+                        },
+                    ]),
+                    ..Default::default()
+                }
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn test_validate_dynamic_service_aggregation_missing_filter() {
+        assert_eq!(
+            validate_dynamic_offers(
+                &vec![
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_a".to_string(),
+                            collection: None
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_c".to_string(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        source_instance_filter: Some(vec!["default".to_string()]),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_b".to_string(),
+                            collection: None
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child_c".to_string(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        source_instance_filter: None,
+                        ..Default::default()
+                    }),
+                ],
+                &fdecl::Component {
+                    children: Some(vec![
+                        fdecl::Child {
+                            name: Some("child_a".to_string()),
+                            url: Some(
+                                "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                                    .to_string()
+                            ),
+                            startup: Some(fdecl::StartupMode::Lazy),
+                            ..Default::default()
+                        },
+                        fdecl::Child {
+                            name: Some("child_b".to_string()),
+                            url: Some(
+                                "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                                    .to_string()
+                            ),
+                            startup: Some(fdecl::StartupMode::Lazy),
+                            ..Default::default()
+                        },
+                        fdecl::Child {
+                            name: Some("child_c".to_string()),
+                            url: Some(
+                                "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                                    .to_string()
+                            ),
+                            startup: Some(fdecl::StartupMode::Lazy),
+                            ..Default::default()
+                        },
+                    ]),
+                    ..Default::default()
+                },
+            ),
+            Err(ErrorList::new(vec![Error::invalid_aggregate_offer(
+                "source_instance_filter must be set for dynamic aggregate service offers"
+            ),]))
         );
     }
 

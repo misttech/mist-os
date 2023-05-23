@@ -450,7 +450,7 @@ pub struct OneOrManyOfferToRefs;
 /// Generates deserializer for `OneOrMany<OfferFromRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"parent\", \"framework\", \"self\", or \"#<child-name>\"",
+    expected = "one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", or \"#<collection-name>\"",
     inner_type = "OfferFromRef",
     min_length = 1,
     unique_items = true

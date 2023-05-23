@@ -33,6 +33,14 @@ impl<T> OneOrMany<T> {
             Self::Many(items) => Iter { inner_one: None, inner_many: Some(items.iter()) },
         }
     }
+
+    /// Returns the number of values in this `OneOrMany<T>`.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::One(_) => 1,
+            Self::Many(v) => v.len(),
+        }
+    }
 }
 
 impl<T> OneOrMany<T>

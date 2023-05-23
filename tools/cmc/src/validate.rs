@@ -598,6 +598,20 @@ impl<'a> ValidationContext<'a> {
                    )));
                     }
                 }
+
+                if expose.from.len() > 1
+                    && !expose.from.iter().all(|r| match r {
+                        cml::ExposeFromRef::Named(r) => self.all_collections.contains(r),
+                        _ => false,
+                    })
+                {
+                    return Err(Error::validate(format!(
+                        "Service \"{}\" is exposed with multiple `from`, but one of them is not a \
+                        collection. Aggregation from non-collection sources is not currently \
+                        supported.",
+                        service
+                    )));
+                }
             }
         }
 
@@ -683,6 +697,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
         }
+
         if let Some(event_stream) = &expose.event_stream {
             if event_stream.iter().len() > 1 && expose.r#as.is_some() {
                 return Err(Error::validate(format!(
@@ -756,6 +771,19 @@ impl<'a> ValidationContext<'a> {
                             service
                         )));
                     }
+                }
+                if offer.from.len() > 1
+                    && !offer.from.iter().all(|r| match r {
+                        cml::OfferFromRef::Named(r) => self.all_collections.contains(r),
+                        _ => false,
+                    })
+                {
+                    return Err(Error::validate(format!(
+                        "Service \"{}\" is offered with multiple `from`, but one of them is not a \
+                        collection. Aggregation from non-collection sources is not currently \
+                        supported.",
+                        service
+                    )));
                 }
             }
         }
@@ -3678,7 +3706,7 @@ mod tests {
                         "to": [ "#echo_server" ],
                     } ]
                 }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"#invalid@\", expected one or an array of \"parent\", \"framework\", \"self\", or \"#<child-name>\""
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"#invalid@\", expected one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", or \"#<collection-name>\""
         ),
         test_cml_offer_invalid_multiple_from(
             json!({
@@ -6095,7 +6123,7 @@ mod tests {
                 "offer": [
                     {
                         "service": "fuchsia.logger.Log",
-                        "from": [ "#logger", "parent" ],
+                        "from": [ "#coll", "parent" ],
                         "to": [ "#echo_server" ],
                     },
                 ],
@@ -6104,29 +6132,15 @@ mod tests {
                         "name": "logger",
                         "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
                     },
+                ],
+                "collections": [
                     {
-                        "name": "echo_server",
-                        "url": "fuchsia-pkg://fuchsia.com/echo/stable#meta/echo_server.cm"
+                        "name": "coll",
+                        "durability": "transient",
                     },
                 ],
             }),
-            Ok(())
-        ),
-        test_cml_offer_service_from_collection_ok(
-            json!({
-                "collections": [ {
-                    "name": "coll",
-                    "durability": "transient",
-                } ],
-                "children": [ {
-                    "name": "echo_server",
-                    "url": "fuchsia-pkg://fuchsia.com/echo/stable#meta/echo_server.cm",
-                } ],
-                "offer": [ {
-                    "service": "fuchsia.logger.Log", "from": "#coll", "to": [ "#echo_server" ]
-                }]
-            }),
-            Ok(())
+            Err(Error::Validate { err, .. }) if &err == "Service \"fuchsia.logger.Log\" is offered with multiple `from`, but one of them is not a collection. Aggregation from non-collection sources is not currently supported."
         ),
         test_cml_offer_service_from_self_missing(
             json!({
@@ -6178,7 +6192,7 @@ mod tests {
                 "expose": [
                     {
                         "service": "fuchsia.logger.Log",
-                        "from": [ "#logger", "self" ],
+                        "from": [ "#logger", "#coll" ],
                     },
                 ],
                 "capabilities": [
@@ -6190,8 +6204,14 @@ mod tests {
                         "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
                     },
                 ],
+                "collections": [
+                    {
+                        "name": "coll",
+                        "durability": "transient",
+                    },
+                ],
             }),
-            Ok(())
+            Err(Error::Validate { err, .. }) if &err == "Service \"fuchsia.logger.Log\" is exposed with multiple `from`, but one of them is not a collection. Aggregation from non-collection sources is not currently supported."
         ),
         test_cml_expose_service_from_self_missing(
             json!({
@@ -6203,18 +6223,6 @@ mod tests {
                 ],
             }),
             Err(Error::Validate { err, .. }) if &err == "Service \"pkg_service\" is exposed from self, so it must be declared as a \"service\" in \"capabilities\""
-        ),
-        test_cml_expose_service_from_collection_ok(
-            json!({
-                "collections": [ {
-                    "name": "coll",
-                    "durability": "transient",
-                } ],
-                "expose": [ {
-                    "service": "fuchsia.logger.Log", "from": "#coll"
-                }]
-            }),
-            Ok(())
         ),
         test_cml_service(
             json!({

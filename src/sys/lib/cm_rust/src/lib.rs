@@ -2652,9 +2652,8 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "netstack".to_string(),
-                            collection: None,
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "modular".to_string(),
                         })),
                         source_name: Some("netstack1".to_string()),
                         target_name: Some("mynetstack".to_string()),
@@ -2663,9 +2662,8 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "netstack".to_string(),
-                            collection: None,
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "modular".to_string(),
                         })),
                         source_name: Some("netstack2".to_string()),
                         target_name: Some("mynetstack".to_string()),
@@ -3043,14 +3041,14 @@ mod tests {
                             target_name: "pkg".try_into().unwrap(),
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Collection("modular".to_string()),
                             source_name: "netstack1".try_into().unwrap(),
                             target_name: "mynetstack".try_into().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Collection("modular".to_string()),
                             source_name: "netstack2".try_into().unwrap(),
                             target_name: "mynetstack".try_into().unwrap(),
                             target: ExposeTarget::Parent,
