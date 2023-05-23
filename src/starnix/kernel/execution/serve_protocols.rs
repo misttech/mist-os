@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::{endpoints::ControlHandle, AsyncChannel};
+use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_binder as fbinder;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_zircon as zx;
@@ -121,47 +120,6 @@ pub async fn serve_container_controller(
                 } else {
                     responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?;
                 }
-            }
-        }
-    }
-    Ok(())
-}
-
-pub async fn serve_dev_binder(
-    mut request_stream: fbinder::DevBinderRequestStream,
-    container: Arc<Container>,
-) -> Result<(), Error> {
-    while let Some(event) = request_stream.try_next().await? {
-        match event {
-            fbinder::DevBinderRequest::Open { payload, control_handle } => {
-                let result: Result<(), Error> = (|| {
-                    let path = payload.path.ok_or_else(|| errno!(EINVAL))?;
-                    let process_accessor =
-                        payload.process_accessor.ok_or_else(|| errno!(EINVAL))?;
-                    let process = payload.process;
-                    let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
-                    let node =
-                        container.kernel.kthreads.system_task().lookup_path_from_root(&path)?;
-                    let device_type = node.entry.node.info().rdev;
-                    let binder_driver = container
-                        .kernel
-                        .binders
-                        .read()
-                        .get(&device_type)
-                        .ok_or_else(|| errno!(ENOTSUP))?
-                        .clone();
-                    binder_driver
-                        .open_external(&container.kernel, process_accessor, process, binder)
-                        .detach();
-                    Ok(())
-                })();
-                if result.is_err() {
-                    control_handle.shutdown();
-                }
-            }
-            fbinder::DevBinderRequest::Close { payload: _, control_handle: _ } => {
-                // Nothing to do here, as ordering between open and close is not important here, as
-                // all opened binder are opened with a different process.
             }
         }
     }

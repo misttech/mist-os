@@ -7,7 +7,6 @@ use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_binder as fbinder;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
@@ -156,7 +155,6 @@ pub struct Container {
 /// The services that are exposed in the container component's outgoing directory.
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
-    Binder(fbinder::DevBinderRequestStream),
     Container(fstarcontainer::ControllerRequestStream),
 }
 
@@ -231,14 +229,12 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
 
     let container = Arc::new(Container { kernel, _node: node });
 
-    let serve_binder = config.features.contains(&"binder".to_string());
     if let Some(outgoing_dir_channel) = config.outgoing_dir.take() {
         let container_clone = container.clone();
         // Add `ComponentRunner` to the exposed services of the container, and then serve the
         // outgoing directory.
         let mut outgoing_directory = ServiceFs::new_local();
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::ComponentRunner);
-        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Binder);
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Container);
         outgoing_directory
             .serve_connection(outgoing_dir_channel.into())
@@ -261,16 +257,6 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
                             }
                         })
                         .detach();
-                    }
-                    ExposedServices::Binder(request_stream) => {
-                        if serve_binder {
-                            fasync::Task::local(async move {
-                                serve_dev_binder(request_stream, container_clone.clone())
-                                    .await
-                                    .expect("failed to start binder.")
-                            })
-                            .detach();
-                        }
                     }
                     ExposedServices::Container(request_stream) => {
                         fasync::Task::local(async move {

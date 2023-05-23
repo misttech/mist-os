@@ -28,17 +28,11 @@ use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQue
 use crate::types::*;
 use bitflags::bitflags;
 use derivative::Derivative;
-use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd};
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
-use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{TryFutureExt, TryStreamExt};
-use std::collections::{
-    btree_map::{BTreeMap, Entry},
-    VecDeque,
-};
-use std::ffi::CString;
+use std::collections::{btree_map::BTreeMap, VecDeque};
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
@@ -2602,77 +2596,6 @@ impl BinderDriver {
         })
     }
 
-    pub fn open_external(
-        self: &Arc<Self>,
-        kernel: &Arc<Kernel>,
-        process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
-        process: Option<zx::Process>,
-        server_end: ServerEnd<fbinder::BinderMarker>,
-    ) -> fasync::Task<()> {
-        let kernel = kernel.clone();
-        let driver = self.clone();
-
-        fasync::Task::local(
-            async move {
-                let base_task = Task::create_init_child_process(
-                    &kernel,
-                    &CString::new("external_binder".to_string()).unwrap(),
-                )?;
-                let connection = driver.open_remote(&base_task, process_accessor, process);
-                let mut stream = fbinder::BinderRequestStream::from_channel(
-                    fasync::Channel::from_channel(server_end.into_channel())?,
-                );
-                let mut tid_to_task: BTreeMap<u64, Arc<CurrentTask>> = Default::default();
-                while let Some(event) = stream.try_next().await? {
-                    match event {
-                        fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
-                            if connection.map_external_vmo(vmo, mapped_address).is_err() {
-                                control_handle.shutdown();
-                            }
-                        }
-                        fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
-                            // Get the task associated with the thread. If none already exist, a
-                            // new thread of `base_task` is created.
-                            let current_task = match tid_to_task.entry(tid) {
-                                Entry::Occupied(e) => e.get().clone(),
-                                Entry::Vacant(e) => e
-                                    .insert(Arc::new(base_task.clone_task(
-                                        (CLONE_THREAD
-                                            | CLONE_VM
-                                            | CLONE_SIGHAND
-                                            | CLONE_FS
-                                            | CLONE_FILES)
-                                            as u64,
-                                        None,
-                                        Default::default(),
-                                        Default::default(),
-                                    )?))
-                                    .clone(),
-                            };
-
-                            let connection = connection.clone();
-
-                            kernel.kthreads.pool.dispatch(move || {
-                                let result = connection
-                                    .ioctl(&current_task, request, parameter.into())
-                                    .map_err(|e| {
-                                        fposix::Errno::from_primitive(e.code.error_code() as i32)
-                                            .unwrap_or(fposix::Errno::Einval)
-                                    });
-                                let _ = responder.send(result);
-                            });
-                        }
-                    }
-                }
-                connection.close();
-                Ok(())
-            }
-            .unwrap_or_else(|_: anyhow::Error| {
-                // Ignoring the error, as it is coming from a disconnection from the client.
-            }),
-        )
-    }
-
     fn get_context_manager(
         &self,
         current_task: &CurrentTask,
@@ -3946,7 +3869,7 @@ pub mod tests {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, create_proxy, RequestStream, ServerEnd};
+    use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
     use fuchsia_async as fasync;
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
@@ -6750,62 +6673,6 @@ pub mod tests {
             let mut executor = LocalExecutor::new();
             executor.run_singlethreaded(run_process_accessor(server_end))
         })
-    }
-
-    #[test_case(true; "with_process")]
-    #[test_case(false; "without_process")]
-    #[::fuchsia::test]
-    async fn external_binder_connection(with_process: bool) {
-        let (process_accessor_client_end, process_accessor_server_end) =
-            create_endpoints::<fbinder::ProcessAccessorMarker>();
-
-        let process_accessor_thread =
-            spawn_new_process_accessor_thread(process_accessor_server_end);
-
-        let (binder_proxy, binder_server_end) =
-            create_proxy::<fbinder::BinderMarker>().expect("proxy");
-        let task = fasync::Task::spawn(async move {
-            let (kernel, _task) = create_kernel_and_task();
-            let driver = BinderDriver::new();
-
-            // Set the context manager, as external ioctl will wait for it to be set before
-            // executing.
-            let context_manager_proc = driver.create_local_process(1);
-            let context_manager =
-                BinderObject::new_context_manager_marker(&context_manager_proc, 0);
-            driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
-            let process = with_process.then(|| {
-                fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process")
-            });
-            driver
-                .open_external(&kernel, process_accessor_client_end, process, binder_server_end)
-                .await;
-        });
-        const vmo_size: usize = 10 * 1024 * 1024;
-        let vmo = zx::Vmo::create(vmo_size as u64).expect("Vmo::create");
-        let addr = fuchsia_runtime::vmar_root_self()
-            .map(0, &vmo, 0, vmo_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
-            .expect("map");
-        scopeguard::defer! {
-            // SAFETY This is a ffi call to a kernel syscall.
-            unsafe { fuchsia_runtime::vmar_root_self().unmap(addr, vmo_size).expect("unmap"); }
-        }
-
-        binder_proxy.set_vmo(vmo, addr as u64).expect("set_vmo");
-        let mut version = binder_version { protocol_version: 0 };
-        let version_ref = &mut version as *mut binder_version;
-        binder_proxy
-            .ioctl(42, uapi::BINDER_VERSION, version_ref as u64)
-            .await
-            .expect("ioctl")
-            .expect("ioctl");
-        // SAFETY This is safe, because version is repr(C)
-        let version = unsafe { std::ptr::read_volatile(version_ref) };
-        assert_eq!(version.protocol_version, BINDER_CURRENT_PROTOCOL_VERSION as i32);
-        std::mem::drop(binder_proxy);
-        task.await;
-
-        process_accessor_thread.join().expect("join").expect("success");
     }
 
     #[test_case(true; "with_process")]

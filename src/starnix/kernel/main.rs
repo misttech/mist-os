@@ -104,14 +104,6 @@ async fn main() -> Result<(), Error> {
         .detach();
     });
 
-    fs.dir("svc").add_fidl_service(|stream| {
-        let container = container.clone();
-        fasync::Task::local(async move {
-            execution::serve_dev_binder(stream, container).await.expect("failed to start binder.")
-        })
-        .detach();
-    });
-
     fs.add_remote("linux_root", execution::expose_root(&container)?);
 
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
