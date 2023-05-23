@@ -152,13 +152,13 @@ class Realm final {
   // Add a v2 component (.cm) to this Realm.
   // Names must be unique. Duplicate names will result in a panic.
   Realm& AddChild(const std::string& child_name, const std::string& url,
-                  ChildOptions options = kDefaultChildOptions);
+                  const ChildOptions& options = kDefaultChildOptions);
 
   // Add a v1 component (.cmx) to this Realm.
   // Names must be unique. Duplicate names will result in a panic.
 #if __Fuchsia_API_level__ <= 11
   Realm& AddLegacyChild(const std::string& child_name, const std::string& url,
-                        ChildOptions options = kDefaultChildOptions);
+                        const ChildOptions& options = kDefaultChildOptions);
 #endif
 
   // This method signature is DEPRECATED.
@@ -181,7 +181,7 @@ class Realm final {
   // TODO(fxbug.dev/109804): Migrate clients to use |LocalComponentFactory|, and
   // remove this deprecated method.
   Realm& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
-                       ChildOptions options = kDefaultChildOptions)
+                       const ChildOptions& options = kDefaultChildOptions)
       ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
 #if __Fuchsia_API_level__ >= 9
@@ -203,12 +203,13 @@ class Realm final {
   //
   // Names must be unique. Duplicate names will result in a panic.
   Realm& AddLocalChild(const std::string& child_name, LocalComponentFactory local_impl,
-                       ChildOptions options = kDefaultChildOptions);
+                       const ChildOptions& options = kDefaultChildOptions);
 #endif
 
   // Create a sub realm as child of this Realm instance. The constructed
   // Realm is returned.
-  Realm AddChildRealm(const std::string& child_name, ChildOptions options = kDefaultChildOptions);
+  Realm AddChildRealm(const std::string& child_name,
+                      const ChildOptions& options = kDefaultChildOptions);
 
   // Route a capability from one child to another.
   Realm& AddRoute(Route route);
@@ -275,7 +276,7 @@ class Realm final {
   std::string GetResolvedName(const std::string& child_name);
 
   Realm& AddLocalChildImpl(const std::string& child_name, LocalComponentKind local_impl,
-                           ChildOptions options = kDefaultChildOptions);
+                           const ChildOptions& options = kDefaultChildOptions);
 
   fuchsia::component::test::RealmSyncPtr realm_proxy_;
   std::shared_ptr<internal::LocalComponentRunner::Builder> runner_builder_;
@@ -306,13 +307,13 @@ class RealmBuilder final {
   // Add a v2 component (.cm) to the root realm being constructed.
   // See |Realm.AddChild| for more details.
   RealmBuilder& AddChild(const std::string& child_name, const std::string& url,
-                         ChildOptions options = kDefaultChildOptions);
+                         const ChildOptions& options = kDefaultChildOptions);
 
   // Add a v1 component (.cmx) to the root realm being constructed.
   // See |Realm.AddLegacyChild| for more details.
 #if __Fuchsia_API_level__ <= 11
   RealmBuilder& AddLegacyChild(const std::string& child_name, const std::string& url,
-                               ChildOptions options = kDefaultChildOptions);
+                               const ChildOptions& options = kDefaultChildOptions);
 #endif
 
   // This method signature is DEPRECATED. Use the LocalComponentFactory
@@ -324,7 +325,7 @@ class RealmBuilder final {
   // TODO(fxbug.dev/109804): Migrate clients to use LocalComponentFactory, and
   // remove this deprecated method.
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
-                              ChildOptions options = kDefaultChildOptions)
+                              const ChildOptions& options = kDefaultChildOptions)
       ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
 #if __Fuchsia_API_level__ >= 9
@@ -333,13 +334,14 @@ class RealmBuilder final {
   // See |Realm.AddLocalChild| for more details.
 
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponentFactory local_impl,
-                              ChildOptions options = kDefaultChildOptions);
+                              const ChildOptions& options = kDefaultChildOptions);
 #endif
 
   // Create a sub realm as child of the root realm. The constructed
   // Realm is returned.
   // See |Realm.AddChildRealm| for more details.
-  Realm AddChildRealm(const std::string& child_name, ChildOptions options = kDefaultChildOptions);
+  Realm AddChildRealm(const std::string& child_name,
+                      const ChildOptions& options = kDefaultChildOptions);
 
   // Route a capability for the root realm being constructed.
   // See |Realm.AddRoute| for more details.

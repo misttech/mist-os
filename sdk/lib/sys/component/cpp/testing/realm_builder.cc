@@ -57,7 +57,7 @@ fidl::InterfaceHandle<fuchsia::io::Directory> CreatePkgDirHandle() {
 // Implementation methods for Realm.
 
 Realm& Realm::AddChild(const std::string& child_name, const std::string& url,
-                       ChildOptions options) {
+                       const ChildOptions& options) {
   fuchsia::component::test::Realm_AddChild_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
       "Realm/AddChild",
@@ -67,7 +67,7 @@ Realm& Realm::AddChild(const std::string& child_name, const std::string& url,
 
 #if __Fuchsia_API_level__ <= 11
 Realm& Realm::AddLegacyChild(const std::string& child_name, const std::string& url,
-                             ChildOptions options) {
+                             const ChildOptions& options) {
   fuchsia::component::test::Realm_AddLegacyChild_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
       "Realm/AddLegacyChild",
@@ -78,17 +78,17 @@ Realm& Realm::AddLegacyChild(const std::string& child_name, const std::string& u
 #endif
 
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
-                            ChildOptions options) {
+                            const ChildOptions& options) {
   return AddLocalChildImpl(child_name, LocalComponentKind(local_impl), options);
 }
 
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponentFactory local_impl,
-                            ChildOptions options) {
+                            const ChildOptions& options) {
   return AddLocalChildImpl(child_name, LocalComponentKind(std::move(local_impl)), options);
 }
 
 Realm& Realm::AddLocalChildImpl(const std::string& child_name, LocalComponentKind local_impl,
-                                ChildOptions options) {
+                                const ChildOptions& options) {
   if (cpp17::holds_alternative<LocalComponent*>(local_impl)) {
     ZX_SYS_ASSERT_NOT_NULL(cpp17::get<LocalComponent*>(local_impl));
   }
@@ -100,7 +100,7 @@ Realm& Realm::AddLocalChildImpl(const std::string& child_name, LocalComponentKin
   return *this;
 }
 
-Realm Realm::AddChildRealm(const std::string& child_name, ChildOptions options) {
+Realm Realm::AddChildRealm(const std::string& child_name, const ChildOptions& options) {
   fuchsia::component::test::RealmSyncPtr sub_realm_proxy;
   std::vector<std::string> sub_realm_scope = scope_;
   sub_realm_scope.push_back(child_name);
@@ -270,7 +270,7 @@ RealmBuilder RealmBuilder::CreateImpl(cpp17::optional<std::string_view> fragment
 }
 
 RealmBuilder& RealmBuilder::AddChild(const std::string& child_name, const std::string& url,
-                                     ChildOptions options) {
+                                     const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
   ZX_ASSERT_MSG(!url.empty(), "url can't be empty");
 
@@ -280,7 +280,7 @@ RealmBuilder& RealmBuilder::AddChild(const std::string& child_name, const std::s
 
 #if __Fuchsia_API_level__ <= 11
 RealmBuilder& RealmBuilder::AddLegacyChild(const std::string& child_name, const std::string& url,
-                                           ChildOptions options) {
+                                           const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
   ZX_ASSERT_MSG(!url.empty(), "url can't be empty");
 
@@ -290,7 +290,7 @@ RealmBuilder& RealmBuilder::AddLegacyChild(const std::string& child_name, const 
 #endif
 
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
-                                          ChildOptions options) {
+                                          const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
   ZX_ASSERT_MSG(local_impl != nullptr, "local_impl can't be nullptr");
   root_.AddLocalChildImpl(child_name, local_impl, options);
@@ -298,13 +298,14 @@ RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalCo
 }
 
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name,
-                                          LocalComponentFactory local_impl, ChildOptions options) {
+                                          LocalComponentFactory local_impl,
+                                          const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
   root_.AddLocalChildImpl(child_name, LocalComponentKind(std::move(local_impl)), options);
   return *this;
 }
 
-Realm RealmBuilder::AddChildRealm(const std::string& child_name, ChildOptions options) {
+Realm RealmBuilder::AddChildRealm(const std::string& child_name, const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
   return root_.AddChildRealm(child_name, options);
 }
