@@ -32,7 +32,8 @@ zx::result<> WaitFor(libsync::Completion& completion) {
   return zx::ok();
 }
 
-zx::result<fdf::SynchronizedDispatcher> TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+zx::result<fdf::SynchronizedDispatcher>
+TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
     const void* driver, fdf::SynchronizedDispatcher::Options options, std::string_view name,
     fdf::Dispatcher::ShutdownHandler shutdown_handler) {
   ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
@@ -57,7 +58,7 @@ zx::result<fdf::SynchronizedDispatcher> TestDispatcherBuilder::CreateTestingSync
 }
 
 zx::result<fdf::UnsynchronizedDispatcher>
-TestDispatcherBuilder::CreateTestingUnsynchronizedDispatcher(
+TestDispatcherBuilder::CreateUnmanagedUnsynchronizedDispatcher(
     const void* driver, fdf::UnsynchronizedDispatcher::Options options, std::string_view name,
     fdf::Dispatcher::ShutdownHandler shutdown_handler) {
   ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
@@ -93,16 +94,22 @@ DefaultDispatcherSetting::~DefaultDispatcherSetting() {
                 zx_status_get_string(status));
 }
 
-TestSynchronizedDispatcher::TestSynchronizedDispatcher(const DispatcherStartArgs& args) {
-  if (args.is_default_dispatcher) {
-    zx::result result = StartAsDefault(args.options, args.dispatcher_name);
-    ZX_ASSERT_MSG(result.is_ok(), "Failed to start dispatcher '%s' as default: %s",
-                  args.dispatcher_name.c_str(), result.status_string());
-  } else {
-    zx::result result = Start(args.options, args.dispatcher_name);
-    ZX_ASSERT_MSG(result.is_ok(), "Failed to start dispatcher '%s': %s",
-                  args.dispatcher_name.c_str(), result.status_string());
+TestSynchronizedDispatcher::TestSynchronizedDispatcher(DispatcherType type) {
+  if (type == DispatcherType::Default) {
+    zx::result result =
+        StartDefault(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "fdf-default");
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to start default dispatcher: %s", result.status_string());
+    return;
   }
+
+  if (type == DispatcherType::Managed) {
+    zx::result result =
+        StartManaged(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "fdf-managed");
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to start managed dispatcher: %s", result.status_string());
+    return;
+  }
+
+  ZX_ASSERT_MSG(false, "Unknown DispatcherType: %d", type);
 }
 
 TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {
@@ -111,8 +118,8 @@ TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {
   ZX_ASSERT_MSG(stop_result.is_ok(), "Stop failed: %s", stop_result.status_string());
 }
 
-zx::result<> TestSynchronizedDispatcher::Start(fdf::SynchronizedDispatcher::Options options,
-                                               std::string_view dispatcher_name) {
+zx::result<> TestSynchronizedDispatcher::StartManaged(fdf::SynchronizedDispatcher::Options options,
+                                                      std::string_view dispatcher_name) {
   auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
       this, options, dispatcher_name,
       [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
@@ -123,10 +130,11 @@ zx::result<> TestSynchronizedDispatcher::Start(fdf::SynchronizedDispatcher::Opti
   return zx::ok();
 }
 
-zx::result<> TestSynchronizedDispatcher::StartAsDefault(
-    fdf::SynchronizedDispatcher::Options options, std::string_view dispatcher_name) {
-  // Create a testing dispatcher that runs separately from the managed runtime thread pool.
-  auto dispatcher = TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+zx::result<> TestSynchronizedDispatcher::StartDefault(fdf::SynchronizedDispatcher::Options options,
+                                                      std::string_view dispatcher_name) {
+  // Default dispatchers are created as unmanaged dispatchers so that they are safe to access from
+  // the main thread.
+  auto dispatcher = TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
       this, options, dispatcher_name,
       [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
   if (dispatcher.is_error()) {
@@ -144,16 +152,10 @@ zx::result<> TestSynchronizedDispatcher::Stop() {
   return stop_result;
 }
 
-const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault = {
-    .is_default_dispatcher = true,
-    .options = fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-    .dispatcher_name = "fdf-default",
-};
+const TestSynchronizedDispatcher::DispatcherType kDispatcherDefault =
+    TestSynchronizedDispatcher::DispatcherType::Default;
 
-const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherManaged = {
-    .is_default_dispatcher = false,
-    .options = fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-    .dispatcher_name = "fdf-managed",
-};
+const TestSynchronizedDispatcher::DispatcherType kDispatcherManaged =
+    TestSynchronizedDispatcher::DispatcherType::Managed;
 
 }  // namespace fdf

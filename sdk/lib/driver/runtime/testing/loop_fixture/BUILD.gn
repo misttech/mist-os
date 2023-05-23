@@ -11,6 +11,7 @@ source_set("gtest") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:testing",
     "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/driver/testing/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/sync:sync-cpp",

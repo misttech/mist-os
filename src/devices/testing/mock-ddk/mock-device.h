@@ -311,15 +311,14 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // Constructor for root parent.
   // |enable_driver_runtime| indicates whether this test should enable the managed driver runtime
   // environment to manage the dispatcher.
-  // |dispatcher_start_args| are the arguments that the driver dispatcher is started with.
-  explicit MockDevice(
-      bool enable_driver_runtime,
-      const fdf::TestSynchronizedDispatcher::DispatcherStartArgs& dispatcher_start_args)
+  // |dispatcher_type| is the type of the driver dispatcher to create.
+  explicit MockDevice(bool enable_driver_runtime,
+                      fdf::TestSynchronizedDispatcher::DispatcherType dispatcher_type)
       : driver_runtime_enabled_(enable_driver_runtime),
         driver_runtime_env_(enable_driver_runtime
                                 ? std::make_optional<fdf_testing::DriverRuntimeEnv>()
                                 : std::nullopt),
-        dispatcher_(std::make_shared<fdf::TestSynchronizedDispatcher>(dispatcher_start_args)) {}
+        dispatcher_(std::make_shared<fdf::TestSynchronizedDispatcher>(dispatcher_type)) {}
 
   // Copies this device's metadata to all descendants.
   void PropagateMetadata();

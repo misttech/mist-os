@@ -15,16 +15,22 @@
 namespace fdf {
 
 // Run `task` on `dispatcher`, and wait until it is completed.
+// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
+// if there are any, to ensure the task can be completed.
 //
 // This MUST be called from the main test thread.
 zx::result<> RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task);
 
 // Wait until the completion is signaled. When this function returns, the completion is signaled.
+// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
+// if there are any.
 //
 // This MUST be called from the main test thread.
 zx::result<> WaitFor(libsync::Completion& completion);
 
 // Wait until the future is resolved, then returns the resolved value of the future.
+// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
+// if there are any.
 //
 // This MUST be called from the main test thread.
 template <typename T>
@@ -41,15 +47,15 @@ zx::result<T> WaitFor(std::future<T> future) {
 
 class TestDispatcherBuilder {
  public:
-  // Creates a testing synchronized dispatcher. This dispatcher is not ran on the managed driver
+  // Creates an unmanaged synchronized dispatcher. This dispatcher is not ran on the managed driver
   // runtime thread pool.
-  static zx::result<fdf::SynchronizedDispatcher> CreateTestingSynchronizedDispatcher(
+  static zx::result<fdf::SynchronizedDispatcher> CreateUnmanagedSynchronizedDispatcher(
       const void* driver, fdf::SynchronizedDispatcher::Options options, cpp17::string_view name,
       fdf::Dispatcher::ShutdownHandler shutdown_handler);
 
-  // Creates a testing unsynchronized dispatcher. This dispatcher is not ran on the managed driver
-  // runtime thread pool.
-  static zx::result<fdf::UnsynchronizedDispatcher> CreateTestingUnsynchronizedDispatcher(
+  // Creates an unmanaged unsynchronized dispatcher. This dispatcher is not ran on the managed
+  // driver runtime thread pool.
+  static zx::result<fdf::UnsynchronizedDispatcher> CreateUnmanagedUnsynchronizedDispatcher(
       const void* driver, fdf::UnsynchronizedDispatcher::Options options, cpp17::string_view name,
       fdf::Dispatcher::ShutdownHandler shutdown_handler);
 };
@@ -60,36 +66,38 @@ class DefaultDispatcherSetting {
   ~DefaultDispatcherSetting();
 };
 
-// A wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
+// A RAII wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
 class TestSynchronizedDispatcher {
  public:
-  // Arguments for starting the underlying fdf::SynchronizedDispatcher.
-  struct DispatcherStartArgs {
-    bool is_default_dispatcher;
-    fdf::SynchronizedDispatcher::Options options;
-    std::string dispatcher_name;
+  // The type of the dispatcher.
+  // See |fdf::kDispatcherDefault| and |fdf::kDispatcherManaged| for a full description of each.
+  enum class DispatcherType {
+    Default,
+    Managed,
   };
-  // This does not start the dispatcher. The |Start| or |StartAsDefault| must be called before
-  // there is an underlying dispatcher to access.
-  TestSynchronizedDispatcher() = default;
 
-  // This will start the underlying dispatcher with the given parameters. If the underlying
+  // This will start the underlying dispatcher with the given type. If the underlying
   // dispatcher fails to start, this constructor will throw an assert.
-  explicit TestSynchronizedDispatcher(const DispatcherStartArgs& args);
+  explicit TestSynchronizedDispatcher(DispatcherType type);
 
-  // If |Stop| hasn't been called, it will get called here.
+  // Initiates and waits for shutdown of the dispatcher.
+  // When the destructor returns the shutdown has completed.
   ~TestSynchronizedDispatcher();
 
-  // Start the dispatcher. Once this returns successfully the dispatcher is available to be
+  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
+  async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
+
+ private:
+  // Start a managed dispatcher. Once this returns successfully the dispatcher is available to be
   // used for queueing and running tasks.
   //
   // This dispatcher will be ran on the managed driver runtime thread pool.
   //
   // This MUST be called from the main test thread.
-  zx::result<> Start(fdf::SynchronizedDispatcher::Options options,
-                     std::string_view dispatcher_name);
+  zx::result<> StartManaged(fdf::SynchronizedDispatcher::Options options,
+                            std::string_view dispatcher_name);
 
-  // Start the dispatcher, and set it as the default dispatcher for the driver runtime.
+  // Start an unmanaged dispatcher, and set it as the default dispatcher for the driver runtime.
   // Once this returns successfully the dispatcher is available to be used for queueing and running
   // tasks.
   //
@@ -98,8 +106,8 @@ class TestSynchronizedDispatcher {
   // that wrap that behavior (eg: |RunOnDispatcherSync|, |WaitFor|).
   //
   // This MUST be called from the main test thread.
-  zx::result<> StartAsDefault(fdf::SynchronizedDispatcher::Options options,
-                              std::string_view dispatcher_name);
+  zx::result<> StartDefault(fdf::SynchronizedDispatcher::Options options,
+                            std::string_view dispatcher_name);
 
   // This will stop the dispatcher and wait until it stops.
   // When this function returns, the dispatcher is stopped.
@@ -108,10 +116,6 @@ class TestSynchronizedDispatcher {
   // This MUST be called from the main test thread.
   zx::result<> Stop();
 
-  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
-  async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
-
- private:
   std::optional<DefaultDispatcherSetting> default_dispatcher_setting_;
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
@@ -119,8 +123,13 @@ class TestSynchronizedDispatcher {
 
 // Starts a driver dispatcher that becomes the default driver dispatcher for the current thread.
 // This dispatcher is not handled by the managed driver runtime thread pool, but instead must be
-// manually told to run using the |fdf_testing_run_until_idle| call, or the provided helpers.
-extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault;
+// manually told to run using the |fdf_testing_run_until_idle| call, or the provided helpers like
+// |RunOnDispatcherSync| and |WaitFor|.
+//
+// Objects that live on default dispatchers can be accessed directly from the test.
+//
+// You can only create 1 default dispatcher at a time.
+extern const TestSynchronizedDispatcher::DispatcherType kDispatcherDefault;
 
 // Starts a driver dispatcher that is handled by the managed driver runtime thread pool.
 // It is good practice to create an |fdf_testing::DriverRuntimeEnv| instance before
@@ -129,7 +138,10 @@ extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault;
 //   the managed thread-pool.
 // - An initial thread is created on the thread pool to avoid deadlocking in some scenarios.
 // - Exercises the cleanup path during teardown.
-extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherManaged;
+//
+// Objects that live on a managed dispatcher should be wrapped with an
+// |async_patterns::TestDispatcherBound|.
+extern const TestSynchronizedDispatcher::DispatcherType kDispatcherManaged;
 
 }  // namespace fdf
 

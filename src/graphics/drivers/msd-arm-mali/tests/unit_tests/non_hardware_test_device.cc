@@ -436,11 +436,8 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void MaliProtocol() {
-    fdf::TestSynchronizedDispatcher test_dispatcher;
-    ASSERT_EQ(ZX_OK,
-              test_dispatcher
-                  .Start(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop")
-                  .status_value());
+    fdf::TestSynchronizedDispatcher test_dispatcher{fdf::kDispatcherManaged};
+
     ASSERT_EQ(ZX_OK,
               fdf::RunOnDispatcherSync(test_dispatcher.dispatcher(), [&]() {
                 auto driver = MsdArmDriver::Create();
@@ -478,11 +475,8 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ProtectedCallbacks() {
-    fdf::TestSynchronizedDispatcher test_dispatcher;
-    ASSERT_EQ(ZX_OK,
-              test_dispatcher
-                  .Start(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop")
-                  .status_value());
+    fdf::TestSynchronizedDispatcher test_dispatcher{fdf::kDispatcherManaged};
+
     auto driver = MsdArmDriver::Create();
     ArmMaliServer server;
     server.use_protected_mode_callbacks_ = true;

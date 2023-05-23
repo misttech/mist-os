@@ -52,20 +52,6 @@ struct IncomingNamespace {
 
 class Imx8mI2cTest : public zxtest::Test {
  public:
-  Imx8mI2cTest() {}
-
-  void SetUp() override {
-    fdf_env_start();
-    zx::result result = test_driver_dispatcher_.Start(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "test-driver-dispatcher");
-    EXPECT_EQ(ZX_OK, result.status_value());
-  }
-
-  void TearDown() override {
-    zx::result result = test_driver_dispatcher_.Stop();
-    EXPECT_EQ(ZX_OK, result.status_value());
-  }
-
   void CreateDut() {
     fake_pdev::FakePDevFidl::Config config;
     config.irqs[0] = {};
@@ -123,7 +109,8 @@ class Imx8mI2cTest : public zxtest::Test {
   Imx8mI2c* dut_;
 
  private:
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_;
+  fdf_testing::DriverRuntimeEnv managed_env_;
+  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{fdf::kDispatcherManaged};
 
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),

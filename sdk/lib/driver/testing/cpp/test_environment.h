@@ -68,11 +68,7 @@ class AsyncTestEnvironment {
 // this inside of an |async_patterns::TestDispatcherBound|. Example below:
 //
 // ```
-// fdf::TestSynchronizedDispatcher test_env_dispatcher_{{
-//      .is_default_dispatcher = false,
-//      .options = {},
-//      .dispatcher_name = "test-env-dispatcher",
-//  }};
+// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
 //
 // async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
 //      test_env_dispatcher_.dispatcher(), std::in_place};

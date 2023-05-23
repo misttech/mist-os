@@ -69,7 +69,6 @@ fi2c::I2CChannel MakeChannel(fidl::AnyArena& arena, uint16_t addr) {
 class I2cMetadataTest : public zxtest::Test {
  public:
   void SetUp() override {
-    EXPECT_TRUE(dispatcher_.Start({}, "i2c-test dispatcher").is_ok());
     // TODO(fxb/124464): Migrate test to use dispatcher integration.
     fake_root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   }
@@ -86,8 +85,8 @@ class I2cMetadataTest : public zxtest::Test {
   }
 
  protected:
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
   std::shared_ptr<zx_device> fake_root_;
-  fdf::TestSynchronizedDispatcher dispatcher_;
 };
 
 TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {

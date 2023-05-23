@@ -6,6 +6,7 @@
 #define LIB_DRIVER_RUNTIME_TESTING_LOOP_FIXTURE_TEST_LOOP_FIXTURE_H_
 
 #include <lib/async/cpp/task.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/testing.h>
 #include <lib/sync/cpp/completion.h>
@@ -39,21 +40,9 @@ class DriverTestLoopFixture : public ::testing::Test {
  public:
   static void WaitUntilIdle() { fdf_testing_wait_until_all_dispatchers_idle(); }
 
-  void SetUp() override {
-    ::testing::Test::SetUp();
-    ASSERT_EQ(
-        ZX_OK,
-        dispatcher_.Start(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop")
-            .status_value());
-  }
+  void SetUp() override { ::testing::Test::SetUp(); }
 
-  void TearDown() override {
-    ::testing::Test::TearDown();
-    ShutdownDriverDispatcher();
-  }
-
-  // Shuts down the driver dispatcher.
-  void ShutdownDriverDispatcher() { EXPECT_EQ(ZX_OK, dispatcher_.Stop().status_value()); }
+  void TearDown() override { ::testing::Test::TearDown(); }
 
   // Posts a task on the driver dispatcher and waits synchronously until it is completed.
   void RunOnDispatcher(fit::closure task) {
@@ -64,7 +53,8 @@ class DriverTestLoopFixture : public ::testing::Test {
   const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_.driver_dispatcher(); }
 
  private:
-  fdf::TestSynchronizedDispatcher dispatcher_;
+  fdf_testing::DriverRuntimeEnv managed_env_;
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
 };
 
 }  // namespace gtest

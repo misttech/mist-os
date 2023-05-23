@@ -35,7 +35,7 @@ void DispatcherDumpTest::SetUp() {
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) {
     shutdown_completion_.Signal();
   };
-  auto dispatcher = fdf::TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+  auto dispatcher = fdf::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
       fake_driver_, {}, kDispatcherName, shutdown_handler);
   ASSERT_OK(dispatcher.status_value());
   dispatcher_ = std::move(*dispatcher);
@@ -120,7 +120,7 @@ TEST_F(DispatcherDumpTest, DumpFromAnotherDispatcher) {
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) {
     shutdown_completion.Signal();
   };
-  auto dispatcher2 = fdf::TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+  auto dispatcher2 = fdf::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
       fake_driver2, {}, kAdditionalDispatcherName, shutdown_handler);
   ASSERT_OK(dispatcher2.status_value());
 
@@ -161,7 +161,7 @@ TEST_F(DispatcherDumpTest, QueueTaskFromAnotherDispatcher) {
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) {
     shutdown_completion.Signal();
   };
-  auto dispatcher2 = fdf::TestDispatcherBuilder::CreateTestingSynchronizedDispatcher(
+  auto dispatcher2 = fdf::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
       fake_driver2, {}, kAdditionalDispatcherName, shutdown_handler);
   ASSERT_OK(dispatcher2.status_value());
 
@@ -251,7 +251,7 @@ TEST_F(DispatcherDumpTest, DumpUnsynchronizedDispatcher) {
   auto fake_driver2 = CreateFakeDriver();
   libsync::Completion completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) { completion.Signal(); };
-  auto dispatcher = fdf::TestDispatcherBuilder::CreateTestingUnsynchronizedDispatcher(
+  auto dispatcher = fdf::TestDispatcherBuilder::CreateUnmanagedUnsynchronizedDispatcher(
       fake_driver2, {}, kDispatcherName, shutdown_handler);
 
   libsync::Completion task_completion;

@@ -55,8 +55,6 @@ class FakeI2cImpl : public ddk::I2cImplProtocol<FakeI2cImpl> {
 
 class I2cChildTest : public zxtest::Test {
  public:
-  void SetUp() override { EXPECT_TRUE(dispatcher_.Start({}, "i2c-test dispatcher").is_ok()); }
-
   void TearDown() override {
     // Destruction must happen on the framework dispatcher.
     auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [this]() {
@@ -138,7 +136,7 @@ class I2cChildTest : public zxtest::Test {
   // TODO(fxb/124464): Migrate test to use dispatcher integration.
   std::shared_ptr<zx_device> fake_root_{
       MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()};
-  fdf::TestSynchronizedDispatcher dispatcher_;
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
 };
 
 TEST_F(I2cChildTest, Write3BytesOnce) {

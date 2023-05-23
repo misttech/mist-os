@@ -436,8 +436,6 @@ class DriverTest : public testing::Test {
   fdf_testing::TestNode& node() { return node_.value(); }
 
   void SetUp() override {
-    ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
-
     ns_loop_.StartThread("fidl-server-thread");
     node_.emplace("root", dispatcher());
   }
@@ -567,7 +565,7 @@ class DriverTest : public testing::Test {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_ns_{ns_loop_.dispatcher(),
                                                                       std::in_place};
   zx_protocol_device_t device_ops_;
-  fdf::TestSynchronizedDispatcher driver_dispatcher_;
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
   std::optional<fdf_testing::TestNode> node_;
 };
 
