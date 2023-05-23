@@ -44,6 +44,9 @@ using std::has_unique_object_representations_v;
 using std::is_const;
 using std::is_const_v;
 
+using std::is_constructible;
+using std::is_constructible_v;
+
 using std::is_copy_constructible;
 using std::is_copy_constructible_v;
 
@@ -91,6 +94,9 @@ using std::is_signed_v;
 
 using std::is_standard_layout;
 using std::is_standard_layout_v;
+
+using std::is_empty;
+using std::is_empty_v;
 
 using std::is_trivial;
 using std::is_trivial_v;
