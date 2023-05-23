@@ -51,17 +51,17 @@ section.
 
 ## Build Fuchsia {:#build-fuchsia .numbered}
 
-Installing Fuchsia on a NUC device requires that you build a Workstation
-image (`workstation_eng.x64`) and generate build artifacts (which include
-the Fuchsia installer) on your workstation.
+Installing Fuchsia on a NUC device requires that you build an x64 image and
+generate build artifacts (which include the Fuchsia installer) on your
+workstation.
 
 To build Fuchsia for NUC installation, do the following:
 
-1. Set your build configuration to `workstation_eng.x64` and include the
-   recovery package (`recovery-installer`):
+1. Set your build configuration to an x64 target and include the
+   `recovery-installer` package.
 
    ```posix-terminal
-   fx set workstation_eng.x64 --with //build/images/recovery:recovery-installer
+   fx set core.x64 --with //build/images/recovery:recovery-installer
    ```
 
 1.  Build Fuchsia:
@@ -223,9 +223,9 @@ Ethernet cable from the NUC device if it's already connected to the host machine
 
 ## Install Fuchsia on the NUC {:#install-fuchsia .numbered}
 
-Use the [bootable USB drive](#prepare-usb) to boot your NUC into
-the Fuchsia installer. It then installs the Workstation image
-(which was built in the [Build Fuchsia](#build-fuchsia) section) to the NUC.
+Use the [bootable USB drive](#prepare-usb) to boot your NUC into the Fuchsia
+installer. It then installs the x64 image (which was built in the
+[Build Fuchsia](#build-fuchsia) section) to the NUC.
 
 To install Fuchsia on your NUC, do the following:
 
@@ -233,7 +233,7 @@ To install Fuchsia on your NUC, do the following:
 
 1. Reboot your NUC.
 
-   The NUC boots into the Fuchsia Workstation Installer (with a pink background).
+   The NUC boots into the Fuchsia Installer (with a pink background).
 
 1. Press **Enter** to select the `Install from USB` option.
 
@@ -243,10 +243,10 @@ To install Fuchsia on your NUC, do the following:
 
 1. Reboot the NUC device.
 
-   The NUC is now booted into Fuchsia’s Workstation.
+   The NUC is now booted into Fuchsia.
 
 Note: Later, if you need to install a new version of Fuchsia (for instance, after
-re-building a new Workstation image using `fx build`), see
+re-building a new image using `fx build`), see
 [Flash a new Fuchsia image to the NUC](#flash-fuchsia) in Appendices.
 
 ## (Optional) Upload Fuchsia SSH keys to the NUC {:#upload-fuchsia-ssh-keys .numbered}
