@@ -2590,6 +2590,15 @@ where
     );
     let state = State::SynSent(syn_sent);
     let poll_send_at = state.poll_send_at().expect("no retrans timer");
+
+    // Before recording the connection, make sure it is viable.
+    ip_transport_ctx
+        .send_ip_packet(ctx, &ip_sock, tcp_serialize_segment(syn, conn_addr.ip), None)
+        .map_err(|(body, err)| {
+            warn!("tcp: failed to send ip packet {:?}: {:?}", body, err);
+            ConnectError::NoRoute
+        })?;
+
     let conn_id = socketmap
         .conns_mut()
         .try_insert(
@@ -2597,7 +2606,7 @@ where
             Connection {
                 acceptor: None,
                 state,
-                ip_sock: ip_sock.clone(),
+                ip_sock,
                 defunct: false,
                 socket_options,
                 soft_error: None,
@@ -2615,13 +2624,6 @@ where
         })?
         .id();
 
-    ip_transport_ctx
-        .send_ip_packet(ctx, &ip_sock, tcp_serialize_segment(syn, conn_addr.ip), None)
-        .map_err(|(body, err)| {
-            warn!("tcp: failed to send ip packet {:?}: {:?}", body, err);
-            assert_matches!(socketmap.conns_mut().remove(&conn_id), Some(_));
-            ConnectError::NoRoute
-        })?;
     assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id)), None);
     // This conversion Ok because `conn_id` is newly created; No one should
     // have called close on it.
