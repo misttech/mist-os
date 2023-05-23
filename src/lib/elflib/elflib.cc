@@ -109,14 +109,15 @@ class ElfLib::MemoryAccessor {
   virtual const uint8_t* GetMemory(uint64_t mapped_address, size_t mapped_size) = 0;
 };
 
-ElfLib::ElfLib(std::unique_ptr<MemoryAccessor>&& memory, ElfLib::AddressMode address_mode)
-    : address_mode_(address_mode), memory_(std::move(memory)) {}
+ElfLib::ElfLib(std::unique_ptr<MemoryAccessor>&& memory, uint64_t load_address,
+               ElfLib::AddressMode address_mode)
+    : address_mode_(address_mode), load_address_(load_address), memory_(std::move(memory)) {}
 
 ElfLib::~ElfLib() = default;
 
 std::unique_ptr<ElfLib> ElfLib::Create(std::unique_ptr<MemoryAccessor>&& memory,
-                                       ElfLib::AddressMode address_mode) {
-  std::unique_ptr<ElfLib> out{new ElfLib(std::move(memory), address_mode)};
+                                       uint64_t load_address, ElfLib::AddressMode address_mode) {
+  std::unique_ptr<ElfLib> out{new ElfLib(std::move(memory), load_address, address_mode)};
 
   auto header = reinterpret_cast<const Elf64_Ehdr*>(out->memory_->GetMemory(0, sizeof(Elf64_Ehdr)));
 
@@ -218,7 +219,7 @@ std::unique_ptr<ElfLib> ElfLib::Create(FILE* fp, ElfLib::Ownership owned) {
     std::map<std::pair<uint64_t, size_t>, std::vector<uint8_t>> data_;
   };
 
-  return Create(std::make_unique<FileAccessor>(fp, owned == ElfLib::Ownership::kTakeOwnership),
+  return Create(std::make_unique<FileAccessor>(fp, owned == ElfLib::Ownership::kTakeOwnership), 0,
                 AddressMode::kFile);
 }
 
@@ -246,11 +247,11 @@ std::unique_ptr<ElfLib> ElfLib::Create(const uint8_t* mem, size_t size) {
     size_t size_;
   };
 
-  return Create(std::make_unique<DataAccessor>(mem, size), AddressMode::kFile);
+  return Create(std::make_unique<DataAccessor>(mem, size), 0, AddressMode::kFile);
 }
 
 std::unique_ptr<ElfLib> ElfLib::Create(std::function<bool(uint64_t, std::vector<uint8_t>*)> fetch,
-                                       ElfLib::AddressMode address_mode) {
+                                       uint64_t load_address, ElfLib::AddressMode address_mode) {
   class CallbackAccessor : public MemoryAccessor {
    public:
     CallbackAccessor(std::function<bool(uint64_t, std::vector<uint8_t>*)> fetch) : fetch_(fetch) {}
@@ -288,7 +289,7 @@ std::unique_ptr<ElfLib> ElfLib::Create(std::function<bool(uint64_t, std::vector<
     std::map<uint64_t, std::vector<std::vector<uint8_t>>> data_;
   };
 
-  return Create(std::make_unique<CallbackAccessor>(std::move(fetch)), address_mode);
+  return Create(std::make_unique<CallbackAccessor>(std::move(fetch)), load_address, address_mode);
 }
 
 std::unique_ptr<ElfLib> ElfLib::Create(const std::string& path) {
@@ -1075,12 +1076,20 @@ bool ElfLib::ProbeHasProgramBits() {
 
 uint64_t ElfLib::MappedAddressToOffset(uint64_t mapped_address) {
   if (address_mode_ == AddressMode::kProcess) {
-    return mapped_address;
-  }
-
-  for (const auto& segment : GetSegmentHeaders()) {
-    if (mapped_address >= segment.p_vaddr && mapped_address < segment.p_vaddr + segment.p_memsz) {
-      return mapped_address - segment.p_vaddr + segment.p_offset;
+    // Does it looks like an offset?
+    for (const auto& segment : GetSegmentHeaders()) {
+      if (mapped_address >= segment.p_vaddr && mapped_address < segment.p_vaddr + segment.p_memsz) {
+        return mapped_address;
+      }
+    }
+    if (mapped_address >= load_address_) {
+      return mapped_address - load_address_;
+    }
+  } else {
+    for (const auto& segment : GetSegmentHeaders()) {
+      if (mapped_address >= segment.p_vaddr && mapped_address < segment.p_vaddr + segment.p_memsz) {
+        return mapped_address - segment.p_vaddr + segment.p_offset;
+      }
     }
   }
 

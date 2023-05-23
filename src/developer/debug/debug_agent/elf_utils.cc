@@ -121,7 +121,7 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
       if (ReadNullTerminatedString(process, str_addr, &module.name).has_error())
         return false;
 
-      if (auto elf = elflib::ElfLib::Create(GetElfLibReader(process, module.base)))
+      if (auto elf = elflib::ElfLib::Create(GetElfLibReader(process, module.base), module.base))
         module.build_id = elf->GetGNUBuildID();
 
       visited_modules.insert(module.base);
@@ -169,7 +169,7 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
     if (!visited_modules.insert(region.base).second) {
       continue;
     }
-    auto elf = elflib::ElfLib::Create(GetElfLibReader(process, region.base));
+    auto elf = elflib::ElfLib::Create(GetElfLibReader(process, region.base), region.base);
     if (!elf) {
       continue;
     }

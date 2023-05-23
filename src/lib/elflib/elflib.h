@@ -129,6 +129,7 @@ class ElfLib {
   // The offsets will assume either an ELF file or an ELF mapped address space
   // depending on the value of the address_mode argument.
   static std::unique_ptr<ElfLib> Create(std::function<bool(uint64_t, std::vector<uint8_t>*)> fetch,
+                                        uint64_t load_address,
                                         AddressMode address_mode = AddressMode::kProcess);
 
   // Returns a map from symbol names to the locations of their PLT entries.
@@ -151,7 +152,8 @@ class ElfLib {
   }
 
  private:
-  explicit ElfLib(std::unique_ptr<MemoryAccessor>&& memory, AddressMode address_mode);
+  explicit ElfLib(std::unique_ptr<MemoryAccessor>&& memory, uint64_t load_address,
+                  AddressMode address_mode);
 
   // Add a warning to this instance. See GetAndClearWarnings.
   void Warn(const std::string&& m) { warnings_.push_back(m); }
@@ -166,7 +168,7 @@ class ElfLib {
 
   // Create a new ElfLib object.
   static std::unique_ptr<ElfLib> Create(std::unique_ptr<MemoryAccessor>&& memory,
-                                        AddressMode address_mode);
+                                        uint64_t load_address, AddressMode address_mode);
 
   // See the definition of this class in elflib.cc for details.
   class PltEntryBuffer;
@@ -211,11 +213,17 @@ class ElfLib {
   // information. Returns true unless an error occurred.
   bool LoadDynamicSymbols();
 
-  // Translate a mapped address to an ELF offset, if the address mode is kFile.
-  // Do nothing if the address mode is kProcess.
+  // If the address mode is kFile, translate a mapped offset to an offset in file.
+  // If the address mode is kProcess, heuristically translate the address to an offset in memory,
+  // because |MemoryAccessor| expects an offset rather than an absolute address.
+  //
+  // This function is useful when loading dynamic tables, because some dynamic linkers, e.g. glibc,
+  // relocate the offsets to absolute addresses (DT_STRTAB, DT_SYMTAB, DT_PLTGOT, etc.) but other
+  // links, e.g., musl, don't.
   uint64_t MappedAddressToOffset(uint64_t mapped_address);
 
   const AddressMode address_mode_;
+  const uint64_t load_address_;
   bool did_load_dynamic_symbols_ = false;
 
   std::unique_ptr<MemoryAccessor> memory_;
