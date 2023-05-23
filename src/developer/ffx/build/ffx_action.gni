@@ -190,7 +190,11 @@ template("ffx_action") {
                            ])
 
     # Use a builddir-specific environment, not the user's own environment.
-    _ffx_config = [ "ffx.analytics.disabled=true" ]
+    _ffx_config = [
+      "ffx.analytics.disabled=true",
+      "daemon.autostart=false",
+      "log.enabled=false",
+    ]
 
     deps = [ ":" + env_target_name ]
     if (defined(invoker.deps)) {
@@ -204,7 +208,6 @@ template("ffx_action") {
       inputs += [ sdk_host_tools_manifest ]
       _ffx_config += [
         "sdk.root=" + rebase_path(root_build_dir, root_build_dir),
-        "sdk.type=in-tree",
         "sdk.module=host_tools.internal",
       ]
     }
@@ -214,6 +217,8 @@ template("ffx_action") {
     args = [
              "--env",
              rebase_path(env_file, root_build_dir),
+             "--isolate-dir",
+             rebase_path(target_out_dir, root_build_dir),
              "--config",
              string_join(",", _ffx_config),
            ] + invoker.args
