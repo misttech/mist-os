@@ -40,28 +40,38 @@ pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
         ])
         .await?;
 
-    // wait a bit again because the daemon doesn't immediately exit when it gets a stop message
-    fuchsia_async::Timer::new(Duration::from_millis(200)).await;
     assert_eq!(
         None,
         daemon.try_wait()?,
-        "Daemon didn't stay up after the stop message was sent to the other daemon."
+        "Daemon didn't stay up after the stop message was sent to the other socket."
     );
 
-    let _out = isolate.ffx(&["daemon", "stop", "-t", "1000"]).await?;
-    fuchsia_async::unblock(move || daemon.wait()).await?;
+    // TODO(): on the mac, we may need to explicitly tell the daemon to exit,
+    // because the socket-watcher doesn't seem to always work.  We don't want
+    // to use "ffx daemon stop" in general, however, since the new daemon may
+    // not yet have created the ascendd socket. (This usually happens only with
+    // targets, so since we don't do host tests on the mac with targets, this
+    // should be a non-issue on mac builders, at least for now.)
+    if cfg!(target_os = "macos") {
+        fuchsia_async::Timer::new(Duration::from_millis(500)).await;
+        let _ = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
+    }
 
-    Ok(Some(isolate))
+    // Because we created the daemon, it won't go away (i.e. in cleanup_isolate())
+    // until we wait() for it. So instead we drop the isolate here, then wait.
+    drop(isolate);
+    fuchsia_async::unblock(move || daemon.wait()).await?;
+    Ok(None)
 }
 
 pub(crate) async fn test_stop() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-stop").await?;
-    let out = isolate.ffx(&["daemon", "stop", "-w"]).await?;
+    let out = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     let want = "No daemon was running.\n";
     assert_eq!(out.stdout, want);
 
     let _ = isolate.ffx(&["daemon", "echo"]).await?;
-    let out = isolate.ffx(&["daemon", "stop", "-w"]).await?;
+    let out = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     let want = "Stopped daemon.\n";
     assert_eq!(out.stdout, want);
 
