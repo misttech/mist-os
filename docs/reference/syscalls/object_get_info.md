@@ -1010,6 +1010,28 @@ typedef struct zx_info_bti {
 } zx_info_bti_t;
 ```
 
+### ZX_INFO_MEMORY_ATTRIBUTION
+
+*handle* type: **Job**, or **Process**
+
+*buffer* type: `zx_info_memory_attribution_t[n]`
+
+Returns the memory attribution information of all processes contained in the sub-hierarchy
+rooted at the provided handle.
+
+```
+typedef struct zx_info_memory_attribution {
+   // The koid of the process for which these attribution statistics apply.
+   zx_koid_t process_koid;
+
+   uint64_t private_resident_pages_allocated;
+   uint64_t private_resident_pages_deallocated;
+
+   uint64_t total_resident_pages_allocated;
+   uint64_t total_resident_pages_deallocated;
+} zx_info_memory_attribution_t;
+```
+
 ## Rights
 
 If *topic* is **ZX_INFO_PROCESS**, *handle* must be of type **ZX_OBJ_TYPE_PROCESS** and have **ZX_RIGHT_INSPECT**.
@@ -1059,6 +1081,8 @@ If *topic* is **ZX_INFO_SOCKET**, *handle* must be of type **ZX_OBJ_TYPE_SOCKET*
 If *topic* is **ZX_INFO_MSI**, *handle* must be of type **ZX_OBJ_TYPE_MSI** and have **ZX_RIGHT_INSPECT**.
 
 If *topic* is **ZX_INFO_TASK_RUNTIME**, *handle* must be of type **ZX_OBJ_TYPE_THREAD**, **ZX_OBJ_TYPE_PROCESS**, or **ZX_OBJ_TYPE_JOB**, and have **ZX_RIGHT_INSPECT**.
+
+If *topic* is **ZX_INFO_MEMORY_ATTRIBUTION**, *handle* must have **ZX_RIGHT_INSPECT**.
 
 ## Return value
 

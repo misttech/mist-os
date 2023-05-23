@@ -12,6 +12,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <ktl/optional.h>
 
 // There is one attribution object per process, and an extra one for the
 // kernel's own memory (AttributionObject::kernel_attribution_). Each
@@ -43,9 +44,15 @@
 // from our usage of RefPtrs. Such attribution objects are only reachable by
 // scanning the list, e.g. by querying one of their ancestor jobs.
 
+class AttributionObject;
+
 class AttributionObjectNode : public fbl::DoublyLinkedListable<AttributionObjectNode*> {
  public:
-  // Protects the global list of the attribution objects.
+  // Constructs a sentinel node by default.
+  AttributionObjectNode() : AttributionObjectNode(NodeType::Sentinel) {}
+
+  // Protects both the global list of the attribution objects and all its
+  // cursors.
   DECLARE_SINGLETON_CRITICAL_MUTEX(AllAttributionObjectsLock);
 
   // Inserts a new node in the list before the given existing node (or at the
@@ -53,11 +60,22 @@ class AttributionObjectNode : public fbl::DoublyLinkedListable<AttributionObject
   static void AddToGlobalListLocked(AttributionObjectNode* where, AttributionObjectNode* node)
       TA_REQ(AllAttributionObjectsLock::Get());
 
-  // Removes a node from the list.
+  // Removes a node from the list and advances all the cursors pointing to it.
   static void RemoveFromGlobalListLocked(AttributionObjectNode* node)
       TA_REQ(AllAttributionObjectsLock::Get());
 
+  // Attempts to downcast this node into an AttributionObject.
+  AttributionObject* DowncastToAttributionObject();
+
+ protected:
+  enum class NodeType : bool { Sentinel = false, AttributionObject = true };
+  explicit AttributionObjectNode(NodeType node_type) : node_type_(node_type) {}
+
  private:
+  friend class AttributionObjectsCursor;
+
+  const NodeType node_type_;
+
   // All the nodes in the system.
   static fbl::DoublyLinkedList<AttributionObjectNode*> all_nodes_
       TA_GUARDED(AllAttributionObjectsLock::Get());
@@ -66,8 +84,9 @@ class AttributionObjectNode : public fbl::DoublyLinkedListable<AttributionObject
 /// AttributionObject is a collection of counters that track page
 /// allocations and deallocations of VmObjectPageds owned by the
 /// process identified by `owning_koid_`.
-class AttributionObject : public fbl::RefCounted<AttributionObject>, private AttributionObjectNode {
+class AttributionObject : public fbl::RefCounted<AttributionObject>, public AttributionObjectNode {
  public:
+  AttributionObject() : AttributionObjectNode(AttributionObjectNode::NodeType::AttributionObject) {}
   ~AttributionObject();
 
   static void KernelAttributionInit();
@@ -110,7 +129,15 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, private Att
     }
   }
 
-  zx_koid_t GetOwningKoid() const { return owning_koid_; }
+  zx_info_memory_attribution_t ToInfoEntry() const {
+    return zx_info_memory_attribution_t{
+        .process_koid = owning_koid_,
+        .private_resident_pages_allocated = private_resident_pages_allocated_.load(),
+        .private_resident_pages_deallocated = private_resident_pages_deallocated_.load(),
+        .total_resident_pages_allocated = total_resident_pages_allocated_.load(),
+        .total_resident_pages_deallocated = total_resident_pages_deallocated_.load(),
+    };
+  }
 
  private:
   // Total number of pages made resident for VmObjectPageds
@@ -131,6 +158,39 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, private Att
   // The attribution object used to track resident memory
   // for VMOs attributed to the kernel.
   static AttributionObject kernel_attribution_;
+};
+
+// AttributionObjectsCursor is an iterator that can visit a subrange of nodes
+// in the global list without holding the global lock for the whole duration of
+// the visit.
+class AttributionObjectsCursor : public fbl::DoublyLinkedListable<AttributionObjectsCursor*> {
+ public:
+  // Creates a cursor that will return all the AttributionObjects between the
+  // given nodes. |begin| and |end| must be contained in the global list and
+  // |end| cannot be removed for the whole lifetime of the cursor.
+  AttributionObjectsCursor(AttributionObjectNode* begin, AttributionObjectNode* end)
+      TA_EXCL(AttributionObjectNode::AllAttributionObjectsLock::Get());
+  ~AttributionObjectsCursor() TA_EXCL(AttributionObjectNode::AllAttributionObjectsLock::Get());
+
+  // Returns the value of the next attribution object, or nullopt if we reached
+  // the end of the requested range.
+  ktl::optional<zx_info_memory_attribution_t> Next()
+      TA_EXCL(AttributionObjectNode::AllAttributionObjectsLock::Get());
+
+  // Advances all the cursors currently pointing to a |node| that is about to
+  // be removed.
+  static void SkipNodeBeingRemoved(AttributionObjectNode* node)
+      TA_REQ(AttributionObjectNode::AllAttributionObjectsLock::Get());
+
+ private:
+  using GlobalListType = decltype(AttributionObjectNode::all_nodes_);
+  GlobalListType::iterator next_
+      TA_GUARDED(AttributionObjectNode::AllAttributionObjectsLock::Get());
+  GlobalListType::iterator end_ TA_GUARDED(AttributionObjectNode::AllAttributionObjectsLock::Get());
+
+  // All the cursors in the system.
+  static fbl::DoublyLinkedList<AttributionObjectsCursor*> all_cursors_
+      TA_GUARDED(AttributionObjectNode::AllAttributionObjectsLock::Get());
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_ATTRIBUTION_H_

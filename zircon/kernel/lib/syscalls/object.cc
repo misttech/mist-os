@@ -153,6 +153,37 @@ class SubsetVmoInfoWriter : public VmoInfoWriter {
   size_t base_offset_ = 0;
 };
 
+class MemoryAttributionWriter {
+ public:
+  MemoryAttributionWriter(user_out_ptr<zx_info_memory_attribution_t> out, size_t max_count)
+      : out_(out), max_count_(max_count) {}
+
+  MemoryAttributionWriter(const MemoryAttributionWriter&) = delete;
+  MemoryAttributionWriter& operator=(const MemoryAttributionWriter&) = delete;
+
+  void WriteEntry(const zx_info_memory_attribution_t& entry) {
+    // Increment the avail counter, but return immediately if it exceeds the buffer size or if an
+    // error has occurred in a previous iteration.
+    size_t offset = avail_++;
+    if (offset >= max_count_ || status_ != ZX_OK)
+      return;
+
+    if (zx_status_t status = out_.element_offset(offset).copy_to_user(entry); status != ZX_OK) {
+      status_ = status;
+    }
+  }
+
+  zx_status_t status() const { return status_; }
+  size_t count() const { return ktl::min(avail_, max_count_); }
+  size_t avail() const { return avail_; }
+
+ private:
+  user_out_ptr<zx_info_memory_attribution_t> out_;
+  size_t max_count_;
+  size_t avail_ = 0;
+  zx_status_t status_ = ZX_OK;
+};
+
 // Copies a single record, |src_record|, into the user buffer |dst_buffer| of size
 // |dst_buffer_size|.
 //
@@ -962,6 +993,48 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       vcpu->GetInfo(&info);
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+    }
+    case ZX_INFO_MEMORY_ATTRIBUTION: {
+      if constexpr (!KERNEL_BASED_MEMORY_ATTRIBUTION) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
+
+      fbl::RefPtr<Dispatcher> dispatcher;
+      auto err =
+          up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &dispatcher);
+      if (err != ZX_OK) {
+        return err;
+      }
+
+      size_t max_count = buffer_size / sizeof(zx_info_memory_attribution_t);
+      MemoryAttributionWriter writer(_buffer.reinterpret<zx_info_memory_attribution_t>(),
+                                     max_count);
+
+      if (auto process = DownCastDispatcher<ProcessDispatcher>(&dispatcher)) {
+        writer.WriteEntry(process->attribution_object()->ToInfoEntry());
+      } else if (auto job = DownCastDispatcher<JobDispatcher>(&dispatcher)) {
+        // Our |job| RefPtr ensures that the job's begin/end nodes are not
+        // removed while the cursor is alive.
+        AttributionObjectsCursor cursor(job->attribution_objects_begin(),
+                                        job->attribution_objects_end());
+        while (auto entry = cursor.Next()) {
+          writer.WriteEntry(*entry);
+        }
+      } else {
+        return ZX_ERR_WRONG_TYPE;
+      }
+
+      if (_actual) {
+        zx_status_t copy_status = _actual.copy_to_user(writer.count());
+        if (copy_status != ZX_OK)
+          return copy_status;
+      }
+      if (_avail) {
+        zx_status_t copy_status = _avail.copy_to_user(writer.avail());
+        if (copy_status != ZX_OK)
+          return copy_status;
+      }
+      return writer.status();
     }
 
     default:
