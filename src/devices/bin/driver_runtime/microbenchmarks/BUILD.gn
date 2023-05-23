@@ -20,7 +20,7 @@ executable("bin") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
-    "//sdk/lib/driver/runtime:testing",
+    "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/syslog/cpp:cpp-macros",
     "//src/devices/bin/driver_runtime:driver_runtime_impl",
     "//src/devices/lib/driver:driver_runtime",

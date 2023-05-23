@@ -93,7 +93,7 @@ sdk_source_set("driver_runtime_env_cpp") {
   sources = [ "env.cc" ]
 }
 
-source_set("testing") {
+source_set("driver_runtime_testing") {
   sources = [ "include/lib/fdf/testing.h" ]
   visibility = [
     "//sdk/lib/driver/runtime/*",
@@ -112,16 +112,6 @@ source_set("testing") {
   ]
   public_deps = [
     ":driver_runtime",
-    "//zircon/system/ulib/zx",
-  ]
-  public_configs = [ ":include" ]
-}
-
-source_set("testing_cpp") {
-  public_deps = [
-    ":driver_runtime_cpp",
-    ":driver_runtime_env_cpp",
-    ":testing",
     "//zircon/system/ulib/zx",
   ]
   public_configs = [ ":include" ]
