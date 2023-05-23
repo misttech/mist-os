@@ -151,6 +151,7 @@
 //sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_sdk
 //sdk/fidl/fuchsia.wlan.product.deprecatedclient:fuchsia.wlan.product.deprecatedclient_sdk
 //sdk/fidl/fuchsia.wlan.product.deprecatedconfiguration:fuchsia.wlan.product.deprecatedconfiguration_sdk
+//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_sdk
 //sdk/lib/async-loop-testing/cpp:cpp_sdk
 //sdk/lib/component/incoming/cpp:cpp_sdk
 //sdk/lib/component/outgoing/cpp:cpp_sdk

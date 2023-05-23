@@ -158,6 +158,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy",
   "//sdk/fidl/fuchsia.wlan.product.deprecatedclient:fuchsia.wlan.product.deprecatedclient",
   "//sdk/fidl/fuchsia.wlan.product.deprecatedconfiguration:fuchsia.wlan.product.deprecatedconfiguration",
+  "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac",
   "//zircon/vdso/zx:zx",
 ]
 
