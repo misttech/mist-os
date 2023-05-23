@@ -177,15 +177,21 @@ type AudioOffloadConfiguration = table {
 };
 
 /// Protocol representing the controller actively encoding offloaded audio to or from this channel.
-/// Closing the protocol will stop the encoding, which can also be done usgin the Stop() if
+/// Closing the protocol will stop the encoding, which can also be done using the Stop() if
 /// synchronization is required. If the controller fails to start audio offloading, an epitaph will
 /// be sent when this is closed.
 ///
-/// This channel will be closed with a `ZX_ERR_ALREADY_BOUND` epitaph if audio offloading is
-/// already started on another channel.
-///
-/// This channel will be closed with a `ZX_ERR_INVALID_ARGUMENT` epitaph if the audio offload
+/// This channel will be closed with a `ZX_ERR_NOT_SUPPORTED` epitaph if the audio offload
 /// configuration for the controller is not supported.
+///
+/// This channel will be closed with a `ZX_ERR_UNAVAILABLE` epitaph if the controller sends an
+/// error.
+///
+/// This channel will be closed with a `ZX_ERR_ALREADY_BOUND` epitaph if audio offloading starting
+/// or stopping is already in progress/complete on another channel.
+///
+/// This channel will be closed with a `ZX_ERR_INTERNAL` epitaph if commands are issued when audio
+/// offloading is not started.
 protocol AudioOffloadController {
     /// Sent from the server when the audio offloading is started successfully.
     /// Only sent once per protocol.
