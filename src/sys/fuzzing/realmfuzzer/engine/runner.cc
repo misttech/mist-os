@@ -624,10 +624,19 @@ Promise<> RealmFuzzerRunner::GenerateCleanInputs(AsyncReceiverPtr<Artifact> rece
 // Methods to perform a sequence of fuzzing runs.
 
 ZxPromise<Artifact> RealmFuzzerRunner::FuzzInputs(size_t backlog) {
-  auto num_inputs = options()->runs();
+  size_t num_inputs = options()->runs();
   if (num_inputs != 0) {
-    // Adjust for fixed inputs tested first. Be careful not to double count the empty input.
-    num_inputs -= (seed_corpus_->num_inputs() + live_corpus_->num_inputs() - 1);
+    // Always perform at least enough runs to test every input in the seed and live corpora.
+    // `num_fixed_inputs` cannot underflow, as the corpus always includes exactly one empty input,
+    // of which the one double-counted instance is removed.
+    // It also cannot overflow, as the combined `num_inputs` is less than the amount of memory being
+    // used (modulo the single empty input), which by definition must fit within a `size_t`.
+    size_t num_fixed_inputs = seed_corpus_->num_inputs() + live_corpus_->num_inputs() - 1;
+    if (num_inputs < num_fixed_inputs) {
+      num_inputs = num_fixed_inputs;
+    } else {
+      num_inputs -= num_fixed_inputs;
+    }
   }
   return TestOneAsync(Input(), kAccumulateCoverage)
       .or_else([this](const zx_status_t& status) {
