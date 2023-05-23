@@ -21,7 +21,7 @@ following gives two ways to flash the image to a NUC device.
 To enable and run the unit test target, run:
 
 ```
-fx set workstation.eng_.x64 --with //src/firmware/gigaboot/cpp/tests
+fx set workstation_eng.x64 --with //src/firmware/gigaboot/cpp/tests
 fx build
 fx test --host gigaboot_unittests
 ```
