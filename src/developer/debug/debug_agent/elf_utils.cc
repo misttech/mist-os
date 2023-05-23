@@ -155,8 +155,7 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
   // the same read-only protection at runtime because it contains read-only relocations.
   //
   // To solve this, we use a variable to track the end of the last module, and skip regions that
-  // overlap with the last module. Other solutions include checking the VMO offset (assuming ELF
-  // files always live from the beginning of VMOs), or checking whether build-id duplicates.
+  // overlap with the last module.
   uint64_t end_of_last_module = 0;
   for (const auto& region : address_regions) {
     if (region.base < end_of_last_module) {
