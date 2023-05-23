@@ -14,6 +14,8 @@ efi_loaded_image_protocol* gEfiLoadedImage = nullptr;
 efi_system_table* gEfiSystemTable = nullptr;
 efi_handle gEfiImageHandle;
 
+constexpr uint32_t kGptHeaderRevision = 0x00010000;
+
 namespace gigaboot {
 
 namespace {
@@ -75,6 +77,7 @@ void BlockDevice::InitializeGpt() {
 
   gpt_header_t primary = {
       .magic = GPT_MAGIC,
+      .revision = kGptHeaderRevision,
       .size = GPT_HEADER_SIZE,
       .crc32 = 0,
       .reserved0 = 0,
@@ -88,20 +91,10 @@ void BlockDevice::InitializeGpt() {
       .entries_crc = 0,
   };
 
-  gpt_header_t backup = {
-      .magic = GPT_MAGIC,
-      .size = GPT_HEADER_SIZE,
-      .crc32 = 0,
-      .reserved0 = 0,
-      .current = total_blocks_ - 1,
-      .backup = 1,
-      .first = kGptFirstUsableBlocks,
-      .last = total_blocks_ - kGptHeaderBlocks - 1,
-      .entries = total_blocks_ - kGptHeaderBlocks,
-      .entries_count = kGptEntries,
-      .entries_size = GPT_ENTRY_SIZE,
-      .entries_crc = 0,
-  };
+  gpt_header_t backup(primary);
+  backup.backup = 1;
+  backup.current = total_blocks_ - 1;
+  backup.entries = total_blocks_ - kGptHeaderBlocks;
 
   primary.entries_crc =
       crc32(0, start + primary.entries * kBlockSize, primary.entries_size * primary.entries_count);
