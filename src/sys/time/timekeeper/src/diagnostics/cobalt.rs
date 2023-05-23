@@ -339,7 +339,7 @@ mod test {
     // in timing, this interval may sometimes be too small and cause flaky
     // tests. The flake rate for 10ms was 0.15 flakes/day, this should be
     // somewhat better.
-    const MONITOR_OFFSET_ERROR: zx::Duration = zx::Duration::from_millis(20);
+    const MONITOR_OFFSET_ERROR: zx::Duration = zx::Duration::from_millis(40);
 
     fn create_clock(time: zx::Time) -> Arc<zx::Clock> {
         let clk = zx::Clock::create(zx::ClockOpts::empty(), None).unwrap();
