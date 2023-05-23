@@ -55,6 +55,19 @@ pub enum SocketWriteDisposition {
     Disabled,
 }
 
+impl SocketWriteDisposition {
+    /// Get a [`SocketWriteDisposition`] from the raw `u32` argument passed to
+    /// [zx_socket_set_disposition](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_set_disposition.md).
+    pub fn from_raw(raw: u32) -> Result<Option<SocketWriteDisposition>, Status> {
+        match raw {
+            0 => Ok(None),
+            sys::ZX_SOCKET_DISPOSITION_WRITE_ENABLED => Ok(Some(SocketWriteDisposition::Enabled)),
+            sys::ZX_SOCKET_DISPOSITION_WRITE_DISABLED => Ok(Some(SocketWriteDisposition::Disabled)),
+            _ => Err(Status::INVALID_ARGS),
+        }
+    }
+}
+
 impl From<SocketWriteDisposition> for u32 {
     fn from(disposition: SocketWriteDisposition) -> Self {
         match disposition {
