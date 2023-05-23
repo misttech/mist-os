@@ -59,7 +59,6 @@ source_set("hermetic_audio_test") {
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/devices/bus/drivers/platform",
     "//src/lib/fxl",
-    "//src/media/audio/bundles:virtual_audio_driver",
     "//zircon/system/ulib/trace-provider",
   ]
 }

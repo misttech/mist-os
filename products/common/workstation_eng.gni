@@ -65,7 +65,3 @@ legacy_cache_package_labels +=
 # Add cfv2 sl4f to base.
 core_realm_shards += [ "//src/testing/sl4f:sl4f_terminal_core_shard" ]
 legacy_base_package_labels += [ "//src/sys/bin/start_sl4f" ]
-
-# Include virtual_audio in developer-focused products/builds, for interactive audio debugging.
-base_driver_package_labels +=
-    [ "//src/media/audio/bundles:virtual_audio_driver" ]

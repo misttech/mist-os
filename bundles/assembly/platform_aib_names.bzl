@@ -86,4 +86,5 @@ ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_A
     "ui_eng",
     "ui_package_eng",
     "ui_legacy_package_eng",
+    "audio_dev_support",
 ]

@@ -225,6 +225,7 @@ template("audio_core_test_package") {
     deps = [
       ":${component_target}",
       "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+      "//src/media/audio/drivers/virtual_audio:virtual_audio_driver",
       "//src/power/testing/thermal-test-control:thermal-test-control-v2",
     ]
     if (defined(invoker.package_deps)) {

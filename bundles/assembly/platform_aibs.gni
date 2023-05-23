@@ -154,6 +154,9 @@ eng_only_platform_aib_names =
 
       # Example AIB
       "example_assembly_bundle",
+
+      # Audio development/debugging
+      "audio_dev_support",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names

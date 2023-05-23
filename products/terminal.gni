@@ -95,10 +95,6 @@ legacy_base_package_labels += [
   "//src/ui/tools/tiles",
 ]
 
-# Include virtual_audio in developer-focused products/builds, for interactive audio debugging.
-base_driver_package_labels +=
-    [ "//src/media/audio/bundles:virtual_audio_driver" ]
-
 # Add Test UI Stack for use in tests.
 # TODO(fxbug.dev/105105): Remove once we migrate client usage to subpackages.
 legacy_cache_package_labels +=

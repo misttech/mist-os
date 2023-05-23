@@ -33,6 +33,6 @@ group("examples") {
   ]
 }
 
+# Delete after multi-repo soft transition.
 group("virtual_audio_driver") {
-  public_deps = [ "//src/media/audio/drivers/virtual_audio" ]
 }

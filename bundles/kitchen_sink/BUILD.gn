@@ -13,7 +13,6 @@ group("kitchen_sink") {
     "//examples",
     "//src/graphics/examples",
     "//src/lib/ui/carnelian:examples",
-    "//src/media/audio/bundles:virtual_audio_driver",
     "//src/media/bundles:examples",
     "//src/media/bundles:services",
     "//src/media/bundles:tools",

@@ -1170,6 +1170,20 @@ assembly_input_bundle("wlan_softmac_support") {
   ]
 }
 
+# Support for interactive debugging/development of platform audio
+#
+# feature_set_levels: minimal
+# build-types: eng
+#
+assembly_input_bundle("audio_dev_support") {
+  base_driver_packages = [
+    {
+      package_target = "//src/media/audio/drivers/virtual_audio"
+      driver_components = [ "meta/virtual_audio_driver.cm" ]
+    },
+  ]
+}
+
 assembly_input_bundle("live_usb") {
   bootfs_packages = [ "//src/sys/live_usb:package" ]
 

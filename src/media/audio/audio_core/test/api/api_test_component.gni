@@ -12,7 +12,7 @@ import("//build/components.gni")
 #
 # Example:
 # ```
-# audio_core_api_test_comonent(name) {
+# audio_core_api_test_component(name) {
 #   source = "foo_test.cc"
 #   executable_deps = ["//lib"]
 # }
