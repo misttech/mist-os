@@ -181,7 +181,7 @@ If more than one Starnix instance is running, the above command will list the ru
 Alternatively, use the following command to stop all the instances at once:
 
 ```sh
-fx shell killall starnix_kernel.cm
+ffx target ssh killall starnix_kernel.cm
 ```
 
 ## Testing
