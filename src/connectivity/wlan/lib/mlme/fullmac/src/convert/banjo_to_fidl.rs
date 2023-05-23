@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::bail, banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
-    banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
+    anyhow::bail, banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_common as banjo_wlan_common,
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
     banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
@@ -388,7 +387,7 @@ pub fn convert_sae_frame(frame: banjo_wlan_fullmac::WlanFullmacSaeFrame) -> fidl
 }
 
 fn convert_wmm_ac_params(
-    params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters,
+    params: banjo_wlan_common::WlanWmmAccessCategoryParameters,
 ) -> fidl_internal::WmmAcParams {
     fidl_internal::WmmAcParams {
         ecw_min: params.ecw_min,
@@ -400,7 +399,7 @@ fn convert_wmm_ac_params(
 }
 
 pub fn convert_wmm_params(
-    wmm_params: banjo_wlan_associnfo::WlanWmmParameters,
+    wmm_params: banjo_wlan_common::WlanWmmParameters,
 ) -> fidl_internal::WmmStatusResponse {
     fidl_internal::WmmStatusResponse {
         apsd: wmm_params.apsd,

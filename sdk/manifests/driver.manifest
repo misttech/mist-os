@@ -17,7 +17,6 @@ sdk://fidl/fuchsia.driver.framework
 sdk://fidl/fuchsia.hardware.acpi
 sdk://fidl/fuchsia.hardware.i2c
 sdk://fidl/fuchsia.hardware.pci
-sdk://fidl/fuchsia.hardware.wlan.associnfo
 sdk://fidl/fuchsia.input
 sdk://fidl/fuchsia.input.report
 sdk://fidl/fuchsia.inspect

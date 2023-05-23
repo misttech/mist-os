@@ -761,7 +761,6 @@ mod handle_mlme_request_tests {
     use {
         super::*,
         crate::device::test_utils::{DriverCall, FakeFullmacDevice},
-        banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
         banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         fidl_fuchsia_wlan_stats as fidl_stats,
@@ -906,7 +905,7 @@ mod handle_mlme_request_tests {
 
             assert_eq!(*wep_key, vec![5u8, 6]);
             assert_eq!(req.wep_key.key_id, 7);
-            assert_eq!(req.wep_key.key_type, banjo_wlan_associnfo::WlanKeyType::GROUP);
+            assert_eq!(req.wep_key.key_type, banjo_wlan_common::WlanKeyType::GROUP);
             assert_eq!(req.wep_key.address, [8u8; 6]);
             assert_eq!(req.wep_key.rsc, 9);
             assert_eq!(req.wep_key.cipher_suite_oui, [10u8; 3]);
@@ -1118,7 +1117,7 @@ mod handle_mlme_request_tests {
         assert_eq!(driver_req.num_keys, 1);
         assert_eq!(driver_req_keys[0], vec![5u8, 6]);
         assert_eq!(driver_req.keylist[0].key_id, 7);
-        assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_associnfo::WlanKeyType::GROUP);
+        assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_common::WlanKeyType::GROUP);
         assert_eq!(driver_req.keylist[0].address, [8u8; 6]);
         assert_eq!(driver_req.keylist[0].rsc, 9);
         assert_eq!(driver_req.keylist[0].cipher_suite_oui, [10u8; 3]);
@@ -1246,7 +1245,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::DelKeysReq { req }) => req);
         assert_eq!(driver_req.num_keys, 1);
         assert_eq!(driver_req.keylist[0].key_id, 1);
-        assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_associnfo::WlanKeyType::PEER);
+        assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_common::WlanKeyType::PEER);
         assert_eq!(driver_req.keylist[0].address, [2u8; 6]);
     }
 
@@ -1534,7 +1533,6 @@ mod handle_driver_event_tests {
     use {
         super::*,
         crate::device::test_utils::{DriverCall, FakeFullmacDevice},
-        banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
         banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -2195,30 +2193,30 @@ mod handle_driver_event_tests {
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let status = zx::sys::ZX_OK;
-        let wmm_params = banjo_wlan_associnfo::WlanWmmParameters {
+        let wmm_params = banjo_wlan_common::WlanWmmParameters {
             apsd: true,
-            ac_be_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
+            ac_be_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 1,
                 ecw_max: 2,
                 aifsn: 3,
                 txop_limit: 4,
                 acm: true,
             },
-            ac_bk_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
+            ac_bk_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 5,
                 ecw_max: 6,
                 aifsn: 7,
                 txop_limit: 8,
                 acm: false,
             },
-            ac_vi_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
+            ac_vi_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 9,
                 ecw_max: 10,
                 aifsn: 11,
                 txop_limit: 12,
                 acm: true,
             },
-            ac_vo_params: banjo_wlan_associnfo::WlanWmmAccessCategoryParameters {
+            ac_vo_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 13,
                 ecw_max: 14,
                 aifsn: 15,

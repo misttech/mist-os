@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.wlan.softmac;
 
-using fuchsia.hardware.wlan.associnfo;
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
@@ -172,7 +171,7 @@ type WlanKeyConfiguration = table {
     2: cipher_oui array<uint8, 3>;
     3: cipher_type uint8;
     /// Whether this key is a pairwise, group or peer key.
-    4: key_type fuchsia.hardware.wlan.associnfo.WlanKeyType;
+    4: key_type fuchsia.wlan.common.WlanKeyType;
     /// The peer MAC address for pairwise and peer keys.
     /// For group keys this value is always the broadcast address.
     5: peer_addr ieee80211.MacAddr;
@@ -310,7 +309,7 @@ type WlanAssociationConfig = table {
     /// QoS capable and parameters
     5: qos bool;
     /// WFA WMM v1.2, 2.2.2
-    6: wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
+    6: wmm_params fuchsia.wlan.common.WlanWmmParameters;
 
     /// Concatenation of SupportedRates and ExtendedSupportedRates
     /// IEEE Std 802.11-2016, 9.4.2.3 & 9.4.2.13
@@ -575,7 +574,7 @@ protocol WlanSoftmac {
     /// particular access category (AC).
     UpdateWmmParameters(table {
         1: ac ieee80211.WlanAccessCategory;
-        2: params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
+        2: params fuchsia.wlan.common.WlanWmmParameters;
     }) -> () error zx.Status;
 };
 

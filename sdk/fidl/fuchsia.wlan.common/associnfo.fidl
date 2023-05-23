@@ -1,17 +1,19 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.hardware.wlan.associnfo;
+
+library fuchsia.wlan.common;
 
 // LINT.IfChange
-type WlanKeyType = strict enum : uint8 {
+@available(added=13)
+type WlanKeyType = flexible enum : uint8 {
     PAIRWISE = 1;
     GROUP = 2;
     IGTK = 3;
     PEER = 4;
 };
 // LINT.ThenChange(//src/connectivity/wlan/lib/mlme/rust/src/key.rs)
-
+@available(added=13)
 type WlanWmmParameters = struct {
     apsd bool;
     ac_be_params WlanWmmAccessCategoryParameters;
@@ -21,6 +23,7 @@ type WlanWmmParameters = struct {
 };
 
 /// WFA WMM v1.2, 2.2.2
+@available(added=13)
 type WlanWmmAccessCategoryParameters = struct {
     /// Lower bound of contention window in exponential form
     /// `cw_min = 2^(ecw_min) - 1`. The unit for contention window is "slot time", which
@@ -44,5 +47,9 @@ type WlanWmmAccessCategoryParameters = struct {
 /// Many parameters do not distinguish Rx capability from Tx capability.
 /// In those cases, a capability is commonly applied to both Rx and Tx.
 /// Some parameters are distinctively for Rx only, and some are Tx only.
+@namespaced
+@available(added=13)
 const WLAN_MAC_MAX_SUPP_RATES uint32 = 8;
+@namespaced
+@available(added=13)
 const WLAN_MAC_MAX_EXT_RATES uint32 = 255;

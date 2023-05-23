@@ -584,19 +584,19 @@ zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
   builder.cipher_oui(cipher_oui);
   builder.cipher_type(in.cipher_type);
 
-  fuchsia_hardware_wlan_associnfo::wire::WlanKeyType wlan_key_type;
+  fuchsia_wlan_common::wire::WlanKeyType wlan_key_type;
   switch (in.key_type) {
     case WLAN_KEY_TYPE_PAIRWISE:
-      wlan_key_type = fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kPairwise;
+      wlan_key_type = fuchsia_wlan_common::wire::WlanKeyType::kPairwise;
       break;
     case WLAN_KEY_TYPE_GROUP:
-      wlan_key_type = fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kGroup;
+      wlan_key_type = fuchsia_wlan_common::wire::WlanKeyType::kGroup;
       break;
     case WLAN_KEY_TYPE_IGTK:
-      wlan_key_type = fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kIgtk;
+      wlan_key_type = fuchsia_wlan_common::wire::WlanKeyType::kIgtk;
       break;
     case WLAN_KEY_TYPE_PEER:
-      wlan_key_type = fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kPeer;
+      wlan_key_type = fuchsia_wlan_common::wire::WlanKeyType::kPeer;
       break;
     default:
       lerror("WlanKeyType is not supported: %hhu", in.key_type);

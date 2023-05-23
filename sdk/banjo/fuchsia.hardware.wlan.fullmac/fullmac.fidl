@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.wlan.fullmac;
 
-using fuchsia.hardware.wlan.associnfo;
 using fuchsia.wlan.common;
 using fuchsia.wlan.internal;
 using fuchsia.wlan.ieee80211 as ieee80211;
@@ -107,7 +106,7 @@ type WlanFullmacStopReq = struct {
 type SetKeyDescriptor = struct {
     key vector<uint8>:MAX;
     key_id uint16;
-    key_type fuchsia.hardware.wlan.associnfo.WlanKeyType;
+    key_type fuchsia.wlan.common.WlanKeyType;
     address ieee80211.MacAddr;
     rsc uint64;
     cipher_suite_oui array<uint8, 3>;
@@ -128,7 +127,7 @@ type WlanFullmacSetKeysResp = struct {
 
 type DeleteKeyDescriptor = struct {
     key_id uint16;
-    key_type fuchsia.hardware.wlan.associnfo.WlanKeyType;
+    key_type fuchsia.wlan.common.WlanKeyType;
     address ieee80211.MacAddr;
 };
 
@@ -660,7 +659,7 @@ protocol WlanFullmacImplIfc {
     }) -> ();
     OnWmmStatusResp(struct {
         status zx.Status;
-        wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
+        wmm_params fuchsia.wlan.common.WlanWmmParameters;
     }) -> ();
 };
 

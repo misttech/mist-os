@@ -12,7 +12,6 @@ rustc_library("wlan-fullmac-mlme") {
   edition = "2021"
 
   deps = [
-    "//sdk/banjo/fuchsia.hardware.wlan.associnfo:fuchsia.hardware.wlan.associnfo_banjo_rust",
     "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",

@@ -19,7 +19,6 @@ namespace {
 namespace wlan_softmac = fuchsia_wlan_softmac::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
 namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
-namespace wlan_associnfo = fuchsia_hardware_wlan_associnfo::wire;
 
 /* Metadata which is used as input and expected output for the under-test conversion functions*/
 
@@ -58,7 +57,7 @@ static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
     wlan_common::ChannelBandwidth::kCbw160;
 static constexpr wlan_softmac::WlanProtection kFakeFidlProtection =
     wlan_softmac::WlanProtection::kRxTx;
-static constexpr wlan_associnfo::WlanKeyType kFakeFidlKeyType = wlan_associnfo::WlanKeyType::kGroup;
+static constexpr wlan_common::WlanKeyType kFakeFidlKeyType = wlan_common::WlanKeyType::kGroup;
 static constexpr wlan_common::BssType kFakeFidlBssType = wlan_common::BssType::kMesh;
 static constexpr wlan_common::WlanTxResultCode kFakeFidlTxResultCode =
     wlan_common::WlanTxResultCode::kSuccess;

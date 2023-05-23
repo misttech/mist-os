@@ -12,7 +12,6 @@ rustc_library("wlan-mlme") {
   edition = "2021"
 
   deps = [
-    "//sdk/banjo/fuchsia.hardware.wlan.associnfo:fuchsia.hardware.wlan.associnfo_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_banjo_rust",

@@ -4,7 +4,6 @@
 
 use {
     super::{convert::banjo_to_fidl, FullmacDriverEvent, FullmacDriverEventSink},
-    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_common as banjo_wlan_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
@@ -105,7 +104,7 @@ pub struct WlanFullmacIfcProtocolOps {
     pub(crate) on_wmm_status_resp: extern "C" fn(
         ctx: &mut FullmacDriverEventSink,
         status: zx::sys::zx_status_t,
-        wmm_params: *const banjo_wlan_associnfo::WlanWmmParameters,
+        wmm_params: *const banjo_wlan_common::WlanWmmParameters,
     ),
 }
 
@@ -267,7 +266,7 @@ extern "C" fn sae_frame_rx(
 extern "C" fn on_wmm_status_resp(
     ctx: &mut FullmacDriverEventSink,
     status: zx::sys::zx_status_t,
-    wmm_params: *const banjo_wlan_associnfo::WlanWmmParameters,
+    wmm_params: *const banjo_wlan_common::WlanWmmParameters,
 ) {
     let resp = banjo_to_fidl::convert_wmm_params(unsafe { *wmm_params });
     ctx.0.send(FullmacDriverEvent::OnWmmStatusResp { status, resp });

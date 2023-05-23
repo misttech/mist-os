@@ -4,10 +4,7 @@
 
 use {
     crate::{banjo_buffer_to_slice, banjo_list_to_slice, buffer::OutBuf, common::mac::WlanGi, key},
-    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
-    banjo_fuchsia_wlan_common::JoinBssRequest,
-    banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxResult},
-    banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
+    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_softmac::{
         self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacQueryResponse, WlanTxPacket,
     },
@@ -96,7 +93,7 @@ pub trait DeviceOps {
         -> Result<u64, zx::Status>;
     fn start_active_scan(&mut self, active_scan_args: ActiveScanArgs) -> Result<u64, zx::Status>;
     fn cancel_scan(&mut self, scan_id: u64) -> Result<(), zx::Status>;
-    fn join_bss(&mut self, cfg: JoinBssRequest) -> Result<(), zx::Status>;
+    fn join_bss(&mut self, cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status>;
     fn enable_beaconing(
         &mut self,
         buf: OutBuf,
@@ -225,10 +222,10 @@ impl DeviceOps for Device {
             cipher_oui: key.cipher_oui,
             cipher_type: key.cipher_type,
             key_type: match key.key_type {
-                key::KeyType::PAIRWISE => banjo_wlan_associnfo::WlanKeyType::PAIRWISE,
-                key::KeyType::GROUP => banjo_wlan_associnfo::WlanKeyType::GROUP,
-                key::KeyType::IGTK => banjo_wlan_associnfo::WlanKeyType::IGTK,
-                key::KeyType::PEER => banjo_wlan_associnfo::WlanKeyType::PEER,
+                key::KeyType::PAIRWISE => banjo_common::WlanKeyType::PAIRWISE,
+                key::KeyType::GROUP => banjo_common::WlanKeyType::GROUP,
+                key::KeyType::IGTK => banjo_common::WlanKeyType::IGTK,
+                key::KeyType::PEER => banjo_common::WlanKeyType::PEER,
                 _ => return Err(zx::Status::INVALID_ARGS),
             },
             peer_addr: key.peer_addr,
@@ -273,7 +270,7 @@ impl DeviceOps for Device {
         (self.raw_device.get_wlan_channel)(self.raw_device.device)
     }
 
-    fn join_bss(&mut self, mut cfg: JoinBssRequest) -> Result<(), zx::Status> {
+    fn join_bss(&mut self, mut cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
         zx::ok((self.raw_device.join_bss)(self.raw_device.device, &mut cfg))
     }
 
@@ -353,8 +350,10 @@ pub struct WlanSoftmacIfcProtocolOps {
         packet: *const WlanTxPacket,
         status: i32,
     ),
-    report_tx_status:
-        extern "C" fn(ctx: &mut crate::DriverEventSink, tx_status: *const WlanTxResult),
+    report_tx_status: extern "C" fn(
+        ctx: &mut crate::DriverEventSink,
+        tx_status: *const banjo_common::WlanTxResult,
+    ),
     scan_complete: extern "C" fn(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64),
 }
 
@@ -378,7 +377,7 @@ extern "C" fn handle_complete_tx(
 #[no_mangle]
 extern "C" fn handle_report_tx_status(
     ctx: &mut crate::DriverEventSink,
-    tx_result_in: *const WlanTxResult,
+    tx_result_in: *const banjo_common::WlanTxResult,
 ) {
     if tx_result_in.is_null() {
         return;
@@ -723,7 +722,7 @@ pub struct DeviceInterface {
         extern "C" fn(device: *mut c_void) -> banjo_common::SpectrumManagementSupport,
     /// Configure the device's BSS.
     /// |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
-    join_bss: extern "C" fn(device: *mut c_void, cfg: &mut JoinBssRequest) -> i32,
+    join_bss: extern "C" fn(device: *mut c_void, cfg: &mut banjo_common::JoinBssRequest) -> i32,
     /// Enable hardware offload of beaconing on the device.
     enable_beaconing: extern "C" fn(
         device: *mut c_void,
@@ -896,7 +895,7 @@ pub mod test_utils {
         pub mac_sublayer_support: banjo_common::MacSublayerSupport,
         pub security_support: banjo_common::SecuritySupport,
         pub spectrum_management_support: banjo_common::SpectrumManagementSupport,
-        pub join_bss_request: Option<JoinBssRequest>,
+        pub join_bss_request: Option<banjo_common::JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
@@ -1083,7 +1082,7 @@ pub mod test_utils {
             Err(zx::Status::NOT_SUPPORTED)
         }
 
-        fn join_bss(&mut self, cfg: JoinBssRequest) -> Result<(), zx::Status> {
+        fn join_bss(&mut self, cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
             self.state.lock().unwrap().join_bss_request.replace(cfg);
             Ok(())
         }
@@ -1725,7 +1724,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .join_bss(JoinBssRequest {
+            .join_bss(banjo_common::JoinBssRequest {
                 bssid: [1, 2, 3, 4, 5, 6],
                 bss_type: banjo_common::BssType::PERSONAL,
                 remote: true,
@@ -1805,7 +1804,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .join_bss(JoinBssRequest {
+            .join_bss(banjo_common::JoinBssRequest {
                 bssid: [1, 2, 3, 4, 5, 6],
                 bss_type: banjo_common::BssType::PERSONAL,
                 remote: true,

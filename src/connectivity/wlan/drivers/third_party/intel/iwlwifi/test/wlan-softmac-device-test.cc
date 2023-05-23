@@ -1278,7 +1278,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
 
     // Set an arbitrary pairwise key.
     builder.cipher_type(4);
-    builder.key_type(fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kPairwise);
+    builder.key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise);
     builder.key_idx(0);
     builder.key(key);
     builder.rsc(0);
@@ -1293,7 +1293,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
 
     // Set an arbitrary group key.
     builder.cipher_type(4);
-    builder.key_type(fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kGroup);
+    builder.key_type(fuchsia_wlan_common::wire::WlanKeyType::kGroup);
     builder.key_idx(1);
     builder.key(key);
     builder.rsc(0);
@@ -1333,7 +1333,7 @@ TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
     // Default cipher configuration for WPA2/3 PTK.  This is data frame protection, required for
     // WPA2/3.
     builder.cipher_type(CIPHER_SUITE_TYPE_CCMP_128);
-    builder.key_type(fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kPairwise);
+    builder.key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise);
     builder.key_idx(0);
     builder.rsc(0);
     auto key_config = builder.Build();
@@ -1348,7 +1348,7 @@ TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
     builder.key(key);
     builder.cipher_oui(cipher_oui);
     builder.cipher_type(CIPHER_SUITE_TYPE_BIP_CMAC_128);
-    builder.key_type(fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kIgtk);
+    builder.key_type(fuchsia_wlan_common::wire::WlanKeyType::kIgtk);
     builder.key_idx(4);
     builder.rsc(0);
     auto key_config = builder.Build();
@@ -1378,7 +1378,7 @@ TEST_F(MacInterfaceTest, InstallKeysTKIP) {
     builder.cipher_oui(cipher_oui);
     // TKIP Pairwise: although we support it but not recommended (deprecated protocol).
     builder.cipher_type(fidl::ToUnderlying(fuchsia_wlan_ieee80211::wire::CipherSuiteType::kTkip));
-    builder.key_type(fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kPairwise);
+    builder.key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise);
     builder.key_idx(0);
     builder.rsc(0);
     auto key_config = builder.Build();
@@ -1392,7 +1392,7 @@ TEST_F(MacInterfaceTest, InstallKeysTKIP) {
     builder.key(tkip_key);
     builder.cipher_oui(cipher_oui);
     builder.cipher_type(fidl::ToUnderlying(fuchsia_wlan_ieee80211::wire::CipherSuiteType::kTkip));
-    builder.key_type(fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kIgtk);
+    builder.key_type(fuchsia_wlan_common::wire::WlanKeyType::kIgtk);
     builder.key_idx(1);
     builder.rsc(0);
     auto key_config = builder.Build();

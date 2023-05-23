@@ -4,7 +4,6 @@
 
 use {
     anyhow::{self, bail},
-    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_common as banjo_wlan_common,
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
@@ -66,12 +65,12 @@ fn convert_channel(channel: &fidl_common::WlanChannel) -> banjo_wlan_common::Wla
     }
 }
 
-fn convert_key_type(key_type: &fidl_mlme::KeyType) -> banjo_wlan_associnfo::WlanKeyType {
+fn convert_key_type(key_type: &fidl_mlme::KeyType) -> banjo_wlan_common::WlanKeyType {
     match key_type {
-        fidl_mlme::KeyType::Group => banjo_wlan_associnfo::WlanKeyType::GROUP,
-        fidl_mlme::KeyType::Pairwise => banjo_wlan_associnfo::WlanKeyType::PAIRWISE,
-        fidl_mlme::KeyType::PeerKey => banjo_wlan_associnfo::WlanKeyType::PEER,
-        fidl_mlme::KeyType::Igtk => banjo_wlan_associnfo::WlanKeyType::IGTK,
+        fidl_mlme::KeyType::Group => banjo_wlan_common::WlanKeyType::GROUP,
+        fidl_mlme::KeyType::Pairwise => banjo_wlan_common::WlanKeyType::PAIRWISE,
+        fidl_mlme::KeyType::PeerKey => banjo_wlan_common::WlanKeyType::PEER,
+        fidl_mlme::KeyType::Igtk => banjo_wlan_common::WlanKeyType::IGTK,
     }
 }
 
@@ -95,7 +94,7 @@ fn dummy_set_key_descriptor() -> banjo_wlan_fullmac::SetKeyDescriptor {
         key_list: std::ptr::null(),
         key_count: 0,
         key_id: 0,
-        key_type: banjo_wlan_associnfo::WlanKeyType(0),
+        key_type: banjo_wlan_common::WlanKeyType(0),
         address: [0; 6],
         rsc: 0,
         cipher_suite_oui: [0; 3],
@@ -116,7 +115,7 @@ fn convert_delete_key_descriptor(
 fn dummy_delete_key_descriptor() -> banjo_wlan_fullmac::DeleteKeyDescriptor {
     banjo_wlan_fullmac::DeleteKeyDescriptor {
         key_id: 0,
-        key_type: banjo_wlan_associnfo::WlanKeyType(0),
+        key_type: banjo_wlan_common::WlanKeyType(0),
         address: [0; 6],
     }
 }
