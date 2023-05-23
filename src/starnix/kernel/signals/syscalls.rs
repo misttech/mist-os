@@ -563,6 +563,7 @@ pub fn sys_waitid(
     id: i32,
     user_info: UserAddress,
     options: u32,
+    user_rusage: UserRef<rusage>,
 ) -> Result<(), Errno> {
     let waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -584,6 +585,17 @@ pub fn sys_waitid(
     // wait_on_pid returns None if the task was not waited on. In that case, we don't write out a
     // siginfo. This seems weird but is the correct behavior according to the waitid(2) man page.
     if let Some(waitable_process) = wait_on_pid(current_task, task_selector, &waiting_options)? {
+        if !user_rusage.is_null() {
+            let usage = rusage {
+                ru_utime: timeval_from_duration(waitable_process.time_stats.user_time),
+                ru_stime: timeval_from_duration(waitable_process.time_stats.system_time),
+                ..Default::default()
+            };
+
+            // TODO(fxb/76976): Return proper usage information.
+            current_task.mm.write_object(user_rusage, &usage)?;
+        }
+
         if !user_info.is_null() {
             let siginfo = waitable_process.as_signal_info();
             current_task.mm.write_memory(user_info, &siginfo.as_siginfo_bytes())?;
@@ -619,10 +631,14 @@ pub fn sys_wait4(
         let status = waitable_process.exit_status.wait_status();
 
         if !user_rusage.is_null() {
-            let usage = rusage::default();
+            let usage = rusage {
+                ru_utime: timeval_from_duration(waitable_process.time_stats.user_time),
+                ru_stime: timeval_from_duration(waitable_process.time_stats.system_time),
+                ..Default::default()
+            };
+
             // TODO(fxb/76976): Return proper usage information.
             current_task.mm.write_object(user_rusage, &usage)?;
-            not_implemented!("wait4 does not set rusage info");
         }
 
         if !user_wstatus.is_null() {
@@ -1391,9 +1407,19 @@ mod tests {
     async fn test_waitid_options() {
         let (_kernel, current_task) = create_kernel_and_task();
         let id = 1;
-        assert_eq!(sys_waitid(&current_task, P_PID, id, UserAddress::default(), 0), error!(EINVAL));
         assert_eq!(
-            sys_waitid(&current_task, P_PID, id, UserAddress::default(), 0xffff),
+            sys_waitid(&current_task, P_PID, id, UserAddress::default(), 0, UserRef::default()),
+            error!(EINVAL)
+        );
+        assert_eq!(
+            sys_waitid(
+                &current_task,
+                P_PID,
+                id,
+                UserAddress::default(),
+                0xffff,
+                UserRef::default()
+            ),
             error!(EINVAL)
         );
     }
@@ -1613,11 +1639,17 @@ mod tests {
         std::mem::drop(child2);
 
         let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        assert_eq!(sys_waitid(&current_task, P_PGID, child2_pid, address, WEXITED), Ok(()));
+        assert_eq!(
+            sys_waitid(&current_task, P_PGID, child2_pid, address, WEXITED, UserRef::default()),
+            Ok(())
+        );
         // The previous wait matched child2, only child1 should be in the available zombies.
         assert_eq!(current_task.thread_group.read().zombie_children[0].pid, child1_pid);
 
-        assert_eq!(sys_waitid(&current_task, P_PGID, 0, address, WEXITED), Ok(()));
+        assert_eq!(
+            sys_waitid(&current_task, P_PGID, 0, address, WEXITED, UserRef::default()),
+            Ok(())
+        );
     }
 
     #[::fuchsia::test]

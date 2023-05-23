@@ -276,7 +276,7 @@ pub fn dispatch_syscall(
         utimensat[4],
         #[cfg(target_arch = "x86_64")] vfork[0],
         wait4[4],
-        waitid[4],
+        waitid[5],
         write[3],
         writev[3],
     }

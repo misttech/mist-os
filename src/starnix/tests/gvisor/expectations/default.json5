@@ -959,8 +959,6 @@
 
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",
-                "WaitTest.Wait4Rusage",
-                "WaitTest.WaitidRusage",
                 "Waiters/WaitAnyChildTest.WaitedChildRusage/*",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",

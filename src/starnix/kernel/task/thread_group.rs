@@ -172,13 +172,15 @@ impl ZombieProcess {
         exit_status: ExitStatus,
         exit_signal: Option<Signal>,
     ) -> Self {
+        let time_stats = thread_group.base.time_stats() + thread_group.children_time_stats;
+
         ZombieProcess {
             pid: thread_group.base.leader,
             pgid: thread_group.process_group.leader,
             uid: credentials.uid,
             exit_status,
             exit_signal,
-            time_stats: Default::default(),
+            time_stats,
         }
     }
 
