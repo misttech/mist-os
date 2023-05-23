@@ -1,0 +1,79 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":resource-usage-benchmarks" ]
+}
+
+rustc_binary("resource_usage_benchmark") {
+  testonly = true
+  edition = "2021"
+  sources = [
+    "src/interfaces.rs",
+    "src/main.rs",
+    "src/sockets.rs",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/testing/netemul/rust:lib",
+    "//src/connectivity/network/tests/integration/common:netstack_testing_common",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
+    "//src/lib/network/packet",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/performance/lib/fuchsiaperf",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:humansize",
+    "//third_party/rust_crates:nonzero_ext",
+    "//third_party/rust_crates:serde_json",
+  ]
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
+fuchsia_test_component("resource-usage-benchmark-netstack2") {
+  manifest = "meta/resource-usage-benchmark-netstack2.cml"
+  deps = [
+    ":resource_usage_benchmark",
+    "//src/connectivity/network/netstack:component",
+    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+    "//src/sys/stash:stash_secure_v2",
+  ]
+}
+
+fuchsia_test_component("resource-usage-benchmark-netstack3") {
+  manifest = "meta/resource-usage-benchmark-netstack3.cml"
+  deps = [
+    ":resource_usage_benchmark",
+
+    # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
+    # component no longer brings its own DHCPv4 client, given that it is
+    # otherwise unused in this benchmark.
+    "//src/connectivity/network/dhcpv4/client/bindings:component",
+    "//src/connectivity/network/netstack3:component",
+    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+  ]
+}
+
+fuchsia_test_package("resource-usage-benchmarks") {
+  test_components = [
+    ":resource-usage-benchmark-netstack2",
+    ":resource-usage-benchmark-netstack3",
+  ]
+}
