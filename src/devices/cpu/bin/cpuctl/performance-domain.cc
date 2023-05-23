@@ -11,12 +11,20 @@
 
 using fuchsia_device::wire::kMaxDevicePerformanceStates;
 
+namespace {
+const std::string kControllerSuffix = "device_controller";
+const std::string kDeviceSuffix = "device_protocol";
+}  // namespace
+
 zx::result<CpuPerformanceDomain> CpuPerformanceDomain::CreateFromPath(const std::string& path) {
-  zx::result cpu = component::Connect<cpuctrl::Device>(path);
+  std::string device_controller_path = path + "/" + kControllerSuffix;
+  std::string device_protocol_path = path + "/" + kDeviceSuffix;
+
+  zx::result cpu = component::Connect<cpuctrl::Device>(device_protocol_path);
   if (cpu.is_error()) {
     return cpu.take_error();
   }
-  zx::result device = component::Connect<fuchsia_device::Controller>(path);
+  zx::result device = component::Connect<fuchsia_device::Controller>(device_controller_path);
   if (device.is_error()) {
     return device.take_error();
   }
