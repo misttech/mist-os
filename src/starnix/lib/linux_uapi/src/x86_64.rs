@@ -11,8 +11,6 @@
 
 use zerocopy::{AsBytes, FromBytes};
 
-pub use crate::x86_64_types::*;
-
 unsafe impl<Storage> AsBytes for __BindgenBitfieldUnit<Storage>
 where
     Storage: AsBytes,
@@ -4437,16 +4435,16 @@ pub const SPLICE_F_MOVE: u32 = 1;
 pub const SPLICE_F_NONBLOCK: u32 = 2;
 pub const SPLICE_F_MORE: u32 = 4;
 pub const SPLICE_F_GIFT: u32 = 8;
-pub type wchar_t = crate::x86_64_types::c_int;
+pub type wchar_t = crate::types::c_int;
 #[repr(C)]
 #[repr(align(16))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct max_align_t {
-    pub __clang_max_align_nonce1: crate::x86_64_types::c_longlong,
+    pub __clang_max_align_nonce1: crate::types::c_longlong,
     pub __bindgen_padding_0: [u8; 8usize],
     pub __clang_max_align_nonce2: u128,
 }
-pub type __kernel_sa_family_t = crate::x86_64_types::c_ushort;
+pub type __kernel_sa_family_t = crate::types::c_ushort;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __kernel_sockaddr_storage {
@@ -4462,7 +4460,7 @@ pub union __kernel_sockaddr_storage__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone)]
 pub struct __kernel_sockaddr_storage__bindgen_ty_1__bindgen_ty_1 {
     pub ss_family: __kernel_sa_family_t,
-    pub __data: [crate::x86_64_types::c_char; 126usize],
+    pub __data: [crate::types::c_char; 126usize],
 }
 impl Default for __kernel_sockaddr_storage__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -4491,57 +4489,57 @@ impl Default for __kernel_sockaddr_storage {
         }
     }
 }
-pub type __s8 = crate::x86_64_types::c_schar;
-pub type __u8 = crate::x86_64_types::c_uchar;
-pub type __s16 = crate::x86_64_types::c_short;
-pub type __u16 = crate::x86_64_types::c_ushort;
-pub type __s32 = crate::x86_64_types::c_int;
-pub type __u32 = crate::x86_64_types::c_uint;
-pub type __s64 = crate::x86_64_types::c_longlong;
-pub type __u64 = crate::x86_64_types::c_ulonglong;
+pub type __s8 = crate::types::c_schar;
+pub type __u8 = crate::types::c_uchar;
+pub type __s16 = crate::types::c_short;
+pub type __u16 = crate::types::c_ushort;
+pub type __s32 = crate::types::c_int;
+pub type __u32 = crate::types::c_uint;
+pub type __s64 = crate::types::c_longlong;
+pub type __u64 = crate::types::c_ulonglong;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __kernel_fd_set {
-    pub fds_bits: [crate::x86_64_types::c_ulong; 16usize],
+    pub fds_bits: [crate::types::c_ulong; 16usize],
 }
 pub type __kernel_sighandler_t =
-    ::std::option::Option<unsafe extern "C" fn(arg1: crate::x86_64_types::c_int)>;
-pub type __kernel_key_t = crate::x86_64_types::c_int;
-pub type __kernel_mqd_t = crate::x86_64_types::c_int;
-pub type __kernel_old_uid_t = crate::x86_64_types::c_ushort;
-pub type __kernel_old_gid_t = crate::x86_64_types::c_ushort;
-pub type __kernel_old_dev_t = crate::x86_64_types::c_ulong;
-pub type __kernel_long_t = crate::x86_64_types::c_long;
-pub type __kernel_ulong_t = crate::x86_64_types::c_ulong;
+    ::std::option::Option<unsafe extern "C" fn(arg1: crate::types::c_int)>;
+pub type __kernel_key_t = crate::types::c_int;
+pub type __kernel_mqd_t = crate::types::c_int;
+pub type __kernel_old_uid_t = crate::types::c_ushort;
+pub type __kernel_old_gid_t = crate::types::c_ushort;
+pub type __kernel_old_dev_t = crate::types::c_ulong;
+pub type __kernel_long_t = crate::types::c_long;
+pub type __kernel_ulong_t = crate::types::c_ulong;
 pub type __kernel_ino_t = __kernel_ulong_t;
-pub type __kernel_mode_t = crate::x86_64_types::c_uint;
-pub type __kernel_pid_t = crate::x86_64_types::c_int;
-pub type __kernel_ipc_pid_t = crate::x86_64_types::c_int;
-pub type __kernel_uid_t = crate::x86_64_types::c_uint;
-pub type __kernel_gid_t = crate::x86_64_types::c_uint;
+pub type __kernel_mode_t = crate::types::c_uint;
+pub type __kernel_pid_t = crate::types::c_int;
+pub type __kernel_ipc_pid_t = crate::types::c_int;
+pub type __kernel_uid_t = crate::types::c_uint;
+pub type __kernel_gid_t = crate::types::c_uint;
 pub type __kernel_suseconds_t = __kernel_long_t;
-pub type __kernel_daddr_t = crate::x86_64_types::c_int;
-pub type __kernel_uid32_t = crate::x86_64_types::c_uint;
-pub type __kernel_gid32_t = crate::x86_64_types::c_uint;
+pub type __kernel_daddr_t = crate::types::c_int;
+pub type __kernel_uid32_t = crate::types::c_uint;
+pub type __kernel_gid32_t = crate::types::c_uint;
 pub type __kernel_size_t = __kernel_ulong_t;
 pub type __kernel_ssize_t = __kernel_long_t;
 pub type __kernel_ptrdiff_t = __kernel_long_t;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __kernel_fsid_t {
-    pub val: [crate::x86_64_types::c_int; 2usize],
+    pub val: [crate::types::c_int; 2usize],
 }
 pub type __kernel_off_t = __kernel_long_t;
-pub type __kernel_loff_t = crate::x86_64_types::c_longlong;
+pub type __kernel_loff_t = crate::types::c_longlong;
 pub type __kernel_old_time_t = __kernel_long_t;
 pub type __kernel_time_t = __kernel_long_t;
-pub type __kernel_time64_t = crate::x86_64_types::c_longlong;
+pub type __kernel_time64_t = crate::types::c_longlong;
 pub type __kernel_clock_t = __kernel_long_t;
-pub type __kernel_timer_t = crate::x86_64_types::c_int;
-pub type __kernel_clockid_t = crate::x86_64_types::c_int;
-pub type __kernel_caddr_t = *mut crate::x86_64_types::c_char;
-pub type __kernel_uid16_t = crate::x86_64_types::c_ushort;
-pub type __kernel_gid16_t = crate::x86_64_types::c_ushort;
+pub type __kernel_timer_t = crate::types::c_int;
+pub type __kernel_clockid_t = crate::types::c_int;
+pub type __kernel_caddr_t = *mut crate::types::c_char;
+pub type __kernel_uid16_t = crate::types::c_ushort;
+pub type __kernel_gid16_t = crate::types::c_ushort;
 pub type __le16 = __u16;
 pub type __be16 = __u16;
 pub type __le32 = __u32;
@@ -4550,23 +4548,23 @@ pub type __le64 = __u64;
 pub type __be64 = __u64;
 pub type __sum16 = __u16;
 pub type __wsum = __u32;
-pub type __poll_t = crate::x86_64_types::c_uint;
+pub type __poll_t = crate::types::c_uint;
 pub type pid_t = __kernel_pid_t;
 pub type uid_t = __kernel_uid_t;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sockaddr {
     pub sa_family: __kernel_sa_family_t,
-    pub sa_data: [crate::x86_64_types::c_char; 14usize],
+    pub sa_data: [crate::types::c_char; 14usize],
 }
 pub type sockaddr_storage = __kernel_sockaddr_storage;
 pub type sa_family_t = __kernel_sa_family_t;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct pollfd {
-    pub fd: crate::x86_64_types::c_int,
-    pub events: crate::x86_64_types::c_short,
-    pub revents: crate::x86_64_types::c_short,
+    pub fd: crate::types::c_int,
+    pub events: crate::types::c_short,
+    pub revents: crate::types::c_short,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -4856,13 +4854,13 @@ impl Default for sigcontext {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct timespec {
     pub tv_sec: __kernel_time_t,
-    pub tv_nsec: crate::x86_64_types::c_long,
+    pub tv_nsec: crate::types::c_long,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __kernel_timespec {
     pub tv_sec: __kernel_time64_t,
-    pub tv_nsec: crate::x86_64_types::c_longlong,
+    pub tv_nsec: crate::types::c_longlong,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -4874,7 +4872,7 @@ pub struct __kernel_itimerspec {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __kernel_old_timespec {
     pub tv_sec: __kernel_old_time_t,
-    pub tv_nsec: crate::x86_64_types::c_long,
+    pub tv_nsec: crate::types::c_long,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -4903,12 +4901,11 @@ pub struct itimerval {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct timezone {
-    pub tz_minuteswest: crate::x86_64_types::c_int,
-    pub tz_dsttime: crate::x86_64_types::c_int,
+    pub tz_minuteswest: crate::types::c_int,
+    pub tz_dsttime: crate::types::c_int,
 }
-pub type sigset_t = crate::x86_64_types::c_ulong;
-pub type __signalfn_t =
-    ::std::option::Option<unsafe extern "C" fn(arg1: crate::x86_64_types::c_int)>;
+pub type sigset_t = crate::types::c_ulong;
+pub type __signalfn_t = ::std::option::Option<unsafe extern "C" fn(arg1: crate::types::c_int)>;
 pub type __sighandler_t = u64;
 pub type __restorefn_t = ::std::option::Option<unsafe extern "C" fn()>;
 pub type __sigrestore_t = u64;
@@ -4916,7 +4913,7 @@ pub type __sigrestore_t = u64;
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sigaction {
     pub sa_handler: __sighandler_t,
-    pub sa_flags: crate::x86_64_types::c_ulong,
+    pub sa_flags: crate::types::c_ulong,
     pub sa_restorer: __sigrestore_t,
     pub sa_mask: sigset_t,
 }
@@ -4924,7 +4921,7 @@ pub struct sigaction {
 #[derive(Debug, Copy, Clone)]
 pub struct sigaltstack {
     pub ss_sp: usize,
-    pub ss_flags: crate::x86_64_types::c_int,
+    pub ss_flags: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
     pub ss_size: __kernel_size_t,
 }
@@ -4941,7 +4938,7 @@ pub type stack_t = sigaltstack;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ucontext {
-    pub uc_flags: crate::x86_64_types::c_ulong,
+    pub uc_flags: crate::types::c_ulong,
     pub uc_link: *mut ucontext,
     pub uc_stack: stack_t,
     pub uc_mcontext: sigcontext,
@@ -4963,10 +4960,10 @@ pub const BINDER_TYPE_WEAK_HANDLE: _bindgen_ty_1 = 2003315333;
 pub const BINDER_TYPE_FD: _bindgen_ty_1 = 1717840517;
 pub const BINDER_TYPE_FDA: _bindgen_ty_1 = 1717854597;
 pub const BINDER_TYPE_PTR: _bindgen_ty_1 = 1886661253;
-pub type _bindgen_ty_1 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_1 = crate::types::c_uint;
 pub const flat_binder_object_shifts_FLAT_BINDER_FLAG_SCHED_POLICY_SHIFT: flat_binder_object_shifts =
     9;
-pub type flat_binder_object_shifts = crate::x86_64_types::c_uint;
+pub type flat_binder_object_shifts = crate::types::c_uint;
 pub const flat_binder_object_flags_FLAT_BINDER_FLAG_PRIORITY_MASK: flat_binder_object_flags = 255;
 pub const flat_binder_object_flags_FLAT_BINDER_FLAG_ACCEPTS_FDS: flat_binder_object_flags = 256;
 pub const flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK: flat_binder_object_flags =
@@ -4974,7 +4971,7 @@ pub const flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK: flat_bind
 pub const flat_binder_object_flags_FLAT_BINDER_FLAG_INHERIT_RT: flat_binder_object_flags = 2048;
 pub const flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX: flat_binder_object_flags =
     4096;
-pub type flat_binder_object_flags = crate::x86_64_types::c_uint;
+pub type flat_binder_object_flags = crate::types::c_uint;
 pub type binder_size_t = __u64;
 pub type binder_uintptr_t = __u64;
 #[repr(C)]
@@ -5057,7 +5054,7 @@ pub struct binder_buffer_object {
     pub parent_offset: binder_size_t,
 }
 pub const BINDER_BUFFER_FLAG_HAS_PARENT: _bindgen_ty_2 = 1;
-pub type _bindgen_ty_2 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_2 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct binder_fd_array_object {
@@ -5127,7 +5124,7 @@ pub const transaction_flags_TF_STATUS_CODE: transaction_flags = 8;
 pub const transaction_flags_TF_ACCEPT_FDS: transaction_flags = 16;
 pub const transaction_flags_TF_CLEAR_BUF: transaction_flags = 32;
 pub const transaction_flags_TF_UPDATE_TXN: transaction_flags = 64;
-pub type transaction_flags = crate::x86_64_types::c_uint;
+pub type transaction_flags = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes)]
 pub struct binder_transaction_data {
@@ -5269,7 +5266,7 @@ pub const binder_driver_return_protocol_BR_FAILED_REPLY: binder_driver_return_pr
 pub const binder_driver_return_protocol_BR_FROZEN_REPLY: binder_driver_return_protocol = 29202;
 pub const binder_driver_return_protocol_BR_ONEWAY_SPAM_SUSPECT: binder_driver_return_protocol =
     29203;
-pub type binder_driver_return_protocol = crate::x86_64_types::c_uint;
+pub type binder_driver_return_protocol = crate::types::c_uint;
 pub const binder_driver_command_protocol_BC_TRANSACTION: binder_driver_command_protocol =
     1077961472;
 pub const binder_driver_command_protocol_BC_REPLY: binder_driver_command_protocol = 1077961473;
@@ -5299,7 +5296,7 @@ pub const binder_driver_command_protocol_BC_DEAD_BINDER_DONE: binder_driver_comm
 pub const binder_driver_command_protocol_BC_TRANSACTION_SG: binder_driver_command_protocol =
     1078485777;
 pub const binder_driver_command_protocol_BC_REPLY_SG: binder_driver_command_protocol = 1078485778;
-pub type binder_driver_command_protocol = crate::x86_64_types::c_uint;
+pub type binder_driver_command_protocol = crate::types::c_uint;
 pub const Audit_equal: _bindgen_ty_3 = 0;
 pub const Audit_not_equal: _bindgen_ty_3 = 1;
 pub const Audit_bitmask: _bindgen_ty_3 = 2;
@@ -5309,11 +5306,11 @@ pub const Audit_gt: _bindgen_ty_3 = 5;
 pub const Audit_le: _bindgen_ty_3 = 6;
 pub const Audit_ge: _bindgen_ty_3 = 7;
 pub const Audit_bad: _bindgen_ty_3 = 8;
-pub type _bindgen_ty_3 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_3 = crate::types::c_uint;
 pub const audit_nlgrps_AUDIT_NLGRP_NONE: audit_nlgrps = 0;
 pub const audit_nlgrps_AUDIT_NLGRP_READLOG: audit_nlgrps = 1;
 pub const audit_nlgrps___AUDIT_NLGRP_MAX: audit_nlgrps = 2;
-pub type audit_nlgrps = crate::x86_64_types::c_uint;
+pub type audit_nlgrps = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct audit_status {
@@ -5378,7 +5375,7 @@ pub struct audit_rule_data {
     pub values: [__u32; 64usize],
     pub fieldflags: [__u32; 64usize],
     pub buflen: __u32,
-    pub buf: __IncompleteArrayField<crate::x86_64_types::c_char>,
+    pub buf: __IncompleteArrayField<crate::types::c_char>,
 }
 impl Default for audit_rule_data {
     fn default() -> Self {
@@ -5401,7 +5398,7 @@ pub const BPF_REG_8: _bindgen_ty_4 = 8;
 pub const BPF_REG_9: _bindgen_ty_4 = 9;
 pub const BPF_REG_10: _bindgen_ty_4 = 10;
 pub const __MAX_BPF_REG: _bindgen_ty_4 = 11;
-pub type _bindgen_ty_4 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_4 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct bpf_insn {
@@ -5466,7 +5463,7 @@ pub const bpf_cgroup_iter_order_BPF_CGROUP_ITER_SELF_ONLY: bpf_cgroup_iter_order
 pub const bpf_cgroup_iter_order_BPF_CGROUP_ITER_DESCENDANTS_PRE: bpf_cgroup_iter_order = 2;
 pub const bpf_cgroup_iter_order_BPF_CGROUP_ITER_DESCENDANTS_POST: bpf_cgroup_iter_order = 3;
 pub const bpf_cgroup_iter_order_BPF_CGROUP_ITER_ANCESTORS_UP: bpf_cgroup_iter_order = 4;
-pub type bpf_cgroup_iter_order = crate::x86_64_types::c_uint;
+pub type bpf_cgroup_iter_order = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_iter_link_info {
@@ -5548,7 +5545,7 @@ pub const bpf_cmd_BPF_ENABLE_STATS: bpf_cmd = 32;
 pub const bpf_cmd_BPF_ITER_CREATE: bpf_cmd = 33;
 pub const bpf_cmd_BPF_LINK_DETACH: bpf_cmd = 34;
 pub const bpf_cmd_BPF_PROG_BIND_MAP: bpf_cmd = 35;
-pub type bpf_cmd = crate::x86_64_types::c_uint;
+pub type bpf_cmd = crate::types::c_uint;
 pub const bpf_map_type_BPF_MAP_TYPE_UNSPEC: bpf_map_type = 0;
 pub const bpf_map_type_BPF_MAP_TYPE_HASH: bpf_map_type = 1;
 pub const bpf_map_type_BPF_MAP_TYPE_ARRAY: bpf_map_type = 2;
@@ -5583,7 +5580,7 @@ pub const bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE: bpf_map_type = 29;
 pub const bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER: bpf_map_type = 30;
 pub const bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF: bpf_map_type = 31;
 pub const bpf_map_type_BPF_MAP_TYPE_CGRP_STORAGE: bpf_map_type = 32;
-pub type bpf_map_type = crate::x86_64_types::c_uint;
+pub type bpf_map_type = crate::types::c_uint;
 pub const bpf_prog_type_BPF_PROG_TYPE_UNSPEC: bpf_prog_type = 0;
 pub const bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER: bpf_prog_type = 1;
 pub const bpf_prog_type_BPF_PROG_TYPE_KPROBE: bpf_prog_type = 2;
@@ -5616,7 +5613,7 @@ pub const bpf_prog_type_BPF_PROG_TYPE_EXT: bpf_prog_type = 28;
 pub const bpf_prog_type_BPF_PROG_TYPE_LSM: bpf_prog_type = 29;
 pub const bpf_prog_type_BPF_PROG_TYPE_SK_LOOKUP: bpf_prog_type = 30;
 pub const bpf_prog_type_BPF_PROG_TYPE_SYSCALL: bpf_prog_type = 31;
-pub type bpf_prog_type = crate::x86_64_types::c_uint;
+pub type bpf_prog_type = crate::types::c_uint;
 pub const bpf_attach_type_BPF_CGROUP_INET_INGRESS: bpf_attach_type = 0;
 pub const bpf_attach_type_BPF_CGROUP_INET_EGRESS: bpf_attach_type = 1;
 pub const bpf_attach_type_BPF_CGROUP_INET_SOCK_CREATE: bpf_attach_type = 2;
@@ -5662,7 +5659,7 @@ pub const bpf_attach_type_BPF_PERF_EVENT: bpf_attach_type = 41;
 pub const bpf_attach_type_BPF_TRACE_KPROBE_MULTI: bpf_attach_type = 42;
 pub const bpf_attach_type_BPF_LSM_CGROUP: bpf_attach_type = 43;
 pub const bpf_attach_type___MAX_BPF_ATTACH_TYPE: bpf_attach_type = 44;
-pub type bpf_attach_type = crate::x86_64_types::c_uint;
+pub type bpf_attach_type = crate::types::c_uint;
 pub const bpf_link_type_BPF_LINK_TYPE_UNSPEC: bpf_link_type = 0;
 pub const bpf_link_type_BPF_LINK_TYPE_RAW_TRACEPOINT: bpf_link_type = 1;
 pub const bpf_link_type_BPF_LINK_TYPE_TRACING: bpf_link_type = 2;
@@ -5674,12 +5671,12 @@ pub const bpf_link_type_BPF_LINK_TYPE_PERF_EVENT: bpf_link_type = 7;
 pub const bpf_link_type_BPF_LINK_TYPE_KPROBE_MULTI: bpf_link_type = 8;
 pub const bpf_link_type_BPF_LINK_TYPE_STRUCT_OPS: bpf_link_type = 9;
 pub const bpf_link_type_MAX_BPF_LINK_TYPE: bpf_link_type = 10;
-pub type bpf_link_type = crate::x86_64_types::c_uint;
+pub type bpf_link_type = crate::types::c_uint;
 pub const BPF_ANY: _bindgen_ty_5 = 0;
 pub const BPF_NOEXIST: _bindgen_ty_5 = 1;
 pub const BPF_EXIST: _bindgen_ty_5 = 2;
 pub const BPF_F_LOCK: _bindgen_ty_5 = 4;
-pub type _bindgen_ty_5 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_5 = crate::types::c_uint;
 pub const BPF_F_NO_PREALLOC: _bindgen_ty_6 = 1;
 pub const BPF_F_NO_COMMON_LRU: _bindgen_ty_6 = 2;
 pub const BPF_F_NUMA_NODE: _bindgen_ty_6 = 4;
@@ -5693,18 +5690,18 @@ pub const BPF_F_CLONE: _bindgen_ty_6 = 512;
 pub const BPF_F_MMAPABLE: _bindgen_ty_6 = 1024;
 pub const BPF_F_PRESERVE_ELEMS: _bindgen_ty_6 = 2048;
 pub const BPF_F_INNER_MAP: _bindgen_ty_6 = 4096;
-pub type _bindgen_ty_6 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_6 = crate::types::c_uint;
 pub const bpf_stats_type_BPF_STATS_RUN_TIME: bpf_stats_type = 0;
-pub type bpf_stats_type = crate::x86_64_types::c_uint;
+pub type bpf_stats_type = crate::types::c_uint;
 pub const bpf_stack_build_id_status_BPF_STACK_BUILD_ID_EMPTY: bpf_stack_build_id_status = 0;
 pub const bpf_stack_build_id_status_BPF_STACK_BUILD_ID_VALID: bpf_stack_build_id_status = 1;
 pub const bpf_stack_build_id_status_BPF_STACK_BUILD_ID_IP: bpf_stack_build_id_status = 2;
-pub type bpf_stack_build_id_status = crate::x86_64_types::c_uint;
+pub type bpf_stack_build_id_status = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct bpf_stack_build_id {
     pub status: __s32,
-    pub build_id: [crate::x86_64_types::c_uchar; 20usize],
+    pub build_id: [crate::types::c_uchar; 20usize],
     pub __bindgen_anon_1: bpf_stack_build_id__bindgen_ty_1,
 }
 #[repr(C)]
@@ -5764,7 +5761,7 @@ pub struct bpf_attr__bindgen_ty_1 {
     pub map_flags: __u32,
     pub inner_map_fd: __u32,
     pub numa_node: __u32,
-    pub map_name: [crate::x86_64_types::c_char; 16usize],
+    pub map_name: [crate::types::c_char; 16usize],
     pub map_ifindex: __u32,
     pub btf_fd: __u32,
     pub btf_key_type_id: __u32,
@@ -5829,7 +5826,7 @@ pub struct bpf_attr__bindgen_ty_4 {
     pub log_buf: __u64,
     pub kern_version: __u32,
     pub prog_flags: __u32,
-    pub prog_name: [crate::x86_64_types::c_char; 16usize],
+    pub prog_name: [crate::types::c_char; 16usize],
     pub prog_ifindex: __u32,
     pub expected_attach_type: __u32,
     pub prog_btf_fd: __u32,
@@ -6322,43 +6319,43 @@ pub const bpf_func_id_BPF_FUNC_user_ringbuf_drain: bpf_func_id = 209;
 pub const bpf_func_id_BPF_FUNC_cgrp_storage_get: bpf_func_id = 210;
 pub const bpf_func_id_BPF_FUNC_cgrp_storage_delete: bpf_func_id = 211;
 pub const bpf_func_id___BPF_FUNC_MAX_ID: bpf_func_id = 212;
-pub type bpf_func_id = crate::x86_64_types::c_uint;
+pub type bpf_func_id = crate::types::c_uint;
 pub const BPF_F_RECOMPUTE_CSUM: _bindgen_ty_7 = 1;
 pub const BPF_F_INVALIDATE_HASH: _bindgen_ty_7 = 2;
-pub type _bindgen_ty_7 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_7 = crate::types::c_uint;
 pub const BPF_F_HDR_FIELD_MASK: _bindgen_ty_8 = 15;
-pub type _bindgen_ty_8 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_8 = crate::types::c_uint;
 pub const BPF_F_PSEUDO_HDR: _bindgen_ty_9 = 16;
 pub const BPF_F_MARK_MANGLED_0: _bindgen_ty_9 = 32;
 pub const BPF_F_MARK_ENFORCE: _bindgen_ty_9 = 64;
-pub type _bindgen_ty_9 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_9 = crate::types::c_uint;
 pub const BPF_F_INGRESS: _bindgen_ty_10 = 1;
-pub type _bindgen_ty_10 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_10 = crate::types::c_uint;
 pub const BPF_F_TUNINFO_IPV6: _bindgen_ty_11 = 1;
-pub type _bindgen_ty_11 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_11 = crate::types::c_uint;
 pub const BPF_F_SKIP_FIELD_MASK: _bindgen_ty_12 = 255;
 pub const BPF_F_USER_STACK: _bindgen_ty_12 = 256;
 pub const BPF_F_FAST_STACK_CMP: _bindgen_ty_12 = 512;
 pub const BPF_F_REUSE_STACKID: _bindgen_ty_12 = 1024;
 pub const BPF_F_USER_BUILD_ID: _bindgen_ty_12 = 2048;
-pub type _bindgen_ty_12 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_12 = crate::types::c_uint;
 pub const BPF_F_ZERO_CSUM_TX: _bindgen_ty_13 = 2;
 pub const BPF_F_DONT_FRAGMENT: _bindgen_ty_13 = 4;
 pub const BPF_F_SEQ_NUMBER: _bindgen_ty_13 = 8;
-pub type _bindgen_ty_13 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_13 = crate::types::c_uint;
 pub const BPF_F_TUNINFO_FLAGS: _bindgen_ty_14 = 16;
-pub type _bindgen_ty_14 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_14 = crate::types::c_uint;
 pub const BPF_F_INDEX_MASK: _bindgen_ty_15 = 4294967295;
 pub const BPF_F_CURRENT_CPU: _bindgen_ty_15 = 4294967295;
 pub const BPF_F_CTXLEN_MASK: _bindgen_ty_15 = 4503595332403200;
-pub type _bindgen_ty_15 = crate::x86_64_types::c_ulong;
+pub type _bindgen_ty_15 = crate::types::c_ulong;
 pub const BPF_F_CURRENT_NETNS: _bindgen_ty_16 = -1;
-pub type _bindgen_ty_16 = crate::x86_64_types::c_int;
+pub type _bindgen_ty_16 = crate::types::c_int;
 pub const BPF_CSUM_LEVEL_QUERY: _bindgen_ty_17 = 0;
 pub const BPF_CSUM_LEVEL_INC: _bindgen_ty_17 = 1;
 pub const BPF_CSUM_LEVEL_DEC: _bindgen_ty_17 = 2;
 pub const BPF_CSUM_LEVEL_RESET: _bindgen_ty_17 = 3;
-pub type _bindgen_ty_17 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_17 = crate::types::c_uint;
 pub const BPF_F_ADJ_ROOM_FIXED_GSO: _bindgen_ty_18 = 1;
 pub const BPF_F_ADJ_ROOM_ENCAP_L3_IPV4: _bindgen_ty_18 = 2;
 pub const BPF_F_ADJ_ROOM_ENCAP_L3_IPV6: _bindgen_ty_18 = 4;
@@ -6366,50 +6363,50 @@ pub const BPF_F_ADJ_ROOM_ENCAP_L4_GRE: _bindgen_ty_18 = 8;
 pub const BPF_F_ADJ_ROOM_ENCAP_L4_UDP: _bindgen_ty_18 = 16;
 pub const BPF_F_ADJ_ROOM_NO_CSUM_RESET: _bindgen_ty_18 = 32;
 pub const BPF_F_ADJ_ROOM_ENCAP_L2_ETH: _bindgen_ty_18 = 64;
-pub type _bindgen_ty_18 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_18 = crate::types::c_uint;
 pub const BPF_ADJ_ROOM_ENCAP_L2_MASK: _bindgen_ty_19 = 255;
 pub const BPF_ADJ_ROOM_ENCAP_L2_SHIFT: _bindgen_ty_19 = 56;
-pub type _bindgen_ty_19 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_19 = crate::types::c_uint;
 pub const BPF_F_SYSCTL_BASE_NAME: _bindgen_ty_20 = 1;
-pub type _bindgen_ty_20 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_20 = crate::types::c_uint;
 pub const BPF_LOCAL_STORAGE_GET_F_CREATE: _bindgen_ty_21 = 1;
 pub const BPF_SK_STORAGE_GET_F_CREATE: _bindgen_ty_21 = 1;
-pub type _bindgen_ty_21 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_21 = crate::types::c_uint;
 pub const BPF_F_GET_BRANCH_RECORDS_SIZE: _bindgen_ty_22 = 1;
-pub type _bindgen_ty_22 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_22 = crate::types::c_uint;
 pub const BPF_RB_NO_WAKEUP: _bindgen_ty_23 = 1;
 pub const BPF_RB_FORCE_WAKEUP: _bindgen_ty_23 = 2;
-pub type _bindgen_ty_23 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_23 = crate::types::c_uint;
 pub const BPF_RB_AVAIL_DATA: _bindgen_ty_24 = 0;
 pub const BPF_RB_RING_SIZE: _bindgen_ty_24 = 1;
 pub const BPF_RB_CONS_POS: _bindgen_ty_24 = 2;
 pub const BPF_RB_PROD_POS: _bindgen_ty_24 = 3;
-pub type _bindgen_ty_24 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_24 = crate::types::c_uint;
 pub const BPF_RINGBUF_BUSY_BIT: _bindgen_ty_25 = 2147483648;
 pub const BPF_RINGBUF_DISCARD_BIT: _bindgen_ty_25 = 1073741824;
 pub const BPF_RINGBUF_HDR_SZ: _bindgen_ty_25 = 8;
-pub type _bindgen_ty_25 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_25 = crate::types::c_uint;
 pub const BPF_SK_LOOKUP_F_REPLACE: _bindgen_ty_26 = 1;
 pub const BPF_SK_LOOKUP_F_NO_REUSEPORT: _bindgen_ty_26 = 2;
-pub type _bindgen_ty_26 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_26 = crate::types::c_uint;
 pub const bpf_adj_room_mode_BPF_ADJ_ROOM_NET: bpf_adj_room_mode = 0;
 pub const bpf_adj_room_mode_BPF_ADJ_ROOM_MAC: bpf_adj_room_mode = 1;
-pub type bpf_adj_room_mode = crate::x86_64_types::c_uint;
+pub type bpf_adj_room_mode = crate::types::c_uint;
 pub const bpf_hdr_start_off_BPF_HDR_START_MAC: bpf_hdr_start_off = 0;
 pub const bpf_hdr_start_off_BPF_HDR_START_NET: bpf_hdr_start_off = 1;
-pub type bpf_hdr_start_off = crate::x86_64_types::c_uint;
+pub type bpf_hdr_start_off = crate::types::c_uint;
 pub const bpf_lwt_encap_mode_BPF_LWT_ENCAP_SEG6: bpf_lwt_encap_mode = 0;
 pub const bpf_lwt_encap_mode_BPF_LWT_ENCAP_SEG6_INLINE: bpf_lwt_encap_mode = 1;
 pub const bpf_lwt_encap_mode_BPF_LWT_ENCAP_IP: bpf_lwt_encap_mode = 2;
-pub type bpf_lwt_encap_mode = crate::x86_64_types::c_uint;
+pub type bpf_lwt_encap_mode = crate::types::c_uint;
 pub const BPF_F_BPRM_SECUREEXEC: _bindgen_ty_27 = 1;
-pub type _bindgen_ty_27 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_27 = crate::types::c_uint;
 pub const BPF_F_BROADCAST: _bindgen_ty_28 = 8;
 pub const BPF_F_EXCLUDE_INGRESS: _bindgen_ty_28 = 16;
-pub type _bindgen_ty_28 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_28 = crate::types::c_uint;
 pub const BPF_SKB_TSTAMP_UNSPEC: _bindgen_ty_29 = 0;
 pub const BPF_SKB_TSTAMP_DELIVERY_MONO: _bindgen_ty_29 = 1;
-pub type _bindgen_ty_29 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_29 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __sk_buff {
@@ -6615,7 +6612,7 @@ pub const bpf_ret_code_BPF_DROP: bpf_ret_code = 2;
 pub const bpf_ret_code_BPF_REDIRECT: bpf_ret_code = 7;
 pub const bpf_ret_code_BPF_LWT_REROUTE: bpf_ret_code = 128;
 pub const bpf_ret_code_BPF_FLOW_DISSECTOR_CONTINUE: bpf_ret_code = 129;
-pub type bpf_ret_code = crate::x86_64_types::c_uint;
+pub type bpf_ret_code = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct bpf_sock {
@@ -6728,7 +6725,7 @@ pub const xdp_action_XDP_DROP: xdp_action = 1;
 pub const xdp_action_XDP_PASS: xdp_action = 2;
 pub const xdp_action_XDP_TX: xdp_action = 3;
 pub const xdp_action_XDP_REDIRECT: xdp_action = 4;
-pub type xdp_action = crate::x86_64_types::c_uint;
+pub type xdp_action = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct xdp_md {
@@ -6748,7 +6745,7 @@ pub struct bpf_devmap_val {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_devmap_val__bindgen_ty_1 {
-    pub fd: crate::x86_64_types::c_int,
+    pub fd: crate::types::c_int,
     pub id: __u32,
 }
 impl Default for bpf_devmap_val__bindgen_ty_1 {
@@ -6778,7 +6775,7 @@ pub struct bpf_cpumap_val {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_cpumap_val__bindgen_ty_1 {
-    pub fd: crate::x86_64_types::c_int,
+    pub fd: crate::types::c_int,
     pub id: __u32,
 }
 impl Default for bpf_cpumap_val__bindgen_ty_1 {
@@ -6801,7 +6798,7 @@ impl Default for bpf_cpumap_val {
 }
 pub const sk_action_SK_DROP: sk_action = 0;
 pub const sk_action_SK_PASS: sk_action = 1;
-pub type sk_action = crate::x86_64_types::c_uint;
+pub type sk_action = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct sk_msg_md {
@@ -7024,7 +7021,7 @@ pub struct bpf_prog_info {
     pub created_by_uid: __u32,
     pub nr_map_ids: __u32,
     pub map_ids: __u64,
-    pub name: [crate::x86_64_types::c_char; 16usize],
+    pub name: [crate::types::c_char; 16usize],
     pub ifindex: __u32,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
@@ -7085,7 +7082,7 @@ pub struct bpf_map_info {
     pub value_size: __u32,
     pub max_entries: __u32,
     pub map_flags: __u32,
-    pub name: [crate::x86_64_types::c_char; 16usize],
+    pub name: [crate::types::c_char; 16usize],
     pub ifindex: __u32,
     pub btf_vmlinux_value_type_id: __u32,
     pub netns_dev: __u64,
@@ -7441,7 +7438,7 @@ pub const BPF_SOCK_OPS_PARSE_ALL_HDR_OPT_CB_FLAG: _bindgen_ty_30 = 16;
 pub const BPF_SOCK_OPS_PARSE_UNKNOWN_HDR_OPT_CB_FLAG: _bindgen_ty_30 = 32;
 pub const BPF_SOCK_OPS_WRITE_HDR_OPT_CB_FLAG: _bindgen_ty_30 = 64;
 pub const BPF_SOCK_OPS_ALL_CB_FLAGS: _bindgen_ty_30 = 127;
-pub type _bindgen_ty_30 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_30 = crate::types::c_uint;
 pub const BPF_SOCK_OPS_VOID: _bindgen_ty_31 = 0;
 pub const BPF_SOCK_OPS_TIMEOUT_INIT: _bindgen_ty_31 = 1;
 pub const BPF_SOCK_OPS_RWND_INIT: _bindgen_ty_31 = 2;
@@ -7458,7 +7455,7 @@ pub const BPF_SOCK_OPS_RTT_CB: _bindgen_ty_31 = 12;
 pub const BPF_SOCK_OPS_PARSE_HDR_OPT_CB: _bindgen_ty_31 = 13;
 pub const BPF_SOCK_OPS_HDR_OPT_LEN_CB: _bindgen_ty_31 = 14;
 pub const BPF_SOCK_OPS_WRITE_HDR_OPT_CB: _bindgen_ty_31 = 15;
-pub type _bindgen_ty_31 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_31 = crate::types::c_uint;
 pub const BPF_TCP_ESTABLISHED: _bindgen_ty_32 = 1;
 pub const BPF_TCP_SYN_SENT: _bindgen_ty_32 = 2;
 pub const BPF_TCP_SYN_RECV: _bindgen_ty_32 = 3;
@@ -7472,7 +7469,7 @@ pub const BPF_TCP_LISTEN: _bindgen_ty_32 = 10;
 pub const BPF_TCP_CLOSING: _bindgen_ty_32 = 11;
 pub const BPF_TCP_NEW_SYN_RECV: _bindgen_ty_32 = 12;
 pub const BPF_TCP_MAX_STATES: _bindgen_ty_32 = 13;
-pub type _bindgen_ty_32 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_32 = crate::types::c_uint;
 pub const TCP_BPF_IW: _bindgen_ty_33 = 1001;
 pub const TCP_BPF_SNDCWND_CLAMP: _bindgen_ty_33 = 1002;
 pub const TCP_BPF_DELACK_MAX: _bindgen_ty_33 = 1003;
@@ -7480,12 +7477,12 @@ pub const TCP_BPF_RTO_MIN: _bindgen_ty_33 = 1004;
 pub const TCP_BPF_SYN: _bindgen_ty_33 = 1005;
 pub const TCP_BPF_SYN_IP: _bindgen_ty_33 = 1006;
 pub const TCP_BPF_SYN_MAC: _bindgen_ty_33 = 1007;
-pub type _bindgen_ty_33 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_33 = crate::types::c_uint;
 pub const BPF_LOAD_HDR_OPT_TCP_SYN: _bindgen_ty_34 = 1;
-pub type _bindgen_ty_34 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_34 = crate::types::c_uint;
 pub const BPF_WRITE_HDR_TCP_CURRENT_MSS: _bindgen_ty_35 = 1;
 pub const BPF_WRITE_HDR_TCP_SYNACK_COOKIE: _bindgen_ty_35 = 2;
-pub type _bindgen_ty_35 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_35 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct bpf_perf_event_value {
@@ -7496,10 +7493,10 @@ pub struct bpf_perf_event_value {
 pub const BPF_DEVCG_ACC_MKNOD: _bindgen_ty_36 = 1;
 pub const BPF_DEVCG_ACC_READ: _bindgen_ty_36 = 2;
 pub const BPF_DEVCG_ACC_WRITE: _bindgen_ty_36 = 4;
-pub type _bindgen_ty_36 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_36 = crate::types::c_uint;
 pub const BPF_DEVCG_DEV_BLOCK: _bindgen_ty_37 = 1;
 pub const BPF_DEVCG_DEV_CHAR: _bindgen_ty_37 = 2;
-pub type _bindgen_ty_37 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_37 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct bpf_cgroup_dev_ctx {
@@ -7514,7 +7511,7 @@ pub struct bpf_raw_tracepoint_args {
 }
 pub const BPF_FIB_LOOKUP_DIRECT: _bindgen_ty_38 = 1;
 pub const BPF_FIB_LOOKUP_OUTPUT: _bindgen_ty_38 = 2;
-pub type _bindgen_ty_38 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_38 = crate::types::c_uint;
 pub const BPF_FIB_LKUP_RET_SUCCESS: _bindgen_ty_39 = 0;
 pub const BPF_FIB_LKUP_RET_BLACKHOLE: _bindgen_ty_39 = 1;
 pub const BPF_FIB_LKUP_RET_UNREACHABLE: _bindgen_ty_39 = 2;
@@ -7524,7 +7521,7 @@ pub const BPF_FIB_LKUP_RET_FWD_DISABLED: _bindgen_ty_39 = 5;
 pub const BPF_FIB_LKUP_RET_UNSUPP_LWT: _bindgen_ty_39 = 6;
 pub const BPF_FIB_LKUP_RET_NO_NEIGH: _bindgen_ty_39 = 7;
 pub const BPF_FIB_LKUP_RET_FRAG_NEEDED: _bindgen_ty_39 = 8;
-pub type _bindgen_ty_39 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_39 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct bpf_fib_lookup {
@@ -7643,22 +7640,22 @@ impl Default for bpf_redir_neigh {
     }
 }
 pub const bpf_check_mtu_flags_BPF_MTU_CHK_SEGS: bpf_check_mtu_flags = 1;
-pub type bpf_check_mtu_flags = crate::x86_64_types::c_uint;
+pub type bpf_check_mtu_flags = crate::types::c_uint;
 pub const bpf_check_mtu_ret_BPF_MTU_CHK_RET_SUCCESS: bpf_check_mtu_ret = 0;
 pub const bpf_check_mtu_ret_BPF_MTU_CHK_RET_FRAG_NEEDED: bpf_check_mtu_ret = 1;
 pub const bpf_check_mtu_ret_BPF_MTU_CHK_RET_SEGS_TOOBIG: bpf_check_mtu_ret = 2;
-pub type bpf_check_mtu_ret = crate::x86_64_types::c_uint;
+pub type bpf_check_mtu_ret = crate::types::c_uint;
 pub const bpf_task_fd_type_BPF_FD_TYPE_RAW_TRACEPOINT: bpf_task_fd_type = 0;
 pub const bpf_task_fd_type_BPF_FD_TYPE_TRACEPOINT: bpf_task_fd_type = 1;
 pub const bpf_task_fd_type_BPF_FD_TYPE_KPROBE: bpf_task_fd_type = 2;
 pub const bpf_task_fd_type_BPF_FD_TYPE_KRETPROBE: bpf_task_fd_type = 3;
 pub const bpf_task_fd_type_BPF_FD_TYPE_UPROBE: bpf_task_fd_type = 4;
 pub const bpf_task_fd_type_BPF_FD_TYPE_URETPROBE: bpf_task_fd_type = 5;
-pub type bpf_task_fd_type = crate::x86_64_types::c_uint;
+pub type bpf_task_fd_type = crate::types::c_uint;
 pub const BPF_FLOW_DISSECTOR_F_PARSE_1ST_FRAG: _bindgen_ty_40 = 1;
 pub const BPF_FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL: _bindgen_ty_40 = 2;
 pub const BPF_FLOW_DISSECTOR_F_STOP_AT_ENCAP: _bindgen_ty_40 = 4;
-pub type _bindgen_ty_40 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_40 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct bpf_flow_keys {
@@ -7979,7 +7976,7 @@ pub const BTF_F_COMPACT: _bindgen_ty_41 = 1;
 pub const BTF_F_NONAME: _bindgen_ty_41 = 2;
 pub const BTF_F_PTR_RAW: _bindgen_ty_41 = 4;
 pub const BTF_F_ZERO: _bindgen_ty_41 = 8;
-pub type _bindgen_ty_41 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_41 = crate::types::c_uint;
 pub const bpf_core_relo_kind_BPF_CORE_FIELD_BYTE_OFFSET: bpf_core_relo_kind = 0;
 pub const bpf_core_relo_kind_BPF_CORE_FIELD_BYTE_SIZE: bpf_core_relo_kind = 1;
 pub const bpf_core_relo_kind_BPF_CORE_FIELD_EXISTS: bpf_core_relo_kind = 2;
@@ -7993,7 +7990,7 @@ pub const bpf_core_relo_kind_BPF_CORE_TYPE_SIZE: bpf_core_relo_kind = 9;
 pub const bpf_core_relo_kind_BPF_CORE_ENUMVAL_EXISTS: bpf_core_relo_kind = 10;
 pub const bpf_core_relo_kind_BPF_CORE_ENUMVAL_VALUE: bpf_core_relo_kind = 11;
 pub const bpf_core_relo_kind_BPF_CORE_TYPE_MATCHES: bpf_core_relo_kind = 12;
-pub type bpf_core_relo_kind = crate::x86_64_types::c_uint;
+pub type bpf_core_relo_kind = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct bpf_core_relo {
@@ -8015,7 +8012,7 @@ impl Default for bpf_core_relo {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __user_cap_header_struct {
     pub version: __u32,
-    pub pid: crate::x86_64_types::c_int,
+    pub pid: crate::types::c_int,
 }
 pub type cap_user_header_t = *mut __user_cap_header_struct;
 #[repr(C)]
@@ -8054,8 +8051,8 @@ pub struct vfs_ns_cap_data__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct flock {
-    pub l_type: crate::x86_64_types::c_short,
-    pub l_whence: crate::x86_64_types::c_short,
+    pub l_type: crate::types::c_short,
+    pub l_whence: crate::types::c_short,
     pub __bindgen_padding_0: [u8; 4usize],
     pub l_start: __kernel_off_t,
     pub l_len: __kernel_off_t,
@@ -8065,7 +8062,7 @@ pub struct flock {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct f_owner_ex {
-    pub type_: crate::x86_64_types::c_int,
+    pub type_: crate::types::c_int,
     pub pid: __kernel_pid_t,
 }
 #[repr(C)]
@@ -8112,8 +8109,8 @@ impl Default for i2c_smbus_data {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fb_fix_screeninfo {
-    pub id: [crate::x86_64_types::c_char; 16usize],
-    pub smem_start: crate::x86_64_types::c_ulong,
+    pub id: [crate::types::c_char; 16usize],
+    pub smem_start: crate::types::c_ulong,
     pub smem_len: __u32,
     pub type_: __u32,
     pub type_aux: __u32,
@@ -8124,7 +8121,7 @@ pub struct fb_fix_screeninfo {
     pub __bindgen_padding_0: [u8; 2usize],
     pub line_length: __u32,
     pub __bindgen_padding_1: [u8; 4usize],
-    pub mmio_start: crate::x86_64_types::c_ulong,
+    pub mmio_start: crate::types::c_ulong,
     pub mmio_len: __u32,
     pub accel: __u32,
     pub capabilities: __u16,
@@ -8201,7 +8198,7 @@ pub const FB_BLANK_NORMAL: _bindgen_ty_42 = 1;
 pub const FB_BLANK_VSYNC_SUSPEND: _bindgen_ty_42 = 2;
 pub const FB_BLANK_HSYNC_SUSPEND: _bindgen_ty_42 = 3;
 pub const FB_BLANK_POWERDOWN: _bindgen_ty_42 = 4;
-pub type _bindgen_ty_42 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_42 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fb_vblank {
@@ -8242,7 +8239,7 @@ pub struct fb_image {
     pub bg_color: __u32,
     pub depth: __u8,
     pub __bindgen_padding_0: [u8; 7usize],
-    pub data: *const crate::x86_64_types::c_char,
+    pub data: *const crate::types::c_char,
     pub cmap: fb_cmap,
 }
 impl Default for fb_image {
@@ -8267,7 +8264,7 @@ pub struct fb_cursor {
     pub enable: __u16,
     pub rop: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub mask: *const crate::x86_64_types::c_char,
+    pub mask: *const crate::types::c_char,
     pub hot: fbcurpos,
     pub __bindgen_padding_1: [u8; 4usize],
     pub image: fb_image,
@@ -8292,7 +8289,7 @@ pub struct sock_filter {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, FromBytes)]
 pub struct sock_fprog {
-    pub len: crate::x86_64_types::c_ushort,
+    pub len: crate::types::c_ushort,
     pub __bindgen_padding_0: [u8; 6usize],
     pub filter: usize,
 }
@@ -8471,7 +8468,7 @@ pub const fsconfig_command_FSCONFIG_SET_PATH_EMPTY: fsconfig_command = 4;
 pub const fsconfig_command_FSCONFIG_SET_FD: fsconfig_command = 5;
 pub const fsconfig_command_FSCONFIG_CMD_CREATE: fsconfig_command = 6;
 pub const fsconfig_command_FSCONFIG_CMD_RECONFIGURE: fsconfig_command = 7;
-pub type fsconfig_command = crate::x86_64_types::c_uint;
+pub type fsconfig_command = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct mount_attr {
@@ -8517,16 +8514,16 @@ pub struct file_dedupe_range {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct files_stat_struct {
-    pub nr_files: crate::x86_64_types::c_ulong,
-    pub nr_free_files: crate::x86_64_types::c_ulong,
-    pub max_files: crate::x86_64_types::c_ulong,
+    pub nr_files: crate::types::c_ulong,
+    pub nr_free_files: crate::types::c_ulong,
+    pub max_files: crate::types::c_ulong,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct inodes_stat_t {
-    pub nr_inodes: crate::x86_64_types::c_long,
-    pub nr_unused: crate::x86_64_types::c_long,
-    pub dummy: [crate::x86_64_types::c_long; 5usize],
+    pub nr_inodes: crate::types::c_long,
+    pub nr_unused: crate::types::c_long,
+    pub dummy: [crate::types::c_long; 5usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -8536,9 +8533,9 @@ pub struct fsxattr {
     pub fsx_nextents: __u32,
     pub fsx_projid: __u32,
     pub fsx_cowextsize: __u32,
-    pub fsx_pad: [crate::x86_64_types::c_uchar; 8usize],
+    pub fsx_pad: [crate::types::c_uchar; 8usize],
 }
-pub type __kernel_rwf_t = crate::x86_64_types::c_int;
+pub type __kernel_rwf_t = crate::types::c_int;
 pub type int_least64_t = i64;
 pub type uint_least64_t = u64;
 pub type int_fast64_t = i64;
@@ -8555,8 +8552,8 @@ pub type int_least8_t = i8;
 pub type uint_least8_t = u8;
 pub type int_fast8_t = i8;
 pub type uint_fast8_t = u8;
-pub type intmax_t = crate::x86_64_types::c_long;
-pub type uintmax_t = crate::x86_64_types::c_ulong;
+pub type intmax_t = crate::types::c_long;
+pub type uintmax_t = crate::types::c_ulong;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fuse_attr {
@@ -8652,7 +8649,7 @@ pub const fuse_opcode_FUSE_CANONICAL_PATH: fuse_opcode = 2016;
 pub const fuse_opcode_CUSE_INIT: fuse_opcode = 4096;
 pub const fuse_opcode_CUSE_INIT_BSWAP_RESERVED: fuse_opcode = 1048576;
 pub const fuse_opcode_FUSE_INIT_BSWAP_RESERVED: fuse_opcode = 436207616;
-pub type fuse_opcode = crate::x86_64_types::c_uint;
+pub type fuse_opcode = crate::types::c_uint;
 pub const fuse_notify_code_FUSE_NOTIFY_POLL: fuse_notify_code = 1;
 pub const fuse_notify_code_FUSE_NOTIFY_INVAL_INODE: fuse_notify_code = 2;
 pub const fuse_notify_code_FUSE_NOTIFY_INVAL_ENTRY: fuse_notify_code = 3;
@@ -8660,7 +8657,7 @@ pub const fuse_notify_code_FUSE_NOTIFY_STORE: fuse_notify_code = 4;
 pub const fuse_notify_code_FUSE_NOTIFY_RETRIEVE: fuse_notify_code = 5;
 pub const fuse_notify_code_FUSE_NOTIFY_DELETE: fuse_notify_code = 6;
 pub const fuse_notify_code_FUSE_NOTIFY_CODE_MAX: fuse_notify_code = 7;
-pub type fuse_notify_code = crate::x86_64_types::c_uint;
+pub type fuse_notify_code = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fuse_entry_out {
@@ -9014,7 +9011,7 @@ pub struct fuse_dirent {
     pub off: u64,
     pub namelen: u32,
     pub type_: u32,
-    pub name: __IncompleteArrayField<crate::x86_64_types::c_char>,
+    pub name: __IncompleteArrayField<crate::types::c_char>,
 }
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -9158,7 +9155,7 @@ impl Default for robust_list {
 #[derive(Debug, Copy, Clone)]
 pub struct robust_list_head {
     pub list: robust_list,
-    pub futex_offset: crate::x86_64_types::c_long,
+    pub futex_offset: crate::types::c_long,
     pub list_op_pending: *mut robust_list,
 }
 impl Default for robust_list_head {
@@ -9177,7 +9174,7 @@ pub struct inotify_event {
     pub mask: __u32,
     pub cookie: __u32,
     pub len: __u32,
-    pub name: __IncompleteArrayField<crate::x86_64_types::c_char>,
+    pub name: __IncompleteArrayField<crate::types::c_char>,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -9483,7 +9480,7 @@ pub const IPV4_DEVCONF_DROP_GRATUITOUS_ARP: _bindgen_ty_43 = 31;
 pub const IPV4_DEVCONF_BC_FORWARDING: _bindgen_ty_43 = 32;
 pub const IPV4_DEVCONF_ARP_EVICT_NOCARRIER: _bindgen_ty_43 = 33;
 pub const __IPV4_DEVCONF_MAX: _bindgen_ty_43 = 34;
-pub type _bindgen_ty_43 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_43 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone, AsBytes, FromBytes)]
 pub struct in6_addr {
@@ -9517,7 +9514,7 @@ impl Default for in6_addr {
 #[repr(C)]
 #[derive(Copy, Clone, AsBytes, FromBytes)]
 pub struct sockaddr_in6 {
-    pub sin6_family: crate::x86_64_types::c_ushort,
+    pub sin6_family: crate::types::c_ushort,
     pub sin6_port: __be16,
     pub sin6_flowinfo: __be32,
     pub sin6_addr: in6_addr,
@@ -9536,7 +9533,7 @@ impl Default for sockaddr_in6 {
 #[derive(Copy, Clone)]
 pub struct ipv6_mreq {
     pub ipv6mr_multiaddr: in6_addr,
-    pub ipv6mr_ifindex: crate::x86_64_types::c_int,
+    pub ipv6mr_ifindex: crate::types::c_int,
 }
 impl Default for ipv6_mreq {
     fn default() -> Self {
@@ -9572,7 +9569,7 @@ impl Default for in6_flowlabel_req {
 #[derive(Copy, Clone, AsBytes, FromBytes)]
 pub struct in6_pktinfo {
     pub ipi6_addr: in6_addr,
-    pub ipi6_ifindex: crate::x86_64_types::c_int,
+    pub ipi6_ifindex: crate::types::c_int,
 }
 impl Default for in6_pktinfo {
     fn default() -> Self {
@@ -9603,7 +9600,7 @@ impl Default for ip6_mtuinfo {
 pub struct in6_ifreq {
     pub ifr6_addr: in6_addr,
     pub ifr6_prefixlen: __u32,
-    pub ifr6_ifindex: crate::x86_64_types::c_int,
+    pub ifr6_ifindex: crate::types::c_int,
 }
 impl Default for in6_ifreq {
     fn default() -> Self {
@@ -9836,7 +9833,7 @@ pub const DEVCONF_IOAM6_ID_WIDE: _bindgen_ty_44 = 55;
 pub const DEVCONF_NDISC_EVICT_NOCARRIER: _bindgen_ty_44 = 56;
 pub const DEVCONF_ACCEPT_UNTRACKED_NA: _bindgen_ty_44 = 57;
 pub const DEVCONF_MAX: _bindgen_ty_44 = 58;
-pub type _bindgen_ty_44 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_44 = crate::types::c_uint;
 pub const membarrier_cmd_MEMBARRIER_CMD_QUERY: membarrier_cmd = 0;
 pub const membarrier_cmd_MEMBARRIER_CMD_GLOBAL: membarrier_cmd = 1;
 pub const membarrier_cmd_MEMBARRIER_CMD_GLOBAL_EXPEDITED: membarrier_cmd = 2;
@@ -9848,70 +9845,70 @@ pub const membarrier_cmd_MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE: me
 pub const membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ: membarrier_cmd = 128;
 pub const membarrier_cmd_MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_RSEQ: membarrier_cmd = 256;
 pub const membarrier_cmd_MEMBARRIER_CMD_SHARED: membarrier_cmd = 1;
-pub type membarrier_cmd = crate::x86_64_types::c_uint;
+pub type membarrier_cmd = crate::types::c_uint;
 pub const membarrier_cmd_flag_MEMBARRIER_CMD_FLAG_CPU: membarrier_cmd_flag = 1;
-pub type membarrier_cmd_flag = crate::x86_64_types::c_uint;
+pub type membarrier_cmd_flag = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sync_serial_settings {
-    pub clock_rate: crate::x86_64_types::c_uint,
-    pub clock_type: crate::x86_64_types::c_uint,
-    pub loopback: crate::x86_64_types::c_ushort,
+    pub clock_rate: crate::types::c_uint,
+    pub clock_type: crate::types::c_uint,
+    pub loopback: crate::types::c_ushort,
     pub __bindgen_padding_0: [u8; 2usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct te1_settings {
-    pub clock_rate: crate::x86_64_types::c_uint,
-    pub clock_type: crate::x86_64_types::c_uint,
-    pub loopback: crate::x86_64_types::c_ushort,
+    pub clock_rate: crate::types::c_uint,
+    pub clock_type: crate::types::c_uint,
+    pub loopback: crate::types::c_ushort,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub slot_map: crate::x86_64_types::c_uint,
+    pub slot_map: crate::types::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct raw_hdlc_proto {
-    pub encoding: crate::x86_64_types::c_ushort,
-    pub parity: crate::x86_64_types::c_ushort,
+    pub encoding: crate::types::c_ushort,
+    pub parity: crate::types::c_ushort,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fr_proto {
-    pub t391: crate::x86_64_types::c_uint,
-    pub t392: crate::x86_64_types::c_uint,
-    pub n391: crate::x86_64_types::c_uint,
-    pub n392: crate::x86_64_types::c_uint,
-    pub n393: crate::x86_64_types::c_uint,
-    pub lmi: crate::x86_64_types::c_ushort,
-    pub dce: crate::x86_64_types::c_ushort,
+    pub t391: crate::types::c_uint,
+    pub t392: crate::types::c_uint,
+    pub n391: crate::types::c_uint,
+    pub n392: crate::types::c_uint,
+    pub n393: crate::types::c_uint,
+    pub lmi: crate::types::c_ushort,
+    pub dce: crate::types::c_ushort,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fr_proto_pvc {
-    pub dlci: crate::x86_64_types::c_uint,
+    pub dlci: crate::types::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct fr_proto_pvc_info {
-    pub dlci: crate::x86_64_types::c_uint,
-    pub master: [crate::x86_64_types::c_char; 16usize],
+    pub dlci: crate::types::c_uint,
+    pub master: [crate::types::c_char; 16usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct cisco_proto {
-    pub interval: crate::x86_64_types::c_uint,
-    pub timeout: crate::x86_64_types::c_uint,
+    pub interval: crate::types::c_uint,
+    pub timeout: crate::types::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct x25_hdlc_proto {
-    pub dce: crate::x86_64_types::c_ushort,
+    pub dce: crate::types::c_ushort,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub modulo: crate::x86_64_types::c_uint,
-    pub window: crate::x86_64_types::c_uint,
-    pub t1: crate::x86_64_types::c_uint,
-    pub t2: crate::x86_64_types::c_uint,
-    pub n2: crate::x86_64_types::c_uint,
+    pub modulo: crate::types::c_uint,
+    pub window: crate::types::c_uint,
+    pub t1: crate::types::c_uint,
+    pub t2: crate::types::c_uint,
+    pub n2: crate::types::c_uint,
 }
 pub const net_device_flags_IFF_UP: net_device_flags = 1;
 pub const net_device_flags_IFF_BROADCAST: net_device_flags = 2;
@@ -9932,7 +9929,7 @@ pub const net_device_flags_IFF_DYNAMIC: net_device_flags = 32768;
 pub const net_device_flags_IFF_LOWER_UP: net_device_flags = 65536;
 pub const net_device_flags_IFF_DORMANT: net_device_flags = 131072;
 pub const net_device_flags_IFF_ECHO: net_device_flags = 262144;
-pub type net_device_flags = crate::x86_64_types::c_uint;
+pub type net_device_flags = crate::types::c_uint;
 pub const IF_OPER_UNKNOWN: _bindgen_ty_45 = 0;
 pub const IF_OPER_NOTPRESENT: _bindgen_ty_45 = 1;
 pub const IF_OPER_DOWN: _bindgen_ty_45 = 2;
@@ -9940,27 +9937,27 @@ pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_45 = 3;
 pub const IF_OPER_TESTING: _bindgen_ty_45 = 4;
 pub const IF_OPER_DORMANT: _bindgen_ty_45 = 5;
 pub const IF_OPER_UP: _bindgen_ty_45 = 6;
-pub type _bindgen_ty_45 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_45 = crate::types::c_uint;
 pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_46 = 0;
 pub const IF_LINK_MODE_DORMANT: _bindgen_ty_46 = 1;
 pub const IF_LINK_MODE_TESTING: _bindgen_ty_46 = 2;
-pub type _bindgen_ty_46 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_46 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct ifmap {
-    pub mem_start: crate::x86_64_types::c_ulong,
-    pub mem_end: crate::x86_64_types::c_ulong,
-    pub base_addr: crate::x86_64_types::c_ushort,
-    pub irq: crate::x86_64_types::c_uchar,
-    pub dma: crate::x86_64_types::c_uchar,
-    pub port: crate::x86_64_types::c_uchar,
+    pub mem_start: crate::types::c_ulong,
+    pub mem_end: crate::types::c_ulong,
+    pub base_addr: crate::types::c_ushort,
+    pub irq: crate::types::c_uchar,
+    pub dma: crate::types::c_uchar,
+    pub port: crate::types::c_uchar,
     pub __bindgen_padding_0: [u8; 3usize],
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct if_settings {
-    pub type_: crate::x86_64_types::c_uint,
-    pub size: crate::x86_64_types::c_uint,
+    pub type_: crate::types::c_uint,
+    pub size: crate::types::c_uint,
     pub ifs_ifsu: if_settings__bindgen_ty_1,
 }
 #[repr(C)]
@@ -10002,7 +9999,7 @@ pub struct ifreq {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union ifreq__bindgen_ty_1 {
-    pub ifrn_name: [crate::x86_64_types::c_char; 16usize],
+    pub ifrn_name: [crate::types::c_char; 16usize],
 }
 impl Default for ifreq__bindgen_ty_1 {
     fn default() -> Self {
@@ -10021,12 +10018,12 @@ pub union ifreq__bindgen_ty_2 {
     pub ifru_broadaddr: sockaddr,
     pub ifru_netmask: sockaddr,
     pub ifru_hwaddr: sockaddr,
-    pub ifru_flags: crate::x86_64_types::c_short,
-    pub ifru_ivalue: crate::x86_64_types::c_int,
-    pub ifru_mtu: crate::x86_64_types::c_int,
+    pub ifru_flags: crate::types::c_short,
+    pub ifru_ivalue: crate::types::c_int,
+    pub ifru_mtu: crate::types::c_int,
     pub ifru_map: ifmap,
-    pub ifru_slave: [crate::x86_64_types::c_char; 16usize],
-    pub ifru_newname: [crate::x86_64_types::c_char; 16usize],
+    pub ifru_slave: [crate::types::c_char; 16usize],
+    pub ifru_newname: [crate::types::c_char; 16usize],
     pub ifru_data: usize,
     pub ifru_settings: if_settings,
 }
@@ -10051,14 +10048,14 @@ impl Default for ifreq {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ifconf {
-    pub ifc_len: crate::x86_64_types::c_int,
+    pub ifc_len: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
     pub ifc_ifcu: ifconf__bindgen_ty_1,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union ifconf__bindgen_ty_1 {
-    pub ifcu_buf: *mut crate::x86_64_types::c_char,
+    pub ifcu_buf: *mut crate::types::c_char,
     pub ifcu_req: *mut ifreq,
 }
 impl Default for ifconf__bindgen_ty_1 {
@@ -10116,7 +10113,7 @@ pub const IPPROTO_ETHERNET: _bindgen_ty_47 = 143;
 pub const IPPROTO_RAW: _bindgen_ty_47 = 255;
 pub const IPPROTO_MPTCP: _bindgen_ty_47 = 262;
 pub const IPPROTO_MAX: _bindgen_ty_47 = 263;
-pub type _bindgen_ty_47 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_47 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct ip_mreq {
@@ -10128,7 +10125,7 @@ pub struct ip_mreq {
 pub struct ip_mreqn {
     pub imr_multiaddr: in_addr,
     pub imr_address: in_addr,
-    pub imr_ifindex: crate::x86_64_types::c_int,
+    pub imr_ifindex: crate::types::c_int,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -10214,7 +10211,7 @@ impl Default for group_filter {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct in_pktinfo {
-    pub ipi_ifindex: crate::x86_64_types::c_int,
+    pub ipi_ifindex: crate::types::c_int,
     pub ipi_spec_dst: in_addr,
     pub ipi_addr: in_addr,
 }
@@ -10224,7 +10221,7 @@ pub struct sockaddr_in {
     pub sin_family: __kernel_sa_family_t,
     pub sin_port: __be16,
     pub sin_addr: in_addr,
-    pub __pad: [crate::x86_64_types::c_uchar; 8usize],
+    pub __pad: [crate::types::c_uchar; 8usize],
 }
 pub const nf_inet_hooks_NF_INET_PRE_ROUTING: nf_inet_hooks = 0;
 pub const nf_inet_hooks_NF_INET_LOCAL_IN: nf_inet_hooks = 1;
@@ -10233,11 +10230,11 @@ pub const nf_inet_hooks_NF_INET_LOCAL_OUT: nf_inet_hooks = 3;
 pub const nf_inet_hooks_NF_INET_POST_ROUTING: nf_inet_hooks = 4;
 pub const nf_inet_hooks_NF_INET_NUMHOOKS: nf_inet_hooks = 5;
 pub const nf_inet_hooks_NF_INET_INGRESS: nf_inet_hooks = 5;
-pub type nf_inet_hooks = crate::x86_64_types::c_uint;
+pub type nf_inet_hooks = crate::types::c_uint;
 pub const nf_dev_hooks_NF_NETDEV_INGRESS: nf_dev_hooks = 0;
 pub const nf_dev_hooks_NF_NETDEV_EGRESS: nf_dev_hooks = 1;
 pub const nf_dev_hooks_NF_NETDEV_NUMHOOKS: nf_dev_hooks = 2;
-pub type nf_dev_hooks = crate::x86_64_types::c_uint;
+pub type nf_dev_hooks = crate::types::c_uint;
 pub const NFPROTO_UNSPEC: _bindgen_ty_48 = 0;
 pub const NFPROTO_INET: _bindgen_ty_48 = 1;
 pub const NFPROTO_IPV4: _bindgen_ty_48 = 2;
@@ -10247,7 +10244,7 @@ pub const NFPROTO_BRIDGE: _bindgen_ty_48 = 7;
 pub const NFPROTO_IPV6: _bindgen_ty_48 = 10;
 pub const NFPROTO_DECNET: _bindgen_ty_48 = 12;
 pub const NFPROTO_NUMPROTO: _bindgen_ty_48 = 13;
-pub type _bindgen_ty_48 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_48 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union nf_inet_addr {
@@ -10281,11 +10278,11 @@ pub const nf_ip_hook_priorities_NF_IP_PRI_SELINUX_LAST: nf_ip_hook_priorities = 
 pub const nf_ip_hook_priorities_NF_IP_PRI_CONNTRACK_HELPER: nf_ip_hook_priorities = 300;
 pub const nf_ip_hook_priorities_NF_IP_PRI_CONNTRACK_CONFIRM: nf_ip_hook_priorities = 2147483647;
 pub const nf_ip_hook_priorities_NF_IP_PRI_LAST: nf_ip_hook_priorities = 2147483647;
-pub type nf_ip_hook_priorities = crate::x86_64_types::c_int;
+pub type nf_ip_hook_priorities = crate::types::c_int;
 #[repr(C)]
 pub struct xt_entry_match {
     pub u: xt_entry_match__bindgen_ty_1,
-    pub data: __IncompleteArrayField<crate::x86_64_types::c_uchar>,
+    pub data: __IncompleteArrayField<crate::types::c_uchar>,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -10298,7 +10295,7 @@ pub union xt_entry_match__bindgen_ty_1 {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_1 {
     pub match_size: __u16,
-    pub name: [crate::x86_64_types::c_char; 29usize],
+    pub name: [crate::types::c_char; 29usize],
     pub revision: __u8,
 }
 #[repr(C)]
@@ -10338,7 +10335,7 @@ impl Default for xt_entry_match {
 #[repr(C)]
 pub struct xt_entry_target {
     pub u: xt_entry_target__bindgen_ty_1,
-    pub data: __IncompleteArrayField<crate::x86_64_types::c_uchar>,
+    pub data: __IncompleteArrayField<crate::types::c_uchar>,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -10351,7 +10348,7 @@ pub union xt_entry_target__bindgen_ty_1 {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_1 {
     pub target_size: __u16,
-    pub name: [crate::x86_64_types::c_char; 29usize],
+    pub name: [crate::types::c_char; 29usize],
     pub revision: __u8,
 }
 #[repr(C)]
@@ -10391,7 +10388,7 @@ impl Default for xt_entry_target {
 #[repr(C)]
 pub struct xt_standard_target {
     pub target: xt_entry_target,
-    pub verdict: crate::x86_64_types::c_int,
+    pub verdict: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
 }
 impl Default for xt_standard_target {
@@ -10406,7 +10403,7 @@ impl Default for xt_standard_target {
 #[repr(C)]
 pub struct xt_error_target {
     pub target: xt_entry_target,
-    pub errorname: [crate::x86_64_types::c_char; 30usize],
+    pub errorname: [crate::types::c_char; 30usize],
     pub __bindgen_padding_0: [u8; 2usize],
 }
 impl Default for xt_error_target {
@@ -10421,7 +10418,7 @@ impl Default for xt_error_target {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct xt_get_revision {
-    pub name: [crate::x86_64_types::c_char; 29usize],
+    pub name: [crate::types::c_char; 29usize],
     pub revision: __u8,
 }
 #[repr(C)]
@@ -10442,8 +10439,8 @@ pub struct xt_counters {
 #[repr(C)]
 #[derive(Debug, Default, FromBytes)]
 pub struct xt_counters_info {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub num_counters: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub num_counters: crate::types::c_uint,
     pub __bindgen_padding_0: [u8; 4usize],
     pub counters: __IncompleteArrayField<xt_counters>,
 }
@@ -10472,10 +10469,10 @@ pub struct ipt_ip {
     pub dst: in_addr,
     pub smsk: in_addr,
     pub dmsk: in_addr,
-    pub iniface: [crate::x86_64_types::c_char; 16usize],
-    pub outiface: [crate::x86_64_types::c_char; 16usize],
-    pub iniface_mask: [crate::x86_64_types::c_uchar; 16usize],
-    pub outiface_mask: [crate::x86_64_types::c_uchar; 16usize],
+    pub iniface: [crate::types::c_char; 16usize],
+    pub outiface: [crate::types::c_char; 16usize],
+    pub iniface_mask: [crate::types::c_uchar; 16usize],
+    pub outiface_mask: [crate::types::c_uchar; 16usize],
     pub proto: __u16,
     pub flags: __u8,
     pub invflags: __u8,
@@ -10484,12 +10481,12 @@ pub struct ipt_ip {
 #[derive(Debug, Default, FromBytes)]
 pub struct ipt_entry {
     pub ip: ipt_ip,
-    pub nfcache: crate::x86_64_types::c_uint,
+    pub nfcache: crate::types::c_uint,
     pub target_offset: __u16,
     pub next_offset: __u16,
-    pub comefrom: crate::x86_64_types::c_uint,
+    pub comefrom: crate::types::c_uint,
     pub counters: xt_counters,
-    pub elems: __IncompleteArrayField<crate::x86_64_types::c_uchar>,
+    pub elems: __IncompleteArrayField<crate::types::c_uchar>,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -10501,23 +10498,23 @@ pub struct ipt_icmp {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct ipt_getinfo {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub valid_hooks: crate::x86_64_types::c_uint,
-    pub hook_entry: [crate::x86_64_types::c_uint; 5usize],
-    pub underflow: [crate::x86_64_types::c_uint; 5usize],
-    pub num_entries: crate::x86_64_types::c_uint,
-    pub size: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub valid_hooks: crate::types::c_uint,
+    pub hook_entry: [crate::types::c_uint; 5usize],
+    pub underflow: [crate::types::c_uint; 5usize],
+    pub num_entries: crate::types::c_uint,
+    pub size: crate::types::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, FromBytes)]
 pub struct ipt_replace {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub valid_hooks: crate::x86_64_types::c_uint,
-    pub num_entries: crate::x86_64_types::c_uint,
-    pub size: crate::x86_64_types::c_uint,
-    pub hook_entry: [crate::x86_64_types::c_uint; 5usize],
-    pub underflow: [crate::x86_64_types::c_uint; 5usize],
-    pub num_counters: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub valid_hooks: crate::types::c_uint,
+    pub num_entries: crate::types::c_uint,
+    pub size: crate::types::c_uint,
+    pub hook_entry: [crate::types::c_uint; 5usize],
+    pub underflow: [crate::types::c_uint; 5usize],
+    pub num_counters: crate::types::c_uint,
     pub counters: u64,
     pub entries: __IncompleteArrayField<ipt_entry>,
 }
@@ -10533,8 +10530,8 @@ impl Default for ipt_replace {
 #[repr(C)]
 #[derive(Debug, Default, FromBytes)]
 pub struct ipt_get_entries {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub size: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub size: crate::types::c_uint,
     pub __bindgen_padding_0: [u8; 4usize],
     pub entrytable: __IncompleteArrayField<ipt_entry>,
 }
@@ -10552,7 +10549,7 @@ pub const nf_ip6_hook_priorities_NF_IP6_PRI_NAT_SRC: nf_ip6_hook_priorities = 10
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_SELINUX_LAST: nf_ip6_hook_priorities = 225;
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_CONNTRACK_HELPER: nf_ip6_hook_priorities = 300;
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_LAST: nf_ip6_hook_priorities = 2147483647;
-pub type nf_ip6_hook_priorities = crate::x86_64_types::c_int;
+pub type nf_ip6_hook_priorities = crate::types::c_int;
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes)]
 pub struct ip6t_ip6 {
@@ -10560,10 +10557,10 @@ pub struct ip6t_ip6 {
     pub dst: in6_addr,
     pub smsk: in6_addr,
     pub dmsk: in6_addr,
-    pub iniface: [crate::x86_64_types::c_char; 16usize],
-    pub outiface: [crate::x86_64_types::c_char; 16usize],
-    pub iniface_mask: [crate::x86_64_types::c_uchar; 16usize],
-    pub outiface_mask: [crate::x86_64_types::c_uchar; 16usize],
+    pub iniface: [crate::types::c_char; 16usize],
+    pub outiface: [crate::types::c_char; 16usize],
+    pub iniface_mask: [crate::types::c_uchar; 16usize],
+    pub outiface_mask: [crate::types::c_uchar; 16usize],
     pub proto: __u16,
     pub tos: __u8,
     pub flags: __u8,
@@ -10583,13 +10580,13 @@ impl Default for ip6t_ip6 {
 #[derive(FromBytes)]
 pub struct ip6t_entry {
     pub ipv6: ip6t_ip6,
-    pub nfcache: crate::x86_64_types::c_uint,
+    pub nfcache: crate::types::c_uint,
     pub target_offset: __u16,
     pub next_offset: __u16,
-    pub comefrom: crate::x86_64_types::c_uint,
+    pub comefrom: crate::types::c_uint,
     pub __bindgen_padding_0: [u8; 4usize],
     pub counters: xt_counters,
-    pub elems: __IncompleteArrayField<crate::x86_64_types::c_uchar>,
+    pub elems: __IncompleteArrayField<crate::types::c_uchar>,
 }
 impl Default for ip6t_entry {
     fn default() -> Self {
@@ -10638,23 +10635,23 @@ pub struct ip6t_icmp {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct ip6t_getinfo {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub valid_hooks: crate::x86_64_types::c_uint,
-    pub hook_entry: [crate::x86_64_types::c_uint; 5usize],
-    pub underflow: [crate::x86_64_types::c_uint; 5usize],
-    pub num_entries: crate::x86_64_types::c_uint,
-    pub size: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub valid_hooks: crate::types::c_uint,
+    pub hook_entry: [crate::types::c_uint; 5usize],
+    pub underflow: [crate::types::c_uint; 5usize],
+    pub num_entries: crate::types::c_uint,
+    pub size: crate::types::c_uint,
 }
 #[repr(C)]
 #[derive(FromBytes)]
 pub struct ip6t_replace {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub valid_hooks: crate::x86_64_types::c_uint,
-    pub num_entries: crate::x86_64_types::c_uint,
-    pub size: crate::x86_64_types::c_uint,
-    pub hook_entry: [crate::x86_64_types::c_uint; 5usize],
-    pub underflow: [crate::x86_64_types::c_uint; 5usize],
-    pub num_counters: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub valid_hooks: crate::types::c_uint,
+    pub num_entries: crate::types::c_uint,
+    pub size: crate::types::c_uint,
+    pub hook_entry: [crate::types::c_uint; 5usize],
+    pub underflow: [crate::types::c_uint; 5usize],
+    pub num_counters: crate::types::c_uint,
     pub counters: u64,
     pub entries: __IncompleteArrayField<ip6t_entry>,
 }
@@ -10670,8 +10667,8 @@ impl Default for ip6t_replace {
 #[repr(C)]
 #[derive(FromBytes)]
 pub struct ip6t_get_entries {
-    pub name: [crate::x86_64_types::c_char; 32usize],
-    pub size: crate::x86_64_types::c_uint,
+    pub name: [crate::types::c_char; 32usize],
+    pub size: crate::types::c_uint,
     pub __bindgen_padding_0: [u8; 4usize],
     pub entrytable: __IncompleteArrayField<ip6t_entry>,
 }
@@ -10688,7 +10685,7 @@ impl Default for ip6t_get_entries {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sockaddr_nl {
     pub nl_family: __kernel_sa_family_t,
-    pub nl_pad: crate::x86_64_types::c_ushort,
+    pub nl_pad: crate::types::c_ushort,
     pub nl_pid: __u32,
     pub nl_groups: __u32,
 }
@@ -10704,7 +10701,7 @@ pub struct nlmsghdr {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct nlmsgerr {
-    pub error: crate::x86_64_types::c_int,
+    pub error: crate::types::c_int,
     pub msg: nlmsghdr,
 }
 pub const nlmsgerr_attrs_NLMSGERR_ATTR_UNUSED: nlmsgerr_attrs = 0;
@@ -10716,7 +10713,7 @@ pub const nlmsgerr_attrs_NLMSGERR_ATTR_MISS_TYPE: nlmsgerr_attrs = 5;
 pub const nlmsgerr_attrs_NLMSGERR_ATTR_MISS_NEST: nlmsgerr_attrs = 6;
 pub const nlmsgerr_attrs___NLMSGERR_ATTR_MAX: nlmsgerr_attrs = 7;
 pub const nlmsgerr_attrs_NLMSGERR_ATTR_MAX: nlmsgerr_attrs = 6;
-pub type nlmsgerr_attrs = crate::x86_64_types::c_uint;
+pub type nlmsgerr_attrs = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct nl_pktinfo {
@@ -10725,16 +10722,16 @@ pub struct nl_pktinfo {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct nl_mmap_req {
-    pub nm_block_size: crate::x86_64_types::c_uint,
-    pub nm_block_nr: crate::x86_64_types::c_uint,
-    pub nm_frame_size: crate::x86_64_types::c_uint,
-    pub nm_frame_nr: crate::x86_64_types::c_uint,
+    pub nm_block_size: crate::types::c_uint,
+    pub nm_block_nr: crate::types::c_uint,
+    pub nm_frame_size: crate::types::c_uint,
+    pub nm_frame_nr: crate::types::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct nl_mmap_hdr {
-    pub nm_status: crate::x86_64_types::c_uint,
-    pub nm_len: crate::x86_64_types::c_uint,
+    pub nm_status: crate::types::c_uint,
+    pub nm_len: crate::types::c_uint,
     pub nm_group: __u32,
     pub nm_pid: __u32,
     pub nm_uid: __u32,
@@ -10745,10 +10742,10 @@ pub const nl_mmap_status_NL_MMAP_STATUS_RESERVED: nl_mmap_status = 1;
 pub const nl_mmap_status_NL_MMAP_STATUS_VALID: nl_mmap_status = 2;
 pub const nl_mmap_status_NL_MMAP_STATUS_COPY: nl_mmap_status = 3;
 pub const nl_mmap_status_NL_MMAP_STATUS_SKIP: nl_mmap_status = 4;
-pub type nl_mmap_status = crate::x86_64_types::c_uint;
+pub type nl_mmap_status = crate::types::c_uint;
 pub const NETLINK_UNCONNECTED: _bindgen_ty_49 = 0;
 pub const NETLINK_CONNECTED: _bindgen_ty_49 = 1;
-pub type _bindgen_ty_49 = crate::x86_64_types::c_uint;
+pub type _bindgen_ty_49 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct nlattr {
@@ -10777,7 +10774,7 @@ pub const netlink_attribute_type_NL_ATTR_TYPE_NUL_STRING: netlink_attribute_type
 pub const netlink_attribute_type_NL_ATTR_TYPE_NESTED: netlink_attribute_type = 13;
 pub const netlink_attribute_type_NL_ATTR_TYPE_NESTED_ARRAY: netlink_attribute_type = 14;
 pub const netlink_attribute_type_NL_ATTR_TYPE_BITFIELD32: netlink_attribute_type = 15;
-pub type netlink_attribute_type = crate::x86_64_types::c_uint;
+pub type netlink_attribute_type = crate::types::c_uint;
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_UNSPEC: netlink_policy_type_attr = 0;
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_TYPE: netlink_policy_type_attr = 1;
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MIN_VALUE_S: netlink_policy_type_attr = 2;
@@ -10794,7 +10791,7 @@ pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_PAD: netlink_policy_type_
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MASK: netlink_policy_type_attr = 12;
 pub const netlink_policy_type_attr___NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 13;
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 12;
-pub type netlink_policy_type_attr = crate::x86_64_types::c_uint;
+pub type netlink_policy_type_attr = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct prctl_mm_map {
@@ -10825,8 +10822,8 @@ impl Default for prctl_mm_map {
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct rand_pool_info {
-    pub entropy_count: crate::x86_64_types::c_int,
-    pub buf_size: crate::x86_64_types::c_int,
+    pub entropy_count: crate::types::c_int,
+    pub buf_size: crate::types::c_int,
     pub buf: __IncompleteArrayField<__u32>,
 }
 #[repr(C)]
@@ -10879,7 +10876,7 @@ pub struct clone_args {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sched_param {
-    pub sched_priority: crate::x86_64_types::c_int,
+    pub sched_priority: crate::types::c_int,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -10898,7 +10895,7 @@ pub struct sched_attr {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct seccomp_data {
-    pub nr: crate::x86_64_types::c_int,
+    pub nr: crate::types::c_int,
     pub arch: __u32,
     pub instruction_pointer: __u64,
     pub args: [__u64; 6usize],
@@ -10938,7 +10935,7 @@ pub struct seccomp_notif_addfd {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sigval {
-    pub sival_int: crate::x86_64_types::c_int,
+    pub sival_int: crate::types::c_int,
     pub sival_ptr: usize,
 }
 impl Default for sigval {
@@ -10972,9 +10969,9 @@ pub struct __sifields__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub struct __sifields__bindgen_ty_2 {
     pub _tid: __kernel_timer_t,
-    pub _overrun: crate::x86_64_types::c_int,
+    pub _overrun: crate::types::c_int,
     pub _sigval: sigval_t,
-    pub _sys_private: crate::x86_64_types::c_int,
+    pub _sys_private: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
 }
 impl Default for __sifields__bindgen_ty_2 {
@@ -11007,7 +11004,7 @@ impl Default for __sifields__bindgen_ty_3 {
 pub struct __sifields__bindgen_ty_4 {
     pub _pid: __kernel_pid_t,
     pub _uid: __kernel_uid32_t,
-    pub _status: crate::x86_64_types::c_int,
+    pub _status: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
     pub _utime: __kernel_clock_t,
     pub _stime: __kernel_clock_t,
@@ -11021,8 +11018,8 @@ pub struct __sifields__bindgen_ty_5 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union __sifields__bindgen_ty_5__bindgen_ty_1 {
-    pub _trapno: crate::x86_64_types::c_int,
-    pub _addr_lsb: crate::x86_64_types::c_short,
+    pub _trapno: crate::types::c_int,
+    pub _addr_lsb: crate::types::c_short,
     pub _addr_bnd: __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1,
     pub _addr_pkey: __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_2,
     pub _perf: __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_3,
@@ -11030,7 +11027,7 @@ pub union __sifields__bindgen_ty_5__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
-    pub _dummy_bnd: [crate::x86_64_types::c_char; 8usize],
+    pub _dummy_bnd: [crate::types::c_char; 8usize],
     pub _lower: usize,
     pub _upper: usize,
 }
@@ -11046,13 +11043,13 @@ impl Default for __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_2 {
-    pub _dummy_pkey: [crate::x86_64_types::c_char; 8usize],
+    pub _dummy_pkey: [crate::types::c_char; 8usize],
     pub _pkey: __u32,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_3 {
-    pub _data: crate::x86_64_types::c_ulong,
+    pub _data: crate::types::c_ulong,
     pub _type: __u32,
     pub _flags: __u32,
 }
@@ -11077,16 +11074,16 @@ impl Default for __sifields__bindgen_ty_5 {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct __sifields__bindgen_ty_6 {
-    pub _band: crate::x86_64_types::c_long,
-    pub _fd: crate::x86_64_types::c_int,
+    pub _band: crate::types::c_long,
+    pub _fd: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
 pub struct __sifields__bindgen_ty_7 {
     pub _call_addr: usize,
-    pub _syscall: crate::x86_64_types::c_int,
-    pub _arch: crate::x86_64_types::c_uint,
+    pub _syscall: crate::types::c_int,
+    pub _arch: crate::types::c_uint,
 }
 impl Default for __sifields__bindgen_ty_7 {
     fn default() -> Self {
@@ -11115,14 +11112,14 @@ pub struct siginfo {
 #[derive(Copy, Clone)]
 pub union siginfo__bindgen_ty_1 {
     pub __bindgen_anon_1: siginfo__bindgen_ty_1__bindgen_ty_1,
-    pub _si_pad: [crate::x86_64_types::c_int; 32usize],
+    pub _si_pad: [crate::types::c_int; 32usize],
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct siginfo__bindgen_ty_1__bindgen_ty_1 {
-    pub si_signo: crate::x86_64_types::c_int,
-    pub si_errno: crate::x86_64_types::c_int,
-    pub si_code: crate::x86_64_types::c_int,
+    pub si_signo: crate::types::c_int,
+    pub si_errno: crate::types::c_int,
+    pub si_code: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
     pub _sifields: __sifields,
 }
@@ -11163,8 +11160,8 @@ pub struct sigevent {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sigevent__bindgen_ty_1 {
-    pub _pad: [crate::x86_64_types::c_int; 12usize],
-    pub _tid: crate::x86_64_types::c_int,
+    pub _pad: [crate::types::c_int; 12usize],
+    pub _tid: crate::types::c_int,
     pub _sigev_thread: sigevent__bindgen_ty_1__bindgen_ty_1,
 }
 #[repr(C)]
@@ -11270,12 +11267,12 @@ pub struct sysinfo {
     pub totalhigh: __kernel_ulong_t,
     pub freehigh: __kernel_ulong_t,
     pub mem_unit: __u32,
-    pub _f: __IncompleteArrayField<crate::x86_64_types::c_char>,
+    pub _f: __IncompleteArrayField<crate::types::c_char>,
     pub __bindgen_padding_1: [u8; 4usize],
 }
-pub type cc_t = crate::x86_64_types::c_uchar;
-pub type speed_t = crate::x86_64_types::c_uint;
-pub type tcflag_t = crate::x86_64_types::c_uint;
+pub type cc_t = crate::types::c_uchar;
+pub type speed_t = crate::types::c_uint;
+pub type tcflag_t = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct termios {
@@ -11313,20 +11310,20 @@ pub struct ktermios {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct winsize {
-    pub ws_row: crate::x86_64_types::c_ushort,
-    pub ws_col: crate::x86_64_types::c_ushort,
-    pub ws_xpixel: crate::x86_64_types::c_ushort,
-    pub ws_ypixel: crate::x86_64_types::c_ushort,
+    pub ws_row: crate::types::c_ushort,
+    pub ws_col: crate::types::c_ushort,
+    pub ws_xpixel: crate::types::c_ushort,
+    pub ws_ypixel: crate::types::c_ushort,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct termio {
-    pub c_iflag: crate::x86_64_types::c_ushort,
-    pub c_oflag: crate::x86_64_types::c_ushort,
-    pub c_cflag: crate::x86_64_types::c_ushort,
-    pub c_lflag: crate::x86_64_types::c_ushort,
-    pub c_line: crate::x86_64_types::c_uchar,
-    pub c_cc: [crate::x86_64_types::c_uchar; 8usize],
+    pub c_iflag: crate::types::c_ushort,
+    pub c_oflag: crate::types::c_ushort,
+    pub c_cflag: crate::types::c_ushort,
+    pub c_lflag: crate::types::c_ushort,
+    pub c_line: crate::types::c_uchar,
+    pub c_cc: [crate::types::c_uchar; 8usize],
     pub __bindgen_padding_0: u8,
 }
 #[repr(C)]
@@ -11348,7 +11345,7 @@ impl Default for iovec {
 #[derive(Debug, Copy, Clone)]
 pub struct sockaddr_un {
     pub sun_family: __kernel_sa_family_t,
-    pub sun_path: [crate::x86_64_types::c_char; 108usize],
+    pub sun_path: [crate::types::c_char; 108usize],
 }
 impl Default for sockaddr_un {
     fn default() -> Self {
@@ -11363,11 +11360,11 @@ impl Default for sockaddr_un {
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sockaddr_vm {
     pub svm_family: __kernel_sa_family_t,
-    pub svm_reserved1: crate::x86_64_types::c_ushort,
-    pub svm_port: crate::x86_64_types::c_uint,
-    pub svm_cid: crate::x86_64_types::c_uint,
+    pub svm_reserved1: crate::types::c_ushort,
+    pub svm_port: crate::types::c_uint,
+    pub svm_cid: crate::types::c_uint,
     pub svm_flags: __u8,
-    pub svm_zero: [crate::x86_64_types::c_uchar; 3usize],
+    pub svm_zero: [crate::types::c_uchar; 3usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
@@ -11429,7 +11426,7 @@ pub const EVIOCGABS_Y: __u32 = 2149074241;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct remote_binder_start_command {
-    pub incoming_service: *const crate::x86_64_types::c_char,
+    pub incoming_service: *const crate::types::c_char,
 }
 impl Default for remote_binder_start_command {
     fn default() -> Self {
@@ -11443,7 +11440,7 @@ impl Default for remote_binder_start_command {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct remote_binder_wait_command {
-    pub spawn_thread: crate::x86_64_types::c_char,
+    pub spawn_thread: crate::types::c_char,
 }
 pub const _REMOTE_BINDER_START: __u32 = 2148028929;
 pub const REMOTE_BINDER_START: __u32 = 2148028929;

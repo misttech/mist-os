@@ -7,17 +7,14 @@ import("//build/rust/rustc_library.gni")
 rustc_library("linux_uapi") {
   edition = "2021"
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/types.rs",
+  ]
   if (current_cpu == "x64") {
-    sources += [
-      "src/x86_64.rs",
-      "src/x86_64_types.rs",
-    ]
+    sources += [ "src/x86_64.rs" ]
   } else if (current_cpu == "arm64") {
-    sources += [
-      "src/arm64.rs",
-      "src/arm64_types.rs",
-    ]
+    sources += [ "src/arm64.rs" ]
   } else if (current_cpu == "riscv64") {
     # TODO(fxbug.dev/124695) - stub out riscv64 support for now
   } else {

@@ -10,8 +10,6 @@ from bindgen import Bindgen
 RAW_LINES = """
 use zerocopy::{AsBytes, FromBytes};
 
-pub use %s::*;
-
 unsafe impl<Storage> AsBytes for __BindgenBitfieldUnit<Storage>
 where
     Storage: AsBytes,
@@ -94,11 +92,9 @@ REPLACEMENTS = [
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
         "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"),
 
-    # The next two allow clients to apply FromBytes to a given struct.  Because the
-    # target of the pointer is in userspace anyway, treating it as an opaque
-    # pointer is harmless.
-    (r'\*mut crate::x86_64_types::c_void', 'usize'),
-    (r'\*mut crate::arm64_types::c_void', 'usize'),
+    # Use usize in place of pointers for compat with FromBytes. Because the target of the
+    # pointer is in userspace anyway, treating it as an opaque pointer is harmless.
+    (r'\*mut crate::types::c_void', 'usize'),
     (r'\*mut sock_filter', 'usize')
 ]
 
@@ -129,10 +125,9 @@ bindgen.set_replacements(REPLACEMENTS)
 bindgen.ignore_functions = True
 
 for arch in ARCH_INFO:
-    type_prefix = 'crate::' + arch.name + '_types'
-    bindgen.c_types_prefix = type_prefix
+    bindgen.c_types_prefix = "crate::types"
     bindgen.clang_target = arch.clang_target
-    bindgen.raw_lines = RAW_LINES % type_prefix
+    bindgen.raw_lines = RAW_LINES
     bindgen.include_dirs = INCLUDE_DIRS + [arch.include]
     rust_file = 'src/starnix/lib/linux_uapi/src/' + arch.name + '.rs'
     bindgen.run(INPUT_FILE, rust_file)
