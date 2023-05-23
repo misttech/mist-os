@@ -521,7 +521,6 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
 #[cfg(test)]
 mod test {
     #![allow(clippy::unused_unit)] // for compatibility with `test_case`
-    #![allow(clippy::manual_range_contains)] // for compatibility with `assert_near`
 
     use super::*;
     use crate::fs::buffers::VecOutputBuffer;
