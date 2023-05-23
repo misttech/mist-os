@@ -12,6 +12,7 @@
 #include <fbl/algorithm.h>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/ui/lib/display/get_hardware_display_controller.h"
 #include "src/ui/lib/escher/flatland/rectangle_compositor.h"
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
@@ -618,6 +619,18 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
           }
         }
         if (!pixel_same) {
+          const int expected_rgb_begin_index = expected_row * expected_stride + expected_column * 4;
+          const std::string expected_rgb =
+              fxl::StringPrintf("%02x%02x%02x", expected_rgba_image[expected_rgb_begin_index + 0],
+                                expected_rgba_image[expected_rgb_begin_index + 1],
+                                expected_rgba_image[expected_rgb_begin_index + 2]);
+          const int captured_rgb_begin_index = captured_row * capture_stride + captured_column * 3;
+          const std::string captured_rgb =
+              fxl::StringPrintf("%02x%02x%02x", captured_image[captured_rgb_begin_index + 0],
+                                captured_image[captured_rgb_begin_index + 1],
+                                captured_image[captured_rgb_begin_index + 2]);
+          FX_LOGS(ERROR) << "(" << expected_row << ", " << expected_column
+                         << ") Expected RGB: " << expected_rgb << " Captured RGB: " << captured_rgb;
           ++num_pixels_different;
         }
       }
