@@ -30,6 +30,8 @@ toc:
     path: /docs/development/build/static_analysis.md
   - title: "Ninja no-op check"
     path: /docs/development/build/ninja_no_op.md
+  - title: "How Ninja works"
+    path: /docs/development/build/ninja_how.md
   - title: "Hermetic actions check"
     path: /docs/development/build/hermetic_actions.md
 - title: "Build system"
