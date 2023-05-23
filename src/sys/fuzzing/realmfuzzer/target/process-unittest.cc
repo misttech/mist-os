@@ -385,6 +385,41 @@ TEST_F(ProcessTest, UpdateOnFinish) {
   EXPECT_EQ(pool()->Measure(), 3U);
 }
 
+TEST_F(ProcessTest, RepeatedSignals) {
+  Process process(executor());
+  FUZZING_EXPECT_OK(Connect(&process));
+  FUZZING_EXPECT_OK(WatchForProcess());
+  RunUntilIdle();
+
+  auto* module = GetModule(AddModule());
+  FUZZING_EXPECT_OK(WatchForModule());
+  RunUntilIdle();
+
+  // Repeating `kStart` restarts coverage collection.
+  FUZZING_EXPECT_OK(eventpair()->WaitFor(kStart));
+  EXPECT_EQ(eventpair()->SignalPeer(kFinish, kStart), ZX_OK);
+  RunUntilIdle();
+  (*module)[0] = 4;
+
+  FUZZING_EXPECT_OK(eventpair()->WaitFor(kStart));
+  EXPECT_EQ(eventpair()->SignalPeer(kFinish, kStart), ZX_OK);
+  RunUntilIdle();
+
+  (*module)[module->num_pcs() / 2] = 16;
+  (*module)[module->num_pcs() - 1] = 128;
+  FUZZING_EXPECT_OK(eventpair()->WaitFor(kFinish));
+  EXPECT_EQ(eventpair()->SignalPeer(kStart, kFinish), ZX_OK);
+  RunUntilIdle();
+  EXPECT_EQ(pool()->Measure(), 2U);
+
+  // Repeating `kFinish` triggers another update.
+  (*module)[0] = 4;
+  FUZZING_EXPECT_OK(eventpair()->WaitFor(kFinish));
+  EXPECT_EQ(eventpair()->SignalPeer(kStart, kFinish), ZX_OK);
+  RunUntilIdle();
+  EXPECT_EQ(pool()->Measure(), 3U);
+}
+
 TEST_F(ProcessTest, UpdateOnExit) {
   Process process(executor());
   FUZZING_EXPECT_OK(Connect(&process));

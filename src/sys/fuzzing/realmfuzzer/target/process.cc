@@ -403,57 +403,52 @@ ZxPromise<> Process::AddModule() {
 }
 
 ZxPromise<> Process::Run() {
-  // Processes typically connect during a fuzzing run, but may connect between runs as well. As a
-  // result, the first wait is for any run-related signal.
-  auto expected = kStart | kStartLeakCheck | kFinish;
-  return fpromise::make_promise([this, expected, wait = ZxFuture<zx_signals_t>()](
-                                    Context& context) mutable -> ZxResult<> {
-           while (true) {
-             if (!wait) {
-               wait = eventpair_.WaitFor(expected);
-             }
-             if (!wait(context)) {
-               return fpromise::pending();
-             }
-             if (wait.is_error()) {
-               return fpromise::error(wait.error());
-             }
-             auto observed = wait.take_value();
-             if (auto status = eventpair_.SignalSelf(observed, 0); status != ZX_OK) {
-               return fpromise::error(status);
-             }
-             zx_signals_t reply = 0;
-             switch (observed) {
-               case kStartLeakCheck:
-                 ConfigureLeakDetection();
-                 [[fallthrough]];
-               case kStart:
-                 // Reset coverage data and leak detection.
-                 for (auto& module : modules_) {
-                   module.Clear();
+  return fpromise::make_promise(
+             [this, wait = ZxFuture<zx_signals_t>()](Context& context) mutable -> ZxResult<> {
+               while (true) {
+                 if (!wait) {
+                   wait = eventpair_.WaitFor(kStart | kStartLeakCheck | kFinish);
                  }
-                 num_mallocs_ = 0;
-                 num_frees_ = 0;
-                 reply = kStart;
-                 expected = kFinish;
-                 break;
-               case kFinish:
-                 // Forward coverage data to engine, and respond with leak status.
-                 for (auto& module : modules_) {
-                   module.Update();
+                 if (!wait(context)) {
+                   return fpromise::pending();
                  }
-                 reply = DetectLeak() ? kFinishWithLeaks : kFinish;
-                 expected = kStart | kStartLeakCheck;
-                 break;
-               default:
-                 FX_NOTREACHED();
-                 break;
-             }
-             if (auto status = eventpair_.SignalPeer(0, reply); status != ZX_OK) {
-               return fpromise::error(status);
-             }
-           }
-         })
+                 if (wait.is_error()) {
+                   return fpromise::error(wait.error());
+                 }
+                 auto observed = wait.take_value();
+                 if (auto status = eventpair_.SignalSelf(observed, 0); status != ZX_OK) {
+                   return fpromise::error(status);
+                 }
+                 zx_signals_t reply = 0;
+                 switch (observed) {
+                   case kStartLeakCheck:
+                     ConfigureLeakDetection();
+                     [[fallthrough]];
+                   case kStart:
+                     // Reset coverage data and leak detection.
+                     for (auto& module : modules_) {
+                       module.Clear();
+                     }
+                     num_mallocs_ = 0;
+                     num_frees_ = 0;
+                     reply = kStart;
+                     break;
+                   case kFinish:
+                     // Forward coverage data to engine, and respond with leak status.
+                     for (auto& module : modules_) {
+                       module.Update();
+                     }
+                     reply = DetectLeak() ? kFinishWithLeaks : kFinish;
+                     break;
+                   default:
+                     FX_NOTREACHED();
+                     break;
+                 }
+                 if (auto status = eventpair_.SignalPeer(0, reply); status != ZX_OK) {
+                   return fpromise::error(status);
+                 }
+               }
+             })
       .or_else([](const zx_status_t& status) -> ZxResult<> {
         if (status != ZX_ERR_PEER_CLOSED) {
           FX_LOGS(WARNING) << "Failed to exchange signals with engine: "
