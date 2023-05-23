@@ -100,6 +100,11 @@ legacy_base_package_labels += [
 legacy_cache_package_labels +=
     [ "//src/ui/testing/test_ui_stack:test-ui-stack-flavors" ]
 
+# Add validator package for use in tests.
+# TODO(fxbug.dev/127138): Remove once we support packages in the SDK.
+legacy_cache_package_labels +=
+    [ "//src/diagnostics/validator/logs/encoding:validator" ]
+
 # Use the product assembly config target to specify the product configuration.
 fuchsia_product_assembly_config_label = "//products/terminal"
 
