@@ -446,39 +446,6 @@ fn translate_expose(
                     ..Default::default()
                 }))
             }
-        } else if let Some(n) = expose.event_stream() {
-            let source = extract_single_expose_source(expose, None)?;
-            let source_names = n.to_vec();
-            let target_names = all_target_capability_names(expose, expose)
-                .ok_or_else(|| Error::internal("no capability"))?;
-            for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
-            {
-                let scopes = match expose.scope.clone() {
-                    Some(value) => Some(annotate_type::<Vec<EventScope>>(value.into())),
-                    None => None,
-                };
-                out_exposes.push(fdecl::Expose::EventStream(fdecl::ExposeEventStream {
-                    source: Some(clone_ref(&source)?),
-                    source_name: Some(source_name.clone().into()),
-                    target: Some(clone_ref(&target)?),
-                    target_name: Some(target_name.into()),
-                    scope: match scopes {
-                        Some(values) => {
-                            let mut output = vec![];
-                            for value in &values {
-                                output.push(translate_child_or_collection_ref(
-                                    value.into(),
-                                    &all_children,
-                                    &all_collections,
-                                )?);
-                            }
-                            Some(output)
-                        }
-                        None => None,
-                    },
-                    ..Default::default()
-                }))
-            }
         } else {
             return Err(Error::internal(format!("expose: must specify a known capability")));
         }
@@ -2668,17 +2635,6 @@ mod tests {
                     { "runner": [ "runner_a", "runner_b" ], "from": "#logger" },
                     { "resolver": "my_resolver", "from": "#logger", "to": "parent", "as": "pkg_resolver" },
                     { "resolver": [ "resolver_a", "resolver_b" ], "from": "#logger" },
-                    {
-                        "event_stream": ["started", "stopped"],
-                        "from": "#logger",
-                        "to": "parent",
-                    },
-                    {
-                        "event_stream": "running",
-                        "as": "running_stream",
-                        "from": "#logger",
-                        "to": "parent",
-                    },
                 ],
                 "capabilities": [
                     { "protocol": "A" },
@@ -2880,42 +2836,6 @@ mod tests {
                             source_name: Some("resolver_b".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("resolver_b".to_string()),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::EventStream (
-                        fdecl::ExposeEventStream {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("started".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            target_name: Some("started".to_string()),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::EventStream (
-                        fdecl::ExposeEventStream {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("stopped".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            target_name: Some("stopped".to_string()),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Expose::EventStream (
-                        fdecl::ExposeEventStream {
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "logger".to_string(),
-                                collection: None,
-                            })),
-                            source_name: Some("running".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            target_name: Some("running_stream".to_string()),
                             ..Default::default()
                         }
                     ),

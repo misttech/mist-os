@@ -181,28 +181,6 @@ fn example_cml_integration_test() {
             availability: Some(Availability::Required),
             ..Default::default()
         }),
-        Expose::EventStream(ExposeEventStream {
-            source: Some(Ref::Framework(FrameworkRef {})),
-            source_name: Some("started".to_string()),
-            target: Some(Ref::Parent(ParentRef {})),
-            scope: Some(vec![Ref::Child(ChildRef {
-                name: "logger".to_string(),
-                collection: None,
-            })]),
-            target_name: Some("started".to_string()),
-            ..Default::default()
-        }),
-        Expose::EventStream(ExposeEventStream {
-            source: Some(Ref::Framework(FrameworkRef {})),
-            source_name: Some("stopped".to_string()),
-            target: Some(Ref::Parent(ParentRef {})),
-            scope: Some(vec![Ref::Child(ChildRef {
-                name: "logger".to_string(),
-                collection: None,
-            })]),
-            target_name: Some("stopped".to_string()),
-            ..Default::default()
-        }),
         Expose::Directory(ExposeDirectory {
             source: Some(Ref::Self_(SelfRef)),
             source_name: Some("blobfs".to_string()),

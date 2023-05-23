@@ -601,7 +601,6 @@ pub enum ExposeDecl {
     Directory(ExposeDirectoryDecl),
     Runner(ExposeRunnerDecl),
     Resolver(ExposeResolverDecl),
-    EventStream(ExposeEventStreamDecl),
 }
 
 impl SourceName for ExposeDecl {
@@ -612,7 +611,6 @@ impl SourceName for ExposeDecl {
             Self::Directory(e) => e.source_name(),
             Self::Runner(e) => e.source_name(),
             Self::Resolver(e) => e.source_name(),
-            Self::EventStream(e) => e.source_name(),
         }
     }
 }
@@ -625,7 +623,6 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.source(),
             Self::Runner(e) => e.source(),
             Self::Resolver(e) => e.source(),
-            Self::EventStream(e) => e.source(),
         }
     }
 
@@ -636,7 +633,6 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.target(),
             Self::Runner(e) => e.target(),
             Self::Resolver(e) => e.target(),
-            Self::EventStream(e) => e.target(),
         }
     }
 
@@ -647,7 +643,6 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.target_name(),
             Self::Runner(e) => e.target_name(),
             Self::Resolver(e) => e.target_name(),
-            Self::EventStream(e) => e.target_name(),
         }
     }
 
@@ -658,7 +653,6 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Directory(e) => e.availability(),
             Self::Runner(e) => e.availability(),
             Self::Resolver(e) => e.availability(),
-            Self::EventStream(e) => e.availability(),
         }
     }
 }
@@ -729,19 +723,6 @@ pub struct ExposeResolverDecl {
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeEventStream")]
-pub struct ExposeEventStreamDecl {
-    pub source: ExposeSource,
-    pub source_name: CapabilityName,
-    pub target: ExposeTarget,
-    pub target_name: CapabilityName,
-    pub scope: Option<Vec<EventScope>>,
-    #[fidl_decl(default)]
-    pub availability: Availability,
 }
 
 #[cfg_attr(
@@ -1898,7 +1879,6 @@ impl From<&ExposeDecl> for CapabilityTypeName {
             ExposeDecl::Directory(_) => Self::Directory,
             ExposeDecl::Runner(_) => Self::Runner,
             ExposeDecl::Resolver(_) => Self::Resolver,
-            ExposeDecl::EventStream(_) => Self::EventStream,
         }
     }
 }
@@ -2693,17 +2673,6 @@ mod tests {
                         availability: Some(fdecl::Availability::Required),
                         ..Default::default()
                     }),
-                    fdecl::Expose::EventStream (
-                        fdecl::ExposeEventStream {
-                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
-                            source_name: Some("diagnostics_ready".to_string()),
-                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef{name: "netstack".to_string(), collection: None})]),
-                            target_name: Some("diagnostics_ready".to_string()),
-                            availability: Some(fdecl::Availability::Optional),
-                            ..Default::default()
-                        }
-                    )
                 ]),
                 offers: Some(vec![
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -3087,16 +3056,6 @@ mod tests {
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
                         }),
-                        ExposeDecl::EventStream (
-                            ExposeEventStreamDecl {
-                                source: ExposeSource::Self_,
-                                source_name: CapabilityName::from("diagnostics_ready"),
-                                target: ExposeTarget::Parent,
-                                scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".into(), collection: None})]),
-                                target_name: CapabilityName::from("diagnostics_ready"),
-                                availability: Availability::Optional,
-                            }
-                        )
                     ],
                     offers: vec![
                         OfferDecl::Protocol(OfferProtocolDecl {
@@ -3656,18 +3615,6 @@ mod tests {
         );
         assert_eq!(
             *fdecl::ExposeResolver {
-                source: Some(source.clone()),
-                source_name: Some(source_name.into()),
-                target: Some(target.clone()),
-                target_name: Some(target_name.into()),
-                ..Default::default()
-            }
-            .fidl_into_native()
-            .availability(),
-            Availability::Required
-        );
-        assert_eq!(
-            *fdecl::ExposeEventStream {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),

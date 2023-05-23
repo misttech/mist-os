@@ -184,9 +184,7 @@ pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Opt
             assert!(exposes.len() == 1, "multiple exposes");
             Some(RouteRequest::ExposeDirectory(e.clone()))
         }
-        cm_rust::ExposeDecl::Runner(_)
-        | cm_rust::ExposeDecl::Resolver(_)
-        | cm_rust::ExposeDecl::EventStream(_) => {
+        cm_rust::ExposeDecl::Runner(_) | cm_rust::ExposeDecl::Resolver(_) => {
             // Runners, resolvers, and event streams do not add directory entries.
             None
         }

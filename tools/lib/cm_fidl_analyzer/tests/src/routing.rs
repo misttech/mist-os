@@ -16,13 +16,12 @@ use {
     cm_rust::{
         Availability, CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, ChildRef,
         ComponentDecl, DependencyType, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl,
-        ExposeEventStreamDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeServiceDecl,
-        ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl,
-        OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
-        ProtocolDecl, RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl,
-        RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
-        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
-        UseStorageDecl,
+        ExposeProtocolDecl, ExposeResolverDecl, ExposeServiceDecl, ExposeSource, ExposeTarget,
+        OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl,
+        OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl,
+        ResolverRegistration, RunnerDecl, RunnerRegistration, ServiceDecl, StorageDecl,
+        StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl,
+        UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_rust_testing::{
         ChildDeclBuilder, ComponentDeclBuilder, DirectoryDeclBuilder, EnvironmentDeclBuilder,
@@ -368,7 +367,7 @@ impl RoutingTestForAnalyzer {
 /// Converts a component framework route to a strongly-typed stringified route
 /// which can be compared against a string of paths for testing purposes.
 fn generate_unified_route(
-    map: Vec<RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ExposeEventStreamDecl>>,
+    map: Vec<RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ()>>,
     route: &mut Vec<ComponentEventRoute>,
 ) {
     for component in &map {
@@ -378,11 +377,7 @@ fn generate_unified_route(
 
 /// Adds a specified component to the route
 fn add_component_to_route(
-    component: &RouteInfo<
-        ComponentInstanceForAnalyzer,
-        OfferEventStreamDecl,
-        ExposeEventStreamDecl,
-    >,
+    component: &RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ()>,
     route: &mut Vec<ComponentEventRoute>,
 ) {
     let mut component_route = ComponentEventRoute {

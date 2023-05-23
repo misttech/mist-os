@@ -6,10 +6,9 @@ use {
     crate::error::AvailabilityRoutingError,
     cm_rust::{
         Availability, DirectoryDecl, EventStreamDecl, ExposeDeclCommon, ExposeDirectoryDecl,
-        ExposeEventStreamDecl, ExposeProtocolDecl, ExposeServiceDecl, ExposeSource,
-        OfferDeclCommon, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, ServiceDecl, StorageDecl,
-        UseDeclCommon,
+        ExposeProtocolDecl, ExposeServiceDecl, ExposeSource, OfferDeclCommon, OfferDirectoryDecl,
+        OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
+        ProtocolDecl, ServiceDecl, StorageDecl, UseDeclCommon,
     },
     std::convert::From,
 };
@@ -193,7 +192,6 @@ make_availability_visitor!(AvailabilityStorageVisitor, {
 
 make_availability_visitor!(AvailabilityEventStreamVisitor, {
     OfferDecl => OfferEventStreamDecl,
-    ExposeDecl => ExposeEventStreamDecl,
     CapabilityDecl => EventStreamDecl,
 });
 

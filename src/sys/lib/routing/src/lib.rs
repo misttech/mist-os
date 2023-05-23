@@ -42,10 +42,10 @@ use {
         walk_state::WalkState,
     },
     cm_rust::{
-        Availability, CapabilityName, DirectoryDecl, ExposeDirectoryDecl, ExposeEventStreamDecl,
-        ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource,
-        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
-        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
+        Availability, CapabilityName, DirectoryDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
+        ExposeResolverDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDirectoryDecl,
+        OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
+        OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
         RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl, RunnerRegistration,
         SourceName, StorageDecl, StorageDirectorySource, UseDirectoryDecl, UseEventStreamDecl,
         UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
@@ -403,7 +403,7 @@ where
     let allowed_sources = AllowedSourcesBuilder::new().builtin();
 
     let mut availability_visitor = AvailabilityEventStreamVisitor::new_from_offer(&offer_decl);
-    let source = router::route_from_offer(
+    let source = router::route_from_offer_without_expose(
         RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
@@ -1067,7 +1067,7 @@ pub async fn route_event_stream<C, M>(
     use_decl: UseEventStreamDecl,
     target: &Arc<C>,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, OfferEventStreamDecl, ExposeEventStreamDecl>>,
+    route: &mut Vec<RouteInfo<C, OfferEventStreamDecl, ()>>,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
@@ -1075,7 +1075,7 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin();
     let mut availability_visitor = AvailabilityEventStreamVisitor::new(&use_decl);
-    let source = router::route_from_use(
+    let source = router::route_from_use_without_expose(
         use_decl,
         target.clone(),
         allowed_sources,
@@ -1240,20 +1240,6 @@ impl ErrorNotFoundInChild for OfferEventStreamDecl {
 }
 
 impl ErrorNotFoundInChild for ExposeProtocolDecl {
-    fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
-        child_moniker: ChildMoniker,
-        capability_name: CapabilityName,
-    ) -> RoutingError {
-        RoutingError::ExposeFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
-impl ErrorNotFoundInChild for ExposeEventStreamDecl {
     fn error_not_found_in_child(
         moniker: AbsoluteMoniker,
         child_moniker: ChildMoniker,

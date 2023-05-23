@@ -164,15 +164,6 @@
             subdir: "blob",
         },
         {
-            event_stream: [
-                "started",
-                "stopped",
-            ],
-            from: "framework",
-            to: "parent",
-            scope: [ "#logger" ],
-        },
-        {
             directory: "blobfs",
             from: "self",
             as: "optional_dir",

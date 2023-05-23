@@ -12,10 +12,9 @@ use {
     },
     anyhow::{anyhow, Context, Result},
     cm_rust::{
-        CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon,
-        ExposeEventStreamDecl, OfferDecl, OfferDeclCommon, OfferEventStreamDecl, OfferTarget,
-        ProgramDecl, ResolverRegistration, SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl,
-        UseStorageDecl,
+        CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
+        OfferDeclCommon, OfferEventStreamDecl, OfferTarget, ProgramDecl, ResolverRegistration,
+        SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseStorageDecl,
     },
     config_encoder::ConfigFields,
     fidl::prelude::*,
@@ -1124,9 +1123,7 @@ impl ComponentModelForAnalyzer {
     pub fn route_event_stream_sync(
         request: UseEventStreamDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-        map: &mut Vec<
-            RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ExposeEventStreamDecl>,
-        >,
+        map: &mut Vec<RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ()>>,
     ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
         let mut mapper = RouteMapper::new();
         let result = route_event_stream(request, target, &mut mapper, map)
