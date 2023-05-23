@@ -8,7 +8,7 @@ use assembly_config_schema::{AssemblyConfig, BoardInformation};
 use assembly_tool::SdkToolProvider;
 use assembly_util as util;
 use camino::Utf8PathBuf;
-use ffx_assembly_args::ProductArgs;
+use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use tracing::info;
 
 mod assembly_builder;
@@ -22,7 +22,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         input_bundles_dir,
         legacy_bundle,
         additional_packages_path,
-        disable_package_validation,
+        package_validation,
     } = args;
 
     info!("Loading configuration files.");
@@ -108,7 +108,10 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
 
     // Validate the built product assembly.
-    assembly_validate_product::validate_product(&image_assembly, &disable_package_validation)?;
+    assembly_validate_product::validate_product(
+        &image_assembly,
+        package_validation == PackageValidationHandling::Warning,
+    )?;
 
     // Serialize out the Image Assembly configuration.
     let image_assembly_path = outdir.join("image_assembly.json");

@@ -14,7 +14,7 @@ use version_history::{self, AbiRevision};
 /// Validate a product config.
 pub fn validate_product(
     product: &ImageAssemblyConfig,
-    disable_package_validation: &Vec<String>,
+    warn_only: bool,
 ) -> Result<(), ProductValidationError> {
     // validate the packages in the system/base/cache package sets
     let manifests = product.system.iter().chain(product.base.iter()).chain(product.cache.iter());
@@ -24,42 +24,25 @@ pub fn validate_product(
             match PackageManifest::try_load_from(&package_manifest_path) {
                 Ok(manifest) => {
                     // After loading the manifest, validate it
-                    if let Err(e) = validate_package(&manifest) {
-                        // If there was a validation error, but the package is
-                        // named in the allowlist for validation errors, then
-                        // print a warning only.
-                        if disable_package_validation.contains(&manifest.name().to_string()) {
-                            println!("WARNING: The package named '{}', with manifest at {} failed validation but is allowlisted:\n{}", manifest.name(), package_manifest_path, e);
-                            None
-                        } else {
-                            // This is very temporary, while OOT products are updated to populate
-                            // their allowlist as a soft-transition.
-                            // Only the default case will be included after the transition is complete.
-                            match e {
-                                e @ PackageValidationError::MissingAbiRevisionFile(_) => {
-                                    println!("WARNING: The package named '{}', with manifest at {} failed validation but is NOT allowlisted:\n{}", manifest.name(), package_manifest_path, e);
-                                    None
-                                }
-                                e @ PackageValidationError::InvalidAbiRevisionFile(_) => {
-                                    println!("WARNING: The package named '{}', with manifest at {} failed validation but is NOT allowlisted:\n{}", manifest.name(), package_manifest_path, e);
-                                    None
-
-                                }
-                                e @ PackageValidationError::UnsupportedAbiRevision { found: _, supported: _ } => {
-                                    println!("WARNING: The package named '{}', with manifest at {} failed validation but is NOT allowlisted:\n{}", manifest.name(), package_manifest_path, e);
-                                    None
-                                }
-                                e @ _ =>{
-                                    // otherwise, return the error along with the path
-                                    // to the package manifest.
-                                    Some((package_manifest_path.to_owned(), e))
-                                 }
+                    match  validate_package(&manifest) {
+                        Ok(()) => None,
+                        Err(e) => {
+                            // If validation issues have been downgraded to warnings, then print
+                            // a warning instead of returning an error.
+                            let print_warning = warn_only && match e {
+                                PackageValidationError::MissingAbiRevisionFile(_) => true,
+                                PackageValidationError::InvalidAbiRevisionFile(_) => true,
+                                PackageValidationError::UnsupportedAbiRevision { found: _, supported: _ } => true,
+                                _ => false};
+                             if print_warning {
+                                println!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
+                                None
+                             } else {
+                                // return the error
+                                Some((package_manifest_path.to_owned(), e))
                             }
                         }
-                    } else {
-                        None
                     }
-
                 }
                 // Convert any error loading the manifest into the appropriate
                 // error type.

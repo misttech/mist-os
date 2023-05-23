@@ -313,6 +313,25 @@ pub struct ProductArgs {
     pub additional_packages_path: Option<Utf8PathBuf>,
 
     /// disable validation of the assembly's packages
-    #[argh(option)]
-    pub disable_package_validation: Vec<String>,
+    #[argh(option, default = "Default::default()")]
+    pub package_validation: PackageValidationHandling,
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub enum PackageValidationHandling {
+    #[default]
+    Warning,
+    Error,
+}
+
+impl FromStr for PackageValidationHandling {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.as_ref() {
+            "warning" => Ok(PackageValidationHandling::Warning),
+            "error" => Ok(PackageValidationHandling::Error),
+            _ => Err(format!("Unknown handling for package validation, valid values are 'warning' and 'error' (the default): {}", s))
+        }
+    }
 }
