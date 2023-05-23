@@ -146,8 +146,10 @@ void Runner::AddMonitor(fidl::InterfaceHandle<Monitor> monitor) {
 }
 
 void Runner::UpdateMonitors(UpdateReason reason) {
-  monitors_.set_status(CollectStatus());
-  monitors_.Update(reason);
+  if (monitors_.active()) {
+    monitors_.set_status(CollectStatus());
+    monitors_.Update(reason);
+  }
 }
 
 }  // namespace fuzzing

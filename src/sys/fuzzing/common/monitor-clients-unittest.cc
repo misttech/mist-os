@@ -17,6 +17,23 @@ class MonitorClientsTest : public AsyncTest {};
 
 // Unit tests.
 
+TEST_F(MonitorClientsTest, Active) {
+  MonitorClients monitors(executor());
+
+  FakeMonitor monitor1(executor());
+  FakeMonitor monitor2(executor());
+  EXPECT_FALSE(monitors.active());
+
+  monitors.Add(monitor1.NewBinding());
+  EXPECT_TRUE(monitors.active());
+
+  monitors.Add(monitor2.NewBinding());
+  EXPECT_TRUE(monitors.active());
+
+  monitors.CloseAll();
+  EXPECT_FALSE(monitors.active());
+}
+
 TEST_F(MonitorClientsTest, Update) {
   MonitorClients monitors(executor());
 

@@ -24,6 +24,8 @@ class MonitorClients final {
   explicit MonitorClients(ExecutorPtr executor);
   ~MonitorClients() = default;
 
+  bool active() const { return active_; }
+
   Status status() const { return CopyStatus(status_); }
   void set_status(Status&& status) { status_ = std::move(status); }
 
@@ -46,6 +48,7 @@ class MonitorClients final {
 
  private:
   ExecutorPtr executor_;
+  bool active_ = false;
   Status status_;
   fidl::InterfacePtrSet<Monitor> monitors_;
   Consumer<> previous_;

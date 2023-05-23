@@ -20,6 +20,7 @@ void MonitorClients::Add(fidl::InterfaceHandle<Monitor> monitor) {
   MonitorPtr ptr;
   ptr.Bind(std::move(monitor), executor_->dispatcher());
   monitors_.AddInterfacePtr(std::move(ptr));
+  active_ = true;
 }
 
 void MonitorClients::Update(UpdateReason reason) {
@@ -56,6 +57,9 @@ Promise<> MonitorClients::AwaitAcknowledgement() {
   return previous ? previous.promise().box() : fpromise::make_ok_promise().box();
 }
 
-void MonitorClients::CloseAll() { monitors_.CloseAll(); }
+void MonitorClients::CloseAll() {
+  monitors_.CloseAll();
+  active_ = false;
+}
 
 }  // namespace fuzzing
