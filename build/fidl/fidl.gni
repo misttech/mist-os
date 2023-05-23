@@ -102,6 +102,15 @@ if (support_rust) {
 #     Indicates if any of the FIDL files contain the driver transport or
 #     references to the driver transport.
 #
+#   enable_cpp (optional flag, default to true)
+#     Set to false to disable the new C++ bindings for this library
+#
+#   enable_rust (optional flag, default to true)
+#     Set to false to disable Rust bindings for this library
+#
+#   enable_bindlib (optional flag, default to true)
+#     Set to false to disable bindlib bindings for this library
+#
 #   enable_hlcpp (optional flag, default to false)
 #     Set to true to enable legacy HLCPP bindings for this library
 #
@@ -138,11 +147,20 @@ template("fidl") {
                    "/${target_name}.fidl.json"
   }
 
+  # These bindings are enabled by default:
+  enable_bindlib = !defined(invoker.enable_bindlib) || invoker.enable_bindlib
+  enable_cpp = !defined(invoker.enable_cpp) || invoker.enable_cpp
+  enable_rust = !defined(invoker.enable_rust) || invoker.enable_rust
+
+  # These bindings are not:
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
   enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
 
   not_needed([
+               "enable_bindlib",
+               "enable_cpp",
+               "enable_rust",
                "enable_banjo",
                "enable_hlcpp",
                "enable_zither",
@@ -230,19 +248,24 @@ template("fidl") {
     "golden_fuzzer",
   ]
   if (!is_dart && !is_go) {
-    fidl_cpp_family(target_name) {
-      forward_variables_from(invoker,
-                             non_dart_go_only + [
-                                   "testonly",
-                                   "visibility",
-                                   "public_deps",
-                                   "sdk_category",
-                                 ])
-      forward_variables_from(common_parameters, "*")
-      enable_hlcpp = enable_hlcpp
+    if (enable_cpp || enable_hlcpp) {
+      fidl_cpp_family(target_name) {
+        forward_variables_from(invoker,
+                               non_dart_go_only + [
+                                     "testonly",
+                                     "visibility",
+                                     "public_deps",
+                                     "sdk_category",
+                                   ])
+        forward_variables_from(common_parameters, "*")
+        enable_hlcpp = enable_hlcpp
+        enable_cpp = enable_cpp
+      }
+    } else {
+      not_needed([ "non_dart_go_only" ])
     }
 
-    if (support_rust) {
+    if (support_rust && enable_rust) {
       fidl_rust("${target_name}_rust") {
         forward_variables_from(invoker,
                                [
@@ -255,14 +278,16 @@ template("fidl") {
         fidl_gen_dir += "/rust"
       }
 
-      fidl_bind_library("${target_name}_bindlib") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visibility",
-                               ])
-        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
-        fidl_gen_dir += "/bindlib"
+      if (enable_bindlib) {
+        fidl_bind_library("${target_name}_bindlib") {
+          forward_variables_from(invoker,
+                                 [
+                                   "testonly",
+                                   "visibility",
+                                 ])
+          forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+          fidl_gen_dir += "/bindlib"
+        }
       }
     } else {
       not_needed(invoker, [ "disable_rustdoc" ])
