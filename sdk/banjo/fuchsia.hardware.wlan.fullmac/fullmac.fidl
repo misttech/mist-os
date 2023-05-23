@@ -90,7 +90,7 @@ type WlanFullmacResetReq = struct {
 
 type WlanFullmacStartReq = struct {
     ssid ieee80211.CSsid;
-    bss_type fuchsia.wlan.internal.BssType;
+    bss_type fuchsia.wlan.common.BssType;
     beacon_period uint32;
     dtim_period uint32;
     channel uint8;

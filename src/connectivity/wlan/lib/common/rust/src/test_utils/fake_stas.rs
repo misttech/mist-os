@@ -14,8 +14,8 @@ use {
         },
     },
     anyhow::Context,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
     ieee80211::Ssid,
     num_derive::FromPrimitive,
     num_traits::FromPrimitive,
@@ -73,7 +73,7 @@ const DEFAULT_MOCK_IES: &'static [u8] = &[
 pub struct BssDescriptionCreator {
     // *** Fields already in fidl_internal::BssDescription
     pub bssid: [u8; 6],
-    pub bss_type: fidl_internal::BssType,
+    pub bss_type: fidl_common::BssType,
     pub beacon_period: u16,
     pub channel: Channel,
     pub rssi_dbm: i8,
@@ -150,9 +150,7 @@ impl BssDescriptionCreator {
             _ => capability_info.with_privacy(true),
         };
         let capability_info = match self.bss_type {
-            fidl_internal::BssType::Infrastructure => {
-                capability_info.with_ess(true).with_ibss(false)
-            }
+            fidl_common::BssType::Infrastructure => capability_info.with_ess(true).with_ibss(false),
             _ => panic!("{:?} is not supported", self.bss_type),
         };
         let capability_info = capability_info.0;
@@ -268,7 +266,7 @@ pub fn build_fake_bss_description_creator__(
 ) -> BssDescriptionCreator {
     BssDescriptionCreator {
         bssid: [7, 1, 2, 77, 53, 8],
-        bss_type: fidl_internal::BssType::Infrastructure,
+        bss_type: fidl_common::BssType::Infrastructure,
         beacon_period: 100,
         channel: Channel::new(3, Cbw::Cbw40),
         rssi_dbm: 0,
@@ -304,7 +302,7 @@ pub fn build_random_bss_description_creator__(
     protection_cfg: FakeProtectionCfg,
 ) -> BssDescriptionCreator {
     // Only the Infrastructure BSS type is supported.
-    let bss_type = fidl_internal::BssType::Infrastructure;
+    let bss_type = fidl_common::BssType::Infrastructure;
 
     let mut rng = rand::thread_rng();
 
@@ -706,7 +704,7 @@ mod tests {
     // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn unsupported_bss_type() {
-        fake_fidl_bss_description!(Open, bss_type: fidl_internal::BssType::Personal);
+        fake_fidl_bss_description!(Open, bss_type: fidl_common::BssType::Personal);
     }
 
     #[test]
@@ -762,7 +760,7 @@ mod tests {
     fn some_random_bss_bits_are_fixed() {
         for _ in 0..5 {
             let random_bss = random_fidl_bss_description!(Open);
-            assert_eq!(random_bss.bss_type, fidl_internal::BssType::Infrastructure);
+            assert_eq!(random_bss.bss_type, fidl_common::BssType::Infrastructure);
             assert!(mac::CapabilityInfo(random_bss.capability_info).ess());
             assert!(!mac::CapabilityInfo(random_bss.capability_info).ibss());
             assert!(!mac::CapabilityInfo(random_bss.capability_info).privacy());

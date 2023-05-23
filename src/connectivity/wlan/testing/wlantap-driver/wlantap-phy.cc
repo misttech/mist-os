@@ -319,7 +319,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     }
   }
 
-  virtual void WlantapMacJoinBss(const wlan_internal::JoinBssRequest& config) override {
+  virtual void WlantapMacJoinBss(const wlan_common::JoinBssRequest& config) override {
     zxlogf(INFO, "%s: WlantapMacJoinBss", name_.c_str());
     std::lock_guard<std::mutex> guard(fidl_server_lock_);
     if (fidl_server_unbound_) {

@@ -5,9 +5,9 @@
 use {
     crate::{banjo_buffer_to_slice, banjo_list_to_slice, buffer::OutBuf, common::mac::WlanGi, key},
     banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
+    banjo_fuchsia_wlan_common::JoinBssRequest,
     banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxStatus},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
-    banjo_fuchsia_wlan_internal::JoinBssRequest,
     banjo_fuchsia_wlan_softmac::{
         self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacQueryResponse, WlanTxPacket,
     },
@@ -1276,8 +1276,7 @@ mod tests {
             zeroed_array_from_prefix,
         },
         banjo_fuchsia_wlan_ieee80211::*,
-        banjo_fuchsia_wlan_internal as banjo_internal, fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_async as fasync,
+        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
         ieee80211::Ssid,
         std::convert::TryFrom,
         wlan_common::assert_variant,
@@ -1728,7 +1727,7 @@ mod tests {
         fake_device
             .join_bss(JoinBssRequest {
                 bssid: [1, 2, 3, 4, 5, 6],
-                bss_type: banjo_internal::BssType::PERSONAL,
+                bss_type: banjo_common::BssType::PERSONAL,
                 remote: true,
                 beacon_period: 100,
             })
@@ -1808,7 +1807,7 @@ mod tests {
         fake_device
             .join_bss(JoinBssRequest {
                 bssid: [1, 2, 3, 4, 5, 6],
-                bss_type: banjo_internal::BssType::PERSONAL,
+                bss_type: banjo_common::BssType::PERSONAL,
                 remote: true,
                 beacon_period: 100,
             })

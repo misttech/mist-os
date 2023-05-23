@@ -4,7 +4,7 @@
 
 use {
     crate::{responder::Responder, MlmeRequest, MlmeSink},
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_mlme::{self as fidl_mlme, DeviceInfo, MlmeEvent},
     futures::channel::{mpsc, oneshot},
     std::mem,
@@ -171,7 +171,7 @@ fn validate_config(config: &Config) -> Result<(), JoinMeshResult> {
 fn create_start_request(config: &Config) -> fidl_mlme::StartRequest {
     fidl_mlme::StartRequest {
         ssid: vec![],
-        bss_type: fidl_internal::BssType::Mesh,
+        bss_type: fidl_common::BssType::Mesh,
         beacon_period: DEFAULT_BEACON_PERIOD,
         dtim_period: DEFAULT_DTIM_PERIOD,
         channel: config.channel,

@@ -47,7 +47,7 @@ fn convert_bss_description(
 ) -> BanjoReturnType<'_, banjo_wlan_internal::BssDescription> {
     BanjoReturnType::new(banjo_wlan_internal::BssDescription {
         bssid: bss.bssid,
-        bss_type: banjo_wlan_internal::BssType(bss.bss_type.into_primitive()),
+        bss_type: banjo_wlan_common::BssType(bss.bss_type.into_primitive()),
         beacon_period: bss.beacon_period,
         capability_info: bss.capability_info,
         ies_list: bss.ies.as_ptr(),
@@ -301,7 +301,7 @@ pub fn convert_start_request(
     let (rsne, rsne_len) = convert_rsne(&req.rsne);
     banjo_wlan_fullmac::WlanFullmacStartReq {
         ssid: convert_ssid(&req.ssid[..]),
-        bss_type: banjo_wlan_internal::BssType(req.bss_type.into_primitive()),
+        bss_type: banjo_wlan_common::BssType(req.bss_type.into_primitive()),
         beacon_period: req.beacon_period as u32,
         dtim_period: req.dtim_period as u32,
         channel: req.channel,

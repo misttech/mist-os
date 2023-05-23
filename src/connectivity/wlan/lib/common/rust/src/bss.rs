@@ -16,8 +16,8 @@ use {
         mac::CapabilityInfo,
     },
     anyhow::format_err,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
     ieee80211::{Bssid, Ssid},
     static_assertions::assert_eq_size,
     std::{
@@ -128,7 +128,7 @@ pub struct BssDescription {
     // *** Fields originally in fidl_internal::BssDescription
     pub ssid: Ssid,
     pub bssid: Bssid,
-    pub bss_type: fidl_internal::BssType,
+    pub bss_type: fidl_common::BssType,
     pub beacon_period: u16,
     pub capability_info: u16,
     pub channel: Channel,

@@ -863,7 +863,7 @@ fn create_start_request(
 
     Ok(fidl_mlme::StartRequest {
         ssid: ssid.to_vec(),
-        bss_type: fidl_internal::BssType::Infrastructure,
+        bss_type: fidl_common::BssType::Infrastructure,
         beacon_period: DEFAULT_BEACON_PERIOD,
         dtim_period: DEFAULT_DTIM_PERIOD,
         channel: op_radio_cfg.channel.primary,
@@ -1054,7 +1054,7 @@ mod tests {
                 start_req.capability_info,
                 mac::CapabilityInfo(0).with_short_preamble(true).with_ess(true).raw(),
             );
-            assert_eq!(start_req.bss_type, fidl_internal::BssType::Infrastructure);
+            assert_eq!(start_req.bss_type, fidl_common::BssType::Infrastructure);
             assert_ne!(start_req.beacon_period, 0);
             assert_eq!(start_req.dtim_period, DEFAULT_DTIM_PERIOD);
             assert_eq!(

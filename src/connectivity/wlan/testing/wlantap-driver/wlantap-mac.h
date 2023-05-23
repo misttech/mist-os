@@ -11,7 +11,6 @@
 
 namespace wlan_tap = fuchsia_wlan_tap::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
-namespace wlan_internal = fuchsia_wlan_internal::wire;
 namespace wlan_softmac = fuchsia_wlan_softmac::wire;
 
 namespace wlan {
@@ -26,7 +25,7 @@ class WlantapMac {
     virtual void WlantapMacStop() = 0;
     virtual void WlantapMacQueueTx(const wlan_softmac::WlanTxPacket& pkt) = 0;
     virtual void WlantapMacSetChannel(const wlan_common::WlanChannel& channel) = 0;
-    virtual void WlantapMacJoinBss(const wlan_internal::JoinBssRequest& join_request) = 0;
+    virtual void WlantapMacJoinBss(const wlan_common::JoinBssRequest& join_request) = 0;
     virtual void WlantapMacStartScan(uint64_t scan_id) = 0;
     virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfiguration& key_config) = 0;
   };

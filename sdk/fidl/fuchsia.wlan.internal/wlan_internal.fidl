@@ -6,27 +6,6 @@ library fuchsia.wlan.internal;
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
 
-type BssType = flexible enum : uint32 {
-    // The UNKNOWN value is added to this type instead of created a new
-    // enum like `DetectedBssType` so that language bindings can avoid the use
-    // of verbose constants like DETECTED_BSS_TYPE_INFRASTRUCTURE. The tradeoff
-    // is to handle UNKNOWN when specifying the BSS type of a new AP.
-    @unknown
-    UNKNOWN = 0;
-
-    INFRASTRUCTURE = 1;
-    INDEPENDENT = 2;
-    MESH = 3;
-    PERSONAL = 4;
-};
-
-type JoinBssRequest = table {
-    1: bssid ieee80211.MacAddr;
-    2: bss_type BssType;
-    3: remote bool;
-    4: beacon_period uint16; // in TU
-};
-
 // IEEE Std 802.11-2016, 9.4.1.4
 alias CapabilityInfo = uint16;
 
@@ -43,7 +22,7 @@ const MAX_ASSOC_BASIC_RATES uint8 = 14;
 type BssDescription = struct {
     bssid ieee80211.MacAddr;
 
-    bss_type BssType;
+    bss_type fuchsia.wlan.common.BssType;
     beacon_period uint16; // in TU
     capability_info CapabilityInfo;
 

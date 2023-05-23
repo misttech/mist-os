@@ -775,7 +775,7 @@ zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
   }
 
   zx_status_t status = ZX_OK;
-  fuchsia_wlan_internal::wire::JoinBssRequest fidl_bss_config;
+  fuchsia_wlan_common::wire::JoinBssRequest fidl_bss_config;
   if ((status = ConvertJoinBssRequest(*cfg, &fidl_bss_config, *arena)) != ZX_OK) {
     lerror("JoinBssRequest conversion failed: %s", zx_status_get_string(status));
     return status;

@@ -764,7 +764,7 @@ mod handle_mlme_request_tests {
         banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
         banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
-        banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_stats as fidl_stats,
+        fidl_fuchsia_wlan_stats as fidl_stats,
         std::pin::Pin,
         test_case::test_case,
         wlan_common::assert_variant,
@@ -847,7 +847,7 @@ mod handle_mlme_request_tests {
         let fidl_req = wlan_sme::MlmeRequest::Connect(fidl_mlme::ConnectRequest {
             selected_bss: fidl_internal::BssDescription {
                 bssid: [100u8; 6],
-                bss_type: fidl_internal::BssType::Infrastructure,
+                bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: 101,
                 capability_info: 102,
                 ies: vec![103u8, 104, 105],
@@ -884,11 +884,11 @@ mod handle_mlme_request_tests {
         );
         assert_variant!(driver_calls.next(), Some(DriverCall::ConnectReq { req, selected_bss_ies, sae_password, wep_key, security_ie }) => {
             assert_eq!(req.selected_bss.bssid, [100u8; 6]);
-            assert_eq!(req.selected_bss.bss_type, banjo_wlan_internal::BssType::INFRASTRUCTURE);
+            assert_eq!(req.selected_bss.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
             assert_eq!(req.selected_bss.beacon_period, 101);
             assert_eq!(req.selected_bss.capability_info, 102);
             assert_eq!(*selected_bss_ies, vec![103u8, 104, 105]);
-            assert_eq!(req.selected_bss.bss_type, banjo_wlan_internal::BssType::INFRASTRUCTURE);
+            assert_eq!(req.selected_bss.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
             assert_eq!(
                 req.selected_bss.channel,
                 banjo_wlan_common::WlanChannel {
@@ -1050,7 +1050,7 @@ mod handle_mlme_request_tests {
         const RSNE_LEN: usize = 15;
         let fidl_req = wlan_sme::MlmeRequest::Start(fidl_mlme::StartRequest {
             ssid: vec![1u8; SSID_LEN],
-            bss_type: fidl_internal::BssType::Infrastructure,
+            bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 3,
             dtim_period: 4,
             channel: 5,
@@ -1070,7 +1070,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::StartReq { req }) => req);
         assert_eq!(driver_req.ssid.len as usize, SSID_LEN);
         assert_eq!(driver_req.ssid.data[..SSID_LEN], [1u8; SSID_LEN][..]);
-        assert_eq!(driver_req.bss_type, banjo_wlan_internal::BssType::INFRASTRUCTURE);
+        assert_eq!(driver_req.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
         assert_eq!(driver_req.beacon_period, 3);
         assert_eq!(driver_req.dtim_period, 4);
         assert_eq!(driver_req.channel, 5);
@@ -1550,7 +1550,7 @@ mod handle_driver_event_tests {
         let ies = vec![3, 4, 5];
         let banjo_bss = banjo_wlan_internal::BssDescription {
             bssid: [9u8; 6],
-            bss_type: banjo_wlan_internal::BssType::INFRASTRUCTURE,
+            bss_type: banjo_wlan_common::BssType::INFRASTRUCTURE,
             beacon_period: 1,
             capability_info: 2,
             ies_list: ies.as_ptr(),
@@ -1566,7 +1566,7 @@ mod handle_driver_event_tests {
 
         let fidl_bss = fidl_internal::BssDescription {
             bssid: [9u8; 6],
-            bss_type: fidl_internal::BssType::Infrastructure,
+            bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 1,
             capability_info: 2,
             ies: ies.clone(),

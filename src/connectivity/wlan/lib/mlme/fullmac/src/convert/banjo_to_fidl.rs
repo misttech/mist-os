@@ -94,12 +94,12 @@ pub fn convert_bss_description(
     }
 }
 
-pub fn convert_bss_type(bss_type: banjo_wlan_internal::BssType) -> fidl_internal::BssType {
-    match fidl_internal::BssType::from_primitive(bss_type.0) {
+pub fn convert_bss_type(bss_type: banjo_wlan_common::BssType) -> fidl_common::BssType {
+    match fidl_common::BssType::from_primitive(bss_type.0) {
         Some(bss_type) => bss_type,
         None => {
             warn!("Invalid BSS type {}, defaulting to BssType::Unknown", bss_type.0);
-            fidl_internal::BssType::Unknown
+            fidl_common::BssType::Unknown
         }
     }
 }

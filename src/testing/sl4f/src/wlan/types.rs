@@ -155,7 +155,7 @@ impl From<WlanChannelDef> for fidl_common::WlanChannel {
     }
 }
 
-// Since fidl_internal::BssType is a flexible enum, the generated Rust enum is declared
+// Since fidl_common::BssType is a flexible enum, the generated Rust enum is declared
 // non-exhaustive, requiring a wildcard arm on all match expressions.
 //
 // However, deriving Serialize/Deserialize on a non-exhaustive enum generates code that have match
@@ -170,7 +170,7 @@ pub(crate) enum BssTypeDef {
     Unknown = 255,
 }
 
-impl From<BssTypeDef> for fidl_internal::BssType {
+impl From<BssTypeDef> for fidl_common::BssType {
     fn from(serde_type: BssTypeDef) -> Self {
         match serde_type {
             BssTypeDef::Infrastructure => Self::Infrastructure,
@@ -182,13 +182,13 @@ impl From<BssTypeDef> for fidl_internal::BssType {
     }
 }
 
-impl From<fidl_internal::BssType> for BssTypeDef {
-    fn from(fidl_type: fidl_internal::BssType) -> Self {
+impl From<fidl_common::BssType> for BssTypeDef {
+    fn from(fidl_type: fidl_common::BssType) -> Self {
         match fidl_type {
-            fidl_internal::BssType::Infrastructure => Self::Infrastructure,
-            fidl_internal::BssType::Personal => Self::Personal,
-            fidl_internal::BssType::Independent => Self::Independent,
-            fidl_internal::BssType::Mesh => Self::Mesh,
+            fidl_common::BssType::Infrastructure => Self::Infrastructure,
+            fidl_common::BssType::Personal => Self::Personal,
+            fidl_common::BssType::Independent => Self::Independent,
+            fidl_common::BssType::Mesh => Self::Mesh,
             _ => Self::Unknown,
         }
     }

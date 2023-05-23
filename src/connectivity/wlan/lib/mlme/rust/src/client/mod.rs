@@ -21,8 +21,7 @@ use {
         logger,
     },
     anyhow::{self, format_err},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_internal as banjo_internal,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
+    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -424,9 +423,9 @@ impl<D: DeviceOps> ClientMlme<D> {
         self.set_main_channel(channel)
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
-        let bss_config = banjo_internal::JoinBssRequest {
+        let bss_config = banjo_common::JoinBssRequest {
             bssid: bss.bssid.0,
-            bss_type: banjo_internal::BssType::INFRASTRUCTURE,
+            bss_type: banjo_common::BssType::INFRASTRUCTURE,
             remote: true,
             beacon_period: bss.beacon_period,
         };

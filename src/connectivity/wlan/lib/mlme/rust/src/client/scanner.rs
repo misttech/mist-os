@@ -540,7 +540,7 @@ mod tests {
         static ref BSS_DESCRIPTION_FOO: fidl_internal::BssDescription =
             fidl_internal::BssDescription {
                 bssid: BSSID_FOO.0,
-                bss_type: fidl_internal::BssType::Infrastructure,
+                bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL_FOO,
                 capability_info: CAPABILITY_INFO_FOO.0,
                 ies: BEACON_IES_FOO.to_vec(),
@@ -575,7 +575,7 @@ mod tests {
         static ref BSS_DESCRIPTION_BAR: fidl_internal::BssDescription =
             fidl_internal::BssDescription {
                 bssid: BSSID_BAR.0,
-                bss_type: fidl_internal::BssType::Infrastructure,
+                bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL_BAR,
                 capability_info: CAPABILITY_INFO_BAR.0,
                 ies: BEACON_IES_BAR.to_vec(),

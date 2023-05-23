@@ -420,7 +420,7 @@ zx_status_t mac_set_channel(struct iwl_mvm_vif* mvmvif, const wlan_channel_t* ch
 
 // This is called after mac_set_channel(). The MAC (mvmvif) will be configured as a CLIENT role.
 zx_status_t mac_join_bss(struct iwl_mvm_vif* mvmvif,
-                         const fuchsia_wlan_internal::wire::JoinBssRequest* config) {
+                         const wlan_common_wire::JoinBssRequest* config) {
   zx_status_t ret = ZX_OK;
 
   // Ensure all table fields being accessed are available before proceeding.
@@ -438,7 +438,7 @@ zx_status_t mac_join_bss(struct iwl_mvm_vif* mvmvif,
            FMT_SSID_BYTES(config->bssid().data(), sizeof(config->bssid())),
            static_cast<uint32_t>(config->bss_type()), config->remote(), config->beacon_period());
 
-  if (config->bss_type() != fuchsia_wlan_internal::BssType::kInfrastructure) {
+  if (config->bss_type() != wlan_common_wire::BssType::kInfrastructure) {
     IWL_ERR(mvmvif, "invalid bss_type requested: %d\n", static_cast<uint32_t>(config->bss_type()));
     return ZX_ERR_INVALID_ARGS;
   }

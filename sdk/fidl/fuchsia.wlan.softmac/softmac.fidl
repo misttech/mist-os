@@ -5,7 +5,6 @@ library fuchsia.wlan.softmac;
 
 using fuchsia.hardware.wlan.associnfo;
 using fuchsia.wlan.common;
-using fuchsia.wlan.internal;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
@@ -482,7 +481,7 @@ protocol WlanSoftmac {
     /// Common errors include: \
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given bss config.
     JoinBss(struct {
-        join_request fuchsia.wlan.internal.JoinBssRequest;
+        join_request fuchsia.wlan.common.JoinBssRequest;
     }) -> () error zx.Status;
 
     /// Enables hardware Beaconing. This API cannot be invoked while beaconing is active.

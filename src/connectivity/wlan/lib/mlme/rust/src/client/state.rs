@@ -1405,8 +1405,8 @@ mod tests {
             test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo},
         },
         akm::AkmAlgorithm,
-        banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_internal as banjo_internal,
-        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
+        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         ieee80211::Bssid,
         std::sync::{Arc, Mutex},
         test_case::test_case,
@@ -1465,9 +1465,9 @@ mod tests {
                 .set_channel(fake_wlan_channel().into())
                 .expect("fake device is obedient");
             self.fake_device
-                .join_bss(banjo_internal::JoinBssRequest {
+                .join_bss(banjo_common::JoinBssRequest {
                     bssid: [1, 2, 3, 4, 5, 6],
-                    bss_type: banjo_internal::BssType::PERSONAL,
+                    bss_type: banjo_common::BssType::PERSONAL,
                     remote: true,
                     beacon_period: 100,
                 })

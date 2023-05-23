@@ -19,7 +19,6 @@ namespace {
 namespace wlan_softmac = fuchsia_wlan_softmac::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
 namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
-namespace wlan_internal = fuchsia_wlan_internal::wire;
 namespace wlan_associnfo = fuchsia_hardware_wlan_associnfo::wire;
 
 /* Metadata which is used as input and expected output for the under-test conversion functions*/
@@ -60,7 +59,7 @@ static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
 static constexpr wlan_softmac::WlanProtection kFakeFidlProtection =
     wlan_softmac::WlanProtection::kRxTx;
 static constexpr wlan_associnfo::WlanKeyType kFakeFidlKeyType = wlan_associnfo::WlanKeyType::kGroup;
-static constexpr wlan_internal::BssType kFakeFidlBssType = wlan_internal::BssType::kMesh;
+static constexpr wlan_common::BssType kFakeFidlBssType = wlan_common::BssType::kMesh;
 static constexpr wlan_common::WlanTxResult kFakeFidlTxResult = wlan_common::WlanTxResult::kSuccess;
 static constexpr wlan_common::DataPlaneType kFakeFidlDataPlaneType =
     wlan_common::DataPlaneType::kEthernetDevice;
@@ -441,7 +440,7 @@ TEST_F(ConvertTest, ToFidlJoinBssRequest) {
   }
 
   // Conduct conversion
-  wlan_internal::JoinBssRequest out;
+  wlan_common::JoinBssRequest out;
   fidl::Arena fidl_arena;
   EXPECT_EQ(ZX_OK, ConvertJoinBssRequest(in, &out, fidl_arena));
 

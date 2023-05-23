@@ -308,7 +308,7 @@ type Country = struct {
 
 type StartRequest = struct {
     ssid ieee80211.Ssid;
-    bss_type internal.BssType;
+    bss_type fuchsia.wlan.common.BssType;
     beacon_period uint16; // in TU
     dtim_period uint8;
 

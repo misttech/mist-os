@@ -15,8 +15,8 @@ use {
         logger,
     },
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
     std::fmt,
     tracing::{debug, error, info, trace, warn},
@@ -227,7 +227,7 @@ impl<D: DeviceOps> Ap<D> {
             return Ok(());
         }
 
-        if req.bss_type != fidl_internal::BssType::Infrastructure {
+        if req.bss_type != fidl_common::BssType::Infrastructure {
             info!("MLME-START.request: BSS type {:?} not supported", req.bss_type);
             self.ctx.send_mlme_start_conf(fidl_mlme::StartResultCode::NotSupported)?;
             return Ok(());
@@ -901,7 +901,7 @@ mod tests {
         let (mut ap, fake_device_state, _) = make_ap(&exec);
         ap.handle_mlme_start_req(fidl_mlme::StartRequest {
             ssid: Ssid::try_from("coolnet").unwrap().into(),
-            bss_type: fidl_internal::BssType::Infrastructure,
+            bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 5,
             dtim_period: 1,
             channel: 2,
@@ -957,7 +957,7 @@ mod tests {
 
         ap.handle_mlme_start_req(fidl_mlme::StartRequest {
             ssid: Ssid::try_from("coolnet").unwrap().into(),
-            bss_type: fidl_internal::BssType::Infrastructure,
+            bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 5,
             dtim_period: 1,
             channel: 2,

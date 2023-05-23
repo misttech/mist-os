@@ -53,8 +53,8 @@ constexpr size_t kNonDefaultBeaconPeriod = 123;
 constexpr size_t kWlanSoftmacBandCapabilityBufferSize =
     fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability,
                            fidl::MessageDirection::kReceiving>();
-constexpr fuchsia_wlan_internal::BssType kDefaultBssType =
-    fuchsia_wlan_internal::wire::BssType::kInfrastructure;
+constexpr fuchsia_wlan_common::wire::BssType kDefaultBssType =
+    fuchsia_wlan_common::wire::BssType::kInfrastructure;
 
 class WlanSoftmacDeviceTest : public SingleApTest,
                               public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
@@ -555,9 +555,9 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
   }
 
   zx_status_t JoinBssRequest(uint16_t beacon_period = kDefaultBeaconPeriod,
-                             fuchsia_wlan_internal::BssType bss_type = kDefaultBssType) {
+                             fuchsia_wlan_common::wire::BssType bss_type = kDefaultBssType) {
     fidl::Arena fidl_arena;
-    auto builder = fuchsia_wlan_internal::wire::JoinBssRequest::Builder(fidl_arena);
+    auto builder = fuchsia_wlan_common::wire::JoinBssRequest::Builder(fidl_arena);
     builder.bssid(kBssid);
     builder.bss_type(bss_type);
     builder.remote(true);
@@ -945,15 +945,13 @@ TEST_F(MacInterfaceTest, DuplicateJoinBss) {
 // Test unsupported bss_type.
 //
 TEST_F(MacInterfaceTest, UnsupportedBssType) {
-  ASSERT_EQ(
-      ZX_ERR_INVALID_ARGS,
-      JoinBssRequest(kDefaultBeaconPeriod, fuchsia_wlan_internal::wire::BssType::kIndependent));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            JoinBssRequest(kDefaultBeaconPeriod, fuchsia_wlan_common::wire::BssType::kIndependent));
 }
 
 TEST_F(MacInterfaceTest, UnsupportedBeaconPeriod) {
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
-            JoinBssRequest(IWL_MIN_BEACON_PERIOD_TU - 1,
-                           fuchsia_wlan_internal::wire::BssType::kIndependent));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, JoinBssRequest(IWL_MIN_BEACON_PERIOD_TU - 1,
+                                                fuchsia_wlan_common::wire::BssType::kIndependent));
 }
 
 // Test failed ADD_STA command.

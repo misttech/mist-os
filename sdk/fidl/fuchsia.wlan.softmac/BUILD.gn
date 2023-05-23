@@ -14,7 +14,6 @@ fidl("fuchsia.wlan.softmac") {
     "//sdk/banjo/fuchsia.hardware.wlan.associnfo",
     "//sdk/fidl/fuchsia.wlan.common",
     "//sdk/fidl/fuchsia.wlan.ieee80211",
-    "//sdk/fidl/fuchsia.wlan.internal",
     "//zircon/vdso/zx",
   ]
   contains_drivers = true

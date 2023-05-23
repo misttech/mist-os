@@ -4,7 +4,8 @@
 
 use {
     anyhow::Error,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_internal as fidl_internal,
+    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_internal as fidl_internal,
     ieee80211::Bssid,
     wlan_common::{channel::derive_channel, ie, mac::CapabilityInfo, TimeUnit},
 };
@@ -56,12 +57,12 @@ pub fn construct_bss_description(
 
 /// Note: This is in Beacon / Probe Response frames context.
 /// IEEE Std 802.11-2016, 9.4.1.4
-fn get_bss_type(capability_info: CapabilityInfo) -> fidl_internal::BssType {
+fn get_bss_type(capability_info: CapabilityInfo) -> fidl_common::BssType {
     match (capability_info.ess(), capability_info.ibss()) {
-        (true, false) => fidl_internal::BssType::Infrastructure,
-        (false, true) => fidl_internal::BssType::Independent,
-        (false, false) => fidl_internal::BssType::Mesh,
-        _ => fidl_internal::BssType::Unknown,
+        (true, false) => fidl_common::BssType::Infrastructure,
+        (false, true) => fidl_common::BssType::Independent,
+        (false, false) => fidl_common::BssType::Mesh,
+        _ => fidl_common::BssType::Unknown,
     }
 }
 
@@ -176,7 +177,7 @@ mod tests {
             bss_description,
             fidl_internal::BssDescription {
                 bssid: BSSID.0,
-                bss_type: fidl_internal::BssType::Infrastructure,
+                bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL,
                 capability_info: CAPABILITY_INFO.0,
                 ies,

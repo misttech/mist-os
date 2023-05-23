@@ -30,7 +30,7 @@ wlan_internal::BssDescription CreateBssDescription(wlan_channel_t channel) {
   wlan_internal::BssDescription bss_desc;
   std::memcpy(bss_desc.bssid.data(), bssid.byte, wlan::common::kMacAddrLen);
   std::vector<uint8_t> ssid(kSsid, kSsid + sizeof(kSsid));
-  bss_desc.bss_type = wlan_internal::BssType::INFRASTRUCTURE;
+  bss_desc.bss_type = wlan_common::BssType::INFRASTRUCTURE;
   bss_desc.beacon_period = kBeaconPeriodTu;
   bss_desc.capability_info = 1 | 1 << 5;  // ESS and short preamble bits
   bss_desc.ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));
@@ -46,7 +46,7 @@ wlan_mlme::StartRequest CreateStartReq() {
   wlan_mlme::StartRequest req;
   std::vector<uint8_t> ssid(kSsid, kSsid + sizeof(kSsid));
   req.ssid = std::move(ssid);
-  req.bss_type = wlan_internal::BssType::INFRASTRUCTURE;
+  req.bss_type = wlan_common::BssType::INFRASTRUCTURE;
   req.beacon_period = kBeaconPeriodTu;
   req.dtim_period = kDtimPeriodTu;
   req.channel = kBssChannel.primary;
