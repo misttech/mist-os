@@ -48,11 +48,18 @@ pub struct ImageFile {
 
 impl ImageFile {
     pub fn new_file(current_task: &CurrentTask, info: ImageInfo, vmo: zx::Vmo) -> FileHandle {
-        Anon::new_file(
+        let vmo_size = vmo.get_size().unwrap();
+
+        let file = Anon::new_file(
             current_task,
             Box::new(ImageFile { info, vmo: Arc::new(vmo) }),
             OpenFlags::RDWR,
-        )
+        );
+
+        // Enable seek for file size discovery.
+        file.node().info_write().size = vmo_size as usize;
+
+        file
     }
 }
 
