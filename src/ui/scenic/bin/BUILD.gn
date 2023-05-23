@@ -19,6 +19,7 @@ executable("bin") {
     "//src/lib/async-watchdog",
     "//src/ui/lib/display:hdcp_client",
     "//src/ui/lib/display:hdcp_service",
+    "//src/ui/scenic:scenic_structured_config",
     "//src/ui/scenic/lib/annotation:annotation_registry",
     "//src/ui/scenic/lib/display",
     "//src/ui/scenic/lib/display:singleton_display_service",

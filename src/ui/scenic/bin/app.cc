@@ -28,6 +28,7 @@
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/metrics_impl.h"
 #include "src/ui/scenic/lib/view_tree/snapshot_dump.h"
+#include "src/ui/scenic/scenic_structured_config.h"
 
 namespace {
 
@@ -55,6 +56,28 @@ struct ConfigValue {
 // Populates a ConfigValues struct by reading a config file.
 scenic_impl::ConfigValues GetConfig() {
   scenic_impl::ConfigValues values;
+
+  // Retrieve structured configuration
+  auto structured_config = scenic_structured_config::Config::TakeFromStartupHandle();
+  values.min_predicted_frame_duration =
+      zx::msec(structured_config.frame_scheduler_min_predicted_frame_duration_in_us());
+  values.i_can_haz_flatland = structured_config.i_can_haz_flatland();
+  values.enable_allocator_for_flatland = structured_config.enable_allocator_for_flatland();
+  values.pointer_auto_focus_on = structured_config.pointer_auto_focus();
+  values.flatland_enable_display_composition =
+      structured_config.flatland_enable_display_composition();
+
+  if (structured_config.i_can_haz_display_id() < 0) {
+    values.i_can_haz_display_id = std::nullopt;
+  } else {
+    values.i_can_haz_display_id = structured_config.i_can_haz_display_id();
+  }
+
+  if (structured_config.i_can_haz_display_mode() < 0) {
+    values.i_can_haz_display_mode = std::nullopt;
+  } else {
+    values.i_can_haz_display_mode = structured_config.i_can_haz_display_mode();
+  }
 
   using GetValueCallback = std::function<void(const std::string&, ConfigValue&)>;
   std::unordered_map<std::string, GetValueCallback> config{

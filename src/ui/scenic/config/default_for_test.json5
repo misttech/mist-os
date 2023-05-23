@@ -1,0 +1,9 @@
+{
+    frame_scheduler_min_predicted_frame_duration_in_us: 0,
+    i_can_haz_flatland: true,
+    enable_allocator_for_flatland: true,
+    pointer_auto_focus: true,
+    flatland_enable_display_composition: false,
+    i_can_haz_display_id: -1,
+    i_can_haz_display_mode: -1,
+}

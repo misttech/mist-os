@@ -301,9 +301,18 @@ fuchsia_unittest_package("view_tree_unittests") {
   deps = [ "lib/view_tree/tests:view_tree_test_bin" ]
 }
 
-fuchsia_component("component_v2") {
+fuchsia_component_manifest("scenic_manifest") {
   component_name = "scenic"
   manifest = "bin/meta/scenic.cml"
+}
+
+fuchsia_component_manifest("scenic_with_supplied_display_provider_manifest") {
+  component_name = "scenic"
+  manifest = "bin/meta/scenic_with_supplied_display_provider.cml"
+}
+
+fuchsia_component("component_v2") {
+  cm_label = ":scenic_manifest"
   deps = [ "bin" ]
 
   if (escher_use_runtime_glsl) {
@@ -321,8 +330,7 @@ fuchsia_component("component_v2") {
 # capability. This should be used in test environments where a fake hardware
 # display controller provider is provided.
 fuchsia_component("component_v2_with_supplied_display_provider") {
-  component_name = "scenic"
-  manifest = "bin/meta/scenic_with_supplied_display_provider.cml"
+  cm_label = ":scenic_with_supplied_display_provider_manifest"
   deps = [ "bin" ]
 
   if (escher_use_runtime_glsl) {
@@ -336,9 +344,36 @@ fuchsia_component("component_v2_with_supplied_display_provider") {
   }
 }
 
+fuchsia_structured_config_cpp_elf_lib("scenic_structured_config") {
+  cm_label = ":scenic_manifest"
+}
+
+fuchsia_structured_config_values("config_for_test") {
+  cm_label = ":scenic_manifest"
+  values_source = "config/default_for_test.json5"
+}
+
+fuchsia_structured_config_values(
+    "config_with_supplied_display_provider_for_test") {
+  cm_label = ":scenic_with_supplied_display_provider_manifest"
+  values_source = "config/default_for_test.json5"
+}
+
 fuchsia_package("scenic_pkg") {
   package_name = "scenic"
-  deps = [ ":component_v2" ]
+  deps = [
+    ":component_v2",
+    ":config_for_test",
+  ]
+}
+
+# TODO(fxbug.dev/106573): Remove test-only target when
+# default config values are available.
+group("component_v2_with_supplied_display_provider_for_test") {
+  deps = [
+    ":component_v2_with_supplied_display_provider",
+    ":config_with_supplied_display_provider_for_test",
+  ]
 }
 
 group("frame-scheduler-min-predicted-frame-duration-in-us--15000") {
