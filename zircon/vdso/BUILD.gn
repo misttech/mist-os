@@ -85,6 +85,8 @@ fidl("zx") {
   experimental_flags = [ "zx_c_types" ]
 
   enable_zither = true
+  enable_cpp = false
+  enable_rust = false
 
   zither = {
     asm = {
