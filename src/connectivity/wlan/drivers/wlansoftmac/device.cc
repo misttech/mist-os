@@ -977,9 +977,12 @@ zx_status_t Device::ClearAssociation(const uint8_t peer_addr[fuchsia_wlan_ieee80
     return ZX_ERR_INTERNAL;
   }
 
+  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacClearAssociationRequest::Builder(*arena);
   fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> fidl_peer_addr;
   memcpy(fidl_peer_addr.begin(), peer_addr, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  auto result = client_.sync().buffer(*std::move(arena))->ClearAssociation(fidl_peer_addr);
+  builder.peer_addr(fidl_peer_addr);
+
+  auto result = client_.sync().buffer(*std::move(arena))->ClearAssociation(builder.Build());
   if (!result.ok()) {
     errorf("ClearAssoc failed (FIDL error %s)", result.status_string());
     return result.status();

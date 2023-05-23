@@ -487,8 +487,8 @@ protocol WlanSoftmac {
     InstallKey(WlanKeyConfiguration) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
-    ClearAssociation(struct {
-        peer_addr ieee80211.MacAddr;
+    ClearAssociation(table {
+        1: peer_addr ieee80211.MacAddr;
     }) -> () error zx.Status;
 
     /// Start a passive scan in the device driver. Scan results will be delivered

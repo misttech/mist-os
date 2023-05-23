@@ -377,6 +377,12 @@ void WlanSoftmacDevice::ClearAssociation(ClearAssociationRequestView request, fd
                                          ClearAssociationCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
 
+  if (!request->has_peer_addr()) {
+    IWL_ERR(this, "Request does not contain peer address.");
+    completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
   if (ap_mvm_sta_ == nullptr) {
     IWL_ERR(this, "Ap sta does not exist.");
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
@@ -389,7 +395,7 @@ void WlanSoftmacDevice::ClearAssociation(ClearAssociationRequestView request, fd
   mvmvif_->bss_conf.assoc = false;
   ap_mvm_sta_.reset();
 
-  if ((status = mac_clear_association(mvmvif_, request->peer_addr.data())) != ZX_OK) {
+  if ((status = mac_clear_association(mvmvif_, request->peer_addr().data())) != ZX_OK) {
     IWL_ERR(this, "failed clear assoc: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;

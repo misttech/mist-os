@@ -637,8 +637,12 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
 
   zx_status_t ClearAssociation() {
     // Not used since all info were saved in mvmvif_sta_ already.
+    fidl::Arena fidl_arena;
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacClearAssociationRequest::Builder(fidl_arena);
     fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> fidl_peer_addr;
-    auto result = client_.buffer(test_arena_)->ClearAssociation(fidl_peer_addr);
+    builder.peer_addr(fidl_peer_addr);
+    auto result = client_.buffer(test_arena_)->ClearAssociation(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
