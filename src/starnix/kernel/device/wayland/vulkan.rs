@@ -12,6 +12,13 @@ use fuchsia_zircon::AsHandleRef;
 use std::mem;
 use vk_sys as vk;
 
+/// Creates a `CStr` from the provided `bytes`.
+macro_rules! cstr {
+    ( $bytes:expr ) => {
+        ::std::ffi::CStr::from_bytes_with_nul($bytes).expect("CStr must end with '\\0'")
+    };
+}
+
 /// `BufferCollectionTokens` contains all the buffer collection tokens required to initialize a
 /// `Loader`.
 ///
@@ -140,12 +147,7 @@ impl Loader {
             pQueuePriorities: &0.0,
         };
 
-        let extension_name: Vec<u8> = b"VK_FUCHSIA_buffer_collection".to_vec();
-        let device_extensions = vec![extension_name.as_ptr()];
-        #[cfg(target_arch = "x86_64")]
-        let device_ptr = device_extensions.as_ptr() as *const *const i8;
-        #[cfg(not(target_arch = "x86_64"))]
-        let device_ptr = device_extensions.as_ptr() as *const *const u8;
+        let extension_names = vec![cstr!(b"VK_FUCHSIA_buffer_collection\0").as_ptr()];
 
         let device_create_info = vk::DeviceCreateInfo {
             sType: vk::STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -155,8 +157,8 @@ impl Loader {
             pQueueCreateInfos: &queue_create_info as *const vk::DeviceQueueCreateInfo,
             enabledLayerCount: 0,
             ppEnabledLayerNames: std::ptr::null(),
-            enabledExtensionCount: device_extensions.len() as u32,
-            ppEnabledExtensionNames: device_ptr,
+            enabledExtensionCount: extension_names.len() as u32,
+            ppEnabledExtensionNames: extension_names.as_ptr(),
             pEnabledFeatures: std::ptr::null(),
         };
 
@@ -315,13 +317,6 @@ impl Loader {
 macro_rules! vulkan_version {
     ( $major:expr, $minor:expr, $patch:expr ) => {
         ($major as u32) << 22 | ($minor as u32) << 12 | ($patch as u32)
-    };
-}
-
-/// Creates a `CStr` from the provided `bytes`.
-macro_rules! cstr {
-    ( $bytes:expr ) => {
-        ::std::ffi::CStr::from_bytes_with_nul($bytes).expect("CStr must end with '\\0'")
     };
 }
 
