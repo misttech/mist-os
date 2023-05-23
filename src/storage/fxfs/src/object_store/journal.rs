@@ -241,13 +241,13 @@ impl Inner {
     fn terminate(&mut self, reason: Option<Error>) {
         self.terminate = true;
 
-        if let Some(e) = reason {
-            error!(error = e.as_value(), "Terminating journal with error");
+        if let Some(err) = reason {
+            error!(error = ?err, "Terminating journal");
             // Log previous error if one was already set, otherwise latch the error.
-            if let Some(e) = self.terminate_reason.as_ref() {
-                error!(error = e.as_value(), "Journal previously terminated with error");
+            if let Some(prev_err) = self.terminate_reason.as_ref() {
+                error!(error = ?prev_err, "Journal previously terminated");
             } else {
-                self.terminate_reason = Some(e);
+                self.terminate_reason = Some(err);
             }
         }
 
@@ -1229,7 +1229,7 @@ impl Journal {
                 let context = inner
                     .terminate_reason
                     .as_ref()
-                    .map(|e| format!("Journal closed with error: {}", e.as_value()))
+                    .map(|e| format!("Journal closed with error: {:?}", e))
                     .unwrap_or("Journal closed".to_string());
                 Poll::Ready(Err(anyhow!(FxfsError::JournalFlushError).context(context)))
             } else {
@@ -1289,7 +1289,7 @@ impl Journal {
                     let context = inner
                         .terminate_reason
                         .as_ref()
-                        .map(|e| format!("Journal closed with error: {}", e.as_value()))
+                        .map(|e| format!("Journal closed with error: {:?}", e))
                         .unwrap_or("Journal closed".to_string());
                     break Err(anyhow!(FxfsError::JournalFlushError).context(context));
                 }
