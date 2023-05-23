@@ -28,14 +28,18 @@ void TargetAdapterClient::Configure(const OptionsPtr& options) {
 Promise<std::vector<std::string>> TargetAdapterClient::GetParameters() {
   Bridge<std::vector<std::string>> bridge;
   return fpromise::make_promise(
-             [this, completer = std::move(bridge.completer)]() mutable -> Result<> {
+             [this, completer = std::move(bridge.completer)]() mutable -> ZxResult<> {
                if (!ptr_.is_bound()) {
                  handler_(ptr_.NewRequest(executor_->dispatcher()));
                }
                ptr_->GetParameters(completer.bind());
                return fpromise::ok();
              })
-      .and_then(bridge.consumer.promise_or(fpromise::error()))
+      .and_then(ConsumeBridge(bridge))
+      .or_else([](const zx_status_t& status) -> Result<std::vector<std::string>> {
+        FX_LOGS(ERROR) << "Failed to get parameters: " << zx_status_get_string(status);
+        return fpromise::error();
+      })
       .wrap_with(scope_);
 }
 
@@ -60,26 +64,14 @@ Promise<> TargetAdapterClient::TestOneInput(const Input& test_input) {
                ptr_->Connect(eventpair_.Create(), std::move(test_input), completer.bind());
                return fpromise::ok();
              })
-      .and_then([consumer = std::move(bridge.consumer),
-                 fut = Future<>()](Context& context) mutable -> ZxResult<> {
-        if (!fut) {
-          fut = consumer.promise_or(fpromise::error());
-        }
-        if (!fut(context)) {
-          return fpromise::pending();
-        }
-        if (fut.is_error()) {
-          return fpromise::error(ZX_ERR_CANCELED);
-        }
-        return fpromise::ok();
-      })
+      .and_then(ConsumeBridge(bridge))
       .and_then([this]() -> ZxResult<> { return AsZxResult(eventpair_.SignalSelf(kFinish, 0)); })
       .and_then([this]() -> ZxResult<> { return AsZxResult(eventpair_.SignalPeer(0, kStart)); })
       .and_then(eventpair_.WaitFor(kFinish))
       .and_then([](const zx_signals_t& observed) -> ZxResult<> { return fpromise::ok(); })
       .or_else([](const zx_status_t& status) -> Result<> {
         if (status != ZX_ERR_PEER_CLOSED) {
-          FX_LOGS(ERROR) << "Target adapter returned error: " << zx_status_get_string(status);
+          FX_LOGS(ERROR) << "Failed to test one input: " << zx_status_get_string(status);
           return fpromise::error();
         }
         return fpromise::ok();

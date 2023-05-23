@@ -53,7 +53,7 @@ ZxPromise<ControllerPtr> EngineIntegrationTest::Start() {
          })
       .and_then([this]() { return AsZxResult(engine_->Spawn()); })
       .and_then(registrar_->TakeProvider())
-      .and_then([this, controller = ControllerPtr(), fut = Future<>()](
+      .and_then([this, controller = ControllerPtr(), fut = ZxFuture<>()](
                     Context& context,
                     ControllerProviderHandle& handle) mutable -> ZxResult<ControllerPtr> {
         if (!fut) {
@@ -61,13 +61,13 @@ ZxPromise<ControllerPtr> EngineIntegrationTest::Start() {
           provider_ = handle.Bind();
           Bridge<> bridge;
           provider_->Connect(std::move(request), bridge.completer.bind());
-          fut = bridge.consumer.promise_or(fpromise::error());
+          fut = ConsumeBridge(bridge);
         }
         if (!fut(context)) {
           return fpromise::pending();
         }
         if (fut.is_error()) {
-          return fpromise::error(ZX_ERR_CANCELED);
+          return fpromise::error(fut.error());
         }
         return fpromise::ok(std::move(controller));
       })
@@ -94,7 +94,7 @@ void EngineIntegrationTest::Crash() {
   Input input("FUZZ");
   ZxBridge<> bridge1;
   controller->TryOne(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual.fuzz_result(), FuzzResult::CRASH);
@@ -102,7 +102,7 @@ void EngineIntegrationTest::Crash() {
   Bridge<Status> bridge2;
   controller->GetStatus(bridge2.completer.bind());
   Status status;
-  FUZZING_EXPECT_OK(bridge2.consumer.promise(), &status);
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2), &status);
   RunUntilIdle();
   EXPECT_TRUE(status.has_elapsed());
 }

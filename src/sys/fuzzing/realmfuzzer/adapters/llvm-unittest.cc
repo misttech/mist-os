@@ -49,7 +49,7 @@ TEST_F(LLVMTargetAdapterTest, GetParameters) {
 
   Bridge<std::vector<std::string>> bridge;
   ptr->GetParameters(bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()), parameters);
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge), parameters);
   RunUntilIdle();
 }
 
@@ -66,7 +66,7 @@ TEST_F(LLVMTargetAdapterTest, Connect) {
   zx::vmo vmo;
   EXPECT_EQ(test_input.Share(&vmo), ZX_OK);
   ptr->Connect(eventpair.Create(), std::move(vmo), bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge));
   RunUntilIdle();
 }
 
@@ -89,9 +89,9 @@ TEST_F(LLVMTargetAdapterTest, Run) {
   zx::vmo vmo;
   EXPECT_EQ(test_input.Share(&vmo), ZX_OK);
   ptr->Connect(eventpair.Create(), std::move(vmo), bridge.completer.bind());
-  auto task = bridge.consumer.promise_or(fpromise::error())
+  auto task = ConsumeBridge(bridge)
                   .and_then([&, run = 0U, finish = ZxFuture<zx_signals_t>()](
-                                Context& context) mutable -> Result<> {
+                                Context& context) mutable -> ZxResult<> {
                     // ...perform 3 runs...
                     while (run < strings.size()) {
                       auto& s = strings[run];

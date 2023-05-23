@@ -90,7 +90,7 @@ class LibFuzzerRunnerTest : public RunnerTest {
     // simply wait again on the already active signal.
     return eventpair_->WaitFor(kStart)
         .and_then([](const zx_signals_t& observed) -> ZxResult<> { return fpromise::ok(); })
-        .or_else([this, relay = RelayPtr(), connect = Future<>()](
+        .or_else([this, relay = RelayPtr(), connect = ZxFuture<>()](
                      Context& context, const zx_status_t& status) mutable -> ZxResult<> {
           if (!connect) {
             // Connect to the fuzzer via the relay.
@@ -108,13 +108,13 @@ class LibFuzzerRunnerTest : public RunnerTest {
             }
             Bridge<> bridge;
             relay->SetTestData(std::move(data), bridge.completer.bind());
-            connect = bridge.consumer.promise_or(fpromise::error());
+            connect = ConsumeBridge(bridge);
           }
           if (!connect(context)) {
             return fpromise::pending();
           }
           if (connect.is_error()) {
-            return fpromise::error(ZX_ERR_PEER_CLOSED);
+            return fpromise::error(connect.error());
           }
           // At this point, the test should be connected to the fuzzer. Wait for a run to start.
           return fpromise::ok();

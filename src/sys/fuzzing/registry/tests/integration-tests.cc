@@ -62,14 +62,14 @@ class RegistryIntegrationTest : public AsyncTest {
     ZxBridge<> bridge;
     registry_->Connect(kFuzzerUrl, controller->NewRequest(), timeout.get(),
                        ZxBind<>(std::move(bridge.completer)));
-    return bridge.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED));
+    return ConsumeBridge(bridge);
   }
 
   // Promises to stop a fuzzer if running.
   ZxPromise<> Disconnect() {
     ZxBridge<> bridge;
     registry_->Disconnect(kFuzzerUrl, ZxBind<>(std::move(bridge.completer)));
-    return bridge.consumer.promise()
+    return ConsumeBridge(bridge)
         .and_then(process_->Wait())
         .and_then([](const int64_t& ignored) -> ZxResult<> { return fpromise::ok(); });
   }
@@ -98,7 +98,7 @@ TEST_F(RegistryIntegrationTest, RegisterThenConnect) {
   // Verify connected.
   Bridge<Options> bridge;
   controller->GetOptions(bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge));
   RunUntilIdle();
   FUZZING_EXPECT_OK(Disconnect());
   RunUntilIdle();
@@ -114,7 +114,7 @@ TEST_F(RegistryIntegrationTest, ConnectThenRegister) {
   // Verify connected.
   Bridge<Options> bridge;
   controller->GetOptions(bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge));
   RunUntilIdle();
 
   FUZZING_EXPECT_OK(Disconnect());

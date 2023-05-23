@@ -24,6 +24,8 @@ source_set("common") {
     "async-eventpair.h",
     "async-socket.cc",
     "async-socket.h",
+    "async-types.cc",
+    "async-types.h",
     "child-process.cc",
     "child-process.h",
     "component-context.cc",

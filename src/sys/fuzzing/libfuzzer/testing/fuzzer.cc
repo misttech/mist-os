@@ -31,103 +31,104 @@ TestFuzzer::TestFuzzer() {
 
 int TestFuzzer::TestOneInput(const uint8_t *data, size_t size) {
   zx_status_t retval = ZX_ERR_SHOULD_WAIT;
-  auto task = fpromise::make_promise([this, relay = RelayPtr(), connect = Future<SignaledBuffer>()](
-                                         Context &context) mutable -> ZxResult<> {
-                // First, connect to the unit test via the relay, if necessary.
-                if (eventpair_->IsConnected() && !relay) {
-                  return fpromise::ok();
-                }
-                if (!connect) {
-                  auto handler = context_->MakeRequestHandler<Relay>();
-                  auto executor = context_->executor();
-                  handler(relay.NewRequest(executor->dispatcher()));
-                  Bridge<SignaledBuffer> bridge;
-                  relay->WatchTestData(bridge.completer.bind());
-                  connect = bridge.consumer.promise_or(fpromise::error());
-                }
-                if (!connect(context)) {
-                  return fpromise::pending();
-                }
-                if (connect.is_error()) {
-                  return fpromise::error(ZX_ERR_PEER_CLOSED);
-                }
-                auto signaled_buffer = connect.take_value();
-                if (auto status = test_input_buffer_.Link(std::move(signaled_buffer.test_input));
-                    status != ZX_OK) {
-                  return fpromise::error(status);
-                }
-                if (auto status = feedback_buffer_.Link(std::move(signaled_buffer.feedback));
-                    status != ZX_OK) {
-                  return fpromise::error(status);
-                }
-                eventpair_->Pair(std::move(signaled_buffer.eventpair));
-                relay->Finish();
+  auto task =
+      fpromise::make_promise([this, relay = RelayPtr(), connect = ZxFuture<SignaledBuffer>()](
+                                 Context &context) mutable -> ZxResult<> {
+        // First, connect to the unit test via the relay, if necessary.
+        if (eventpair_->IsConnected() && !relay) {
+          return fpromise::ok();
+        }
+        if (!connect) {
+          auto handler = context_->MakeRequestHandler<Relay>();
+          auto executor = context_->executor();
+          handler(relay.NewRequest(executor->dispatcher()));
+          Bridge<SignaledBuffer> bridge;
+          relay->WatchTestData(bridge.completer.bind());
+          connect = ConsumeBridge(bridge);
+        }
+        if (!connect(context)) {
+          return fpromise::pending();
+        }
+        if (connect.is_error()) {
+          return fpromise::error(connect.error());
+        }
+        auto signaled_buffer = connect.take_value();
+        if (auto status = test_input_buffer_.Link(std::move(signaled_buffer.test_input));
+            status != ZX_OK) {
+          return fpromise::error(status);
+        }
+        if (auto status = feedback_buffer_.Link(std::move(signaled_buffer.feedback));
+            status != ZX_OK) {
+          return fpromise::error(status);
+        }
+        eventpair_->Pair(std::move(signaled_buffer.eventpair));
+        relay->Finish();
+        return fpromise::ok();
+      })
+          .and_then([this, data, size] {
+            if (auto status = test_input_buffer_.Write(data, size); status != ZX_OK) {
+              return AsZxResult(status);
+            }
+            // Notify the unit test that the test input is ready, and wait for its
+            // notification that feedback is ready.
+            return AsZxResult(eventpair_->SignalPeer(0, kStart));
+          })
+          .and_then(eventpair_->WaitFor(kStart))
+          .and_then([this](const zx_signals_t &observed) {
+            return AsZxResult(eventpair_->SignalSelf(observed, 0));
+          })
+          .and_then([this]() -> ZxResult<> {
+            const auto *feedback =
+                reinterpret_cast<const RelayedFeedback *>(feedback_buffer_.data());
+            for (size_t i = 0; i < feedback->num_counters; ++i) {
+              const auto *counter = &feedback->counters[i];
+              SetCoverage(counter->offset, counter->value);
+            }
+            if (feedback->leak_suspected) {
+              // Without a call to the |free_hook|, the fake sanitizer should suspect a
+              // leak.
+              Malloc(sizeof(*this));
+            }
+            switch (feedback->result) {
+              case FuzzResult::NO_ERRORS:
+                // Notify the unit test that the fuzzer completed the run.
+                return AsZxResult(eventpair_->SignalPeer(0, kFinish));
+              case FuzzResult::BAD_MALLOC:
+                printf("DEDUP_TOKEN: BAD_MALLOC\n");
+                Malloc(size_t(-1));
+                break;
+              case FuzzResult::CRASH:
+                printf("DEDUP_TOKEN: CRASH\n");
+                Crash();
+                break;
+              case FuzzResult::DEATH:
+                printf("DEDUP_TOKEN: DEATH\n");
+                Die();
+                break;
+              case FuzzResult::EXIT:
+                // Don't call exit() here; the atexit handlers will invoke the executors
+                // destructors, which will panic since we're mid-task. Signal via error.
+                printf("DEDUP_TOKEN: EXIT\n");
+                return fpromise::error(ZX_ERR_STOP);
+              case FuzzResult::LEAK:
+                LeakMemory();
                 return fpromise::ok();
-              })
-                  .and_then([this, data, size] {
-                    if (auto status = test_input_buffer_.Write(data, size); status != ZX_OK) {
-                      return AsZxResult(status);
-                    }
-                    // Notify the unit test that the test input is ready, and wait for its
-                    // notification that feedback is ready.
-                    return AsZxResult(eventpair_->SignalPeer(0, kStart));
-                  })
-                  .and_then(eventpair_->WaitFor(kStart))
-                  .and_then([this](const zx_signals_t &observed) {
-                    return AsZxResult(eventpair_->SignalSelf(observed, 0));
-                  })
-                  .and_then([this]() -> ZxResult<> {
-                    const auto *feedback =
-                        reinterpret_cast<const RelayedFeedback *>(feedback_buffer_.data());
-                    for (size_t i = 0; i < feedback->num_counters; ++i) {
-                      const auto *counter = &feedback->counters[i];
-                      SetCoverage(counter->offset, counter->value);
-                    }
-                    if (feedback->leak_suspected) {
-                      // Without a call to the |free_hook|, the fake sanitizer should suspect a
-                      // leak.
-                      Malloc(sizeof(*this));
-                    }
-                    switch (feedback->result) {
-                      case FuzzResult::NO_ERRORS:
-                        // Notify the unit test that the fuzzer completed the run.
-                        return AsZxResult(eventpair_->SignalPeer(0, kFinish));
-                      case FuzzResult::BAD_MALLOC:
-                        printf("DEDUP_TOKEN: BAD_MALLOC\n");
-                        Malloc(size_t(-1));
-                        break;
-                      case FuzzResult::CRASH:
-                        printf("DEDUP_TOKEN: CRASH\n");
-                        Crash();
-                        break;
-                      case FuzzResult::DEATH:
-                        printf("DEDUP_TOKEN: DEATH\n");
-                        Die();
-                        break;
-                      case FuzzResult::EXIT:
-                        // Don't call exit() here; the atexit handlers will invoke the executors
-                        // destructors, which will panic since we're mid-task. Signal via error.
-                        printf("DEDUP_TOKEN: EXIT\n");
-                        return fpromise::error(ZX_ERR_STOP);
-                      case FuzzResult::LEAK:
-                        LeakMemory();
-                        return fpromise::ok();
-                      case FuzzResult::OOM:
-                        printf("DEDUP_TOKEN: OOM\n");
-                        OOM();
-                        break;
-                      case FuzzResult::TIMEOUT:
-                        printf("DEDUP_TOKEN: TIMEOUT\n");
-                        Timeout();
-                        break;
-                    }
-                    FX_NOTREACHED();
-                    return fpromise::error(ZX_ERR_INTERNAL);
-                  })
-                  .then([&retval](const ZxResult<> &result) {
-                    retval = result.is_ok() ? ZX_OK : result.error();
-                    return fpromise::ok();
-                  });
+              case FuzzResult::OOM:
+                printf("DEDUP_TOKEN: OOM\n");
+                OOM();
+                break;
+              case FuzzResult::TIMEOUT:
+                printf("DEDUP_TOKEN: TIMEOUT\n");
+                Timeout();
+                break;
+            }
+            FX_NOTREACHED();
+            return fpromise::error(ZX_ERR_INTERNAL);
+          })
+          .then([&retval](const ZxResult<> &result) {
+            retval = result.is_ok() ? ZX_OK : result.error();
+            return fpromise::ok();
+          });
   // Compare with async-test.h. Unlike a real fuzzer, this fake fuzzer runs its async loop on the
   // current thread. To make |LLVMFuzzerTestOneInput| synchronous, this method needs to periodically
   // kick the loop until the promise above completes.

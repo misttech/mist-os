@@ -125,7 +125,7 @@ ZxPromise<Artifact> Runner::TryOne(Input input) {
 }
 
 ZxPromise<> Runner::Workflow::Stop() {
-  return consumer_ ? consumer_.promise_or(fpromise::error(ZX_ERR_CANCELED)).box()
+  return consumer_ ? AwaitConsumer(std::move(consumer_)).box()
                    : fpromise::make_promise([]() -> ZxResult<> { return fpromise::ok(); });
 }
 

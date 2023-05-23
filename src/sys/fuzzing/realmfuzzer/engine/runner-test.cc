@@ -76,16 +76,8 @@ ZxPromise<> RealmFuzzerRunnerTest::PublishProcess() {
                collector_->Initialize(eventpair_->Create(), target_->Launch(), completer.bind());
                return fpromise::ok();
              })
-      .and_then([wait = Future<Options>(bridge.consumer.promise_or(fpromise::error()))](
-                    Context& context) mutable -> ZxResult<> {
-        if (!wait(context)) {
-          return fpromise::pending();
-        }
-        if (wait.is_error()) {
-          return fpromise::error(ZX_ERR_CANCELED);
-        }
-        return fpromise::ok();
-      });
+      .and_then(ConsumeBridge(bridge))
+      .and_then([](Options& options) -> ZxResult<> { return fpromise::ok(); });
 }
 
 ZxPromise<> RealmFuzzerRunnerTest::PublishModule() {
@@ -99,14 +91,8 @@ ZxPromise<> RealmFuzzerRunnerTest::PublishModule() {
                collector_->AddInline8bitCounters(std::move(inline_8bit_counters), completer.bind());
                return fpromise::ok();
              })
-      .and_then([this, wait = Future<>(bridge.consumer.promise_or(fpromise::error()))](
-                    Context& context) mutable -> ZxResult<> {
-        if (!wait(context)) {
-          return fpromise::pending();
-        }
-        if (wait.is_error()) {
-          return fpromise::error(ZX_ERR_CANCELED);
-        }
+      .and_then(ConsumeBridge(bridge))
+      .and_then([this]() {
         // Automatically clear feedback on start. This will complete when |eventpair_| is reset.
         executor()->schedule_task(AwaitStart());
         return fpromise::ok();

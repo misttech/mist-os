@@ -236,16 +236,9 @@ ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollector> collec
         collector_->Initialize(eventpair_.Create(), std::move(process), completer.bind());
         return fpromise::ok();
       })
-      .and_then([this, connect = Future<Options>(bridge.consumer.promise_or(fpromise::error()))](
-                    Context& context) mutable -> ZxResult<> {
-        // Wait for the collector to respond with options, and use them to configure this process.
-        if (!connect(context)) {
-          return fpromise::pending();
-        }
-        if (connect.is_error()) {
-          return fpromise::error(ZX_ERR_CANCELED);
-        }
-        Configure(connect.take_value());
+      .and_then(ConsumeBridge(bridge))
+      .and_then([this](Options& options) {
+        Configure(std::move(options));
         return fpromise::ok();
       })
       .and_then([this, eventpair = std::move(eventpair), add = ZxFuture<>(),
@@ -387,14 +380,8 @@ ZxPromise<> Process::AddModule() {
             collector_->AddInline8bitCounters(std::move(inline_8bit_counters), completer.bind());
             return fpromise::ok();
           })
-      .and_then([this, wait = Future<>(bridge.consumer.promise_or(fpromise::error()))](
-                    Context& context) mutable -> ZxResult<> {
-        if (!wait(context)) {
-          return fpromise::pending();
-        }
-        if (wait.is_error()) {
-          return fpromise::error(ZX_ERR_CANCELED);
-        }
+      .and_then(ConsumeBridge(bridge))
+      .and_then([this]() {
         if (awaiting_ && modules_.size() >= gContext.num_pcs) {
           awaiting_.resume_task();
         }

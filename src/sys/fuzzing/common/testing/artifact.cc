@@ -13,14 +13,10 @@ namespace fuzzing {
 ZxPromise<Artifact> WatchArtifact(const ExecutorPtr& executor, ControllerPtr& controller) {
   Bridge<FidlArtifact> bridge;
   controller->WatchArtifact(bridge.completer.bind());
-  return bridge.consumer.promise_or(fpromise::error())
-      .then([executor, fuzz_result = FuzzResult::NO_ERRORS, read = ZxFuture<Input>()](
-                Context& context, Result<FidlArtifact>& result) mutable -> ZxResult<Artifact> {
+  return ConsumeBridge(bridge).and_then(
+      [executor, fuzz_result = FuzzResult::NO_ERRORS, read = ZxFuture<Input>()](
+          Context& context, FidlArtifact& fidl_artifact) mutable -> ZxResult<Artifact> {
         if (!read) {
-          if (result.is_error()) {
-            return fpromise::error(ZX_ERR_CANCELED);
-          }
-          auto fidl_artifact = result.take_value();
           if (fidl_artifact.IsEmpty()) {
             return fpromise::ok(Artifact());
           }

@@ -60,14 +60,14 @@ TEST_F(ControllerProviderTest, Connect) {
   ControllerPtr ptr1;
   Bridge<> bridge1;
   provider->Connect(ptr1.NewRequest(), bridge1.completer.bind());
-  FUZZING_EXPECT_OK(bridge1.consumer.promise());
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
   RunUntilIdle();
 
   // ...and reconnect.
   ControllerPtr ptr2;
   Bridge<> bridge2;
   provider->Connect(ptr2.NewRequest(), bridge2.completer.bind());
-  FUZZING_EXPECT_OK(bridge2.consumer.promise());
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
 }
 

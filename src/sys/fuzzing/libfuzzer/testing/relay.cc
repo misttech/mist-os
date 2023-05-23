@@ -29,7 +29,7 @@ void RelayImpl::SetTestData(SignaledBuffer test_data, SetTestDataCallback callba
   Bridge<> finish_bridge;
   finish_ = std::move(finish_bridge.completer);
   executor_->schedule_task(
-      finish_bridge.consumer.promise().and_then([callback = std::move(callback)] { callback(); }));
+      ConsumeBridge(finish_bridge).and_then([callback = std::move(callback)] { callback(); }));
   completer.complete_ok(std::move(test_data));
 }
 
@@ -41,9 +41,10 @@ void RelayImpl::WatchTestData(WatchTestDataCallback callback) {
     consumer = std::move(test_data_bridge.consumer);
   }
   executor_->schedule_task(
-      consumer.promise().and_then([callback = std::move(callback)](SignaledBuffer& test_data) {
-        callback(std::move(test_data));
-      }));
+      AwaitConsumer(std::move(consumer))
+          .and_then([callback = std::move(callback)](SignaledBuffer& test_data) {
+            callback(std::move(test_data));
+          }));
 }
 
 void RelayImpl::Finish() { finish_.complete_ok(); }

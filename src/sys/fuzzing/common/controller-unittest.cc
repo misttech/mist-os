@@ -54,7 +54,7 @@ TEST_F(ControllerTest, ConfigureAndGetOptions) {
   Options options1;
   Bridge<Options> bridge1;
   controller->GetOptions(bridge1.completer.bind());
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error()), &options1);
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1), &options1);
   RunUntilIdle();
 
   // Configure.
@@ -75,12 +75,12 @@ TEST_F(ControllerTest, ConfigureAndGetOptions) {
   auto options2 = CopyOptions(options1);
   ZxBridge<> bridge2;
   controller->Configure(std::move(options1), ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
 
   Bridge<Options> bridge3;
   controller->GetOptions(bridge3.completer.bind());
-  FUZZING_EXPECT_OK(bridge3.consumer.promise_or(fpromise::error()), &options1);
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge3), &options1);
   RunUntilIdle();
   EXPECT_NE(options1.seed(), 0U);
 
@@ -105,14 +105,14 @@ TEST_F(ControllerTest, ConfigureAndGetOptions) {
   options2.set_pulse_interval(pulse_interval.get());
   ZxBridge<> bridge4;
   controller->Configure(std::move(options2), ZxBind<>(std::move(bridge4.completer)));
-  FUZZING_EXPECT_OK(bridge4.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge4));
   RunUntilIdle();
 
   // Changes are reflected.
   Options options3;
   Bridge<Options> bridge5;
   controller->GetOptions(bridge5.completer.bind());
-  FUZZING_EXPECT_OK(bridge5.consumer.promise_or(fpromise::error()), &options3);
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge5), &options3);
   RunUntilIdle();
   EXPECT_EQ(options3.runs(), runs);
   EXPECT_EQ(options3.max_total_time(), max_total_time.get());
@@ -151,10 +151,10 @@ TEST_F(ControllerTest, AddToCorpus) {
                           ZxBind<>(std::move(bridge2.completer)));
   controller->AddToCorpus(CorpusType::LIVE, AsyncSocketWrite(executor(), live_input4),
                           ZxBind<>(std::move(bridge4.completer)));
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
-  FUZZING_EXPECT_OK(bridge3.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
-  FUZZING_EXPECT_OK(bridge4.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge3));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge4));
   RunUntilIdle();
 
   auto seed_corpus = runner()->GetCorpus(CorpusType::SEED);
@@ -191,8 +191,8 @@ TEST_F(ControllerTest, ReadCorpus) {
   Bridge<> live_bridge;
   controller->ReadCorpus(CorpusType::SEED, seed_reader.NewBinding(), seed_bridge.completer.bind());
   controller->ReadCorpus(CorpusType::LIVE, live_reader.NewBinding(), live_bridge.completer.bind());
-  FUZZING_EXPECT_OK(seed_bridge.consumer.promise_or(fpromise::error()));
-  FUZZING_EXPECT_OK(live_bridge.consumer.promise_or(fpromise::error()));
+  FUZZING_EXPECT_OK(ConsumeBridge(seed_bridge));
+  FUZZING_EXPECT_OK(ConsumeBridge(live_bridge));
   RunUntilIdle();
 
   // Returned corpora are sorted.
@@ -216,13 +216,12 @@ TEST_F(ControllerTest, WriteDictionary) {
   ZxBridge<> bridge1;
   controller->WriteDictionary(AsyncSocketWrite(executor(), FakeRunner::invalid_dictionary()),
                               ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_ERROR(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)),
-                       ZX_ERR_INVALID_ARGS);
+  FUZZING_EXPECT_ERROR(ConsumeBridge(bridge1), ZX_ERR_INVALID_ARGS);
 
   ZxBridge<> bridge2;
   controller->WriteDictionary(AsyncSocketWrite(executor(), FakeRunner::valid_dictionary()),
                               ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
 
   RunUntilIdle();
 }
@@ -236,11 +235,9 @@ TEST_F(ControllerTest, ReadDictionary) {
 
   Bridge<FidlInput> bridge;
   controller->ReadDictionary(bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error())
-                        .or_else([] { return fpromise::error(ZX_ERR_CANCELED); })
-                        .and_then([&](FidlInput& fidl_input) {
-                          return AsyncSocketRead(executor(), std::move(fidl_input));
-                        }),
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge).and_then([&](FidlInput& fidl_input) {
+    return AsyncSocketRead(executor(), std::move(fidl_input));
+  }),
                     std::move(dict));
   RunUntilIdle();
 }
@@ -257,7 +254,7 @@ TEST_F(ControllerTest, AddMonitor) {
 
   Bridge<> bridge;
   controller->AddMonitor(monitor.NewBinding(), bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge));
   RunUntilIdle();
 
   runner()->UpdateMonitors(UpdateReason::PULSE);
@@ -284,7 +281,7 @@ TEST_F(ControllerTest, Fuzz) {
   runner()->set_error(ZX_ERR_WRONG_TYPE);
   ZxBridge<> bridge1;
   controller->Fuzz(ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
   RunUntilIdle();
 
   // Subsequent calls to |WatchArtifact| should block and return an artifact.
@@ -295,7 +292,7 @@ TEST_F(ControllerTest, Fuzz) {
   runner()->set_result_input(expected.input());
   ZxBridge<> bridge2;
   controller->Fuzz(ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual, expected);
@@ -310,7 +307,7 @@ TEST_F(ControllerTest, TryOne) {
   runner()->set_error(ZX_ERR_WRONG_TYPE);
   ZxBridge<> bridge1;
   controller->TryOne(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
   RunUntilIdle();
 
   FUZZING_EXPECT_ERROR(WatchArtifact(executor(), controller), ZX_ERR_WRONG_TYPE);
@@ -323,7 +320,7 @@ TEST_F(ControllerTest, TryOne) {
   runner()->set_result(FuzzResult::OOM);
   ZxBridge<> bridge2;
   controller->TryOne(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual.fuzz_result(), FuzzResult::OOM);
@@ -339,8 +336,7 @@ TEST_F(ControllerTest, Minimize) {
   runner()->set_validation_error(ZX_ERR_INVALID_ARGS);
   ZxBridge<> bridge1;
   controller->Minimize(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_ERROR(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)),
-                       ZX_ERR_INVALID_ARGS);
+  FUZZING_EXPECT_ERROR(ConsumeBridge(bridge1), ZX_ERR_INVALID_ARGS);
   RunUntilIdle();
 
   // Late errors are reported via |WatchArtifact|.
@@ -348,7 +344,7 @@ TEST_F(ControllerTest, Minimize) {
   runner()->set_error(ZX_ERR_WRONG_TYPE);
   ZxBridge<> bridge2;
   controller->Minimize(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
 
   FUZZING_EXPECT_ERROR(WatchArtifact(executor(), controller), ZX_ERR_WRONG_TYPE);
@@ -362,7 +358,7 @@ TEST_F(ControllerTest, Minimize) {
   runner()->set_result_input(minimized);
   ZxBridge<> bridge3;
   controller->Minimize(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge3.completer)));
-  FUZZING_EXPECT_OK(bridge3.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge3));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual.fuzz_result(), FuzzResult::MINIMIZED);
@@ -379,7 +375,7 @@ TEST_F(ControllerTest, Cleanse) {
   runner()->set_error(ZX_ERR_WRONG_TYPE);
   ZxBridge<> bridge1;
   controller->Cleanse(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
   RunUntilIdle();
 
   FUZZING_EXPECT_ERROR(WatchArtifact(executor(), controller), ZX_ERR_WRONG_TYPE);
@@ -393,7 +389,7 @@ TEST_F(ControllerTest, Cleanse) {
   runner()->set_result_input(cleansed);
   ZxBridge<> bridge2;
   controller->Cleanse(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual.fuzz_result(), FuzzResult::CLEANSED);
@@ -409,8 +405,7 @@ TEST_F(ControllerTest, Merge) {
   runner()->set_validation_error(ZX_ERR_INVALID_ARGS);
   ZxBridge<> bridge1;
   controller->Merge(ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_ERROR(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)),
-                       ZX_ERR_INVALID_ARGS);
+  FUZZING_EXPECT_ERROR(ConsumeBridge(bridge1), ZX_ERR_INVALID_ARGS);
   RunUntilIdle();
 
   // Late errors are reported via |WatchArtifact|.
@@ -418,7 +413,7 @@ TEST_F(ControllerTest, Merge) {
   runner()->set_error(ZX_ERR_WRONG_TYPE);
   ZxBridge<> bridge2;
   controller->Merge(ZxBind<>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge2));
   RunUntilIdle();
 
   FUZZING_EXPECT_ERROR(WatchArtifact(executor(), controller), ZX_ERR_WRONG_TYPE);
@@ -430,7 +425,7 @@ TEST_F(ControllerTest, Merge) {
   runner()->set_error(ZX_OK);
   ZxBridge<> bridge3;
   controller->Merge(ZxBind<>(std::move(bridge3.completer)));
-  FUZZING_EXPECT_OK(bridge3.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge3));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual.fuzz_result(), FuzzResult::MERGED);
@@ -454,7 +449,7 @@ TEST_F(ControllerTest, GetStatus) {
 
   Bridge<Status> bridge;
   controller->GetStatus(bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()), &result);
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge), &result);
   RunUntilIdle();
 
   EXPECT_EQ(result.running(), expected.running());

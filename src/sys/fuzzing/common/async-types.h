@@ -53,9 +53,7 @@ namespace fuzzing {
 
 // All tasks should be scheduled on a common executor.
 using ExecutorPtr = std::shared_ptr<async::Executor>;
-inline ExecutorPtr MakeExecutor(async_dispatcher_t* dispatcher) {
-  return std::make_shared<async::Executor>(dispatcher);
-}
+ExecutorPtr MakeExecutor(async_dispatcher_t* dispatcher);
 
 // Types templated on values and errors, for both generic errors and zx_status_t.
 //
@@ -98,18 +96,43 @@ inline fit::function<void(ZxResult<V>)> ZxBind(typename ZxBridge<V>::completer_t
 }
 
 // Converts a status code result to a |ZxResult|.
-inline ZxResult<> AsZxResult(zx_status_t status) {
-  if (status != ZX_OK) {
-    return fpromise::error(status);
-  }
-  return fpromise::ok();
+ZxResult<> AsZxResult(zx_status_t status);
+ZxResult<> AsZxResult(const Result<zx_status_t>& result);
+
+// Returns a promise to wait for a `Consumer` to be completed by its associated `Completer`.
+//
+// These explicit overrides do not return values on success. They return ZX_ERR_CANCELED if the
+// associated completer is destroyed.
+//
+ZxPromise<> AwaitConsumer(Consumer<> consumer);
+ZxPromise<> AwaitConsumer(Consumer<zx_status_t> consumer);
+ZxPromise<> AwaitConsumer(ZxConsumer<> consumer);
+
+// Like `AwaitConsumer` above, but these also returns a value on success.
+template <typename T>
+ZxPromise<T> AwaitConsumer(Consumer<T> consumer) {
+  return consumer.promise_or(fpromise::error()).or_else([]() {
+    return fpromise::error(ZX_ERR_CANCELED);
+  });
 }
 
-inline ZxResult<> AsZxResult(const Result<zx_status_t>& result) {
-  if (result.is_error()) {
-    return fpromise::error(ZX_ERR_INTERNAL);
-  }
-  return AsZxResult(result.value());
+template <typename T>
+ZxPromise<T> AwaitConsumer(ZxConsumer<T> consumer) {
+  return consumer.promise_or(fpromise::error(ZX_ERR_CANCELED));
+}
+
+// Returns a promise to wait for a bridge's consumer to be completed by its associated `Completer`.
+//
+// These explicit overrides do not return values on success. They return ZX_ERR_CANCELED if the
+// associated completer is destroyed.
+//
+ZxPromise<> ConsumeBridge(Bridge<>& bridge);
+ZxPromise<> ConsumeBridge(Bridge<zx_status_t>& bridge);
+
+// Like `ConsumeBridge` above, but also returns a value on success.
+template <typename B>
+ZxPromise<typename B::value_type> ConsumeBridge(B& bridge) {
+  return AwaitConsumer(std::move(bridge.consumer));
 }
 
 // Additional supporting types from fpromise.
