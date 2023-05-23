@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use std::{
     fmt,
     fs::OpenOptions,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{BufReader, BufWriter, ErrorKind, Read, Write},
     path::{Path, PathBuf},
 };
 use tracing::error;
@@ -128,14 +128,17 @@ impl ConfigFile {
     }
 
     fn from_file(path: &Path) -> Result<Self> {
-        let buffer = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&path)
-            .map(BufReader::new)?;
+        let file = OpenOptions::new().read(true).open(path);
 
-        Ok(Self::from_buf(Some(path.to_owned()), buffer))
+        match file {
+            Ok(buf) => Ok(Self::from_buf(Some(path.to_owned()), BufReader::new(buf))),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(Self {
+                path: Some(path.to_owned()),
+                contents: ConfigMap::default(),
+                dirty: false,
+            }),
+            Err(e) => Err(e.into()),
+        }
     }
 
     fn is_dirty(&self) -> bool {
