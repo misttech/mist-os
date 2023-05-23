@@ -1937,11 +1937,13 @@ impl SequenceFileSource for ProcSmapsFile {
         if let Some((range, map)) = iter.next() {
             write_map(task, sink, range, map)?;
 
-            let vmo_info = map.vmo.info().map_err(|_| errno!(EIO))?;
-            let size_kb = vmo_info.size_bytes / 1024;
+            let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
             writeln!(sink, "Size:\t{size_kb} kB",)?;
+
+            let vmo_info = map.vmo.info().map_err(|_| errno!(EIO))?;
             let rss_kb = vmo_info.committed_bytes / 1024;
             writeln!(sink, "Rss:\t{rss_kb} kB")?;
+
             writeln!(
                 sink,
                 "Pss:\t{} kB",
