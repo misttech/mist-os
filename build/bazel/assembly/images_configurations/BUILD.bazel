@@ -10,6 +10,7 @@ load(
     "fuchsia_filesystem_reserved",
     "fuchsia_fvm_sparse",
     "fuchsia_fvm_standard",
+    "fuchsia_fxfs",
     "fuchsia_images_configuration",
     "fuchsia_vbmeta",
     "fuchsia_zbi",
@@ -59,6 +60,15 @@ fuchsia_images_configuration(
         ":sparse_fvm",
         ":blob_sparse_fvm",
         ":emmc_fvm_x64",
+    ],
+)
+
+fuchsia_images_configuration(
+    name = "fuchsia_x64_fxblob",
+    images = [
+        ":fuchsia_zbi",
+        ":fuchsia_vbmeta_default",
+        ":fuchsia_fxfs",
     ],
 )
 
@@ -171,6 +181,11 @@ fuchsia_filesystem_empty_data(
 fuchsia_filesystem_reserved(
     name = "internal_reserved",
     slices = "0",
+)
+
+fuchsia_fxfs(
+    name = "fuchsia_fxfs",
+    fxfs_name = "fxfs",
 )
 
 fuchsia_zbi(

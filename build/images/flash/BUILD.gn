@@ -187,7 +187,7 @@ foreach(info, firmware_info) {
     },
   ]
 }
-if (fxfs_blob) {
+if (supports_flashing_fxfs) {
   flash_script_args += [
     "--fvm-image=" + rebase_path(files.fxfs, root_build_dir),
     "--fvm=${fxfs_partition}",

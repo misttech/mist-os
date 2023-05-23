@@ -160,6 +160,14 @@ FuchsiaFVMNandInfo = provider(
     },
 )
 
+FuchsiaFxfsInfo = provider(
+    doc = "An Fxfs image.",
+    fields = {
+        "fxfs_name": "Name of Fxfs image file",
+        "fxfs_info": "Json of Fxfs information",
+    },
+)
+
 FuchsiaProductImageInfo = provider(
     doc = "Info needed to pave a Fuchsia image",
     fields = {

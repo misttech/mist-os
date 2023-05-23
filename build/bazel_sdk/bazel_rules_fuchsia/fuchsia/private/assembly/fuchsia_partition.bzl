@@ -18,6 +18,7 @@ PARTITION_TYPE = struct(
     ZBI = "ZBI",
     VBMETA = "VBMeta",
     FVM = "FVM",
+    FXFS = "Fxfs",
 )
 
 def _fuchsia_partition_impl(ctx):
@@ -50,7 +51,7 @@ fuchsia_partition = rule(
         "type": attr.string(
             doc = "Type of this partition",
             mandatory = True,
-            values = [PARTITION_TYPE.ZBI, PARTITION_TYPE.VBMETA, PARTITION_TYPE.FVM],
+            values = [PARTITION_TYPE.ZBI, PARTITION_TYPE.VBMETA, PARTITION_TYPE.FVM, PARTITION_TYPE.FXFS],
         ),
     },
 )

@@ -92,6 +92,10 @@ load(
     _fuchsia_fvm_sparse = "fuchsia_fvm_sparse",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_fxfs.bzl",
+    _fuchsia_fxfs = "fuchsia_fxfs",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_fvm_standard.bzl",
     _fuchsia_fvm_standard = "fuchsia_fvm_standard",
 )
@@ -157,6 +161,7 @@ fuchsia_filesystem_reserved = _fuchsia_filesystem_reserved
 fuchsia_fvm_nand = _fuchsia_fvm_nand
 fuchsia_fvm_sparse = _fuchsia_fvm_sparse
 fuchsia_fvm_standard = _fuchsia_fvm_standard
+fuchsia_fxfs = _fuchsia_fxfs
 fuchsia_scrutiny_config = _fuchsia_scrutiny_config
 
 fuchsia_bootstrap_partition = _fuchsia_bootstrap_partition

@@ -60,6 +60,8 @@ labels = {
 
 supports_fastboot_fvm =
     !fxfs_blob && fvm_partition != "" && !use_bringup_assembly
+supports_flashing_fxfs =
+    fxfs_blob && fxfs_partition != "" && !use_bringup_assembly
 
 # These are the common assembly-related files.
 files = {

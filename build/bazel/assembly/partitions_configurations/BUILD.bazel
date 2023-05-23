@@ -85,6 +85,12 @@ fuchsia_partition(
     type = PARTITION_TYPE.FVM,
 )
 
+fuchsia_partition(
+    name = "fxfs",
+    partition_name = "fvm",
+    type = PARTITION_TYPE.FXFS,
+)
+
 fuchsia_bootloader_partition(
     name = "fuchsia_esp",
     image = "@legacy_ninja_build_outputs//:fuchsia.esp.blk",

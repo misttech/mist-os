@@ -15,6 +15,13 @@ if (use_bringup_assembly) {
         [ "//build/images/bringup:bringup.bazel_images_config_inputs" ]
   }
 } else {
+  verify_images_configuration("verify_fuchsia_x64_fxblob") {
+    testonly = true
+    gn_images_config_target = "//boards/images:x64-fxfs"
+    bazel_images_config_target = ":fuchsia_x64_fxblob"
+    bazel_inputs =
+        [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
+  }
   verify_images_configuration("verify_fuchsia_x64") {
     testonly = true
     gn_images_config_target = "//boards/images:x64"
@@ -52,6 +59,9 @@ group("verifications") {
   if (use_bringup_assembly) {
     deps += [ ":verify_bringup" ]
   } else {
-    deps += [ ":verify_fuchsia_x64" ]
+    deps += [
+      ":verify_fuchsia_x64",
+      ":verify_fuchsia_x64_fxblob",
+    ]
   }
 }

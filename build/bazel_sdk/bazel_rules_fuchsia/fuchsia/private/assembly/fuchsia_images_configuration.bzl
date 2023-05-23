@@ -14,6 +14,7 @@ load(
     "FuchsiaFsEmptyAccountInfo",
     "FuchsiaFsEmptyDataInfo",
     "FuchsiaFsReservedInfo",
+    "FuchsiaFxfsInfo",
     "FuchsiaVbmetaExtraDescriptorInfo",
     "FuchsiaVbmetaInfo",
     "FuchsiaZbiInfo",
@@ -119,6 +120,11 @@ def _fuchsia_images_configuration_impl(ctx):
             nand_fvm = dict(raw_image.fvm_info)
             nand_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems)
             fvms.append(nand_fvm)
+        elif FuchsiaFxfsInfo in image:
+            fxfs = {
+                "type": "fxfs",
+            }
+            images.append(fxfs)
 
     if fvms:
         fvm = {
@@ -159,6 +165,7 @@ fuchsia_images_configuration = rule(
                 [FuchsiaFVMNandInfo],
                 [FuchsiaFVMStandardInfo],
                 [FuchsiaFVMSparseInfo],
+                [FuchsiaFxfsInfo],
                 [FuchsiaZbiInfo],
                 [FuchsiaVbmetaInfo],
             ],
