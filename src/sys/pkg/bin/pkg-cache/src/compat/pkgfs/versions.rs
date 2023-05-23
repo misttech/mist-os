@@ -143,7 +143,7 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                 }
                 Some(Ok(package_hash)) => {
                     let cloned_scope = scope.clone();
-                    object_request.take().spawn(&scope, move |object_request, _| {
+                    object_request.take().spawn(&scope, move |object_request| {
                         async move {
                             let package_status = crate::cache_service::get_package_status(
                                 self.base_packages.as_ref(),

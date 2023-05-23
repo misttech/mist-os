@@ -24,7 +24,7 @@ use {
     fuchsia_merkle::{hash_block, MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{channel::oneshot, future::BoxFuture, join, FutureExt},
+    futures::{future::BoxFuture, join, FutureExt},
     fxfs::{
         async_enter,
         errors::FxfsError,
@@ -306,52 +306,43 @@ impl DirectoryEntry for BlobDirectory {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).spawn(
-            &scope.clone(),
-            move |object_request, shutdown| {
-                async move {
-                    let node = self.lookup(flags, path).await.map_err(|e| {
-                        debug!(?e, "lookup failed");
-                        map_to_status(e)
-                    })?;
-                    if node.is::<BlobDirectory>() {
-                        Ok(MutableConnection::create_connection_async(
-                            scope,
-                            node.downcast::<BlobDirectory>()
-                                .unwrap_or_else(|_| unreachable!())
-                                .take(),
-                            flags.to_directory_options()?,
-                            object_request.take(),
-                            shutdown,
-                        )
-                        .boxed())
-                    } else if node.is::<FxBlob>() {
-                        let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
-                        FxBlob::create_connection_async(
-                            node,
-                            scope,
-                            flags.to_file_options()?,
-                            object_request,
-                            shutdown,
-                        )
-                    } else if node.is::<FxUnsealedBlob>() {
-                        let node =
-                            node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
-                        Ok(FxUnsealedBlob::create_connection(
-                            node,
-                            scope,
-                            flags.to_file_options()?,
-                            object_request.take(),
-                            shutdown,
-                        )
-                        .boxed())
-                    } else {
-                        unreachable!();
-                    }
+        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
+            async move {
+                let node = self.lookup(flags, path).await.map_err(|e| {
+                    debug!(?e, "lookup failed");
+                    map_to_status(e)
+                })?;
+                if node.is::<BlobDirectory>() {
+                    Ok(MutableConnection::create_connection_async(
+                        scope,
+                        node.downcast::<BlobDirectory>().unwrap_or_else(|_| unreachable!()).take(),
+                        flags.to_directory_options()?,
+                        object_request.take(),
+                    )
+                    .boxed())
+                } else if node.is::<FxBlob>() {
+                    let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
+                    FxBlob::create_connection_async(
+                        node,
+                        scope,
+                        flags.to_file_options()?,
+                        object_request,
+                    )
+                } else if node.is::<FxUnsealedBlob>() {
+                    let node = node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
+                    Ok(FxUnsealedBlob::create_connection(
+                        node,
+                        scope,
+                        flags.to_file_options()?,
+                        object_request.take(),
+                    )
+                    .boxed())
+                } else {
+                    unreachable!();
                 }
-                .boxed()
-            },
-        );
+            }
+            .boxed()
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -445,7 +436,6 @@ impl FxBlob {
         scope: ExecutionScope,
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
-        shutdown: oneshot::Receiver<()>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
         Ok(if options.is_node {
             create_node_reference_connection_async(
@@ -453,7 +443,6 @@ impl FxBlob {
                 this.take(),
                 options,
                 object_request.take(),
-                shutdown,
             )
             .boxed()
         } else {
@@ -470,7 +459,6 @@ impl FxBlob {
                 /*writable=*/ false,
                 /*executable=*/ true,
                 stream,
-                shutdown,
             )
             .boxed()
         })
@@ -486,23 +474,19 @@ impl DirectoryEntry for FxBlob {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).spawn(
-            &scope.clone(),
-            move |object_request, shutdown| {
-                Box::pin(async move {
-                    if !path.is_empty() {
-                        return Err(Status::NOT_FILE);
-                    }
-                    Self::create_connection_async(
-                        OpenedNode::new(self),
-                        scope,
-                        flags.to_file_options()?,
-                        object_request,
-                        shutdown,
-                    )
-                })
-            },
-        );
+        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                if !path.is_empty() {
+                    return Err(Status::NOT_FILE);
+                }
+                Self::create_connection_async(
+                    OpenedNode::new(self),
+                    scope,
+                    flags.to_file_options()?,
+                    object_request,
+                )
+            })
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -965,7 +949,6 @@ impl FxUnsealedBlob {
         scope: ExecutionScope,
         options: FileOptions,
         object_request: ObjectRequest,
-        shutdown: oneshot::Receiver<()>,
     ) {
         create_connection_async(
             scope,
@@ -975,7 +958,6 @@ impl FxUnsealedBlob {
             /*readable=*/ true,
             /*writable=*/ true,
             /*executable=*/ false,
-            shutdown,
         )
         .await
     }
@@ -989,23 +971,19 @@ impl DirectoryEntry for FxUnsealedBlob {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).spawn(
-            &scope.clone(),
-            move |object_request, shutdown| {
-                Box::pin(async move {
-                    if !path.is_empty() {
-                        return Err(Status::NOT_FILE);
-                    }
-                    Ok(Self::create_connection(
-                        OpenedNode::new(self),
-                        scope,
-                        flags.to_file_options()?,
-                        object_request.take(),
-                        shutdown,
-                    ))
-                })
-            },
-        );
+        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                if !path.is_empty() {
+                    return Err(Status::NOT_FILE);
+                }
+                Ok(Self::create_connection(
+                    OpenedNode::new(self),
+                    scope,
+                    flags.to_file_options()?,
+                    object_request.take(),
+                ))
+            })
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

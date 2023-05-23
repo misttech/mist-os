@@ -579,56 +579,48 @@ impl DirectoryEntry for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        flags.to_object_request(server_end).spawn(
-            &scope.clone(),
-            move |object_request, shutdown| {
-                Box::pin(async move {
-                    let node = self.lookup(&flags, path, None).await.map_err(map_to_status)?;
-                    if node.is::<FxDirectory>() {
-                        Ok(MutableConnection::create_connection_async(
-                            scope,
-                            node.downcast::<FxDirectory>()
-                                .unwrap_or_else(|_| unreachable!())
-                                .take(),
-                            flags.to_directory_options()?,
-                            object_request.take(),
-                            shutdown,
-                        )
-                        .boxed())
-                    } else if node.is::<FxFile>() {
-                        let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                        if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
-                            let mut server =
-                                BlockServer::new(node, scope, object_request.take().into_channel());
-                            Ok(async move {
-                                let _ = server.run().await;
-                            }
-                            .boxed())
-                        } else {
-                            FxFile::create_connection_async(
-                                node,
-                                scope,
-                                flags.to_file_options()?,
-                                object_request,
-                                shutdown,
-                            )
+        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                let node = self.lookup(&flags, path, None).await.map_err(map_to_status)?;
+                if node.is::<FxDirectory>() {
+                    Ok(MutableConnection::create_connection_async(
+                        scope,
+                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
+                        flags.to_directory_options()?,
+                        object_request.take(),
+                    )
+                    .boxed())
+                } else if node.is::<FxFile>() {
+                    let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
+                        let mut server =
+                            BlockServer::new(node, scope, object_request.take().into_channel());
+                        Ok(async move {
+                            let _ = server.run().await;
                         }
-                    } else if node.is::<FxSymlink>() {
-                        let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                        Ok(symlink::Connection::run(
-                            scope,
-                            node.take(),
-                            flags.to_symlink_options()?,
-                            object_request.take(),
-                            shutdown,
-                        )
                         .boxed())
                     } else {
-                        unreachable!();
+                        FxFile::create_connection_async(
+                            node,
+                            scope,
+                            flags.to_file_options()?,
+                            object_request,
+                        )
                     }
-                })
-            },
-        );
+                } else if node.is::<FxSymlink>() {
+                    let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
+                    Ok(symlink::Connection::run(
+                        scope,
+                        node.take(),
+                        flags.to_symlink_options()?,
+                        object_request.take(),
+                    )
+                    .boxed())
+                } else {
+                    unreachable!();
+                }
+            })
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -645,7 +637,7 @@ impl DirectoryEntry for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        object_request.take().spawn(&scope.clone(), move |object_request, shutdown| {
+        object_request.take().spawn(&scope.clone(), move |object_request| {
             Box::pin(async move {
                 let node = self.lookup(&protocols, path, None).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
@@ -654,7 +646,6 @@ impl DirectoryEntry for FxDirectory {
                         node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
                         protocols.to_directory_options()?,
                         object_request.take(),
-                        shutdown,
                     )
                     .boxed())
                 } else if node.is::<FxFile>() {
@@ -664,7 +655,6 @@ impl DirectoryEntry for FxDirectory {
                         scope,
                         protocols.to_file_options()?,
                         object_request,
-                        shutdown,
                     )
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
@@ -673,7 +663,6 @@ impl DirectoryEntry for FxDirectory {
                         node.take(),
                         protocols.to_symlink_options()?,
                         object_request.take(),
-                        shutdown,
                     )
                     .boxed())
                 } else {

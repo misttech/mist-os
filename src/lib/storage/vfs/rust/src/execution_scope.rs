@@ -23,8 +23,8 @@ use crate::{
 use {
     futures::{
         channel::oneshot,
-        task::{self, Context, Poll},
-        Future, FutureExt,
+        task::{self, Context, Poll, Waker},
+        Future,
     },
     pin_project::pin_project,
     slab::Slab,
@@ -59,17 +59,67 @@ struct Executor {
 }
 
 struct Inner {
-    /// This is a list of shutdown channels for all the tasks that might be currently running.
-    /// When we initiate a task shutdown by sending a message over the channel, but as we need to
-    /// consume the sender in the process, we use `Option`s turning the consumed ones into `None`s.
-    running: Slab<Option<oneshot::Sender<()>>>,
+    /// Registered tasks that are to be shut down when shutting down the executor.
+    registered: Slab<Waker>,
 
-    /// Waiters waiting for all connections to be closed.
+    /// Waiters waiting for all tasks to be terminated.
     waiters: std::vec::Vec<oneshot::Sender<()>>,
 
-    /// Records if shutdown has been called on the executor. Any new tasks started on an executor
-    /// that has been shutdown will immediately be sent the shutdown signal.
+    /// Records if shutdown has been called on the executor.
     is_shutdown: bool,
+
+    /// The number of active tasks preventing shutdown.
+    active_count: usize,
+}
+
+impl Inner {
+    // If there are no active tasks, and we are terminating, the tasks are woken and they should
+    // terminate. If there are no active tasks and no registered tasks, wake any tasks that might
+    // be waiting for that.
+    fn check_active_count(&mut self) {
+        if self.active_count == 0 {
+            // If shutting down, wake all registered tasks which will cause them to terminate.
+            if self.is_shutdown {
+                for (_, waker) in &self.registered {
+                    waker.wake_by_ref();
+                }
+            }
+            if self.registered.is_empty() {
+                for waiter in self.waiters.drain(..) {
+                    let _ = waiter.send(());
+                }
+            }
+        }
+    }
+
+    fn task_did_finish(&mut self, task_id: usize) {
+        // If the task was never registered, then we must balance the increment to `active_count` in
+        // `spawn`.
+        if task_id == usize::MAX {
+            self.active_count -= 1;
+        } else {
+            self.registered.remove(task_id);
+        }
+        self.check_active_count();
+    }
+
+    // Registers a task. If task_id == usize, it means this is the first time the task has been
+    // registered. Returns true if the executor has been shut down and this task should terminate
+    // (which is the case if the active count is zero).
+    fn register_task(&mut self, task_id: &mut usize, waker: std::task::Waker) -> bool {
+        if self.is_shutdown && self.active_count == 0 {
+            return true;
+        }
+        if *task_id == usize::MAX {
+            // Balance the increment to `active_count` in `spawn`.
+            self.active_count -= 1;
+            *task_id = self.registered.insert(waker);
+            self.check_active_count();
+        } else {
+            *self.registered.get_mut(*task_id).unwrap() = waker;
+        }
+        false
+    }
 }
 
 impl ExecutionScope {
@@ -90,42 +140,23 @@ impl ExecutionScope {
     /// [`futures::task::Spawn::spawn_obj()`] with a minor difference that `self` reference is not
     /// exclusive.
     ///
-    /// Note that when the scope is shut down, this task will be interrupted the next time it
-    /// returns `Pending`.  If you need to perform any shutdown operations, use
-    /// [`ExecutionScope::spawn_with_shutdown()`] instead.
+    /// If the task needs to prevent itself from being shutdown, then it should use the
+    /// `try_active_guard` function below.
     ///
     /// For the "vfs" library it is more convenient that this method allows non-exclusive
     /// access.  And as the implementation is employing internal mutability there are no downsides.
     /// This way `ExecutionScope` can actually also implement [`futures::task::Spawn`] - it just was
     /// not necessary for now.
-    pub fn spawn<Task>(&self, task: Task)
-    where
-        Task: Future<Output = ()> + Send + 'static,
-    {
-        Executor::run_abort_any_time(self.executor.clone(), task)
-    }
-
-    /// Sends a `task` to be executed in this execution scope.  This is very similar to
-    /// [`futures::task::Spawn::spawn_obj`] with a minor difference that `self` reference is not
-    /// exclusive.
-    ///
-    /// Task to be executed will be constructed using the specified callback.  It is provided with
-    /// a one-shot channel that will be signaled during the shutdown process.  The task must be
-    /// monitoring the channel and should perform any necessary shutdown steps and terminate when
-    /// a message is received over the channel.  If you do not need a custom shutdown process you
-    /// can use [`ExecutionScope::spawn()`] method instead.
-    ///
-    /// For the "vfs" library it is more convenient that this method allows non-exclusive
-    /// access.  And as the implementation is employing internal mutability there are no downsides.
-    /// This way `ExecutionScope` can actually also implement [`futures::task::Spawn`] - it just was
-    /// not necessary for now.
-    pub fn spawn_with_shutdown<Constructor, Task>(&self, constructor: Constructor)
-    where
-        Constructor: FnOnce(oneshot::Receiver<()>) -> Task + 'static,
-        Task: Future<Output = ()> + Send + 'static,
-    {
-        let (sender, receiver) = oneshot::channel();
-        Executor::run_abort_with_shutdown(self.executor.clone(), constructor(receiver), sender)
+    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+        // We consider the task as active until it first runs. Otherwise, it is possible to shut
+        // down the executor before the task has been dropped which would deny it the opportunity to
+        // correctly spawn a task in its drop function.
+        self.executor.inner.lock().unwrap().active_count += 1;
+        fuchsia_async::Task::spawn(TaskRunner {
+            task,
+            task_state: TaskState { executor: self.executor.clone(), task_id: usize::MAX },
+        })
+        .detach();
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -144,7 +175,7 @@ impl ExecutionScope {
     pub async fn wait(&self) {
         let receiver = {
             let mut this = self.executor.inner.lock().unwrap();
-            if this.running.is_empty() {
+            if this.registered.is_empty() && this.active_count == 0 {
                 None
             } else {
                 let (sender, receiver) = oneshot::channel::<()>();
@@ -155,6 +186,24 @@ impl ExecutionScope {
         if let Some(receiver) = receiver {
             receiver.await.unwrap();
         }
+    }
+
+    /// Prevents the executor from shutting down whilst the guard is held. Returns None if the
+    /// executor is shutting down.
+    pub fn try_active_guard(&self) -> Option<ActiveGuard> {
+        let mut inner = self.executor.inner.lock().unwrap();
+        if inner.is_shutdown {
+            return None;
+        }
+        inner.active_count += 1;
+        Some(ActiveGuard(self.executor.clone()))
+    }
+
+    /// As above, but succeeds even if the executor is shutting down. This can be used in drop
+    /// implementations to spawn tasks that *must* run before the executor shuts down.
+    pub fn active_guard(&self) -> ActiveGuard {
+        self.executor.inner.lock().unwrap().active_count += 1;
+        ActiveGuard(self.executor.clone())
     }
 }
 
@@ -197,9 +246,10 @@ impl ExecutionScopeParams {
             executor: Arc::new(Executor {
                 token_registry: TokenRegistry::new(),
                 inner: Mutex::new(Inner {
-                    running: Slab::new(),
+                    registered: Slab::new(),
                     waiters: Vec::new(),
                     is_shutdown: false,
+                    active_count: 0,
                 }),
             }),
             entry_constructor: self.entry_constructor,
@@ -207,105 +257,70 @@ impl ExecutionScopeParams {
     }
 }
 
-// A future that completes when either of two futures completes.
-#[pin_project]
-struct FirstToFinish<A, B> {
-    #[pin]
-    first: A,
-    #[pin]
-    second: B,
+struct TaskState {
+    executor: Arc<Executor>,
+    task_id: usize,
 }
 
-impl<A: Future, B: Future> Future for FirstToFinish<A, B> {
+impl Drop for TaskState {
+    fn drop(&mut self) {
+        self.executor
+            .inner
+            .lock()
+            .unwrap()
+            .task_did_finish(std::mem::replace(&mut self.task_id, usize::MAX));
+    }
+}
+
+#[pin_project]
+struct TaskRunner<F> {
+    #[pin]
+    task: F,
+    // Must be dropped *after* task above.
+    task_state: TaskState,
+}
+
+impl<F: 'static + Future<Output = ()> + Send> Future for TaskRunner<F> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.project();
-        if let Poll::Ready(_) = this.first.poll(cx) {
-            Poll::Ready(())
-        } else if let Poll::Ready(_) = this.second.poll(cx) {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+        if this
+            .task_state
+            .executor
+            .inner
+            .lock()
+            .unwrap()
+            .register_task(&mut this.task_state.task_id, cx.waker().clone())
+        {
+            return Poll::Ready(());
         }
+        this.task.poll(cx)
     }
 }
-
-trait OrFuture
-where
-    Self: Sized,
-{
-    fn or<B: Future>(self, second: B) -> FirstToFinish<Self, B> {
-        FirstToFinish { first: self, second }
-    }
-}
-
-impl<A> OrFuture for A {}
 
 impl Executor {
-    fn run_abort_any_time<F: 'static + Future<Output = ()> + Send>(
-        executor: Arc<Executor>,
-        task: F,
-    ) {
-        let (sender, receiver) = oneshot::channel();
-        Self::run_abort_with_shutdown(executor, task.or(receiver), sender)
-    }
-
-    fn run_abort_with_shutdown<F: 'static + Future + Send>(
-        executor: Arc<Executor>,
-        task: F,
-        shutdown: oneshot::Sender<()>,
-    ) {
-        let task_id = {
-            let mut this = executor.inner.lock().unwrap();
-
-            let shutdown = if this.is_shutdown {
-                shutdown
-                    .send(())
-                    .expect("Shutdown receiver was dropped before its task was started");
-                None
-            } else {
-                Some(shutdown)
-            };
-            this.running.insert(shutdown)
-        };
-
-        fuchsia_async::Task::spawn(task.map(move |_| executor.task_did_finish(task_id))).detach();
-    }
-
     fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = true;
-        for (_key, task) in inner.running.iter_mut() {
-            // As the task removal is processed by the task itself, we may see cases when we have
-            // already sent the stop message, but the task did not remove its entry from the list
-            // just yet.  There is a race condition with the task shutdown process.  Shutdown
-            // happens in one thread, while task execution - in another.  So, we need to tolerate
-            // "double" removal either here, or in the task shutdown code.  Making the task shutodwn
-            // code responsible from removing itself from the `running` list seems a bit cleaner.
-            if let Some(sender) = task.take() {
-                // If the task is in the process of finishing by itself, there's a small window
-                // where the receiver could have been dropped before the task has been removed from
-                // the running list, so ignore errors here.
-                let _ = sender.send(());
-            }
-        }
-    }
-
-    fn task_did_finish(&self, task_id: usize) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.running.remove(task_id);
-        if inner.running.is_empty() {
-            for waiter in inner.waiters.drain(..) {
-                let _ = waiter.send(());
-            }
-        }
+        inner.check_active_count();
     }
 }
 
 impl Drop for Executor {
     fn drop(&mut self) {
         self.shutdown();
+    }
+}
+
+// ActiveGuard prevents the executor from shutting down until the guard is dropped.
+pub struct ActiveGuard(Arc<Executor>);
+
+impl Drop for ActiveGuard {
+    fn drop(&mut self) {
+        let mut inner = self.0.inner.lock().unwrap();
+        inner.active_count -= 1;
+        inner.check_active_count();
     }
 }
 
@@ -316,17 +331,12 @@ mod tests {
     use crate::directory::mutable::entry_constructor::EntryConstructor;
 
     use {
-        fuchsia_async::{TestExecutor, Time, Timer},
+        fuchsia_async::{Task, TestExecutor, Time, Timer},
         fuchsia_zircon::prelude::*,
-        futures::{
-            channel::{mpsc, oneshot},
-            select,
-            task::Poll,
-            Future, FutureExt, StreamExt,
-        },
+        futures::{channel::oneshot, task::Poll, Future},
         pin_utils::pin_mut,
         std::sync::{
-            atomic::{AtomicUsize, Ordering},
+            atomic::{AtomicBool, Ordering},
             Arc,
         },
     };
@@ -427,84 +437,59 @@ mod tests {
         });
     }
 
-    #[test]
-    fn spawn_with_shutdown() {
-        run_test(|scope| async move {
-            let (processing_done_sender, processing_done_receiver) = oneshot::channel();
-            let (shutdown_complete_sender, shutdown_complete_receiver) = oneshot::channel();
-
-            scope.spawn_with_shutdown(|_shutdown| async move {
-                processing_done_receiver.await.unwrap();
-                shutdown_complete_sender.send(()).unwrap();
-            });
-
-            processing_done_sender.send(()).unwrap();
-
-            shutdown_complete_receiver.await.unwrap();
-        });
-    }
-
-    #[test]
-    fn spawn_with_shutdown_after_shutdown_receives_shutdown_signal() {
-        run_test(|scope| async move {
-            scope.spawn_with_shutdown({
-                let scope = scope.clone();
-                |shutdown| async move {
-                    let _ = shutdown.await;
-                    scope.spawn_with_shutdown(|shutdown| async move {
-                        let _ = shutdown.await;
-                    });
-                }
-            });
-            scope.shutdown();
-            scope.wait().await;
-        });
-    }
-
-    #[test]
-    fn explicit_shutdown() {
-        run_test(|scope| async move {
-            let (tick_sender, tick_receiver) = mpsc::unbounded();
-            let (tick_confirmation_sender, mut tick_confirmation_receiver) = mpsc::unbounded();
-            let (shutdown_complete_sender, shutdown_complete_receiver) = oneshot::channel();
-
-            let tick_count = Arc::new(AtomicUsize::new(0));
-
-            scope.spawn_with_shutdown({
-                let tick_count = tick_count.clone();
-
-                |shutdown| async move {
-                    let mut tick_receiver = tick_receiver.fuse();
-                    let mut shutdown = shutdown.fuse();
-                    loop {
-                        select! {
-                            tick = tick_receiver.next() => {
-                                tick.unwrap();
-                                tick_count.fetch_add(1, Ordering::Relaxed);
-                                tick_confirmation_sender.unbounded_send(()).unwrap();
-                            },
-                            _ = shutdown => break,
-                        }
+    #[fuchsia::test]
+    async fn test_active_guard() {
+        let scope = ExecutionScope::new();
+        let (guard_taken_tx, guard_taken_rx) = oneshot::channel();
+        let (shutdown_triggered_tx, shutdown_triggered_rx) = oneshot::channel();
+        let (drop_task_tx, drop_task_rx) = oneshot::channel();
+        let scope_clone = scope.clone();
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        scope.spawn(async move {
+            {
+                struct OnDrop((ExecutionScope, Option<oneshot::Receiver<()>>));
+                impl Drop for OnDrop {
+                    fn drop(&mut self) {
+                        let guard = self.0 .0.active_guard();
+                        let rx = self.0 .1.take().unwrap();
+                        Task::spawn(async move {
+                            rx.await.unwrap();
+                            std::mem::drop(guard);
+                        })
+                        .detach();
                     }
-                    shutdown_complete_sender.send(()).unwrap();
                 }
-            });
-
-            assert_eq!(tick_count.load(Ordering::Relaxed), 0);
-
-            tick_sender.unbounded_send(()).unwrap();
-            tick_confirmation_receiver.next().await.unwrap();
-            assert_eq!(tick_count.load(Ordering::Relaxed), 1);
-
-            tick_sender.unbounded_send(()).unwrap();
-            tick_confirmation_receiver.next().await.unwrap();
-            assert_eq!(tick_count.load(Ordering::Relaxed), 2);
-
-            scope.shutdown();
-
-            shutdown_complete_receiver.await.unwrap();
-            assert_eq!(tick_count.load(Ordering::Relaxed), 2);
+                let _guard = scope_clone.try_active_guard().unwrap();
+                let _on_drop = OnDrop((scope_clone, Some(drop_task_rx)));
+                guard_taken_tx.send(()).unwrap();
+                shutdown_triggered_rx.await.unwrap();
+                // Stick a timer here and record whether we're done to make sure we get to run to
+                // completion.
+                Timer::new(std::time::Duration::from_millis(100)).await;
+                done_clone.store(true, Ordering::SeqCst);
+            }
         });
+        guard_taken_rx.await.unwrap();
+        scope.shutdown();
+
+        // The task should keep running whilst it has an active guard. Introduce a timer here to
+        // make failing more likely if it's broken.
+        Timer::new(std::time::Duration::from_millis(100)).await;
+        let mut shutdown_wait = std::pin::pin!(scope.wait());
+        assert_eq!(futures::poll!(shutdown_wait.as_mut()), Poll::Pending);
+
+        shutdown_triggered_tx.send(()).unwrap();
+
+        // The drop task should now start running and the executor still shouldn't have finished.
+        Timer::new(std::time::Duration::from_millis(100)).await;
+        assert_eq!(futures::poll!(shutdown_wait.as_mut()), Poll::Pending);
+
+        drop_task_tx.send(()).unwrap();
+
+        shutdown_wait.await;
+
+        assert!(done.load(Ordering::SeqCst));
     }
 
     #[test]

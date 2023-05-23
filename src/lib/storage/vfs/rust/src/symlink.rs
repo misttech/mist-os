@@ -18,7 +18,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::{ControlHandle as _, RequestStream, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{channel::oneshot, select, StreamExt},
+    futures::StreamExt,
     std::sync::Arc,
 };
 
@@ -74,9 +74,7 @@ impl Connection {
         options: SymlinkOptions,
         object_request: ObjectRequest,
     ) {
-        scope.clone().spawn_with_shutdown(move |shutdown| {
-            Self::run(scope, symlink, options, object_request, shutdown)
-        });
+        scope.clone().spawn(Self::run(scope, symlink, options, object_request));
     }
 
     /// Processes requests for this connection until either `shutdown` is notfied, the connection is
@@ -86,20 +84,11 @@ impl Connection {
         symlink: Arc<dyn Symlink>,
         _options: SymlinkOptions,
         object_request: ObjectRequest,
-        mut shutdown: oneshot::Receiver<()>,
     ) {
         let mut connection = Connection { symlink, scope };
         if let Ok(mut requests) = object_request.into_request_stream(&connection).await {
-            while let Some(request) = select! {
-                request = requests.next() => {
-                    if let Some(Ok(request)) = request {
-                        Some(request)
-                    } else {
-                        None
-                    }
-                },
-                _ = shutdown => None,
-            } {
+            while let Some(Ok(request)) = requests.next().await {
+                let Some(_guard) = connection.scope.try_active_guard() else { break };
                 if let Err(e) = connection.handle_request(request).await {
                     if let HandleRequestError::ShutdownWithEpitaph(status) = e {
                         requests.control_handle().shutdown_with_epitaph(status);

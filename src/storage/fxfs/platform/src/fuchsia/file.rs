@@ -16,7 +16,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::{channel::oneshot, future::BoxFuture, join, FutureExt},
+    futures::{future::BoxFuture, join, FutureExt},
     fxfs::{
         async_enter,
         filesystem::SyncOptions,
@@ -82,7 +82,6 @@ impl FxFile {
         scope: ExecutionScope,
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
-        shutdown: oneshot::Receiver<()>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
         if options.is_node {
             Ok(create_node_reference_connection_async(
@@ -90,7 +89,6 @@ impl FxFile {
                 this.take(),
                 options,
                 object_request.take(),
-                shutdown,
             )
             .boxed())
         } else {
@@ -109,7 +107,6 @@ impl FxFile {
                 /*writable=*/ true,
                 /*executable=*/ false,
                 stream,
-                shutdown,
             )
             .boxed())
         }
@@ -231,23 +228,19 @@ impl DirectoryEntry for FxFile {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        flags.to_object_request(server_end).spawn(
-            &scope.clone(),
-            move |object_request, shutdown| {
-                Box::pin(async move {
-                    if !path.is_empty() {
-                        return Err(Status::NOT_FILE);
-                    }
-                    Self::create_connection_async(
-                        OpenedNode::new(self),
-                        scope,
-                        flags.to_file_options()?,
-                        object_request,
-                        shutdown,
-                    )
-                })
-            },
-        );
+        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                if !path.is_empty() {
+                    return Err(Status::NOT_FILE);
+                }
+                Self::create_connection_async(
+                    OpenedNode::new(self),
+                    scope,
+                    flags.to_file_options()?,
+                    object_request,
+                )
+            })
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

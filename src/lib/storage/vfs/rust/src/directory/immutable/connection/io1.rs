@@ -8,7 +8,7 @@
 use crate::{
     directory::{
         connection::{
-            io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
+            io1::{BaseConnection, ConnectionState, DerivedConnection},
             util::OpenDirectory,
         },
         entry::DirectoryEntry,
@@ -21,25 +21,16 @@ use crate::{
     ObjectRequest,
 };
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
-    futures::{channel::oneshot, TryStreamExt as _},
-    std::sync::Arc,
-};
+use {fidl_fuchsia_io as fio, fuchsia_zircon::Status, futures::TryStreamExt as _, std::sync::Arc};
 
 pub struct ImmutableConnection {
     base: BaseConnection<Self>,
 }
 
 impl ImmutableConnection {
-    async fn handle_requests(
-        mut self,
-        requests: fio::DirectoryRequestStream,
-        shutdown: oneshot::Receiver<()>,
-    ) {
-        let mut requests = requests.with_shutdown(shutdown);
+    async fn handle_requests(mut self, mut requests: fio::DirectoryRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
+            let Some(_guard) = self.base.scope.try_active_guard() else { break };
             if !matches!(self.base.handle_request(request).await, Ok(ConnectionState::Alive)) {
                 break;
             }
@@ -61,9 +52,9 @@ impl ImmutableConnection {
         // process of shutting down (this is the only error state currently).  So there is nothing
         // for us to do - the connection will be closed automatically when the connection object is
         // dropped.
-        let _ = scope.spawn_with_shutdown(move |shutdown| async {
+        let _ = scope.spawn(async {
             if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                connection.handle_requests(requests, shutdown).await;
+                connection.handle_requests(requests).await;
             }
         });
     }

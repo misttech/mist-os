@@ -11,7 +11,7 @@ use crate::{
     },
     directory::{
         connection::{
-            io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
+            io1::{BaseConnection, ConnectionState, DerivedConnection},
             util::OpenDirectory,
         },
         entry::DirectoryEntry,
@@ -29,7 +29,7 @@ use {
     anyhow::Error,
     fidl::{endpoints::ServerEnd, Handle},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{channel::oneshot, pin_mut, TryStreamExt as _},
+    futures::{pin_mut, TryStreamExt as _},
     pin_project::pin_project,
     std::{pin::Pin, sync::Arc},
 };
@@ -86,9 +86,9 @@ impl MutableConnection {
         // process of shutting down (this is the only error state currently).  So there is
         // nothing for us to do - the connection will be closed automatically when the
         // connection object is dropped.
-        let _ = scope.spawn_with_shutdown(move |shutdown| async {
+        let _ = scope.spawn(async {
             if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                Self::handle_requests(connection, requests, shutdown).await;
+                Self::handle_requests(connection, requests).await;
             }
         });
     }
@@ -99,7 +99,6 @@ impl MutableConnection {
         directory: Arc<dyn MutableDirectory>,
         options: DirectoryOptions,
         object_request: ObjectRequest,
-        shutdown: oneshot::Receiver<()>,
     ) {
         // Ensure we close the directory if we fail to prepare the connection.
         let directory = OpenDirectory::new(directory);
@@ -107,7 +106,7 @@ impl MutableConnection {
         let connection = Self::new(scope, directory, options);
 
         if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-            Self::handle_requests(connection, requests, shutdown).await
+            connection.handle_requests(requests).await
         }
     }
 
@@ -340,15 +339,11 @@ impl MutableConnection {
         self.base.directory.remove_extended_attribute(name).await
     }
 
-    async fn handle_requests(
-        self,
-        requests: fio::DirectoryRequestStream,
-        shutdown: oneshot::Receiver<()>,
-    ) {
+    async fn handle_requests(self, mut requests: fio::DirectoryRequestStream) {
         let this = Tokenizable::new(self);
         pin_mut!(this);
-        let mut requests = requests.with_shutdown(shutdown);
         while let Ok(Some(request)) = requests.try_next().await {
+            let Some(_guard) = this.base.scope.try_active_guard() else { break };
             if !matches!(
                 Self::handle_request(Pin::as_mut(&mut this), request).await,
                 Ok(ConnectionState::Alive)

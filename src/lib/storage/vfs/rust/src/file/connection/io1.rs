@@ -27,7 +27,7 @@ use {
         sys::{ZX_ERR_NOT_SUPPORTED, ZX_OK},
         HandleBased, Status,
     },
-    futures::{channel::oneshot, select, stream::StreamExt},
+    futures::stream::StreamExt,
     static_assertions::assert_eq_size,
     std::{
         convert::TryInto as _,
@@ -53,18 +53,15 @@ pub fn create_connection<U: 'static + File + FileIo + DirectoryEntry>(
     // If we failed to send the task to the executor, it is probably shut down or is in the
     // process of shutting down (this is the only error state currently). `object_request` and the
     // file will be closed when they're dropped - there seems to be no error to report there.
-    let _ = scope.clone().spawn_with_shutdown(move |shutdown| {
-        create_connection_async(
-            scope,
-            file,
-            options,
-            object_request,
-            readable,
-            writable,
-            executable,
-            shutdown,
-        )
-    });
+    let _ = scope.clone().spawn(create_connection_async(
+        scope,
+        file,
+        options,
+        object_request,
+        readable,
+        writable,
+        executable,
+    ));
 }
 
 /// Same as create_connection, but does not spawn a new task.
@@ -76,7 +73,6 @@ pub async fn create_connection_async<U: 'static + File + FileIo + DirectoryEntry
     readable: bool,
     writable: bool,
     executable: bool,
-    shutdown: oneshot::Receiver<()>,
 ) {
     let file = FidlIoFile { file, seek: 0, is_append: options.is_append };
     create_connection_async_impl(
@@ -87,7 +83,6 @@ pub async fn create_connection_async<U: 'static + File + FileIo + DirectoryEntry
         readable,
         writable,
         executable,
-        shutdown,
     )
     .await
 }
@@ -103,7 +98,6 @@ pub async fn create_raw_connection_async<
     readable: bool,
     writable: bool,
     executable: bool,
-    shutdown: oneshot::Receiver<()>,
 ) {
     let file = RawIoFile { file };
     create_connection_async_impl(
@@ -114,7 +108,6 @@ pub async fn create_raw_connection_async<
         readable,
         writable,
         executable,
-        shutdown,
     )
     .await
 }
@@ -137,7 +130,6 @@ pub async fn create_stream_connection_async<U: 'static + File + DirectoryEntry>(
     writable: bool,
     executable: bool,
     stream: zx::Stream,
-    shutdown: oneshot::Receiver<()>,
 ) {
     assert!(!options.is_node, "Stream based connections can not be used for node references");
     let file = StreamIoFile { file, stream };
@@ -149,7 +141,6 @@ pub async fn create_stream_connection_async<U: 'static + File + DirectoryEntry>(
         readable,
         writable,
         executable,
-        shutdown,
     )
     .await
 }
@@ -161,7 +152,6 @@ pub async fn create_node_reference_connection_async<U: 'static + File + Director
     file: Arc<U>,
     options: FileOptions,
     object_request: ObjectRequest,
-    shutdown: oneshot::Receiver<()>,
 ) {
     assert!(options.is_node);
     create_connection_async_impl(
@@ -172,7 +162,6 @@ pub async fn create_node_reference_connection_async<U: 'static + File + Director
         false,
         false,
         false,
-        shutdown,
     )
     .await
 }
@@ -185,7 +174,6 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
     readable: bool,
     writable: bool,
     executable: bool,
-    shutdown: oneshot::Receiver<()>,
 ) {
     // RAII helper that ensures that the file is closed if we fail to create the connection.
     let file = OpenFile::new(file, scope.clone());
@@ -209,7 +197,7 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
 
     let connection = FileConnection { scope: scope.clone(), file, options };
     if let Ok(requests) = object_request.into_request_stream(&connection).await {
-        connection.handle_requests(shutdown, requests).await
+        connection.handle_requests(requests).await
     }
 }
 
@@ -621,6 +609,8 @@ impl<T: 'static + File + IoOpHandler + CloneFile> OpenFile<T> {
 
     /// Explicitly close the file.
     pub async fn close(&mut self) -> Result<(), Status> {
+        // Hold a guard to make sure close completes.
+        let _guard = self.scope.active_guard();
         let file = self.file.take().ok_or(Status::BAD_HANDLE)?;
         file.close().await
     }
@@ -629,10 +619,12 @@ impl<T: 'static + File + IoOpHandler + CloneFile> OpenFile<T> {
 impl<T: 'static + File + IoOpHandler + CloneFile> Drop for OpenFile<T> {
     fn drop(&mut self) {
         if let Some(file) = self.file.take() {
-            let _ = self.scope.spawn_with_shutdown(|shutdown| async move {
+            let guard = self.scope.active_guard();
+            fuchsia_async::Task::spawn(async move {
                 let _ = file.close().await;
-                std::mem::drop(shutdown);
-            });
+                std::mem::drop(guard);
+            })
+            .detach();
         }
     }
 }
@@ -677,22 +669,9 @@ struct FileConnection<T: 'static + File + IoOpHandler + CloneFile> {
 }
 
 impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
-    async fn handle_requests(
-        mut self,
-        mut shutdown: oneshot::Receiver<()>,
-        mut requests: fio::FileRequestStream,
-    ) {
-        loop {
-            let request = select! {
-                request = requests.next() => {
-                    if let Some(request) = request {
-                        request
-                    } else {
-                        break;
-                    }
-                },
-                _ = shutdown => break,
-            };
+    async fn handle_requests(mut self, mut requests: fio::FileRequestStream) {
+        while let Some(request) = requests.next().await {
+            let Some(_guard) = self.scope.try_active_guard() else { break };
 
             let state = match request {
                 Err(_) => {
@@ -1939,7 +1918,7 @@ mod tests {
 
         let cloned_file = file.clone();
         let cloned_scope = scope.clone();
-        flags.to_object_request(server_end).spawn(&scope, move |object_request, shutdown| {
+        flags.to_object_request(server_end).spawn(&scope, move |object_request| {
             Box::pin(async move {
                 Ok(create_stream_connection_async(
                     cloned_scope,
@@ -1950,7 +1929,6 @@ mod tests {
                     /*writeable=*/ true,
                     /*executable=*/ false,
                     stream,
-                    shutdown,
                 ))
             })
         });

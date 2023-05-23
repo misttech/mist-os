@@ -244,7 +244,7 @@ impl StarnixNodeConnection {
         let file = self.reopen(flags)?;
         flags.to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into())).spawn(
             &scope.clone(),
-            move |object_request, shutdown| {
+            move |object_request| {
                 Box::pin(async move {
                     Ok(file::connection::io1::create_raw_connection_async(
                         scope,
@@ -254,7 +254,6 @@ impl StarnixNodeConnection {
                         true,
                         true,
                         false,
-                        shutdown,
                     ))
                 })
             },

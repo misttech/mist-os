@@ -10,7 +10,7 @@ use {
         epitaph::ChannelEpitaphExt,
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{channel::oneshot, future::BoxFuture},
+    futures::future::BoxFuture,
     std::{
         future::Future,
         ops::{Deref, DerefMut},
@@ -126,7 +126,7 @@ impl ObjectRequest {
     /// For example:
     ///
     ///   object_request.spawn(
-    ///       move |object_request, shutdown| async move {
+    ///       move |object_request| async move {
     ///           // Perform checks on the new connection
     ///           if !valid(...) {
     ///               return Err(zx::Status::INVALID_ARGS);
@@ -142,19 +142,15 @@ impl ObjectRequest {
     ///
     pub fn spawn<F, Fut>(self, scope: &ExecutionScope, f: F)
     where
-        for<'a> F: FnOnce(
-                ObjectRequestRef<'a>,
-                oneshot::Receiver<()>,
-            ) -> BoxFuture<'a, Result<Fut, zx::Status>>
-            + Send
-            + 'static,
+        for<'a> F:
+            FnOnce(ObjectRequestRef<'a>) -> BoxFuture<'a, Result<Fut, zx::Status>> + Send + 'static,
         Fut: Future<Output = ()> + Send,
     {
-        scope.spawn_with_shutdown(move |shutdown| async {
+        scope.spawn(async {
             // This avoids paying the stack cost for ObjectRequest for the lifetime of the task.
             let fut = {
                 let mut object_request = Some(self);
-                match f(ObjectRequestRef(&mut object_request), shutdown).await {
+                match f(ObjectRequestRef(&mut object_request)).await {
                     Err(s) => {
                         if let Some(object_request) = object_request {
                             object_request.shutdown(s);
