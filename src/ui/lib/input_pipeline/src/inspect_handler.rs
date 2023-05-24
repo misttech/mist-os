@@ -118,14 +118,14 @@ impl CircularBuffer {
         CircularBuffer { _size: size, _events: events }
     }
 
-    fn _push(&mut self, event: InputEvent) {
+    fn push(&mut self, event: InputEvent) {
         if self._events.len() >= self._size {
             std::mem::drop(self._events.pop_front());
         }
         self._events.push_back(event);
     }
 
-    fn _record_all_lazy_inspect(&self, inspector: inspect::Inspector) -> inspect::Inspector {
+    fn record_all_lazy_inspect(&self, inspector: inspect::Inspector) -> inspect::Inspector {
         self._events.iter().enumerate().for_each(|(i, &ref event)| {
             let event_clone = event.clone();
             inspector
@@ -156,9 +156,10 @@ pub struct InspectHandler {
     /// The event time at which the last recorded event was generated.
     /// 0 if unset.
     last_generated_timestamp_ns: inspect::IntProperty,
-
     /// An inventory of event counters by type.
     events_by_type: HashMap<EventType, EventCounters>,
+    /// Log of recent events in the order they were received.
+    recent_events_log: Option<Arc<Mutex<CircularBuffer>>>,
 }
 
 #[async_trait(?Send)]
@@ -174,6 +175,9 @@ impl InputHandler for InspectHandler {
             .get(&event_type)
             .unwrap_or_else(|| panic!("no event counters for {}", event_type))
             .count_event(now, event_time, &input_event.handled);
+        if let Some(recent_events_log) = &self.recent_events_log {
+            recent_events_log.lock().await.push(input_event.clone());
+        }
         vec![input_event]
     }
 }
@@ -197,11 +201,11 @@ impl InspectHandler {
         let last_seen_timestamp_ns = node.create_int("last_seen_timestamp_ns", 0);
         let last_generated_timestamp_ns = node.create_int("last_generated_timestamp_ns", 0);
 
-        let _recent_events_log = match displays_recent_events {
+        let recent_events_log = match displays_recent_events {
             true => {
                 let recent_events =
                     Arc::new(Mutex::new(CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE)));
-                Self::record_lazy_recent_events(&node);
+                Self::record_lazy_recent_events(&node, Arc::clone(&recent_events));
                 Some(recent_events)
             }
             false => None,
@@ -224,14 +228,16 @@ impl InspectHandler {
             last_seen_timestamp_ns,
             last_generated_timestamp_ns,
             events_by_type,
+            recent_events_log,
         })
     }
 
-    fn record_lazy_recent_events(node: &inspect::Node) {
-        node.record_lazy_child("recent_events_log", || {
+    fn record_lazy_recent_events(node: &inspect::Node, recent_events: Arc<Mutex<CircularBuffer>>) {
+        node.record_lazy_child("recent_events_log", move || {
+            let recent_events_clone = Arc::clone(&recent_events);
             async move {
                 let inspector = Inspector::default();
-                Ok(inspector)
+                Ok(recent_events_clone.lock().await.record_all_lazy_inspect(inspector))
             }
             .boxed()
         });
@@ -261,14 +267,14 @@ mod tests {
         assert_eq!(circular_buffer._size, MAX_RECENT_EVENT_LOG_SIZE);
 
         let first_event_time = zx::Time::get_monotonic();
-        circular_buffer._push(testing_utilities::create_fake_input_event(first_event_time));
+        circular_buffer.push(testing_utilities::create_fake_input_event(first_event_time));
         let second_event_time = zx::Time::get_monotonic();
-        circular_buffer._push(testing_utilities::create_fake_input_event(second_event_time));
+        circular_buffer.push(testing_utilities::create_fake_input_event(second_event_time));
 
         // Fill up `events` VecDeque
         for _i in 2..MAX_RECENT_EVENT_LOG_SIZE {
             let curr_event_time = zx::Time::get_monotonic();
-            circular_buffer._push(testing_utilities::create_fake_input_event(curr_event_time));
+            circular_buffer.push(testing_utilities::create_fake_input_event(curr_event_time));
             match circular_buffer._events.back() {
                 Some(event) => assert_eq!(event.event_time, curr_event_time),
                 None => assert!(false),
@@ -283,7 +289,7 @@ mod tests {
 
         // CircularBuffer `events` should be full, pushing another event should remove the first event.
         let last_event_time = zx::Time::get_monotonic();
-        circular_buffer._push(testing_utilities::create_fake_input_event(last_event_time));
+        circular_buffer.push(testing_utilities::create_fake_input_event(last_event_time));
         match circular_buffer._events.front() {
             Some(event) => assert_eq!(event.event_time, second_event_time),
             None => assert!(false),
@@ -346,9 +352,9 @@ mod tests {
         ];
 
         for event in recent_events.iter() {
-            recent_events_log._push(event.clone());
+            recent_events_log.push(event.clone());
         }
-        inspector = recent_events_log._record_all_lazy_inspect(inspector);
+        inspector = recent_events_log.record_all_lazy_inspect(inspector);
         assert_data_tree!(inspector, root: {
             keyboard_event_0: {},
             consumer_controls_event_1: {},
@@ -656,7 +662,9 @@ mod tests {
                 events_count: 1u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 43i64,
-                recent_events_log: {},
+                recent_events_log: {
+                    fake_event_0: {},
+                },
                 consumer_controls: {
                      events_count: 0u64,
                      handled_events_count: 0u64,
@@ -713,7 +721,10 @@ mod tests {
                 events_count: 2u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
-                recent_events_log: {},
+                recent_events_log: {
+                    fake_event_0: {},
+                    fake_event_1: {},
+                },
                 consumer_controls: {
                      events_count: 0u64,
                      handled_events_count: 0u64,
@@ -770,7 +781,11 @@ mod tests {
                 events_count: 3u64,
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
-                recent_events_log: {},
+                recent_events_log: {
+                    fake_event_0: {},
+                    fake_event_1: {},
+                    fake_event_2: {},
+                },
                 consumer_controls: {
                      events_count: 0u64,
                      handled_events_count: 0u64,
