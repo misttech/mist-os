@@ -159,7 +159,37 @@ func NewSystemUpdater(repo *packages.Repository, updatePackageUrl string) *Syste
 
 func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 	startTime := time.Now()
-	server, err := c.ServePackageRepository(ctx, u.repo, "download-ota", true, nil)
+
+	repoName := "download-ota"
+	tempDir, err := os.MkdirTemp("", "update-pkg-expand")
+	if err != nil {
+		return fmt.Errorf("unable to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	url, err := url.Parse(u.updatePackageUrl)
+	if err != nil {
+		return fmt.Errorf("invalid update package URL %q: %w", u.updatePackageUrl, err)
+	}
+
+	if err := rehostPackageRepository(ctx, u.repo, url, repoName, tempDir); err != nil {
+		return fmt.Errorf("failed to rehost the package repository: %q", err)
+	}
+
+	pkgBuilder, err := packages.NewPackageBuilderFromDir(tempDir, "system_update", "0", "testrepository.com")
+	if err != nil {
+		return fmt.Errorf("Failed to parse package from %q: %w", tempDir, err)
+	}
+	defer pkgBuilder.Close()
+
+	pkgPath, pkgMerkle, err := pkgBuilder.Publish(ctx, u.repo)
+	if err != nil {
+		return fmt.Errorf("Failed to publish update package: %w", err)
+	}
+
+	logger.Infof(ctx, "published %q as %q to %q", pkgPath, pkgMerkle, u.repo)
+
+	server, err := c.ServePackageRepository(ctx, u.repo, repoName, true, nil)
 	if err != nil {
 		return fmt.Errorf("error setting up server: %w", err)
 	}
@@ -252,8 +282,8 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	if err := pkg.Expand(ctx, tempDir); err != nil {
-		return fmt.Errorf("failed to expand pkg to %s: %w", tempDir, err)
+	if err := rehostPackageRepository(ctx, u.repo, u.updatePackageURL, "trigger-ota", tempDir); err != nil {
+		return fmt.Errorf("failed to rehost the package repository: %q", err)
 	}
 
 	// Create a ZBI with the omaha_url argument.
@@ -297,25 +327,6 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 
 	logger.Infof(ctx, "Omaha Server URL set in vbmeta to %q", u.omahaTool.URL())
 
-	// Update packages.json in this package.
-	packagesJsonPath := filepath.Join(tempDir, "packages.json")
-	err = util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-		src, err := os.Open(packagesJsonPath)
-		if err != nil {
-			return fmt.Errorf("Failed to open packages.json %q: %w", packagesJsonPath, err)
-		}
-		if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), "trigger-ota"); err != nil {
-			return fmt.Errorf("Failed to rehost packages.json: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("Failed to atomically overwrite %q: %w", packagesJsonPath, err)
-	}
-
-	logger.Infof(ctx, "host names in packages.json set to trigger-ota")
-
 	pkgBuilder, err := packages.NewPackageBuilderFromDir(tempDir, "update_omaha", "0", "testrepository.com")
 	if err != nil {
 		return fmt.Errorf("Failed to parse package from %q: %w", tempDir, err)
@@ -338,4 +349,38 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 
 	// Trigger an update
 	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules)
+}
+
+func rehostPackageRepository(ctx context.Context, repo *packages.Repository, updatePackageUrl *url.URL, repoName string, tempDir string) error {
+	pkg, err := repo.OpenPackage(ctx, updatePackageUrl.Path[1:])
+	if err != nil {
+		return fmt.Errorf("failed to open url %q: %w", updatePackageUrl.String(), err)
+	}
+
+	logger.Infof(ctx, "source update package merkle for %q is %q", updatePackageUrl.String(), pkg.Merkle())
+
+	if err := pkg.Expand(ctx, tempDir); err != nil {
+		return fmt.Errorf("failed to expand pkg to %s: %w", tempDir, err)
+	}
+
+	// Update packages.json in this package.
+	packagesJsonPath := filepath.Join(tempDir, "packages.json")
+	err = util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
+		src, err := os.Open(packagesJsonPath)
+		if err != nil {
+			return fmt.Errorf("Failed to open packages.json %q: %w", packagesJsonPath, err)
+		}
+		if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
+			return fmt.Errorf("Failed to rehost packages.json: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to atomically overwrite %q: %w", packagesJsonPath, err)
+	}
+
+	logger.Infof(ctx, "host names in packages.json set to %w", repoName)
+
+	return nil
 }
