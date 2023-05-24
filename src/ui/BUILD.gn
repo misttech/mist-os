@@ -70,9 +70,9 @@ fuchsia_package("ui_minimal_package") {
 group("ui_packages_base") {
   deps = [
     "a11y",
-    "bin/root_presenter:virtual_keyboard_manager",
     "bin/scene_manager",
     "bin/text:text_manager",
+    "bin/virtual_keyboard_manager",
     "scenic",
   ]
 }

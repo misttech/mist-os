@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_BIN_ROOT_PRESENTER_VIRTUAL_KEYBOARD_COORDINATOR_H_
-#define SRC_UI_BIN_ROOT_PRESENTER_VIRTUAL_KEYBOARD_COORDINATOR_H_
+#ifndef SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_VIRTUAL_KEYBOARD_COORDINATOR_H_
+#define SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_VIRTUAL_KEYBOARD_COORDINATOR_H_
 
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
@@ -14,11 +14,11 @@
 
 #include <memory>
 
-#include "src/ui/bin/root_presenter/focus_listener.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_controller.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_manager.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_listener.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_controller.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_manager.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 class VirtualKeyboardController;
 
@@ -152,6 +152,6 @@ class FidlBoundVirtualKeyboardCoordinator
   fxl::WeakPtrFactory<FidlBoundVirtualKeyboardCoordinator> weak_ptr_factory_;
 };
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager
 
-#endif  // SRC_UI_BIN_ROOT_PRESENTER_VIRTUAL_KEYBOARD_COORDINATOR_H_
+#endif  // SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_VIRTUAL_KEYBOARD_COORDINATOR_H_

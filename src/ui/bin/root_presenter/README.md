@@ -6,4 +6,5 @@ The Root Presenter component has been deprecated and removed. Specifically, it h
   input event dispatch, and
 - [Scene Manager](./../scene_manager/README.md) for creating the root of the global scene graph and
   connecting root-level Views by clients such as Sys UI.
-- Virtual Keyboard Manager for providing virtual keyboard functionality.
+- [Virtual Keyboard Manager](./../virtual_keyboard_manager/README.md) for providing virtual keyboard
+  functionality.

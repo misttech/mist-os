@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/tests/fakes/fake_keyboard_focus_controller.h"
+#include "src/ui/bin/virtual_keyboard_manager/tests/fakes/fake_keyboard_focus_controller.h"
 
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 namespace testing {
 
 using fuchsia::ui::keyboard::focus::Controller;
@@ -41,4 +41,4 @@ void FakeKeyboardFocusController::Notify(ViewRef view_ref, NotifyCallback callba
 }
 
 }  // namespace testing
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

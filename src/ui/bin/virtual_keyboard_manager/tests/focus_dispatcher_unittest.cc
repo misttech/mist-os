@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/focus_dispatcher.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_dispatcher.h"
 
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
@@ -21,10 +21,10 @@
 
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/ui/bin/root_presenter/focus_listener.h"
-#include "src/ui/bin/root_presenter/tests/fakes/fake_keyboard_focus_controller.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_listener.h"
+#include "src/ui/bin/virtual_keyboard_manager/tests/fakes/fake_keyboard_focus_controller.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 using fuchsia::ui::focus::FocusChain;
 using fuchsia::ui::focus::FocusChainListener;
@@ -164,4 +164,4 @@ TEST_F(FocusDispatcherTest, UnsetFocusChain) {
   EXPECT_FALSE(keyboard_notification_received_);
 }
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

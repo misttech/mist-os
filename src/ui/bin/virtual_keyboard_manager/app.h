@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_BIN_ROOT_PRESENTER_APP_H_
-#define SRC_UI_BIN_ROOT_PRESENTER_APP_H_
+#ifndef SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_APP_H_
+#define SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_APP_H_
 
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
@@ -17,11 +17,11 @@
 #include <vector>
 
 #include "src/lib/fxl/macros.h"
-#include "src/ui/bin/root_presenter/focus_dispatcher.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_coordinator.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_manager.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_dispatcher.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_coordinator.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_manager.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 // Class for serving various input and graphics related APIs.
 class App {
@@ -46,6 +46,6 @@ class App {
   FXL_DISALLOW_COPY_AND_ASSIGN(App);
 };
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager
 
-#endif  // SRC_UI_BIN_ROOT_PRESENTER_APP_H_
+#endif  // SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_APP_H_

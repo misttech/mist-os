@@ -50,8 +50,8 @@ executable("virtual_keyboard_unittests_bin") {
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/bin/root_presenter:lib",
-    "//src/ui/bin/root_presenter:virtual_keyboard",
+    "//src/ui/bin/virtual_keyboard_manager:lib",
+    "//src/ui/bin/virtual_keyboard_manager:virtual_keyboard",
   ]
 }
 
@@ -70,7 +70,7 @@ executable("focus_dispatcher_unittests_bin") {
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/bin/root_presenter:lib",
-    "//src/ui/bin/root_presenter/tests/fakes",
+    "//src/ui/bin/virtual_keyboard_manager:lib",
+    "//src/ui/bin/virtual_keyboard_manager/tests/fakes",
   ]
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/app.h"
+#include "src/ui/bin/virtual_keyboard_manager/app.h"
 
 #include <fuchsia/ui/keyboard/focus/cpp/fidl.h>
 #include <lib/fidl/cpp/clone.h>
@@ -14,7 +14,7 @@
 #include <cstdlib>
 #include <string>
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 App::App(sys::ComponentContext* component_context, fit::closure quit_callback)
     : quit_callback_(std::move(quit_callback)),
@@ -23,4 +23,4 @@ App::App(sys::ComponentContext* component_context, fit::closure quit_callback)
   FX_DCHECK(component_context);
 }
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_BIN_ROOT_PRESENTER_FOCUS_DISPATCHER_H_
-#define SRC_UI_BIN_ROOT_PRESENTER_FOCUS_DISPATCHER_H_
+#ifndef SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_FOCUS_DISPATCHER_H_
+#define SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_FOCUS_DISPATCHER_H_
 
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/keyboard/focus/cpp/fidl.h>
@@ -13,9 +13,9 @@
 #include <memory>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
-#include "src/ui/bin/root_presenter/focus_listener.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_listener.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 // Forwards the focus change messages from fuchsia.ui.focus.FocusChainListener to
 // fuchsia.ui.keyboard.focus.Controller.
@@ -53,6 +53,6 @@ class FocusDispatcher : public fuchsia::ui::focus::FocusChainListener {
   fxl::WeakPtr<FocusListener> local_focus_listener_;
 };
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager
 
-#endif  // SRC_UI_BIN_ROOT_PRESENTER_FOCUS_DISPATCHER_H_
+#endif  // SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_FOCUS_DISPATCHER_H_

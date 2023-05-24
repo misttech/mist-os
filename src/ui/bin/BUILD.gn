@@ -7,9 +7,9 @@ group("bin") {
   deps = [
     "brightness_manager",
     "clipboard",
-    "root_presenter:virtual_keyboard_manager",
     "scene_manager",
     "text:text_manager",
+    "virtual_keyboard_manager",
   ]
 }
 
@@ -19,9 +19,9 @@ group("tests") {
   deps = [
     "brightness_manager:tests",
     "clipboard:tests",
-    "root_presenter:tests",
     "scene_manager:scene_manager_tests",
     "terminal:tests",
     "text:tests",
+    "virtual_keyboard_manager:tests",
   ]
 }

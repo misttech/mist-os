@@ -9,6 +9,6 @@
 #include "hid-parser/usages.h"
 #include "hid/usages.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 namespace {}  // namespace
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

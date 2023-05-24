@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_BIN_ROOT_PRESENTER_VIRTUAL_KEYBOARD_MANAGER_H_
-#define SRC_UI_BIN_ROOT_PRESENTER_VIRTUAL_KEYBOARD_MANAGER_H_
+#ifndef SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_VIRTUAL_KEYBOARD_MANAGER_H_
+#define SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_VIRTUAL_KEYBOARD_MANAGER_H_
 
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 
@@ -11,7 +11,7 @@
 #include "lib/sys/cpp/component_context.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 class VirtualKeyboardCoordinator;
 
@@ -74,6 +74,6 @@ class VirtualKeyboardManager : public fuchsia::input::virtualkeyboard::Manager {
   WatchTypeAndVisibilityCallback watch_callback_;
 };
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager
 
-#endif  // SRC_UI_BIN_ROOT_PRESENTER_VIRTUAL_KEYBOARD_MANAGER_H_
+#endif  // SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_VIRTUAL_KEYBOARD_MANAGER_H_

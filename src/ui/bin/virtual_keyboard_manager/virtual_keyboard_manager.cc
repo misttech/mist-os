@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/virtual_keyboard_manager.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_manager.h"
 
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_request.h>
@@ -15,9 +15,9 @@
 #include <utility>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_coordinator.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_coordinator.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 VirtualKeyboardManager::VirtualKeyboardManager(
     fxl::WeakPtr<VirtualKeyboardCoordinator> coordinator,
@@ -88,4 +88,4 @@ void VirtualKeyboardManager::MaybeNotifyWatcher() {
   }
 }
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

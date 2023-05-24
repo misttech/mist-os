@@ -8,7 +8,7 @@
 
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
-#include "src/ui/bin/root_presenter/app.h"
+#include "src/ui/bin/virtual_keyboard_manager/app.h"
 
 int main(int argc, const char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
@@ -20,7 +20,7 @@ int main(int argc, const char** argv) {
   std::unique_ptr<sys::ComponentContext> component_context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  root_presenter::App app(component_context.get(), [&loop] { loop.Quit(); });
+  virtual_keyboard_manager::App app(component_context.get(), [&loop] { loop.Quit(); });
 
   loop.Run();
   return 0;

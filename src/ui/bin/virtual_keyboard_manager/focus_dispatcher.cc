@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/focus_dispatcher.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_dispatcher.h"
 
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/keyboard/focus/cpp/fidl.h>
@@ -11,9 +11,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
-#include "src/ui/bin/root_presenter/focus_listener.h"
+#include "src/ui/bin/virtual_keyboard_manager/focus_listener.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 using fuchsia::ui::focus::FocusChain;
 using fuchsia::ui::focus::FocusChainListener;
@@ -70,4 +70,4 @@ void FocusDispatcher::OnFocusChange(FocusChain new_focus_chain,
   callback();
 }
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

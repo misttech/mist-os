@@ -1268,7 +1268,7 @@ assembly_input_bundle("ui_eng") {
     "//src/ui/a11y/bin/a11y_manager:a11y-manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/scenic:scenic_pkg",
-    "//src/ui/bin/root_presenter:virtual_keyboard_manager",
+    "//src/ui/bin/virtual_keyboard_manager",
     "//src/ui/bin/scene_manager",
   ]
 }
@@ -1283,7 +1283,7 @@ assembly_input_bundle("ui_user_and_userdebug") {
     "//src/ui/a11y/bin/a11y_manager:a11y-manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/scenic:scenic_pkg",
-    "//src/ui/bin/root_presenter:virtual_keyboard_manager",
+    "//src/ui/bin/virtual_keyboard_manager",
     "//src/ui/bin/scene_manager",
   ]
 }

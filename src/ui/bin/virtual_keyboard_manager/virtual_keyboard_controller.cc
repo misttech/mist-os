@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/virtual_keyboard_controller.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_controller.h"
 
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/types.h>
@@ -10,9 +10,9 @@
 #include <memory>
 #include <utility>
 
-#include "src/ui/bin/root_presenter/virtual_keyboard_coordinator.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_coordinator.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 FidlBoundVirtualKeyboardController::FidlBoundVirtualKeyboardController(
     fxl::WeakPtr<VirtualKeyboardCoordinator> coordinator, zx_koid_t view_koid,
@@ -91,4 +91,4 @@ void FidlBoundVirtualKeyboardController::NotifyCoordinator() {
   }
 }
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

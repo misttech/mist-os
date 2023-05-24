@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/virtual_keyboard_coordinator.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_coordinator.h"
 
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
@@ -15,7 +15,7 @@
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 namespace virtual_keyboard_coordinator {
 namespace {
 
@@ -110,4 +110,4 @@ TEST_F(VirtualKeyboardCoordinatorTest, RequestTypeAndVisibilityDoesNotCrash) {
 
 }  // namespace
 }  // namespace virtual_keyboard_coordinator
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

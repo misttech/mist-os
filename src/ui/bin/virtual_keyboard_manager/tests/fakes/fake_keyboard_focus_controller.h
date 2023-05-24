@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_BIN_ROOT_PRESENTER_TESTS_FAKES_FAKE_KEYBOARD_FOCUS_CONTROLLER_H_
-#define SRC_UI_BIN_ROOT_PRESENTER_TESTS_FAKES_FAKE_KEYBOARD_FOCUS_CONTROLLER_H_
+#ifndef SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_TESTS_FAKES_FAKE_KEYBOARD_FOCUS_CONTROLLER_H_
+#define SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_TESTS_FAKES_FAKE_KEYBOARD_FOCUS_CONTROLLER_H_
 
 #include <fuchsia/ui/keyboard/focus/cpp/fidl.h>
 #include <fuchsia/ui/keyboard/focus/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
-namespace root_presenter::testing {
+namespace virtual_keyboard_manager::testing {
 
 // A fake server for "fuchsia.ui.keyboard.focus.Controller".
 //
@@ -53,6 +53,6 @@ class FakeKeyboardFocusController
   std::function<void(const fuchsia::ui::views::ViewRef& received_view_ref)> on_notify_callback_;
 };
 
-}  // namespace root_presenter::testing
+}  // namespace virtual_keyboard_manager::testing
 
-#endif  // SRC_UI_BIN_ROOT_PRESENTER_TESTS_FAKES_FAKE_KEYBOARD_FOCUS_CONTROLLER_H_
+#endif  // SRC_UI_BIN_VIRTUAL_KEYBOARD_MANAGER_TESTS_FAKES_FAKE_KEYBOARD_FOCUS_CONTROLLER_H_

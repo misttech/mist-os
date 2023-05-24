@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/bin/root_presenter/virtual_keyboard_coordinator.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_coordinator.h"
 
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
@@ -11,9 +11,9 @@
 #include <memory>
 
 #include "fuchsia/input/virtualkeyboard/cpp/fidl.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_controller.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_controller.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 
 FidlBoundVirtualKeyboardCoordinator::FidlBoundVirtualKeyboardCoordinator(
     sys::ComponentContext* component_context)
@@ -211,4 +211,4 @@ std::optional<zx_koid_t> FidlBoundVirtualKeyboardCoordinator::ApplyFocusedReques
   return view_koid;
 }
 
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager

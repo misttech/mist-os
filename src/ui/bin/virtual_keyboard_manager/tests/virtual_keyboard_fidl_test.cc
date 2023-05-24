@@ -14,10 +14,10 @@
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 
-#include "src/ui/bin/root_presenter/virtual_keyboard_controller.h"
-#include "src/ui/bin/root_presenter/virtual_keyboard_coordinator.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_controller.h"
+#include "src/ui/bin/virtual_keyboard_manager/virtual_keyboard_coordinator.h"
 
-namespace root_presenter {
+namespace virtual_keyboard_manager {
 namespace virtual_keyboard_fidl {
 namespace {
 
@@ -1032,4 +1032,4 @@ TEST_F(VirtualKeyboardFidlTest, UnfocusedControllerCannotHideKeyboard) {
 
 }  // namespace
 }  // namespace virtual_keyboard_fidl
-}  // namespace root_presenter
+}  // namespace virtual_keyboard_manager
