@@ -20,7 +20,7 @@ macro_rules! cstr {
         // It is always safe to create a CStr from a null-terminated string.
         // If there are interior null bytes, the string will just end early.
         unsafe {
-            ::std::ffi::CStr::from_ptr::<'static>(
+            ::core::ffi::CStr::from_ptr::<'static>(
                 concat!($s, "\0").as_ptr() as *const $crate::__libc_reexport::c_char
             )
         }
