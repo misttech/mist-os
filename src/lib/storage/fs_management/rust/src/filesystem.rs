@@ -189,7 +189,7 @@ impl Filesystem {
             Mode::Component { format_options, .. } => {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-                proxy.format(channel, format_options).await?.map_err(Status::from_raw)?;
+                proxy.format(channel, &format_options).await?.map_err(Status::from_raw)?;
             }
             Mode::Legacy(mut config) => {
                 // SpawnAction is not Send, so make sure it is dropped before any `await`s.

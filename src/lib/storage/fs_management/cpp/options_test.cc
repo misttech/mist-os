@@ -23,9 +23,18 @@ void AssertStartOptionsEqual(const fuchsia_fs_startup::wire::StartOptions& a,
 
 void AssertFormatOptionsEqual(const fuchsia_fs_startup::wire::FormatOptions& a,
                               const fuchsia_fs_startup::wire::FormatOptions& b) {
-  ASSERT_EQ(a.verbose, b.verbose);
-  ASSERT_EQ(a.num_inodes, b.num_inodes);
-  ASSERT_EQ(a.deprecated_padded_blobfs_format, b.deprecated_padded_blobfs_format);
+  ASSERT_EQ(a.has_verbose(), b.has_verbose());
+  if (a.has_verbose())
+    ASSERT_EQ(a.verbose(), b.verbose());
+  ASSERT_EQ(a.has_num_inodes(), b.has_num_inodes());
+  if (a.has_num_inodes())
+    ASSERT_EQ(a.num_inodes(), b.num_inodes());
+  ASSERT_EQ(a.has_deprecated_padded_blobfs_format(), b.has_deprecated_padded_blobfs_format());
+  if (a.has_deprecated_padded_blobfs_format())
+    ASSERT_EQ(a.deprecated_padded_blobfs_format(), b.deprecated_padded_blobfs_format());
+  ASSERT_EQ(a.has_sectors_per_cluster(), b.has_sectors_per_cluster());
+  if (a.has_sectors_per_cluster())
+    ASSERT_EQ(a.sectors_per_cluster(), b.sectors_per_cluster());
 }
 
 TEST(MountOptionsTest, DefaultOptions) {
@@ -109,30 +118,37 @@ TEST(MountOptionsTest, ZstdChunkedEvictImmediately) {
 TEST(MkfsOptionsTest, DefaultOptions) {
   MkfsOptions options;
   std::vector<std::string> expected_argv = {kTestBinary, "mkfs"};
-  fuchsia_fs_startup::wire::FormatOptions expected_format_options;
+  fidl::Arena arena;
+  auto expected_format_options = fuchsia_fs_startup::wire::FormatOptions::Builder(arena)
+                                     .verbose(false)
+                                     .deprecated_padded_blobfs_format(false)
+                                     .Build();
 
   ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
-  AssertFormatOptionsEqual(options.as_format_options(), expected_format_options);
+  AssertFormatOptionsEqual(options.as_format_options(arena), expected_format_options);
 }
 
 TEST(MkfsOptionsTest, AllOptionsSet) {
   MkfsOptions options{
       .fvm_data_slices = 10,
       .verbose = true,
+      .sectors_per_cluster = 2,
       .deprecated_padded_blobfs_format = true,
       .num_inodes = 100,
   };
   std::vector<std::string> expected_argv = {
       kTestBinary, "-v",  "--fvm_data_slices", "10", "--deprecated_padded_format", "--num_inodes",
       "100",       "mkfs"};
-  fuchsia_fs_startup::wire::FormatOptions expected_format_options{
-      .verbose = true,
-      .deprecated_padded_blobfs_format = true,
-      .num_inodes = 100,
-  };
+  fidl::Arena arena;
+  auto expected_format_options = fuchsia_fs_startup::wire::FormatOptions::Builder(arena)
+                                     .verbose(true)
+                                     .deprecated_padded_blobfs_format(true)
+                                     .num_inodes(100)
+                                     .sectors_per_cluster(2)
+                                     .Build();
 
   ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
-  AssertFormatOptionsEqual(options.as_format_options(), expected_format_options);
+  AssertFormatOptionsEqual(options.as_format_options(arena), expected_format_options);
 }
 
 TEST(FsckOptionsTest, DefaultOptions) {

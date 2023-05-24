@@ -3,12 +3,13 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
 
-rustc_binary("block_adapter") {
+rustc_library("block_adapter_lib") {
+  name = "block_adapter"
   edition = "2021"
-  with_unit_tests = true
 
-  sources = [ "src/main.rs" ]
+  sources = [ "src/lib.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -23,4 +24,18 @@ rustc_binary("block_adapter") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
   ]
+}
+
+rustc_binary("block_adapter") {
+  edition = "2021"
+  deps = [
+    ":block_adapter_lib",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:anyhow",
+  ]
+  sources = [ "src/main.rs" ]
 }

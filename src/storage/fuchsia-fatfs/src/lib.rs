@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{directory::FatDirectory, filesystem::FatFilesystem, node::Node},
+    crate::{filesystem::FatFilesystem, node::Node},
     anyhow::Error,
     fatfs::FsOptions,
     fidl_fuchsia_fs::{AdminRequest, AdminShutdownResponder},
@@ -22,6 +22,8 @@ mod node;
 mod refs;
 mod types;
 mod util;
+
+pub use {directory::FatDirectory, util::fatfs_error_to_status};
 
 #[cfg(fuzz)]
 mod fuzzer;
@@ -84,7 +86,7 @@ impl FatFs {
 
     /// Get the root directory of this filesystem.
     /// The caller must call close() on the returned entry when it's finished with it.
-    pub fn get_root(&self) -> Result<Arc<dyn RootDirectory>, Status> {
+    pub fn get_root(&self) -> Result<Arc<FatDirectory>, Status> {
         // Make sure it's open.
         self.root.open_ref(&self.inner.lock().unwrap())?;
         Ok(self.root.clone())
