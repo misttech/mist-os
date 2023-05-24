@@ -41,6 +41,13 @@
             to: "#ffx-laboratory",
         },
         {
+            protocol: [
+                "fuchsia.posix.socket.Provider",
+            ],
+            from: "#network",
+            to: "#ffx-laboratory",
+        },
+        {
             storage: "laboratory-data",
             from: "self",
             as: "data",
