@@ -3462,8 +3462,7 @@ mod tests {
     use super::*;
     use {
         assert_matches::assert_matches,
-        cm_json::{self, Error as JsonError},
-        error::Error,
+        error::{Error, Location},
         serde_json::{self, json},
         serde_json5,
         std::path::Path,
@@ -3497,16 +3496,23 @@ mod tests {
         assert_matches!("#invalid-child^".parse::<OfferFromRef>(), Err(_));
     }
 
-    fn parse_as_ref(input: &str) -> Result<OfferFromRef, JsonError> {
-        serde_json::from_value::<OfferFromRef>(cm_json::from_json_str(
-            input,
-            &Path::new("test.cml"),
-        )?)
-        .map_err(|e| JsonError::parse(format!("{}", e), None, None))
+    fn json_value_from_str(json: &str, filename: &Path) -> Result<Value, Error> {
+        serde_json::from_str(json).map_err(|e| {
+            Error::parse(
+                format!("Couldn't read input as JSON: {}", e),
+                Some(Location { line: e.line(), column: e.column() }),
+                Some(filename),
+            )
+        })
+    }
+
+    fn parse_as_ref(input: &str) -> Result<OfferFromRef, Error> {
+        serde_json::from_value::<OfferFromRef>(json_value_from_str(input, &Path::new("test.cml"))?)
+            .map_err(|e| Error::parse(format!("{}", e), None, None))
     }
 
     #[test]
-    fn test_deserialize_ref() -> Result<(), JsonError> {
+    fn test_deserialize_ref() -> Result<(), Error> {
         assert_matches!(parse_as_ref("\"self\""), Ok(OfferFromRef::Self_));
         assert_matches!(parse_as_ref("\"parent\""), Ok(OfferFromRef::Parent));
         assert_matches!(parse_as_ref("\"#child\""), Ok(OfferFromRef::Named(name)) if name == "child");

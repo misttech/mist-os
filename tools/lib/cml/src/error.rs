@@ -187,18 +187,6 @@ impl From<fidl::Error> for Error {
     }
 }
 
-impl From<cm_json::Error> for Error {
-    fn from(err: cm_json::Error) -> Self {
-        match err {
-            cm_json::Error::Io(err) => Error::Io(err),
-            cm_json::Error::Parse { err, location, filename } => {
-                Error::Parse { err, location: location.map(|loc| loc.into()), filename }
-            }
-            cm_json::Error::Validate { err, filename } => Error::Validate { err, filename },
-        }
-    }
-}
-
 impl From<ParseError> for Error {
     fn from(err: ParseError) -> Self {
         match err {
@@ -211,12 +199,6 @@ impl From<ParseError> for Error {
             ParseError::NotAName => Self::internal("not a name"),
             ParseError::NotAPath => Self::internal("not a path"),
         }
-    }
-}
-
-impl From<cm_json::Location> for Location {
-    fn from(location: cm_json::Location) -> Self {
-        Location { line: location.line, column: location.column }
     }
 }
 
@@ -235,6 +217,7 @@ impl TryFrom<serde_json5::Error> for Location {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::format_err;
     use assert_matches::assert_matches;
     use cm_types as cm;
 
@@ -248,5 +231,39 @@ mod tests {
     fn test_validation_error_message() {
         let result = serde_json::from_str::<cm::Name>("\"foo$\"").map_err(Error::from);
         assert_matches!(result, Err(Error::Validate { .. }));
+    }
+
+    #[test]
+    fn test_parse_error() {
+        let result = Error::parse(format_err!("oops"), None, None);
+        assert_eq!(format!("{}", result), "oops");
+
+        let result = Error::parse(format_err!("oops"), Some(Location { line: 2, column: 3 }), None);
+        assert_eq!(format!("{}", result), "Error at 2:3: oops");
+
+        let result = Error::parse(
+            format_err!("oops"),
+            Some(Location { line: 2, column: 3 }),
+            Some(&Path::new("test.cml")),
+        );
+        assert_eq!(format!("{}", result), "Error at test.cml:2:3: oops");
+
+        let result = Error::parse(
+            format_err!(" --> pest error"),
+            Some(Location { line: 42, column: 42 }),
+            Some(&Path::new("test.cml")),
+        );
+        assert_eq!(format!("{}", result), "Error at test.cml:  --> pest error");
+    }
+
+    #[test]
+    fn test_validation_error() {
+        let mut result = Error::validate(format_err!("oops"));
+        assert_eq!(format!("{}", result), "oops");
+
+        if let Error::Validate { filename, .. } = &mut result {
+            *filename = Some("test.cml".to_string());
+        }
+        assert_eq!(format!("{}", result), "Error at test.cml: oops");
     }
 }
