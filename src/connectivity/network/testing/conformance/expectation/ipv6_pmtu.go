@@ -7,8 +7,7 @@ package expectation
 import "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expectation/outcome"
 
 var ipv6PmtuExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	// TODO(https://fxbug.dev/123534): Expect pass after next release with ANVL fix.
-	{2, 1}: Flaky,
+	{2, 1}: Pass,
 	{2, 2}: Fail,
 	{3, 1}: Fail,
 	{3, 2}: Fail,
@@ -19,8 +18,7 @@ var ipv6PmtuExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 }
 
 var ipv6PmtuExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	// TODO(https://fxbug.dev/123534): Expect pass after next release with ANVL fix.
-	{2, 1}: Flaky,
+	{2, 1}: Fail,
 	{2, 2}: Fail,
 	{3, 1}: Fail,
 	{3, 2}: Fail,

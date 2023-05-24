@@ -65,9 +65,8 @@ var dhcpv6ClientExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{25, 2}: Pass,
 	{25, 3}: Pass,
 	// TODO(http://fxbug.dev/116499): Root-cause and fix.
-	{25, 4}: Flaky,
-	// TODO(http://fxbug.dev/116499): Root-cause and fix.
-	{25, 5}:  Flaky,
+	{25, 4}:  Flaky,
+	{25, 5}:  Pass,
 	{25, 6}:  Pass,
 	{26, 1}:  Fail,
 	{26, 2}:  Fail,
@@ -169,9 +168,8 @@ var dhcpv6ClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCas
 	{25, 2}: Pass,
 	{25, 3}: Pass,
 	// TODO(http://fxbug.dev/116499): Root-cause and fix.
-	{25, 4}: Flaky,
-	// TODO(http://fxbug.dev/116499): Root-cause and fix.
-	{25, 5}:  Flaky,
+	{25, 4}:  Flaky,
+	{25, 5}:  Pass,
 	{25, 6}:  Pass,
 	{26, 1}:  Fail,
 	{26, 2}:  Fail,

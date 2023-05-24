@@ -84,7 +84,7 @@ var ipv6RouterExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{8, 14}:  Pass,
 	{8, 15}:  Pass,
 	{8, 16}:  Pass,
-	{8, 17}:  Flaky, // TODO(https://fxbug.dev/105256): fix flake
+	{8, 17}:  Pass,
 	{9, 1}:   Pass,
 	{9, 2}:   Pass,
 	{9, 3}:   Pass,
@@ -196,7 +196,7 @@ var ipv6RouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{8, 14}:  Pass,
 	{8, 15}:  Fail,
 	{8, 16}:  Fail,
-	{8, 17}:  Flaky, // TODO(https://fxbug.dev/105256): fix flake
+	{8, 17}:  Pass,
 	{9, 1}:   Pass,
 	{9, 2}:   Pass,
 	{9, 3}:   Pass,
