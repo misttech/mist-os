@@ -5,14 +5,18 @@
 #include <fcntl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fdio/spawn.h>
+#include <lib/fdio/vfs.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <zircon/processargs.h>
+
+#include <array>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/launch.h"
+#include "src/lib/storage/fs_management/cpp/admin.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/testing/ram_disk.h"
 
@@ -49,15 +53,17 @@ TEST(FactoryFs, ExportedFilesystemIsMountable) {
     ASSERT_EQ(write(fd.get(), "bar", 3), 3);
   }
 
-  std::string ram_disk_path = ram_disk_or.value().path();
-  const char *argv[] = {"/pkg/bin/export-ffs", staging_path, ram_disk_path.c_str(), nullptr};
-  zx::process process;
-  zx_status_t status = fdio_spawn(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_ALL, argv[0], argv,
-                                  process.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK);
+  {
+    std::string ram_disk_path = ram_disk_or.value().path();
+    const char *argv[] = {"/pkg/bin/export-ffs", staging_path, ram_disk_path.c_str(), nullptr};
+    zx::process process;
+    zx_status_t status = fdio_spawn(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_ALL, argv[0], argv,
+                                    process.reset_and_get_address());
+    ASSERT_EQ(status, ZX_OK);
 
-  status = process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr);
-  ASSERT_EQ(status, ZX_OK);
+    status = process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  }
 
   // Now try and mount Factoryfs.
   ASSERT_EQ(ramdisk_set_flags(ram_disk_or.value().client(), FLAG_READONLY), ZX_OK);
@@ -65,12 +71,36 @@ TEST(FactoryFs, ExportedFilesystemIsMountable) {
   zx::result device = ram_disk_or.value().channel();
   ASSERT_EQ(device.status_value(), ZX_OK);
 
-  auto result =
-      fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatFactoryfs,
-                           fs_management::MountOptions(), fs_management::LaunchStdioAsync);
-  ASSERT_EQ(result.status_value(), ZX_OK);
-  auto data = result->DataRoot();
+  const char *argv[] = {"/pkg/bin/factoryfs", "mount", nullptr};
+  auto outgoing_directory = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_EQ(outgoing_directory.status_value(), ZX_OK);
+
+  fdio_spawn_action_t actions[] = {
+      {.action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+       .h =
+           {
+               .id = FS_HANDLE_BLOCK_DEVICE_ID,
+               .handle = device->TakeChannel().release(),
+           }},
+      {.action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+       .h =
+           {
+               .id = PA_DIRECTORY_REQUEST,
+               .handle = outgoing_directory->server.TakeChannel().release(),
+           }},
+  };
+
+  zx::process proc;
+  char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
+  zx_status_t status = fdio_spawn_etc(
+      ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_STDIO | FDIO_SPAWN_CLONE_ALL, argv[0], argv, nullptr,
+      std::size(actions), actions, proc.reset_and_get_address(), err_msg);
+  ASSERT_EQ(status, ZX_OK);
+  auto kill = fit::defer([&]() { proc.kill(); });
+
+  auto data = fs_management::FsRootHandle(outgoing_directory->client);
   ASSERT_EQ(data.status_value(), ZX_OK);
+
   auto binding = fs_management::NamespaceBinding::Create(kMountPath, std::move(*data));
   ASSERT_EQ(binding.status_value(), ZX_OK);
 
