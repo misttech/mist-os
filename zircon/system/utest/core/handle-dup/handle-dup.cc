@@ -33,39 +33,4 @@ TEST(HandleDup, ReplaceFailureBothInvalid) {
   EXPECT_FALSE(orig_event.is_valid());
   EXPECT_FALSE(failed_event.is_valid());
 }
-
-// UBSan triggers on nullptrs passed as an argument, but these tests are meant
-// to test the kernel's handling of an invalid argument, which we want. So we
-// just disable UBSan for these two tests.
-#ifdef __clang__
-[[clang::no_sanitize("undefined")]]
-#endif
-void TestReplace() {
-  // Call handle_replace with an invalid destination slot. This will cause the handle to get
-  // duplicated in the kernel, but then have to get deleted at the point the copy-out happens.
-  zx::event event;
-
-  ASSERT_OK(zx::event::create(kEventOption, &event));
-
-  // This should fail and not cause the kernel to panic. The event handle is invalidated.
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, zx_handle_replace(event.release(), 0, nullptr));
-}
-
-TEST(HandleDup, Replace) { ASSERT_NO_FATAL_FAILURE(TestReplace()); }
-
-#ifdef __clang__
-[[clang::no_sanitize("undefined")]]
-#endif
-void TestDuplicate() {
-  // Same as above, but using the handle_duplicate to cause the dup to happen in the kernel.
-  zx::event event;
-
-  ASSERT_OK(zx::event::create(kEventOption, &event));
-
-  // This should fail and not cause the kernel to panic.
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, zx_handle_duplicate(event.get(), 0, nullptr));
-}
-
-TEST(HandleDup, Duplicate) { ASSERT_NO_FATAL_FAILURE(TestDuplicate()); }
-
 }  // namespace

@@ -20,8 +20,20 @@
 // user_out_ptr<zx_handle_t>.  System call implementation functions use the
 // make, dup, or transfer method to turn a Dispatcher pointer or another
 // handle into a handle received by the user.
+//
+// user_out_handle will generate a policy exception if destroyed while the
+// enclosed HandleOwner is non-null, as we expect all syscalls to successfully
+// move the Handle to userspace.
 class user_out_handle final {
  public:
+  ~user_out_handle() {
+    if (h_) {
+      // user_out_handle should never go out of scope with a valid handle, so
+      // if it does we raise an exception to the process.
+      Thread::Current::SignalPolicyException(ZX_EXCP_POLICY_CODE_HANDLE_LEAK, 0u);
+    }
+  }
+
   zx_status_t make(fbl::RefPtr<Dispatcher> dispatcher, zx_rights_t rights) {
     h_ = Handle::Make(ktl::move(dispatcher), rights);
     return h_ ? ZX_OK : ZX_ERR_NO_MEMORY;

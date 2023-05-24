@@ -369,10 +369,6 @@ TEST(RestrictedMode, BindState) {
             zx_restricted_bind_state(0xffffffff, v_invalid.reset_and_get_address()));
   ASSERT_FALSE(v_invalid.is_valid());
 
-  // Bad out_handle address.
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_bind_state(0, nullptr));
-  ASSERT_FALSE(v_invalid.is_valid());
-
   // Happy case.
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));

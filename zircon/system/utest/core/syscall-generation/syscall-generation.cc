@@ -3,9 +3,14 @@
 // found in the LICENSE file.
 
 #include <lib/stdcompat/bit.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/exception.h>
 #include <string.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/exception.h>
 #include <zircon/testonly-syscalls.h>
+
+#include <thread>
 
 #include <zxtest/zxtest.h>
 
@@ -49,13 +54,62 @@ TEST(SyscallGenerationTest, HandleCreateSuccess) {
   EXPECT_OK(zx_handle_close(handle));
 }
 
+// Catch and swallow the ZX_EXCP_POLICY_CODE_HANDLE_LEAK exception exactly once.
+void CatchLeakedHandleException(zx::channel* exception_channel) {
+  ASSERT_OK(exception_channel->wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
+
+  // Read the exception out of the channel and verify it's a policy error.
+  uint32_t actual_num_handles, actual_num_bytes;
+  zx::exception exception;
+  zx_exception_info_t info;
+  ASSERT_OK(exception_channel->read(0, &info, exception.reset_and_get_address(), sizeof(info), 1,
+                                    &actual_num_bytes, &actual_num_handles));
+  EXPECT_TRUE(exception.is_valid());
+  EXPECT_EQ(actual_num_bytes, sizeof(info));
+  EXPECT_EQ(actual_num_handles, 1);
+
+  // Get the exception report in order to check the synth code.
+  zx::thread test_thread;
+  ASSERT_OK(exception.get_thread(&test_thread));
+  size_t actual;
+  size_t avail;
+  zx_exception_report_t report;
+  ASSERT_OK(test_thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report,
+                                 sizeof(zx_exception_report_t), &actual, &avail));
+  EXPECT_EQ(actual, avail);
+  EXPECT_EQ(actual, 1);
+
+  ASSERT_TRUE(info.type == ZX_EXCP_POLICY_ERROR &&
+              report.context.synth_code == ZX_EXCP_POLICY_CODE_HANDLE_LEAK);
+
+  constexpr uint32_t kExceptionState = ZX_EXCEPTION_STATE_HANDLED;
+  ASSERT_OK(
+      exception.set_property(ZX_PROP_EXCEPTION_STATE, &kExceptionState, sizeof(kExceptionState)));
+}
+
 TEST(SyscallGenerationTest, HandleCreateFailure) {
+  // Create an exception handler to swallow up leaked handle exceptions.
+  zx::channel exception_channel;
+  ASSERT_OK(zx::thread::self()->create_exception_channel(0, &exception_channel));
+  std::thread exception_handler(CatchLeakedHandleException, &exception_channel);
+
   zx_handle_t handle = ZX_HANDLE_INVALID;
   ASSERT_EQ(ZX_ERR_UNAVAILABLE, zx_syscall_test_handle_create(ZX_ERR_UNAVAILABLE, &handle));
 
   // Returning a non-OK status from the syscall should prevent the abigen
   // wrapper from copying handles out.
   EXPECT_EQ(ZX_HANDLE_INVALID, handle);
+  exception_handler.join();
+}
+
+TEST(SyscallGenerationTest, HandleCopyoutFailure) {
+  // Create an exception handler to swallow up leaked handle exceptions.
+  zx::channel exception_channel;
+  ASSERT_OK(zx::thread::self()->create_exception_channel(0, &exception_channel));
+  std::thread exception_handler(CatchLeakedHandleException, &exception_channel);
+
+  ASSERT_EQ(ZX_ERR_UNAVAILABLE, zx_syscall_test_handle_create(ZX_ERR_UNAVAILABLE, nullptr));
+  exception_handler.join();
 }
 
 // zx_syscall_test_widening_* take four args of 64-bit, 32-bit, 16-bit, and

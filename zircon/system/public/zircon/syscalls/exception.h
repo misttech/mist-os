@@ -78,6 +78,11 @@ __BEGIN_CDECLS
 #define ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_PACKETS   17u
 #define ZX_EXCP_POLICY_CODE_BAD_SYSCALL             18u  // synth_data is the syscall number.
 #define ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_OBSERVERS 19u
+// An invalid zx_handle_t* was passed to a syscall, resulting in a handle leak.
+// This exception is generated when a thread fails to provide a valid target
+// handle buffer for syscalls that return handles. This is temporary until we
+// have fully migrated to HandleTableV3.
+#define ZX_EXCP_POLICY_CODE_HANDLE_LEAK             20u
 
 // A process is starting.
 // This exception is sent to job debuggers only

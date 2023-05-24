@@ -304,18 +304,6 @@ TEST(ProfileTest, CreateProfileWithInvalidHandleIsBadHandle) {
   ASSERT_EQ(ZX_ERR_BAD_HANDLE, zx::profile::create(zx::job(), 0u, nullptr, &profile));
 }
 
-TEST(ProfileTest, CreateProfileWithNullProfileIsInvalidArgs) {
-  zx::unowned_job root_job(zx::job::default_job());
-  ASSERT_TRUE(root_job->is_valid());
-  zx_profile_info_t profile_info = MakeSchedulerProfileInfo(ZX_PRIORITY_DEFAULT);
-
-// Needed to test API coverage of null params in GCC.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wnonnull"
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_profile_create(root_job->get(), 0u, &profile_info, nullptr));
-#pragma GCC diagnostic pop
-}
-
 zx_status_t RunThreadWithProfile(const zx::profile& profile,
                                  const std::function<zx_status_t()>& body) {
   zx_status_t result;

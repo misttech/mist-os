@@ -830,19 +830,6 @@ TEST(Vmar, InvalidArgsTest) {
                   zx_system_get_page_size(), vmo, 0, 4 * zx_system_get_page_size(), &map_addr),
       ZX_ERR_INVALID_ARGS);
 
-  // Bad OUT pointers
-  uintptr_t* bad_addr_ptr = reinterpret_cast<uintptr_t*>(1);
-  zx_handle_t* bad_handle_ptr = reinterpret_cast<zx_handle_t*>(1);
-  EXPECT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
-                             10 * zx_system_get_page_size(), &region, bad_addr_ptr),
-            ZX_ERR_INVALID_ARGS);
-  EXPECT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
-                             10 * zx_system_get_page_size(), bad_handle_ptr, &region_addr),
-            ZX_ERR_INVALID_ARGS);
-  EXPECT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
-                        4 * zx_system_get_page_size(), bad_addr_ptr),
-            ZX_ERR_INVALID_ARGS);
-
   // Non-page-aligned arguments
   EXPECT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
                              zx_system_get_page_size() - 1, &region, &region_addr),
