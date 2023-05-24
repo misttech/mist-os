@@ -479,76 +479,78 @@ impl<'a> Fsck<'a> {
         let objects_pending_deletion = allocator.objects_pending_deletion();
         let layer_set = allocator.tree().layer_set();
         let mut merger = layer_set.merger();
-        let mut actual =
+        let mut stored_allocations =
             CoalescingIterator::new(allocator.iter(&mut merger, Bound::Unbounded).await?)
                 .await
                 .expect("filter failed");
-        let mut expected =
+        let mut observed_allocations =
             CoalescingIterator::new(self.allocations.seek(Bound::Unbounded).await?).await?;
-        let mut expected_owner_allocated_bytes = BTreeMap::new();
+        let mut observed_owner_allocated_bytes = BTreeMap::new();
         let mut extra_allocations: Vec<errors::Allocation> = vec![];
         let bs = filesystem.block_size();
-        while let Some(actual_item) = actual.get() {
-            if actual_item.key.device_range.start % bs > 0
-                || actual_item.key.device_range.end % bs > 0
+        while let Some(allocation) = stored_allocations.get() {
+            if allocation.key.device_range.start % bs > 0
+                || allocation.key.device_range.end % bs > 0
             {
-                self.error(FsckError::MisalignedAllocation(actual_item.into()))?;
-            } else if actual_item.key.device_range.start >= actual_item.key.device_range.end {
-                self.error(FsckError::MalformedAllocation(actual_item.into()))?;
+                self.error(FsckError::MisalignedAllocation(allocation.into()))?;
+            } else if allocation.key.device_range.start >= allocation.key.device_range.end {
+                self.error(FsckError::MalformedAllocation(allocation.into()))?;
             }
-            let owner_object_id = match actual_item.value {
+            let owner_object_id = match allocation.value {
                 AllocatorValue::None => INVALID_OBJECT_ID,
                 AllocatorValue::Abs { owner_object_id, .. } => *owner_object_id,
             };
-            let r = &actual_item.key.device_range;
+            let r = &allocation.key.device_range;
             if !objects_pending_deletion.contains(&owner_object_id) {
-                *expected_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
+                *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
                     (r.end - r.start) as i64;
             }
             if !store_object_ids.contains(&owner_object_id) {
                 if filesystem.object_manager().store(owner_object_id).is_none()
                     && !objects_pending_deletion.contains(&owner_object_id)
                 {
-                    self.error(FsckError::AllocationForNonexistentOwner(actual_item.into()))?;
+                    self.error(FsckError::AllocationForNonexistentOwner(allocation.into()))?;
                 }
-                actual.advance().await?;
+                stored_allocations.advance().await?;
                 continue;
             }
-            // Cross-reference allocations against the ones we observed in `expected`.
-            match expected.get() {
-                None => extra_allocations.push(actual_item.into()),
-                Some(expected_item) => {
-                    if actual_item.key.device_range.end <= expected_item.key.device_range.start {
-                        extra_allocations.push(actual_item.into());
-                        actual.advance().await?;
+            // Cross-reference allocations against the ones we observed.
+            match observed_allocations.get() {
+                None => extra_allocations.push(allocation.into()),
+                Some(observed_allocation) => {
+                    if allocation.key.device_range.end <= observed_allocation.key.device_range.start
+                    {
+                        extra_allocations.push(allocation.into());
+                        stored_allocations.advance().await?;
                         continue;
                     }
-                    if expected_item.key.device_range.end <= actual_item.key.device_range.start {
-                        self.error(FsckError::MissingAllocation(expected_item.into()))?;
-                        expected.advance().await?;
+                    if observed_allocation.key.device_range.end <= allocation.key.device_range.start
+                    {
+                        self.error(FsckError::MissingAllocation(observed_allocation.into()))?;
+                        observed_allocations.advance().await?;
                         continue;
                     }
                     // We can only reconstruct the key/value fields of Item.
-                    if actual_item.key != expected_item.key
-                        || actual_item.value != expected_item.value
+                    if allocation.key != observed_allocation.key
+                        || allocation.value != observed_allocation.value
                     {
                         self.error(FsckError::AllocationMismatch(
-                            expected_item.into(),
-                            actual_item.into(),
+                            observed_allocation.into(),
+                            allocation.into(),
                         ))?;
-                        actual.advance().await?;
+                        stored_allocations.advance().await?;
                         continue;
                     }
                 }
             }
-            try_join!(actual.advance(), expected.advance())?;
+            try_join!(stored_allocations.advance(), observed_allocations.advance())?;
         }
-        while let Some(expected_item) = expected.get() {
-            self.error(FsckError::MissingAllocation(expected_item.into()))?;
-            expected.advance().await?;
+        while let Some(allocation) = observed_allocations.get() {
+            self.error(FsckError::MissingAllocation(allocation.into()))?;
+            observed_allocations.advance().await?;
             continue;
         }
-        let expected_allocated_bytes = expected_owner_allocated_bytes.values().sum::<i64>() as u64;
+        let expected_allocated_bytes = observed_owner_allocated_bytes.values().sum::<i64>() as u64;
         self.verbose(format!(
             "Found {} bytes allocated (expected {} bytes). Total device size is {} bytes.",
             allocator.get_allocated_bytes(),
@@ -558,18 +560,15 @@ impl<'a> Fsck<'a> {
         if !extra_allocations.is_empty() {
             self.error(FsckError::ExtraAllocations(extra_allocations))?;
         }
-        if let Some(item) = expected.get() {
-            self.error(FsckError::MissingAllocation(item.into()))?;
-        }
         let owner_allocated_bytes = allocator.get_owner_allocated_bytes();
         if expected_allocated_bytes != allocator.get_allocated_bytes()
-            || zip(expected_owner_allocated_bytes.iter(), owner_allocated_bytes.iter())
+            || zip(observed_owner_allocated_bytes.iter(), owner_allocated_bytes.iter())
                 .filter(|((k1, v1), (k2, v2))| (*k1, *v1) != (*k2, *v2))
                 .count()
                 != 0
         {
             self.error(FsckError::AllocatedBytesMismatch(
-                expected_owner_allocated_bytes.iter().map(|(k, v)| (*k, *v)).collect(),
+                observed_owner_allocated_bytes.iter().map(|(k, v)| (*k, *v)).collect(),
                 owner_allocated_bytes.iter().map(|(k, v)| (*k, *v)).collect(),
             ))?;
         }

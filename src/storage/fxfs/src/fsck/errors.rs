@@ -253,23 +253,23 @@ pub enum FsckError {
 impl FsckError {
     fn to_string(&self) -> String {
         match self {
-            FsckError::AllocatedBytesMismatch(expected, actual) => {
+            FsckError::AllocatedBytesMismatch(observed, stored) => {
                 format!(
-                    "Expected allocated bytes for each owner to be {:?}, but found {:?}",
-                    expected, actual
+                    "Per-owner allocated bytes was {:?}, but sum of allocations gave {:?}",
+                    stored, observed
                 )
             }
-            FsckError::AllocatedSizeMismatch(store_id, oid, expected, actual) => {
+            FsckError::AllocatedSizeMismatch(store_id, oid, observed, stored) => {
                 format!(
                     "Expected {} bytes allocated for object {} in store {}, but found {} bytes",
-                    expected, oid, store_id, actual
+                    stored, oid, store_id, observed
                 )
             }
             FsckError::AllocationForNonexistentOwner(alloc) => {
                 format!("Allocation {:?} for non-existent owner", alloc)
             }
-            FsckError::AllocationMismatch(expected, actual) => {
-                format!("Expected allocation {:?} but found allocation {:?}", expected, actual)
+            FsckError::AllocationMismatch(observed, stored) => {
+                format!("Observed allocation {:?} but allocator has {:?}", observed, stored)
             }
             FsckError::AttributeNotOnFile(store_id, object_id) => {
                 format!("Object {} in store {} has unexpected attributes", object_id, store_id)
@@ -326,7 +326,7 @@ impl FsckError {
                 )
             }
             FsckError::MissingAllocation(allocation) => {
-                format!("Expected but didn't find allocation {:?}", allocation)
+                format!("Observed {:?} but didn't find record in allocator", allocation)
             }
             FsckError::MissingDataAttribute(store_id, oid) => {
                 format!("File {} in store {} didn't have the default data attribute", store_id, oid)
@@ -343,8 +343,8 @@ impl FsckError {
                     project_id, store_id, object_id
                 )
             }
-            FsckError::ObjectCountMismatch(store_id, expected, actual) => {
-                format!("Store {} had {} objects, expected {}", store_id, actual, expected)
+            FsckError::ObjectCountMismatch(store_id, observed, stored) => {
+                format!("Store {} had {} objects, expected {}", store_id, observed, stored)
             }
             FsckError::ProjectOnGraveyard(store_id, project_id, object_id) => {
                 format!(
@@ -358,8 +358,8 @@ impl FsckError {
                     store_id, node_id, project_id
                 )
             }
-            FsckError::RefCountMismatch(oid, expected, actual) => {
-                format!("Object {} had {} references, expected {}", oid, actual, expected)
+            FsckError::RefCountMismatch(oid, observed, stored) => {
+                format!("Object {} had {} references, expected {}", oid, observed, stored)
             }
             FsckError::RootObjectHasParent(store_id, object_id, apparent_parent_id) => {
                 format!(
@@ -367,10 +367,10 @@ impl FsckError {
                     object_id, apparent_parent_id, store_id
                 )
             }
-            FsckError::SubDirCountMismatch(store_id, object_id, expected, actual) => {
+            FsckError::SubDirCountMismatch(store_id, object_id, observed, stored) => {
                 format!(
                     "Directory {} in store {} should have {} sub dirs but had {}",
-                    object_id, store_id, expected, actual
+                    object_id, store_id, stored, observed
                 )
             }
             FsckError::TombstonedObjectHasRecords(store_id, object_id) => {
@@ -408,17 +408,17 @@ impl FsckError {
 
     fn log(&self) {
         match self {
-            FsckError::AllocatedBytesMismatch(expected, actual) => {
-                error!(?expected, ?actual, "Unexpected allocated bytes");
+            FsckError::AllocatedBytesMismatch(observed, stored) => {
+                error!(?observed, ?stored, "Unexpected allocated bytes");
             }
-            FsckError::AllocatedSizeMismatch(store_id, oid, expected, actual) => {
-                error!(expected, oid, store_id, actual, "Unexpected allocated size");
+            FsckError::AllocatedSizeMismatch(store_id, oid, observed, stored) => {
+                error!(observed, oid, store_id, stored, "Unexpected allocated size");
             }
             FsckError::AllocationForNonexistentOwner(alloc) => {
                 error!(?alloc, "Allocation for non-existent owner")
             }
-            FsckError::AllocationMismatch(expected, actual) => {
-                error!(?expected, ?actual, "Unexpected allocation");
+            FsckError::AllocationMismatch(observed, stored) => {
+                error!(?observed, ?stored, "Unexpected allocation");
             }
             FsckError::AttributeNotOnFile(store_id, oid) => {
                 error!(store_id, oid, "Attribute on unexpected type");
@@ -477,8 +477,8 @@ impl FsckError {
                     object_id, project_id, "Non root object in volume with project id metadata"
                 );
             }
-            FsckError::ObjectCountMismatch(store_id, expected, actual) => {
-                error!(store_id, expected, actual, "Object count mismatch");
+            FsckError::ObjectCountMismatch(store_id, observed, stored) => {
+                error!(store_id, observed, stored, "Object count mismatch");
             }
             FsckError::ProjectOnGraveyard(store_id, project_id, object_id) => {
                 error!(store_id, project_id, object_id, "Project was set on graveyard object");
@@ -486,14 +486,14 @@ impl FsckError {
             FsckError::ProjectUsedWithNoUsageTracking(store_id, project_id, node_id) => {
                 error!(store_id, project_id, node_id, "Project used without tracking metadata");
             }
-            FsckError::RefCountMismatch(oid, expected, actual) => {
-                error!(oid, expected, actual, "Reference count mismatch");
+            FsckError::RefCountMismatch(oid, observed, stored) => {
+                error!(oid, observed, stored, "Reference count mismatch");
             }
             FsckError::RootObjectHasParent(store_id, oid, apparent_parent_id) => {
                 error!(store_id, oid, apparent_parent_id, "Root object is a child");
             }
-            FsckError::SubDirCountMismatch(store_id, oid, expected, actual) => {
-                error!(store_id, oid, expected, actual, "Sub-dir count mismatch");
+            FsckError::SubDirCountMismatch(store_id, oid, observed, stored) => {
+                error!(store_id, oid, observed, stored, "Sub-dir count mismatch");
             }
             FsckError::TombstonedObjectHasRecords(store_id, oid) => {
                 error!(store_id, oid, "Tombstoned object with references");

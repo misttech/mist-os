@@ -39,21 +39,22 @@ struct ScannedFile {
     // outside the object store (either the graveyard, or because the object is a root object of the
     // store and probably has a reference to it in e.g. the StoreInfo or superblock).
     parents: Vec<u64>,
-    // The file's actual allocated size.
-    actual_allocated_size: u64,
+    // The file's allocated size, according to its metadata.
+    stored_allocated_size: u64,
     // The allocated size of the file (computed by summing up the extents for the file).
-    allocated_size: u64,
+    observed_allocated_size: u64,
     // The object is in the graveyard which means extents beyond the end of the file are allowed.
     in_graveyard: bool,
-    // The number of actual references for the file.
-    actual_refs: u64,
+    // The number of references to the file, according to its metadata.
+    stored_refs: u64,
 }
 
 #[derive(Debug)]
 struct ScannedDir {
-    // Sub directory counts.
-    actual_sub_dirs: u64,
-    sub_dirs: u64,
+    // The number of sub-directories of the dir, according to its metadata.
+    stored_sub_dirs: u64,
+    // The number of sub-directories we found for the dir.
+    observed_sub_dirs: u64,
     // The parent object of the directory.  See ScannedFile::parents.  Note that directories can
     // only have one parent, hence this is just an Option (not a Vec).
     parent: Option<u64>,
@@ -159,10 +160,10 @@ impl<'a> ScannedStore<'a> {
                             ScannedObject::File(ScannedFile {
                                 attributes: vec![],
                                 parents,
-                                actual_allocated_size: *allocated_size,
-                                allocated_size: 0,
+                                stored_allocated_size: *allocated_size,
+                                observed_allocated_size: 0,
                                 in_graveyard: false,
-                                actual_refs: *refs,
+                                stored_refs: *refs,
                             }),
                         );
                     }
@@ -186,8 +187,8 @@ impl<'a> ScannedStore<'a> {
                         self.objects.insert(
                             key.object_id,
                             ScannedObject::Directory(ScannedDir {
-                                actual_sub_dirs: *sub_dirs,
-                                sub_dirs: 0,
+                                stored_sub_dirs: *sub_dirs,
+                                observed_sub_dirs: 0,
                                 parent,
                                 visited: UnsafeCell::new(false),
                             }),
@@ -465,9 +466,9 @@ impl<'a> ScannedStore<'a> {
             Some(ScannedObject::File(..) | ScannedObject::Graveyard | ScannedObject::Symlink) => {
                 self.fsck.error(FsckError::ObjectHasChildren(self.store_id, parent_id))?;
             }
-            Some(ScannedObject::Directory(ScannedDir { sub_dirs, .. })) => {
+            Some(ScannedObject::Directory(ScannedDir { observed_sub_dirs, .. })) => {
                 if *object_descriptor == ObjectDescriptor::Directory {
-                    *sub_dirs += 1;
+                    *observed_sub_dirs += 1;
                 }
             }
             Some(ScannedObject::Tombstone) => {
@@ -508,7 +509,7 @@ impl<'a> ScannedStore<'a> {
         match self.objects.get_mut(&object_id) {
             Some(ScannedObject::File(ScannedFile {
                 attributes,
-                allocated_size,
+                observed_allocated_size: allocated_size,
                 in_graveyard,
                 ..
             })) => {
@@ -778,27 +779,27 @@ pub(super) async fn scan_store(
             ScannedObject::File(ScannedFile {
                 attributes,
                 parents,
-                actual_allocated_size,
-                allocated_size,
-                actual_refs,
+                stored_allocated_size,
+                observed_allocated_size,
+                stored_refs,
                 ..
             }) => {
                 files += 1;
-                let expected_refs = parents.len().try_into().unwrap();
-                // expected_refs == 0 is handled separately to distinguish orphaned objects
-                if expected_refs != *actual_refs && expected_refs > 0 {
+                let observed_refs = parents.len().try_into().unwrap();
+                // observed_refs == 0 is handled separately to distinguish orphaned objects
+                if observed_refs != *stored_refs && observed_refs > 0 {
                     fsck.error(FsckError::RefCountMismatch(
                         *object_id,
-                        expected_refs,
-                        *actual_refs,
+                        observed_refs,
+                        *stored_refs,
                     ))?;
                 }
-                if allocated_size != actual_allocated_size {
+                if observed_allocated_size != stored_allocated_size {
                     fsck.error(FsckError::AllocatedSizeMismatch(
                         store_id,
                         *object_id,
-                        *allocated_size,
-                        *actual_allocated_size,
+                        *observed_allocated_size,
+                        *stored_allocated_size,
                     ))?;
                 }
                 if attributes
@@ -813,19 +814,19 @@ pub(super) async fn scan_store(
                 }
             }
             ScannedObject::Directory(ScannedDir {
-                actual_sub_dirs,
-                sub_dirs,
+                stored_sub_dirs,
+                observed_sub_dirs,
                 parent,
                 visited,
                 ..
             }) => {
                 directories += 1;
-                if *sub_dirs != *actual_sub_dirs {
+                if *observed_sub_dirs != *stored_sub_dirs {
                     fsck.error(FsckError::SubDirCountMismatch(
                         store_id,
                         *object_id,
-                        *sub_dirs,
-                        *actual_sub_dirs,
+                        *observed_sub_dirs,
+                        *stored_sub_dirs,
                     ))?;
                 }
                 if let Some(mut oid) = parent {
@@ -875,7 +876,7 @@ pub(super) async fn scan_store(
         }
     }
     if num_objects != store.object_count() {
-        fsck.error(FsckError::ObjectCountMismatch(store_id, store.object_count(), num_objects))?;
+        fsck.error(FsckError::ObjectCountMismatch(store_id, num_objects, store.object_count()))?;
     }
     fsck.verbose(format!(
         "Store {store_id} has {files} files, {directories} dirs, {symlinks} symlinks, \
