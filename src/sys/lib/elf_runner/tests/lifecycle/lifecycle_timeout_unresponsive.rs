@@ -9,6 +9,7 @@ use {
         sequence::{EventSequence, Ordering},
     },
     fuchsia_component_test::ScopedInstance,
+    tracing::info,
 };
 /// This test invokes components which don't stop when they're told to. We
 /// still expect them to be stopped when the system kills them.
@@ -61,6 +62,8 @@ async fn test_stop_timeouts() {
         (root_moniker, custom_timeout_child, inherited_timeout_child)
     };
 
+    info!("All components started");
+
     EventSequence::new()
         .has_subset(
             vec![
@@ -74,6 +77,8 @@ async fn test_stop_timeouts() {
         .expect(event_stream_root)
         .await
         .unwrap();
+
+    info!("Parent exited");
 
     EventSequence::new()
         .has_subset(
@@ -89,6 +94,8 @@ async fn test_stop_timeouts() {
         .await
         .unwrap();
 
+    info!("Custom timeout child exited");
+
     EventSequence::new()
         .has_subset(
             vec![
@@ -102,4 +109,6 @@ async fn test_stop_timeouts() {
         .expect(event_stream_inherited)
         .await
         .unwrap();
+
+    info!("Inherited timeout child exited");
 }
