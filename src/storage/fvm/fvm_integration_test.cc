@@ -1101,13 +1101,6 @@ TEST_F(FvmTest, TestVPartitionShrink) {
   }
 }
 
-// TODO(https://fxbug.dev/124007): this type is no longer used in any APIs, but this test contains
-// references.
-using extend_request_t = struct {
-  size_t offset;  // Both in units of "slice". "0" = slice 0, "1" = slice 1, etc...
-  size_t length;
-};
-
 // Test splitting a contiguous slice extent into multiple parts
 TEST_F(FvmTest, TestVPartitionSplit) {
   constexpr uint64_t kBlockSize = 512;
@@ -1144,23 +1137,19 @@ TEST_F(FvmTest, TestVPartitionSplit) {
   const fuchsia_hardware_block::wire::BlockInfo& block_info = response.value()->info;
   ASSERT_EQ(block_info.block_count * block_info.block_size, slice_size * slice_count);
 
-  extend_request_t reset_erequest;
-  reset_erequest.offset = 1;
-  reset_erequest.length = slice_count - 1;
-  extend_request_t mid_erequest;
-  mid_erequest.offset = 2;
-  mid_erequest.length = 1;
-  extend_request_t start_erequest;
-  start_erequest.offset = 1;
-  start_erequest.length = 1;
-  extend_request_t end_erequest;
-  end_erequest.offset = 3;
-  end_erequest.length = slice_count - 3;
+  size_t reset_offset = 1;
+  size_t reset_length = slice_count - 1;
+  size_t mid_offset = 2;
+  size_t mid_length = 1;
+  size_t start_offset = 1;
+  size_t start_length = 1;
+  size_t end_offset = 3;
+  size_t end_length = slice_count - 3;
 
   auto verifyExtents = [&](bool start, bool mid, bool end) {
-    size_t start_block = start_erequest.offset * (slice_size / block_info.block_size);
-    size_t mid_block = mid_erequest.offset * (slice_size / block_info.block_size);
-    size_t end_block = end_erequest.offset * (slice_size / block_info.block_size);
+    size_t start_block = start_offset * (slice_size / block_info.block_size);
+    size_t mid_block = mid_offset * (slice_size / block_info.block_size);
+    size_t end_block = end_offset * (slice_size / block_info.block_size);
 
     if (start) {
       CheckWriteReadBlock(vp_fd, start_block, 1);
@@ -1180,19 +1169,19 @@ TEST_F(FvmTest, TestVPartitionSplit) {
     return true;
   };
 
-  auto doExtend = [&partition_caller](extend_request_t request) {
+  auto doExtend = [&partition_caller](size_t offset, size_t length) {
     const fidl::WireResult result =
         fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-            ->Extend(request.offset, request.length);
+            ->Extend(offset, length);
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
   };
 
-  auto doShrink = [&partition_caller](extend_request_t request) {
+  auto doShrink = [&partition_caller](size_t offset, size_t length) {
     const fidl::WireResult result =
         fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-            ->Shrink(request.offset, request.length);
+            ->Shrink(offset, length);
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
@@ -1200,64 +1189,64 @@ TEST_F(FvmTest, TestVPartitionSplit) {
 
   // We should be able to split the extent.
   verifyExtents(true, true, true);
-  doShrink(mid_erequest);
+  doShrink(mid_offset, mid_length);
   verifyExtents(true, false, true);
-  doShrink(start_erequest);
+  doShrink(start_offset, start_length);
   verifyExtents(false, false, true);
-  doShrink(end_erequest);
+  doShrink(end_offset, end_length);
   verifyExtents(false, false, false);
 
-  doExtend(reset_erequest);
+  doExtend(reset_offset, reset_length);
 
-  doShrink(start_erequest);
+  doShrink(start_offset, start_length);
   verifyExtents(false, true, true);
-  doShrink(mid_erequest);
+  doShrink(mid_offset, mid_length);
   verifyExtents(false, false, true);
-  doShrink(end_erequest);
+  doShrink(end_offset, end_length);
   verifyExtents(false, false, false);
 
-  doExtend(reset_erequest);
+  doExtend(reset_offset, reset_length);
 
-  doShrink(end_erequest);
+  doShrink(end_offset, end_length);
   verifyExtents(true, true, false);
-  doShrink(mid_erequest);
+  doShrink(mid_offset, mid_length);
   verifyExtents(true, false, false);
-  doShrink(start_erequest);
+  doShrink(start_offset, start_length);
   verifyExtents(false, false, false);
 
-  doExtend(reset_erequest);
+  doExtend(reset_offset, reset_length);
 
-  doShrink(end_erequest);
+  doShrink(end_offset, end_length);
   verifyExtents(true, true, false);
-  doShrink(start_erequest);
+  doShrink(start_offset, start_length);
   verifyExtents(false, true, false);
-  doShrink(mid_erequest);
+  doShrink(mid_offset, mid_length);
   verifyExtents(false, false, false);
 
   // We should also be able to combine extents
-  doExtend(mid_erequest);
+  doExtend(mid_offset, mid_length);
   verifyExtents(false, true, false);
-  doExtend(start_erequest);
+  doExtend(start_offset, start_length);
   verifyExtents(true, true, false);
-  doExtend(end_erequest);
+  doExtend(end_offset, end_length);
   verifyExtents(true, true, true);
 
-  doShrink(reset_erequest);
+  doShrink(reset_offset, reset_length);
 
-  doExtend(end_erequest);
+  doExtend(end_offset, end_length);
   verifyExtents(false, false, true);
-  doExtend(mid_erequest);
+  doExtend(mid_offset, mid_length);
   verifyExtents(false, true, true);
-  doExtend(start_erequest);
+  doExtend(start_offset, start_length);
   verifyExtents(true, true, true);
 
-  doShrink(reset_erequest);
+  doShrink(reset_offset, reset_length);
 
-  doExtend(end_erequest);
+  doExtend(end_offset, end_length);
   verifyExtents(false, false, true);
-  doExtend(start_erequest);
+  doExtend(start_offset, start_length);
   verifyExtents(true, false, true);
-  doExtend(mid_erequest);
+  doExtend(mid_offset, mid_length);
   verifyExtents(true, true, true);
 
   ASSERT_EQ(close(vp_fd.release()), 0);
@@ -2066,17 +2055,10 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   }
 }
 
-// TODO(https://fxbug.dev/124007): this type is no longer used in any APIs, but this test contains
-// references.
-using query_request_t = struct {
-  size_t count;             // number of elements in vslice_start
-  size_t vslice_start[16];  // vslices to query from
-};
-
 void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_path,
                         const fs_management::MountOptions& mounting_options,
-                        fs_management::DiskFormat disk_format,
-                        const query_request_t& query_request) {
+                        fs_management::DiskFormat disk_format, const size_t* vslice_start,
+                        size_t vslice_count) {
   // Format the VPart as |disk_format|.
   fs_management::MkfsOptions mkfs_options{
       .component_child_name = mounting_options.component_child_name,
@@ -2099,11 +2081,11 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     const fidl::WireResult result =
         fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
             ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                const_cast<size_t*>(query_request.vslice_start), query_request.count));
+                const_cast<size_t*>(vslice_start), vslice_count));
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
-    ASSERT_EQ(query_request.count, response.response_count);
+    ASSERT_EQ(vslice_count, response.response_count);
 
     for (unsigned i = 0; i < response.response_count; i++) {
       ASSERT_TRUE(response.response[i].allocated);
@@ -2112,7 +2094,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     }
 
     // Manually shrink slices so FVM will differ from the partition.
-    uint64_t offset = query_request.vslice_start[0] + response.response[0].count - 1;
+    uint64_t offset = vslice_start[0] + response.response[0].count - 1;
     uint64_t length = 1;
     {
       const fidl::WireResult result =
@@ -2128,14 +2110,13 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
       const fidl::WireResult result =
           fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
               ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                  const_cast<size_t*>(query_request.vslice_start), query_request.count));
+                  const_cast<size_t*>(vslice_start), vslice_count));
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
-      ASSERT_EQ(query_request.count, response.response_count);
+      ASSERT_EQ(vslice_count, response.response_count);
       ASSERT_FALSE(response.response[0].allocated);
-      ASSERT_EQ(response.response[0].count,
-                query_request.vslice_start[1] - query_request.vslice_start[0]);
+      ASSERT_EQ(response.response[0].count, vslice_start[1] - vslice_start[0]);
     }
 
     // Try to mount the VPart. Since this mount call is supposed to fail, we wait for the spawned
@@ -2156,7 +2137,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
 
     // Grow back the slice we shrunk earlier.
-    uint64_t offset = query_request.vslice_start[0];
+    uint64_t offset = vslice_start[0];
     uint64_t length = 1;
     {
       const fidl::WireResult result =
@@ -2171,21 +2152,21 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     const fidl::WireResult result =
         fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
             ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                const_cast<size_t*>(query_request.vslice_start), query_request.count));
+                const_cast<size_t*>(vslice_start), vslice_count));
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
-    ASSERT_EQ(query_request.count, response.response_count);
+    ASSERT_EQ(vslice_count, response.response_count);
     ASSERT_TRUE(response.response[0].allocated);
     ASSERT_EQ(response.response[0].count, 1);
 
     // Now extend all extents by some number of additional slices.
     fuchsia_hardware_block_volume::wire::VsliceRange
         ranges_before_extend[fuchsia_hardware_block_volume::wire::kMaxSliceRequests];
-    for (unsigned i = 0; i < query_request.count; i++) {
+    for (unsigned i = 0; i < vslice_count; i++) {
       ranges_before_extend[i] = response.response[i];
-      uint64_t offset = query_request.vslice_start[i] + response.response[i].count;
-      uint64_t length = query_request.count - i;
+      uint64_t offset = vslice_start[i] + response.response[i].count;
+      uint64_t length = vslice_count - i;
       {
         const fidl::WireResult result =
             fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
@@ -2201,15 +2182,14 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
       const fidl::WireResult result =
           fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
               ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                  const_cast<size_t*>(query_request.vslice_start), query_request.count));
+                  const_cast<size_t*>(vslice_start), vslice_count));
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
-      ASSERT_EQ(query_request.count, response.response_count);
-      for (unsigned i = 0; i < query_request.count; i++) {
+      ASSERT_EQ(vslice_count, response.response_count);
+      for (unsigned i = 0; i < vslice_count; i++) {
         ASSERT_TRUE(response.response[i].allocated);
-        ASSERT_EQ(response.response[i].count,
-                  ranges_before_extend[i].count + query_request.count - i);
+        ASSERT_EQ(response.response[i].count, ranges_before_extend[i].count + vslice_count - i);
       }
     }
 
@@ -2230,14 +2210,14 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
   // Verify that slices were fixed on mount.
   const fidl::WireResult result =
       fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-          ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-              const_cast<size_t*>(query_request.vslice_start), query_request.count));
+          ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(const_cast<size_t*>(vslice_start),
+                                                                 vslice_count));
   ASSERT_OK(result.status());
   const fidl::WireResponse response = result.value();
   ASSERT_OK(response.status);
-  ASSERT_EQ(query_request.count, response.response_count);
+  ASSERT_EQ(vslice_count, response.response_count);
 
-  for (unsigned i = 0; i < query_request.count; i++) {
+  for (unsigned i = 0; i < vslice_count; i++) {
     ASSERT_TRUE(response.response[i].allocated);
     ASSERT_EQ(response.response[i].count, initial_ranges[i].count);
   }
@@ -2267,29 +2247,32 @@ TEST_F(FvmTest, TestCorruptMount) {
   ASSERT_OK(partition_path.status_value());
 
   size_t kMinfsBlocksPerSlice = kSliceSize / minfs::kMinfsBlockSize;
-  query_request_t query_request;
-  query_request.count = 4;
-  query_request.vslice_start[0] = minfs::kFVMBlockInodeBmStart / kMinfsBlocksPerSlice;
-  query_request.vslice_start[1] = minfs::kFVMBlockDataBmStart / kMinfsBlocksPerSlice;
-  query_request.vslice_start[2] = minfs::kFVMBlockInodeStart / kMinfsBlocksPerSlice;
-  query_request.vslice_start[3] = minfs::kFVMBlockDataStart / kMinfsBlocksPerSlice;
+  size_t minfs_vslice_count = 4;
+  size_t minfs_vslice_start[] = {
+      minfs::kFVMBlockInodeBmStart / kMinfsBlocksPerSlice,
+      minfs::kFVMBlockDataBmStart / kMinfsBlocksPerSlice,
+      minfs::kFVMBlockInodeStart / kMinfsBlocksPerSlice,
+      minfs::kFVMBlockDataStart / kMinfsBlocksPerSlice,
+  };
 
   // Run the test for Minfs.
   fs_management::MountOptions mounting_options;
   CorruptMountHelper(devfs_root(), partition_path->c_str(), mounting_options,
-                     fs_management::kDiskFormatMinfs, query_request);
+                     fs_management::kDiskFormatMinfs, minfs_vslice_start, minfs_vslice_count);
 
   size_t kBlobfsBlocksPerSlice = kSliceSize / blobfs::kBlobfsBlockSize;
-  query_request.count = 3;
-  query_request.vslice_start[0] = blobfs::kFVMBlockMapStart / kBlobfsBlocksPerSlice;
-  query_request.vslice_start[1] = blobfs::kFVMNodeMapStart / kBlobfsBlocksPerSlice;
-  query_request.vslice_start[2] = blobfs::kFVMDataStart / kBlobfsBlocksPerSlice;
+  size_t blobfs_vslice_count = 3;
+  size_t blobfs_vslice_start[] = {
+      blobfs::kFVMBlockMapStart / kBlobfsBlocksPerSlice,
+      blobfs::kFVMNodeMapStart / kBlobfsBlocksPerSlice,
+      blobfs::kFVMDataStart / kBlobfsBlocksPerSlice,
+  };
 
   // Run the test for Blobfs.
   mounting_options.component_child_name = kTestBlobfsChildName;
   mounting_options.component_collection_name = kTestCollectionName;
   CorruptMountHelper(devfs_root(), partition_path->c_str(), mounting_options,
-                     fs_management::kDiskFormatBlobfs, query_request);
+                     fs_management::kDiskFormatBlobfs, blobfs_vslice_start, blobfs_vslice_count);
 
   // Clean up
   ASSERT_EQ(close(fvm_fd.value().release()), 0);
