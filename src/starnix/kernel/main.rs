@@ -13,7 +13,9 @@ extern crate macro_rules_attribute;
 use crate::execution::create_container;
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
+use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_process_lifecycle as flifecycle;
+use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as fruntime;
@@ -47,21 +49,7 @@ mod vmex_resource;
 #[cfg(test)]
 mod testing;
 
-#[fuchsia::main(logging_tags = ["starnix"])]
-async fn main() -> Result<(), Error> {
-    // Because the starnix kernel state is shared among all of the processes in the same job,
-    // we need to kill those in addition to the process which panicked.
-    kill_job_on_panic::install_hook("\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n");
-
-    fuchsia_trace_provider::trace_provider_create_with_fdio();
-    trace_instant!(
-        trace_category_starnix!(),
-        trace_name_start_kernel!(),
-        fuchsia_trace::Scope::Thread
-    );
-
-    let container = create_container().await?;
-
+fn maybe_serve_lifecycle() {
     if let Some(lifecycle) =
         fruntime::take_startup_handle(fruntime::HandleInfo::new(fruntime::HandleType::Lifecycle, 0))
     {
@@ -82,34 +70,56 @@ async fn main() -> Result<(), Error> {
         })
         .detach();
     }
+}
+
+enum KernelServices {
+    ComponentRunner(fcrunner::ComponentRunnerRequestStream),
+    ContainerController(fstarcontainer::ControllerRequestStream),
+}
+
+#[fuchsia::main(logging_tags = ["starnix"])]
+async fn main() -> Result<(), Error> {
+    // Because the starnix kernel state is shared among all of the processes in the same job,
+    // we need to kill those in addition to the process which panicked.
+    kill_job_on_panic::install_hook("\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n");
+
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    trace_instant!(
+        trace_category_starnix!(),
+        trace_name_start_kernel!(),
+        fuchsia_trace::Scope::Thread
+    );
+
+    let container = create_container().await?;
+
+    maybe_serve_lifecycle();
 
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc").add_fidl_service(|stream| {
-        let container = container.clone();
-        fasync::Task::local(async move {
-            execution::serve_component_runner(stream, container)
-                .await
-                .expect("failed to start runner.")
-        })
-        .detach();
-    });
-
-    fs.dir("svc").add_fidl_service(|stream| {
-        let container = container.clone();
-        fasync::Task::local(async move {
-            execution::serve_container_controller(stream, container)
-                .await
-                .expect("failed to start container controller.")
-        })
-        .detach();
-    });
-
+    fs.dir("svc")
+        .add_fidl_service(KernelServices::ComponentRunner)
+        .add_fidl_service(KernelServices::ContainerController);
     fs.add_remote("linux_root", execution::expose_root(&container)?);
 
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
     fs.take_and_serve_directory_handle()?;
-    fs.collect::<()>().await;
+
+    fs.for_each_concurrent(None, |request: KernelServices| async {
+        let container = container.clone();
+        match request {
+            KernelServices::ComponentRunner(stream) => {
+                execution::serve_component_runner(stream, container)
+                    .await
+                    .expect("failed to start component runner");
+            }
+            KernelServices::ContainerController(stream) => {
+                execution::serve_container_controller(stream, container)
+                    .await
+                    .expect("failed to start container controller");
+            }
+        }
+    })
+    .await;
 
     Ok(())
 }
