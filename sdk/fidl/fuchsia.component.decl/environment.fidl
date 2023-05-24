@@ -25,7 +25,7 @@ type Environment = table {
     /// if this environment `extends` from `REALM`.
     4: resolvers vector<ResolverRegistration>:MAX;
 
-    /// (Optional) Expose capabilties to debug section when component manager
+    /// (Optional) Expose capabilities to debug section when component manager
     /// allows it.
     ///
     /// These capabilities are accessible to any component in the environment
@@ -35,7 +35,8 @@ type Environment = table {
     5: debug_capabilities vector<DebugRegistration>:MAX;
 
     /// (Optional) The duration in milliseconds that the component will have to
-    /// stop before it is killed.
+    /// stop before it is killed. Required if this environment `extends` from
+    /// `NONE`.
     6: stop_timeout_ms uint32;
 };
 

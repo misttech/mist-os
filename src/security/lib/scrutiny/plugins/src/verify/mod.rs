@@ -599,7 +599,7 @@ mod tests {
                             "protocol": [
                                 "protocol",
                             ],
-                            "from": "#self",
+                            "from": "self",
                             "to": "#my-resolver"
                         },
                     ],
@@ -684,7 +684,7 @@ mod tests {
             json!({
               "deps": ["core_dep"],
               "monikers": ["/logger"],
-            })
+            }),
         );
         Ok(())
     }
@@ -756,7 +756,7 @@ mod tests {
             json!({
               "deps": ["core_dep"],
               "monikers": ["/logger"],
-            })
+            }),
         );
         Ok(())
     }
@@ -814,12 +814,14 @@ mod tests {
                         {
                             "name": "env",
                             "extends": "none",
-                            "resolvers": [ {
-                                "resolver": "my-resolver",
-                                "from": "parent",
-                                "scheme": "fuchsia-pkg",
-                            },
+                            "resolvers": [
+                                {
+                                    "resolver": "my-resolver",
+                                    "from": "parent",
+                                    "scheme": "fuchsia-pkg",
+                                },
                             ],
+                            "__stop_timeout_ms": 10000,
                         },
                     ],
                 }),
@@ -846,7 +848,7 @@ mod tests {
             json!({
               "deps": ["core_dep"],
               "monikers": ["/logger/log-child"],
-            })
+            }),
         );
         Ok(())
     }
@@ -882,11 +884,12 @@ mod tests {
                         {
                             "name": "core-env",
                             "extends": "realm",
-                            "resolvers": [ {
-                                "resolver": "base_resolver",
-                                "from": "#bootstrap",
-                                "scheme": "fuchsia-pkg",
-                            },
+                            "resolvers": [
+                                {
+                                    "resolver": "base_resolver",
+                                    "from": "#bootstrap",
+                                    "scheme": "fuchsia-pkg",
+                                },
                             ],
                         },
                     ]
@@ -932,17 +935,6 @@ mod tests {
                             "name": "custom-resolver",
                             "url": "fuchsia-pkg://fuchsia.com/custom-resolver#meta/custom-resolver.cm",
                         },
-
-                    ],
-                    "expose": [
-                        {
-                            "protocol": "fuchsia.component.resolution.Resolver",
-                            "from": "#base_resolver",
-                        },
-                        {
-                            "resolver": "base_resolver",
-                            "from": "#base_resolver",
-                        },
                     ],
                     "capabilities": [
                         {
@@ -955,7 +947,7 @@ mod tests {
                             "protocol": [
                                 "fuchsia.test.SpecialProtocol",
                             ],
-                            "from": "#self",
+                            "from": "self",
                             "to": "#custom-resolver"
                         },
                     ],
@@ -963,11 +955,12 @@ mod tests {
                         {
                             "name": "custom-resolver-env",
                             "extends": "realm",
-                            "resolvers": [ {
-                                "resolver": "custom-resolver",
-                                "from": "#custom-resolver",
-                                "scheme": "fuchsia-pkg",
-                            },
+                            "resolvers": [
+                                {
+                                    "resolver": "custom-resolver",
+                                    "from": "#custom-resolver",
+                                    "scheme": "fuchsia-pkg",
+                                },
                             ],
                         },
                     ]
@@ -1043,7 +1036,7 @@ mod tests {
             json!({
               "deps": ["core_dep"],
               "monikers": ["/core/resolved-from-custom"],
-            })
+            }),
         );
         Ok(())
     }
@@ -1057,7 +1050,7 @@ mod tests {
         let response = controller.query(model.clone(), json!("{}"))?;
         assert_json_eq(
             response,
-            json!({"instances":  [{ "instance": "/", "url": DEFAULT_ROOT_URL.to_string() }]})
+            json!({"instances":  [{ "instance": "/", "url": DEFAULT_ROOT_URL.to_string() }]}),
         );
         Ok(())
     }

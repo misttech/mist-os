@@ -1703,8 +1703,8 @@ impl<'a> ValidationContext<'a> {
         }
         for (p, offer_group) in offer_groups {
             if offer_group.len() == 1 {
-                // If there is not multiple offers for a  target_name, target pair then there are no
-                // aggregation conditions to check.
+                // If there are not multiple offers for a (target_name, target) pair then there are
+                // no aggregation conditions to check.
                 continue;
             }
             let (target_name, _) = p;
@@ -6838,7 +6838,8 @@ mod tests {
         },
 
         test_validate_environment_no_stop_timeout => {
-            input = {  let mut decl = new_component_decl();
+            input = {
+                let mut decl = new_component_decl();
                 decl.environments = Some(vec![fdecl::Environment {
                     name: Some("env".to_string()),
                     extends: Some(fdecl::EnvironmentExtends::None),

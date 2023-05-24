@@ -379,7 +379,8 @@ The `environments` section declares environments as described in
         available as to clients. Disallowed if `protocol` is an array.
 
 - `__stop_timeout_ms`: (_optional `number`_) The number of milliseconds to wait, after notifying a component in this environment that it
-    should terminate, before forcibly killing it.
+    should terminate, before forcibly killing it. This field is required if the environment
+    extends from `none`.
 
 Example:
 
