@@ -310,13 +310,17 @@ VmCowPages::VmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
                        const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
                        VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
                        fbl::RefPtr<PageSource> page_source,
-                       ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker)
+                       ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
+                       fbl::RefPtr<AttributionObject> attribution_object)
     : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
       pmm_alloc_flags_(pmm_alloc_flags),
       container_(fbl::AdoptRef(cow_container.release())),
       options_(options),
       size_(size),
       page_source_(ktl::move(page_source)),
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+      attribution_object_(ktl::move(attribution_object)),
+#endif
       discardable_tracker_(ktl::move(discardable_tracker)) {
 #if DEBUG_ASSERT_IMPLEMENTED
   debug_retained_raw_container_ = container_.get();
@@ -499,11 +503,12 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                                uint32_t pmm_alloc_flags, uint64_t size,
                                ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
+                               fbl::RefPtr<AttributionObject> attribution_object,
                                fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
   auto cow = NewVmCowPages(&ac, ktl::move(root_lock), options, pmm_alloc_flags, size, nullptr,
-                           ktl::move(discardable_tracker));
+                           ktl::move(discardable_tracker), ktl::move(attribution_object));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -517,11 +522,12 @@ zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPag
 
 zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOptions options,
                                        fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
+                                       fbl::RefPtr<AttributionObject> attribution_object,
                                        fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
   auto cow = NewVmCowPages(&ac, ktl::move(root_lock), options, PMM_ALLOC_FLAG_ANY, size,
-                           ktl::move(src), nullptr);
+                           ktl::move(src), nullptr, ktl::move(attribution_object));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -604,7 +610,10 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   // Slices just need the slice option and default alloc flags since they will propagate any
   // operation up to a parent and use their options and alloc flags.
   auto slice = NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kSlice,
-                             PMM_ALLOC_FLAG_ANY, size, nullptr, nullptr);
+                             PMM_ALLOC_FLAG_ANY, size, nullptr, nullptr,
+                             // Attribution object is null for slices, since pages can never
+                             // be made resident.
+                             /*attribution_object=*/nullptr);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -665,6 +674,7 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
 }
 
 zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
+                                          fbl::RefPtr<AttributionObject> attribution_object,
                                           fbl::RefPtr<VmCowPages>* cow_child) {
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
 
@@ -737,13 +747,17 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
     // At this point cow_pages must *not* be destructed in this function, as doing so would cause a
     // deadlock. That means from this point on we *must* succeed and any future error checking needs
     // to be added prior to creation.
-
-    fbl::RefPtr<VmCowPages> left_child =
-        NewVmCowPages(ktl::move(left_child_placeholder), hierarchy_state_ptr_,
-                      VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr);
-    fbl::RefPtr<VmCowPages> right_child =
-        NewVmCowPages(ktl::move(right_child_placeholder), hierarchy_state_ptr_,
-                      VmCowPagesOptions::kNone, pmm_alloc_flags_, size, nullptr, nullptr);
+    // Note: The left child inherits the attribution object of the original cow pages.
+    fbl::RefPtr<AttributionObject> left_attribution_object;
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+    left_attribution_object = attribution_object_;
+#endif
+    fbl::RefPtr<VmCowPages> left_child = NewVmCowPages(
+        ktl::move(left_child_placeholder), hierarchy_state_ptr_, VmCowPagesOptions::kNone,
+        pmm_alloc_flags_, size_, nullptr, nullptr, ktl::move(left_attribution_object));
+    fbl::RefPtr<VmCowPages> right_child = NewVmCowPages(
+        ktl::move(right_child_placeholder), hierarchy_state_ptr_, VmCowPagesOptions::kNone,
+        pmm_alloc_flags_, size, nullptr, nullptr, ktl::move(attribution_object));
 
     AssertHeld(left_child->lock_ref());
     AssertHeld(right_child->lock_ref());
@@ -767,8 +781,9 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
     return ZX_OK;
   } else {
     fbl::AllocChecker ac;
-    auto cow_pages = NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kNone,
-                                   pmm_alloc_flags_, size, nullptr, nullptr);
+    auto cow_pages =
+        NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size,
+                      nullptr, nullptr, ktl::move(attribution_object));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }

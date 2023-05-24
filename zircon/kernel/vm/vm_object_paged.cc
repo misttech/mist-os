@@ -230,9 +230,10 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     }
   }
 
+  // TODO(117196): Propagate attribution objects.
   fbl::RefPtr<VmCowPages> cow_pages;
   status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
-                              ktl::move(discardable), &cow_pages);
+                              ktl::move(discardable), nullptr, &cow_pages);
   if (status != ZX_OK) {
     return status;
   }
@@ -463,9 +464,11 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   if (options & kContiguous) {
     cow_options |= VmCowPagesOptions::kCannotDecommitZeroPages;
   }
+
+  // TODO(117196): Propagate attribution objects.
   fbl::RefPtr<VmCowPages> cow_pages;
   zx_status_t status =
-      VmCowPages::CreateExternal(ktl::move(src), cow_options, state, size, &cow_pages);
+      VmCowPages::CreateExternal(ktl::move(src), cow_options, state, size, nullptr, &cow_pages);
   if (status != ZX_OK) {
     return status;
   }
@@ -723,7 +726,8 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     }
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
-    status = cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
+    // TODO(117196): Propagate attribution objects.
+    status = cow_pages_locked()->CreateCloneLocked(type, offset, size, nullptr, &clone_cow_pages);
     if (status != ZX_OK) {
       return status;
     }

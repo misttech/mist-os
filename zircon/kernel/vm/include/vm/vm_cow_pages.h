@@ -71,15 +71,18 @@ class VmCowPages final : public VmHierarchyBase,
   static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                             uint32_t pmm_alloc_flags, uint64_t size,
                             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
+                            fbl::RefPtr<AttributionObject> attribution_object,
                             fbl::RefPtr<VmCowPages>* cow_pages);
 
   static zx_status_t CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOptions options,
                                     fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
+                                    fbl::RefPtr<AttributionObject> attribution_object,
                                     fbl::RefPtr<VmCowPages>* cow_pages);
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx_status_t CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
+                                fbl::RefPtr<AttributionObject> attribution_object,
                                 fbl::RefPtr<VmCowPages>* child_cow) TA_REQ(lock());
 
   // Creates a child that looks back to this VmCowPages for all operations. Once a child slice is
@@ -573,16 +576,16 @@ class VmCowPages final : public VmHierarchyBase,
 #if KERNEL_BASED_MEMORY_ATTRIBUTION
   void IncrementResidentPagesLocked() TA_REQ(lock()) {
     ++resident_pages_;
-    if (attribution_obj_) {
-      attribution_obj_->AddPages(1, shared_);
+    if (attribution_object_) {
+      attribution_object_->AddPages(1, shared_);
     }
   }
 
   void DecrementResidentPagesLocked() TA_REQ(lock()) {
     DEBUG_ASSERT(resident_pages_ > 0);
     --resident_pages_;
-    if (attribution_obj_) {
-      attribution_obj_->RemovePages(1, shared_);
+    if (attribution_object_) {
+      attribution_object_->RemovePages(1, shared_);
     }
   }
 #endif
@@ -592,7 +595,8 @@ class VmCowPages final : public VmHierarchyBase,
   VmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
              fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
              uint32_t pmm_alloc_flags, uint64_t size, fbl::RefPtr<PageSource> page_source,
-             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker);
+             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
+             fbl::RefPtr<AttributionObject> attribution_object);
   friend class VmCowPagesContainer;
 
   ~VmCowPages() override;
@@ -1191,10 +1195,10 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Required reference back to a AttributionObject associated with the process that last uniquely
   // owned these pages.
-  fbl::RefPtr<AttributionObject> attribution_obj_ TA_GUARDED(lock());
+  fbl::RefPtr<AttributionObject> attribution_object_ TA_GUARDED(lock());
 
-  // Whether resident_pages_ are charged on the attribution_obj_'s private count or not (meaningless
-  // if attribution_obj_ == nullptr).
+  // Whether resident_pages_ are charged on the attribution_object_'s private count or not
+  // (meaningless if attribution_object_ == nullptr).
   bool shared_ TA_GUARDED(lock()) = false;
 #endif
 
