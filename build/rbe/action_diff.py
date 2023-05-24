@@ -47,11 +47,11 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         description="Recursively finds input differences of a remote output.",
     )
     parser.add_argument(
-        "--reproxy_logdirs",
+        "--reproxy_logs",
         type=Path,
-        help="reproxy log directories, containing .rrpl or .rpl logs",
+        help="reproxy logs (.rrpl or .rpl) or the directories containing them",
         required=True,
-        metavar="DIR",
+        metavar="PATH",
         nargs=2,
     )
     parser.add_argument(
@@ -265,10 +265,12 @@ class ActionDiffer(object):
 
 
 # Defined at the module level for multiprocessing to be able to serialize.
-def _process_log(d: Path) -> reproxy_logs.ReproxyLog:
+def _process_log(log_path: Path) -> reproxy_logs.ReproxyLog:
+    """Prepare and parse reproxy logs."""
     return reproxy_logs.ReproxyLog(
         reproxy_logs.convert_reproxy_actions_log(
-            reproxy_logdir=d,
+            reproxy_logdir=reproxy_logs.setup_logdir_for_logdump(
+                log_path, verbose=True),
             reclient_bindir=fuchsia.RECLIENT_BINDIR,
             verbose=True,
         ))
@@ -278,7 +280,7 @@ def main(argv: Sequence[str]) -> int:
     main_args = _MAIN_ARG_PARSER.parse_args(argv)
 
     with multiprocessing.Pool() as pool:
-        logs = pool.map(_process_log, main_args.reproxy_logdirs)
+        logs = pool.map(_process_log, main_args.reproxy_logs)
     # len(logs) == 2, enforced by _MAIN_ARG_PARSER.
 
     with open(remotetool._REPROXY_CFG) as cfg:

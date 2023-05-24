@@ -3,8 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import shutil
 import subprocess
+import tempfile
 import unittest
+
 from unittest import mock
 
 from api.proxy import log_pb2
@@ -13,7 +16,14 @@ import reproxy_logs
 
 from pathlib import Path
 
+
+def _write_file_contents(path: Path, contents: str):
+    with open(path, 'w') as f:
+        f.write(contents)
+
+
 class ReproxyLogTests(unittest.TestCase):
+
     def test_construction(self):
         record1 = log_pb2.LogRecord()
         record1.command.output.output_files.extend(['obj/foo.o'])
@@ -22,10 +32,31 @@ class ReproxyLogTests(unittest.TestCase):
         log_dump = log_pb2.LogDump(records=[record1, record2])
         log = reproxy_logs.ReproxyLog(log_dump)
         self.assertEqual(log.proto, log_dump)
-        self.assertEqual(log.records_by_output_file,
-                         {Path('obj/foo.o'): record1,
-                          Path('obj/bar.o'): record2,
-                          })
+        self.assertEqual(
+            log.records_by_output_file, {
+                Path('obj/foo.o'): record1,
+                Path('obj/bar.o'): record2,
+            })
+
+
+class SetupLogdirForLogDumpTest(unittest.TestCase):
+
+    def test_already_a_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            reproxy_logs.setup_logdir_for_logdump(Path(td))
+
+    def test_log_file_copied_to_new_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            log_file = Path(td) / 'test.rrpl'
+            log_contents = 'fake log contents, not checked'
+            _write_file_contents(log_file, log_contents)
+            with mock.patch.object(Path, 'mkdir') as mock_mkdir:
+                with mock.patch.object(shutil, 'copy2') as mock_copy:
+                    new_log_dir = reproxy_logs.setup_logdir_for_logdump(
+                        log_file)
+            mock_mkdir.assert_called_with(parents=True, exist_ok=True)
+            mock_copy.assert_called_with(log_file, new_log_dir)
+
 
 class ConvertReproxyActionsLogTest(unittest.TestCase):
 
