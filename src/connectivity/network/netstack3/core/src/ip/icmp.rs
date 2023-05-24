@@ -341,7 +341,7 @@ where
 /// These are opaque `usize`s which are intentionally allocated as densely as
 /// possible around 0, making it possible to store any associated data in a
 /// `Vec` indexed by the ID. `IcmpConnId` implements `Into<usize>`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq, Hash)]
 pub struct IcmpConnId<I: Ip>(usize, IpVersionMarker<I>);
 
 impl<I: Ip> IcmpConnId<I> {
@@ -3093,7 +3093,7 @@ mod tests {
         StackStateBuilder,
     };
 
-    trait TestIpExt: crate::testutil::TestIpExt + crate::testutil::TestutilIpExt {
+    trait TestIpExt: crate::testutil::TestIpExt {
         fn new_icmp_connection<NonSyncCtx: NonSyncContext>(
             sync_ctx: &SyncCtx<NonSyncCtx>,
             ctx: &mut NonSyncCtx,

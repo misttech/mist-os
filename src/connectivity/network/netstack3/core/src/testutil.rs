@@ -14,7 +14,10 @@ use core::{
 
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
+    ip::{
+        AddrSubnet, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
+        SubnetEither,
+    },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{Buf, BufferMut};
@@ -789,35 +792,16 @@ impl FakeNetworkContext for FakeCtx {
     type SendMeta = EthernetWeakDeviceId<FakeNonSyncCtx>;
 }
 
-pub(crate) trait TestutilIpExt: Ip {
-    fn icmp_replies(
-        evt: &mut FakeNonSyncCtx,
-    ) -> &mut HashMap<IcmpConnId<Self>, Vec<(u16, Vec<u8>)>>;
-}
-
-impl TestutilIpExt for Ipv4 {
-    fn icmp_replies(
-        FakeNonSyncCtx(evt): &mut FakeNonSyncCtx,
-    ) -> &mut HashMap<IcmpConnId<Ipv4>, Vec<(u16, Vec<u8>)>> {
-        &mut evt.state_mut().icmpv4_replies
-    }
-}
-
-impl TestutilIpExt for Ipv6 {
-    fn icmp_replies(
-        FakeNonSyncCtx(evt): &mut FakeNonSyncCtx,
-    ) -> &mut HashMap<IcmpConnId<Ipv6>, Vec<(u16, Vec<u8>)>> {
-        &mut evt.state_mut().icmpv6_replies
-    }
-}
-
 impl FakeNonSyncCtx {
     /// Takes all the received ICMP replies for a given `conn`.
-    pub(crate) fn take_icmp_replies<I: TestutilIpExt>(
-        &mut self,
-        conn: IcmpConnId<I>,
-    ) -> Vec<(u16, Vec<u8>)> {
-        I::icmp_replies(self).remove(&conn).unwrap_or_else(Vec::default)
+    pub(crate) fn take_icmp_replies<I: Ip>(&mut self, conn: IcmpConnId<I>) -> Vec<(u16, Vec<u8>)> {
+        I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
+            (IpInvariant(self), conn),
+            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv4_replies.remove(&conn)),
+            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv6_replies.remove(&conn)),
+        )
+        .into_inner()
+        .unwrap_or_else(Vec::default)
     }
 }
 

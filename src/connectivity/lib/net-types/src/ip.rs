@@ -2854,6 +2854,13 @@ pub trait GenericOverIp<NewIp: Ip> {
 /// some portion that is invariant over IP version.
 pub struct IpInvariant<T>(pub T);
 
+impl<T> IpInvariant<T> {
+    /// Consumes the `IpInvariant` and returns the wrapped value.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
 impl<I: Ip, T> GenericOverIp<I> for IpInvariant<T> {
     type Type = Self;
 }
