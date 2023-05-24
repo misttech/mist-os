@@ -628,7 +628,6 @@ impl LogsDataBuilder {
     /// If value is greater than zero, a DroppedLogs error
     /// will also be added to the list of errors or updated if
     /// already present.
-
     #[must_use = "You must call build on your builder to consume its result"]
     pub fn set_dropped(mut self, value: u64) -> Self {
         if value == 0 {
@@ -645,6 +644,30 @@ impl LogsDataBuilder {
             *v = value;
         } else {
             self.errors.push(LogError::DroppedLogs { count: value });
+        }
+        self
+    }
+
+    /// Sets the number of rolled out messages.
+    /// If value is greater than zero, a RolledOutLogs error
+    /// will also be added to the list of errors or updated if
+    /// already present.
+    #[must_use = "You must call build on your builder to consume its result"]
+    pub fn set_rolled_out(mut self, value: u64) -> Self {
+        if value == 0 {
+            return self;
+        }
+        let val = self.errors.iter_mut().find_map(|error| {
+            if let LogError::RolledOutLogs { count } = error {
+                Some(count)
+            } else {
+                None
+            }
+        });
+        if let Some(v) = val {
+            *v = value;
+        } else {
+            self.errors.push(LogError::RolledOutLogs { count: value });
         }
         self
     }

@@ -47,18 +47,25 @@ async fn test_budget() {
     env.create_puppet(VICTIM_PUPPET_ID).await;
     let expected = env.running_puppets[VICTIM_PUPPET_ID].emit_packet().await;
     let mut observed_logs = env.log_reader.snapshot_then_subscribe::<Logs>().unwrap();
+    let mut observed_logs_2 = env.log_reader.snapshot_then_subscribe::<Logs>().unwrap();
     let msg_a = observed_logs.next().await.unwrap().unwrap();
+    let msg_a_2 = observed_logs_2.next().await.unwrap().unwrap();
     assert_eq!(expected, msg_a);
-    let mut last_msg;
+    assert_eq!(expected, msg_a_2);
     for _ in 0..SPAM_COUNT {
-        last_msg = env.running_puppets[SPAM_PUPPET_ID].emit_packet().await;
+        let last_msg = env.running_puppets[SPAM_PUPPET_ID].emit_packet().await;
         assert_eq!(last_msg, observed_logs.next().await.unwrap().unwrap());
     }
-    let mut observed_logs = env.log_reader.snapshot_then_subscribe::<Logs>().unwrap();
-    let msg_b = observed_logs.next().await.unwrap().unwrap();
-    // First message should have been rolled out
-    assert_eq!(msg_b.rolled_out_logs(), Some(8940));
-    assert_eq!(observed_logs.next().await.unwrap().unwrap().rolled_out_logs(), None);
+    let log = observed_logs_2.skip(33).next().await.unwrap().unwrap();
+    assert_eq!(log.rolled_out_logs(), Some(8907));
+    let mut observed_logs = env.log_reader.snapshot::<Logs>().await.unwrap().into_iter();
+    let msg_b = observed_logs.next().unwrap();
+    assert!(!msg_b.moniker.contains(&format!("puppet-{VICTIM_PUPPET_ID}")));
+    // Vicitm logs should have been rolled out.
+    let messages = observed_logs
+        .filter(|log| log.moniker.contains(&format!("puppet-{VICTIM_PUPPET_ID}")))
+        .collect::<Vec<_>>();
+    assert!(messages.is_empty());
     assert_ne!(msg_a, msg_b);
 }
 

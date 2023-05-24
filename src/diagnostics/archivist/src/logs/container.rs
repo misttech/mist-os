@@ -154,9 +154,10 @@ impl LogsArtifactsContainer {
         Box::pin(
             self.buffer
                 .cursor(mode)
+                .enumerate()
                 .scan(
                     (earliest_timestamp, 0u64),
-                    move |(last_timestamp, rolled_out_messages), item| {
+                    move |(last_timestamp, rolled_out_messages), (i, item)| {
                         futures::future::ready(match item {
                             LazyItem::Next(m) => {
                                 let trace_id = ftrace::Id::random();
@@ -196,7 +197,9 @@ impl LogsArtifactsContainer {
                                 }
                             }
                             LazyItem::ItemsRolledOut(rolled_out_count) => {
-                                *rolled_out_messages += rolled_out_count;
+                                if i > 0 {
+                                    *rolled_out_messages += rolled_out_count;
+                                }
                                 Some(None)
                             }
                         })

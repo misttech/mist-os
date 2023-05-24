@@ -486,6 +486,23 @@ impl<'a> DefaultLogFormatter<'a> {
             String::default()
         };
 
+        let dropped = data.dropped_logs().unwrap_or_default();
+        let rolled = data.rolled_out_logs().unwrap_or_default();
+        let dropped_info = if dropped != 0 || rolled != 0 {
+            let dropped =
+                if dropped != 0 { format!(" [dropped={dropped}]") } else { String::default() };
+            let rolled =
+                if rolled != 0 { format!(" [rolled={rolled}]") } else { String::default() };
+            let color = if options.color {
+                color::Fg(color::Yellow).to_string()
+            } else {
+                String::default()
+            };
+            format!("{color}{dropped}{rolled}")
+        } else {
+            String::default()
+        };
+
         let file_info_str = if options.show_file {
             match (data.metadata.file, data.metadata.line) {
                 (Some(filename), Some(line)) => {
@@ -511,17 +528,7 @@ impl<'a> DefaultLogFormatter<'a> {
 
         let severity_str = &format!("{}", data.metadata.severity)[..1];
         format!(
-            "{}[{}]{}[{}]{}[{}]{} {}{}{}",
-            color_str,
-            ts,
-            process_info_str,
-            moniker,
-            tags_str,
-            severity_str,
-            file_info_str,
-            msg,
-            kvps,
-            reset_str
+            "{color_str}[{ts}]{process_info_str}[{moniker}]{tags_str}[{severity_str}]{file_info_str} {msg}{kvps}{dropped_info}{reset_str}",
         )
     }
 }
@@ -2452,5 +2459,32 @@ mod test {
             }
             DisplayOption::Json => unreachable!("The default display option must be Text"),
         }
+    }
+
+    #[fuchsia::test]
+    fn display_dropped_and_rolled_out_info() {
+        let mut stdout = Unblock::new(std::io::stdout());
+        let display_options =
+            TextDisplayOptions { show_file: true, ..TextDisplayOptions::default() };
+        let options = LogFormatterOptions {
+            display: DisplayOption::Text(display_options.clone()),
+            raw: false,
+            highlight_spam: false,
+        };
+
+        let formatter =
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        let message_with_file_and_line =
+            logs_data_builder().set_dropped(3).set_rolled_out(5).set_message("my message").build();
+
+        assert_eq!(
+            formatter.format_target_log_data(
+                &display_options,
+                message_with_file_and_line,
+                /* symbolized_msg */ None,
+                /*color_override */ None
+            ),
+            "[1615535969.000][moniker][W] my message [dropped=3] [rolled=5]"
+        );
     }
 }

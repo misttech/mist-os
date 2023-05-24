@@ -64,7 +64,17 @@ impl From<DateTime<Local>> for DetailedDateTime {
     subcommand,
     name = "log",
     description = "Display logs from a target device",
-    note = "Logs are proactively retrieved from target devices and cached on the host.
+    note = "Logs are retrieve from the target at the moment this command is called.
+
+You may see some additional information attached to the log line:
+
+- `dropped=N`: this means that N logs attributed to the component were dropped when the component
+  wrote to the log socket. This can happen when archivist cannot keep up with the rate of logs being
+  emitted by the component and the component filled the log socket buffer in the kernel.
+
+- `rolled=N`: this means that N logs rolled out from the archivist buffer and ffx never saw them.
+  This can happen when more logs are being ingested by the archivist across all components and the
+  ffx couldn't retrieve them fast enough.
 
 Symbolization is performed in the background using the symbolizer host tool. You can pass
 additional arguments to the symbolizer tool (for example, to add a remote symbol server) using:
