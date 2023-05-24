@@ -19,7 +19,7 @@ import remote_action
 import cl_utils
 import output_leak_scanner
 
-from typing import Any, Sequence
+from typing import Any, Dict, Sequence
 
 _HAVE_XATTR = hasattr(os, 'setxattr')
 
@@ -53,6 +53,32 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
     t = type(items)
     raise TypeError(f"Unhandled sequence type: {t}")
+
+
+class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
+    """Mimic a ReproxyLogEntry by setting properties without parsing."""
+
+    def __init__(self, **kwargs):
+        # intentionally does not call super().__init__(), but instead
+        # sets property attributes.
+        for k, v in kwargs.items():
+            setattr(self, '_' + k, v)
+
+    @property
+    def execution_id(self) -> str:
+        return self._execution_id
+
+    @property
+    def action_digest(self) -> str:
+        return self._action_digest
+
+    @property
+    def output_file_digests(self) -> Dict[Path, str]:
+        return self._output_file_digests
+
+    @property
+    def output_directory_digests(self) -> Dict[Path, str]:
+        return self._output_directory_digests
 
 
 class FileMatchTests(unittest.TestCase):
@@ -1655,9 +1681,9 @@ class DownloadStubsTests(unittest.TestCase):
             rrpl = tdp / 'action_log.rrpl'
             rrpl_contents = f"""
 command: {{
-  action_digest: "feedfacefeedface/1337"
 }}
 remote_metadata: {{
+  action_digest: "feedfacefeedface/1337"
   output_file_digests: {{
     key: "{p}"
     value: "{digest}"
@@ -1715,9 +1741,9 @@ remote_metadata: {{
             rrpl = tdp / 'action_log-2.rrpl'
             rrpl_contents = f"""
 command: {{
-  action_digest: "cafef00dcafef00d/656"
 }}
 remote_metadata: {{
+  action_digest: "cafef00dcafef00d/656"
   output_directory_digests: {{
     key: "{p}"
     value: "{digest}"
@@ -1902,7 +1928,7 @@ remote_metadata: {{
         options = action.options
         self.assertIn(download_option, options)
         logdir = '/fake/tmp/rpl/logz.12387127'
-        log_record = remote_action.ReproxyLogEntry(
+        log_record = FakeReproxyLogEntry(
             execution_id='000-111-22',
             action_digest='9182731aef9ad0',
             output_file_digests={output: output_digest},

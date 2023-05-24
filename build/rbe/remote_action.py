@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import dataclasses
 import difflib
 import filecmp
 import os
@@ -24,9 +23,10 @@ import fuchsia
 import cl_utils
 import depfile
 import output_leak_scanner
+import textpb
 
 from pathlib import Path
-from typing import AbstractSet, Callable, Dict, Iterable, Optional, Sequence, Tuple
+from typing import AbstractSet, Any, Callable, Dict, Iterable, Optional, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -354,18 +354,40 @@ def _remove_suffix(text: str, suffix: str) -> str:
     return text[:-len(suffix)] if text.endswith(suffix) else text
 
 
-def _extract_proto_field_value(line: str, field_name: str) -> str:
-    return _remove_prefix(line, field_name + ':').strip(' "')
-
-
-@dataclasses.dataclass
 class ReproxyLogEntry(object):
-    execution_id: str
-    action_digest: str
-    output_file_digests: Dict[Path, str]  # path, hash/size
-    output_directory_digests: Dict[Path, str]  # path, hash/size
 
-    # add more useful fields as needed
+    def __init__(self, parsed_form: Dict[str, Any]):
+        self._raw = parsed_form
+
+    @property
+    def command(self) -> Dict[str, Any]:
+        return self._raw["command"][0]
+
+    @property
+    def identifiers(self) -> Dict[str, Any]:
+        return self.command["identifiers"][0]
+
+    @property
+    def execution_id(self) -> str:
+        return self.identifiers["execution_id"][0].text.strip('"')
+
+    @property
+    def remote_metadata(self) -> Dict[str, Any]:
+        return self._raw["remote_metadata"][0]
+
+    @property
+    def action_digest(self) -> str:
+        return self.remote_metadata["action_digest"][0].text.strip('"')
+
+    @property
+    def output_file_digests(self) -> Dict[Path, str]:  # path, hash/size
+        d = self.remote_metadata.get("output_file_digests", dict())
+        return {Path(k): v.text.strip('"') for k, v in d.items()}
+
+    @property
+    def output_directory_digests(self) -> Dict[Path, str]:  # path, hash/size
+        d = self.remote_metadata.get("output_directory_digests", dict())
+        return {Path(k): v.text.strip('"') for k, v in d.items()}
 
     def make_download_stub_info(
             self, path: Path, build_id: str) -> 'DownloadStubInfo':
@@ -392,77 +414,15 @@ class ReproxyLogEntry(object):
 
     @staticmethod
     def _parse_lines(lines: Iterable[str]) -> 'ReproxyLogEntry':
-        """Extremely crude extraction of data from a .rrpl (reproxy log) file.
+        """Parse data from a .rrpl (reproxy log) file.
 
         Args:
           lines: text from a rewrapper --action_log file
 
-        TODO: properly parse reclient proxy.LogRecord textproto, which
-          requires protoc -> .pb2.py from .protos from various sources.
-          See build/rbe/proto/refresh.sh.
+        Returns:
+          ReproxyLogEntry object.
         """
-        execution_id = None
-        action_digest = None
-        output_file_digests: Dict[Path, str] = {}
-        output_directory_digests: Dict[Path, str] = {}
-
-        in_output_file_digests = False
-        in_output_directory_digests = False
-        key = None
-        for line in lines:
-            stripped = line.strip()
-            if in_output_file_digests:
-                if stripped.startswith("key:"):  # output file path
-                    key = _extract_proto_field_value(stripped, "key").strip('"')
-                elif stripped.startswith("value:"):  # digest: hash/size
-                    value = _extract_proto_field_value(stripped,
-                                                       "value").strip('"')
-                    output_file_digests[Path(key)] = value
-                    key = None
-                elif stripped == '}':
-                    in_output_file_digests = False
-                continue
-
-            if in_output_directory_digests:
-                if stripped.startswith("key:"):  # output directory path
-                    key = _extract_proto_field_value(stripped, "key").strip('"')
-                elif stripped.startswith("value:"):  # digest: hash/size
-                    value = _extract_proto_field_value(stripped,
-                                                       "value").strip('"')
-                    output_directory_digests[Path(key)] = value
-                    key = None
-                elif stripped == '}':
-                    in_output_directory_digests = False
-                continue
-
-            if stripped.startswith("execution_id:"):
-                execution_id = _extract_proto_field_value(
-                    stripped, "execution_id")
-                continue
-
-            if stripped.startswith("action_digest:"):
-                action_digest = _extract_proto_field_value(
-                    stripped, "action_digest")
-                continue
-
-            if stripped.startswith(
-                    "output_file_digests:"):  # starts a '{' section
-                in_output_file_digests = True
-                continue
-
-            if stripped.startswith(
-                    "output_directory_digests:"):  # starts a '{' section
-                in_output_directory_digests = True
-                continue
-
-            # else ignore line
-
-        return ReproxyLogEntry(
-            execution_id=execution_id,
-            action_digest=action_digest,
-            output_file_digests=output_file_digests,
-            output_directory_digests=output_directory_digests,
-        )
+        return ReproxyLogEntry(textpb.parse(lines))
 
 
 def _diagnose_fail_to_dial(line: str):

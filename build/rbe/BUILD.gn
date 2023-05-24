@@ -22,6 +22,7 @@ group("tests") {
     ":remotetool_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
     ":rustc_test($host_toolchain)",
+    ":textpb_test($host_toolchain)",
   ]
 }
 
@@ -35,12 +36,13 @@ if (is_host) {
   _depfile_sources = [ "depfile.py" ]
   _output_leak_scanner_sources =
       [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
+  _textpb_sources = [ "textpb.py" ]
 
   _remotetool_sources =
       [ "remotetool.py" ] + _fuchsia_sources + _cl_utils_sources
   _remote_action_sources =
       [ "remote_action.py" ] + _fuchsia_sources + _cl_utils_sources +
-      [ "output_leak_scanner.py" ] + _depfile_sources
+      [ "output_leak_scanner.py" ] + _depfile_sources + _textpb_sources
   _dlwrap_sources = [ "dlwrap.py" ] + _remote_action_sources
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =
@@ -156,5 +158,13 @@ if (is_host) {
   python_host_test("rustc_remote_wrapper_test") {
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
+  }
+
+  python_library("textpb") {
+    sources = _textpb_sources
+  }
+  python_host_test("textpb_test") {
+    main_source = "textpb_test.py"
+    sources = _textpb_sources
   }
 }
