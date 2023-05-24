@@ -182,7 +182,6 @@ icu_source_set("lib") {
   deps = [
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",

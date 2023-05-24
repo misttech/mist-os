@@ -32,7 +32,6 @@
             protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.policy.Presenter",
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",

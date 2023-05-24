@@ -87,7 +87,6 @@ source_set("legacy") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fostr/fidl/fuchsia.ui.input.accessibility",
   ]

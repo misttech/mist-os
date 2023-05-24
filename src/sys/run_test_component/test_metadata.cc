@@ -91,7 +91,6 @@ const std::unordered_set<std::string> kAllowedSystemServices = {
     fuchsia::tracing::kernel::Controller::Name_,
     fuchsia::tracing::kernel::Reader::Name_,
     fuchsia::ui::composition::Allocator::Name_,
-    fuchsia::ui::policy::Presenter::Name_,
     fuchsia::ui::scenic::Scenic::Name_,
     fuchsia::vulkan::loader::Loader::Name_,
     fuchsia::test::manager::Query::Name_,
