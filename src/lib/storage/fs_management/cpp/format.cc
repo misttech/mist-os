@@ -257,12 +257,11 @@ __EXPORT std::string_view DiskFormatComponentUrl(DiskFormat fs_type) {
       return kMinfsComponentUrl;
     case kDiskFormatF2fs:
       return kF2fsComponentUrl;
-    case kDiskFormatFat:
-      return kFatfsComponentUrl;
     case kDiskFormatCount:
     case kDiskFormatUnknown:
     case kDiskFormatGpt:
     case kDiskFormatMbr:
+    case kDiskFormatFat:
     case kDiskFormatFvm:
     case kDiskFormatZxcrypt:
     case kDiskFormatFactoryfs:

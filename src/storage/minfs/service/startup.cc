@@ -34,14 +34,11 @@ MountOptions ParseMountOptions(fuchsia_fs_startup::wire::StartOptions start_opti
   return options;
 }
 
-MountOptions ParseFormatOptions(const fuchsia_fs_startup::wire::FormatOptions& format_options) {
+MountOptions ParseFormatOptions(fuchsia_fs_startup::wire::FormatOptions format_options) {
   MountOptions options;
 
-  options.verbose = format_options.has_verbose() && format_options.verbose();
-  if (format_options.has_fvm_data_slices() &&
-      format_options.fvm_data_slices() > options.fvm_data_slices) {
-    options.fvm_data_slices = format_options.fvm_data_slices();
-  }
+  options.verbose = format_options.verbose;
+  options.fvm_data_slices = std::max(options.fvm_data_slices, format_options.fvm_data_slices);
   // We _need_ a writable filesystem to meaningfully format it.
   options.writability = Writability::Writable;
 

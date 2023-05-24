@@ -116,16 +116,14 @@ std::vector<std::string> MkfsOptions::as_argv(const char *binary) const {
   return argv;
 }
 
-fuchsia_fs_startup::wire::FormatOptions MkfsOptions::as_format_options(
-    fidl::AnyArena &arena) const {
-  auto builder = fuchsia_fs_startup::wire::FormatOptions::Builder(arena);
-  builder.verbose(verbose);
-  builder.deprecated_padded_blobfs_format(deprecated_padded_blobfs_format);
-  if (num_inodes > 0)
-    builder.num_inodes(num_inodes);
-  if (sectors_per_cluster > 0)
-    builder.sectors_per_cluster(sectors_per_cluster);
-  return builder.Build();
+fuchsia_fs_startup::wire::FormatOptions MkfsOptions::as_format_options() const {
+  fuchsia_fs_startup::wire::FormatOptions options;
+
+  options.verbose = verbose;
+  options.deprecated_padded_blobfs_format = deprecated_padded_blobfs_format;
+  options.num_inodes = num_inodes;
+
+  return options;
 }
 
 std::vector<std::string> FsckOptions::as_argv(const char *binary) const {

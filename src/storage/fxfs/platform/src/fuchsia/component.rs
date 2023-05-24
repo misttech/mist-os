@@ -23,7 +23,8 @@ use {
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_inspect::{FsInspect, FsInspectTree, InfoData, UsageData},
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{lock::Mutex, TryStreamExt},
+    futures::lock::Mutex,
+    futures::TryStreamExt,
     fxfs::{
         filesystem::{
             mkfs, Filesystem as _, FxFilesystem, OpenFxFilesystem, OpenOptions, MIN_BLOCK_SIZE,

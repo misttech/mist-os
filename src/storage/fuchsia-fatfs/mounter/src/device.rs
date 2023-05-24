@@ -128,10 +128,7 @@ pub mod test {
         futures::prelude::*,
         ramdevice_client::RamdiskClient,
         std::io::Write,
-        vfs::{
-            directory::{entry::DirectoryEntry, entry_container::Directory},
-            path::Path,
-        },
+        vfs::path::Path,
     };
 
     /// Dictates the FIDL protocol a MockPartition should speak.

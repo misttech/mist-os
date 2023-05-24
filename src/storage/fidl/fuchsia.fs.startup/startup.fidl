@@ -53,18 +53,19 @@ type StartOptions = resource struct {
 };
 
 /// Options for how to format filesystems.
-type FormatOptions = table {
+type FormatOptions = resource struct {
     /// Enable verbose logging.
-    1: verbose bool;
+    @allow_deprecated_struct_defaults
+    verbose bool = false;
     /// If true, use the deprecated padded merkle tree blobfs format.
-    2: deprecated_padded_blobfs_format bool;
+    @allow_deprecated_struct_defaults
+    deprecated_padded_blobfs_format bool = false;
     /// The initial number of inodes to allocate space for. If zero, a default is used. Only
     /// supported for blobfs.
-    3: num_inodes uint64;
+    @allow_deprecated_struct_defaults
+    num_inodes uint64 = 0;
     /// The number of fvm slices to preallocate for data when the filesystem is created.
-    4: fvm_data_slices uint32;
-    /// The number of sectors-per-cluster (for FAT filesystems).
-    5: sectors_per_cluster uint16;
+    fvm_data_slices uint32;
 };
 
 /// Options for running consistency checks on filesystems.

@@ -58,15 +58,13 @@ MountOptions ParseMountOptions(fuchsia_fs_startup::wire::StartOptions start_opti
   return options;
 }
 
-FilesystemOptions ParseFormatOptions(
-    const fuchsia_fs_startup::wire::FormatOptions& format_options) {
+FilesystemOptions ParseFormatOptions(fuchsia_fs_startup::wire::FormatOptions format_options) {
   FilesystemOptions options;
 
-  if (format_options.has_num_inodes()) {
-    options.num_inodes = format_options.num_inodes();
+  if (format_options.num_inodes > 0) {
+    options.num_inodes = format_options.num_inodes;
   }
-  if (format_options.has_deprecated_padded_blobfs_format() &&
-      format_options.deprecated_padded_blobfs_format()) {
+  if (format_options.deprecated_padded_blobfs_format) {
     options.blob_layout_format = BlobLayoutFormat::kDeprecatedPaddedMerkleTreeAtStart;
   }
 

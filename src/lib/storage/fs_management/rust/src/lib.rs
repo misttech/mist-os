@@ -239,10 +239,10 @@ impl FSConfig for Blobfs {
             name: "blobfs",
             reuse_component_after_serving: false,
             format_options: FormatOptions {
-                verbose: Some(self.verbose),
-                deprecated_padded_blobfs_format: Some(self.deprecated_padded_blobfs_format),
-                num_inodes: if self.num_inodes > 0 { Some(self.num_inodes) } else { None },
-                ..Default::default()
+                verbose: self.verbose,
+                deprecated_padded_blobfs_format: self.deprecated_padded_blobfs_format,
+                num_inodes: self.num_inodes,
+                fvm_data_slices: 0,
             },
             start_options: {
                 let mut start_options = StartOptions {
@@ -316,9 +316,10 @@ impl FSConfig for Minfs {
             name: "minfs",
             reuse_component_after_serving: false,
             format_options: FormatOptions {
-                verbose: Some(self.verbose),
-                fvm_data_slices: Some(self.fvm_data_slices),
-                ..Default::default()
+                verbose: self.verbose,
+                deprecated_padded_blobfs_format: false,
+                num_inodes: 0,
+                fvm_data_slices: self.fvm_data_slices,
             },
             start_options: StartOptions {
                 read_only: self.readonly,
@@ -427,7 +428,12 @@ impl FSConfig for Fxfs {
         Mode::Component {
             name: "fxfs",
             reuse_component_after_serving: true,
-            format_options: FormatOptions { verbose: Some(false), ..Default::default() },
+            format_options: FormatOptions {
+                verbose: false,
+                deprecated_padded_blobfs_format: false,
+                num_inodes: 0,
+                fvm_data_slices: 0,
+            },
             start_options: StartOptions {
                 read_only: self.readonly,
                 verbose: false,
@@ -483,7 +489,12 @@ impl FSConfig for F2fs {
         Mode::Component {
             name: "f2fs",
             reuse_component_after_serving: false,
-            format_options: FormatOptions::default(),
+            format_options: FormatOptions {
+                verbose: false,
+                deprecated_padded_blobfs_format: false,
+                num_inodes: 0,
+                fvm_data_slices: 0,
+            },
             start_options: StartOptions {
                 read_only: false,
                 verbose: false,

@@ -115,7 +115,7 @@ struct MkfsOptions {
   // Generate a FormatOptions fidl struct to pass the a fuchsia.fs.startup.Startup interface based
   // on this set of options.
   __EXPORT
-  fuchsia_fs_startup::wire::FormatOptions as_format_options(fidl::AnyArena& arena) const;
+  fuchsia_fs_startup::wire::FormatOptions as_format_options() const;
 };
 
 struct FsckOptions {

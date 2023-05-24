@@ -72,8 +72,7 @@ zx::result<> MkfsComponentFs(fidl::UnownedClientEnd<fuchsia_io::Directory> expos
     return startup_client_end.take_error();
   fidl::WireSyncClient startup_client{std::move(*startup_client_end)};
 
-  fidl::Arena arena;
-  auto res = startup_client->Format(std::move(*device), options.as_format_options(arena));
+  auto res = startup_client->Format(std::move(*device), options.as_format_options());
   if (!res.ok())
     return zx::error(res.status());
   if (res->is_error())
