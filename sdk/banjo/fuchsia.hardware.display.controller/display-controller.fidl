@@ -34,10 +34,12 @@ type Image = struct {
 
 const INVALID_DISPLAY_ID uint32 = 0;
 const INVALID_ID uint32 = 0;
+
+/// Indicates that a ConfigStamp is invalid.
 const INVALID_CONFIG_STAMP_VALUE uint64 = 0;
 
-/// A unique stamp representing a unique set of display configuration
-/// in ApplyConfiguration().
+/// A unique stamp representing a unique set of display configuration.
+/// The value is always strictly increasing in chronological order.
 type ConfigStamp = struct {
     /// For valid configurations, the value should not be equal to
     /// `INVALID_CONFIG_STAMP_VALUE`.
@@ -520,14 +522,13 @@ protocol DisplayControllerImpl {
     /// In either case, the driver must drop all references to old images and invoke the vsync
     /// callback after doing so.
     ///
-    /// `config_stamp` is a non-zero unique stamp to identify each configuration.
-    /// Callers must guarantee that `config_stamp` is unique for each `ApplyConfiguration()`
-    /// call.
-    ///
     /// The driver must not retain references to the configuration after this function returns.
     ApplyConfiguration(struct {
         @inner_pointer
         display_config vector<DisplayConfig>:MAX;
+
+        /// Identifies the configuration to be applied. Must be a valid value.
+        /// Must be strictly increasing across calls.
         config_stamp ConfigStamp;
     }) -> ();
 
