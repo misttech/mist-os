@@ -168,4 +168,8 @@ WEAVE_ERROR ConfigurationManagerImpl::_StorePairedAccountId(const char* account_
   return delegate_->StorePairedAccountId(account_id, account_id_len);
 }
 
+zx_status_t ConfigurationManagerImpl::GetCertValidationEffectiveTimestamp(uint64_t* out) {
+  return delegate_->GetCertValidationEffectiveTimestamp(out);
+}
+
 }  // namespace nl::Weave::DeviceLayer

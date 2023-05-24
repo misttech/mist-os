@@ -57,6 +57,8 @@ constexpr char kDeviceInfoConfigKey_ThreadJoinableDurationSec[] = "thread-joinab
 constexpr char kDeviceInfoConfigKey_VendorId[] = "vendor-id";
 constexpr char kDeviceInfoConfigKey_VendorIdDescription[] = "vendor-id-description";
 constexpr char kDeviceInfoConfigKey_AppletPaths[] = "applet-paths";
+constexpr char kDeviceInfoConfigKey_CertValidationEffectiveTimestamp[] =
+    "cert-validation-effective-timestamp";
 
 // Maximum number of chars in hex for a uint64_t.
 constexpr int kWeaveDeviceIdMaxLength = 16;
@@ -666,6 +668,10 @@ WEAVE_ERROR ConfigurationManagerDelegateImpl::StorePairedAccountId(const char* a
   auto& inspector = WeaveInspector::GetWeaveInspector();
   inspector.NotifyPairingStateChange(WeaveInspector::kPairingState_RegisterServiceCompleted);
   return err;
+}
+
+zx_status_t ConfigurationManagerDelegateImpl::GetCertValidationEffectiveTimestamp(uint64_t* out) {
+  return device_info_->ReadConfigValue(kDeviceInfoConfigKey_CertValidationEffectiveTimestamp, out);
 }
 
 }  // namespace nl::Weave::DeviceLayer

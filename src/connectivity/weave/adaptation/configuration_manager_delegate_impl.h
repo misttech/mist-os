@@ -73,6 +73,8 @@ class NL_DLL_EXPORT ConfigurationManagerDelegateImpl : public ConfigurationManag
   // into |buf|. If not NULL, the number of bytes read is stored in |out_len|.
   zx_status_t ReadFactoryFile(const char* path, char* buf, size_t buf_size, size_t* out_len);
 
+  zx_status_t GetCertValidationEffectiveTimestamp(uint64_t* out) override;
+
  private:
   using GroupKeyStoreBase = ::nl::Weave::Profiles::Security::AppKeys::GroupKeyStoreBase;
   using GroupKeyStoreImpl = ::nl::Weave::DeviceLayer::Internal::GroupKeyStoreImpl;
