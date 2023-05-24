@@ -6,6 +6,9 @@
 
 use std::sync::{Arc, Mutex};
 
+use derivative::Derivative;
+use tracing::debug;
+
 use crate::{
     messaging::{Receiver, Sender},
     multicast_groups::{
@@ -13,6 +16,7 @@ use crate::{
         MulticastGroupMemberships,
     },
     protocol_family::ProtocolFamily,
+    NETLINK_LOG_TAG,
 };
 
 /// The internal half of a Netlink client, with the external half being provided
@@ -22,9 +26,7 @@ pub(crate) struct InternalClient<F: ProtocolFamily, S: Sender<F::Message>, R: Re
     /// The client's current multicast group memberships.
     group_memberships: Arc<Mutex<MulticastGroupMemberships<F>>>,
     /// The [`Sender`] of messages from Netlink to the Client.
-    // TODO(https://issuetracker.google.com/283136408): Use this field to send
-    // responses/events to the client.
-    _sender: S,
+    sender: S,
     /// The receiver of messages from the client to Netlink.
     // TODO(https://issuetracker.google.com/283136408): Use this field to
     // receive requests from the client.
@@ -33,11 +35,12 @@ pub(crate) struct InternalClient<F: ProtocolFamily, S: Sender<F::Message>, R: Re
 
 impl<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> InternalClient<F, S, R> {
     /// Returns true if this client is a member of the provided group.
-    // TODO(https://issuetracker.google.com/280483454): Use this method to check
-    // multicast group memberships.
-    #[allow(dead_code)]
     pub(crate) fn member_of_group(&self, group: ModernGroup) -> bool {
         self.group_memberships.lock().unwrap().member_of_group(group)
+    }
+    /// Sends the given message to the external half of this client.
+    pub(crate) fn send(&mut self, message: F::Message) {
+        self.sender.send(message)
     }
 }
 
@@ -76,8 +79,66 @@ pub(crate) fn new_client_pair<F: ProtocolFamily, S: Sender<F::Message>, R: Recei
     let group_memberships = Arc::new(Mutex::new(MulticastGroupMemberships::new()));
     (
         ExternalClient { group_memberships: group_memberships.clone() },
-        InternalClient { group_memberships, _sender: sender, _receiver: receiver },
+        InternalClient { group_memberships, sender: sender, _receiver: receiver },
     )
+}
+
+/// The table of connected clients for a given ProtocolFamily.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Default(bound = ""))]
+pub(crate) struct ClientTable<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> {
+    clients: Arc<Mutex<Vec<InternalClient<F, S, R>>>>,
+}
+
+impl<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> ClientTable<F, S, R> {
+    /// Adds the given client to this [`ClientTable`].
+    pub(crate) fn add_client(&self, client: InternalClient<F, S, R>) {
+        self.clients.lock().unwrap().push(client);
+    }
+
+    /// Sends the message to all clients who are members of the multicast group.
+    pub(crate) fn send_message_to_group(&self, message: F::Message, group: ModernGroup) {
+        let count = self.clients.lock().unwrap().iter_mut().fold(0, |count, client| {
+            if client.member_of_group(group) {
+                client.send(message.clone());
+                count + 1
+            } else {
+                count
+            }
+        });
+        debug!(
+            tag = NETLINK_LOG_TAG,
+            "Notified {} {} clients of message for group {:?}: {:?}",
+            count,
+            F::NAME,
+            group,
+            message
+        );
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod testutil {
+    use super::*;
+    use crate::{
+        messaging::testutil::{FakeReceiver, FakeSender, FakeSenderSink},
+        protocol_family::ProtocolFamily,
+    };
+
+    /// Creates a new client with memberships to the given groups.
+    pub(crate) fn new_fake_client<F: ProtocolFamily>(
+        group_memberships: &[ModernGroup],
+    ) -> (
+        FakeSenderSink<F::Message>,
+        InternalClient<F, FakeSender<F::Message>, FakeReceiver<F::Message>>,
+    ) {
+        let (sender, sender_sink) = crate::messaging::testutil::fake_sender_with_sink();
+        let (external_client, internal_client) = new_client_pair(sender, FakeReceiver::default());
+        for group in group_memberships {
+            external_client.add_membership(*group).expect("add group membership");
+        }
+        (sender_sink, internal_client)
+    }
 }
 
 #[cfg(test)]
@@ -86,7 +147,9 @@ mod tests {
 
     use crate::{
         messaging::testutil::{FakeReceiver, FakeSender},
-        protocol_family::testutil::{FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2},
+        protocol_family::testutil::{
+            FakeNetlinkMessage, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
+        },
     };
 
     // Verify that multicast group membership changes applied to the external
@@ -117,5 +180,33 @@ mod tests {
         external_client.del_membership(MODERN_GROUP2).expect("failed to del membership");
         assert!(!internal_client.member_of_group(MODERN_GROUP1));
         assert!(!internal_client.member_of_group(MODERN_GROUP2));
+    }
+
+    #[test]
+    fn test_send_message_to_group() {
+        let clients = ClientTable::default();
+        let (mut sink_group1, client_group1) =
+            testutil::new_fake_client::<FakeProtocolFamily>(&[MODERN_GROUP1]);
+        let (mut sink_group2, client_group2) =
+            testutil::new_fake_client::<FakeProtocolFamily>(&[MODERN_GROUP2]);
+        let (mut sink_both_groups, client_both_groups) =
+            testutil::new_fake_client::<FakeProtocolFamily>(&[MODERN_GROUP1, MODERN_GROUP2]);
+        clients.add_client(client_group1);
+        clients.add_client(client_group2);
+        clients.add_client(client_both_groups);
+
+        assert_eq!(&sink_group1.take_messages()[..], &[]);
+        assert_eq!(&sink_group2.take_messages()[..], &[]);
+        assert_eq!(&sink_both_groups.take_messages()[..], &[]);
+
+        clients.send_message_to_group(FakeNetlinkMessage, MODERN_GROUP1);
+        assert_eq!(&sink_group1.take_messages()[..], &[FakeNetlinkMessage]);
+        assert_eq!(&sink_group2.take_messages()[..], &[]);
+        assert_eq!(&sink_both_groups.take_messages()[..], &[FakeNetlinkMessage]);
+
+        clients.send_message_to_group(FakeNetlinkMessage, MODERN_GROUP2);
+        assert_eq!(&sink_group1.take_messages()[..], &[]);
+        assert_eq!(&sink_group2.take_messages()[..], &[FakeNetlinkMessage]);
+        assert_eq!(&sink_both_groups.take_messages()[..], &[FakeNetlinkMessage]);
     }
 }

@@ -5,21 +5,28 @@
 //! A module for managing RTM_ROUTE information by receiving RTM_ROUTE
 //! Netlink messages and maintaining route table state from Netstack.
 
-use {
-    anyhow::{anyhow, Context as _},
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    futures::{pin_mut, select, StreamExt as _, TryStreamExt as _},
-    net_types::ip::{Ip, IpAddress, IpVersion},
-    netlink_packet_route::{
-        RouteHeader, RouteMessage, AF_INET, AF_INET6, RTN_UNICAST, RTPROT_UNSPEC,
-        RT_SCOPE_UNIVERSE, RT_TABLE_UNSPEC,
-    },
-    netlink_packet_utils::nla::Nla,
-    std::{
-        collections::HashSet,
-        hash::{Hash, Hasher},
-    },
-    tracing::{error, warn},
+use std::{
+    collections::HashSet,
+    hash::{Hash, Hasher},
+};
+
+use anyhow::{anyhow, Context as _};
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+use futures::{pin_mut, select, StreamExt as _, TryStreamExt as _};
+use net_types::ip::{Ip, IpAddress, IpVersion};
+use netlink_packet_core::NetlinkMessage;
+use netlink_packet_route::{
+    RouteHeader, RouteMessage, RtnlMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
+    RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_UNSPEC,
+};
+use netlink_packet_utils::nla::Nla;
+use tracing::{error, warn};
+
+use crate::{
+    client::ClientTable,
+    messaging::SenderReceiverProvider,
+    multicast_groups::ModernGroup,
+    protocol_family::{route::NetlinkRoute, ProtocolFamily},
 };
 
 use crate::NETLINK_LOG_TAG;
@@ -28,10 +35,16 @@ use crate::NETLINK_LOG_TAG;
 ///
 /// Connects to the route watcher and can respond to RTM_ROUTE
 /// message requests.
-pub(crate) struct EventLoop {
+pub(crate) struct EventLoop<P: SenderReceiverProvider> {
     /// Represents the current route state as observed by Netstack, converted into
     /// Netlink messages to send when requested.
     route_messages: HashSet<NetlinkRouteMessage>,
+    /// The current set of clients of NETLINK_ROUTE protocol family.
+    route_clients: ClientTable<
+        NetlinkRoute,
+        P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+        P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
+    >,
 }
 
 /// RTM_ROUTE related event loop errors.
@@ -48,10 +61,16 @@ pub(crate) enum RoutesEventLoopError {
     Netstack(anyhow::Error),
 }
 
-impl EventLoop {
+impl<P: SenderReceiverProvider> EventLoop<P> {
     /// `new` returns an `EventLoop` instance.
-    pub(crate) fn new() -> Self {
-        EventLoop { route_messages: Default::default() }
+    pub(crate) fn new(
+        route_clients: ClientTable<
+            NetlinkRoute,
+            P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+            P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
+        >,
+    ) -> Self {
+        EventLoop { route_messages: Default::default(), route_clients }
     }
 
     /// Run the asynchronous work related to RTM_ROUTE messages.
@@ -108,7 +127,9 @@ impl EventLoop {
             }
         };
 
-        self.route_messages = new_set_with_existing_routes(routes);
+        let EventLoop { route_messages, route_clients } = self;
+
+        *route_messages = new_set_with_existing_routes(routes);
 
         ctx = format!("in IPv{} route event stream", I::VERSION.version_number());
         loop {
@@ -147,7 +168,11 @@ impl EventLoop {
                         None => return RoutesEventLoopError::Fidl(anyhow!("route event stream ended")),
                     };
 
-                    match handle_route_watcher_event(&mut self.route_messages, event) {
+                    match handle_route_watcher_event::<I, P>(
+                        route_messages,
+                        route_clients,
+                        event
+                    ) {
                         Ok(()) => {}
                         // Recoverable errors that do not affect the processing of further events.
                         Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route))
@@ -187,16 +212,24 @@ enum RouteEventHandlerError<I: Ip> {
 /// from the underlying `NetlinkRouteMessage` set.
 ///
 /// Returns a `RoutesEventLoopError` when unexpected events or HashSet issues occur.
-fn handle_route_watcher_event<I: Ip>(
+fn handle_route_watcher_event<I: Ip, P: SenderReceiverProvider>(
     route_messages: &mut HashSet<NetlinkRouteMessage>,
+    route_clients: &ClientTable<
+        NetlinkRoute,
+        P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+        P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
+    >,
     event: fnet_routes_ext::Event<I>,
 ) -> Result<(), RouteEventHandlerError<I>> {
-    match event {
+    let message_for_clients = match event {
         fnet_routes_ext::Event::Added(route) => {
             if let Some(route_message) = NetlinkRouteMessage::optionally_from(route) {
-                if !route_messages.insert(route_message) {
+                if !route_messages.insert(route_message.clone()) {
                     return Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route));
                 }
+                Some(route_message.as_rtnl_new_route())
+            } else {
+                None
             }
         }
         fnet_routes_ext::Event::Removed(route) => {
@@ -204,6 +237,9 @@ fn handle_route_watcher_event<I: Ip>(
                 if !route_messages.remove(&route_message) {
                     return Err(RouteEventHandlerError::NonExistentRouteDeletion(route));
                 }
+                Some(route_message.as_rtnl_del_route())
+            } else {
+                None
             }
         }
         // We don't expect to observe any existing events, because the route watchers were drained
@@ -213,7 +249,15 @@ fn handle_route_watcher_event<I: Ip>(
         | fnet_routes_ext::Event::Unknown => {
             return Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(event));
         }
+    };
+    if let Some(message_for_clients) = message_for_clients {
+        let route_group = match I::VERSION {
+            IpVersion::V4 => ModernGroup(RTNLGRP_IPV4_ROUTE),
+            IpVersion::V6 => ModernGroup(RTNLGRP_IPV6_ROUTE),
+        };
+        route_clients.send_message_to_group(message_for_clients, route_group);
     }
+
     Ok(())
 }
 
@@ -257,7 +301,20 @@ impl NetlinkRouteMessage {
             }
         }
     }
+
+    /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::NewRoute`].
+    fn as_rtnl_new_route(self) -> NetlinkMessage<RtnlMessage> {
+        let NetlinkRouteMessage(message) = self;
+        RtnlMessage::NewRoute(message).into()
+    }
+
+    /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::DelRoute`].
+    fn as_rtnl_del_route(self) -> NetlinkMessage<RtnlMessage> {
+        let NetlinkRouteMessage(message) = self;
+        RtnlMessage::DelRoute(message).into()
+    }
 }
+
 impl Hash for NetlinkRouteMessage {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let NetlinkRouteMessage(message) = self;
@@ -381,16 +438,17 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        assert_matches::assert_matches,
-        fidl_fuchsia_net_routes as fnet_routes,
-        net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6},
-        net_types::{
-            ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
-            SpecifiedAddr,
-        },
-        test_case::test_case,
+
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_net_routes as fnet_routes;
+    use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
+    use net_types::{
+        ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
+        SpecifiedAddr,
     };
+    use test_case::test_case;
+
+    use crate::messaging::testutil::{FakeReceiver, FakeSender, FakeSenderReceiverProvider};
 
     fn create_installed_route<I: Ip>(
         subnet: Subnet<I::Addr>,
@@ -476,6 +534,7 @@ mod tests {
             net_ip_v6!("2001:db8::1"),
         );
     }
+
     fn handle_route_watcher_event_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
         let interface_id = 1u64;
         let metric: u32 = Default::default();
@@ -493,39 +552,107 @@ mod tests {
         let expected_route_message1: NetlinkRouteMessage = installed_route1.try_into().unwrap();
         let expected_route_message2: NetlinkRouteMessage = installed_route2.try_into().unwrap();
 
+        // Setup two fake clients: one is a member of the route multicast group.
+        let (right_group, wrong_group) = match I::VERSION {
+            IpVersion::V4 => (ModernGroup(RTNLGRP_IPV4_ROUTE), ModernGroup(RTNLGRP_IPV6_ROUTE)),
+            IpVersion::V6 => (ModernGroup(RTNLGRP_IPV6_ROUTE), ModernGroup(RTNLGRP_IPV4_ROUTE)),
+        };
+        let (mut right_sink, right_client) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[right_group]);
+        let (mut wrong_sink, wrong_client) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[wrong_group]);
+        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>, FakeReceiver<_>> =
+            ClientTable::default();
+        route_clients.add_client(right_client);
+        route_clients.add_client(wrong_client);
+
         // An event that is not an add or remove should result in an error.
         assert_matches!(
-            handle_route_watcher_event(&mut route_messages, unknown_event),
+            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
+                &mut route_messages,
+                &route_clients,
+                unknown_event
+            ),
             Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(_))
         );
         assert_eq!(route_messages.len(), 0);
+        assert_eq!(&right_sink.take_messages()[..], &[]);
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
-        assert_eq!(handle_route_watcher_event(&mut route_messages, add_event1), Ok(()));
+        assert_eq!(
+            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
+                &mut route_messages,
+                &route_clients,
+                add_event1
+            ),
+            Ok(())
+        );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[expected_route_message1.clone().as_rtnl_new_route()]
+        );
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         // Adding the same route again should result in an error.
         assert_matches!(
-            handle_route_watcher_event(&mut route_messages, add_event1),
+            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
+                &mut route_messages,
+                &route_clients,
+                add_event1
+            ),
             Err(RouteEventHandlerError::AlreadyExistingRouteAddition(_))
         );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
+        assert_eq!(&right_sink.take_messages()[..], &[]);
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         // Adding a different route should result in an addition.
-        assert_eq!(handle_route_watcher_event(&mut route_messages, add_event2), Ok(()));
+        assert_eq!(
+            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
+                &mut route_messages,
+                &route_clients,
+                add_event2
+            ),
+            Ok(())
+        );
         assert_eq!(
             route_messages,
             HashSet::from_iter([expected_route_message1.clone(), expected_route_message2.clone()])
         );
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[expected_route_message2.clone().as_rtnl_new_route()]
+        );
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
-        assert_eq!(handle_route_watcher_event(&mut route_messages, remove_event), Ok(()));
+        assert_eq!(
+            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
+                &mut route_messages,
+                &route_clients,
+                remove_event
+            ),
+            Ok(())
+        );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[expected_route_message1.clone().as_rtnl_del_route()]
+        );
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         // Removing a route that doesn't exist should result in an error.
         assert_matches!(
-            handle_route_watcher_event(&mut route_messages, remove_event),
+            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
+                &mut route_messages,
+                &route_clients,
+                remove_event
+            ),
             Err(RouteEventHandlerError::NonExistentRouteDeletion(_))
         );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
+        assert_eq!(&right_sink.take_messages()[..], &[]);
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 
     #[test_case(net_subnet_v4!("192.0.2.0/24"), net_ip_v4!("192.0.2.1"))]

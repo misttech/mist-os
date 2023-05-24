@@ -5,6 +5,9 @@
 //! A module for managing protocol-specific aspects of Netlink.
 
 use netlink_packet_core::NetlinkMessage;
+use netlink_packet_utils::Emitable;
+
+use std::fmt::Debug;
 
 use crate::{
     client::ExternalClient,
@@ -16,7 +19,9 @@ use crate::{
 
 /// A type representing a Netlink Protocol Family.
 pub(crate) trait ProtocolFamily: MulticastCapableNetlinkFamily {
-    type Message;
+    type Message: Clone + Debug + Emitable + Send + 'static;
+
+    const NAME: &'static str;
 }
 
 pub mod route {
@@ -122,6 +127,8 @@ pub mod route {
 
     impl ProtocolFamily for NetlinkRoute {
         type Message = NetlinkMessage<RtnlMessage>;
+
+        const NAME: &'static str = "NETLINK_ROUTE";
     }
 
     /// A connection to the Route Netlink Protocol family.
@@ -186,7 +193,7 @@ pub(crate) mod testutil {
         }
     }
 
-    #[derive(Clone, Default)]
+    #[derive(Clone, Debug, Default, PartialEq)]
     pub(crate) struct FakeNetlinkMessage;
 
     impl Emitable for FakeNetlinkMessage {
@@ -199,5 +206,7 @@ pub(crate) mod testutil {
 
     impl ProtocolFamily for FakeProtocolFamily {
         type Message = FakeNetlinkMessage;
+
+        const NAME: &'static str = "FAKE_PROTOCOL_FAMILY";
     }
 }
