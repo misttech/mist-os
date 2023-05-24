@@ -175,7 +175,6 @@ group("bt-hfp-audio-gateway") {
 }
 
 fuchsia_test_component("test-component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/bt-hfp-audio-gateway-tests.cml"
   deps = [ ":bin_test" ]
 }

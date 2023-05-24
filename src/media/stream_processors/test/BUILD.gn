@@ -150,7 +150,6 @@ resource("sbc_file") {
 }
 
 fuchsia_test_component("audio_decoder_test_comp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "audio_decoder_test"
   manifest = "meta/audio_decoder_test.cml"
   deps = [
@@ -217,7 +216,6 @@ rustc_test("audio_encoder_test_bin") {
 }
 
 fuchsia_test_component("audio_encoder_test_comp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "audio_encoder_test"
   manifest = "meta/audio_encoder_test.cml"
   deps = [
@@ -318,7 +316,6 @@ rustc_test("audio_roundtrip_test_bin") {
 }
 
 fuchsia_test_component("audio_roundtrip_test_comp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "audio_roundtrip_test"
   manifest = "meta/audio_roundtrip_test.cml"
   deps = [
@@ -414,7 +411,6 @@ resource("bear_video") {
 }
 
 fuchsia_test_component("h264_decoder_test_comp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "h264_decoder_test"
   manifest = "meta/h264_decoder_test.cml"
   deps = [ ":h264_decoder_test_bin" ]
@@ -505,7 +501,6 @@ rustc_test("h265_encoder_test_bin") {
 }
 
 fuchsia_test_component("h265-encoder-test") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/h265_encoder_test.cml"
   deps = [ ":h265_encoder_test_bin" ]
 }

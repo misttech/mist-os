@@ -32,9 +32,4 @@
             rights: [ "r*" ],
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "codec_factory_test" ],
-        },
-    },
 }
