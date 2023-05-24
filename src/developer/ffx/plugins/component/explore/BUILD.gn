@@ -13,6 +13,7 @@ ffx_plugin("ffx_component_explore") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/sys/lib/component_debug",
+    "//src/sys/lib/socket-to-stdio",
   ]
 
   args_sources = [ "src/args.rs" ]

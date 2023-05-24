@@ -30,6 +30,7 @@ group("tests") {
     "routing:fuchsia-routing-tests",
     "routing:host-routing-tests",
     "runner:tests",
+    "socket-to-stdio:tests",
     "task-exceptions:tests",
   ]
 }

@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use component_debug::{cli::explore_cmd, explore::Stdout};
+use component_debug::cli::explore_cmd;
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
 use ffx_core::ffx_plugin;
 use fidl_fuchsia_dash::LauncherProxy;
 use fidl_fuchsia_developer_remotecontrol as rc;
+use socket_to_stdio::Stdout;
 
 // TODO(https://fxbug.dev/102835): This plugin needs E2E tests.
 #[ffx_plugin(LauncherProxy = "core/debug-dash-launcher:expose:fuchsia.dash.Launcher")]

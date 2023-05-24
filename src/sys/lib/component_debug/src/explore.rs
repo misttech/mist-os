@@ -3,57 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{bail, format_err, Result},
-    fidl_fuchsia_dash as fdash, fidl_fuchsia_io as fio,
+    anyhow::{format_err, Result},
+    fidl_fuchsia_dash as fdash,
     futures::prelude::*,
     moniker::RelativeMoniker,
-    std::io::{Read, StdoutLock, Write},
     std::str::FromStr,
-    termion::raw::{IntoRawMode, RawTerminal},
 };
-
-pub enum Stdout<'a> {
-    Raw(RawTerminal<StdoutLock<'a>>),
-    Buffered,
-}
-
-impl std::io::Write for Stdout<'_> {
-    fn flush(&mut self) -> Result<(), std::io::Error> {
-        match self {
-            Self::Raw(r) => r.flush(),
-            Self::Buffered => std::io::stdout().flush(),
-        }
-    }
-    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-        match self {
-            Self::Raw(r) => r.write(buf),
-            Self::Buffered => std::io::stdout().write(buf),
-        }
-    }
-}
-
-impl Stdout<'_> {
-    pub fn raw() -> Result<Self> {
-        let stdout = std::io::stdout();
-
-        if !termion::is_tty(&stdout) {
-            bail!("interactive mode does not support piping");
-        }
-
-        // Put the host terminal into raw mode, so input characters are not echoed, streams are
-        // not buffered and newlines are not changed.
-        let term_out = std::io::stdout()
-            .lock()
-            .into_raw_mode()
-            .map_err(|e| format_err!("could not set raw mode on terminal: {}", e))?;
-
-        Ok(Self::Raw(term_out))
-    }
-
-    pub fn buffered() -> Self {
-        Self::Buffered
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub enum DashNamespaceLayout {
@@ -80,45 +35,6 @@ impl Into<fdash::DashNamespaceLayout> for DashNamespaceLayout {
             Self::InstanceNamespaceIsRoot => fdash::DashNamespaceLayout::InstanceNamespaceIsRoot,
         }
     }
-}
-
-pub async fn connect_socket_to_stdio(socket: fidl::Socket, mut stdout: Stdout<'_>) -> Result<()> {
-    let pty = fuchsia_async::Socket::from_socket(socket)?;
-    let (mut read_from_pty, mut write_to_pty) = pty.split();
-
-    // Set up a thread for forwarding stdin. Reading from stdin is a blocking operation which
-    // will halt the executor if it were to run on the same thread.
-    std::thread::spawn(move || {
-        let mut executor = fuchsia_async::LocalExecutor::new();
-        executor.run_singlethreaded(async move {
-            let mut term_in = std::io::stdin().lock();
-            let mut buf = [0u8; fio::MAX_BUF as usize];
-            loop {
-                let bytes_read = term_in.read(&mut buf)?;
-                if bytes_read == 0 {
-                    return Ok::<(), anyhow::Error>(());
-                }
-                write_to_pty.write_all(&buf[..bytes_read]).await?;
-                write_to_pty.flush().await?;
-            }
-        })?;
-        Ok::<(), anyhow::Error>(())
-    });
-
-    // In a loop, wait for the TTY to be readable and print out the bytes.
-    loop {
-        let mut buf = [0u8; fio::MAX_BUF as usize];
-        let bytes_read = read_from_pty.read(&mut buf).await?;
-        if bytes_read == 0 {
-            // There are no more bytes to read. This means that the socket has been closed. This is
-            // probably because the dash process has terminated.
-            break;
-        }
-        stdout.write_all(&buf[..bytes_read])?;
-        stdout.flush()?;
-    }
-
-    Ok(())
 }
 
 pub async fn explore_over_socket(

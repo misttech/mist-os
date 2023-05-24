@@ -15,6 +15,7 @@ rustc_binary("component") {
     "//src/lib/fuchsia-url",
     "//src/sys/lib/component_debug",
     "//src/sys/lib/moniker",
+    "//src/sys/lib/socket-to-stdio",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
   ]

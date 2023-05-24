@@ -16,7 +16,7 @@ pub async fn explore_cmd(
     tools_urls: Vec<String>,
     dash_launcher: fdash::LauncherProxy,
     realm_query: fsys::RealmQueryProxy,
-    stdout: Stdout<'_>,
+    stdout: socket_to_stdio::Stdout<'_>,
 ) -> Result<()> {
     let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
 
@@ -31,7 +31,7 @@ pub async fn explore_cmd(
     explore_over_socket(relative_moniker, server, tools_urls, command, ns_layout, &dash_launcher)
         .await?;
 
-    connect_socket_to_stdio(client, stdout).await?;
+    socket_to_stdio::connect_socket_to_stdio(client, stdout).await?;
 
     let exit_code = wait_for_shell_exit(&dash_launcher).await?;
 
