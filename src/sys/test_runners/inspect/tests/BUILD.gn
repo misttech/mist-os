@@ -30,10 +30,10 @@ rustc_test("tests_bin") {
   sources = [ "main.rs" ]
 }
 
-fuchsia_component("inspect_runner_integration_test") {
-  testonly = true
+fuchsia_test_component("inspect_runner_integration_test") {
   manifest = "meta/inspect_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
+  test_type = "test_arch"
 }
 
 fuchsia_test_package("inspect-runner-integration-test") {

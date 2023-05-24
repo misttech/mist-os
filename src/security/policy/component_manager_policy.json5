@@ -32,6 +32,7 @@
                 // deprecated-ambient-replace-as-executable feature and
                 // VmexResource protocol on eng builds.
                 "/core/test_manager/**",
+                "/core/testing/**",
 
                 // TODO(fxbug.dev/105101): remove all dart runners when Dart is
                 // extracted from fuchsia.git into an external repository.
@@ -610,7 +611,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/test_manager",
-                    "/core/testing/system-tests:**",
+                    "/core/testing/test-arch-tests:**",
                     "/core/test_manager/system-tests:**",
                     "/core/full-resolver",
                 ],

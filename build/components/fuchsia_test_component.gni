@@ -6,10 +6,16 @@ import("fuchsia_component.gni")
 
 _type_moniker_map = {
   system = "/core/testing:system-tests"
+  test_arch = "/core/testing:test-arch-tests"
 }
 
 # Defines a Fuchsia component that is testonly.
 # See: https://fuchsia.dev/fuchsia-src/development/components/build
+# Other Parameters
+#   test_type (optional)
+#     Maps to the moniker to run the test component in.
+#     Type: string
+#     TODO(https://fxbug.dev/127535: Document various types)
 template("fuchsia_test_component") {
   fuchsia_component(target_name) {
     forward_variables_from(invoker,
@@ -18,6 +24,9 @@ template("fuchsia_test_component") {
                              "testonly",
                              "metadata",
                            ])
+    if (defined(invoker.manifest) && !defined(manifest)) {
+      manifest = invoker.manifest
+    }
     testonly = true
     metadata = {
       if (defined(invoker.metadata)) {

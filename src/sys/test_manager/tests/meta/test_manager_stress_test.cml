@@ -5,6 +5,8 @@
     include: [
         "//src/sys/test_manager/meta/test_manager_for_test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
+
+        // TODO(fxbug.dev/127684) : Port this to realm outside test manager
         "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
