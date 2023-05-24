@@ -59,6 +59,8 @@ source_set("src") {
     "region.cc",
     "region.h",
     "registers.h",
+    "string_printf.cc",
+    "string_printf.h",
   ]
 
   defines = []
@@ -96,7 +98,6 @@ source_set("src") {
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:mmio",
     "//zircon/system/ulib/backtrace-request",
-    "//zircon/system/ulib/fbl",
   ]
 
   public_deps = [

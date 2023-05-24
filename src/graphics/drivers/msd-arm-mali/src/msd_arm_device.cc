@@ -16,9 +16,6 @@
 #include <iterator>
 #include <string>
 
-#include <fbl/algorithm.h>
-#include <fbl/string_printf.h>
-
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
 #include "magma_util/short_macros.h"
@@ -30,6 +27,7 @@
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
+#include "string_printf.h"
 
 using std::chrono_literals::operator""ms;
 using std::chrono_literals::operator""us;
@@ -1082,14 +1080,13 @@ void MsdArmDevice::DumpToString(std::vector<std::string>* dump_string, bool on_d
     std::unique_lock<std::mutex> lock(device_request_mutex_);
     auto current_time = std::chrono::steady_clock::now();
     dump_string->push_back(
-        fbl::StringPrintf("Device request queue size: %ld", device_request_list_.size()).c_str());
+        StringPrintf("Device request queue size: %ld", device_request_list_.size()).c_str());
     for (auto& request : device_request_list_) {
-      dump_string->push_back(
-          fbl::StringPrintf("Device request queuing delay: %lld ms",
-                            std::chrono::duration_cast<std::chrono::milliseconds>(
-                                current_time - request->enqueue_time())
-                                .count())
-              .c_str());
+      dump_string->push_back(StringPrintf("Device request queuing delay: %lld ms",
+                                          std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              current_time - request->enqueue_time())
+                                              .count())
+                                 .c_str());
     }
   }
 }
@@ -1136,77 +1133,75 @@ static std::string InterpretMmuFaultStatus(uint32_t status) {
   }
   uint32_t source_id = status >> kSourceIdShift;
   const char* exception_type = ExceptionTypeToString(status & kExceptionTypeMask);
-  return fbl::StringPrintf("  Fault source_id %d, access type \"%s\", exception type: \"%s\"",
-                           source_id, access_type, exception_type)
+  return StringPrintf("  Fault source_id %d, access type \"%s\", exception type: \"%s\"", source_id,
+                      access_type, exception_type)
       .c_str();
 }
 
 void MsdArmDevice::FormatDump(DumpState& dump_state, std::vector<std::string>* dump_string) {
   dump_string->push_back("Core power states");
   for (auto& state : dump_state.power_states) {
-    dump_string->push_back(fbl::StringPrintf("Core type %s state %s bitmap: 0x%lx", state.core_type,
-                                             state.status_type, state.bitmask)
+    dump_string->push_back(StringPrintf("Core type %s state %s bitmap: 0x%lx", state.core_type,
+                                        state.status_type, state.bitmask)
                                .c_str());
   }
-  dump_string->push_back(fbl::StringPrintf("Total ms %" PRIu64 " Active ms %" PRIu64,
-                                           dump_state.total_time_ms, dump_state.active_time_ms)
+  dump_string->push_back(StringPrintf("Total ms %" PRIu64 " Active ms %" PRIu64,
+                                      dump_state.total_time_ms, dump_state.active_time_ms)
                              .c_str());
-  dump_string->push_back(fbl::StringPrintf("Gpu fault status 0x%x, address 0x%lx",
-                                           dump_state.gpu_fault_status,
-                                           dump_state.gpu_fault_address)
+  dump_string->push_back(StringPrintf("Gpu fault status 0x%x, address 0x%lx",
+                                      dump_state.gpu_fault_status, dump_state.gpu_fault_address)
                              .c_str());
-  dump_string->push_back(fbl::StringPrintf("Gpu status 0x%x", dump_state.gpu_status).c_str());
-  dump_string->push_back(fbl::StringPrintf("Gpu cycle count %ld, timestamp %ld",
-                                           dump_state.cycle_count, dump_state.timestamp)
+  dump_string->push_back(StringPrintf("Gpu status 0x%x", dump_state.gpu_status).c_str());
+  dump_string->push_back(StringPrintf("Gpu cycle count %ld, timestamp %ld", dump_state.cycle_count,
+                                      dump_state.timestamp)
                              .c_str());
 
-  dump_string->push_back(fbl::StringPrintf("GPU IRQ Rawstat 0x%x Status 0x%x Mask 0x%x",
-                                           dump_state.gpu_irq_rawstat, dump_state.gpu_irq_status,
-                                           dump_state.gpu_irq_mask)
+  dump_string->push_back(StringPrintf("GPU IRQ Rawstat 0x%x Status 0x%x Mask 0x%x",
+                                      dump_state.gpu_irq_rawstat, dump_state.gpu_irq_status,
+                                      dump_state.gpu_irq_mask)
                              .c_str());
-  dump_string->push_back(
-      fbl::StringPrintf("JOB IRQ Rawstat 0x%x Status 0x%x Mask 0x%x JsState 0x%x",
-                        dump_state.job_irq_rawstat, dump_state.job_irq_status,
-                        dump_state.job_irq_mask, dump_state.job_irq_js_state)
-          .c_str());
-  dump_string->push_back(fbl::StringPrintf("MMU IRQ Rawstat 0x%x Status 0x%x Mask 0x%x",
-                                           dump_state.mmu_irq_rawstat, dump_state.mmu_irq_status,
-                                           dump_state.mmu_irq_mask)
+  dump_string->push_back(StringPrintf("JOB IRQ Rawstat 0x%x Status 0x%x Mask 0x%x JsState 0x%x",
+                                      dump_state.job_irq_rawstat, dump_state.job_irq_status,
+                                      dump_state.job_irq_mask, dump_state.job_irq_js_state)
                              .c_str());
-  dump_string->push_back(fbl::StringPrintf("IRQ handlers running - GPU: %d Mmu: %d",
-                                           dump_state.handling_gpu_interrupt,
-                                           dump_state.handling_mmu_interrupt)
+  dump_string->push_back(StringPrintf("MMU IRQ Rawstat 0x%x Status 0x%x Mask 0x%x",
+                                      dump_state.mmu_irq_rawstat, dump_state.mmu_irq_status,
+                                      dump_state.mmu_irq_mask)
+                             .c_str());
+  dump_string->push_back(StringPrintf("IRQ handlers running - GPU: %d Mmu: %d",
+                                      dump_state.handling_gpu_interrupt,
+                                      dump_state.handling_mmu_interrupt)
                              .c_str());
 
   auto now = magma::get_monotonic_ns();
   dump_string->push_back(
-      fbl::StringPrintf("Time since last IRQ handler - GPU: %ld us, Job: %ld us, Mmu: %ld us",
-                        (now - dump_state.gpu_interrupt_time) / 1000,
-                        (now - dump_state.job_interrupt_time) / 1000,
-                        (now - dump_state.mmu_interrupt_time) / 1000)
+      StringPrintf("Time since last IRQ handler - GPU: %ld us, Job: %ld us, Mmu: %ld us",
+                   (now - dump_state.gpu_interrupt_time) / 1000,
+                   (now - dump_state.job_interrupt_time) / 1000,
+                   (now - dump_state.mmu_interrupt_time) / 1000)
           .c_str());
   dump_string->push_back(
-      fbl::StringPrintf("Last job interrupt time: %ld", dump_state.job_interrupt_time).c_str());
+      StringPrintf("Last job interrupt time: %ld", dump_state.job_interrupt_time).c_str());
 
   dump_string->push_back(
-      fbl::StringPrintf("Last interrupt delays - GPU: %ld us, Job: %ld us, Mmu: %ld us",
-                        dump_state.gpu_interrupt_delay, dump_state.job_interrupt_delay,
-                        dump_state.mmu_interrupt_delay)
+      StringPrintf("Last interrupt delays - GPU: %ld us, Job: %ld us, Mmu: %ld us",
+                   dump_state.gpu_interrupt_delay, dump_state.job_interrupt_delay,
+                   dump_state.mmu_interrupt_delay)
           .c_str());
 
   for (size_t i = 0; i < dump_state.job_slot_status.size(); i++) {
     auto* status = &dump_state.job_slot_status[i];
     dump_string->push_back(
-        fbl::StringPrintf("Job slot %zu status 0x%x head 0x%lx tail 0x%lx config 0x%x", i,
-                          status->status, status->head, status->tail, status->config)
+        StringPrintf("Job slot %zu status 0x%x head 0x%lx tail 0x%lx config 0x%x", i,
+                     status->status, status->head, status->tail, status->config)
             .c_str());
   }
   for (size_t i = 0; i < dump_state.address_space_status.size(); i++) {
     auto* status = &dump_state.address_space_status[i];
-    dump_string->push_back(
-        fbl::StringPrintf("AS %zu status 0x%x fault status 0x%x fault address 0x%lx", i,
-                          status->status, status->fault_status, status->fault_address)
-            .c_str());
+    dump_string->push_back(StringPrintf("AS %zu status 0x%x fault status 0x%x fault address 0x%lx",
+                                        i, status->status, status->fault_status,
+                                        status->fault_address)
+                               .c_str());
     dump_string->push_back(InterpretMmuFaultStatus(status->fault_status));
   }
 }
@@ -1730,8 +1725,8 @@ magma_status_t MsdArmDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_ou
   icd_info.resize(std::size(kVariants));
   for (uint32_t i = 0; i < std::size(kVariants); i++) {
     strcpy(icd_info[i].component_url,
-           fbl::StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm",
-                             kVariants[i].url, GpuId(), kVariants[i].suffix)
+           StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm",
+                        kVariants[i].url, GpuId(), kVariants[i].suffix)
                .c_str());
     icd_info[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
   }

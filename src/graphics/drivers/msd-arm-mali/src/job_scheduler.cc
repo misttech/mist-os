@@ -4,13 +4,12 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 
-#include <fbl/string_printf.h>
-
 #include "magma_util/dlog.h"
 #include "msd_defs.h"
 #include "platform_logger.h"
 #include "platform_trace.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
+#include "string_printf.h"
 
 JobScheduler::JobScheduler(Owner* owner, uint32_t job_slots)
     : owner_(owner),
@@ -587,7 +586,7 @@ static void AppendTo(std::vector<std::string>&& input, std::vector<std::string>*
 std::vector<std::string> JobScheduler::DumpStatus() {
   std::vector<std::string> result;
   for (uint32_t i = 0; i < job_slots_; ++i) {
-    result.push_back(fbl::StringPrintf("Job slot %d", i).c_str());
+    result.push_back(StringPrintf("Job slot %d", i).c_str());
     if (executing_atoms_[i]) {
       result.push_back("Executing atom:");
       AppendTo(executing_atoms_[i]->DumpInformation(), &result);

@@ -7,11 +7,10 @@
 
 #include <lib/inspect/cpp/inspect.h>
 
-#include <fbl/string_printf.h>
-
 #include "magma_util/register_io.h"
 #include "src/graphics/drivers/msd-arm-mali/src/mali_register_io.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
+#include "string_printf.h"
 
 struct GpuFeatures {
   static constexpr uint32_t kSuspendSizeOffset = 0x8;
@@ -123,11 +122,11 @@ struct GpuFeatures {
     INIT_REG_PROPERTY(coherency_features);
 
     for (uint32_t i = 0; i < kMaxJobSlots; i++) {
-      node.CreateUint(fbl::StringPrintf("job_slot_features_%d", i).c_str(), job_slot_features[i],
+      node.CreateUint(StringPrintf("job_slot_features_%d", i).c_str(), job_slot_features[i],
                       &properties);
     }
     for (uint32_t i = 0; i < kNumTextureFeaturesRegisters; i++) {
-      node.CreateUint(fbl::StringPrintf("texture_features_%d", i).c_str(), texture_features[i],
+      node.CreateUint(StringPrintf("texture_features_%d", i).c_str(), texture_features[i],
                       &properties);
     }
 

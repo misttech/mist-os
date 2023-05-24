@@ -10,8 +10,6 @@
 #include <limits>
 #include <vector>
 
-#include <fbl/string_printf.h>
-
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/simple_allocator.h"
@@ -28,6 +26,7 @@
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_perf_count_pool.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_semaphore.h"
+#include "string_printf.h"
 
 // This definition of arraysize was stolen from fxl in order to avoid
 // a dynamic library dependency on it.
@@ -293,7 +292,7 @@ std::shared_ptr<MsdArmConnection> MsdArmConnection::Create(msd_client_id_t clien
 
 void MsdArmConnection::InitializeInspectNode(inspect::Node* parent) {
   static std::atomic_uint64_t counter;
-  node_ = parent->CreateChild(fbl::StringPrintf("connection-%ld", counter++).c_str());
+  node_ = parent->CreateChild(StringPrintf("connection-%ld", counter++).c_str());
   jit_regions_ = node_.CreateChild("jit_regions");
   client_id_property_ = node_.CreateUint("client_id", client_id_);
 }
@@ -665,7 +664,7 @@ std::optional<ArmMaliResultCode> MsdArmConnection::AllocateNewJitMemoryRegion(
 
   std::shared_ptr<MsdArmBuffer> buffer =
       MsdArmBuffer::Create(info.va_page_count * magma::page_size(),
-                           fbl::StringPrintf("Mali JIT memory %ld", client_id_).c_str());
+                           StringPrintf("Mali JIT memory %ld", client_id_).c_str());
   if (!buffer) {
     DLOG("Can't allocate buffer for jit memory");
     std::lock_guard<std::mutex> lock(address_lock_);
