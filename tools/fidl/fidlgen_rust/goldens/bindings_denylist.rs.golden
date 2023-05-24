@@ -1347,10 +1347,7 @@ impl DenyEachBindingOnlyDenyCppResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyCppResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1361,26 +1358,20 @@ impl DenyEachBindingOnlyDenyCppResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyCppResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut DenyEachBindingOnlyDenyCppResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|b| (*b,)),
+            body: result.map(|b| (b,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -1435,10 +1426,7 @@ impl DenyEachBindingOnlyDenyDartResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyDartResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1449,26 +1437,20 @@ impl DenyEachBindingOnlyDenyDartResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyDartResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut DenyEachBindingOnlyDenyDartResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|b| (*b,)),
+            body: result.map(|b| (b,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -1523,7 +1505,7 @@ impl DenyEachBindingOnlyDenyGoResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut result: &mut DenyEachBindingOnlyDenyGoResult) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1534,26 +1516,20 @@ impl DenyEachBindingOnlyDenyGoResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyGoResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut DenyEachBindingOnlyDenyGoResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|b| (*b,)),
+            body: result.map(|b| (b,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -1608,10 +1584,7 @@ impl DenyEachBindingOnlyDenyLibfuzzerResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyLibfuzzerResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1622,26 +1595,20 @@ impl DenyEachBindingOnlyDenyLibfuzzerResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenyLibfuzzerResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut DenyEachBindingOnlyDenyLibfuzzerResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|b| (*b,)),
+            body: result.map(|b| (b,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -1696,10 +1663,7 @@ impl DenyEachBindingOnlyDenySyzkallerResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenySyzkallerResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1710,26 +1674,20 @@ impl DenyEachBindingOnlyDenySyzkallerResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut DenyEachBindingOnlyDenySyzkallerResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut DenyEachBindingOnlyDenySyzkallerResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|b| (*b,)),
+            body: result.map(|b| (b,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

@@ -1289,7 +1289,7 @@ where
                 responder_send!(responder, self.set_reuse_address(value));
             }
             fposix_socket::StreamSocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, &mut Ok(self.reuse_address()));
+                responder_send!(responder, Ok(self.reuse_address()));
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
                 responder_send!(responder, self.get_error());
@@ -1298,20 +1298,20 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetBroadcast { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
                 self.set_send_buffer_size(value_bytes);
                 responder_send!(responder, Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.send_buffer_size()));
+                responder_send!(responder, Ok(self.send_buffer_size()));
             }
             fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
                 responder_send!(responder, Ok(self.set_receive_buffer_size(value_bytes)));
             }
             fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.receive_buffer_size()));
+                responder_send!(responder, Ok(self.receive_buffer_size()));
             }
             fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
                 self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled);
@@ -1319,19 +1319,19 @@ where
             }
             fposix_socket::StreamSocketRequest::GetKeepAlive { responder } => {
                 let enabled = self.with_socket_options(|so| so.keep_alive.enabled);
-                responder_send!(responder, &mut Ok(enabled));
+                responder_send!(responder, Ok(enabled));
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetOutOfBandInline { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetNoCheck { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetNoCheck { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetLinger {
                 linger: _,
@@ -1347,10 +1347,10 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetReusePort { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetAcceptConn { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1377,19 +1377,19 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpTtl { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpTtl { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpPacketInfo { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpPacketInfo { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveTypeOfService {
                 value: _,
@@ -1398,13 +1398,13 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveTypeOfService { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveTtl { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveTtl { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastInterface {
                 iface: _,
@@ -1420,13 +1420,13 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastTtl { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastLoopback { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastLoopback { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::AddIpMembership { membership: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1447,25 +1447,25 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastInterface { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6UnicastHops { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6UnicastHops { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceiveHopLimit { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastHops { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastHops { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastLoopback {
                 value: _,
@@ -1474,7 +1474,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastLoopback { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6Only { value, responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack sockets.
@@ -1489,7 +1489,7 @@ where
                 );
             }
             fposix_socket::StreamSocketRequest::GetIpv6Only { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveTrafficClass {
                 value: _,
@@ -1498,13 +1498,13 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceiveTrafficClass { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6TrafficClass { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6TrafficClass { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
@@ -1513,7 +1513,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceivePacketInfo { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1529,19 +1529,19 @@ where
             }
             fposix_socket::StreamSocketRequest::GetTcpNoDelay { responder } => {
                 let nagle_enabled = self.with_socket_options(|so| so.nagle_enabled);
-                responder_send!(responder, &mut Ok(!nagle_enabled));
+                responder_send!(responder, Ok(!nagle_enabled));
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpMaxSegment { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTcpCork { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpCork { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveIdle { value_secs, responder } => {
                 match NonZeroU64::new(value_secs.into())
@@ -1561,7 +1561,7 @@ where
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveIdle { responder } => {
                 let secs =
                     self.with_socket_options(|so| Duration::from(so.keep_alive.idle).as_secs());
-                responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
+                responder_send!(responder, Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveInterval {
                 value_secs,
@@ -1584,7 +1584,7 @@ where
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveInterval { responder } => {
                 let secs =
                     self.with_socket_options(|so| Duration::from(so.keep_alive.interval).as_secs());
-                responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
+                responder_send!(responder, Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value, responder } => {
                 match u8::try_from(value)
@@ -1605,7 +1605,7 @@ where
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveCount { responder } => {
                 let count = self.with_socket_options(|so| so.keep_alive.count);
-                responder_send!(responder, &mut Ok(u32::from(u8::from(count))));
+                responder_send!(responder, Ok(u32::from(u8::from(count))));
             }
             fposix_socket::StreamSocketRequest::SetTcpSynCount { value, responder } => {
                 responder_send!(
@@ -1621,7 +1621,7 @@ where
             }
             fposix_socket::StreamSocketRequest::GetTcpSynCount { responder } => {
                 let syn_cnt = self.with_socket_options(|so| u32::from(so.max_syn_retries.get()));
-                responder_send!(responder, &mut Ok(syn_cnt));
+                responder_send!(responder, Ok(syn_cnt));
             }
             fposix_socket::StreamSocketRequest::SetTcpLinger { value_secs, responder } => {
                 const MAX_FIN_WAIT2_TIMEOUT_SECS: u32 = 120;
@@ -1647,13 +1647,13 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpDeferAccept { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTcpWindowClamp { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpWindowClamp { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1664,7 +1664,7 @@ where
             }
             fposix_socket::StreamSocketRequest::GetTcpQuickAck { responder } => {
                 let quick_ack = self.with_socket_options(|so| !so.delayed_ack);
-                responder_send!(responder, &mut Ok(quick_ack));
+                responder_send!(responder, Ok(quick_ack));
             }
             fposix_socket::StreamSocketRequest::SetTcpCongestion { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1684,9 +1684,9 @@ where
                 let millis = self.with_socket_options(|so| {
                     so.user_timeout.map(|d| d.get().as_millis()).unwrap_or(0)
                 });
-                let mut result =
+                let result =
                     u32::try_from(millis).map_err(|_: TryFromIntError| fposix::Errno::Einval);
-                responder_send!(responder, &mut result);
+                responder_send!(responder, result);
             }
         }
         ControlFlow::Continue(None)

@@ -2116,7 +2116,7 @@ mod tests {
                 .into_remove_address()
                 .expect("del address request");
             assert_eq!(addr, IF_ADDR_V4);
-            let () = responder.send(&mut Ok(true)).expect("responder send");
+            let () = responder.send(Ok(true)).expect("responder send");
         };
 
         futures::select! {
@@ -2167,7 +2167,7 @@ mod tests {
                     .into_remove_address()
                     .expect("del address request");
                 assert_eq!(addr, IF_ADDR_V6);
-                let () = responder.send(&mut Ok(false)).expect("responder send");
+                let () = responder.send(Ok(false)).expect("responder send");
             };
             futures::select! {
                 () = interfaces_fut => panic!("interfaces_fut should never complete"),

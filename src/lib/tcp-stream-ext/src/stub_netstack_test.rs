@@ -42,7 +42,7 @@ fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
                     }
                     fposix_socket::StreamSocketRequest::GetTcpUserTimeout { responder } => {
                         let () = responder
-                            .send(&mut Ok(TCP_USER_TIMEOUT_OPTION_VALUE as u32))
+                            .send(Ok(TCP_USER_TIMEOUT_OPTION_VALUE as u32))
                             .expect("send TcpUserTimeout response");
                     }
                     request => panic!("unhandled StreamSocketRequest: {:?}", request),

@@ -481,7 +481,7 @@ mod tests {
             Ok(fidl_fuchsia_hardware_backlight::DeviceRequest::GetMaxAbsoluteBrightness {
                 responder,
             }) => {
-                if let Err(e) = responder.send(&mut Ok(250.0)) {
+                if let Err(e) = responder.send(Ok(250.0)) {
                     panic!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
                 }
             }

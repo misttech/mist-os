@@ -156,8 +156,7 @@ impl ControllerService {
             }
             ControllerRequest::SetAbsoluteVolume { requested_volume, responder } => {
                 responder.send(
-                    &mut self
-                        .controller
+                    self.controller
                         .set_absolute_volume(requested_volume)
                         .await
                         .map_err(ControllerError::from),

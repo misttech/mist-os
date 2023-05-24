@@ -408,7 +408,7 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetError { responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
@@ -417,37 +417,37 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetBroadcast { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetSendBuffer { value_bytes: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
                 responder_send!(responder, Ok(self.set_receive_buffer(value_bytes)));
             }
             fppacket::SocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.receive_buffer()));
+                responder_send!(responder, Ok(self.receive_buffer()));
             }
             fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetKeepAlive { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetOutOfBandInline { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetOutOfBandInline { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetNoCheck { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetNoCheck { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
@@ -459,10 +459,10 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetReusePort { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetAcceptConn { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetBindToDevice { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))

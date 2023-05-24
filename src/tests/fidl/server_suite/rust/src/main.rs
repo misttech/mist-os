@@ -282,10 +282,10 @@ async fn run_open_target_server(
             },
             OpenTargetRequest::StrictTwoWayFieldsErr { payload, responder } => match payload {
                 OpenTargetStrictTwoWayFieldsErrRequest::ReplySuccess(reply_success) => {
-                    responder.send(&mut Ok(reply_success)).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Ok(reply_success)).expect(EXPECT_REPLY_FAILED);
                 }
                 OpenTargetStrictTwoWayFieldsErrRequest::ReplyError(reply_error) => {
-                    responder.send(&mut Err(reply_error)).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Err(reply_error)).expect(EXPECT_REPLY_FAILED);
                 }
             },
             OpenTargetRequest::FlexibleTwoWay { responder } => {
@@ -304,10 +304,10 @@ async fn run_open_target_server(
             },
             OpenTargetRequest::FlexibleTwoWayFieldsErr { payload, responder } => match payload {
                 OpenTargetFlexibleTwoWayFieldsErrRequest::ReplySuccess(reply_success) => {
-                    responder.send(&mut Ok(reply_success)).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Ok(reply_success)).expect(EXPECT_REPLY_FAILED);
                 }
                 OpenTargetFlexibleTwoWayFieldsErrRequest::ReplyError(reply_error) => {
-                    responder.send(&mut Err(reply_error)).expect(EXPECT_REPLY_FAILED);
+                    responder.send(Err(reply_error)).expect(EXPECT_REPLY_FAILED);
                 }
             },
             OpenTargetRequest::_UnknownMethod {

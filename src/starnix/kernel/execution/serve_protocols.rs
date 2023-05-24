@@ -103,9 +103,9 @@ pub async fn serve_container_controller(
                             execute_task(current_task, move |result| {
                                 let _ = match result {
                                     Ok(ExitStatus::Exit(exit_code)) => {
-                                        responder.send(&mut Ok(exit_code))
+                                        responder.send(Ok(exit_code))
                                     }
-                                    _ => responder.send(&mut Err(zx::Status::CANCELED.into_raw())),
+                                    _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
                                 };
                             });
                             let _ = forward_to_pty(&container, console, pty).map_err(|e| {
@@ -114,11 +114,11 @@ pub async fn serve_container_controller(
                         }
                         Err(errno) => {
                             log_error!("failed to create task with pty {:?}", errno);
-                            responder.send(&mut Err(zx::Status::IO.into_raw()))?;
+                            responder.send(Err(zx::Status::IO.into_raw()))?;
                         }
                     }
                 } else {
-                    responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?;
+                    responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
                 }
             }
         }

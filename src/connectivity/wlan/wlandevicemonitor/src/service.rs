@@ -1498,9 +1498,9 @@ mod tests {
                 }
 
                 if create_iface_fails {
-                    responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).expect("failed to send iface_id");
+                    responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).expect("failed to send iface_id");
                 } else {
-                    responder.send(&mut Ok(123)).expect("failed to send iface id");
+                    responder.send(Ok(123)).expect("failed to send iface id");
                 };
 
                 req.mlme_channel
@@ -1604,7 +1604,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
                 assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
                 assert_eq!(req.init_sta_addr, sta_addr);
-                responder.send(&mut Ok(phy_assigned_iface_id)).expect("failed to send iface id");
+                responder.send(Ok(phy_assigned_iface_id)).expect("failed to send iface id");
                 req.mlme_channel.expect("no MLME channel")
             });
 

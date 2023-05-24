@@ -232,8 +232,8 @@ where
                 responder.send(resp).context("sending RemoveAccount response")?;
             }
             AccountManagerRequest::ProvisionNewAccount { payload: _, responder } => {
-                let mut resp = Err(faccount::Error::UnsupportedOperation);
-                responder.send(&mut resp).context("sending ProvisionNewAccount response")?;
+                let resp = Err(faccount::Error::UnsupportedOperation);
+                responder.send(resp).context("sending ProvisionNewAccount response")?;
             }
         }
         Ok(())

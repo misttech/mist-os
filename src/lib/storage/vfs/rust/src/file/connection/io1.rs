@@ -804,7 +804,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::Write { data, responder } => {
                 fuchsia_trace::duration!("storage", "File::Write", "bytes" => data.len() as u64);
                 let result = self.handle_write(&data).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::WriteAt { offset, data, responder } => {
                 fuchsia_trace::duration!(
@@ -814,12 +814,12 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                     "bytes" => data.len() as u64
                 );
                 let result = self.handle_write_at(offset, &data).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::Seek { origin, offset, responder } => {
                 fuchsia_trace::duration!("storage", "File::Seek");
                 let result = self.handle_seek(offset, origin).await;
-                responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::Resize { length, responder } => {
                 fuchsia_trace::duration!("storage", "File::Resize", "length" => length);

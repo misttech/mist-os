@@ -201,7 +201,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
             }
             AccountRequest::GetDefaultPersona { persona: _, responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending GetDefaultPersona response")?;
             }
             AccountRequest::GetPersona { id: _, persona: _, responder } => {
@@ -224,7 +224,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
             }
             AccountRequest::CreateAuthMechanismEnrollment { interaction: _, responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending CreateAuthMechanismEnrollment response")?;
             }
             AccountRequest::RemoveAuthMechanismEnrollment { enrollment_id: _, responder } => {

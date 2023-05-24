@@ -265,14 +265,14 @@ impl Control {
                 let result = self.get_max_absolute_brightness();
                 match result.await {
                     Ok(value) => {
-                        if let Err(e) = responder.send(&mut Ok(value)) {
+                        if let Err(e) = responder.send(Ok(value)) {
                             tracing::error!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
                         }
                     }
                     Err(e) => {
                         tracing::error!("Failed to get max absolute brightness: {}", e);
 
-                        if let Err(e) = responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED)) {
+                        if let Err(e) = responder.send(Err(ZX_ERR_NOT_SUPPORTED)) {
                             tracing::error!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
                         }
                     }

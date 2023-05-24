@@ -1602,7 +1602,7 @@ where
                 responder,
             } => {
                 // TODO(https://fxbug.dev/21106): handle control.
-                responder_send!(responder, &mut self.send_msg(addr.map(|addr| *addr), data));
+                responder_send!(responder, self.send_msg(addr.map(|addr| *addr), data));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetInfo { responder } => {
                 responder_send!(responder, self.get_sock_info())
@@ -1626,7 +1626,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReceiveBuffer {
                 value_bytes,
@@ -1638,7 +1638,7 @@ where
                 });
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.get_max_receive_buffer_size()));
+                responder_send!(responder, Ok(self.get_max_receive_buffer_size()));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReuseAddress {
                 value: _,
@@ -1651,16 +1651,16 @@ where
                 responder_send!(responder, Ok(()));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReusePort { value, responder } => {
                 responder_send!(responder, self.set_reuse_port(value));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReusePort { responder } => {
-                responder_send!(responder, &mut Ok(self.get_reuse_port()));
+                responder_send!(responder, Ok(self.get_reuse_port()));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetAcceptConn { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetBindToDevice {
                 value,
@@ -1686,7 +1686,7 @@ where
                 responder_send!(responder, response);
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetBroadcast { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetKeepAlive {
                 value: _,
@@ -1695,7 +1695,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetKeepAlive { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetLinger {
                 linger: _,
@@ -1714,13 +1714,13 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetOutOfBandInline { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetNoCheck { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetNoCheck { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6Only { value, responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack sockets.
@@ -1737,7 +1737,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6Only { responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack
                 // sockets.
-                responder_send!(responder, &mut Ok(true));
+                responder_send!(responder, Ok(true));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6TrafficClass {
                 value: _,
@@ -1746,7 +1746,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6TrafficClass { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastInterface {
                 value: _,
@@ -1758,7 +1758,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastInterface {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6UnicastHops {
                 value,
@@ -1767,7 +1767,7 @@ where
                 responder_send!(responder, self.set_unicast_hop_limit(Ipv6::VERSION, value))
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6UnicastHops { responder } => {
-                responder_send!(responder, &mut self.get_unicast_hop_limit(Ipv6::VERSION))
+                responder_send!(responder, self.get_unicast_hop_limit(Ipv6::VERSION))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastHops {
                 value,
@@ -1776,7 +1776,7 @@ where
                 responder_send!(responder, self.set_multicast_hop_limit(Ipv6::VERSION, value))
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastHops { responder } => {
-                responder_send!(responder, &mut self.get_multicast_hop_limit(Ipv6::VERSION))
+                responder_send!(responder, self.get_multicast_hop_limit(Ipv6::VERSION))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastLoopback {
                 value,
@@ -1792,13 +1792,13 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastLoopback {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpTtl { value, responder } => {
                 responder_send!(responder, self.set_unicast_hop_limit(Ipv4::VERSION, value))
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpTtl { responder } => {
-                responder_send!(responder, &mut self.get_unicast_hop_limit(Ipv4::VERSION))
+                responder_send!(responder, self.get_unicast_hop_limit(Ipv4::VERSION))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastTtl {
                 value,
@@ -1807,7 +1807,7 @@ where
                 responder_send!(responder, self.set_multicast_hop_limit(Ipv4::VERSION, value))
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastTtl { responder } => {
-                responder_send!(responder, &mut self.get_multicast_hop_limit(Ipv4::VERSION))
+                responder_send!(responder, self.get_multicast_hop_limit(Ipv4::VERSION))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastInterface {
                 iface: _,
@@ -1830,7 +1830,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastLoopback {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpTypeOfService {
                 value: _,
@@ -1839,7 +1839,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpTypeOfService { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::AddIpMembership {
                 membership,
@@ -1874,7 +1874,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceiveTrafficClass {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceiveHopLimit {
                 value: _,
@@ -1885,7 +1885,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceiveHopLimit {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTypeOfService {
                 value: _,
@@ -1896,7 +1896,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveTypeOfService {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
@@ -1907,7 +1907,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceivePacketInfo {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTtl {
                 value: _,
@@ -1916,7 +1916,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveTtl { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpPacketInfo {
                 value: _,
@@ -1925,7 +1925,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpPacketInfo { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
         }
         ControlFlow::Continue(None)

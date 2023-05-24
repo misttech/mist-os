@@ -221,7 +221,7 @@ impl LightRealm {
                         .expect("get info"),
                     LightRequest::GetCurrentBrightnessValue { index, responder } => responder
                         .send(
-                            &mut brightness_values
+                            brightness_values
                                 .lock()
                                 .await
                                 .get(&(index as usize))
@@ -231,7 +231,7 @@ impl LightRealm {
                         .expect("get brightness value"),
                     LightRequest::GetCurrentSimpleValue { index, responder } => responder
                         .send(
-                            &mut simple_values
+                            simple_values
                                 .lock()
                                 .await
                                 .get(&(index as usize))

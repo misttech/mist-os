@@ -768,13 +768,13 @@ trait OpenBlobResponder {
     fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error>;
 }
 impl OpenBlobResponder for fidl_fuchsia_pkg::NeededBlobsOpenBlobResponder {
-    fn send(self, mut res: OpenBlobResponse) -> Result<(), fidl::Error> {
-        self.send(&mut res)
+    fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error> {
+        self.send(res)
     }
 }
 impl OpenBlobResponder for fidl_fuchsia_pkg::NeededBlobsOpenMetaBlobResponder {
-    fn send(self, mut res: OpenBlobResponse) -> Result<(), fidl::Error> {
-        self.send(&mut res)
+    fn send(self, res: OpenBlobResponse) -> Result<(), fidl::Error> {
+        self.send(res)
     }
 }
 
@@ -1021,7 +1021,7 @@ async fn serve_write_blob(
                     drop(guard);
 
                     let _: Result<(), fidl::Error> =
-                        responder.send(&mut match write_result_to_status(&res) {
+                        responder.send(match write_result_to_status(&res) {
                             Status::OK => Ok(data.len() as u64),
                             error => Err(error.into_raw()),
                         });
@@ -2494,7 +2494,7 @@ mod serve_write_blob_tests {
                 serve_fidl_request!(stream, {
                     fio::FileRequest::Write { data: actual_data, responder } => {
                         assert_eq!(data, actual_data);
-                        let () = responder.send(&mut if blobfs_response == zx::Status::OK {
+                        let () = responder.send(if blobfs_response == zx::Status::OK {
                             Ok(data.len() as u64)
                         } else {
                             Err(blobfs_response.into_raw())

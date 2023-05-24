@@ -152,8 +152,8 @@ where
                 } else {
                     info!("AddCredential: Succeeded");
                 }
-                let mut response = result.map_err(ServiceError::into);
-                responder.send(&mut response).context("sending AddCredential response")?;
+                let response = result.map_err(ServiceError::into);
+                responder.send(response).context("sending AddCredential response")?;
                 self.diagnostics.incoming_manager_outcome(
                     IncomingManagerMethod::AddCredential,
                     response.map(|_| ()),

@@ -468,7 +468,7 @@ impl FxVolumeAndRoot {
                     ),
                 )?,
                 ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
-                    &mut self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
+                    self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
                         error!(?error, store_id, node_id, "Failed to get node.");
                         map_to_raw_status(error)
                     }),

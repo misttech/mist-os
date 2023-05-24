@@ -522,9 +522,7 @@ async fn handle_datagram_request(
             info!("got close request for socket");
         }
         fposix_socket::SynchronousDatagramSocketRequest::GetReceiveBuffer { responder } => {
-            responder
-                .send(&mut Ok(*receive_buffer_size))
-                .context("send GetReceiveBuffer response")?;
+            responder.send(Ok(*receive_buffer_size)).context("send GetReceiveBuffer response")?;
         }
         fposix_socket::SynchronousDatagramSocketRequest::SetReceiveBuffer {
             value_bytes,
@@ -562,9 +560,7 @@ async fn handle_datagram_request(
             } else if let Some(addr) = socket.connected {
                 addr
             } else {
-                responder
-                    .send(&mut Err(fposix::Errno::Enotconn))
-                    .context("send SendMsg response")?;
+                responder.send(Err(fposix::Errno::Enotconn)).context("send SendMsg response")?;
                 return Ok(());
             };
             // Ensure this message is destined for the loopback address.
@@ -592,7 +588,7 @@ async fn handle_datagram_request(
 
                     let len = data.len().try_into().unwrap();
                     loopback_receive_buffer.push_back((from, data));
-                    responder.send(&mut Ok(len)).context("send SendMsg response")?;
+                    responder.send(Ok(len)).context("send SendMsg response")?;
                 }
                 fposix_socket::DatagramSocketProtocol::IcmpEcho => {
                     let len = data.len().try_into().unwrap();
@@ -620,7 +616,7 @@ async fn handle_datagram_request(
                         make_loopback_src_addr_with_port(socket.domain, icmp_id),
                         reply,
                     ));
-                    responder.send(&mut Ok(len)).context("send SendMsg response")?;
+                    responder.send(Ok(len)).context("send SendMsg response")?;
                 }
             }
         }
@@ -730,7 +726,7 @@ async fn handle_stream_request(
 
         fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
             responder
-                .send(&mut Ok(socket.borrow().send_buffer_size))
+                .send(Ok(socket.borrow().send_buffer_size))
                 .context("send GetSendBuffer response")?;
         }
         fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
@@ -751,7 +747,7 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
             responder
-                .send(&mut Ok(socket.borrow().receive_buffer_size))
+                .send(Ok(socket.borrow().receive_buffer_size))
                 .context("send GetReceiveBuffer response")?;
         }
         fposix_socket::StreamSocketRequest::GetSockName { responder } => {

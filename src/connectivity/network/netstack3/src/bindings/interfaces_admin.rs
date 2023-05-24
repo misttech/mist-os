@@ -655,7 +655,7 @@ async fn dispatch_control_request(
             control_handle: _,
         } => Ok(add_address(ctx, id, address, parameters, address_state_provider)),
         fnet_interfaces_admin::ControlRequest::RemoveAddress { address, responder } => {
-            responder.send(&mut Ok(remove_address(ctx, id, address).await))
+            responder.send(Ok(remove_address(ctx, id, address).await))
         }
         fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id.get()),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
@@ -665,10 +665,10 @@ async fn dispatch_control_request(
             responder.send(&mut Ok(get_configuration(ctx, id)))
         }
         fnet_interfaces_admin::ControlRequest::Enable { responder } => {
-            responder.send(&mut Ok(set_interface_enabled(ctx, true, id).await))
+            responder.send(Ok(set_interface_enabled(ctx, true, id).await))
         }
         fnet_interfaces_admin::ControlRequest::Disable { responder } => {
-            responder.send(&mut Ok(set_interface_enabled(ctx, false, id).await))
+            responder.send(Ok(set_interface_enabled(ctx, false, id).await))
         }
         fnet_interfaces_admin::ControlRequest::Detach { control_handle: _ } => {
             *owns_interface = false;

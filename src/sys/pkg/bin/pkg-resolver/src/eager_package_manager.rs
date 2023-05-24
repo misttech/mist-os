@@ -751,7 +751,7 @@ mod tests {
                                 blob_type: _,
                                 responder,
                             } => {
-                                responder.send(&mut Ok(false)).unwrap();
+                                responder.send(Ok(false)).unwrap();
                             }
                             NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ } => {
                                 let mut stream = iterator.into_stream().unwrap();

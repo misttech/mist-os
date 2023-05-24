@@ -41,7 +41,7 @@ pub async fn sound_player_service_mock(
                     match req {
                         PlayerRequest::AddSoundFromFile { id, file: _file, responder } => {
                             let _ = play_counts.lock().await.insert(id, 0);
-                            responder.send(&mut Ok(DURATION)).unwrap();
+                            responder.send(Ok(DURATION)).unwrap();
                         }
                         PlayerRequest::PlaySound { id, usage, responder } => {
                             if let Entry::Occupied(mut count) = play_counts.lock().await.entry(id) {

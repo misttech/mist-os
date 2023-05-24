@@ -133,7 +133,7 @@ mod test {
             let request = file.try_next().await;
             if let Ok(Some(fio::FileRequest::Write { data, responder })) = request {
                 assert_eq!(data, EXPECTED_DATA);
-                responder.send(&mut Ok(data.len() as u64)).unwrap();
+                responder.send(Ok(data.len() as u64)).unwrap();
             } else {
                 panic!("did not get write request: {:?}", request)
             }

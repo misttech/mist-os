@@ -440,7 +440,7 @@ impl Blob {
         match self.stream.next().await {
             Some(Ok(fio::FileRequest::Write { data, responder })) => {
                 responder
-                    .send(&mut if status == Status::OK {
+                    .send(if status == Status::OK {
                         Ok(data.len() as u64)
                     } else {
                         Err(status.into_raw())

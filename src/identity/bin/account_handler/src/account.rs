@@ -238,8 +238,8 @@ where
                 responder.send(&response)?;
             }
             AccountRequest::GetDefaultPersona { persona, responder } => {
-                let mut response = self.get_default_persona(context, persona).await;
-                responder.send(&mut response)?;
+                let response = self.get_default_persona(context, persona).await;
+                responder.send(response)?;
             }
             AccountRequest::GetPersona { id, persona, responder } => {
                 let response = self.get_persona(context, id.into(), persona).await;
@@ -249,7 +249,7 @@ where
                 responder.send(&mut Err(ApiError::UnsupportedOperation))?;
             }
             AccountRequest::CreateAuthMechanismEnrollment { responder, .. } => {
-                responder.send(&mut Err(ApiError::UnsupportedOperation))?;
+                responder.send(Err(ApiError::UnsupportedOperation))?;
             }
             AccountRequest::RemoveAuthMechanismEnrollment { responder, .. } => {
                 responder.send(Err(ApiError::UnsupportedOperation))?;

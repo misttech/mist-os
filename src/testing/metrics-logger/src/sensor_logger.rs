@@ -569,7 +569,7 @@ pub mod tests {
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(fpower::DeviceRequest::GetPowerWatts { responder }) => {
-                        let _ = responder.send(&mut Ok(get_power()));
+                        let _ = responder.send(Ok(get_power()));
                     }
                     _ => assert!(false),
                 }

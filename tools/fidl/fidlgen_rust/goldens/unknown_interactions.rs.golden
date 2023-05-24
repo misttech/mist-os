@@ -3615,13 +3615,13 @@ impl UnknownInteractionsAjarProtocolControlHandle {
     }
     pub fn send_strict_event_fields_err(
         &self,
-        mut result: &mut UnknownInteractionsAjarProtocolStrictEventFieldsErrResult,
+        mut result: Result<i32, i32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse,
             i32,
         >, false>(
-            result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            result.map(|some_field| (some_field,)),
             0,
             0x3ae22659224effb9,
             fidl::encoding::DynamicFlags::empty(),
@@ -3697,13 +3697,13 @@ impl UnknownInteractionsAjarProtocolControlHandle {
     }
     pub fn send_flexible_event_fields_err(
         &self,
-        mut result: &mut UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult,
+        mut result: Result<i32, i32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse,
             i32,
         >, false>(
-            result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            result.map(|some_field| (some_field,)),
             0,
             0x22a3e45e944031c4,
             fidl::encoding::DynamicFlags::FLEXIBLE,
@@ -4181,10 +4181,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -4195,26 +4192,20 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            body: result.map(|some_field| (some_field,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -5644,13 +5635,13 @@ impl UnknownInteractionsClosedProtocolControlHandle {
     }
     pub fn send_strict_event_fields_err(
         &self,
-        mut result: &mut UnknownInteractionsClosedProtocolStrictEventFieldsErrResult,
+        mut result: Result<i32, i32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse,
             i32,
         >, false>(
-            result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            result.map(|some_field| (some_field,)),
             0,
             0x2d16399d2e8a5c96,
             fidl::encoding::DynamicFlags::empty(),
@@ -6130,10 +6121,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -6144,26 +6132,20 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            body: result.map(|some_field| (some_field,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8597,13 +8579,13 @@ impl UnknownInteractionsProtocolControlHandle {
     }
     pub fn send_strict_event_fields_err(
         &self,
-        mut result: &mut UnknownInteractionsProtocolStrictEventFieldsErrResult,
+        mut result: Result<i32, i32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             UnknownInteractionsProtocolStrictEventFieldsErrResponse,
             i32,
         >, false>(
-            result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            result.map(|some_field| (some_field,)),
             0,
             0x72c0566865e53c8b,
             fidl::encoding::DynamicFlags::empty(),
@@ -8679,13 +8661,13 @@ impl UnknownInteractionsProtocolControlHandle {
     }
     pub fn send_flexible_event_fields_err(
         &self,
-        mut result: &mut UnknownInteractionsProtocolFlexibleEventFieldsErrResult,
+        mut result: Result<i32, i32>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl::encoding::ResultType<
             UnknownInteractionsProtocolFlexibleEventFieldsErrResponse,
             i32,
         >, false>(
-            result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            result.map(|some_field| (some_field,)),
             0,
             0xf370ade2f7c7a4a,
             fidl::encoding::DynamicFlags::FLEXIBLE,
@@ -9163,10 +9145,7 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut UnknownInteractionsProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -9177,26 +9156,20 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut UnknownInteractionsProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut UnknownInteractionsProtocolStrictTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
+            body: result.map(|some_field| (some_field,)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -9855,10 +9828,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(
-        self,
-        mut result: &mut UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -9869,28 +9839,20 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut result: &mut UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(
-        &self,
-        mut result: &mut UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult,
-    ) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::FLEXIBLE,
             ),
-            body: fidl::encoding::FlexibleResult::new(
-                result.as_mut().map_err(|e| *e).map(|some_field| (*some_field,)),
-            ),
+            body: fidl::encoding::FlexibleResult::new(result.map(|some_field| (some_field,))),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

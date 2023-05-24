@@ -277,13 +277,13 @@ impl FailingWriteFileStreamHandler {
     async fn handle_write(self: &Arc<Self>, data: Vec<u8>, responder: fio::FileWriteResponder) {
         if self.writes_should_fail() {
             self.write_fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            responder.send(&mut Err(Status::NO_MEMORY.into_raw())).expect("send on write");
+            responder.send(Err(Status::NO_MEMORY.into_raw())).expect("send on write");
             return;
         }
 
         // Don't fail, actually do the write.
-        let mut result = self.backing_file.write(&data).await.unwrap();
-        responder.send(&mut result).unwrap();
+        let result = self.backing_file.write(&data).await.unwrap();
+        responder.send(result).unwrap();
     }
 
     fn handle_stream(

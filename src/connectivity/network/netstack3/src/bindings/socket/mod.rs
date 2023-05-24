@@ -76,7 +76,7 @@ pub(crate) async fn serve(
                     responder_send!(responder, &mut response);
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
-                    let mut response = {
+                    let response = {
                         let ctx = ctx.clone();
                         let Ctx { sync_ctx: _, non_sync_ctx } = &ctx;
                         let devices = AsRef::<Devices<_>>::as_ref(&non_sync_ctx);
@@ -86,7 +86,7 @@ pub(crate) async fn serve(
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };
-                    responder_send!(responder, &mut response);
+                    responder_send!(responder, response);
                 }
                 psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
                     responder_send!(responder, &mut get_interface_flags(&ctx, &name));

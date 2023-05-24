@@ -467,7 +467,7 @@ impl SoftPcm {
                 self.frame_vmo.lock().set_position_responder(responder);
             }
             RingBufferRequest::SetActiveChannels { active_channels_bitmask: _, responder } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             RingBufferRequest::WatchDelayInfo { responder } => {
                 if self.delay_info_replied {

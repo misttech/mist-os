@@ -38,9 +38,9 @@ impl BrowseControllerService {
                 let folder_uid = match path {
                     Path::Parent(_) => None,
                     Path::ChildFolderUid(folder_uid) => Some(folder_uid),
-                    _ => return Ok(responder.send(&mut Err(BrowseControllerError::ProtocolError))?),
+                    _ => return Ok(responder.send(Err(BrowseControllerError::ProtocolError))?),
                 };
-                responder.send(&mut self.controller.change_directory(folder_uid).await)?
+                responder.send(self.controller.change_directory(folder_uid).await)?
             }
             BrowseControllerRequest::GetFileSystemItems {
                 start_index,

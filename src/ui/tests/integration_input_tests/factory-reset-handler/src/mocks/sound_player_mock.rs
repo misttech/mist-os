@@ -75,7 +75,7 @@ impl SoundPlayerMock {
         {
             match request {
                 PlayerRequest::AddSoundFromFile { responder, .. } => {
-                    responder.send(&mut self.add_sound_from_file()).unwrap();
+                    responder.send(self.add_sound_from_file()).unwrap();
                 }
                 PlayerRequest::PlaySound { responder, .. } => {
                     responder.send(self.play_sound()).unwrap();

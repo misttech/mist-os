@@ -204,7 +204,7 @@ impl Nvdata {
             match request {
                 FirmwareParamRequest::Get { key, responder } => {
                     responder
-                        .send(&mut self.get(key).await.map_err(|e| match e {
+                        .send(self.get(key).await.map_err(|e| match e {
                             NvdataError::UnknownKey => zx::Status::NOT_SUPPORTED.into_raw(),
                             _ => zx::Status::INTERNAL.into_raw(),
                         }))

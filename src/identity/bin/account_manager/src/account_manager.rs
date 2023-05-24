@@ -100,8 +100,8 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
                 responder.send(response)?;
             }
             AccountManagerRequest::ProvisionNewAccount { payload, responder } => {
-                let mut response = self.provision_new_account(payload).await;
-                responder.send(&mut response)?;
+                let response = self.provision_new_account(payload).await;
+                responder.send(response)?;
             }
             AccountManagerRequest::DeprecatedProvisionNewAccount {
                 password: _,
