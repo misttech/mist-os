@@ -1,9 +1,9 @@
 # C++ Inspect Puppet
 
-Reviewed on: 2019-11-12
+Reviewed on: 2023-05-24
 
 This is the C++ Puppet for the Inspect Validator. The test
-inspect\_validator\_test\_cpp checks that the C++ Inspect library conforms
+`inspect-validator-test-cpp` checks that the C++ Inspect library conforms
 to the specification.
 
 ## Building
