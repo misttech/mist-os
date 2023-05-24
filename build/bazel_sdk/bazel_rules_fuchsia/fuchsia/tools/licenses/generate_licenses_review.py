@@ -60,6 +60,7 @@ def _write_summary_csv(
                 "name",
                 "identifications",
                 "conditions",
+                "identifications_and_conditions",
                 "overriden_conditions",
                 "link",
                 "tracking_issues",
@@ -84,6 +85,7 @@ def _write_summary_csv(
             license_id = license.license_id
             identifications = []
             conditions = []
+            identifications_and_conditions = []
             overriden_conditions = []
             detailed_identifications = []
             detailed_overrides = []
@@ -120,6 +122,9 @@ def _write_summary_csv(
                     identifications.append(i.identified_as)
                     conditions.append(i.condition)
 
+                    identifications_and_conditions.append(
+                        f"{i.identified_as} ({i.condition})")
+
                     detailed_identifications.append(
                         f"{i.identified_as} at lines {i.start_line}-{i.end_line}: {i.condition}"
                     )
@@ -131,7 +136,15 @@ def _write_summary_csv(
                                 f"{i.identified_as} ({i.condition}) at {i.start_line}-{i.end_line} overriden to ({r.override_condition_to}) by {r.rule_file_path}"
                             )
                             tracking_issues.append(r.bug)
-                            comments.append("\n".join(r.comment))
+                            comment = "{matched_identifications} ({matched_conditions}) -> ({overriden_condition})\n{comment_text}".format(
+                                matched_identifications=",".join(
+                                    r.match_identifications.all_expressions),
+                                matched_conditions=",".join(
+                                    r.match_conditions.all_expressions),
+                                overriden_condition=r.override_condition_to,
+                                comment_text="\n".join(r.comment),
+                            )
+                            comments.append(comment)
 
                     if i.public_source_mirrors:
                         public_source_mirrors.extend(i.public_source_mirrors)
@@ -146,12 +159,14 @@ def _write_summary_csv(
                     ",\n".join(_dedup(identifications)),
                 "conditions":
                     ",\n".join(_dedup(conditions)),
+                "identifications_and_conditions":
+                    ",\n".join(_dedup(identifications_and_conditions)),
                 "overriden_conditions":
                     ",".join(_dedup(overriden_conditions)),
                 "tracking_issues":
                     "\n".join(_dedup(tracking_issues)),
                 "comments":
-                    "\n=======\n".join(_dedup(comments)),
+                    "\n==============\n".join(_dedup(comments)),
                 "public_source_mirrors":
                     "\n".join(_dedup(public_source_mirrors)),
                 # Advanced / debugging columns
