@@ -80,6 +80,10 @@ class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
     def output_directory_digests(self) -> Dict[Path, str]:
         return self._output_directory_digests
 
+    @property
+    def completion_status(self) -> str:
+        return self._completion_status
+
 
 class FileMatchTests(unittest.TestCase):
 
@@ -1858,7 +1862,7 @@ remote_metadata: {{
         if _HAVE_XATTR:
             mock_removexattr.assert_not_called()
 
-    def test_made_download_stubs(self):
+    def test_made_download_stubs_for_remote_execution(self):
         exec_root = Path('/home/project')
         build_dir = Path('build-out')
         working_dir = exec_root / build_dir
@@ -1879,7 +1883,7 @@ remote_metadata: {{
         options = action.options
         self.assertIn(download_option, options)
         logdir = '/fake/tmp/rpl/logz.932874'
-        fake_log_record = remote_action.ReproxyLogEntry(dict())
+        fake_log_record = FakeReproxyLogEntry(completion_status='SUCCESS')
         with mock.patch.object(remote_action, '_reproxy_log_dir',
                                return_value=logdir) as mock_log_dir:
             with mock.patch.object(
@@ -1902,6 +1906,168 @@ remote_metadata: {{
             working_dir_abs=working_dir,
             build_id=logdir,
         )
+
+    def test_made_download_stubs_for_racing_remote_win(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        download_option = '--download_outputs=false'
+        p = remote_action._MAIN_ARG_PARSER
+        command = ['echo']
+        output = 'out.out'
+        main_args, other = p.parse_known_args(
+            [download_option, '--exec_strategy=racing', '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            output_files=[Path(output)],
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertFalse(action.download_outputs)
+        options = action.options
+        self.assertIn(download_option, options)
+        logdir = '/fake/tmp/rpl/logz.932874'
+        fake_log_record = FakeReproxyLogEntry(
+            completion_status='STATUS_CACHE_HIT')
+        with mock.patch.object(remote_action, '_reproxy_log_dir',
+                               return_value=logdir) as mock_log_dir:
+            with mock.patch.object(
+                    remote_action.ReproxyLogEntry, 'parse_action_log',
+                    return_value=fake_log_record) as mock_parse_log:
+                with mock.patch.object(remote_action.ReproxyLogEntry,
+                                       'make_download_stubs') as mock_stub:
+                    with mock.patch.object(
+                            remote_action.RemoteAction, '_run_maybe_remotely',
+                            return_value=cl_utils.SubprocessResult(
+                                0)) as mock_run:
+                        exit_code = action.run()
+            self.assertEqual(exit_code, 0)
+        mock_run.assert_called()
+        mock_log_dir.assert_called_once()
+        mock_parse_log.assert_called_with(Path(output + '.rrpl'))
+        mock_stub.assert_called_with(
+            files=[Path(output)],
+            dirs=[],
+            working_dir_abs=working_dir,
+            build_id=logdir,
+        )
+
+    def test_no_download_stubs_for_local_execution(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        download_option = '--download_outputs=false'
+        p = remote_action._MAIN_ARG_PARSER
+        command = ['echo']
+        output = 'out.out'
+        main_args, other = p.parse_known_args(
+            [download_option, '--exec_strategy=local', '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            output_files=[Path(output)],
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertFalse(action.download_outputs)
+        options = action.options
+        self.assertIn(download_option, options)
+        logdir = '/fake/tmp/rpl/logz.888222'
+        fake_log_record = FakeReproxyLogEntry(
+            completion_status='STATUS_LOCAL_EXECUTION')
+        with mock.patch.object(remote_action.ReproxyLogEntry,
+                               'parse_action_log',
+                               return_value=fake_log_record) as mock_parse_log:
+            with mock.patch.object(remote_action.ReproxyLogEntry,
+                                   'make_download_stubs') as mock_stub:
+                with mock.patch.object(
+                        remote_action.RemoteAction, '_run_maybe_remotely',
+                        return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                    exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called()
+        mock_parse_log.assert_called_with(Path(output + '.rrpl'))
+        mock_stub.assert_not_called()
+
+    def test_no_download_stubs_for_racing_local_win(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        download_option = '--download_outputs=false'
+        p = remote_action._MAIN_ARG_PARSER
+        command = ['echo']
+        output = 'out.out'
+        main_args, other = p.parse_known_args(
+            [download_option, '--exec_strategy=racing', '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            output_files=[Path(output)],
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertFalse(action.download_outputs)
+        options = action.options
+        self.assertIn(download_option, options)
+        logdir = '/fake/tmp/rpl/logz.213123'
+        fake_log_record = FakeReproxyLogEntry(
+            completion_status='STATUS_RACING_LOCAL')
+        with mock.patch.object(remote_action.ReproxyLogEntry,
+                               'parse_action_log',
+                               return_value=fake_log_record) as mock_parse_log:
+            with mock.patch.object(remote_action.ReproxyLogEntry,
+                                   'make_download_stubs') as mock_stub:
+                with mock.patch.object(
+                        remote_action.RemoteAction, '_run_maybe_remotely',
+                        return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                    exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called()
+        mock_parse_log.assert_called_with(Path(output + '.rrpl'))
+        mock_stub.assert_not_called()
+
+    def test_no_download_stubs_for_local_fallback(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        download_option = '--download_outputs=false'
+        p = remote_action._MAIN_ARG_PARSER
+        command = ['echo']
+        output = 'out.out'
+        main_args, other = p.parse_known_args(
+            [download_option, '--exec_strategy=remote_local_fallback', '--'] +
+            command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            output_files=[Path(output)],
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertFalse(action.download_outputs)
+        options = action.options
+        self.assertIn(download_option, options)
+        logdir = '/fake/tmp/rpl/logz.81891'
+        fake_log_record = FakeReproxyLogEntry(
+            completion_status='STATUS_LOCAL_FALLBACK')
+        with mock.patch.object(remote_action.ReproxyLogEntry,
+                               'parse_action_log',
+                               return_value=fake_log_record) as mock_parse_log:
+            with mock.patch.object(remote_action.ReproxyLogEntry,
+                                   'make_download_stubs') as mock_stub:
+                with mock.patch.object(
+                        remote_action.RemoteAction, '_run_maybe_remotely',
+                        return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                    exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called()
+        mock_parse_log.assert_called_with(Path(output + '.rrpl'))
+        mock_stub.assert_not_called()
 
     def test_explicit_always_download(self):
         exec_root = Path('/home/project')
@@ -1932,6 +2098,7 @@ remote_metadata: {{
             action_digest='9182731aef9ad0',
             output_file_digests={output: output_digest},
             output_directory_digests={},
+            completion_status='STATUS_REMOTE_EXECUTION',
         )
         with mock.patch.object(remote_action, '_reproxy_log_dir',
                                return_value=logdir) as mock_log_dir:
@@ -2005,6 +2172,7 @@ remote_metadata:  {{
                 value: "{output_digest}"
         }}
 }}
+completion_status: STATUS_CACHE_HIT
 """
 
             def fake_run_remote(

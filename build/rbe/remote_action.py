@@ -389,6 +389,10 @@ class ReproxyLogEntry(object):
         d = self.remote_metadata.get("output_directory_digests", dict())
         return {Path(k): v.text.strip('"') for k, v in d.items()}
 
+    @property
+    def completion_status(self) -> str:
+        return self._raw["completion_status"][0].text
+
     def make_download_stub_info(
             self, path: Path, build_id: str) -> 'DownloadStubInfo':
         type = "file"
@@ -1290,11 +1294,18 @@ class RemoteAction(object):
         return self.remote_launch_command
 
     def _process_download_stubs(self):
-        self.vmsg("Creating download stubs for remote outputs.")
-        build_id = _reproxy_log_dir()  # unique per build
+        self.vmsg(f"Reading remote action log from {self._action_log}.")
         log_record = ReproxyLogEntry.parse_action_log(self._action_log)
 
+        # local execution and local race wins don't need download stubs.
+        if log_record.completion_status in {'STATUS_LOCAL_EXECUTION',
+                                            'STATUS_LOCAL_FALLBACK',
+                                            'STATUS_RACING_LOCAL'}:
+            return
+
+        self.vmsg("Creating download stubs for remote outputs.")
         # Create stubs, even for artifacts that are always_download-ed.
+        build_id = _reproxy_log_dir()  # unique per build
         log_record.make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
