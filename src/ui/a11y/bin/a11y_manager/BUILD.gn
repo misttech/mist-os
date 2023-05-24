@@ -13,10 +13,12 @@ icu_executable("bin") {
 
   sources = [ "main.cc" ]
 
-  icu_deps = [ "//src/intl/intl_services:lib" ]
+  icu_deps = [
+    ":lib",
+    "//src/intl/intl_services:lib",
+  ]
 
   deps = [
-    ":lib",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
