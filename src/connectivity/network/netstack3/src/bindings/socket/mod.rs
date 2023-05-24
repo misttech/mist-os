@@ -565,9 +565,19 @@ impl IntoErrno for netstack3_core::ip::icmp::IcmpSockCreationError {
 impl IntoErrno for udp::SendToError {
     fn into_errno(self) -> Errno {
         match self {
+            Self::NotWriteable => Errno::Epipe,
             Self::CreateSock(err) => err.into_errno(),
             Self::Zone(err) => err.into_errno(),
             Self::Mtu => Errno::Emsgsize,
+        }
+    }
+}
+
+impl IntoErrno for udp::SendError {
+    fn into_errno(self) -> Errno {
+        match self {
+            Self::IpSock(err) => err.into_errno(),
+            Self::NotWriteable => Errno::Epipe,
         }
     }
 }

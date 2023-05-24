@@ -55,7 +55,8 @@ use crate::{
             DatagramSocketId, DatagramSocketSpec, DatagramSocketStateSpec, DatagramSockets,
             DatagramStateContext, DatagramStateNonSyncContext, InUseError, ListenerState,
             LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
-            SetMulticastMembershipError, SockCreationError, SocketHopLimits, UnboundSocketState,
+            SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
+            SockCreationError, SocketHopLimits, UnboundSocketState,
         },
         posix::{
             PosixAddrState, PosixAddrVecIter, PosixAddrVecTag, PosixSharingOptions,
@@ -1065,6 +1066,9 @@ impl<
 /// An error encountered while sending a UDP packet to an alternate address.
 #[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SendToError {
+    /// The socket is not writeable.
+    #[error("not writeable")]
+    NotWriteable,
     /// An error was encountered while trying to create a temporary IP socket
     /// to use for the send operation.
     #[error("could not create a temporary connection socket: {}", _0)]
@@ -1153,6 +1157,8 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     ) -> Result<ConnId<I>, (ConnectListenerError, ListenerId<I>)>;
 
     fn disconnect_udp_connected(&mut self, ctx: &mut C, id: ConnId<I>) -> ListenerId<I>;
+
+    fn shutdown(&mut self, ctx: &C, id: ConnId<I>, which: ShutdownType);
 
     fn reconnect_udp(
         &mut self,
@@ -1365,6 +1371,10 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         datagram::disconnect_connected(self, ctx, id)
     }
 
+    fn shutdown(&mut self, ctx: &C, id: ConnId<I>, which: ShutdownType) {
+        datagram::shutdown_connected(self, ctx, id, which)
+    }
+
     fn reconnect_udp(
         &mut self,
         ctx: &mut C,
@@ -1431,6 +1441,15 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
     }
 }
 
+/// Error when sending a packet on a socket.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
+pub enum SendError {
+    /// The socket is not writeable.
+    NotWriteable,
+    /// The packet couldn't be sent.
+    IpSock(IpSockSendError),
+}
+
 pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
     SocketHandler<I, C>
 {
@@ -1439,7 +1458,7 @@ pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
         ctx: &mut C,
         conn: ConnId<I>,
         body: B,
-    ) -> Result<(), (B, IpSockSendError)>;
+    ) -> Result<(), (B, SendError)>;
 
     fn send_udp_conn_to(
         &mut self,
@@ -1472,8 +1491,11 @@ impl<
         ctx: &mut C,
         conn: ConnId<I>,
         body: B,
-    ) -> Result<(), (B, IpSockSendError)> {
-        datagram::send_conn(self, ctx, conn, body).map_err(|(body, err)| (body.into_inner(), err))
+    ) -> Result<(), (B, SendError)> {
+        datagram::send_conn(self, ctx, conn, body).map_err(|send_error| match send_error {
+            DatagramSendError::NotWriteable(b) => (b, SendError::NotWriteable),
+            DatagramSendError::IpSock(body, err) => (body.into_inner(), SendError::IpSock(err)),
+        })
     }
 
     fn send_udp_conn_to(
@@ -1485,6 +1507,7 @@ impl<
         body: B,
     ) -> Result<(), (B, SendToError)> {
         datagram::send_conn_to(self, ctx, conn, remote_ip, remote_port, body).map_err(|s| match s {
+            datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
             datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
             datagram::SendToError::CreateAndSend(ser, e) => (
                 ser.into_inner(),
@@ -1514,6 +1537,7 @@ impl<
             body,
         )
         .map_err(|e| match e {
+            datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
             datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
             datagram::SendToError::CreateAndSend(ser, e) => (
                 ser.into_inner(),
@@ -1541,7 +1565,7 @@ pub fn send_udp_conn<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     ctx: &mut C,
     conn: ConnId<I>,
     body: B,
-) -> Result<(), (B, IpSockSendError)> {
+) -> Result<(), (B, SendError)> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, body)), conn),
@@ -2183,6 +2207,28 @@ pub fn reconnect_udp<I: IpExt, C: crate::NonSyncContext>(
     )
     .map_err(|(IpInvariant(a), b)| (a, b))
 }
+/// Shuts down a socket for reading and/or writing.
+///
+/// # Panics
+///
+/// Panics if `id` is not a valid `ConnId`.
+pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: ConnId<I>,
+    which: ShutdownType,
+) {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx, which)), id),
+        |(IpInvariant((sync_ctx, ctx, which)), id)| {
+            SocketHandler::<Ipv4, _>::shutdown(sync_ctx, ctx, id, which)
+        },
+        |(IpInvariant((sync_ctx, ctx, which)), id)| {
+            SocketHandler::<Ipv6, _>::shutdown(sync_ctx, ctx, id, which)
+        },
+    )
+}
 
 /// Removes a previously registered UDP connection.
 ///
@@ -2324,6 +2370,7 @@ mod tests {
         vec,
         vec::Vec,
     };
+    use const_unwrap::const_unwrap_option;
     use core::convert::TryInto as _;
 
     use assert_matches::assert_matches;
@@ -2364,7 +2411,7 @@ mod tests {
         },
         socket::{
             self,
-            datagram::{IpOptions, MulticastInterfaceSelector},
+            datagram::{IpOptions, MulticastInterfaceSelector, Shutdown},
         },
         testutil::{assert_empty, set_logger_for_test, TestIpExt as _},
     };
@@ -3412,7 +3459,7 @@ mod tests {
             Buf::new(Vec::new(), ..),
         )
         .unwrap_err();
-        assert_eq!(send_err, IpSockSendError::Mtu);
+        assert_eq!(send_err, SendError::IpSock(IpSockSendError::Mtu));
     }
 
     #[ip_test]
@@ -3443,7 +3490,7 @@ mod tests {
                 true,
                 Err((
                     Buf::new(Vec::new(), ..),
-                    IpSockSendError::Unroutable(ResolveRouteError::Unreachable),
+                    SendError::IpSock(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)),
                 )),
             ),
         ] {
@@ -3459,6 +3506,71 @@ mod tests {
                 expected_res,
             )
         }
+    }
+
+    #[ip_test]
+    #[test_case(false; "send")]
+    #[test_case(true; "sendto")]
+    fn test_send_udp_after_shutdown<I: Ip + TestIpExt>(send_to: bool) {
+        set_logger_for_test();
+
+        #[derive(Debug)]
+        struct NotWriteableError;
+
+        fn send<
+            I: Ip + TestIpExt,
+            SC: BufferSocketHandler<I, FakeUdpNonSyncCtx<I>, Buf<Vec<u8>>>,
+        >(
+            remote_ip: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+            sync_ctx: &mut SC,
+            non_sync_ctx: &mut FakeUdpNonSyncCtx<I>,
+            conn: ConnId<I>,
+        ) -> Result<(), NotWriteableError> {
+            match remote_ip {
+                Some(remote_ip) => BufferSocketHandler::send_udp_conn_to(
+                    sync_ctx,
+                    non_sync_ctx,
+                    conn,
+                    remote_ip,
+                    REMOTE_PORT,
+                    Buf::new(Vec::new(), ..),
+                )
+                .map_err(
+                    |(_, e)| assert_matches!(e, SendToError::NotWriteable => NotWriteableError),
+                ),
+                None => BufferSocketHandler::send_udp_conn(
+                    sync_ctx,
+                    non_sync_ctx,
+                    conn,
+                    Buf::new(Vec::new(), ..),
+                )
+                .map_err(|(_, e)| assert_matches!(e, SendError::NotWriteable => NotWriteableError)),
+            }
+        }
+
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
+        const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
+        let send_to_ip = send_to.then_some(remote_ip);
+
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        let conn = SocketHandler::<I, _>::connect_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            remote_ip,
+            REMOTE_PORT,
+        )
+        .expect("connect_udp failed");
+
+        send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn).expect("can send");
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, ShutdownType::Send);
+
+        assert_matches!(
+            send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn),
+            Err(NotWriteableError)
+        );
     }
 
     /// Tests that if we have multiple listeners and connections, demuxing the
@@ -6262,7 +6374,7 @@ where {
         )
         .unwrap();
 
-        ConnState { clear_device_on_disconnect: false, socket }
+        ConnState { clear_device_on_disconnect: false, socket, shutdown: Shutdown::default() }
     }
 
     #[test_case([

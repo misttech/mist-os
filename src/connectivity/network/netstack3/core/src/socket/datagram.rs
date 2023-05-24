@@ -72,6 +72,7 @@ pub(crate) struct ListenerState<A: Eq + Hash, D: Hash + Eq> {
 #[derive(Debug)]
 pub(crate) struct ConnState<I: IpExt, D: Eq + Hash> {
     pub(crate) socket: IpSock<I, D, IpOptions<I::Addr, D>>,
+    pub(crate) shutdown: Shutdown,
     /// Determines whether a call to disconnect this socket should also clear
     /// the device on the socket address.
     ///
@@ -87,6 +88,14 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash> {
     /// TODO(http://fxbug.dev/110370): Implement this by changing socket
     /// addresses.
     pub(crate) clear_device_on_disconnect: bool,
+}
+
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct Shutdown {
+    /// True if the send path is shut down for the owning socket.
+    ///
+    /// If this is true, the socket should not be able to send packets.
+    send: bool,
 }
 
 #[derive(Clone, Debug, Derivative)]
@@ -459,7 +468,7 @@ where
         let DatagramSockets { bound, unbound: _ } = state;
         let (state, _sharing, addr): (_, S::ConnSharingState, _) =
             bound.conns_mut().remove(&id).expect("UDP connection not found");
-        let ConnState { socket, clear_device_on_disconnect: _ } = state;
+        let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
 
         let IpOptions { multicast_memberships, hop_limits: _ } = socket.into_options();
         leave_all_joined_groups(sync_ctx, ctx, multicast_memberships);
@@ -670,7 +679,11 @@ where
         };
         match bound.conns_mut().try_insert(
             c,
-            ConnState { socket: ip_sock, clear_device_on_disconnect: false },
+            ConnState {
+                socket: ip_sock,
+                clear_device_on_disconnect: false,
+                shutdown: Shutdown::default(),
+            },
             sharing.clone().into(),
         ) {
             Ok(mut entry) => {
@@ -762,7 +775,11 @@ where
         };
         let insert_error = match bound.conns_mut().try_insert(
             c,
-            ConnState { socket: ip_sock, clear_device_on_disconnect },
+            ConnState {
+                socket: ip_sock,
+                clear_device_on_disconnect,
+                shutdown: Shutdown::default(),
+            },
             sharing.clone().into(),
         ) {
             Ok(mut entry) => {
@@ -803,7 +820,7 @@ where
         let DatagramSockets { bound, unbound: _ } = state;
         let entry = bound.conns_mut().entry(&id).expect("Invalid conn ID");
         let (
-            ConnState { socket, clear_device_on_disconnect: _ },
+            ConnState { socket, clear_device_on_disconnect: _, shutdown: _ },
             _,
             ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
         ): &(ConnState<_, _>, S::ConnSharingState, _) = entry.get();
@@ -830,7 +847,7 @@ where
 
         let local = local.clone();
         let (mut conn_state, sharing, original_addr) = entry.remove();
-        let ConnState { socket, clear_device_on_disconnect } = &mut conn_state;
+        let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = &mut conn_state;
 
         let c = ConnAddr {
             ip: ConnIpAddr { local, remote: (remote_ip, remote_id) },
@@ -839,7 +856,11 @@ where
 
         let insert_error = match bound.conns_mut().try_insert(
             c,
-            ConnState { socket: ip_sock, clear_device_on_disconnect: *clear_device_on_disconnect },
+            ConnState {
+                socket: ip_sock,
+                clear_device_on_disconnect: *clear_device_on_disconnect,
+                shutdown: Shutdown::default(),
+            },
             sharing,
         ) {
             Ok(mut entry) => {
@@ -905,7 +926,7 @@ where
         let (state, sharing, addr): (_, S::ConnSharingState, _) =
             bound.conns_mut().remove(&id).expect("connection not found");
 
-        let ConnState { socket, clear_device_on_disconnect } = state;
+        let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = state;
         let ip_options = socket.into_options();
 
         let ConnAddr { ip: ConnIpAddr { local: (local_ip, identifier), remote: _ }, mut device } =
@@ -924,6 +945,46 @@ where
     })
 }
 
+/// Which direction(s) to shut down for a socket.
+pub enum ShutdownType {
+    /// Prevent sending packets on the socket.
+    Send,
+}
+
+pub(crate) fn shutdown_connected<
+    A: SocketMapAddrSpec,
+    C: DatagramStateNonSyncContext<A>,
+    SC: DatagramStateContext<A, C, S>,
+    S: DatagramSocketSpec<A>,
+>(
+    sync_ctx: &mut SC,
+    _ctx: &C,
+    id: S::ConnId,
+    which: ShutdownType,
+) where
+    Bound<S>: Tagged<AddrVec<A>>,
+{
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
+        let DatagramSockets { bound, unbound: _ } = state;
+        let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
+            bound.conns_mut().get_by_id_mut(&id).expect("invalid connection ID");
+        let Shutdown { send } = shutdown;
+        match which {
+            ShutdownType::Send => {
+                *send = true;
+            }
+        }
+    })
+}
+
+/// Error encountered when sending a datagram on a socket.
+pub enum SendError<B, S> {
+    /// The socket is not writeable.
+    NotWriteable(B),
+    /// There was a problem sending the IP packet.
+    IpSock(S, IpSockSendError),
+}
+
 pub(crate) fn send_conn<
     A: SocketMapAddrSpec,
     C: DatagramStateNonSyncContext<A>,
@@ -935,21 +996,34 @@ pub(crate) fn send_conn<
     ctx: &mut C,
     id: S::ConnId,
     body: B,
-) -> Result<(), (S::Serializer<B>, IpSockSendError)>
+) -> Result<(), SendError<B, S::Serializer<B>>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
     sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
         let DatagramSockets { bound, unbound: _ } = state;
-        let (ConnState { socket, clear_device_on_disconnect: _ }, _sharing, addr) =
-            bound.conns().get_by_id(&id).expect("no such connection");
-        let ConnAddr { ip, device: _ } = addr;
+        let (
+            ConnState {
+                socket,
+                clear_device_on_disconnect: _,
+                shutdown: Shutdown { send: shutdown_send },
+            },
+            _sharing,
+            addr,
+        ) = bound.conns().get_by_id(&id).expect("no such connection");
+        if *shutdown_send {
+            return Err(SendError::NotWriteable(body));
+        }
 
-        sync_ctx.send_ip_packet(ctx, &socket, S::make_packet(body, &ip), None)
+        let ConnAddr { ip, device: _ } = addr;
+        sync_ctx
+            .send_ip_packet(ctx, &socket, S::make_packet(body, &ip), None)
+            .map_err(|(serializer, send_error)| SendError::IpSock(serializer, send_error))
     })
 }
 
 pub(crate) enum SendToError<B, S> {
+    NotWriteable(B),
     Zone(B, ZonedAddressError),
     CreateAndSend(S, IpSockCreateAndSendError),
 }
@@ -977,11 +1051,15 @@ where
     sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
         let DatagramSockets { bound, unbound: _ } = state;
         let (
-            ConnState { socket, clear_device_on_disconnect: _ },
+            ConnState { socket, clear_device_on_disconnect: _, shutdown },
             _,
             ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
         ): &(_, S::ConnSharingState, _) = bound.conns().get_by_id(&id).expect("no such connection");
 
+        let Shutdown { send: shutdown_write } = shutdown;
+        if *shutdown_write {
+            return Err(SendToError::NotWriteable(body));
+        }
         let (local_ip, local_id) = local;
 
         send_oneshot::<A, S, _, _, _>(
@@ -1192,7 +1270,7 @@ where
             )));
         }
 
-        let ConnState { socket, clear_device_on_disconnect: _ } = state;
+        let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
         let mut new_socket = sync_ctx
             .new_ip_socket(
                 ctx,
@@ -1219,7 +1297,7 @@ where
         };
         // Since the move was successful, replace the old socket with
         // the new one but move the options over.
-        let ConnState { socket, clear_device_on_disconnect } = entry.get_state_mut();
+        let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = entry.get_state_mut();
         let _: IpOptions<_, _> = new_socket.replace_options(socket.take_options());
         *socket = new_socket;
 
@@ -1450,7 +1528,7 @@ where
                 ip_options
             }
             DatagramSocketId::Bound(DatagramBoundId::Connected(id)) => {
-                let (ConnState { socket, clear_device_on_disconnect: _ }, _, _): (
+                let (ConnState { socket, clear_device_on_disconnect: _, shutdown: _ }, _, _): (
                     _,
                     &S::ConnSharingState,
                     &ConnAddr<_, _, _, _>,
@@ -1507,7 +1585,7 @@ where
         }
         DatagramSocketId::Bound(DatagramBoundId::Connected(id)) => {
             let (
-                ConnState { socket, clear_device_on_disconnect: _ },
+                ConnState { socket, clear_device_on_disconnect: _, shutdown: _ },
                 _,
                 ConnAddr { device, ip: _ },
             ): &(_, S::ConnSharingState, _) =
@@ -1543,7 +1621,7 @@ where
             ip_options
         }
         DatagramSocketId::Bound(DatagramBoundId::Connected(id)) => {
-            let (ConnState { socket, clear_device_on_disconnect: _ }, _, _): (
+            let (ConnState { socket, clear_device_on_disconnect: _, shutdown: _ }, _, _): (
                 _,
                 &S::ConnSharingState,
                 &ConnAddr<_, _, _, _>,

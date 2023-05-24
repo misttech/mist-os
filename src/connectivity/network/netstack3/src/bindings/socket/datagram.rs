@@ -34,7 +34,7 @@ use netstack3_core::{
     ip::{icmp, socket::IpSockSendError, IpExt},
     socket::datagram::{
         ConnectListenerError, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-        SetMulticastMembershipError, SockCreationError,
+        SetMulticastMembershipError, ShutdownType, SockCreationError,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp,
@@ -281,6 +281,13 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         remote_id: Self::RemoteIdentifier,
     ) -> Result<Self::ConnId, (Self::ReconnectConnError, Self::ConnId)>;
 
+    fn shutdown<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: Self::ConnId,
+        which: ShutdownType,
+    );
+
     fn get_conn_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
@@ -506,6 +513,15 @@ impl<I: IpExt> TransportState<I> for Udp {
         udp::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
+    fn shutdown<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: Self::ConnId,
+        which: ShutdownType,
+    ) {
+        udp::shutdown(sync_ctx, ctx, id, which)
+    }
+
     fn get_conn_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
@@ -660,7 +676,7 @@ impl<I: IpExt> TransportState<I> for Udp {
 }
 
 impl<I: IpExt, B: BufferMut> BufferTransportState<I, B> for Udp {
-    type SendConnError = IpSockSendError;
+    type SendConnError = udp::SendError;
     type SendConnToError = udp::SendToError;
     type SendListenerError = udp::SendToError;
 
@@ -1022,6 +1038,15 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
+    fn shutdown<NonSyncCtx: NonSyncContext>(
+        _sync_ctx: &SyncCtx<NonSyncCtx>,
+        _ctx: &NonSyncCtx,
+        _id: Self::ConnId,
+        _which: ShutdownType,
+    ) {
+        todo!("https://fxbug.dev/47321: needs Core implementation")
+    }
+
     fn reconnect_conn<NonSyncCtx: NonSyncContext>(
         _sync_ctx: &SyncCtx<NonSyncCtx>,
         _ctx: &mut NonSyncCtx,
@@ -1341,9 +1366,17 @@ pub(crate) struct SocketControlInfo<I: Ip, T: Transport<I>> {
 /// Possible states for a datagram socket.
 #[derive(Debug)]
 enum SocketState<I: Ip, T: Transport<I>> {
-    Unbound { unbound_id: T::UnboundId },
-    BoundListen { listener_id: T::ListenerId },
-    BoundConnect { conn_id: T::ConnId, shutdown_read: bool, shutdown_write: bool },
+    Unbound {
+        unbound_id: T::UnboundId,
+    },
+    BoundListen {
+        listener_id: T::ListenerId,
+    },
+    BoundConnect {
+        conn_id: T::ConnId,
+        // TODO(https://fxbug.dev/126141): Move read shutdown into core.
+        shutdown_read: bool,
+    },
 }
 
 impl<'a, I: Ip, T: Transport<I>> From<&'a SocketState<I, T>> for SocketId<I, T> {
@@ -1353,7 +1386,7 @@ impl<'a, I: Ip, T: Transport<I>> From<&'a SocketState<I, T>> for SocketId<I, T> 
             SocketState::BoundListen { listener_id } => {
                 BoundSocketId::Listener(*listener_id).into()
             }
-            SocketState::BoundConnect { conn_id, shutdown_read: _, shutdown_write: _ } => {
+            SocketState::BoundConnect { conn_id, shutdown_read: _ } => {
                 BoundSocketId::Connected(*conn_id).into()
             }
         }
@@ -2018,7 +2051,7 @@ where
                     }
                 }
             }
-            SocketState::BoundConnect { conn_id, shutdown_read, shutdown_write } => {
+            SocketState::BoundConnect { conn_id, shutdown_read } => {
                 // if we're bound to a connect mode, we need to remove the
                 // connection, and retrieve the bound local addr and port.
 
@@ -2037,16 +2070,14 @@ where
                                 .insert(&conn_id, messages)),
                             None
                         );
-                        self.data.info.state =
-                            SocketState::BoundConnect { conn_id, shutdown_read, shutdown_write };
+                        self.data.info.state = SocketState::BoundConnect { conn_id, shutdown_read };
                         return Err(e.into_errno());
                     }
                 }
             }
         };
 
-        self.data.info.state =
-            SocketState::BoundConnect { conn_id, shutdown_read: false, shutdown_write: false };
+        self.data.info.state = SocketState::BoundConnect { conn_id, shutdown_read: false };
         assert_matches!(
             I::with_collection_mut(non_sync_ctx, |c| c.conns.insert(&conn_id, messages)),
             None
@@ -2070,7 +2101,7 @@ where
         let unbound_id = match self.data.info.state {
             SocketState::Unbound { unbound_id } => Ok(unbound_id),
             SocketState::BoundListen { listener_id: _ }
-            | SocketState::BoundConnect { conn_id: _, shutdown_read: _, shutdown_write: _ } => {
+            | SocketState::BoundConnect { conn_id: _, shutdown_read: _ } => {
                 Err(fposix::Errno::Einval)
             }
         }?;
@@ -2301,17 +2332,12 @@ where
                 }
                 None => Err(fposix::Errno::Edestaddrreq),
             },
-            SocketState::BoundConnect { conn_id, shutdown_write, .. } => {
-                if shutdown_write {
-                    return Err(fposix::Errno::Epipe);
-                }
-                match remote {
-                    None => T::send_conn(sync_ctx, non_sync_ctx, conn_id, body)
-                        .map_err(|(_body, err)| err.into_errno()),
-                    Some(remote) => T::send_conn_to(sync_ctx, non_sync_ctx, conn_id, body, remote)
-                        .map_err(|(_body, err)| err.into_errno()),
-                }
-            }
+            SocketState::BoundConnect { conn_id, shutdown_read: _ } => match remote {
+                None => T::send_conn(sync_ctx, non_sync_ctx, conn_id, body)
+                    .map_err(|(_body, err)| err.into_errno()),
+                Some(remote) => T::send_conn_to(sync_ctx, non_sync_ctx, conn_id, body, remote)
+                    .map_err(|(_body, err)| err.into_errno()),
+            },
             SocketState::BoundListen { listener_id } => match remote {
                 Some((addr, port)) => {
                     T::send_listener(sync_ctx, non_sync_ctx, listener_id, addr, port, body)
@@ -2385,19 +2411,18 @@ where
     }
 
     fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { peer_event: _, info, messages }, ctx: _ } = self;
+        let Self { data: BindingData { peer_event: _, info, messages }, ctx } = self;
+        let Ctx { sync_ctx, non_sync_ctx } = ctx;
 
         // Only "connected" sockets can be shutdown.
-        if let SocketState::BoundConnect { ref mut shutdown_read, ref mut shutdown_write, .. } =
-            info.state
-        {
+        if let SocketState::BoundConnect { ref mut shutdown_read, conn_id } = info.state {
             if how.is_empty() {
                 return Err(fposix::Errno::Einval);
             }
             // Shutting down a socket twice is valid so we can just blindly set
             // the corresponding flags.
             if how.contains(fposix_socket::ShutdownMode::WRITE) {
-                *shutdown_write = true;
+                T::shutdown(sync_ctx, non_sync_ctx, conn_id, ShutdownType::Send);
             }
             if how.contains(fposix_socket::ShutdownMode::READ) {
                 *shutdown_read = true;
