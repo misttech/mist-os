@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::mem::*;
+use crate::fs::kobject::*;
 use crate::fs::{FileOps, FsNode};
 use crate::lock::RwLock;
 use crate::logging::log_error;
@@ -56,7 +57,7 @@ pub type DeviceListenerKey = u64;
 
 /// A listener for uevents on devices.
 pub trait DeviceListener: Send + Sync {
-    fn on_device_event(&self, seqnum: u64, device: DeviceType);
+    fn on_device_event(&self, action: UEventAction, kobject: KObjectHandle, context: UEventContext);
 }
 
 /// The kernel's registry of drivers.
@@ -129,11 +130,13 @@ impl DeviceRegistry {
     }
 
     /// Dispatch an uevent for the given `device`.
-    pub fn dispatch_event(&mut self, device: DeviceType) {
+    /// TODO(fxb/119437): move uevent to sysfs.
+    pub fn dispatch_uevent(&mut self, action: UEventAction, kobject: KObjectHandle) {
         let event_id = self.next_event_id;
         self.next_event_id += 1;
+        let context = UEventContext { seqnum: event_id };
         for listener in self.listeners.values() {
-            listener.on_device_event(event_id, device)
+            listener.on_device_event(action, kobject.clone(), context);
         }
     }
 
@@ -143,15 +146,15 @@ impl DeviceRegistry {
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,
-        dev: DeviceType,
+        id: DeviceType,
         mode: DeviceMode,
     ) -> Result<Box<dyn FileOps>, Errno> {
         match mode {
             DeviceMode::Char => self
                 .char_devices
-                .get(&dev.major())
+                .get(&id.major())
                 .ok_or_else(|| errno!(ENODEV))?
-                .open(current_task, dev, node, flags),
+                .open(current_task, id, node, flags),
             DeviceMode::Block => error!(ENODEV),
         }
     }

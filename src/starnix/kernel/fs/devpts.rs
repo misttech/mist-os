@@ -31,7 +31,7 @@ const ROOT_INODE: ino_t = 1;
 const PTMX_INODE: ino_t = 2;
 const FIRST_PTS_INODE: ino_t = 3;
 
-pub fn dev_pts_fs(kernel: &Kernel) -> &FileSystemHandle {
+pub fn dev_pts_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
     kernel.dev_pts_fs.get_or_init(|| init_devpts(kernel))
 }
 
@@ -56,18 +56,19 @@ pub fn create_main_and_replica(
     Ok((pty_file, pts_file))
 }
 
-fn init_devpts(kernel: &Kernel) -> FileSystemHandle {
+fn init_devpts(kernel: &Arc<Kernel>) -> FileSystemHandle {
     let state = Arc::new(TTYState::new());
     let device = DevPtsDevice::new(state.clone());
+
     {
         let mut registry = kernel.device_registry.write();
-        // Register /dev/pts/X device type
+        // Register /dev/pts/X device type.
         for n in 0..DEVPTS_MAJOR_COUNT {
             registry
                 .register_chrdev_major(device.clone(), DEVPTS_FIRST_MAJOR + n)
                 .expect("Registering pts device");
         }
-        // Register tty/ptmx device major
+        // Register tty and ptmx device types.
         registry.register_chrdev_major(device, TTY_ALT_MAJOR).unwrap();
     }
     let fs = FileSystem::new(

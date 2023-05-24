@@ -36,6 +36,7 @@ pub mod file_server;
 pub mod fs_args;
 pub mod fuchsia;
 pub mod fuse;
+pub mod kobject;
 pub mod layeredfs;
 pub mod path;
 pub mod pipe;

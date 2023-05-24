@@ -7,9 +7,10 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::device::{DeviceListener, DeviceListenerKey};
 use crate::fs::buffers::*;
+use crate::fs::kobject::*;
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::logging::{log, not_implemented};
+use crate::logging::{log, log_error, not_implemented};
 use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
@@ -645,38 +646,40 @@ impl SocketOps for UEventNetlinkSocket {
 }
 
 impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
-    fn on_device_event(&self, seqnum: u64, device: DeviceType) {
-        let message = match (device, device.major(), device.minor()) {
-            (DeviceType::DEVICE_MAPPER, _, _) => format!(
-                "add@/devices/virtual/misc/device-mapper\0ACTION=add\0DEVPATH=/devices/virtual/misc/device-mapper\0SUBSYSTEM=misc\0SYNTH_UUID=0\0MAJOR=10\0MINOR=236\0DEVNAME=mapper/control\0SEQNUM={seqnum}\0"
-            ),
-            (_, major @ INPUT_MAJOR, minor) => format!(
-                "add@/devices/virtual/input/event{minor}\0\
-                ACTION=add\0\
-                DEVPATH=/devices/virtual/input/event{minor}\0\
-                SUBSYSTEM=input\0\
-                SYNTH_UUID=0\0\
-                MAJOR={major}\0\
-                MINOR={minor}\0\
-                DEVNAME=input/event{minor}\0\
-                SEQNUM={seqnum}",
-            ),
-            (DeviceType::TTY, _, _) => format!(
-                "add@/devices/virtual/tty/tty\0\
-                ACTION=add\0\
-                DEVPATH=/devices/virtual/tty/tty\0\
-                SUBSYSTEM=tty\0\
-                SYNTH_UUID=0\0\
-                MAJOR={}\0\
-                MINOR={}\0\
-                DEVNAME=tty\0\
-                SEQNUM={seqnum}", DeviceType::TTY.major(), DeviceType::TTY.minor()
-            ),
-            _ => {
-                crate::logging::not_implemented!(
-                    "Device event for {} is not implemented!",
-                    device,
+    fn on_device_event(
+        &self,
+        action: UEventAction,
+        kobject: KObjectHandle,
+        context: UEventContext,
+    ) {
+        let message = match kobject.ktype() {
+            KType::Device { name: device_name, device_type } => {
+                let subsystem = kobject.parent().unwrap().name();
+                // TODO(fxb/127713): Pass the synthetic UUID when available.
+                // Otherwise, default as "0".
+                let mut message = format!(
+                    "{action}@/devices{path}\0\
+                            ACTION={action}\0\
+                            DEVPATH=/devices{path}\0\
+                            SUBSYSTEM={subsystem}\0\
+                            SYNTH_UUID=0\0\
+                            MAJOR={major}\0\
+                            MINOR={minor}\0\
+                            SEQNUM={seqnum}\0",
+                    path = String::from_utf8_lossy(&kobject.path()),
+                    subsystem = String::from_utf8_lossy(&subsystem),
+                    major = device_type.major(),
+                    minor = device_type.minor(),
+                    seqnum = context.seqnum,
                 );
+                if device_name.is_some() {
+                    message +=
+                        &format!("DEVNAME={}\0", String::from_utf8_lossy(&device_name.unwrap()));
+                }
+                message
+            }
+            _ => {
+                log_error!("This kobject ({}) is not a device type.", kobject);
                 return;
             }
         };

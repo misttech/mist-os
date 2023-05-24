@@ -1,29 +1,35 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 use super::*;
-use crate::auth::FsCred;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::cgroup::CgroupDirectoryNode;
-use crate::logging::*;
-use crate::task::*;
-use crate::types::*;
+
 use std::sync::Arc;
 
-struct SysFs;
-impl FileSystemOps for SysFs {
+use crate::auth::FsCred;
+use crate::fs::cgroup::CgroupDirectoryNode;
+use crate::fs::kobject::*;
+use crate::task::*;
+use crate::types::*;
+
+struct SysFsOps;
+impl FileSystemOps for SysFsOps {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(SYSFS_MAGIC))
     }
 }
 
+pub struct SysFs {
+    root_kobject: KObjectHandle,
+    kernel: Arc<Kernel>,
+    fs: FileSystemHandle,
+}
+
 impl SysFs {
-    fn new_fs(kernel: &Arc<Kernel>) -> Result<FileSystemHandle, Errno> {
+    pub fn new(kernel: &Arc<Kernel>) -> Self {
         let fs = FileSystem::new(
             kernel,
             CacheMode::Permanent,
-            SysFs,
+            SysFsOps,
             FileSystemLabel::without_source("sysfs"),
         );
         let mut dir = StaticDirectoryBuilder::new(&fs);
@@ -36,116 +42,96 @@ impl SysFs {
             );
             dir.subdir(b"fuse", 0o755, |dir| dir.subdir(b"connections", 0o755, |_| ()));
         });
-        // TODO(fxb/119437): Create a dynamic directory that depends on registered devices.
-        dir.subdir(b"devices", 0o755, |dir| {
-            dir.subdir(b"virtual", 0o755, |dir| {
-                dir.subdir(b"tty", 0o755, |dir| {
-                    dir.entry(
-                        b"tty",
-                        DeviceDirectory::new(kernel.clone(), DeviceType::TTY),
-                        mode!(IFDIR, 0o755),
-                    );
-                });
-                dir.subdir(b"input", 0o755, |dir| {
-                    dir.entry(
-                        b"input",
-                        DeviceDirectory::new(kernel.clone(), DeviceType::new(INPUT_MAJOR, 0)),
-                        mode!(IFDIR, 0o755),
-                    );
-                });
-                dir.subdir(b"misc", 0o755, |dir| {
-                    dir.entry(
-                        b"device-mapper",
-                        DeviceDirectory::new(kernel.clone(), DeviceType::DEVICE_MAPPER),
-                        mode!(IFDIR, 0o755),
-                    );
-                });
-            })
-        });
+
+        let root_kobject = KObject::new_root();
+        dir.entry(b"devices", SysFsDirectory::new(root_kobject.clone()), mode!(IFDIR, 0o755));
+
         dir.build_root();
-        Ok(fs)
+
+        let new_sysfs = Self { root_kobject, kernel: kernel.clone(), fs };
+        new_sysfs.add_common_devices();
+        new_sysfs
     }
-}
 
-pub fn sys_fs(kern: &Arc<Kernel>) -> &FileSystemHandle {
-    kern.sys_fs.get_or_init(|| SysFs::new_fs(kern).expect("failed to construct sysfs!"))
-}
-
-struct UEventFile {
-    device: DeviceType,
-}
-
-impl UEventFile {
-    fn parse_commands(data: &[u8]) -> Vec<&[u8]> {
-        data.split(|&c| c == b'\0' || c == b'\n').collect()
+    /// Returns the `FileSystemHandle` of the SysFs filesystem.
+    pub fn fs(&self) -> FileSystemHandle {
+        self.fs.clone()
     }
-}
 
-impl FileOps for UEventFile {
-    fileops_impl_seekable!();
+    /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
+    pub fn virtual_bus(&self) -> KObjectHandle {
+        self.root_kobject.get_or_create_child(b"virtual", KType::Bus)
+    }
 
-    fn read(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        match self.device {
-            DeviceType::DEVICE_MAPPER => {
-                let content = format!(
-                    "MAJOR={}\nMINOR={}\nDEVNAME=mapper/control\n",
-                    self.device.major(),
-                    self.device.minor()
-                );
-                data.write(content[offset..].as_bytes())
-            }
-            _ => {
-                // TODO(fxb/119437): Retrieve DEVNAME from DeviceRegistry
-                not_implemented!("read_at for {}", self.device);
-                error!(EOPNOTSUPP)
-            }
+    /// Adds a single device kobject in the tree.
+    pub fn add_device(&self, subsystem: KObjectHandle, dev_attr: KObjectDeviceAttribute) {
+        let ktype =
+            KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
+        self.kernel.device_registry.write().dispatch_uevent(
+            UEventAction::Add,
+            subsystem.get_or_create_child(&dev_attr.kobject_name, ktype),
+        );
+    }
+
+    /// Adds a list of device kobjects in the tree.
+    pub fn add_devices(&self, subsystem: KObjectHandle, dev_attrs: Vec<KObjectDeviceAttribute>) {
+        for attr in dev_attrs {
+            self.add_device(subsystem.clone(), attr);
         }
     }
 
-    fn write(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        if offset != 0 {
-            return error!(EINVAL);
-        }
-        let content = data.read_all()?;
-        for command in Self::parse_commands(&content) {
-            match command {
-                b"" => { // Ignore empty lines
-                }
-                b"add" => {
-                    current_task.kernel().device_registry.write().dispatch_event(self.device);
-                }
-                // TODO(fxb/119437): Handle other commands
-                _ => return error!(EINVAL),
-            }
-        }
-        Ok(content.len())
+    fn add_common_devices(&self) {
+        let virtual_bus = self.virtual_bus();
+
+        // MEM class.
+        self.add_devices(
+            virtual_bus.get_or_create_child(b"mem", KType::Class),
+            KObjectDeviceAttribute::new_from_vec(vec![
+                (b"null", b"null", DeviceType::NULL),
+                (b"zero", b"zero", DeviceType::ZERO),
+                (b"full", b"full", DeviceType::FULL),
+                (b"random", b"random", DeviceType::RANDOM),
+                (b"urandom", b"urandom", DeviceType::URANDOM),
+                (b"kmsg", b"kmsg", DeviceType::KMSG),
+            ]),
+        );
+
+        // MISC class.
+        self.add_devices(
+            virtual_bus.get_or_create_child(b"misc", KType::Class),
+            KObjectDeviceAttribute::new_from_vec(vec![
+                (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
+                (b"fuse", b"fuse", DeviceType::FUSE),
+                (b"device-mapper", b"mapper/control", DeviceType::DEVICE_MAPPER),
+            ]),
+        );
+
+        // TTY class.
+        self.add_devices(
+            virtual_bus.get_or_create_child(b"tty", KType::Class),
+            KObjectDeviceAttribute::new_from_vec(vec![
+                (b"tty", b"tty", DeviceType::TTY),
+                (b"ptmx", b"ptmx", DeviceType::PTMX),
+            ]),
+        );
     }
 }
 
-struct DeviceDirectory {
-    _kernel: Arc<Kernel>,
-    device: DeviceType,
+pub fn sys_fs(kern: &Arc<Kernel>) -> &SysFs {
+    kern.sys_fs.get_or_init(|| SysFs::new(kern))
 }
 
-impl DeviceDirectory {
-    fn new(kernel: Arc<Kernel>, device: DeviceType) -> Arc<Self> {
-        Arc::new(Self { _kernel: kernel, device })
+struct SysFsDirectory {
+    kobject: KObjectHandle,
+}
+
+impl SysFsDirectory {
+    pub fn new(kobject: KObjectHandle) -> Self {
+        Self { kobject }
     }
 }
 
-impl FsNodeOps for Arc<DeviceDirectory> {
+impl FsNodeOps for SysFsDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -153,7 +139,69 @@ impl FsNodeOps for Arc<DeviceDirectory> {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        // TODO(fxb/119437): Add power and subsystem nodes.
+        Ok(VecDirectory::new_file(
+            self.kobject
+                .get_children_names()
+                .into_iter()
+                .map(|name| VecDirectoryEntry {
+                    entry_type: DirectoryEntryType::DIR,
+                    name,
+                    inode: None,
+                })
+                .collect(),
+        ))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        match self.kobject.get_child(name) {
+            Some(child_kobject) => match child_kobject.ktype() {
+                KType::Device { .. } => Ok(node.fs().create_node(
+                    DeviceDirectory::new(child_kobject),
+                    mode!(IFDIR, 0o755),
+                    FsCred::root(),
+                )),
+                _ => Ok(node.fs().create_node(
+                    SysFsDirectory::new(child_kobject),
+                    mode!(IFDIR, 0o755),
+                    FsCred::root(),
+                )),
+            },
+            None => error!(ENOENT),
+        }
+    }
+}
+
+struct DeviceDirectory {
+    kobject: KObjectHandle,
+}
+
+impl DeviceDirectory {
+    pub fn new(kobject: KObjectHandle) -> Self {
+        Self { kobject }
+    }
+
+    fn device_type(&self) -> Result<DeviceType, Errno> {
+        match self.kobject.ktype() {
+            KType::Device { device_type, .. } => Ok(device_type),
+            _ => error!(ENODEV),
+        }
+    }
+}
+
+impl FsNodeOps for DeviceDirectory {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        // TODO(fxb/121327): Add power and subsystem nodes.
         Ok(VecDirectory::new_file(vec![
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
@@ -177,19 +225,17 @@ impl FsNodeOps for Arc<DeviceDirectory> {
         match name {
             b"dev" => Ok(node.fs().create_node(
                 BytesFile::new_node(
-                    format!("{}:{}\n", self.device.major(), self.device.minor()).into_bytes(),
+                    format!("{}:{}\n", self.device_type()?.major(), self.device_type()?.minor())
+                        .into_bytes(),
                 ),
                 mode!(IFREG, 0o444),
                 FsCred::root(),
             )),
-            b"uevent" => {
-                let device = self.device;
-                Ok(node.fs().create_node(
-                    SimpleFileNode::new(move || Ok(UEventFile { device })),
-                    mode!(IFREG, 0o644),
-                    FsCred::root(),
-                ))
-            }
+            b"uevent" => Ok(node.fs().create_node(
+                UEventFsNode::new(self.kobject.clone()),
+                mode!(IFREG, 0o644),
+                FsCred::root(),
+            )),
             _ => error!(ENOENT),
         }
     }

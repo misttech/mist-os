@@ -485,7 +485,7 @@ pub fn create_filesystem(
         b"fuse" => new_fuse_fs(task, data)?,
         b"proc" => proc_fs(kernel.clone()),
         b"selinuxfs" => selinux_fs(kernel).clone(),
-        b"sysfs" => sys_fs(kernel).clone(),
+        b"sysfs" => sys_fs(kernel).fs(),
         b"tmpfs" => TmpFs::new_fs_with_data(kernel, data)?,
         _ => return error!(ENODEV, String::from_utf8_lossy(fs_type)),
     };

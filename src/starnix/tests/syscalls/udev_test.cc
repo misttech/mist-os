@@ -108,6 +108,31 @@ TEST(UdevTest, AddDevMapper) {
   ASSERT_FALSE(parameters["SEQNUM"].empty());
 }
 
+TEST(UdevTest, RemoveDevMapper) {
+  if (getuid() != 0) {
+    GTEST_SKIP() << "Can only be run as root.";
+  }
+  auto fd = GetUdevSocket();
+  ASSERT_TRUE(fd.is_valid());
+
+  ScopedFD write_fd(open("/sys/devices/virtual/misc/device-mapper/uevent", O_WRONLY));
+  ASSERT_TRUE(write_fd.is_valid());
+  ASSERT_EQ(write(write_fd.get(), "remove\n", 7), 7);
+
+  std::string command;
+  std::map<std::string, std::string> parameters;
+  ASSERT_TRUE(read_next_uevent(fd.get(), &command, &parameters));
+  ASSERT_EQ(command, "remove@/devices/virtual/misc/device-mapper");
+  ASSERT_EQ(parameters["ACTION"], "remove");
+  ASSERT_EQ(parameters["DEVPATH"], "/devices/virtual/misc/device-mapper");
+  ASSERT_EQ(parameters["SUBSYSTEM"], "misc");
+  ASSERT_EQ(parameters["SYNTH_UUID"], "0");
+  ASSERT_EQ(parameters["MAJOR"], "10");
+  ASSERT_EQ(parameters["MINOR"], "236");
+  ASSERT_EQ(parameters["DEVNAME"], "mapper/control");
+  ASSERT_FALSE(parameters["SEQNUM"].empty());
+}
+
 TEST(UdevTest, AddInput) {
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
@@ -116,7 +141,7 @@ TEST(UdevTest, AddInput) {
   ASSERT_TRUE(fd.is_valid());
 
   // This path is based on values in `ueventd.rc`.
-  ScopedFD write_fd(open("/sys/devices/virtual/input/input/uevent", O_WRONLY));
+  ScopedFD write_fd(open("/sys/devices/virtual/input/event0/uevent", O_WRONLY));
   ASSERT_TRUE(write_fd.is_valid());
   ASSERT_EQ(write(write_fd.get(), "add\n", 4), 4);
 

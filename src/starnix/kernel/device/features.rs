@@ -3,7 +3,12 @@
 // found in the LICENSE file.
 
 use crate::device::{binder::create_binders, starnix::StarnixDevice};
-use crate::fs::{devtmpfs::dev_tmp_fs, SpecialNode};
+use crate::fs::sysfs::sys_fs;
+use crate::fs::{
+    devtmpfs::dev_tmp_fs,
+    kobject::{KObjectDeviceAttribute, KType},
+    SpecialNode,
+};
 use crate::logging::log_warn;
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -24,10 +29,25 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
             "selinux_enabled" => {}
             "framebuffer" => {
                 let kernel = current_task.kernel();
-                let mut dev_reg = kernel.device_registry.write();
 
+                // Add framebuffer and input devices in sysfs.
+                let sysfs = sys_fs(kernel);
+                sysfs.add_device(
+                    sysfs.virtual_bus().get_or_create_child(b"graphics", KType::Class),
+                    KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0),
+                );
+                sysfs.add_device(
+                    sysfs.virtual_bus().get_or_create_child(b"input", KType::Class),
+                    KObjectDeviceAttribute::new(
+                        b"event0",
+                        b"input/event0",
+                        DeviceType::new(INPUT_MAJOR, 0),
+                    ),
+                );
+
+                let mut device_registry = kernel.device_registry.write();
                 // Register a framebuffer.
-                dev_reg.register_chrdev_major(kernel.framebuffer.clone(), FB_MAJOR)?;
+                device_registry.register_chrdev_major(kernel.framebuffer.clone(), FB_MAJOR)?;
 
                 // Also register an input device, which can be used to read pointer events
                 // associated with the framebuffer's `View`.
@@ -38,9 +58,16 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 // TODO(quiche): When adding support for multiple input devices, ensure
                 // that the appropriate `InputFile` is associated with the appropriate
                 // `INPUT_MINOR`.
-                dev_reg.register_chrdev_major(kernel.input_file.clone(), INPUT_MAJOR)?;
+                device_registry.register_chrdev_major(kernel.input_file.clone(), INPUT_MAJOR)?;
             }
             "magma" => {
+                let sysfs = sys_fs(current_task.kernel());
+                let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
+                sysfs.add_device(
+                    sysfs.virtual_bus().get_or_create_child(b"starnix", KType::Class),
+                    KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type),
+                );
+
                 // Add the starnix device group.
                 current_task
                     .kernel()
@@ -48,11 +75,12 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                     .write()
                     .register_chrdev_major(StarnixDevice, STARNIX_MAJOR)?;
 
+                // TODO(fxb/119437): Remove after devtmpfs listens to uevent.
                 dev_tmp_fs(current_task).root().add_node_ops_dev(
                     current_task,
                     b"magma0",
                     mode!(IFCHR, 0o600),
-                    DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA),
+                    magma_type,
                     SpecialNode,
                 )?;
             }

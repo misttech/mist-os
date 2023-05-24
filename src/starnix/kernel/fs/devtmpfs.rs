@@ -16,6 +16,7 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
     let fs = TmpFs::new_fs(current_task.kernel());
     let root = fs.root();
 
+    // TODO(fxb/119437): Subscribe uevent to create dev nodes.
     let mkchr = |name, device_type| {
         root.create_node(current_task, name, mode!(IFCHR, 0o666), device_type, FsCred::root())
             .unwrap();

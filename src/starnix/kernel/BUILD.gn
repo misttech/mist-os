@@ -212,6 +212,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/fuchsia/timer.rs",
     "fs/fuse.rs",
     "fs/inotify.rs",
+    "fs/kobject.rs",
     "fs/layeredfs.rs",
     "fs/mod.rs",
     "fs/namespace.rs",
