@@ -385,7 +385,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getxattr04.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getxattr05.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_ht_affinity.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_ht_enabled.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_hugefallocate01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_hugefallocate02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_hugefork01.cm",
@@ -601,6 +600,9 @@
 
                 // TODO(fxbug.dev/127716) Re-enable once flake is resolved.
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fs_inod.cm",
+
+                // TODO(fxbug.dev/127765) Re-enable once flake is resolved.
+                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_ht_enabled.cm",
 
                 // TODO(fxbug.dev/127693) Re-enable once flake is resolved.
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_waitid07.cm",
