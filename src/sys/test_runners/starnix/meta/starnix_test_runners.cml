@@ -40,7 +40,6 @@
                 "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.test.runner.LibraryLoaderCacheBuilder",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",
@@ -49,6 +48,13 @@
             ],
             from: "parent",
             to: [ "#starnix_unit_test_runner" ],
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#starnix_unit_test_runner" ],
+            availability: "optional",
+            source_availability: "unknown",
         },
         {
             directory: "dev-gpu",

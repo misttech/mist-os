@@ -27,12 +27,17 @@
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
-
-                // Tests can produce traces.
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: [ "#google-tests" ],
+        },
+        {
+            // Tests can produce traces.
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#google-tests" ],
+            source_availability: "unknown",
+            availability: "optional",
         },
 
         // These system capabilities are offered for use by the google tests.

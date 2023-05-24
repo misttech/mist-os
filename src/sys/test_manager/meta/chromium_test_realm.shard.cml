@@ -94,7 +94,7 @@
             ],
             from: "parent",
             to: "#chromium-tests",
-            availability: "same_as_target",
+            source_availability: "unknown",
         },
 
         // Test realms may offer subdirectories of config-data to test

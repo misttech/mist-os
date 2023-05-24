@@ -16,6 +16,7 @@
         "inspect/client.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -228,9 +229,6 @@
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.process.Launcher",
-
-                // Tests can produce trace.
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: [
@@ -283,7 +281,6 @@
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: [
@@ -374,11 +371,6 @@
                 "#netemul_test_runner",
             ],
             availability: "optional",
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: [ "#starnix_test_runners" ],
         },
         {
             protocol: [

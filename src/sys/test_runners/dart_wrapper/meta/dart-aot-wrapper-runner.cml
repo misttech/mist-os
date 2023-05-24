@@ -5,6 +5,7 @@
     include: [
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
+        "trace/offer.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -50,7 +51,6 @@
                 "fuchsia.logger.LogSink", // For syslog
                 "fuchsia.net.name.Lookup", // For fdio sockets
                 "fuchsia.posix.socket.Provider", // For fdio sockets
-                "fuchsia.tracing.provider.Registry", // For trace-provider
             ],
             from: "parent",
             to: "#runners",
