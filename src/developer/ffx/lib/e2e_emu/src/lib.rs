@@ -4,14 +4,13 @@
 
 use anyhow::{ensure, Context as _};
 use diagnostics_data::LogsData;
-use ffx_config::{ConfigLevel, TestEnv};
+use ffx_config::TestEnv;
 use ffx_isolate::Isolate;
 use serde::Deserialize;
 use tempfile::TempDir;
 use tracing::info;
 
 const PRODUCT_BUNDLE_PATH: &str = env!("PRODUCT_BUNDLE_PATH");
-const SDK_ROOT_DIR: &str = env!("SDK_ROOT_DIR");
 
 /// An isolated environment for testing ffx against a running emulator.
 pub struct IsolatedEmulator {
@@ -42,16 +41,7 @@ impl IsolatedEmulator {
         let ssh_priv_key = temp_dir.path().join("ssh_private_key");
         let ssh_pub_key = temp_dir.path().join("ssh_public_key");
 
-        // teach the test environment where to find ffx
-        test_env
-            .context
-            .query("sdk.root")
-            // this should not affect the user's home directory because this is in a test env
-            .level(Some(ConfigLevel::User))
-            .set(SDK_ROOT_DIR.into())
-            .await
-            .context("setting sdk root dir")?;
-        let ffx_isolate = Isolate::new_with_sdk(name, ssh_priv_key.clone(), &test_env.context)
+        let ffx_isolate = Isolate::new_in_test(name, ssh_priv_key.clone(), &test_env.context)
             .await
             .context("creating ffx isolate")?;
 

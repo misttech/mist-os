@@ -4,62 +4,63 @@
 
 import("//build/rust/rustc_library.gni")
 
-if (is_host) {
-  group("lib") {
-    testonly = true
-    deps = [ ":ffx_e2e_emu" ]
-  }
+assert(is_host)
 
-  group("host_tests") {
-    testonly = true
-    deps = [ ":ffx_e2e_emu_test" ]
-  }
+group("lib") {
+  testonly = true
+  deps = [ ":ffx_e2e_emu" ]
+}
 
-  rustc_library("ffx_e2e_emu") {
-    testonly = true
-    edition = "2021"
-    with_unit_tests = true
-    sources = [ "src/lib.rs" ]
-    deps = [
-      "//src/developer/ffx/config:lib",
-      "//src/developer/ffx/lib/isolate:lib",
-      "//src/lib/diagnostics/data/rust",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:serde",
-      "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:tempfile",
-      "//third_party/rust_crates:tracing",
-    ]
-    test_deps = [ "//src/lib/fuchsia" ]
-    data_deps = [ ":test_data" ]
-    configs += [ ":test_data_path_config" ]
-  }
+group("host_tests") {
+  testonly = true
+  deps = [ ":ffx_e2e_emu_test" ]
+}
 
-  # Product bundle containing emulator image.
-  _pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
-  _pb_outdir = get_label_info(_pb_label, "target_out_dir")
-  _product_bundle = "$_pb_outdir/product_bundle"
+rustc_library("ffx_e2e_emu") {
+  testonly = true
+  edition = "2021"
+  with_unit_tests = true
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/isolate:lib",
+    "//src/lib/diagnostics/data/rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:tracing",
+  ]
+  test_deps = [ "//src/lib/fuchsia" ]
+  data_deps = [
+    ":test_data",
+    "//src/developer/ffx:suite_test_data",
+  ]
+  configs += [ ":test_data_path_config" ]
+}
 
-  # Exported SDK with ffx binary.
-  _sdk_label = "//sdk:core($default_toolchain)"
-  _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
-  _sdk_path = _sdk_outdir + "/sdk/exported/core"
+# Exported SDK with ffx binary.
+_sdk_label = "//sdk:core($default_toolchain)"
+_sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
+_sdk_path = _sdk_outdir + "/sdk/exported/core"
 
-  host_test_data("test_data") {
-    sources = [
-      _product_bundle,
-      _sdk_path,
-    ]
-    deps = [
-      _pb_label,
-      _sdk_label,
-    ]
-  }
+# Product bundle containing emulator image.
+_pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
+_pb_outdir = get_label_info(_pb_label, "target_out_dir")
+_product_bundle = "$_pb_outdir/product_bundle"
 
-  config("test_data_path_config") {
-    rustenv = [
-      "PRODUCT_BUNDLE_PATH=" + rebase_path(_product_bundle, root_build_dir),
-      "SDK_ROOT_DIR=" + rebase_path(_sdk_path, root_build_dir),
-    ]
-  }
+host_test_data("test_data") {
+  sources = [
+    _product_bundle,
+    _sdk_path,
+  ]
+  deps = [
+    _pb_label,
+    _sdk_label,
+  ]
+}
+
+config("test_data_path_config") {
+  rustenv =
+      [ "PRODUCT_BUNDLE_PATH=" + rebase_path(_product_bundle, root_build_dir) ]
 }

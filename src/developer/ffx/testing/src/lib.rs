@@ -53,14 +53,9 @@ where
     // Not actually used. ffx will generate an ssh key for usage with the emulator.
     let ssh_path = OUT_DIR.join("ssh");
 
-    let isolate = ffx_isolate::Isolate::new_in_test(
-        case_name,
-        ROOT_OUT_DIR.clone(),
-        ssh_path,
-        &test_env.context,
-    )
-    .await
-    .expect("create isolate");
+    let isolate = ffx_isolate::Isolate::new_in_test(case_name, ssh_path, &test_env.context)
+        .await
+        .expect("create isolate");
     let config = TestContext { isolate };
 
     // Spawn a new thread so that we can catch panics from the test. To avoid blocking this thread's

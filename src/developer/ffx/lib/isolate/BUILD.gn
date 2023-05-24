@@ -23,8 +23,8 @@ rustc_library("lib") {
   ]
 
   _subtool_search_test_data =
-      rebase_path(ffx_test_host_tools_out_dir, root_out_dir)
-  _subtool_search_host_tools = rebase_path(host_tools_dir, root_out_dir)
+      rebase_path(ffx_test_host_tools_out_dir, root_build_dir)
+  _subtool_search_host_tools = rebase_path(host_tools_dir, root_build_dir)
 
   # We pass the paths to the host tools and test data directories into the rust
   # build as environment variables so that for unit-test situations, they can

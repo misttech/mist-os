@@ -48,16 +48,19 @@ fn find_ffx(search: &SearchContext, search_paths: &[Cow<'_, Path>]) -> Result<Pa
     use SearchContext::*;
     match search {
         Runtime { ffx_path, .. } => return Ok(ffx_path.to_owned()),
-        Build { build_root } => {
+        Build { .. } => {
             for path in search_paths {
-                let path = build_root.join(path).join("ffx");
+                let path = path.join("ffx");
                 if path.exists() {
                     return Ok(path);
                 }
             }
         }
     }
-    Err(anyhow!("ffx not found in search paths for isolation"))
+    Err(anyhow!(
+        "ffx not found in search paths for isolation. cwd={}, search_paths={search_paths:?}",
+        std::env::current_dir()?.display()
+    ))
 }
 
 #[derive(Debug)]
@@ -97,6 +100,10 @@ impl Isolate {
 
         let sdk_config = match &search {
             SearchContext::Runtime { sdk_root: Some(sdk_root), .. } => Some(sdk_root.to_config()),
+            SearchContext::Build { build_root } => {
+                let root = Some(build_root.join("sdk/exported/core"));
+                Some(FfxSdkConfig { root, module: None })
+            }
             _ => None,
         };
 
@@ -252,12 +259,15 @@ impl Isolate {
     /// Use this when building an isolation environment from within a unit test
     /// in the fuchsia tree. This will make the isolated ffx look for subtools
     /// in the appropriate places in the build tree.
+    ///
+    /// Note: This function assumes the test is being run from the build root.
+    /// If not, you can use [`Self::new_with_search`] to make it explicit.
     pub async fn new_in_test(
         name: &str,
-        build_root: PathBuf,
         ssh_key: PathBuf,
         context: &EnvironmentContext,
     ) -> Result<Self> {
+        let build_root = std::env::current_dir()?;
         Self::new_with_search(name, SearchContext::Build { build_root }, ssh_key, context).await
     }
 
