@@ -5,6 +5,7 @@
 //! `cmc` is the Component Manifest Compiler.
 
 use anyhow::{ensure, Error};
+use cml::features;
 pub use cml::{self, error, one_or_many, translate, Document};
 use reference_doc::MarkdownReferenceDocGenerator;
 use std::fs;
@@ -13,7 +14,6 @@ use structopt::StructOpt;
 
 #[allow(unused)] // A test-only macro is defined on all builds.
 mod compile;
-mod features;
 mod format;
 mod include;
 mod merge;
@@ -45,7 +45,7 @@ fn run_cmc() -> Result<(), Error> {
             validate::validate(
                 &files,
                 &features::FeatureSet::empty(),
-                &validate::ProtocolRequirements {
+                &cml::validate::ProtocolRequirements {
                     must_offer: &must_offer_protocol,
                     must_use: &must_use_protocol,
                 },
@@ -121,7 +121,7 @@ fn run_cmc() -> Result<(), Error> {
                 config_package_path.as_ref().map(String::as_str),
                 &features.into(),
                 &experimental_force_runner,
-                validate::ProtocolRequirements {
+                cml::validate::ProtocolRequirements {
                     must_offer: &must_offer_protocol,
                     must_use: &must_use_protocol,
                 },

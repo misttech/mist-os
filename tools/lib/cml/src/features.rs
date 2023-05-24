@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cml::error::Error;
+use crate::error::Error;
 use std::{fmt, str::FromStr};
 
 /// Represents the set of features a CML file is compiled with. This struct can be

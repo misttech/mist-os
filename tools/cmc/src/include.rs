@@ -8,7 +8,7 @@ use {
     crate::merge::merge_json,
     crate::util,
     crate::util::{json_or_json5_from_file, write_depfile},
-    crate::validate::{validate_cml, ProtocolRequirements},
+    cml::validate::{validate_cml, ProtocolRequirements},
     serde_json::Value,
     std::{
         collections::HashSet,
