@@ -35,7 +35,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   bool IsFormatSupported(fuchsia_images2::wire::PixelFormat format);
 
   VoutType type() { return type_; }
-  bool supports_afbc() const { return supports_afbc_; }
   bool supports_hpd() const { return supports_hpd_; }
   uint32_t display_width() {
     switch (type_) {
@@ -126,7 +125,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   VoutType type_ = VoutType::kUnknown;
 
   // Features
-  bool supports_afbc_ = false;
   bool supports_hpd_ = false;
 
   struct dsi_t {

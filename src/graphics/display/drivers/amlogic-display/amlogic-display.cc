@@ -114,9 +114,8 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   // The "osd" node must be created because these metric paths are load-bearing
   // for some triage workflows.
   osd_node_ = root_node_.CreateChild("osd");
-  auto osd_or_status =
-      Osd::Create(&pdev_, vout_->supports_afbc(), vout_->fb_width(), vout_->fb_height(),
-                  vout_->display_width(), vout_->display_height(), &osd_node_);
+  auto osd_or_status = Osd::Create(&pdev_, vout_->fb_width(), vout_->fb_height(),
+                                   vout_->display_width(), vout_->display_height(), &osd_node_);
   if (osd_or_status.is_error()) {
     return osd_or_status.status_value();
   }

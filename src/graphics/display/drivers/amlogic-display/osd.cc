@@ -186,11 +186,10 @@ OsdRegisters osd1_registers = {
 
 config_stamp_t Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
 
-Osd::Osd(bool supports_afbc, uint32_t fb_width, uint32_t fb_height, uint32_t display_width,
-         uint32_t display_height, inspect::Node* unused_osd_inspect_node,
-         std::optional<fdf::MmioBuffer> vpu_mmio, std::unique_ptr<RdmaEngine> rdma)
+Osd::Osd(uint32_t fb_width, uint32_t fb_height, uint32_t display_width, uint32_t display_height,
+         inspect::Node* unused_osd_inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
+         std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)),
-      supports_afbc_(supports_afbc),
       fb_width_(fb_width),
       fb_height_(fb_height),
       display_width_(display_width),
@@ -335,7 +334,7 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
     }
   }
   auto cfg_w0 = osd1_registers.blk0_cfg_w0.FromValue(0);
-  if (supports_afbc_ && info->is_afbc) {
+  if (info->is_afbc) {
     // AFBC: Enable sourcing from mali + configure as big endian
     cfg_w0.set_mali_src_en(1).set_little_endian(0);
   } else {
@@ -404,15 +403,13 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   }
 
   // Use linear address for AFBC, Canvas otherwise
-  osd_ctrl_stat_val.set_osd_mem_mode((supports_afbc_ && info->is_afbc) ? 1 : 0);
+  osd_ctrl_stat_val.set_osd_mem_mode(info->is_afbc ? 1 : 0);
   osd_ctrl_stat2_val.set_pending_status_cleanup(1);
 
   rdma_->SetRdmaTableValue(next_table_idx, IDX_CTRL_STAT, osd_ctrl_stat_val.reg_value());
   rdma_->SetRdmaTableValue(next_table_idx, IDX_CTRL_STAT2, osd_ctrl_stat2_val.reg_value());
 
-  // Complain if doesn't support AFBC, but trying to display with AFBC
-  ZX_DEBUG_ASSERT(!(!supports_afbc_ && info->is_afbc));
-  if (supports_afbc_ && info->is_afbc) {
+  if (info->is_afbc) {
     // Line Stride calculation based on vendor code
     auto a = fbl::round_up(fbl::round_up(info->image_width * 4, 16u) / 16, 2u);
     auto r = osd1_registers.blk2_cfg_w4.FromValue(0).set_linear_stride(a).reg_value();
@@ -474,11 +471,11 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
                            (config_stamp->value & 0xFFFFFFFF));
 
   rdma_->FlushRdmaTable(next_table_idx);
-  if (supports_afbc_ && info->is_afbc) {
+  if (info->is_afbc) {
     rdma_->FlushAfbcRdmaTable();
   }
 
-  rdma_->ExecRdmaTable(next_table_idx, config_stamp, supports_afbc_ && info->is_afbc);
+  rdma_->ExecRdmaTable(next_table_idx, config_stamp, info->is_afbc);
 }
 
 void Osd::DefaultSetup() {
@@ -841,10 +838,8 @@ void Osd::HwInit() {
   WRITE32_REG(VPU, VPP_OSD1_BLD_V_SCOPE, 0 << 16 | (display_height_ - 1));
   WRITE32_REG(VPU, VPU_VPP_OUT_H_V_SIZE, display_width_ << 16 | display_height_);
 
-  if (supports_afbc_) {
-    // Configure AFBC Engine's one-time programmable fields, so it's ready
-    ConfigAfbc();
-  }
+  // Configure AFBC Engine's one-time programmable fields, so it's ready
+  ConfigAfbc();
 }
 
 #define REG_OFFSET (0x20 << 2)
@@ -939,10 +934,9 @@ void Osd::Release() {
 }
 
 // static
-zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, bool supports_afbc,
-                                             uint32_t fb_width, uint32_t fb_height,
-                                             uint32_t display_width, uint32_t display_height,
-                                             inspect::Node* osd_node) {
+zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_width,
+                                             uint32_t fb_height, uint32_t display_width,
+                                             uint32_t display_height, inspect::Node* osd_node) {
   std::optional<fdf::MmioBuffer> vpu_mmio;
   // Map vpu mmio used by the OSD object
   zx_status_t status = pdev->MapMmio(MMIO_VPU, &vpu_mmio);
@@ -957,9 +951,9 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, bool supports_
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<Osd> self(new (&ac) Osd(supports_afbc, fb_width, fb_height, display_width,
-                                          display_height, osd_node, std::move(vpu_mmio),
-                                          std::move(rdma_or_status.value())));
+  std::unique_ptr<Osd> self(new (&ac)
+                                Osd(fb_width, fb_height, display_width, display_height, osd_node,
+                                    std::move(vpu_mmio), std::move(rdma_or_status.value())));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }

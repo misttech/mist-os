@@ -38,9 +38,9 @@ enum class GammaChannel {
 
 class Osd {
  public:
-  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev, bool supports_afbc,
-                                                 uint32_t fb_width, uint32_t fb_height,
-                                                 uint32_t display_width, uint32_t display_height,
+  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev, uint32_t fb_width,
+                                                 uint32_t fb_height, uint32_t display_width,
+                                                 uint32_t display_height,
                                                  inspect::Node* parent_node);
 
   Osd(Osd& other) = delete;
@@ -81,8 +81,8 @@ class Osd {
   void SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
-  Osd(bool supports_afbc, uint32_t fb_width, uint32_t fb_height, uint32_t display_width,
-      uint32_t display_height, inspect::Node* inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
+  Osd(uint32_t fb_width, uint32_t fb_height, uint32_t display_width, uint32_t display_height,
+      inspect::Node* inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
       std::unique_ptr<RdmaEngine> rdma);
   void DefaultSetup();
   // this function sets up scaling based on framebuffer and actual display
@@ -100,8 +100,6 @@ class Osd {
   void DumpNonRdmaRegisters();
 
   std::optional<fdf::MmioBuffer> vpu_mmio_;
-
-  const bool supports_afbc_;
 
   // Framebuffer dimension
   uint32_t fb_width_;
