@@ -7,7 +7,8 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("lazy_init") {
   sdk = "source"
   sdk_headers = [
-    "lib/lazy_init/internal.h",
+    "lib/lazy_init/internal/assert.h",
+    "lib/lazy_init/internal/storage.h",
     "lib/lazy_init/lazy_init.h",
     "lib/lazy_init/options.h",
   ]

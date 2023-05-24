@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "internal.h"
+#include "internal/storage.h"
 #include "options.h"
 
 namespace lazy_init {

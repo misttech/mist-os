@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_LAZY_INIT_INTERNAL_H_
-#define LIB_LAZY_INIT_INTERNAL_H_
+#ifndef LIB_LAZY_INIT_INTERNAL_STORAGE_H_
+#define LIB_LAZY_INIT_INTERNAL_STORAGE_H_
+
+#include <lib/lazy_init/options.h>
 
 #include <type_traits>
 #include <utility>
 
-#include "options.h"
+#include "assert.h"
 
-namespace lazy_init::internal {
-
-constexpr void Assert(bool condition) {
-  if (!condition) {
-    __builtin_abort();
-  }
-}
+namespace lazy_init {
+namespace internal {
 
 // Empty type that is trivially constructible/destructible.
 struct Empty {};
@@ -64,6 +61,6 @@ union LazyInitStorage<T, false> {
   T value;
 };
 
-}  // namespace lazy_init::internal
-
-#endif  // LIB_LAZY_INIT_INTERNAL_H_
+}  // namespace internal
+}  // namespace lazy_init
+#endif  // LIB_LAZY_INIT_INTERNAL_STORAGE_H_
