@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 """Merges sources of a Dart target and its dependencies"""
 
 # Copyright 2021 The Fuchsia Authors. All rights reserved.

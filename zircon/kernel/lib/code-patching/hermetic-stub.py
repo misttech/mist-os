@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2021 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style

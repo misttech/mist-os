@@ -46,7 +46,7 @@ Fuchsia currently uses Python 3.8. All Python sources are to begin with the
 following:
 
 ```shell
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 ```
 
 ## Shell scripts as build actions

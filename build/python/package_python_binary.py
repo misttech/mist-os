@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 """Creats a Python zip archive for the input main source."""
 
 # Copyright 2021 The Fuchsia Authors. All rights reserved.

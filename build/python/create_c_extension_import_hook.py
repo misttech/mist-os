@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 """Creates a Python library for a C extension."""
 
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
