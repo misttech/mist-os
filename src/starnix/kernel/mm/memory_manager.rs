@@ -5,7 +5,6 @@
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryInto;
@@ -1882,14 +1881,14 @@ fn write_map(
 
 #[derive(Default)]
 pub struct MemoryStats {
-    vm_size: usize,
-    vm_rss: usize,
-    rss_anonymous: usize,
-    rss_file: usize,
-    rss_shared: usize,
-    vm_data: usize,
-    vm_stack: usize,
-    vm_exe: usize,
+    pub vm_size: usize,
+    pub vm_rss: usize,
+    pub rss_anonymous: usize,
+    pub rss_file: usize,
+    pub rss_shared: usize,
+    pub vm_data: usize,
+    pub vm_stack: usize,
+    pub vm_exe: usize,
 }
 
 #[derive(Clone)]
@@ -1983,169 +1982,6 @@ impl SequenceFileSource for ProcSmapsFile {
             return Ok(Some(range.end));
         }
         Ok(None)
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum StatsScope {
-    Task,
-    ThreadGroup,
-}
-
-#[derive(Clone)]
-pub struct ProcStatFile {
-    task: Arc<Task>,
-    scope: StatsScope,
-}
-impl ProcStatFile {
-    pub fn new_node(task: &Arc<Task>, scope: StatsScope) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { task: task.clone(), scope })
-    }
-}
-impl DynamicFileSource for ProcStatFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let command = self.task.command();
-        let command = command.as_c_str().to_str().unwrap_or("unknown");
-        let mut stats = [0u64; 48];
-        {
-            let thread_group = self.task.thread_group.read();
-            stats[0] = thread_group.get_ppid() as u64;
-            stats[1] = thread_group.process_group.leader as u64;
-            stats[2] = thread_group.process_group.session.leader as u64;
-
-            // TTY device ID.
-            {
-                let session = thread_group.process_group.session.read();
-                stats[3] = session
-                    .controlling_terminal
-                    .as_ref()
-                    .map(|t| t.terminal.device().bits())
-                    .unwrap_or(0);
-            }
-
-            stats[12] =
-                duration_to_scheduler_clock(thread_group.children_time_stats.user_time) as u64;
-            stats[13] =
-                duration_to_scheduler_clock(thread_group.children_time_stats.system_time) as u64;
-
-            stats[16] = thread_group.tasks.len() as u64;
-            stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
-        }
-
-        let time_stats = match self.scope {
-            StatsScope::Task => self.task.time_stats(),
-            StatsScope::ThreadGroup => self.task.thread_group.time_stats(),
-        };
-        stats[10] = duration_to_scheduler_clock(time_stats.user_time) as u64;
-        stats[11] = duration_to_scheduler_clock(time_stats.system_time) as u64;
-
-        let info = self.task.thread_group.process.info().map_err(|_| errno!(EIO))?;
-        stats[18] =
-            duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
-                as u64;
-
-        let mem_stats = self.task.mm.get_stats().map_err(|_| errno!(EIO))?;
-        let page_size = *PAGE_SIZE as usize;
-        stats[19] = mem_stats.vm_size as u64;
-        stats[20] = (mem_stats.vm_rss / page_size) as u64;
-
-        {
-            let mm_state = self.task.mm.state.read();
-            stats[24] = mm_state.stack_start.ptr() as u64;
-            stats[44] = mm_state.argv_start.ptr() as u64;
-            stats[45] = mm_state.argv_end.ptr() as u64;
-            stats[46] = mm_state.environ_start.ptr() as u64;
-            stats[47] = mm_state.environ_end.ptr() as u64;
-        }
-        let stat_str = stats.map(|n| n.to_string()).join(" ");
-
-        writeln!(
-            sink,
-            "{} ({}) {} {}",
-            self.task.get_pid(),
-            command,
-            self.task.state_code().code_char(),
-            stat_str
-        )?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct ProcStatmFile(Arc<Task>);
-impl ProcStatmFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
-    }
-}
-impl DynamicFileSource for ProcStatmFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = self.0.mm.get_stats().map_err(|_| errno!(EIO))?;
-        let page_size = *PAGE_SIZE as usize;
-
-        // 5th and 7th fields are deprecated and should be set to 0.
-        writeln!(
-            sink,
-            "{} {} {} {} 0 {} 0",
-            mem_stats.vm_size / page_size,
-            mem_stats.vm_rss / page_size,
-            mem_stats.rss_shared / page_size,
-            mem_stats.vm_exe / page_size,
-            (mem_stats.vm_data + mem_stats.vm_stack) / page_size
-        )?;
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct ProcStatusFile(Arc<Task>);
-impl ProcStatusFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task.clone()))
-    }
-}
-impl DynamicFileSource for ProcStatusFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let task = &self.0;
-
-        write!(sink, "Name:\t")?;
-        sink.write(task.command().as_bytes());
-        writeln!(sink)?;
-
-        writeln!(sink, "Umask:\t0{:03o}", self.0.fs().umask().bits())?;
-
-        let state_code = self.0.state_code();
-        writeln!(sink, "State:\t{} ({})", state_code.code_char(), state_code.name())?;
-
-        writeln!(sink, "Tgid:\t{}", task.get_pid())?;
-        writeln!(sink, "Pid:\t{}", task.id)?;
-        let (ppid, threads) = {
-            let task_group = task.thread_group.read();
-            (task_group.get_ppid(), task_group.tasks.len())
-        };
-        writeln!(sink, "PPid:\t{}", ppid)?;
-
-        // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented fsuid.
-        let creds = task.creds();
-        writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
-        writeln!(sink, "Gid:\t{}\t{}\t{}\t{}", creds.gid, creds.egid, creds.saved_gid, creds.egid)?;
-        writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
-
-        let mem_stats = task.mm.get_stats().map_err(|_| errno!(EIO))?;
-        writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
-        writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
-        writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;
-        writeln!(sink, "RssFile:\t{} kB", mem_stats.rss_file / 1024)?;
-        writeln!(sink, "RssShmem:\t{} kB", mem_stats.rss_shared / 1024)?;
-        writeln!(sink, "VmData:\t{} kB", mem_stats.vm_data / 1024)?;
-        writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
-        writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
-
-        // There should be at least on thread in Zombie processes.
-        writeln!(sink, "Threads:\t{}", std::cmp::max(1, threads))?;
-
-        Ok(())
     }
 }
 

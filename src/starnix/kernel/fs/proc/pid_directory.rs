@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_zircon as zx;
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::ffi::CString;
@@ -9,10 +11,7 @@ use std::sync::Arc;
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::mm::{
-    MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatmFile, ProcStatusFile,
-    StatsScope,
-};
+use crate::mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
 use crate::selinux::selinux_proc_attrs;
 use crate::task::{CurrentTask, Task, TaskStateCode, ThreadGroup};
 use crate::types::*;
@@ -75,9 +74,9 @@ fn static_directory_builder_with_common_task_entries<'a>(
         mode!(IFLNK, 0o777),
     );
     dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
-    dir.entry(b"stat", ProcStatFile::new_node(task, scope), mode!(IFREG, 0o444));
-    dir.entry(b"statm", ProcStatmFile::new_node(task), mode!(IFREG, 0o444));
-    dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"stat", StatFile::new_node(task, scope), mode!(IFREG, 0o444));
+    dir.entry(b"statm", StatmFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"status", StatusFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"environ", EnvironFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"auxv", AuxvFile::new_node(task), mode!(IFREG, 0o444));
@@ -572,5 +571,168 @@ impl FileOps for MemFile {
                 })
             }
         }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum StatsScope {
+    Task,
+    ThreadGroup,
+}
+
+#[derive(Clone)]
+pub struct StatFile {
+    task: Arc<Task>,
+    scope: StatsScope,
+}
+impl StatFile {
+    pub fn new_node(task: &Arc<Task>, scope: StatsScope) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { task: task.clone(), scope })
+    }
+}
+impl DynamicFileSource for StatFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let command = self.task.command();
+        let command = command.as_c_str().to_str().unwrap_or("unknown");
+        let mut stats = [0u64; 48];
+        {
+            let thread_group = self.task.thread_group.read();
+            stats[0] = thread_group.get_ppid() as u64;
+            stats[1] = thread_group.process_group.leader as u64;
+            stats[2] = thread_group.process_group.session.leader as u64;
+
+            // TTY device ID.
+            {
+                let session = thread_group.process_group.session.read();
+                stats[3] = session
+                    .controlling_terminal
+                    .as_ref()
+                    .map(|t| t.terminal.device().bits())
+                    .unwrap_or(0);
+            }
+
+            stats[12] =
+                duration_to_scheduler_clock(thread_group.children_time_stats.user_time) as u64;
+            stats[13] =
+                duration_to_scheduler_clock(thread_group.children_time_stats.system_time) as u64;
+
+            stats[16] = thread_group.tasks.len() as u64;
+            stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
+        }
+
+        let time_stats = match self.scope {
+            StatsScope::Task => self.task.time_stats(),
+            StatsScope::ThreadGroup => self.task.thread_group.time_stats(),
+        };
+        stats[10] = duration_to_scheduler_clock(time_stats.user_time) as u64;
+        stats[11] = duration_to_scheduler_clock(time_stats.system_time) as u64;
+
+        let info = self.task.thread_group.process.info().map_err(|_| errno!(EIO))?;
+        stats[18] =
+            duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
+                as u64;
+
+        let mem_stats = self.task.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let page_size = *PAGE_SIZE as usize;
+        stats[19] = mem_stats.vm_size as u64;
+        stats[20] = (mem_stats.vm_rss / page_size) as u64;
+
+        {
+            let mm_state = self.task.mm.state.read();
+            stats[24] = mm_state.stack_start.ptr() as u64;
+            stats[44] = mm_state.argv_start.ptr() as u64;
+            stats[45] = mm_state.argv_end.ptr() as u64;
+            stats[46] = mm_state.environ_start.ptr() as u64;
+            stats[47] = mm_state.environ_end.ptr() as u64;
+        }
+        let stat_str = stats.map(|n| n.to_string()).join(" ");
+
+        writeln!(
+            sink,
+            "{} ({}) {} {}",
+            self.task.get_pid(),
+            command,
+            self.task.state_code().code_char(),
+            stat_str
+        )?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct StatmFile(Arc<Task>);
+impl StatmFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for StatmFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let mem_stats = self.0.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let page_size = *PAGE_SIZE as usize;
+
+        // 5th and 7th fields are deprecated and should be set to 0.
+        writeln!(
+            sink,
+            "{} {} {} {} 0 {} 0",
+            mem_stats.vm_size / page_size,
+            mem_stats.vm_rss / page_size,
+            mem_stats.rss_shared / page_size,
+            mem_stats.vm_exe / page_size,
+            (mem_stats.vm_data + mem_stats.vm_stack) / page_size
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct StatusFile(Arc<Task>);
+impl StatusFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for StatusFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let task = &self.0;
+
+        write!(sink, "Name:\t")?;
+        sink.write(task.command().as_bytes());
+        writeln!(sink)?;
+
+        writeln!(sink, "Umask:\t0{:03o}", self.0.fs().umask().bits())?;
+
+        let state_code = self.0.state_code();
+        writeln!(sink, "State:\t{} ({})", state_code.code_char(), state_code.name())?;
+
+        writeln!(sink, "Tgid:\t{}", task.get_pid())?;
+        writeln!(sink, "Pid:\t{}", task.id)?;
+        let (ppid, threads) = {
+            let task_group = task.thread_group.read();
+            (task_group.get_ppid(), task_group.tasks.len())
+        };
+        writeln!(sink, "PPid:\t{}", ppid)?;
+
+        // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented fsuid.
+        let creds = task.creds();
+        writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
+        writeln!(sink, "Gid:\t{}\t{}\t{}\t{}", creds.gid, creds.egid, creds.saved_gid, creds.egid)?;
+        writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
+
+        let mem_stats = task.mm.get_stats().map_err(|_| errno!(EIO))?;
+        writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
+        writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
+        writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;
+        writeln!(sink, "RssFile:\t{} kB", mem_stats.rss_file / 1024)?;
+        writeln!(sink, "RssShmem:\t{} kB", mem_stats.rss_shared / 1024)?;
+        writeln!(sink, "VmData:\t{} kB", mem_stats.vm_data / 1024)?;
+        writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
+        writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
+
+        // There should be at least on thread in Zombie processes.
+        writeln!(sink, "Threads:\t{}", std::cmp::max(1, threads))?;
+
+        Ok(())
     }
 }
