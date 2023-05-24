@@ -4,6 +4,8 @@
 
 //! A module for managing protocol-specific aspects of Netlink.
 
+use netlink_packet_core::NetlinkMessage;
+
 use crate::{
     client::ExternalClient,
     multicast_groups::{
@@ -12,20 +14,28 @@ use crate::{
     },
 };
 
+/// A type representing a Netlink Protocol Family.
+pub(crate) trait ProtocolFamily: MulticastCapableNetlinkFamily {
+    type Message;
+}
+
 pub mod route {
     //! This module implements the Route Netlink Protocol Family.
 
     use super::*;
 
-    use netlink_packet_route::rtnl::constants::{
-        RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE,
-        RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R, RTNLGRP_IPV4_NETCONF,
-        RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE, RTNLGRP_IPV6_IFADDR, RTNLGRP_IPV6_IFINFO,
-        RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R, RTNLGRP_IPV6_NETCONF, RTNLGRP_IPV6_PREFIX,
-        RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE, RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF,
-        RTNLGRP_MPLS_ROUTE, RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2,
-        RTNLGRP_NOP4, RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE,
-        RTNLGRP_TC,
+    use netlink_packet_route::rtnl::{
+        constants::{
+            RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE,
+            RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R, RTNLGRP_IPV4_NETCONF,
+            RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE, RTNLGRP_IPV6_IFADDR, RTNLGRP_IPV6_IFINFO,
+            RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R, RTNLGRP_IPV6_NETCONF, RTNLGRP_IPV6_PREFIX,
+            RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE, RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF,
+            RTNLGRP_MPLS_ROUTE, RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2,
+            RTNLGRP_NOP4, RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR,
+            RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
+        },
+        RtnlMessage,
     };
 
     /// An implementation of the Netlink Route protocol family.
@@ -110,6 +120,10 @@ pub mod route {
         }
     }
 
+    impl ProtocolFamily for NetlinkRoute {
+        type Message = NetlinkMessage<RtnlMessage>;
+    }
+
     /// A connection to the Route Netlink Protocol family.
     pub struct NetlinkRouteClient(pub(crate) ExternalClient<NetlinkRoute>);
 
@@ -141,6 +155,8 @@ pub mod route {
 pub(crate) mod testutil {
     use super::*;
 
+    use netlink_packet_utils::Emitable;
+
     pub(crate) const LEGACY_GROUP1: u32 = 0x00000001;
     pub(crate) const LEGACY_GROUP2: u32 = 0x00000010;
     pub(crate) const LEGACY_GROUP3: u32 = 0x00000100;
@@ -168,5 +184,20 @@ pub(crate) mod testutil {
                 _ => false,
             }
         }
+    }
+
+    #[derive(Clone, Default)]
+    pub(crate) struct FakeNetlinkMessage;
+
+    impl Emitable for FakeNetlinkMessage {
+        fn buffer_len(&self) -> usize {
+            0
+        }
+
+        fn emit(&self, _buffer: &mut [u8]) {}
+    }
+
+    impl ProtocolFamily for FakeProtocolFamily {
+        type Message = FakeNetlinkMessage;
     }
 }
