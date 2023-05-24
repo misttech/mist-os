@@ -12,7 +12,6 @@
 #include <lib/async/task.h>
 #include <lib/async/trap.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/ddk/device.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>

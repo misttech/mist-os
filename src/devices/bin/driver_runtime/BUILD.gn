@@ -46,7 +46,6 @@ source_set("driver_runtime_impl") {
     "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/fidl/cpp/wire",
     "//src/devices/lib/log",
-    "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
   ]
 }
