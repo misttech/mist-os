@@ -436,11 +436,10 @@ mod tests {
             ]
             .into_iter(),
         );
-        assert_eq!(
-            HashSet::from_iter(suite.command_list().await.into_iter()),
-            expected_commands,
-            "subtools we created should exist"
+        let found_commands = HashSet::from_iter(
+            find_workspace_tools(&[tempdir.path()]).filter_map(|tool| tool.validate_tool()),
         );
+        assert_eq!(found_commands, expected_commands, "subtools we created should exist");
 
         suite
             .try_from_args(&FfxCommandLine {
