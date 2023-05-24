@@ -22,6 +22,7 @@
 #include <ktl/atomic.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
+#include <ktl/type_traits.h>
 
 #include <ktl/enforce.h>
 
@@ -33,8 +34,13 @@ using object_cache::ObjectCache;
 using object_cache::Option;
 using object_cache::UniquePtr;
 
-struct TestAllocator {
+struct TestGlobalAllocator {
   static constexpr size_t kSlabSize = DefaultAllocator::kSlabSize;
+
+  constexpr TestGlobalAllocator() = default;
+
+  // Ignores the allocator argunments passed to the ObjectCache ctor.
+  constexpr TestGlobalAllocator(int a, int b) {}
 
   static zx::result<void*> Allocate() {
     allocated_slabs.fetch_add(1, ktl::memory_order_relaxed);
@@ -56,6 +62,43 @@ struct TestAllocator {
     freed_slabs = 0;
   }
 
+  inline static ktl::atomic<int> allocated_slabs{0};
+  inline static ktl::atomic<int> freed_slabs{0};
+};
+
+struct TestLocalAllocator {
+  static constexpr size_t kSlabSize = DefaultAllocator::kSlabSize;
+
+  // Stores the allocator arguments passed to the ObjectCache ctor for verification.
+  TestLocalAllocator(int a, int b) : local_state_a{a}, local_state_b{b} {}
+
+  zx::result<void*> Allocate() {
+    allocated_slabs.fetch_add(1, ktl::memory_order_relaxed);
+    local_allocated_slabs.fetch_add(1, ktl::memory_order_relaxed);
+    return DefaultAllocator::Allocate();
+  }
+
+  void Release(void* slab) {
+    freed_slabs.fetch_add(1, ktl::memory_order_relaxed);
+    local_freed_slabs.fetch_add(1, ktl::memory_order_relaxed);
+    DefaultAllocator::Release(slab);
+  }
+
+  static void CountObjectAllocation() { DefaultAllocator::CountObjectAllocation(); }
+  static void CountObjectFree() { DefaultAllocator::CountObjectFree(); }
+  static void CountSlabAllocation() { DefaultAllocator::CountSlabAllocation(); }
+  static void CountSlabFree() { DefaultAllocator::CountSlabFree(); }
+
+  static void ResetCounts() {
+    allocated_slabs = 0;
+    freed_slabs = 0;
+  }
+
+  int local_state_a;
+  int local_state_b;
+
+  ktl::atomic<int> local_allocated_slabs{0};
+  ktl::atomic<int> local_freed_slabs{0};
   inline static ktl::atomic<int> allocated_slabs{0};
   inline static ktl::atomic<int> freed_slabs{0};
 };
@@ -85,7 +128,7 @@ struct TestParent : fbl::RefCounted<TestParent> {
   TestParent() = default;
   ~TestParent() { destructor_count++; }
 
-  struct Child : fbl::RefCounted<Child>, Deletable<Child, TestAllocator> {
+  struct Child : fbl::RefCounted<Child>, Deletable<Child, TestGlobalAllocator> {
     explicit Child(fbl::RefPtr<TestParent> parent) : parent{ktl::move(parent)} {}
     fbl::RefPtr<TestParent> parent;
   };
@@ -98,7 +141,7 @@ struct TestParent : fbl::RefCounted<TestParent> {
     return zx::ok(fbl::AdoptRef(result.value().release()));
   }
 
-  using Allocator = ObjectCache<Child, Option::Single, TestAllocator>;
+  using Allocator = ObjectCache<Child, Option::Single, TestGlobalAllocator>;
   static constexpr size_t kObjectsPerSlab = Allocator::objects_per_slab();
   static constexpr size_t kReserveSlabs = 1;
   Allocator allocator{kReserveSlabs};
@@ -107,7 +150,7 @@ struct TestParent : fbl::RefCounted<TestParent> {
   inline static ktl::atomic<int> destructor_count{0};
 };
 
-template <int retain_slabs, int slab_count, Option option>
+template <int retain_slabs, int slab_count, Option option, typename TestAllocator>
 bool ObjectCacheTests() {
   BEGIN_TEST;
 
@@ -131,9 +174,14 @@ bool ObjectCacheTests() {
   {
     ktl::optional<ObjectCache<TestObject, option, TestAllocator>> object_cache;
     if constexpr (option == Option::Single) {
-      object_cache.emplace(retain_slabs);
+      object_cache.emplace(retain_slabs, 10, 20);
+      if constexpr (ktl::is_same_v<TestAllocator, TestLocalAllocator>) {
+        EXPECT_EQ(10, object_cache->allocator().local_state_a);
+        EXPECT_EQ(20, object_cache->allocator().local_state_b);
+      }
     } else {
-      auto result = ObjectCache<TestObject, Option::PerCpu, TestAllocator>::Create(retain_slabs);
+      auto result =
+          ObjectCache<TestObject, Option::PerCpu, TestAllocator>::Create(retain_slabs, 10, 20);
       ASSERT_TRUE(result.is_ok());
       object_cache.emplace(ktl::move(result.value()));
     }
@@ -172,6 +220,11 @@ bool ObjectCacheTests() {
     EXPECT_EQ(slab_count, TestAllocator::allocated_slabs);
     EXPECT_EQ(0, TestAllocator::freed_slabs);
 
+    if constexpr (ktl::is_same_v<TestAllocator, TestLocalAllocator> && option == Option::Single) {
+      EXPECT_EQ(slab_count, object_cache->allocator().local_allocated_slabs);
+      EXPECT_EQ(0, object_cache->allocator().local_freed_slabs);
+    }
+
     // Release the first slab worth of objects.
     for (int i = 0; i < objects_per_slab; i++) {
       objects[i] = nullptr;
@@ -182,6 +235,14 @@ bool ObjectCacheTests() {
     EXPECT_EQ(slab_count <= retain_slabs ? 0 : 1, TestAllocator::freed_slabs);
     EXPECT_EQ(TestAllocator::allocated_slabs - TestAllocator::freed_slabs,
               static_cast<int>(object_cache->slab_count()));
+
+    if constexpr (ktl::is_same_v<TestAllocator, TestLocalAllocator> && option == Option::Single) {
+      EXPECT_EQ(slab_count, object_cache->allocator().local_allocated_slabs);
+      EXPECT_EQ(slab_count <= retain_slabs ? 0 : 1, object_cache->allocator().local_freed_slabs);
+      EXPECT_EQ(object_cache->allocator().local_allocated_slabs -
+                    object_cache->allocator().local_freed_slabs,
+                static_cast<int>(object_cache->slab_count()));
+    }
 
     objects.reset();
 
@@ -201,9 +262,9 @@ bool BackreferenceLifetimeTests() {
   TestParent::ResetCounts();
   EXPECT_EQ(0, TestParent::destructor_count);
 
-  TestAllocator::ResetCounts();
-  ASSERT_EQ(0, TestAllocator::allocated_slabs);
-  ASSERT_EQ(0, TestAllocator::freed_slabs);
+  TestGlobalAllocator::ResetCounts();
+  ASSERT_EQ(0, TestGlobalAllocator::allocated_slabs);
+  ASSERT_EQ(0, TestGlobalAllocator::freed_slabs);
 
   fbl::AllocChecker checker;
   fbl::RefPtr parent = fbl::AdoptRef(new (&checker) TestParent{});
@@ -225,7 +286,7 @@ bool BackreferenceLifetimeTests() {
   result3.value().reset();
   EXPECT_EQ(1, TestParent::destructor_count);
 
-  EXPECT_EQ(TestAllocator::allocated_slabs, TestAllocator::freed_slabs);
+  EXPECT_EQ(TestGlobalAllocator::allocated_slabs, TestGlobalAllocator::freed_slabs);
 
   END_TEST;
 }
@@ -238,9 +299,9 @@ bool BackreferenceLifetimeStressTests() {
     TestParent::ResetCounts();
     EXPECT_EQ(0, TestParent::destructor_count);
 
-    TestAllocator::ResetCounts();
-    ASSERT_EQ(0, TestAllocator::allocated_slabs);
-    ASSERT_EQ(0, TestAllocator::freed_slabs);
+    TestGlobalAllocator::ResetCounts();
+    ASSERT_EQ(0, TestGlobalAllocator::allocated_slabs);
+    ASSERT_EQ(0, TestGlobalAllocator::freed_slabs);
 
     fbl::AllocChecker checker;
     fbl::RefPtr parent = fbl::AdoptRef(new (&checker) TestParent{});
@@ -315,8 +376,8 @@ bool BackreferenceLifetimeStressTests() {
       control.allocation_event.Wait();
     }
     EXPECT_FALSE(control.failed);
-    EXPECT_EQ(thread_count, TestAllocator::allocated_slabs);
-    EXPECT_EQ(0, TestAllocator::freed_slabs);
+    EXPECT_EQ(thread_count, TestGlobalAllocator::allocated_slabs);
+    EXPECT_EQ(0, TestGlobalAllocator::freed_slabs);
 
     // Workers should not touch the parent object after they finish allocating
     // children.
@@ -335,8 +396,8 @@ bool BackreferenceLifetimeStressTests() {
     }
     EXPECT_FALSE(control.failed);
     EXPECT_EQ(1, TestParent::destructor_count);
-    EXPECT_EQ(thread_count, TestAllocator::allocated_slabs);
-    EXPECT_EQ(thread_count, TestAllocator::freed_slabs);
+    EXPECT_EQ(thread_count, TestGlobalAllocator::allocated_slabs);
+    EXPECT_EQ(thread_count, TestGlobalAllocator::freed_slabs);
 
     for (Thread* thread : threads) {
       int retcode;
@@ -351,12 +412,30 @@ bool BackreferenceLifetimeStressTests() {
 }  // namespace
 
 UNITTEST_START_TESTCASE(object_cache_tests)
-UNITTEST("object_cache_tests<0, 2, Single>", (ObjectCacheTests<0, 2, Option::Single>))
-UNITTEST("object_cache_tests<1, 2, Single>", (ObjectCacheTests<1, 2, Option::Single>))
-UNITTEST("object_cache_tests<2, 2, Single>", (ObjectCacheTests<2, 2, Option::Single>))
-UNITTEST("object_cache_tests<0, 2, PerCpu>", (ObjectCacheTests<0, 2, Option::PerCpu>))
-UNITTEST("object_cache_tests<1, 2, PerCpu>", (ObjectCacheTests<1, 2, Option::PerCpu>))
-UNITTEST("object_cache_tests<2, 2, PerCpu>", (ObjectCacheTests<2, 2, Option::PerCpu>))
+UNITTEST("object_cache_tests<0, 2, Single, TestLocalAllocator>",
+         (ObjectCacheTests<0, 2, Option::Single, TestLocalAllocator>))
+UNITTEST("object_cache_tests<1, 2, Single, TestLocalAllocator>",
+         (ObjectCacheTests<1, 2, Option::Single, TestLocalAllocator>))
+UNITTEST("object_cache_tests<2, 2, Single, TestLocalAllocator>",
+         (ObjectCacheTests<2, 2, Option::Single, TestLocalAllocator>))
+UNITTEST("object_cache_tests<0, 2, PerCpu, TestLocalAllocator>",
+         (ObjectCacheTests<0, 2, Option::PerCpu, TestLocalAllocator>))
+UNITTEST("object_cache_tests<1, 2, PerCpu, TestLocalAllocator>",
+         (ObjectCacheTests<1, 2, Option::PerCpu, TestLocalAllocator>))
+UNITTEST("object_cache_tests<2, 2, PerCpu, TestLocalAllocator>",
+         (ObjectCacheTests<2, 2, Option::PerCpu, TestLocalAllocator>))
+UNITTEST("object_cache_tests<0, 2, Single, TestGlobalAllocator>",
+         (ObjectCacheTests<0, 2, Option::Single, TestLocalAllocator>))
+UNITTEST("object_cache_tests<1, 2, Single, TestGlobalAllocator>",
+         (ObjectCacheTests<1, 2, Option::Single, TestLocalAllocator>))
+UNITTEST("object_cache_tests<2, 2, Single, TestGlobalAllocator>",
+         (ObjectCacheTests<2, 2, Option::Single, TestLocalAllocator>))
+UNITTEST("object_cache_tests<0, 2, PerCpu, TestGlobalAllocator>",
+         (ObjectCacheTests<0, 2, Option::PerCpu, TestLocalAllocator>))
+UNITTEST("object_cache_tests<1, 2, PerCpu, TestGlobalAllocator>",
+         (ObjectCacheTests<1, 2, Option::PerCpu, TestLocalAllocator>))
+UNITTEST("object_cache_tests<2, 2, PerCpu, TestGlobalAllocator>",
+         (ObjectCacheTests<2, 2, Option::PerCpu, TestLocalAllocator>))
 UNITTEST("backreference_lifetime_tests", BackreferenceLifetimeTests)
 UNITTEST("backreference_lifetime_stress_tests", BackreferenceLifetimeStressTests)
 UNITTEST_END_TESTCASE(object_cache_tests, "object_cache", "object_cache tests")

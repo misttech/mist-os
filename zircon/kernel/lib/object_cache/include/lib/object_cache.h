@@ -15,7 +15,6 @@
 #include <zircon/errors.h>
 
 #include <new>
-#include <type_traits>
 
 #include <arch/kernel_aspace.h>
 #include <arch/ops.h>
@@ -34,19 +33,71 @@
 #include <ktl/forward.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
+#include <ktl/type_traits.h>
 #include <ktl/unique_ptr.h>
 #include <vm/page_state.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 
+//
+// # Object Cache Slab Allocator
+//
 // ObjectCache is a power of two slab allocator. Slabs are allocated and
 // retained for future use up to the specified limit, reducing contention on the
 // the underlying allocator. A variant with per-CPU slab caches is provided to
 // further improve concurrency in high-demand use cases.
 //
-// This allocator supports back reference lifetime dependency in ref counted
-// types, where ObjectCache allocated objects hold ref pointers to the object
-// that owns the ObjectCache the objects are allocated from.
+// ## Custom Allocators
+//
+// Custom slab allocators that are either globally or locally stateful are
+// supported. Globally stateful allocator types may not have data members and
+// the allocation protocol methods must be static. Locally stateful allocator
+// types may have data members and any allocation protocol methods that need to
+// access the data members may be non-static.
+//
+// Custom allocators have the following public methods, which may be static or
+// non-static depending on the allocator. The static constexpr member kSlabSize
+// must be defined to indicate the slab size and must be a power of two.
+//
+//   struct GlobalAllocator {
+//     static constexpr size_t kSlabSize = ...;
+//     static zx::result<void*> Allocate();
+//     static void Release(void* slab);
+//     static void CountObjectAllocation();
+//     static void CountObjectFree();
+//     static void CountSlabAllocation();
+//     static void CountSlabFree();
+//   };
+//
+//   class LocalAllocator {
+//    public:
+//     static constexpr size_t kSlabSize = ...;
+//
+//     LocalAllocator(...) : state_{...} {}
+//
+//     zx::result<void*> Allocate();
+//     void Release(void* slab);
+//
+//     // May be static if the counters are global.
+//     static void CountObjectAllocation();
+//     static void CountObjectFree();
+//     static void CountSlabAllocation();
+//     static void CountSlabFree();
+//
+//    private:
+//     State state_;
+//   };
+//
+// ## Orphan Slab Support
+//
+// An ObjectCache instance can be destroyed before all of the objects allocated
+// from it have been freed, provided a globally stateful allocator is used. This
+// feature supports use cases where a parent object contains the object cache
+// that its children are allocated from and the childrent maintain ref pointers
+// to their parent object that affect its lifetime. Releasing a ref pointer to
+// the parent could result in destruction of the object cache while a child is
+// still alive. Slabs are allowed to outlive their owning object cache, provided
+// the allocator can release the slab independently of the object cache.
 //
 // For example, the ref counted object Parent allocates ref counted Child
 // objects with references back to itself:
@@ -80,12 +131,11 @@
 // instances are allocated from to ensure the memory is valid until the last
 // Child is destroyed, even if that is after the ObjectCache has been destroyed.
 //
-
 namespace object_cache {
 
 // The default allocator for the object cache. Allocates page sized slabs from
 // the PMM. This may be replaced by a higher-order page allocator without loss
-// of generality.
+// of generality. This allocator is globally stateful, allowing orphan slabs.
 struct DefaultAllocator {
   static constexpr size_t kSlabSize = PAGE_SIZE;
 
@@ -144,7 +194,7 @@ struct Deletable {
 //
 template <typename T, typename Allocator = DefaultAllocator>
 struct Deleter {
-  using Type = std::remove_const_t<T>;
+  using Type = ktl::remove_const_t<T>;
   void operator()(const Type* object) const {
     Type* pointer = const_cast<Type*>(object);
     pointer->Type::~Type();
@@ -164,9 +214,13 @@ static constexpr size_t kSlabControlMaxSize = 152;
 // Specialization of ObjectCache for the single slab cache variant. Operations
 // serialize on the main object cache lock, regardless of CPU.
 template <typename T, typename Allocator>
-class ObjectCache<T, Option::Single, Allocator> {
+class ObjectCache<T, Option::Single, Allocator> : private Allocator {
   template <typename Return, typename... Args>
-  using EnableIfConstructible = std::enable_if_t<std::is_constructible_v<T, Args...>, Return>;
+  using EnableIfConstructible = ktl::enable_if_t<ktl::is_constructible_v<T, Args...>, Return>;
+
+  template <typename... Args>
+  using EnableIfAllocatorConstructible =
+      ktl::enable_if_t<ktl::is_constructible_v<Allocator, Args...>>;
 
   static constexpr int kTraceLevel = 0;
 
@@ -176,10 +230,15 @@ class ObjectCache<T, Option::Single, Allocator> {
   static_assert(ktl::has_single_bit(Allocator::kSlabSize), "Slabs must be a power of two!");
   static constexpr uintptr_t kSlabAddrMask = Allocator::kSlabSize - 1;
 
+  // Evaluates to true if the allocator has local state.
+  static constexpr bool IsAllocatorStateful = !ktl::is_empty_v<Allocator>;
+
  public:
   // Constructs an ObjectCache with the given slab reservation value. Reserve
   // slabs are not immediately allocated.
-  explicit ObjectCache(size_t reserve_slabs) : reserve_slabs_{reserve_slabs} {
+  template <typename... Args, typename = EnableIfAllocatorConstructible<Args...>>
+  explicit ObjectCache(size_t reserve_slabs, Args&&... args)
+      : Allocator(ktl::forward<Args>(args)...), reserve_slabs_{reserve_slabs} {
     ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched",
                                                     "ObjectCache::ObjectCache");
   }
@@ -190,6 +249,12 @@ class ObjectCache<T, Option::Single, Allocator> {
 
     {
       Guard<Mutex> guard{&lock_};
+
+      // Slabs cannot be orphaned if the allocator is stateful, since the
+      // allocator state is destroyed when this destructor completes.
+      ZX_DEBUG_ASSERT(!IsAllocatorStateful || full_list_.is_empty());
+      ZX_DEBUG_ASSERT(!IsAllocatorStateful || partial_list_.is_empty());
+
       // Mark active slabs orphan. Threads racing in Slab::Free may not observe
       // this state before attempting to acquire the cache lock.
       for (Slab& slab : full_list_) {
@@ -253,6 +318,9 @@ class ObjectCache<T, Option::Single, Allocator> {
   }
 
   static constexpr size_t objects_per_slab() { return kEntriesPerSlab; }
+
+  Allocator& allocator() { return *this; }
+  const Allocator& allocator() const { return *this; }
 
  private:
   template <typename, typename>
@@ -348,7 +416,7 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   // A slab of objects in the object cache. Constructed on a raw block of power
   // of two aligned memory.
-  struct Slab {
+  struct Slab : fbl::Recyclable<Slab> {
     explicit Slab(ObjectCache* object_cache) : control{object_cache} {
       ktrace::Scope trace =
           KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::Slab");
@@ -372,14 +440,36 @@ class ObjectCache<T, Option::Single, Allocator> {
       }
     }
 
-    // Returns the raw memory for the slab to the allocator when the last
-    // reference is released.
-    static void operator delete(void* slab, size_t size) {
+    // The slab memory must be returned through recycle/Destroy. It cannot be deleted directly.
+    static void operator delete(void* slab, size_t size) { ZX_DEBUG_ASSERT(false); }
+
+    // Destroys the slab when the last reference is released.
+    void fbl_recycle() { Destroy(this); }
+
+    // Destructs the slab and returns its memory to the allocator.
+    static void Destroy(Slab* slab) {
       ktrace::Scope trace =
-          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::delete");
-      DEBUG_ASSERT(size == sizeof(Slab));
-      Allocator::CountSlabFree();
-      Allocator::Release(slab);
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::Destroy");
+
+      // Slabs cannot be orphaned when the allocator is stateful.
+      ZX_DEBUG_ASSERT(!IsAllocatorStateful || !slab->is_orphan());
+
+      // The lock should not be held or acquired when the slab is being destroyed.
+      ZX_DEBUG_ASSERT(!slab->control.lock.lock().IsHeld());
+      const auto get_object_cache_unlocked = [](Slab* slab) TA_NO_THREAD_SAFETY_ANALYSIS {
+        return slab->control.object_cache;
+      };
+
+      ObjectCache* object_cache = get_object_cache_unlocked(slab);
+      slab->~Slab();
+
+      if constexpr (IsAllocatorStateful) {
+        object_cache->Allocator::CountSlabFree();
+        object_cache->Allocator::Release(slab);
+      } else {
+        Allocator::CountSlabFree();
+        Allocator::Release(slab);
+      }
     }
 
     // Forward reference counting methods to the control block.
@@ -594,7 +684,11 @@ size_t GetProcessorCount();
 template <typename T, typename Allocator>
 class ObjectCache<T, Option::PerCpu, Allocator> {
   template <typename Return, typename... Args>
-  using EnableIfConstructible = std::enable_if_t<std::is_constructible_v<T, Args...>, Return>;
+  using EnableIfConstructible = ktl::enable_if_t<ktl::is_constructible_v<T, Args...>, Return>;
+
+  template <typename Return, typename... Args>
+  using EnableIfAllocatorConstructible =
+      ktl::enable_if_t<ktl::is_constructible_v<Allocator, Args...>, Return>;
 
  public:
   // ObjectCache is default constructible in the empty state.
@@ -608,10 +702,12 @@ class ObjectCache<T, Option::PerCpu, Allocator> {
   ObjectCache(ObjectCache&&) noexcept = default;
   ObjectCache& operator=(ObjectCache&&) noexcept = default;
 
-  // Creates a per-CPU ObjectCache with the given slab reservation value. The
-  // reserve value applies to each per-CPU cache independently. Reserve slabs
-  // are not immediately allocated.
-  static zx::result<ObjectCache> Create(size_t reserve_slabs) {
+  // Creates a per-CPU ObjectCache with the given slab reservation value and
+  // allocator args. The reserve value applies to each per-CPU cache
+  // independently. Reserve slabs are not immediately allocated.
+  template <typename... Args>
+  static EnableIfAllocatorConstructible<zx::result<ObjectCache>, Args...> Create(
+      size_t reserve_slabs, Args&&... args) {
     const size_t processor_count = internal::GetProcessorCount();
     fbl::AllocChecker checker;
     ktl::unique_ptr<CpuCache[]> per_cpu_caches{new (&checker) CpuCache[processor_count]};
@@ -620,7 +716,7 @@ class ObjectCache<T, Option::PerCpu, Allocator> {
     }
 
     for (size_t i = 0; i < processor_count; i++) {
-      per_cpu_caches[i].emplace(reserve_slabs);
+      per_cpu_caches[i].emplace(reserve_slabs, args...);
     }
 
     return zx::ok(ObjectCache{processor_count, ktl::move(per_cpu_caches)});
