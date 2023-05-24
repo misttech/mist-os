@@ -22,6 +22,7 @@ test("uart-unittests") {
     "parsing-tests.cc",
     "pl011-tests.cc",
   ]
+  defines = [ "UART_ALL_DRIVERS=1" ]
   deps = [
     "//sdk/lib/zbi-format",
     "//zircon/system/ulib/uart",
