@@ -203,7 +203,7 @@ enum TaskRequest {
         // process_accessor
         ClientEnd<fbinder::ProcessAccessorMarker>,
         // process
-        Option<zx::Process>,
+        zx::Process,
         // responder
         oneshot::Sender<Result<Arc<RemoteBinderConnection>, Errno>>,
     ),
@@ -253,7 +253,7 @@ struct RemoteBinderHandle<F: RemoteControllerConnector> {
 /// accept request for that thread, or for any task.
 struct RemoteBinderHandleState {
     /// The thread_group of the tasks that interact with this remote binder. This is used to
-    /// ionterrupt a random thread in the task group is a taskless request needs to be handled.
+    /// interrupt a random thread in the task group is a taskless request needs to be handled.
     thread_group: Weak<ThreadGroup>,
 
     /// Mapping from the koid of the remote process to the local task.
@@ -371,7 +371,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         self: Arc<Self>,
         path: Vec<u8>,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
-        process: Option<zx::Process>,
+        process: zx::Process,
         binder: ServerEnd<fbinder::BinderMarker>,
     ) -> Result<(), Error> {
         // Open the device.
@@ -483,7 +483,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let path = payload.path.ok_or_else(|| errno!(EINVAL))?;
                         let process_accessor =
                             payload.process_accessor.ok_or_else(|| errno!(EINVAL))?;
-                        let process = payload.process;
+                        let process = payload.process.ok_or_else(|| errno!(EINVAL))?;
                         let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
                         let koid = binder.as_handle_ref().basic_info()?.related_koid;
                         let handle = self.clone();
@@ -602,7 +602,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         current_task: &CurrentTask,
         path: Vec<u8>,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
-        process: Option<zx::Process>,
+        process: zx::Process,
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
         let node = current_task.lookup_path_from_root(&path)?;
         let device_type = node.entry.node.info().rdev;
@@ -752,8 +752,6 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unused_unit)] // for compatibility with `test_case`
-
     use super::*;
     use crate::device::binder::tests::run_process_accessor;
     use crate::device::BinderFs;
@@ -768,7 +766,6 @@ mod tests {
     use std::collections::BTreeMap;
     use std::ffi::CString;
     use std::future::Future;
-    use test_case::test_case;
 
     static REMOTE_CONTROLLER_CLIENT: Lazy<
         Mutex<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>,
@@ -789,7 +786,7 @@ mod tests {
 
     /// Setup and run a test against the remote binder. The closure that is passed to this function
     /// will be called with a binder proxy that can be used to access the remote binder.
-    async fn run_remote_binder_test<F, Fut>(with_process: bool, f: F)
+    async fn run_remote_binder_test<F, Fut>(f: F)
     where
         Fut: Future<Output = fbinder::BinderProxy>,
         F: FnOnce(fbinder::BinderProxy) -> Fut,
@@ -877,16 +874,15 @@ mod tests {
         let (binder, binder_server_end) =
             create_proxy::<fbinder::BinderMarker>().expect("create_proxy");
 
-        let process = with_process.then(|| {
-            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process")
-        });
+        let process =
+            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
         let dev_binder =
             fbinder::DevBinderSynchronousProxy::new(dev_binder_client_end.into_channel());
         dev_binder
             .open(fbinder::DevBinderOpenRequest {
                 path: Some(b"/dev/binder".to_vec()),
                 process_accessor: Some(process_accessor_client_end),
-                process,
+                process: Some(process),
                 binder: Some(binder_server_end),
                 ..Default::default()
             })
@@ -908,11 +904,9 @@ mod tests {
         process_accessor_task.await.expect("process accessor wait");
     }
 
-    #[test_case(true; "with_process")]
-    #[test_case(false; "without_process")]
     #[::fuchsia::test]
-    async fn external_binder_connection(with_process: bool) {
-        run_remote_binder_test(with_process, |binder| async move {
+    async fn external_binder_connection() {
+        run_remote_binder_test(|binder| async move {
             const VMO_SIZE: usize = 10 * 1024 * 1024;
             let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("Vmo::create");
             let addr = fuchsia_runtime::vmar_root_self()

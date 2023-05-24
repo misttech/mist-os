@@ -51,6 +51,7 @@ protocol ProcessAccessor {
     /// Returns the `length` bytes of the memory of the process at `address` in
     /// the `content` vmo. Th returned vmo's content size must always be exactly
     /// `length`.
+    @transitional
     ReadMemory(struct {
         address uint64;
         length uint64;
@@ -96,9 +97,8 @@ protocol DevBinder {
         2: process_accessor client_end:ProcessAccessor;
 
         /// The handle to the process that will use the binder driver. It is
-        /// used by the driver to read the data sent to the driver. If not
-        /// present, the driver will use `process_accessor` for reading data.
-        /// Optional
+        /// used by the driver to read the data sent to the driver.
+        /// Mandatory
         3: process zx.Handle:PROCESS;
 
         /// The request to the Binder protocol implementation.

@@ -2270,7 +2270,7 @@ impl MemoryAccessorExt for dyn ResourceAccessor + '_ {}
 /// Implementation of `ResourceAccessor` for a remote client.
 struct RemoteResourceAccessor {
     kernel: Arc<Kernel>,
-    process: Option<zx::Process>,
+    process: zx::Process,
     process_accessor: fbinder::ProcessAccessorSynchronousProxy,
 }
 
@@ -2302,37 +2302,25 @@ const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
 impl MemoryAccessor for RemoteResourceAccessor {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        if let Some(process) = self.process.as_ref() {
-            let mut index = 0;
-            while index < bytes.len() {
-                let len =
-                    std::cmp::min(bytes.len() - index, MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
-                let bytes_count = process
-                    .read_memory(addr.ptr() + index, &mut bytes[index..(index + len)])
-                    .map_err(|_| errno!(EINVAL))?;
-                // bytes_count can be less than len when:
-                // - there is a fault
-                // - the reading is done across 2 mappings
-                // To detect this, this only fails when nothing could be read. Otherwise, a new
-                // read will be issued with the remaining of the buffer, and a fault will be
-                // detected when no byte can be read.
-                if bytes_count == 0 {
-                    return error!(EFAULT);
-                }
-                index += bytes_count;
+        let mut index = 0;
+        while index < bytes.len() {
+            let len = std::cmp::min(bytes.len() - index, MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
+            let bytes_count = self
+                .process
+                .read_memory(addr.ptr() + index, &mut bytes[index..(index + len)])
+                .map_err(|_| errno!(EINVAL))?;
+            // bytes_count can be less than len when:
+            // - there is a fault
+            // - the reading is done across 2 mappings
+            // To detect this, this only fails when nothing could be read. Otherwise, a new
+            // read will be issued with the remaining of the buffer, and a fault will be
+            // detected when no byte can be read.
+            if bytes_count == 0 {
+                return error!(EFAULT);
             }
-            Ok(())
-        } else {
-            let result = self
-                .process_accessor
-                .read_memory(addr.ptr() as u64, bytes.len() as u64, zx::Time::INFINITE)
-                .map_err(|_| errno!(ENOENT))?;
-            let vmo = result.map_err(Self::map_fidl_posix_errno)?;
-            vmo.read(bytes, 0).map_err(|e| {
-                log_warn!("Got an error when reading from vmo: {:?}", e);
-                errno!(EFAULT)
-            })
+            index += bytes_count;
         }
+        Ok(())
     }
 
     fn read_memory_partial(&self, _addr: UserAddress, _bytes: &mut [u8]) -> Result<usize, Errno> {
@@ -2516,9 +2504,9 @@ impl BinderDriver {
     fn create_remote_process(
         &self,
         pid: pid_t,
-        resouce_accessor: RemoteResourceAccessor,
+        resource_accessor: RemoteResourceAccessor,
     ) -> Arc<BinderProcess> {
-        self.create_process(pid, Some(resouce_accessor))
+        self.create_process(pid, Some(resource_accessor))
     }
 
     /// Creates and register the binder process state to represent a process with `pid`.
@@ -2553,7 +2541,7 @@ impl BinderDriver {
         self: &Arc<Self>,
         current_task: &CurrentTask,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
-        process: Option<zx::Process>,
+        process: zx::Process,
     ) -> Arc<RemoteBinderConnection> {
         let process_accessor =
             fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
@@ -3122,7 +3110,7 @@ impl BinderDriver {
                         thread_state.transactions.push(tx);
                     }
                     Command::DeadReply { pop_transaction: true } | Command::Reply(..) => {
-                        // The sender got a reply, pop the sender entry from the transaction stac.
+                        // The sender got a reply, pop the sender entry from the transaction stack.
                         let transaction =
                             thread_state.transactions.pop().expect("transaction stack underflow!");
                         // Command::Reply is sent to the receiver side. So the popped transaction
@@ -3839,8 +3827,6 @@ pub fn create_binders(current_task: &CurrentTask) -> Result<(), Errno> {
 
 #[cfg(test)]
 pub mod tests {
-    #![allow(clippy::unused_unit)] // for compatibility with `test_case`
-
     use super::*;
     use crate::fs::{DirEntry, FdFlags};
     use crate::mm::MemoryAccessor;
@@ -3852,7 +3838,6 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
-    use test_case::test_case;
 
     const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
@@ -6590,6 +6575,7 @@ pub mod tests {
         let mut next_fd = 0;
         let mut fds: TestFdTable = Default::default();
         'event_loop: while let Some(event) = stream.try_next().await? {
+            #[allow(unreachable_patterns)]
             match event {
                 fbinder::ProcessAccessorRequest::WriteMemory { address, content, responder } => {
                     let size = content.get_content_size()?;
@@ -6599,16 +6585,6 @@ pub mod tests {
                     };
                     content.read(buffer, 0)?;
                     responder.send(Ok(()))?;
-                }
-                fbinder::ProcessAccessorRequest::ReadMemory { address, length, responder } => {
-                    let vmo = zx::Vmo::create(length)?;
-                    // SAFETY: This is not safe and rely on the client being correct.
-                    let buffer = unsafe {
-                        std::slice::from_raw_parts(address as *const u8, length as usize)
-                    };
-                    vmo.write(buffer, 0)?;
-                    vmo.set_content_size(&length)?;
-                    responder.send(Ok(vmo))?;
                 }
                 fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
                     let mut response = fbinder::FileResponse::default();
@@ -6634,6 +6610,7 @@ pub mod tests {
                     }
                     responder.send(Ok(response))?;
                 }
+                _ => {}
             }
         }
         Ok(fds)
@@ -6653,10 +6630,8 @@ pub mod tests {
         })
     }
 
-    #[test_case(true; "with_process")]
-    #[test_case(false; "without_process")]
     #[::fuchsia::test]
-    async fn remote_binder_task(with_process: bool) {
+    async fn remote_binder_task() {
         const vector_size: usize = 128 * 1024 * 1024;
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();
@@ -6669,9 +6644,8 @@ pub mod tests {
         );
 
         let (kernel, _task) = create_kernel_and_task();
-        let process = with_process.then(|| {
-            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process")
-        });
+        let process =
+            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
         let remote_binder_task =
             RemoteResourceAccessor { process_accessor, process, kernel: kernel.clone() };
         let mut vector = Vec::with_capacity(vector_size);
