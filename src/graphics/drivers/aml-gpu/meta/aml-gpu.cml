@@ -19,7 +19,6 @@
         { service: "fuchsia.hardware.gpu.mali.Service" },
     ],
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { service: "fuchsia.hardware.registers.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],

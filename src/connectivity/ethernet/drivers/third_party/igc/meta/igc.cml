@@ -14,7 +14,6 @@
         compat: "driver/igc.so",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { service: "fuchsia.hardware.pci.Service" },
     ],
 }

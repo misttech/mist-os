@@ -14,7 +14,4 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [
-        { protocol: "fuchsia.boot.RootResource" },
-    ],
 }

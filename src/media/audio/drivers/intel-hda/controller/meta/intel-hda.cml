@@ -14,7 +14,6 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.acpi.Service" },
         { service: "fuchsia.hardware.pci.Service" },

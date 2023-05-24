@@ -16,7 +16,6 @@
         fallback: "false",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { service: "fuchsia.wlan.phyimpl.Service" },
     ],
 }

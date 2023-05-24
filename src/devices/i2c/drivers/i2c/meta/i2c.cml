@@ -19,7 +19,6 @@
     ],
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
-        { protocol: "fuchsia.boot.RootResource" },
     ],
     expose: [
         {

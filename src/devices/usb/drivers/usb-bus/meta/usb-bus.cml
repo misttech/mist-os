@@ -19,7 +19,6 @@
         { service: "fuchsia.hardware.usb.UsbService" },
     ],
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { service: "fuchsia.hardware.usb.hci.UsbHciService" },
     ],
     expose: [
