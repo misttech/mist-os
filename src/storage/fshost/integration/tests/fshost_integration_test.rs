@@ -523,6 +523,28 @@ async fn block_watcher_second_pause_fails() {
 }
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxfs", ignore)]
+async fn shred_data_volume_not_supported() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    let admin = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .expect("connect_to_protcol_at_exposed_dir failed");
+
+    admin
+        .shred_data_volume()
+        .await
+        .expect("shred_data_volume FIDL failed")
+        .expect_err("shred_data_volume should fail");
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
 #[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_when_mounted() {
     let mut builder = new_builder();

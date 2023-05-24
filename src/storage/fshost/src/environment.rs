@@ -95,6 +95,10 @@ pub trait Environment: Send + Sync {
 
     /// Binds |filesystem| to the `/data` path. Fails if already bound.
     fn bind_data(&mut self, filesystem: Filesystem) -> Result<(), Error>;
+
+    /// Shreds the data volume, triggering a reformat on reboot.
+    /// The data volume must be Fxfs-formatted and must be currently serving.
+    async fn shred_data(&mut self) -> Result<(), Error>;
 }
 
 // Before a filesystem is mounted, we queue requests.
@@ -106,6 +110,14 @@ pub enum Filesystem {
 }
 
 impl Filesystem {
+    fn is_serving(&self) -> bool {
+        if let Self::Queue(_) = self {
+            false
+        } else {
+            true
+        }
+    }
+
     pub fn root(
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
@@ -131,10 +143,11 @@ impl Filesystem {
         Ok(proxy)
     }
 
-    fn volume(&mut self, volume_name: &str) -> Result<Option<&mut ServingVolume>, Error> {
+    fn volume(&mut self, volume_name: &str) -> Option<&mut ServingVolume> {
         match self {
-            Filesystem::ServingMultiVolume(_, fs, _) => Ok(fs.volume_mut(&volume_name)),
-            _ => Ok(None),
+            Filesystem::ServingMultiVolume(_, fs, _) => fs.volume_mut(&volume_name),
+            Filesystem::ServingVolumeInFxblob(..) => unreachable!(),
+            _ => None,
         }
     }
 
@@ -460,16 +473,6 @@ impl Environment for FshostEnvironment {
             self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
         let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
 
-        // TODO(fxbug.dev/122966): shred_volume relies on the unencrypted volume being bound in the
-        // namespace. This should be reevaluated when keybag takes a proxy, but for now this is the
-        // fastest fix.
-        let unencrypted_volume = multi_vol_fs.volume_mut("unencrypted").ok_or_else(|| {
-            anyhow!("failed to get a mutable reference to the unencrypted volume")
-        })?;
-        let () = unencrypted_volume
-            .bind_to_path("/main_fxfs_unencrypted_volume")
-            .context("failed to bind unencrypted volume to namespace")?;
-
         let queue = self.data.queue().unwrap();
         let root_dir = filesystem.root(self.fxblob.as_mut())?;
         for server in queue.drain(..) {
@@ -639,22 +642,40 @@ impl Environment for FshostEnvironment {
     fn bind_data(&mut self, mut filesystem: Filesystem) -> Result<(), Error> {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
-        // TODO(fxbug.dev/122966): shred_volume relies on the unencrypted volume being bound in the
-        // namespace. This should be reevaluated when keybag takes a proxy, but for now this is the
-        // fastest fix.
-        if let Filesystem::ServingMultiVolume(_, _, _) = filesystem {
-            filesystem
-                .volume("unencrypted")?
-                .ok_or(anyhow!("Failed to bind encrypted volume to namespace"))?
-                .bind_to_path("/main_fxfs_unencrypted_volume")?;
-        }
-
         let queue = self.data.queue().unwrap();
         let root_dir = filesystem.root(None)?;
         for server in queue.drain(..) {
             root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.data = filesystem;
+        Ok(())
+    }
+
+    async fn shred_data(&mut self) -> Result<(), Error> {
+        if self.config.data_filesystem_format != "fxfs" {
+            return Err(anyhow!("Can't shred data; not fxfs"));
+        }
+        if !self.data.is_serving() {
+            return Err(anyhow!("Can't shred data; not already mounted"));
+        }
+        // Erase the keybag.
+        let unencrypted = if let Some(fxblob) = &mut self.fxblob {
+            fxblob.volume_mut("unencrypted")
+        } else {
+            self.data.volume("unencrypted")
+        }
+        .context("Failed to find unencrypted volume")?;
+        let dir = fuchsia_fs::directory::open_directory(
+            unencrypted.root(),
+            "keys",
+            fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .await
+        .context("Failed to open keys dir")?;
+        dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
+            .await?
+            .map_err(|e| anyhow!(zx::Status::from_raw(e)))
+            .context("Failed to remove keybag")?;
         Ok(())
     }
 }

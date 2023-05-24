@@ -7,9 +7,11 @@ use {
         crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice},
         debug_log,
         device::{constants, BlockDevice, Device},
-        environment::{FilesystemLauncher, ServeFilesystemStatus},
+        environment::{Environment, FilesystemLauncher, ServeFilesystemStatus},
         fxblob,
-        service::constants::ZXCRYPT_DRIVER_PATH,
+        service::constants::{
+            DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
+        },
         watcher,
     },
     anyhow::{anyhow, Context, Error},
@@ -54,9 +56,6 @@ impl FshostShutdownResponder {
 }
 
 const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
-const DATA_PARTITION_LABEL: &str = "data";
-const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
-const KEY_BAG_FILE: &str = "/main_fxfs_unencrypted_volume/keys/fxfs-data";
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
@@ -345,16 +344,19 @@ async fn write_data_file(
 }
 
 async fn shred_data_volume(
+    environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
 ) -> Result<(), zx::Status> {
     if config.data_filesystem_format != "fxfs" {
         return Err(zx::Status::NOT_SUPPORTED);
     }
-    // If we expect Fxfs to be live, just erase the key bag.
+    // If we expect Fxfs to be live, ask `environment` to shred the data volume.
     if config.data && !config.ramdisk_image {
-        std::fs::remove_file(KEY_BAG_FILE)?;
-        debug_log("Erased key bag");
+        environment.lock().await.shred_data().await.map_err(|err| {
+            debug_log(&format!("Failed to shred data: {:?}", err));
+            zx::Status::INTERNAL
+        })?;
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         // TODO(https://fxbug.dev/122940) Add support for fxblob.
@@ -385,12 +387,14 @@ async fn shred_data_volume(
 
 /// Make a new vfs service node that implements fuchsia.fshost.Admin
 pub fn fshost_admin(
+    environment: Arc<Mutex<dyn Environment>>,
     config: Arc<fshost_config::Config>,
     ramdisk_prefix: Option<String>,
     launcher: Arc<FilesystemLauncher>,
     matcher_lock: Arc<Mutex<HashSet<String>>>,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
+        let env = environment.clone();
         let config = config.clone();
         let ramdisk_prefix = ramdisk_prefix.clone();
         let launcher = launcher.clone();
@@ -481,16 +485,17 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         tracing::info!("admin shred data volume called");
-                        let res = match shred_data_volume(&config, ramdisk_prefix.clone()).await {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                debug_log(&format!(
-                                    "admin service: shred_data_volume failed: {:?}",
-                                    e
-                                ));
-                                Err(zx::Status::INTERNAL.into_raw())
-                            }
-                        };
+                        let res =
+                            match shred_data_volume(&env, &config, ramdisk_prefix.clone()).await {
+                                Ok(()) => Ok(()),
+                                Err(e) => {
+                                    debug_log(&format!(
+                                        "admin service: shred_data_volume failed: {:?}",
+                                        e
+                                    ));
+                                    Err(e.into_raw())
+                                }
+                            };
                         responder.send(res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send ShredDataVolume response. error: {:?}",

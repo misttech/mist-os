@@ -107,21 +107,30 @@ async fn unlock_or_init_data_volume<'a>(
             .await
             .context("Failed to open unencrypted")?
     };
-    root_vol.bind_to_path("/unencrypted_volume")?;
-    if create {
-        std::fs::create_dir("/unencrypted_volume/keys").map_err(|e| anyhow!(e))?;
-    }
-    let keybag = KeyBagManager::open(Path::new("/unencrypted_volume/keys/fxfs-data"))
-        .map_err(|e| anyhow!(e))?;
+    let keybag_dir = if create {
+        fuchsia_fs::directory::create_directory(
+            root_vol.root(),
+            "keys",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .await
+        .context("Failed to create keys dir")?
+    } else {
+        fuchsia_fs::directory::open_directory(
+            root_vol.root(),
+            "keys",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .await
+        .context("Failed to open keys dir")?
+    };
+    let keybag_dir_fd = fdio::create_fd::<std::os::fd::OwnedFd>(
+        keybag_dir.into_channel().unwrap().into_zx_channel().into(),
+    )?;
+    let keybag =
+        KeyBagManager::open(keybag_dir_fd, Path::new("fxfs-data")).map_err(|e| anyhow!(e))?;
 
     let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, create).await?;
-
-    // Make sure we unbind the path we used, in case another fxfs instance goes through unlock
-    // or init. This needs to be after we are done using the keybag, as it keeps using the path
-    // in it's operations.
-    // TODO(fxbug.dev/122966): when keybag takes a proxy instead of a path, we don't need to
-    // worry about managing the namespace binding and can remove this.
-    root_vol.unbind_path();
 
     let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
         .await

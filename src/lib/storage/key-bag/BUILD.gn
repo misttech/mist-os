@@ -14,6 +14,7 @@ rustc_library("key-bag") {
     "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:openat",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",

@@ -109,6 +109,7 @@ async fn main() -> Result<(), Error> {
     let svc_dir = vfs::pseudo_directory! {
         fshost::AdminMarker::PROTOCOL_NAME =>
             service::fshost_admin(
+                env.clone(),
                 config.clone(),
                 ramdisk_path.clone(),
                 launcher,
