@@ -54,6 +54,7 @@ source_set("src") {
     "parent_device.h",
     "performance_counters.cc",
     "performance_counters.h",
+    "performance_counters_manager.h",
     "power_manager.cc",
     "power_manager.h",
     "region.cc",
@@ -61,6 +62,7 @@ source_set("src") {
     "registers.h",
     "string_printf.cc",
     "string_printf.h",
+    "types.h",
   ]
 
   defines = []
