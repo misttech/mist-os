@@ -118,13 +118,10 @@ PyObject *Context_open_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) 
                                handle);
 }
 
-PyObject *Context_open_device_proxy(Context *self, PyObject *moniker, PyObject *capability_name) {
-  const char *c_moniker = PyUnicode_AsUTF8(moniker);
-  if (c_moniker == nullptr) {
-    return nullptr;
-  }
-  const char *c_capability_name = PyUnicode_AsUTF8(capability_name);
-  if (c_capability_name == nullptr) {
+PyObject *Context_open_device_proxy(Context *self, PyObject *args) {
+  char *c_moniker;
+  char *c_capability_name;
+  if (!PyArg_ParseTuple(args, "ss", &c_moniker, &c_capability_name)) {
     return nullptr;
   }
   zx_handle_t handle;
@@ -141,7 +138,7 @@ PyMethodDef Context_methods[] = {
      nullptr},
     {"open_target_proxy", reinterpret_cast<PyCFunction>(Context_open_target_proxy), METH_NOARGS,
      nullptr},
-    {"open_device_proxy", reinterpret_cast<PyCFunction>(Context_open_device_proxy), METH_O,
+    {"open_device_proxy", reinterpret_cast<PyCFunction>(Context_open_device_proxy), METH_VARARGS,
      nullptr},
     SENTINEL};
 
