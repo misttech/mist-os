@@ -63,7 +63,6 @@
 
 #include "banjo/common.h"
 #include "banjo/softmac.h"
-#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
 #include "lib/fidl/cpp/wire/arena.h"
 #include "lib/fidl/cpp/wire/array.h"
 
