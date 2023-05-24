@@ -65,10 +65,6 @@ constexpr uint32_t kFloatToFixed2_10Mask = 0xFFF;
 // AFBC related constants
 constexpr uint32_t kAfbcb16x16Pixel = 0;
 [[maybe_unused]] constexpr uint32_t kAfbc32x8Pixel = 1;
-constexpr uint32_t kAfbcSplitOff = 0;
-[[maybe_unused]] constexpr uint32_t kAfbcSplitOn = 1;
-constexpr uint32_t kAfbcYuvTransferOff = 0;
-[[maybe_unused]] constexpr uint32_t kAfbcYuvTransferOn = 1;
 constexpr uint32_t kAfbcRGBA8888 = 5;
 constexpr uint32_t kAfbcColorReorderR = 1;
 constexpr uint32_t kAfbcColorReorderG = 2;
@@ -304,6 +300,7 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   }
 
   DISP_TRACE("Table index %d used", next_table_idx);
+  DISP_TRACE("AFBC %s", info->is_afbc ? "enabled" : "disabled");
 
   if ((config[0].mode.h_addressable != display_width_) ||
       (config[0].mode.v_addressable != display_height_)) {
@@ -716,12 +713,15 @@ void Osd::SetMinimumRgb(uint8_t minimum_rgb) {
 
 // These configuration could be done during initialization.
 zx_status_t Osd::ConfigAfbc() {
-  // Set AFBC to 16x16 Blocks, Split Mode OFF, YUV Transfer OFF, and RGBA8888 Format
-  // Note RGBA8888 works for both RGBA and ABGR formats. The channels order will be set
-  // by mali_unpack_ctrl register
+  // The format specifier must match the sysmem format modifier flags specified
+  // in AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints().
+  //
+  // Note RGBA8888 works for both RGBA and BGRA formats. The color channels can
+  // be reordered by setting MALI_UNPACK_CTRL register.
   osd1_registers.afbc_format_specifier_s.FromValue(0)
-      .set_block_split(kAfbcSplitOff)
-      .set_yuv_transform(kAfbcYuvTransferOff)
+      .set_block_split_mode_enabled(true)
+      .set_tiled_header_enabled(false)
+      .set_yuv_transform_enabled(true)
       .set_super_block_aspect(kAfbcb16x16Pixel)
       .set_pixel_format(kAfbcRGBA8888)
       .WriteTo(&(*vpu_mmio_));

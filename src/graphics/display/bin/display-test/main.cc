@@ -887,6 +887,20 @@ int main(int argc, const char* argv[]) {
     }
   }
 
+  // TODO(fxbug.dev/125730): AFBC compression test doesn't work on
+  // amlogic-display; the AFBC encoding format supported by amlogic-display
+  // driver is not compatible with the AFBC buffer formats and generation logic
+  // used by this test. Once amlogic-display supports non-tiled-header formats
+  // and AFBC format switching on the fly, this test will work again and we can
+  // delete the error message below.
+  if (enable_compression) {
+    fprintf(stderr,
+            "AFBC compression test is not working for amlogic-display. "
+            "The --enable-compression option will be re-enabled once "
+            "fxbug.dev/125730 is fixed.\n");
+    return -1;
+  }
+
   if (use_color_correction) {
     for (auto& d : displays) {
       d.apply_color_correction(true);
