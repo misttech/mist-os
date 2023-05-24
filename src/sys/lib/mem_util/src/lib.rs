@@ -209,13 +209,13 @@ mod tests {
                             responder.send(Err(zxs::Status::NOT_SUPPORTED.into_raw())).unwrap()
                         }
                         fio::FileRequest::Read { count: _, responder } => {
-                            let to_send = if !have_sent_bytes {
+                            let to_send: &[u8] = if !have_sent_bytes {
                                 have_sent_bytes = true;
-                                b"hello, world!".to_vec()
+                                b"hello, world!"
                             } else {
-                                vec![]
+                                &[]
                             };
-                            responder.send(&mut Ok(to_send)).unwrap();
+                            responder.send(Ok(to_send)).unwrap();
                         }
                         unexpected => unimplemented!("{:#?}", unexpected),
                     }

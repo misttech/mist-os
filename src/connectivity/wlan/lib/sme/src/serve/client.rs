@@ -133,14 +133,14 @@ async fn scan(
         Err(e) => {
             error!("Scan receiver error: {:?}", e);
             return filter_out_peer_closed(
-                responder.send(&mut Err(fidl_sme::ScanErrorCode::InternalError)),
+                responder.send(Err(fidl_sme::ScanErrorCode::InternalError)),
             )
             .map_err(anyhow::Error::from);
         }
     };
 
     let send_result = match receive_result {
-        Ok(scan_results) => responder.send(&mut Ok(scan_results
+        Ok(scan_results) => responder.send(Ok(&scan_results
             .into_iter()
             .map(fidl_sme::ScanResult::from)
             .collect::<Vec<_>>())),
@@ -159,7 +159,7 @@ async fn scan(
                     fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware
                 }
             };
-            responder.send(&mut Err(scan_error_code))
+            responder.send(Err(scan_error_code))
         }
     };
     filter_out_peer_closed(send_result).map_err(anyhow::Error::from)
@@ -415,7 +415,7 @@ mod tests {
                         Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                             req: _, responder,
                         }))) => {
-                            responder.send(&mut Ok(scan_result_list.clone())).expect("failed to send scan results");
+                            responder.send(Ok(&scan_result_list)).expect("failed to send scan results");
                         }
         );
 

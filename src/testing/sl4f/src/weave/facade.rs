@@ -107,17 +107,17 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_weave::{
-        FactoryDataManagerGetPairingCodeResult, FactoryDataManagerRequest,
-        PairingStateWatcherRequest, QrCode, ResetConfigFlags, StackGetQrCodeResult, StackRequest,
-        StackResetConfigResult,
+        FactoryDataManagerRequest, PairingStateWatcherRequest, QrCode, ResetConfigFlags,
+        StackGetQrCodeResult, StackRequest, StackResetConfigResult,
     };
     use fuchsia_async as fasync;
     use futures::prelude::*;
     use lazy_static::lazy_static;
     use serde_json::{json, Value};
 
+    const PAIRING_CODE: &'static [u8] = b"ABC1234";
+
     lazy_static! {
-        static ref PAIRING_CODE: Vec<u8> = b"ABC1234".to_vec();
         static ref QR_CODE: QrCode = QrCode { data: String::from("qrcodedata") };
         static ref PAIRING_STATE: PairingState = PairingState {
             is_wlan_provisioned: Some(true),
@@ -248,13 +248,10 @@ mod tests {
             self
         }
 
-        fn expect_get_pairing_code(
-            self,
-            mut result: FactoryDataManagerGetPairingCodeResult,
-        ) -> Self {
+        fn expect_get_pairing_code(self, result: Result<&'static [u8], ErrorCode>) -> Self {
             self.push(move |req| match req {
                 FactoryDataManagerRequest::GetPairingCode { responder } => {
-                    responder.send(&mut result).unwrap()
+                    responder.send(result).unwrap()
                 }
                 _ => {}
             })
@@ -281,12 +278,11 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_pairing_code() {
-        let (facade, pairing_code_fut) = MockFactoryDataManagerBuilder::new()
-            .expect_get_pairing_code(Ok(PAIRING_CODE.to_vec()))
-            .build();
+        let (facade, pairing_code_fut) =
+            MockFactoryDataManagerBuilder::new().expect_get_pairing_code(Ok(PAIRING_CODE)).build();
 
         let facade_fut = async move {
-            assert_eq!(facade.get_pairing_code().await.unwrap(), *PAIRING_CODE);
+            assert_eq!(facade.get_pairing_code().await.unwrap(), PAIRING_CODE);
         };
 
         future::join(facade_fut, pairing_code_fut).await;

@@ -59,7 +59,7 @@ impl InputReportsReader {
                 match request_and_reports {
                     (InputReportsReaderRequest::ReadInputReports { responder }, reports) => {
                         responder
-                            .send(&mut Ok(reports))
+                            .send(Ok(&reports))
                             .map_err(anyhow::Error::from)
                             .context("while sending reports")
                     }

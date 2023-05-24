@@ -358,7 +358,7 @@ mod tests {
             Poll::Ready(Ok(TargetHandlerRequest::ListPlayerApplicationSettingAttributes {
                 responder,
             })) => {
-                assert!(responder.send(&mut Ok(vec![])).is_ok());
+                assert!(responder.send(Ok(&[])).is_ok());
             }
             _ => assert!(false, "unexpected stream state"),
         };
@@ -475,10 +475,7 @@ mod tests {
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::GetMediaPlayerItems { responder, .. })) => {
                 assert!(responder
-                    .send(&mut Ok(vec![MediaPlayerItem {
-                        player_id: Some(1),
-                        ..Default::default()
-                    }]))
+                    .send(Ok(&[MediaPlayerItem { player_id: Some(1), ..Default::default() }]))
                     .is_ok());
             }
             _ => assert!(false, "unexpected stream state"),
@@ -536,7 +533,7 @@ mod tests {
             match exec.run_until_stalled(&mut select_next_some_fut) {
                 Poll::Ready(Ok(TargetHandlerRequest::GetEventsSupported { responder })) => {
                     assert!(responder
-                        .send(&mut Ok(vec![
+                        .send(Ok(&[
                             NotificationEvent::VolumeChanged,
                             NotificationEvent::TrackPosChanged,
                         ]))

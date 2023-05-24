@@ -138,10 +138,10 @@ async fn test_handle_dai_requests(
                 log_error!(responder.send(&properties), "properties response");
             }
             DaiRequest::GetDaiFormats { responder } => {
-                log_error!(responder.send(&mut Ok(vec![dai_formats.clone()])), "formats response");
+                log_error!(responder.send(Ok(from_ref(&dai_formats))), "formats response");
             }
             DaiRequest::GetRingBufferFormats { responder } => {
-                log_error!(responder.send(&mut Ok(vec![pcm_formats.clone()])), "pcm response");
+                log_error!(responder.send(Ok(from_ref(&pcm_formats))), "pcm response");
             }
             DaiRequest::CreateRingBuffer {
                 dai_format, ring_buffer_format, ring_buffer, ..

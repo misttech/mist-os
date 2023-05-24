@@ -218,7 +218,7 @@ mod tests {
 
         match exec.run_until_stalled(&mut requests.next()) {
             Poll::Ready(Some(Ok(DaiRequest::GetDaiFormats { responder }))) => responder
-                .send(&mut Ok(vec![
+                .send(Ok(&[
                     DaiSupportedFormats {
                         number_of_channels: vec![1],
                         sample_formats: vec![

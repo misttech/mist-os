@@ -151,10 +151,17 @@ impl CryptService {
                                 });
                         }
                         CryptRequest::UnwrapKey { wrapping_key_id, owner, key, responder } => {
-                            let mut response = self.unwrap_key(wrapping_key_id, owner, key);
-                            responder.send(&mut response).unwrap_or_else(|e| {
-                                error!(error = e.as_value(), "Failed to send UnwrapKey response")
-                            });
+                            responder
+                                .send(match self.unwrap_key(wrapping_key_id, owner, key) {
+                                    Ok(ref unwrapped) => Ok(unwrapped),
+                                    Err(e) => Err(e),
+                                })
+                                .unwrap_or_else(|e| {
+                                    error!(
+                                        error = e.as_value(),
+                                        "Failed to send UnwrapKey response"
+                                    )
+                                });
                         }
                     }
                 }

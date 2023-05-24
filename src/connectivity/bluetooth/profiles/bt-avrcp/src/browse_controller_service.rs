@@ -48,14 +48,19 @@ impl BrowseControllerService {
                 attribute_option,
                 responder,
             } => responder.send(
-                &mut self
-                    .controller
+                self.controller
                     .get_file_system_items(start_index, end_index, attribute_option)
-                    .await,
+                    .await
+                    .as_deref()
+                    .map_err(|e| *e),
             )?,
             BrowseControllerRequest::GetMediaPlayerItems { start_index, end_index, responder } => {
                 responder.send(
-                    &mut self.controller.get_media_player_items(start_index, end_index).await,
+                    self.controller
+                        .get_media_player_items(start_index, end_index)
+                        .await
+                        .as_deref()
+                        .map_err(|e| *e),
                 )?
             }
             BrowseControllerRequest::GetNowPlayingItems {
@@ -64,10 +69,11 @@ impl BrowseControllerService {
                 attribute_option,
                 responder,
             } => responder.send(
-                &mut self
-                    .controller
+                self.controller
                     .get_now_playing_items(start_index, end_index, attribute_option)
-                    .await,
+                    .await
+                    .as_deref()
+                    .map_err(|e| *e),
             )?,
             BrowseControllerRequest::PlayFileSystemItem { uid, responder } => responder
                 .send(self.controller.play_item(uid, Scope::MediaPlayerVirtualFilesystem).await)?,
@@ -103,11 +109,10 @@ impl BrowseControllerExtService {
             }
             BrowseControllerExtRequest::SendRawBrowseCommand { pdu_id, command, responder } => {
                 responder.send(
-                    &mut self
-                        .controller
-                        .send_raw_browse_command(pdu_id, &command[..])
-                        .map_err(|e| BrowseControllerError::from(e))
-                        .await,
+                    match self.controller.send_raw_browse_command(pdu_id, &command[..]).await {
+                        Ok(ref response) => Ok(response),
+                        Err(e) => Err(BrowseControllerError::from(e)),
+                    },
                 )?;
             }
         };

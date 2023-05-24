@@ -122,15 +122,11 @@ impl GenericAccessService {
         id: u64,
     ) -> Result<(), fidl::Error> {
         match id {
-            GENERIC_ACCESS_DEVICE_NAME_ID => {
-                let value = self.hd.get_name().as_bytes().to_vec();
-                responder.send(&mut Ok(value))
-            }
+            GENERIC_ACCESS_DEVICE_NAME_ID => responder.send(Ok(self.hd.get_name().as_bytes())),
             GENERIC_ACCESS_APPEARANCE_ID => {
-                let value = self.hd.get_appearance().into_primitive().to_le_bytes().to_vec();
-                responder.send(&mut Ok(value))
+                responder.send(Ok(&self.hd.get_appearance().into_primitive().to_le_bytes()))
             }
-            _ => responder.send(&mut Err(gatt::Error::ReadNotPermitted)),
+            _ => responder.send(Err(gatt::Error::ReadNotPermitted)),
         }
     }
 

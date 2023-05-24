@@ -624,11 +624,11 @@ where
                             .if_disabled(|s| s.dispatch_set_parameter(v))
                             .map_err(|e| e.into_raw()),
                     ),
-                fidl_fuchsia_net_dhcp::Server_Request::ListOptions { responder: r } => {
-                    r.send(&mut server.borrow().dispatch_list_options().map_err(|e| e.into_raw()))
-                }
+                fidl_fuchsia_net_dhcp::Server_Request::ListOptions { responder: r } => r.send(
+                    server.borrow().dispatch_list_options().as_deref().map_err(|e| e.into_raw()),
+                ),
                 fidl_fuchsia_net_dhcp::Server_Request::ListParameters { responder: r } => r.send(
-                    &mut server.borrow().dispatch_list_parameters().map_err(|e| e.into_raw()),
+                    server.borrow().dispatch_list_parameters().as_deref().map_err(|e| e.into_raw()),
                 ),
                 fidl_fuchsia_net_dhcp::Server_Request::ResetOptions { responder: r } => {
                     r.send(server.borrow_mut().dispatch_reset_options().map_err(|e| e.into_raw()))

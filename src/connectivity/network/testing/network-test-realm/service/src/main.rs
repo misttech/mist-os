@@ -844,12 +844,9 @@ impl Controller {
                         num_retries,
                         &mut rx_buffer,
                     )
-                    .await;
-                let mut result = result.map(|num_bytes| {
-                    rx_buffer.truncate(num_bytes);
-                    rx_buffer
-                });
-                responder.send(&mut result)?;
+                    .await
+                    .map(|num_bytes| &rx_buffer[..num_bytes]);
+                responder.send(result)?;
             }
             fntr::ControllerRequest::Ping {
                 target,

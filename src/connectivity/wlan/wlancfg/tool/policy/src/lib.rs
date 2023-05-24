@@ -962,14 +962,14 @@ mod tests {
     fn send_scan_result(
         exec: &mut TestExecutor,
         server: &mut wlan_policy::ScanResultIteratorRequestStream,
-        mut scan_result: &mut Result<Vec<wlan_policy::ScanResult>, wlan_policy::ScanErrorCode>,
+        scan_result: Result<&[wlan_policy::ScanResult], wlan_policy::ScanErrorCode>,
     ) {
         assert_variant!(
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(wlan_policy::ScanResultIteratorRequest::GetNext {
                 responder
             }))) => {
-                match responder.send(&mut scan_result) {
+                match responder.send(scan_result) {
                     Ok(()) => {}
                     Err(e) => panic!("failed to send scan result: {}", e),
                 }
@@ -1634,13 +1634,13 @@ mod tests {
 
         // Send back a scan result
         let mut iterator = get_scan_result_iterator(&mut exec, test_values.client_stream);
-        send_scan_result(&mut exec, &mut iterator, &mut Ok(vec![create_scan_result(TEST_SSID)]));
+        send_scan_result(&mut exec, &mut iterator, Ok(&[create_scan_result(TEST_SSID)]));
 
         // Process the scan result
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Send back an empty scan result
-        send_scan_result(&mut exec, &mut iterator, &mut Ok(Vec::new()));
+        send_scan_result(&mut exec, &mut iterator, Ok(&[]));
 
         // Expect the scan process to complete
         assert_variant!(
@@ -1666,11 +1666,7 @@ mod tests {
 
         // Send back a scan error
         let mut iterator = get_scan_result_iterator(&mut exec, test_values.client_stream);
-        send_scan_result(
-            &mut exec,
-            &mut iterator,
-            &mut Err(wlan_policy::ScanErrorCode::GeneralError),
-        );
+        send_scan_result(&mut exec, &mut iterator, Err(wlan_policy::ScanErrorCode::GeneralError));
 
         // Process the scan error
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));

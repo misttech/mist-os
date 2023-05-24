@@ -992,7 +992,7 @@ mod test {
 
                 let _result = match event {
                     TargetHandlerRequest::GetEventsSupported { responder } => {
-                        responder.send(&mut Err(TargetAvcError::RejectedInternalError))
+                        responder.send(Err(TargetAvcError::RejectedInternalError))
                     }
                     TargetHandlerRequest::GetMediaAttributes { responder } => {
                         responder.send(&mut Ok(MediaAttributes {
@@ -1012,9 +1012,8 @@ mod test {
                         }
                     }
                     TargetHandlerRequest::ListPlayerApplicationSettingAttributes { responder } => {
-                        responder.send(&mut Ok(vec![
-                            fidl_avrcp::PlayerApplicationSettingAttributeId::Equalizer,
-                        ]))
+                        responder
+                            .send(Ok(&[fidl_avrcp::PlayerApplicationSettingAttributeId::Equalizer]))
                     }
                     TargetHandlerRequest::GetPlayerApplicationSettings {
                         attribute_ids: _,
@@ -1045,7 +1044,7 @@ mod test {
                         responder.send(Ok(()))
                     }
                     TargetHandlerRequest::GetMediaPlayerItems { responder, .. } => {
-                        responder.send(&mut Err(TargetAvcError::RejectedNoAvailablePlayers))
+                        responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))
                     }
                 };
             }

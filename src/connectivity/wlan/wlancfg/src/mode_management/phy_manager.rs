@@ -899,10 +899,7 @@ mod tests {
     fn send_get_supported_mac_roles_response(
         exec: &mut TestExecutor,
         server: &mut fidl_service::DeviceMonitorRequestStream,
-        mut supported_mac_roles: Result<
-            Vec<fidl_common::WlanMacRole>,
-            fuchsia_zircon::sys::zx_status_t,
-        >,
+        supported_mac_roles: Result<&[fidl_common::WlanMacRole], fuchsia_zircon::sys::zx_status_t>,
     ) {
         let _ = assert_variant!(
             exec.run_until_stalled(&mut server.next()),
@@ -911,7 +908,7 @@ mod tests {
                     responder, ..
                 }
             ))) => {
-                responder.send(&mut supported_mac_roles)
+                responder.send(supported_mac_roles)
             }
         );
     }
@@ -1078,7 +1075,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles.clone()),
+                Ok(&fake_mac_roles),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
@@ -1144,7 +1141,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles.clone()),
+                Ok(&fake_mac_roles),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
@@ -1167,7 +1164,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles.clone()),
+                Ok(&fake_mac_roles),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
@@ -1214,7 +1211,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles),
+                Ok(&fake_mac_roles),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
@@ -1282,7 +1279,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles),
+                Ok(&fake_mac_roles),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
@@ -1325,7 +1322,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles.clone()),
+                Ok(&fake_mac_roles),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
@@ -1605,7 +1602,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(fake_mac_roles),
+                Ok(&fake_mac_roles),
             );
 
             // Wait for the PhyManager to finish processing the received iface information
@@ -2752,7 +2749,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(vec![]),
+                Ok(&[]),
             );
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
         }
@@ -2779,7 +2776,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(vec![]),
+                Ok(&[]),
             );
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
         }
@@ -2791,7 +2788,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(vec![]),
+                Ok(&[]),
             );
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
         }
@@ -3521,7 +3518,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Ok(Vec::new()),
+                Ok(&[]),
             );
 
             // There should be a stall as the low power mode is requested.

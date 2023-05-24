@@ -1337,7 +1337,9 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 			innerType.IsResourceType() ||
 			len(c.structs[innerType.Identifier].Members) == 0 ||
 			len(c.structs[innerType.Identifier].Members) > 1 ||
-			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.PrimitiveType
+			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.PrimitiveType ||
+			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.ArrayType ||
+			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.VectorType
 		if migrate {
 			okParamType := "()"
 			if len(inner.Parameters) > 0 {

@@ -3235,16 +3235,14 @@ mac             -
                         let responder = req
                             .into_list_options()
                             .expect("request should be of type list options");
-                        let () =
-                            responder.send(&mut Ok(vec![])).expect("responder.send should succeed");
+                        let () = responder.send(Ok(&[])).expect("responder.send should succeed");
                         Ok(())
                     }
                     opts::dhcpd::ListArg::Parameter(opts::dhcpd::ParameterToken {}) => {
                         let responder = req
                             .into_list_parameters()
                             .expect("request should be of type list options");
-                        let () =
-                            responder.send(&mut Ok(vec![])).expect("responder.send should succeed");
+                        let () = responder.send(Ok(&[])).expect("responder.send should succeed");
                         Ok(())
                     }
                 },

@@ -155,7 +155,7 @@ mod test {
             // Reading the file should succeed
             let request = file.try_next().await;
             if let Ok(Some(fio::FileRequest::Read { responder, .. })) = request {
-                responder.send(&mut Ok(EXPECTED_DATA.to_vec())).unwrap();
+                responder.send(Ok(&EXPECTED_DATA)).unwrap();
             } else {
                 panic!("did not get read request: {:?}", request)
             }
@@ -163,7 +163,7 @@ mod test {
             // Reading the file should not return any more data
             let request = file.try_next().await;
             if let Ok(Some(fio::FileRequest::Read { responder, .. })) = request {
-                responder.send(&mut Ok(vec![])).unwrap();
+                responder.send(Ok(&[])).unwrap();
             } else {
                 panic!("did not get read request: {:?}", request)
             }

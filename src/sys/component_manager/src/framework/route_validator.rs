@@ -275,14 +275,14 @@ impl RouteValidator {
             while let Some(request) = stream.try_next().await? {
                 match request {
                     fsys::RouteValidatorRequest::Validate { moniker, responder } => {
-                        let mut result = self.validate(&scope_moniker, &moniker).await;
-                        if let Err(e) = responder.send(&mut result) {
+                        let result = self.validate(&scope_moniker, &moniker).await;
+                        if let Err(e) = responder.send(result.as_deref().map_err(|e| *e)) {
                             warn!(error = %e, "RouteValidator failed to send Validate response");
                         }
                     }
                     fsys::RouteValidatorRequest::Route { moniker, targets, responder } => {
-                        let mut result = self.route(&scope_moniker, &moniker, targets).await;
-                        if let Err(e) = responder.send(&mut result) {
+                        let result = self.route(&scope_moniker, &moniker, targets).await;
+                        if let Err(e) = responder.send(result.as_deref().map_err(|e| *e)) {
                             warn!(error = %e, "RouteValidator failed to send Route response");
                         }
                     }

@@ -236,7 +236,7 @@ mod tests {
                 match req {
                     fio::FileRequest::Read { count, responder } => {
                         assert_eq!(count, 1);
-                        responder.send(&mut Ok(vec![file_read_requests])).unwrap();
+                        responder.send(Ok(&[file_read_requests])).unwrap();
                     }
                     req => panic!("unhandled request {:?}", req),
                 }
@@ -267,7 +267,7 @@ mod tests {
             match stream.next().await.unwrap().unwrap() {
                 fio::FileRequest::Read { count, responder } => {
                     assert_eq!(count, 3);
-                    responder.send(&mut Ok(b"012".to_vec())).unwrap();
+                    responder.send(Ok(b"012")).unwrap();
                 }
                 req => panic!("unhandled request {:?}", req),
             }
@@ -301,7 +301,7 @@ mod tests {
             match stream.next().await.unwrap().unwrap() {
                 fio::FileRequest::Read { count, responder } => {
                     assert_eq!(count, 4);
-                    responder.send(&mut Ok(b"3456".to_vec())).unwrap();
+                    responder.send(Ok(b"3456")).unwrap();
                 }
                 req => panic!("unhandled request {:?}", req),
             }
@@ -349,7 +349,7 @@ mod tests {
             match stream.next().await.unwrap().unwrap() {
                 fio::FileRequest::Read { count, responder } => {
                     assert_eq!(count, 1);
-                    responder.send(&mut Err(zx_status::Status::NO_MEMORY.into_raw())).unwrap();
+                    responder.send(Err(zx_status::Status::NO_MEMORY.into_raw())).unwrap();
                 }
                 req => panic!("unhandled request {:?}", req),
             }
@@ -367,7 +367,7 @@ mod tests {
             match stream.next().await.unwrap().unwrap() {
                 fio::FileRequest::Read { count, responder } => {
                     assert_eq!(count, 1);
-                    responder.send(&mut Ok(b"0".to_vec())).unwrap();
+                    responder.send(Ok(b"0")).unwrap();
                 }
                 req => panic!("unhandled request {:?}", req),
             }
@@ -395,7 +395,7 @@ mod tests {
         match stream.next().await.unwrap().unwrap() {
             fio::FileRequest::Read { count, responder } => {
                 assert_eq!(count, 0);
-                responder.send(&mut Ok(vec![])).unwrap();
+                responder.send(Ok(&[])).unwrap();
             }
             req => panic!("unhandled request {:?}", req),
         }
@@ -412,7 +412,7 @@ mod tests {
             match stream.next().await.unwrap().unwrap() {
                 fio::FileRequest::Read { count, responder } => {
                     assert_eq!(count, 1);
-                    responder.send(&mut Ok(vec![1])).unwrap();
+                    responder.send(Ok(&[1])).unwrap();
                 }
                 req => panic!("unhandled request {:?}", req),
             }
@@ -453,7 +453,7 @@ mod tests {
                         fio::FileRequest::Read { count, responder } => {
                             assert_eq!(count, u64::try_from(first_poll_read_len).unwrap());
                             let resp = vec![7u8; min(file_size, first_poll_read_len)];
-                            responder.send(&mut Ok(resp)).unwrap();
+                            responder.send(Ok(&resp)).unwrap();
                         }
                         req => panic!("unhandled request {:?}", req),
                     }
@@ -470,7 +470,7 @@ mod tests {
                                 fio::FileRequest::Read { count, responder } => {
                                     assert_eq!(count, u64::try_from(second_poll_read_len).unwrap());
                                     let resp = vec![7u8; min(file_size, second_poll_read_len)];
-                                    responder.send(&mut Ok(resp)).unwrap();
+                                    responder.send(Ok(&resp)).unwrap();
                                 }
                                 req => panic!("unhandled request {:?}", req),
                             }

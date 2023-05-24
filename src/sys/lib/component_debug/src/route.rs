@@ -194,7 +194,7 @@ mod test {
                 fsys::RouteValidatorRequest::Route { moniker, targets, responder } => {
                     assert_eq!(expected_moniker, moniker);
                     assert_eq!(expected_targets, targets);
-                    responder.send(&mut Ok(reports)).unwrap();
+                    responder.send(Ok(&reports)).unwrap();
                 }
             }
         })

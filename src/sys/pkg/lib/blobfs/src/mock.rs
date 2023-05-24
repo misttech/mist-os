@@ -336,7 +336,7 @@ impl Blob {
         match self.stream.next().await {
             Some(Ok(fio::FileRequest::Read { count, responder })) => {
                 let count = min(count.try_into().unwrap(), data.len());
-                responder.send(&mut Ok(data[..count].to_vec())).unwrap();
+                responder.send(Ok(&data[..count])).unwrap();
                 count
             }
             other => panic!("unexpected request: {other:?}"),
@@ -385,14 +385,14 @@ impl Blob {
                 Some(Ok(fio::FileRequest::Read { count, responder })) => {
                     let avail = data.len() - pos;
                     let count = min(count.try_into().unwrap(), avail);
-                    responder.send(&mut Ok(data[pos..pos + count].to_vec())).unwrap();
+                    responder.send(Ok(&data[pos..pos + count])).unwrap();
                     pos += count;
                 }
                 Some(Ok(fio::FileRequest::ReadAt { count, offset, responder })) => {
                     let pos: usize = offset.try_into().unwrap();
                     let avail = data.len() - pos;
                     let count = min(count.try_into().unwrap(), avail);
-                    responder.send(&mut Ok(data[pos..pos + count].to_vec())).unwrap();
+                    responder.send(Ok(&data[pos..pos + count])).unwrap();
                 }
                 Some(Ok(fio::FileRequest::GetAttr { responder })) => {
                     let mut attr = fio::NodeAttributes {

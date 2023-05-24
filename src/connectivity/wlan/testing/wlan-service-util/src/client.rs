@@ -1175,47 +1175,35 @@ mod tests {
 
     #[test]
     fn scan_success_returns_empty_results() {
-        let scan_results_for_response = Vec::new();
-        let scan_results = test_scan(scan_results_for_response);
-
-        assert_eq!(scan_results, Vec::new());
+        assert_eq!(test_scan(&[]), &[]);
     }
 
     #[test]
     fn scan_success_returns_results() {
-        let mut scan_results_for_response = Vec::new();
-        // due to restrictions for cloning fidl objects, forced to make a copy of the vector here
-        let entry1 = create_scan_result(
-            [0, 1, 2, 3, 4, 5],
-            Ssid::try_from("foo").unwrap(),
-            -30,
-            20,
-            Channel::new(1, Cbw::Cbw20),
-            Protection::Wpa2Personal,
-            Some(fidl_sme::Compatibility {
-                mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
-            }),
-        );
-        let entry1_copy = entry1.clone();
-        let entry2 = create_scan_result(
-            [1, 2, 3, 4, 5, 6],
-            Ssid::try_from("hello").unwrap(),
-            -60,
-            10,
-            Channel::new(2, Cbw::Cbw20),
-            Protection::Wpa2Personal,
-            None,
-        );
-        let entry2_copy = entry2.clone();
-        scan_results_for_response.push(entry1);
-        scan_results_for_response.push(entry2);
-        let mut expected_response = Vec::new();
-        expected_response.push(entry1_copy);
-        expected_response.push(entry2_copy);
+        let scan_results = &[
+            create_scan_result(
+                [0, 1, 2, 3, 4, 5],
+                Ssid::try_from("foo").unwrap(),
+                -30,
+                20,
+                Channel::new(1, Cbw::Cbw20),
+                Protection::Wpa2Personal,
+                Some(fidl_sme::Compatibility {
+                    mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
+                }),
+            ),
+            create_scan_result(
+                [1, 2, 3, 4, 5, 6],
+                Ssid::try_from("hello").unwrap(),
+                -60,
+                10,
+                Channel::new(2, Cbw::Cbw20),
+                Protection::Wpa2Personal,
+                None,
+            ),
+        ];
 
-        let scan_results = test_scan(scan_results_for_response);
-
-        assert_eq!(scan_results, expected_response);
+        assert_eq!(test_scan(scan_results), scan_results);
     }
 
     #[test]
@@ -1224,7 +1212,7 @@ mod tests {
         assert!(test_scan_error().is_err())
     }
 
-    fn test_scan(scan_results: Vec<fidl_sme::ScanResult>) -> Vec<fidl_sme::ScanResult> {
+    fn test_scan(scan_results: &[fidl_sme::ScanResult]) -> Vec<fidl_sme::ScanResult> {
         let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut client_sme_req = server.into_future();
@@ -1248,11 +1236,11 @@ mod tests {
     fn send_scan_result_response(
         exec: &mut TestExecutor,
         server: &mut StreamFuture<fidl_sme::ClientSmeRequestStream>,
-        scan_results: Vec<fidl_sme::ScanResult>,
+        scan_results: &[fidl_sme::ScanResult],
     ) {
         match poll_client_sme_request(exec, server) {
             Poll::Ready(fidl_sme::ClientSmeRequest::Scan { responder, .. }) => {
-                responder.send(&mut Ok(scan_results)).expect("failed to send scan results")
+                responder.send(Ok(scan_results)).expect("failed to send scan results")
             }
             Poll::Pending => panic!("expected a request to be available"),
             _ => panic!("expected a scan request"),
@@ -1279,7 +1267,7 @@ mod tests {
     ) {
         match poll_client_sme_request(exec, server) {
             Poll::Ready(fidl_sme::ClientSmeRequest::Scan { responder, .. }) => responder
-                .send(&mut Err(fidl_sme::ScanErrorCode::InternalError))
+                .send(Err(fidl_sme::ScanErrorCode::InternalError))
                 .expect("failed to send ScanError"),
             Poll::Pending => panic!("expected a request to be available"),
             _ => panic!("expected a scan request"),

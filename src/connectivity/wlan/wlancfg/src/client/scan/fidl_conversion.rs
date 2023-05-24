@@ -97,44 +97,36 @@ pub fn scan_result_to_policy_scan_result(
 /// Send empty batch and close the channel when no results are remaining.
 pub async fn send_scan_results_over_fidl(
     output_iterator: fidl::endpoints::ServerEnd<fidl_policy::ScanResultIteratorMarker>,
-    scan_results: &Vec<fidl_policy::ScanResult>,
+    mut scan_results: &[fidl_policy::ScanResult],
 ) -> Result<(), Error> {
     // Wait to get a request for a chunk of scan results
     let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle()?;
-    let max_batch_size = zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize;
     let mut sent_some_results = false;
-    let mut remaining_results = scan_results.iter().peekable();
-    let mut batch_size: usize;
 
     // Verify consumer is expecting results before each batch
     loop {
         if let Some(fidl_policy::ScanResultIteratorRequest::GetNext { responder }) =
             stream.try_next().await?
         {
-            sent_some_results = true;
-            let mut batch = vec![];
-            batch_size = FIDL_HEADER_AND_ERR_WRAPPED_VEC_HEADER_SIZE;
-            // Peek if next element exists and will fit in current batch
-            while let Some(peeked_result) = remaining_results.peek() {
-                let result_size = peeked_result.measure().num_bytes;
-                if result_size + FIDL_HEADER_AND_ERR_WRAPPED_VEC_HEADER_SIZE > max_batch_size {
-                    return Err(format_err!("Single scan result too large to send via FIDL"));
-                }
-                // Peeked result will not fit. Send batch and continue.
-                if result_size + batch_size > max_batch_size {
+            let mut bytes_used = FIDL_HEADER_AND_ERR_WRAPPED_VEC_HEADER_SIZE;
+            let mut result_count = 0;
+            for result in scan_results {
+                bytes_used += result.measure().num_bytes;
+                if bytes_used > zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize {
+                    if result_count == 0 {
+                        return Err(format_err!("Single scan result too large to send via FIDL"));
+                    }
+                    // This result will not fit. Send batch and continue.
                     break;
                 }
-                // Actually remove result and push to batch
-                if let Some(result) = remaining_results.next() {
-                    batch.push(result.clone());
-                    batch_size += result_size;
-                }
+                result_count += 1;
             }
-            let close_channel = batch.is_empty();
-            responder.send(&mut Ok(batch))?;
+            responder.send(Ok(&scan_results[..result_count]))?;
+            scan_results = &scan_results[result_count..];
+            sent_some_results = true;
 
             // Guarantees empty batch is sent before channel is closed.
-            if close_channel {
+            if result_count == 0 {
                 ctrl.shutdown();
                 return Ok(());
             }
@@ -146,9 +138,8 @@ pub async fn send_scan_results_over_fidl(
                 // particular network they were looking for. This is not an error.
                 debug!("Scan result consumer closed channel before consuming all scan results");
                 return Ok(());
-            } else {
-                return Err(format_err!("Peer closed channel before receiving any scan results"));
             }
+            return Err(format_err!("Peer closed channel before receiving any scan results"));
         }
     }
 }
@@ -163,8 +154,7 @@ pub async fn send_scan_error_over_fidl(
     let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle()?;
     if let Some(req) = stream.try_next().await? {
         let fidl_policy::ScanResultIteratorRequest::GetNext { responder } = req;
-        let mut err: fidl_policy::ScanResultIteratorGetNextResult = Err(error_code);
-        responder.send(&mut err)?;
+        responder.send(Err(error_code))?;
         ctrl.shutdown();
     } else {
         // This will happen if the iterator request stream was closed and we expected to send

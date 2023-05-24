@@ -246,7 +246,7 @@ where
                 responder.send(response)?;
             }
             AccountRequest::GetAuthMechanismEnrollments { responder, .. } => {
-                responder.send(&mut Err(ApiError::UnsupportedOperation))?;
+                responder.send(Err(ApiError::UnsupportedOperation))?;
             }
             AccountRequest::CreateAuthMechanismEnrollment { responder, .. } => {
                 responder.send(Err(ApiError::UnsupportedOperation))?;

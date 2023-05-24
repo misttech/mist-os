@@ -149,7 +149,7 @@ async fn run(
                 DeviceRequest::Read { responder } => {
                     if let Some(read) = read.lock().await.next().await {
                         tracing::trace!("got read: {:?}", read);
-                        responder.send(&mut Ok(read))?;
+                        responder.send(Ok(&read))?;
                     } else {
                         tracing::info!("no read (read thread done?)");
                     }

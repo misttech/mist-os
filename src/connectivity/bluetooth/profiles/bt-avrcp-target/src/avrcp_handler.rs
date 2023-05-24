@@ -28,7 +28,7 @@ async fn handle_target_request(
     match request {
         TargetHandlerRequest::GetEventsSupported { responder } => {
             // Send a static response of TG supported events.
-            responder.send(&mut Ok(media_sessions.get_supported_notification_events()))?;
+            responder.send(Ok(media_sessions.get_supported_notification_events()))?;
         }
         TargetHandlerRequest::GetPlayStatus { responder } => {
             let mut response = media_sessions.get_active_session().map_or(
@@ -59,12 +59,11 @@ async fn handle_target_request(
         }
         TargetHandlerRequest::ListPlayerApplicationSettingAttributes { responder } => {
             // Send back the static list of Media supported PlayerApplicationSettingAttributes.
-            let mut response = media_sessions
-                .get_active_session()
-                .map_or(Err(TargetAvcError::RejectedNoAvailablePlayers), |state| {
-                    Ok(state.get_supported_player_application_setting_attributes())
-                });
-            responder.send(&mut response)?;
+            if let Ok(state) = media_sessions.get_active_session() {
+                responder.send(Ok(state.get_supported_player_application_setting_attributes()))?;
+            } else {
+                responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
+            }
         }
         TargetHandlerRequest::GetPlayerApplicationSettings { attribute_ids, responder } => {
             let mut response = media_sessions.get_active_session().map_or(
@@ -117,8 +116,8 @@ async fn handle_target_request(
             responder.send(response)?;
         }
         TargetHandlerRequest::GetMediaPlayerItems { responder } => {
-            let mut response = media_sessions.get_media_player_items();
-            responder.send(&mut response)?;
+            let response = media_sessions.get_media_player_items();
+            responder.send(response.as_deref().map_err(|e| *e))?;
         }
     }
 

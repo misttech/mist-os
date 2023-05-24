@@ -789,7 +789,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::Read { count, responder } => {
                 fuchsia_trace::duration!("storage", "File::Read", "bytes" => count);
                 let result = self.handle_read(count).await;
-                let () = responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
             }
             fio::FileRequest::ReadAt { offset, count, responder } => {
                 fuchsia_trace::duration!(
@@ -799,7 +799,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                     "bytes" => count
                 );
                 let result = self.handle_read_at(offset, count).await;
-                let () = responder.send(&mut result.map_err(zx::Status::into_raw))?;
+                let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
             }
             fio::FileRequest::Write { data, responder } => {
                 fuchsia_trace::duration!("storage", "File::Write", "bytes" => data.len() as u64);

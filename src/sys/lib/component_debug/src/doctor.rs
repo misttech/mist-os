@@ -127,7 +127,7 @@ mod test {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { moniker, responder, .. } => {
                     assert_eq!(expected_moniker, moniker);
-                    responder.send(&mut Ok(reports)).unwrap();
+                    responder.send(Ok(&reports)).unwrap();
                 }
                 fsys::RouteValidatorRequest::Route { .. } => {
                     panic!("unexpected Route request");

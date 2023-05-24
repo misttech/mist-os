@@ -321,29 +321,19 @@ impl ControllerExtService {
             }
             ControllerExtRequest::GetEventsSupported { responder } => {
                 match self.controller.get_supported_events().await {
-                    Ok(events) => {
-                        let mut r_events = vec![];
-                        for e in events {
-                            if let Some(target_event) =
-                                NotificationEvent::from_primitive(u8::from(&e))
-                            {
-                                r_events.push(target_event);
-                            }
-                        }
-                        responder.send(&mut Ok(r_events))?;
-                    }
-                    Err(peer_error) => {
-                        responder.send(&mut Err(ControllerError::from(peer_error)))?
-                    }
+                    Ok(events) => responder.send(Ok(&events
+                        .iter()
+                        .filter_map(|e| NotificationEvent::from_primitive(u8::from(e)))
+                        .collect::<Vec<_>>()))?,
+                    Err(peer_error) => responder.send(Err(ControllerError::from(peer_error)))?,
                 }
             }
             ControllerExtRequest::SendRawVendorDependentCommand { pdu_id, command, responder } => {
                 responder.send(
-                    &mut self
-                        .controller
-                        .send_raw_vendor_command(pdu_id, &command[..])
-                        .map_err(ControllerError::from)
-                        .await,
+                    match self.controller.send_raw_vendor_command(pdu_id, &command[..]).await {
+                        Ok(ref response) => Ok(response),
+                        Err(e) => Err(ControllerError::from(e)),
+                    },
                 )?;
             }
         };

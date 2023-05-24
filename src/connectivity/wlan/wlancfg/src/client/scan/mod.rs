@@ -776,7 +776,7 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, scan_request);
-                responder.send(&mut Ok(input_aps.clone())).expect("failed to send scan data");
+                responder.send(Ok(&input_aps)).expect("failed to send scan data");
             }
         );
 
@@ -826,7 +826,7 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, scan_request);
-                responder.send(&mut Ok(input_aps.clone())).expect("failed to send scan data");
+                responder.send(Ok(&input_aps)).expect("failed to send scan data");
             }
         );
 
@@ -908,7 +908,7 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, sme_scan.clone());
-                responder.send(&mut Ok(input_aps.clone())).expect("failed to send scan data");
+                responder.send(Ok(&input_aps)).expect("failed to send scan data");
             }
         );
 
@@ -950,7 +950,7 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, sme_scan.clone());
-                responder.send(&mut Ok(vec![])).expect("failed to send scan data");
+                responder.send(Ok(&[])).expect("failed to send scan data");
             }
         );
 
@@ -1009,7 +1009,7 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, sme_scan_request);
-                responder.send(&mut Ok(input_aps.clone())).expect("failed to send scan data");
+                responder.send(Ok(&input_aps)).expect("failed to send scan data");
             }
         );
 
@@ -1180,7 +1180,7 @@ mod tests {
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
                 // Send failed scan response.
-                responder.send(&mut Err(sme_failure_mode)).expect("failed to send scan error");
+                responder.send(Err(sme_failure_mode)).expect("failed to send scan error");
             }
         );
 
@@ -1226,7 +1226,7 @@ mod tests {
                  req: _, responder,
             }))) => {
                 // Send failed scan response.
-                responder.send(&mut Err(error_code)).expect("failed to send scan error");
+                responder.send(Err(error_code)).expect("failed to send scan error");
             }
         );
 
@@ -1250,7 +1250,7 @@ mod tests {
                     req, responder,
                 }))) => {
                     assert_eq!(req, sme_scan.clone());
-                    responder.send(&mut Ok(input_aps.clone())).expect("failed to send scan data");
+                    responder.send(Ok(&input_aps)).expect("failed to send scan data");
                 }
             );
 
@@ -1272,7 +1272,7 @@ mod tests {
                      req: _, responder,
                 }))) => {
                     // Send failed scan response.
-                    responder.send(&mut Err(error_code)).expect("failed to send scan error");
+                    responder.send(Err(error_code)).expect("failed to send scan error");
                 }
             );
 
@@ -1423,7 +1423,7 @@ mod tests {
                     assert_eq!(req.channels, first_req_channels)
                 });
                 // Send failed scan response.
-                responder.send(&mut Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
+                responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1456,7 +1456,7 @@ mod tests {
                     assert_eq!(req.channels, second_req_channels)
                 });
                 // Send failed scan response.
-                responder.send(&mut Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
+                responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1531,7 +1531,7 @@ mod tests {
 
         // Send back a failed scan response.
         responder1
-            .send(&mut Err(fidl_sme::ScanErrorCode::InternalError))
+            .send(Err(fidl_sme::ScanErrorCode::InternalError))
             .expect("failed to send scan error");
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1544,7 +1544,7 @@ mod tests {
                     assert_eq!(req.channels, second_req_channels)
                 });
                 // Send failed scan response.
-                responder.send(&mut Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
+                responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1589,8 +1589,8 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
-                let mut results = Ok(vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()]);
-                responder.send(&mut results).expect("failed to send scan error");
+                let results = &[generate_random_sme_scan_result(), generate_random_sme_scan_result()];
+                responder.send(Ok(results)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1642,8 +1642,8 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
-                let mut results = Ok(vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()]);
-                responder.send(&mut results).expect("failed to send scan error");
+                let results = &[generate_random_sme_scan_result(), generate_random_sme_scan_result()];
+                responder.send(Ok(results)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1665,8 +1665,8 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
-                let mut results = Ok(vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()]);
-                responder.send(&mut results).expect("failed to send scan error");
+                let results = &[generate_random_sme_scan_result(), generate_random_sme_scan_result()];
+                responder.send(Ok(results)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);

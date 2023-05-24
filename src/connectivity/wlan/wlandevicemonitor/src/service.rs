@@ -53,9 +53,8 @@ pub(crate) async fn serve_monitor_requests(
             DeviceMonitorRequest::GetDevPath { phy_id, responder } => {
                 responder.send(get_dev_path(&phys, phy_id).as_deref())
             }
-            DeviceMonitorRequest::GetSupportedMacRoles { phy_id, responder } => {
-                responder.send(&mut get_supported_mac_roles(&phys, phy_id).await)
-            }
+            DeviceMonitorRequest::GetSupportedMacRoles { phy_id, responder } => responder
+                .send(get_supported_mac_roles(&phys, phy_id).await.as_deref().map_err(|e| *e)),
             DeviceMonitorRequest::WatchDevices { watcher, control_handle: _ } => {
                 watcher_service
                     .add_watcher(watcher)
@@ -841,7 +840,7 @@ mod tests {
 
         // Reply with a fake phy info
         responder
-            .send(&mut Ok(vec![fidl_wlan_common::WlanMacRole::Client]))
+            .send(Ok(&[fidl_wlan_common::WlanMacRole::Client]))
             .expect("failed to send QueryResponse");
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 

@@ -243,11 +243,9 @@ mod test {
                     fio::FileRequest::Read { count: _, responder } => {
                         cc = cc + 1;
                         if cc == 1 {
-                            responder
-                                .send(&mut Ok(data.to_vec()))
-                                .expect("writing file test response");
+                            responder.send(Ok(&data)).expect("writing file test response");
                         } else {
-                            responder.send(&mut Ok(vec![])).expect("writing file test response");
+                            responder.send(Ok(&[])).expect("writing file test response");
                         }
                     }
                     fio::FileRequest::GetAttr { responder } => {

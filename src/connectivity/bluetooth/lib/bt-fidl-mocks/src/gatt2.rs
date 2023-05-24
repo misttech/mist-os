@@ -8,9 +8,8 @@ use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_bluetooth::Uuid as FidlUuid;
 use fidl_fuchsia_bluetooth_gatt2::{
     self as gatt2, Characteristic, CharacteristicNotifierMarker, ClientControlHandle, ClientMarker,
-    ClientProxy, ClientRequest, ClientRequestStream, Handle, RemoteServiceMarker,
-    RemoteServiceProxy, RemoteServiceReadByTypeResult, RemoteServiceRequest,
-    RemoteServiceRequestStream, ServiceHandle,
+    ClientProxy, ClientRequest, ClientRequestStream, Handle, ReadByTypeResult, RemoteServiceMarker,
+    RemoteServiceProxy, RemoteServiceRequest, RemoteServiceRequestStream, ServiceHandle,
 };
 use fuchsia_bluetooth::types::Uuid;
 use fuchsia_zircon::Duration;
@@ -52,17 +51,17 @@ impl RemoteServiceMock {
     pub async fn expect_read_by_type(
         &mut self,
         expected_uuid: Uuid,
-        mut result: RemoteServiceReadByTypeResult,
+        result: Result<&[ReadByTypeResult], gatt2::Error>,
     ) -> Result<(), Error> {
         let expected_uuid: FidlUuid = expected_uuid.into();
         expect_call(&mut self.stream, self.timeout, move |req| {
             if let RemoteServiceRequest::ReadByType { uuid, responder } = req {
                 if uuid == expected_uuid {
-                    responder.send(&mut result)?;
+                    responder.send(result)?;
                     Ok(Status::Satisfied(()))
                 } else {
                     // Send error to unexpected request.
-                    responder.send(&mut Err(fidl_fuchsia_bluetooth_gatt2::Error::UnlikelyError))?;
+                    responder.send(Err(fidl_fuchsia_bluetooth_gatt2::Error::UnlikelyError))?;
                     Ok(Status::Pending)
                 }
             } else {
@@ -135,7 +134,7 @@ mod tests {
         let (proxy, mut mock) =
             RemoteServiceMock::new(timeout_duration()).expect("failed to create mock");
         let uuid = Uuid::new16(0x180d);
-        let result: RemoteServiceReadByTypeResult = Ok(vec![]);
+        let result = Ok(&[][..]);
 
         let fidl_uuid: FidlUuid = uuid.clone().into();
         let read_by_type_fut = proxy.read_by_type(&fidl_uuid);

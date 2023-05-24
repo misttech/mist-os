@@ -1159,7 +1159,7 @@ mod tests {
             }))) => {
                 // Only return 1 inactive player.
                 responder
-                    .send(&mut Ok(vec![avrcp::MediaPlayerItem {
+                    .send(Ok(&[avrcp::MediaPlayerItem {
                         player_id: Some(1),
                         playback_status: Some(avrcp::PlaybackStatus::Stopped),
                         ..Default::default()

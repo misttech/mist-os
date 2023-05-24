@@ -185,15 +185,14 @@ impl GattServerFacade {
             Some(v) => {
                 let (value, _enforce_initial_attribute_length) = v;
                 if value.len() < offset as usize {
-                    let _result = responder.send(&mut Err(gatt::Error::InvalidOffset));
+                    let _result = responder.send(Err(gatt::Error::InvalidOffset));
                 } else {
-                    let value_to_write = value.clone().split_off(offset as usize);
-                    let _result = responder.send(&mut Ok(value_to_write));
+                    let _result = responder.send(Ok(&value[offset as usize..]));
                 }
             }
             None => {
                 // ID doesn't exist in the database
-                let _result = responder.send(&mut Err(gatt::Error::ReadNotPermitted));
+                let _result = responder.send(Err(gatt::Error::ReadNotPermitted));
             }
         };
     }

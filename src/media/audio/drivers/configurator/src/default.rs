@@ -1503,7 +1503,7 @@ mod tests {
                 CodecRequest::IsBridgeable { responder: _ } => {}
                 CodecRequest::SetBridgedMode { enable_bridged_mode: _, control_handle: _ } => {}
                 CodecRequest::GetDaiFormats { responder } => {
-                    let mut formats = Ok(vec![DaiSupportedFormats {
+                    let formats = &[DaiSupportedFormats {
                         number_of_channels: vec![2],
                         sample_formats: vec![DaiSampleFormat::PcmSigned],
                         frame_formats: vec![DaiFrameFormat::FrameFormatStandard(
@@ -1512,8 +1512,8 @@ mod tests {
                         frame_rates: vec![48000],
                         bits_per_sample: vec![24],
                         bits_per_slot: vec![32],
-                    }]);
-                    responder.send(&mut formats)?;
+                    }];
+                    responder.send(Ok(formats))?;
                 }
                 CodecRequest::SetDaiFormat { responder: _, format: _ } => {}
                 CodecRequest::WatchPlugState { responder } => {
@@ -1556,8 +1556,7 @@ mod tests {
                         })),
                         ..Default::default()
                     };
-                    let mut ret = Ok(vec![pe]);
-                    responder.send(&mut ret)?;
+                    responder.send(Ok(&[pe]))?;
                 }
                 SignalProcessingRequest::SetElementState {
                     processing_element_id,

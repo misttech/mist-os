@@ -162,8 +162,7 @@ async fn handle_request(
         PinWeaverRequest::ResetTree { bits_per_level: _, height: _, responder: resp } => {
             match next_response {
                 MockResponse::ResetTree { root_hash } => {
-                    resp.send(&mut std::result::Result::Ok(root_hash))
-                        .expect("failed to send response");
+                    resp.send(Ok(&root_hash)).expect("failed to send response");
                 }
                 _ => {
                     panic!("Next mock response type was {next_response:?} but expected ResetTree.")
@@ -189,8 +188,7 @@ async fn handle_request(
         PinWeaverRequest::RemoveLeaf { params: _, responder: resp } => {
             match next_response {
                 MockResponse::RemoveLeaf { root_hash } => {
-                    resp.send(&mut std::result::Result::Ok(root_hash))
-                        .expect("failed to send response");
+                    resp.send(Ok(&root_hash)).expect("failed to send response");
                 }
                 _ => {
                     panic!("Next mock response type was {next_response:?} but expected RemoveLeaf.")

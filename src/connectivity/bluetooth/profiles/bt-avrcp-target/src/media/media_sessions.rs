@@ -73,7 +73,7 @@ impl MediaSessions {
         r_inner.ok_or(format_err!("No active player"))
     }
 
-    pub fn get_supported_notification_events(&self) -> Vec<fidl_avrcp::NotificationEvent> {
+    pub fn get_supported_notification_events(&self) -> &'static [fidl_avrcp::NotificationEvent] {
         self.inner.read().get_supported_notification_events()
     }
 
@@ -204,8 +204,8 @@ impl MediaSessionsInner {
         self.active_session_id.as_ref().and_then(|id| self.map.get(id).cloned())
     }
 
-    pub fn get_supported_notification_events(&self) -> Vec<fidl_avrcp::NotificationEvent> {
-        vec![
+    pub fn get_supported_notification_events(&self) -> &'static [fidl_avrcp::NotificationEvent] {
+        &[
             fidl_avrcp::NotificationEvent::AddressedPlayerChanged,
             fidl_avrcp::NotificationEvent::PlayerApplicationSettingChanged,
             fidl_avrcp::NotificationEvent::PlaybackStatusChanged,

@@ -332,7 +332,7 @@ mod test {
                 assert_eq!(payload, expected_payload.as_bytes());
                 assert_eq!(timeout, expected_timeout);
                 assert_eq!(num_retries, expected_num_retries);
-                responder.send(&mut Ok(payload)).expect("failed to send PollUdp response");
+                responder.send(Ok(&payload)).expect("failed to send PollUdp response");
             },
         )
         .await;

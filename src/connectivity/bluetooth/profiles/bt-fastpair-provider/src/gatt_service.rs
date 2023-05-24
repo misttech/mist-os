@@ -313,16 +313,14 @@ impl GattService {
     fn handle_read_request(&self, handle: Handle, responder: LocalServiceReadValueResponder) {
         match handle {
             MODEL_ID_CHARACTERISTIC_HANDLE => {
-                let model_id_bytes: [u8; 3] = self.config.model_id.into();
-                let _ = responder.send(&mut Ok(model_id_bytes.to_vec()));
+                let _ = responder.send(Ok(&<[u8; 3]>::from(self.config.model_id)));
             }
             FIRMWARE_REVISION_CHARACTERISTIC_HANDLE => {
-                let firmware_revision_bytes = self.config.firmware_revision.clone().into_bytes();
-                let _ = responder.send(&mut Ok(firmware_revision_bytes));
+                let _ = responder.send(Ok(self.config.firmware_revision.as_bytes()));
             }
             h => {
                 warn!("Received unsupported read request for handle: {:?}", h);
-                let _ = responder.send(&mut Err(gatt::Error::InvalidHandle));
+                let _ = responder.send(Err(gatt::Error::InvalidHandle));
             }
         }
     }

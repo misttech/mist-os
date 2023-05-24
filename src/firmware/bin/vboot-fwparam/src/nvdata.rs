@@ -528,9 +528,8 @@ mod tests {
                         }
                         DeviceRequest::Read { offset, size, responder } => {
                             responder
-                                .send(&mut Ok(self.contents.lock().await
-                                    [(offset as usize)..((offset + size) as usize)]
-                                    .to_vec()))
+                                .send(Ok(&self.contents.lock().await
+                                    [(offset as usize)..((offset + size) as usize)]))
                                 .expect("Read reply ok");
                         }
                         DeviceRequest::Write { offset, data, responder } => {

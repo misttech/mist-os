@@ -22,7 +22,7 @@ use {
     lazy_static::lazy_static,
 };
 
-const EMPTY_PRE_AUTH_STATE: Vec<u8> = vec![];
+const EMPTY_PRE_AUTH_STATE: &[u8] = &[];
 
 lazy_static! {
     // Indicating en error-free, standard response.
@@ -68,11 +68,11 @@ impl AccountHandlerConnection for FakeAccountHandlerConnection {
             while let Some(req) = stream.try_next().await.unwrap() {
                 match req {
                     AccountHandlerControlRequest::CreateAccount { responder, .. } => {
-                        let mut response = Ok(EMPTY_PRE_AUTH_STATE.clone());
-                        if generate_unknown_err {
-                            response = Err(ApiError::Unknown);
-                        }
-                        responder.send(&mut response).unwrap();
+                        responder.send(if generate_unknown_err {
+                            Err(ApiError::Unknown)
+                        } else {
+                            Ok(EMPTY_PRE_AUTH_STATE)
+                        }).unwrap();
                     }
                     AccountHandlerControlRequest::Preload { responder, .. } => {
                         let mut response = Ok(());
@@ -162,7 +162,7 @@ mod tests {
             *DEFAULT_ACCOUNT_ID,
         )
         .await?;
-        assert!(conn.proxy().preload(&EMPTY_PRE_AUTH_STATE).await.unwrap().is_ok());
+        assert!(conn.proxy().preload(EMPTY_PRE_AUTH_STATE).await.unwrap().is_ok());
         Ok(())
     }
 
@@ -174,7 +174,7 @@ mod tests {
         )
         .await?;
         assert_eq!(
-            conn.proxy().preload(&EMPTY_PRE_AUTH_STATE).await.unwrap().unwrap_err(),
+            conn.proxy().preload(EMPTY_PRE_AUTH_STATE).await.unwrap().unwrap_err(),
             ApiError::Unknown
         );
         Ok(())
@@ -188,7 +188,7 @@ mod tests {
         )
         .await?;
         assert_eq!(
-            conn.proxy().preload(&EMPTY_PRE_AUTH_STATE).await.unwrap().unwrap_err(),
+            conn.proxy().preload(EMPTY_PRE_AUTH_STATE).await.unwrap().unwrap_err(),
             ApiError::Internal
         );
         Ok(())

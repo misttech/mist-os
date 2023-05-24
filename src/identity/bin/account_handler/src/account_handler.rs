@@ -135,28 +135,28 @@ where
     ) -> Result<(), fidl::Error> {
         match req {
             AccountHandlerControlRequest::CreateAccount { payload, responder } => {
-                let mut response = self.create_account(payload).await;
-                responder.send(&mut response)?;
+                responder.send(self.create_account(payload).await.as_deref().map_err(|e| *e))?;
             }
             AccountHandlerControlRequest::Preload { pre_auth_state, responder } => {
-                let response = self.preload(pre_auth_state).await;
-                responder.send(response)?;
+                responder.send(self.preload(pre_auth_state).await)?;
             }
             AccountHandlerControlRequest::UnlockAccount { payload, responder } => {
-                let mut response = self.unlock_account(payload.interaction).await;
-                responder.send(&mut response)?;
+                responder.send(match self.unlock_account(payload.interaction).await {
+                    Ok(ref response) => Ok(response.as_deref()),
+                    Err(e) => Err(e),
+                })?;
             }
             AccountHandlerControlRequest::LockAccount { responder } => {
-                let mut response = self.storage_lock_account().await;
-                responder.send(&mut response)?;
+                responder.send(match self.storage_lock_account().await {
+                    Ok(ref response) => Ok(response.as_deref()),
+                    Err(e) => Err(e),
+                })?;
             }
             AccountHandlerControlRequest::RemoveAccount { responder } => {
-                let response = self.remove_account().await;
-                responder.send(response)?;
+                responder.send(self.remove_account().await)?;
             }
             AccountHandlerControlRequest::GetAccount { account, responder } => {
-                let response = self.get_account(account).await;
-                responder.send(response)?;
+                responder.send(self.get_account(account).await)?;
             }
             AccountHandlerControlRequest::Terminate { control_handle } => {
                 self.terminate().await;

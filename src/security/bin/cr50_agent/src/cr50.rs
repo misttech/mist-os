@@ -146,9 +146,7 @@ impl Cr50 {
                     // underlying TPM transport?
                     let result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;
-                    responder
-                        .send(&mut result.ok().map(|_| result.root))
-                        .context("Replying to request")?;
+                    responder.send(result.ok().map(|r| &r.root)).context("Replying to request")?;
                 }
                 PinWeaverRequest::InsertLeaf { params, responder } => {
                     let request = match PinweaverInsertLeaf::new(params) {
@@ -179,16 +177,14 @@ impl Cr50 {
                     let request = match PinweaverRemoveLeaf::new(params) {
                         Ok(req) => req,
                         Err(e) => {
-                            responder.send(&mut Err(e)).context("Replying to request")?;
+                            responder.send(Err(e)).context("Replying to request")?;
                             continue;
                         }
                     };
 
                     let result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;
-                    responder
-                        .send(&mut result.ok().map(|_| result.root))
-                        .context("Replying to request")?;
+                    responder.send(result.ok().map(|r| &r.root)).context("Replying to request")?;
                 }
                 PinWeaverRequest::TryAuth { params, responder } => {
                     let request = match PinweaverTryAuth::new(params) {
@@ -244,14 +240,14 @@ impl Cr50 {
                     let request = match PinweaverGetLog::new(root_hash) {
                         Ok(req) => req,
                         Err(e) => {
-                            responder.send(&mut Err(e)).context("Replying to request")?;
+                            responder.send(Err(e)).context("Replying to request")?;
                             continue;
                         }
                     };
 
                     let exec_result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;
-                    let mut result = match exec_result.ok() {
+                    let result = match exec_result.ok() {
                         Ok(_) => Ok(exec_result
                             .data
                             .ok_or(anyhow::anyhow!("No data in GetLog?"))?
@@ -289,7 +285,9 @@ impl Cr50 {
                         Err(e) => Err(e),
                     };
 
-                    responder.send(&mut result).context("Replying to request")?;
+                    responder
+                        .send(result.as_deref().map_err(|e| *e))
+                        .context("Replying to request")?;
                 }
                 PinWeaverRequest::LogReplay { params, responder } => {
                     let request = match PinweaverLogReplay::new(params) {

@@ -226,14 +226,14 @@ mod tests {
                     stream.next().await.unwrap().unwrap().into_read_at().unwrap();
                 assert_eq!(count, 50);
                 assert_eq!(offset, 20);
-                responder.send(&mut Ok(contents[..20].to_vec())).unwrap();
+                responder.send(Ok(&contents[..20])).unwrap();
             }
             {
                 let (count, offset, responder) =
                     stream.next().await.unwrap().unwrap().into_read_at().unwrap();
                 assert_eq!(count, 30);
                 assert_eq!(offset, 40);
-                responder.send(&mut Ok(contents[20..].to_vec())).unwrap();
+                responder.send(Ok(&contents[20..])).unwrap();
             }
         };
         future::join(read_at_exact, handle_requests).await;

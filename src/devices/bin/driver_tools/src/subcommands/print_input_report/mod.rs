@@ -112,12 +112,12 @@ mod tests {
             if let Err(e) = reader
                 .map(|result| result.context("Failed input report reader request"))
                 .try_for_each(|request| {
-                    let mut input_reports = Ok(input_reports.clone());
+                    let input_reports = Ok(input_reports.as_slice());
                     async move {
                         match request {
                             fir::InputReportsReaderRequest::ReadInputReports { responder } => {
                                 responder
-                                    .send(&mut input_reports)
+                                    .send(input_reports)
                                     .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                     .context("Failed to respond to ReadInputReports request")?;
                             }

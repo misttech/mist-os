@@ -139,8 +139,8 @@ impl MediaState {
 
     pub fn get_supported_player_application_setting_attributes(
         &self,
-    ) -> Vec<fidl_avrcp::PlayerApplicationSettingAttributeId> {
-        vec![
+    ) -> &'static [fidl_avrcp::PlayerApplicationSettingAttributeId] {
+        &[
             fidl_avrcp::PlayerApplicationSettingAttributeId::RepeatStatusMode,
             fidl_avrcp::PlayerApplicationSettingAttributeId::ShuffleMode,
         ]

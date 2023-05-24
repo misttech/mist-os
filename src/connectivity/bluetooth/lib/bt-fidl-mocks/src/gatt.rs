@@ -7,7 +7,7 @@ use {
     anyhow::Error,
     fidl_fuchsia_bluetooth::Uuid as FidlUuid,
     fidl_fuchsia_bluetooth_gatt::{
-        RemoteServiceMarker, RemoteServiceProxy, RemoteServiceReadByTypeResult,
+        self as gatt, ReadByTypeResult, RemoteServiceMarker, RemoteServiceProxy,
         RemoteServiceRequest, RemoteServiceRequestStream,
     },
     fuchsia_bluetooth::types::Uuid,
@@ -31,17 +31,17 @@ impl RemoteServiceMock {
     pub async fn expect_read_by_type(
         &mut self,
         expected_uuid: Uuid,
-        mut result: RemoteServiceReadByTypeResult,
+        result: Result<&[ReadByTypeResult], gatt::Error>,
     ) -> Result<(), Error> {
         let expected_uuid: FidlUuid = expected_uuid.into();
         expect_call(&mut self.stream, self.timeout, move |req| {
             if let RemoteServiceRequest::ReadByType { uuid, responder } = req {
                 if uuid == expected_uuid {
-                    responder.send(&mut result)?;
+                    responder.send(result)?;
                     Ok(Status::Satisfied(()))
                 } else {
                     // Send error to unexpected request.
-                    responder.send(&mut Err(fidl_fuchsia_bluetooth_gatt::Error::Failure))?;
+                    responder.send(Err(fidl_fuchsia_bluetooth_gatt::Error::Failure))?;
                     Ok(Status::Pending)
                 }
             } else {
@@ -62,7 +62,7 @@ mod tests {
         let (proxy, mut mock) =
             RemoteServiceMock::new(timeout_duration()).expect("failed to create mock");
         let uuid = Uuid::new16(0x180d);
-        let result: RemoteServiceReadByTypeResult = Ok(vec![]);
+        let result = Ok(&[][..]);
 
         let fidl_uuid: FidlUuid = uuid.clone().into();
         let read_by_type = proxy.read_by_type(&fidl_uuid);

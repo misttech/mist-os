@@ -183,7 +183,7 @@ mod tests {
                                 .context("Failed to verify ping")?;
                             *num_pings_received.lock().await += 1;
                             responder
-                                .send(&mut Ok(vec![vec![0]]))
+                                .send(Ok(&[vec![0]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
@@ -208,7 +208,7 @@ mod tests {
                                 .context("Failed to verify ping")?;
                             *num_pings_received.lock().await += 1;
                             responder
-                                .send(&mut Ok(vec![vec![0]]))
+                                .send(Ok(&[vec![0]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
@@ -255,7 +255,7 @@ class/i2c/B: OK
                                 .context("Failed to verify transaction")?;
                             *received_expected_transfer_request.lock().await = true;
                             responder
-                                .send(&mut Ok(vec![vec![245]]))
+                                .send(Ok(&[vec![245]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
@@ -308,7 +308,7 @@ class/i2c/B: OK
                                 .context("Failed to verify transaction")?;
                             *received_expected_transfer_request.lock().await = true;
                             responder
-                                .send(&mut Ok(vec![vec![]]))
+                                .send(Ok(&[vec![]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
@@ -362,7 +362,7 @@ class/i2c/B: OK
                                 .context("Failed to verify transaction")?;
                             *received_expected_transfer_request.lock().await = true;
                             responder
-                                .send(&mut Ok(vec![vec![]]))
+                                .send(Ok(&[vec![]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
@@ -413,7 +413,7 @@ class/i2c/B: OK
                             }
                             *received_expected_transfer_request.lock().await = true;
                             responder
-                                .send(&mut Ok(vec![]))
+                                .send(Ok(&[]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
@@ -474,7 +474,7 @@ class/i2c/B: OK
                                 .context("Failed to verify fifth transaction")?;
                             *received_expected_transfer_request.lock().await = true;
                             responder
-                                .send(&mut Ok(vec![vec![26, 45], vec![8]]))
+                                .send(Ok(&[vec![26, 45], vec![8]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }

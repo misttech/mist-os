@@ -325,8 +325,8 @@ impl FailingWriteFileStreamHandler {
                         responder.send(status, &attrs).unwrap();
                     }
                     fio::FileRequest::Read { count, responder } => {
-                        let mut result = self.backing_file.read(count).await.unwrap();
-                        responder.send(&mut result).unwrap();
+                        let result = self.backing_file.read(count).await.unwrap();
+                        responder.send(result.as_deref().map_err(|e| *e)).unwrap();
                     }
                     fio::FileRequest::Close { responder } => {
                         let backing_file_close_response = self.backing_file.close().await.unwrap();

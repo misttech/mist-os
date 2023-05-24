@@ -779,9 +779,7 @@ mod tests {
 
     use bt_fidl_mocks::gatt2::{ClientMock, RemoteServiceMock};
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_bluetooth_gatt2::{
-        ClientMarker, RemoteServiceReadByTypeResult, ServiceHandle,
-    };
+    use fidl_fuchsia_bluetooth_gatt2::{ClientMarker, ServiceHandle};
     use fuchsia_zircon::DurationNum;
     use futures::{future::FutureExt, join, pin_mut, select};
     use std::vec::Vec;
@@ -800,7 +798,7 @@ mod tests {
         gatt_client.write().active_service = Some(ActiveService::new(service_proxy));
 
         let expected_uuid = Uuid::new16(0x180d);
-        let result: RemoteServiceReadByTypeResult = Ok(vec![]);
+        let result = Ok(&[][..]);
         let expect_fut = service_mock.expect_read_by_type(expected_uuid, result);
 
         let (read_result, expect_result) = join!(read_fut, expect_fut);
