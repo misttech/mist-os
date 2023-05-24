@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/backtrace-request/backtrace-request.h>
-#include <lib/ddk/device.h>
 #include <lib/fit/defer.h>
 
 #include <bitset>

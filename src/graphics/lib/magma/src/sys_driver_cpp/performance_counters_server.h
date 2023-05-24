@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/runtime/include/lib/fdf/cpp/dispatcher.h>
+#include <lib/fdf/cpp/dispatcher.h>
 
 #include "magma_util/macros.h"
 
