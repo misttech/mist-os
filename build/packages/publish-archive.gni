@@ -128,10 +128,6 @@ template("publish_archive") {
         "--delivery-blob-type",
         "${delivery_blob_type}",
       ]
-
-      deps += [ "//src/storage/tools/blobfs-compression:blobfs-compression($host_toolchain)" ]
-
-      inputs += [ "$root_build_dir/host_x64/blobfs-compression" ]
     }
 
     outputs = [

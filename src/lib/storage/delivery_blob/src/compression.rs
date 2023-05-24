@@ -99,10 +99,9 @@ impl ChunkedArchive {
 
     /// Serialize the chunked archive.
     pub fn serialize(self) -> Vec<u8> {
-        let seek_table = self.make_seek_table();
+        let (seek_table, compressed_size) = self.make_seek_table();
         let header = ChunkedArchiveHeader::new(&seek_table);
         let mut serialized: Vec<u8> = Vec::new();
-        let compressed_size: usize = self.chunks.iter().map(|(_, chunk)| chunk.len()).sum();
         serialized.reserve(ChunkedArchiveHeader::header_length(seek_table.len()) + compressed_size);
         serialized.extend_from_slice(header.as_bytes());
         serialized.extend_from_slice(seek_table.as_slice().as_bytes());
@@ -117,6 +116,22 @@ impl ChunkedArchive {
         serialized
     }
 
+    pub fn serialized_size(&self) -> usize {
+        let (seek_table, compressed_size) = self.make_seek_table();
+        ChunkedArchiveHeader::header_length(seek_table.len()) + compressed_size
+    }
+
+    pub fn write(self, mut writer: impl std::io::Write) -> Result<(), std::io::Error> {
+        let (seek_table, _compressed_size) = self.make_seek_table();
+        let header = ChunkedArchiveHeader::new(&seek_table);
+        writer.write_all(header.as_bytes())?;
+        writer.write_all(seek_table.as_slice().as_bytes())?;
+        for (_, chunk) in self.chunks {
+            writer.write_all(&chunk)?;
+        }
+        Ok(())
+    }
+
     /// Calculate how large chunks must be for a given uncompressed buffer.
     fn chunk_size_for(uncompressed_length: usize, chunk_alignment: usize) -> usize {
         if uncompressed_length <= (Self::MAX_CHUNKS * Self::TARGET_CHUNK_SIZE) {
@@ -126,7 +141,7 @@ impl ChunkedArchive {
         return round_up(chunk_size, chunk_alignment);
     }
 
-    fn make_seek_table(&self) -> Vec<SeekTableEntry> {
+    fn make_seek_table(&self) -> (Vec<SeekTableEntry>, usize) {
         let header_length = ChunkedArchiveHeader::header_length(self.chunks.len());
         let mut seek_table = vec![];
         seek_table.reserve(self.chunks.len());
@@ -142,7 +157,7 @@ impl ChunkedArchive {
             compressed_size += chunk.len();
             decompressed_offset += *chunk_size;
         }
-        seek_table
+        (seek_table, compressed_size)
     }
 }
 

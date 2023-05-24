@@ -31,7 +31,7 @@ func TestTargetListEmpty(t *testing.T) {
 		t.Fatalf("Failed to marshal: %s", err)
 	}
 	ffxtoolScript := createScript(t, string(data))
-	ffx, err := NewFFXTool(ffxtoolScript, "")
+	ffx, err := NewFFXTool(ffxtoolScript)
 	if err != nil {
 		t.Fatalf("Failed to create ffx tool: %s", err)
 	}
@@ -54,7 +54,7 @@ func TestTargetList(t *testing.T) {
 		t.Fatalf("Failed to marshal: %s", err)
 	}
 	ffxtoolScript := createScript(t, string(data))
-	ffx, err := NewFFXTool(ffxtoolScript, "")
+	ffx, err := NewFFXTool(ffxtoolScript)
 	if err != nil {
 		t.Fatalf("Failed to create ffx tool: %s", err)
 	}

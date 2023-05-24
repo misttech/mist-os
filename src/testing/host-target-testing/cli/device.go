@@ -36,7 +36,6 @@ type DeviceConfig struct {
 	deviceFinderPath         string
 	ffxPath                  string
 	ffx                      *ffx.FFXTool
-	blobfsCompressionPath    string
 	deviceName               string
 	deviceHostname           string
 	deviceResolverMode       DeviceResolverMode
@@ -57,7 +56,6 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.deviceHostname, "device-hostname", os.Getenv(constants.DeviceAddrEnvKey), "device hostname or IPv4/IPv6 address")
 	fs.StringVar(&c.deviceResolverMode, "device-resolver", FfxResolver, "device resolver (default: ffx)")
 	fs.StringVar(&c.ffxPath, "ffx-path", "host-tools/ffx", "ffx tool path")
-	fs.StringVar(&c.blobfsCompressionPath, "blobfs-compression-path", filepath.Join(testDataPath, "blobfs-compression"), "blobfs-compression tool path")
 	fs.IntVar(&c.deviceSshPort, "device-ssh-port", 22, "device port")
 	fs.StringVar(&c.deviceFinderPath, "device-finder-path", "", "device-finder tool path")
 	fs.StringVar(&c.SerialSocketPath, "device-serial", "", "device serial path")
@@ -78,7 +76,6 @@ func (c *DeviceConfig) Validate() error {
 	for _, s := range []string{
 		c.sshKeyFile,
 		c.ffxPath,
-		c.blobfsCompressionPath,
 		c.SerialSocketPath,
 	} {
 		if err := util.ValidatePath(s); err != nil {
@@ -90,7 +87,7 @@ func (c *DeviceConfig) Validate() error {
 
 func (c *DeviceConfig) FFXTool() (*ffx.FFXTool, error) {
 	if c.ffx == nil {
-		ffx, err := ffx.NewFFXTool(c.ffxPath, c.blobfsCompressionPath)
+		ffx, err := ffx.NewFFXTool(c.ffxPath)
 		if err != nil {
 			return nil, err
 		}

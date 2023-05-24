@@ -13,6 +13,7 @@ rustc_library("delivery_blob") {
   visibility = [
     "//src/lib/storage/*",
     "//src/storage/*",
+    "//src/sys/pkg/lib/fuchsia-repo/*",
   ]
   sources = [
     "src/compression.rs",

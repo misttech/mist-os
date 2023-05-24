@@ -47,7 +47,7 @@ func createAndRunFlasher(t *testing.T, options ...BuildFlasherOption) string {
 	var output bytes.Buffer
 	options = append(options, Stdout(&output))
 	flash_manifest := "dir/flash.json"
-	ffx, err := ffx.NewFFXTool(ffxPath, "")
+	ffx, err := ffx.NewFFXTool(ffxPath)
 	if err != nil {
 		t.Fatal(err)
 	}

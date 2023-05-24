@@ -14,6 +14,7 @@ use {
     },
     anyhow::Result,
     camino::{Utf8Path, Utf8PathBuf},
+    delivery_blob::DeliveryBlobType,
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, stream::BoxStream, AsyncRead},
     std::{collections::BTreeSet, fmt::Debug, time::SystemTime},
@@ -61,14 +62,8 @@ impl PmRepositoryBuilder {
     }
 
     /// Set the type of delivery blob to generate when copying blobs into the repository.
-    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<u32>) -> Self {
+    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<DeliveryBlobType>) -> Self {
         self.builder = self.builder.delivery_blob_type(delivery_blob_type);
-        self
-    }
-
-    /// Set the path to the blobfs-compression tool.
-    pub fn blobfs_compression_path(mut self, blobfs_compression_path: Utf8PathBuf) -> Self {
-        self.builder = self.builder.blobfs_compression_path(blobfs_compression_path);
         self
     }
 

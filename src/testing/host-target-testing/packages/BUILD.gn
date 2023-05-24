@@ -35,17 +35,9 @@ if (is_host) {
   go_test("host-target-testing-packages-test") {
     library = ":packages"
     data_deps = [
-      ":blobfs-compression",
       "//src/developer/ffx:test_data",
       "//src/developer/ffx/lib/pkg:empty-repo-keys",
       "//src/developer/ffx/plugins/repository:ffx_repository_tool_test_data",
     ]
-  }
-
-  host_test_data("blobfs-compression") {
-    sources = [ "$root_build_dir/host_x64/blobfs-compression" ]
-    deps = [ "//src/storage/tools/blobfs-compression" ]
-
-    visibility = [ ":*" ]
   }
 }

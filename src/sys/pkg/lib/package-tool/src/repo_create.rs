@@ -56,7 +56,6 @@ mod tests {
             depfile: None,
             copy_mode: CopyMode::Copy,
             delivery_blob_type: None,
-            blobfs_compression_path: None,
             ignore_missing_packages: false,
             blob_manifest: None,
             blob_repo_dir: None,

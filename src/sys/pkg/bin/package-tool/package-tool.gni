@@ -383,9 +383,6 @@ template("package_tool_repository_publish") {
     if (defined(invoker.repo_deps)) {
       public_deps += invoker.repo_deps
     }
-    if (delivery_blob_type != false) {
-      public_deps += [ "//src/storage/tools/blobfs-compression:blobfs-compression($host_toolchain)" ]
-    }
   }
 
   compiled_action(target_name) {
@@ -432,10 +429,6 @@ template("package_tool_repository_publish") {
 
     if (defined(invoker.output_blob_manifest_path)) {
       outputs += [ invoker.output_blob_manifest_path ]
-    }
-
-    if (delivery_blob_type != false) {
-      inputs += [ "$root_build_dir/host_x64/blobfs-compression" ]
     }
 
     if (defined(sources)) {

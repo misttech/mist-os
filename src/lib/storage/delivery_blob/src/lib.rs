@@ -40,6 +40,19 @@ pub fn generate(delivery_type: DeliveryBlobType, data: &[u8]) -> Vec<u8> {
     }
 }
 
+/// Generate a delivery blob of the specified `delivery_type` for `data` using default parameters
+/// and write the generated blob to `writer`.
+pub fn generate_to(
+    delivery_type: DeliveryBlobType,
+    data: &[u8],
+    writer: impl std::io::Write,
+) -> Result<(), std::io::Error> {
+    match delivery_type {
+        DeliveryBlobType::Type1 => Type1Blob::generate_to(data, CompressionMode::Attempt, writer),
+        _ => panic!("Unsupported delivery blob type: {:?}", delivery_type),
+    }
+}
+
 /// Obtain the file path to use when writing `blob_name` as a delivery blob.
 pub fn delivery_blob_path(blob_name: impl std::fmt::Display) -> String {
     format!("{}{}", DELIVERY_PATH_PREFIX, blob_name)
@@ -140,6 +153,46 @@ impl Type1Blob {
         let blob_header: SerializedType1Blob =
             Self { header: Type1Blob::HEADER, payload_length: payload.len(), is_compressed }.into();
         [blob_header.as_bytes(), payload].concat()
+    }
+
+    pub fn generate_to(
+        data: &[u8],
+        compression_mode: CompressionMode,
+        mut writer: impl std::io::Write,
+    ) -> Result<(), std::io::Error> {
+        let chunked_archive = match compression_mode {
+            CompressionMode::Attempt | CompressionMode::Always => {
+                const CHUNK_ALIGNMENT: usize = fuchsia_merkle::BLOCK_SIZE;
+                let compressed = crate::compression::ChunkedArchive::new(data, CHUNK_ALIGNMENT);
+                let use_compressed = compression_mode == CompressionMode::Always
+                    || compressed.serialized_size() < data.len();
+                use_compressed.then_some(compressed)
+            }
+            CompressionMode::Never => None,
+        };
+        match chunked_archive {
+            Some(chunked_archive) => {
+                let blob_header: SerializedType1Blob = Self {
+                    header: Type1Blob::HEADER,
+                    payload_length: chunked_archive.serialized_size(),
+                    is_compressed: true,
+                }
+                .into();
+                writer.write_all(blob_header.as_bytes())?;
+                chunked_archive.write(writer)?;
+            }
+            None => {
+                let blob_header: SerializedType1Blob = Self {
+                    header: Type1Blob::HEADER,
+                    payload_length: data.len(),
+                    is_compressed: false,
+                }
+                .into();
+                writer.write_all(blob_header.as_bytes())?;
+                writer.write_all(data)?;
+            }
+        }
+        Ok(())
     }
 
     /// Attempt to parse `data` as a Type 1 delivery blob. On success, returns validated blob info,

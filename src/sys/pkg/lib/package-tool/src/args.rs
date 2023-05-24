@@ -178,10 +178,6 @@ pub struct RepoPublishCommand {
     #[argh(option)]
     pub delivery_blob_type: Option<u32>,
 
-    /// path to the blobfs-compression tool
-    #[argh(option)]
-    pub blobfs_compression_path: Option<Utf8PathBuf>,
-
     /// republish packages on file change
     #[argh(switch)]
     pub watch: bool,

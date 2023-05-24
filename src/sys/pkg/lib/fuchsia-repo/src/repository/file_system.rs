@@ -11,6 +11,7 @@ use {
     anyhow::{Context as _, Result},
     async_fs::DirBuilder,
     camino::{Utf8Component, Utf8Path, Utf8PathBuf},
+    delivery_blob::DeliveryBlobType,
     fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fuchsia_async as fasync,
     fuchsia_merkle::Hash,
@@ -65,8 +66,7 @@ pub struct FileSystemRepositoryBuilder {
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
     aliases: BTreeSet<String>,
-    delivery_blob_type: Option<u32>,
-    blobfs_compression_path: Utf8PathBuf,
+    delivery_blob_type: Option<DeliveryBlobType>,
 }
 
 impl FileSystemRepositoryBuilder {
@@ -79,7 +79,6 @@ impl FileSystemRepositoryBuilder {
             copy_mode: CopyMode::Copy,
             aliases: BTreeSet::new(),
             delivery_blob_type: None,
-            blobfs_compression_path: "host_x64/blobfs-compression".into(),
         }
     }
 
@@ -104,14 +103,8 @@ impl FileSystemRepositoryBuilder {
     }
 
     /// Set the type of delivery blob to generate when copying blobs into the repository.
-    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<u32>) -> Self {
+    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<DeliveryBlobType>) -> Self {
         self.delivery_blob_type = delivery_blob_type;
-        self
-    }
-
-    /// Set the path to the blobfs-compression tool.
-    pub fn blobfs_compression_path(mut self, blobfs_compression_path: Utf8PathBuf) -> Self {
-        self.blobfs_compression_path = blobfs_compression_path;
         self
     }
 
@@ -129,7 +122,6 @@ impl FileSystemRepositoryBuilder {
             copy_mode: self.copy_mode,
             aliases: self.aliases,
             delivery_blob_type: self.delivery_blob_type,
-            blobfs_compression_path: self.blobfs_compression_path,
             tuf_repo: TufFileSystemRepositoryBuilder::new(self.metadata_repo_path)
                 .targets_prefix("targets")
                 .build(),
@@ -144,8 +136,7 @@ pub struct FileSystemRepository {
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
     aliases: BTreeSet<String>,
-    delivery_blob_type: Option<u32>,
-    blobfs_compression_path: Utf8PathBuf,
+    delivery_blob_type: Option<DeliveryBlobType>,
     tuf_repo: TufFileSystemRepository<Pouf1>,
 }
 
@@ -388,11 +379,11 @@ impl RepoStorage for FileSystemRepository {
                 }
             }
 
-            if let Some(blob_type) = &self.delivery_blob_type {
-                let dst = sanitize_path(&self.blob_repo_path, &format!("{blob_type}/{hash}"))?;
+            if let Some(blob_type) = self.delivery_blob_type {
+                let dst =
+                    sanitize_path(&self.blob_repo_path, &format!("{}/{hash}", blob_type as u32))?;
                 if self.copy_mode == CopyMode::CopyOverwrite || !path_exists(&dst).await? {
-                    generate_delivery_blob(&src, &dst, *blob_type, &self.blobfs_compression_path)
-                        .await?;
+                    generate_delivery_blob(&src, &dst, blob_type).await?;
                 }
             }
 
@@ -443,23 +434,17 @@ async fn copy_blob(src: &Utf8Path, dst: &Utf8Path) -> Result<()> {
 async fn generate_delivery_blob(
     src: &Utf8Path,
     dst: &Utf8Path,
-    blob_type: u32,
-    blobfs_compression_path: &Utf8Path,
+    blob_type: DeliveryBlobType,
 ) -> Result<()> {
-    let temp_path = create_temp_file(dst).await?;
+    let src_blob = async_fs::read(src).await.with_context(|| format!("reading {src}"))?;
 
-    let mut compressed_file_arg = std::ffi::OsString::from("--compressed_file=");
-    compressed_file_arg.push(temp_path.as_os_str());
-    let mut child = std::process::Command::new(blobfs_compression_path)
-        .arg(format!("--source_file={src}"))
-        .arg(compressed_file_arg)
-        .arg(format!("--type={blob_type}"))
-        .spawn()
-        .context("spawn blobfs-compression")?;
-    let status = fasync::unblock(move || child.wait()).await.context("wait blobfs-compression")?;
-    if !status.success() {
-        anyhow::bail!("blobfs-compression failed: {status}");
-    }
+    let temp_path = create_temp_file(dst).await?;
+    let file = std::fs::File::create(&temp_path)?;
+    fasync::unblock(move || {
+        delivery_blob::generate_to(blob_type, &src_blob, std::io::BufWriter::new(file))
+    })
+    .await
+    .context("generate delivery blob")?;
 
     temp_path.persist(dst)?;
 
@@ -773,7 +758,7 @@ mod tests {
         std::fs::create_dir(&blob_repo_path).unwrap();
 
         let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
-            .delivery_blob_type(Some(1))
+            .delivery_blob_type(Some(DeliveryBlobType::Type1))
             .build();
 
         // Store the blob.

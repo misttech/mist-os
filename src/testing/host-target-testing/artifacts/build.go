@@ -328,7 +328,7 @@ func (b *ArtifactsBuild) getFlasher(ctx context.Context) (*flasher.BuildFlasher,
 		return nil, fmt.Errorf("failed to make ffxPath executable: %w", err)
 	}
 
-	ffx, err := ffx.NewFFXTool(ffxPath, "")
+	ffx, err := ffx.NewFFXTool(ffxPath)
 	if err != nil {
 		return nil, err
 	}
@@ -401,8 +401,7 @@ func (b *FuchsiaDirBuild) GetBootserver(ctx context.Context) (string, error) {
 
 func (b *FuchsiaDirBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
 	ffxPath := filepath.Join(b.dir, "host_x64/ffx")
-	blobfsCompressionPath := filepath.Join(b.dir, "host_x64/blobfs-compression")
-	return ffx.NewFFXTool(ffxPath, blobfsCompressionPath)
+	return ffx.NewFFXTool(ffxPath)
 }
 
 func (b *FuchsiaDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
@@ -496,7 +495,7 @@ func (b *ProductBundleDirBuild) GetBootserver(ctx context.Context) (string, erro
 
 func (b *ProductBundleDirBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
 	ffxPath := filepath.Join(b.dir, "ffx")
-	return ffx.NewFFXTool(ffxPath, "")
+	return ffx.NewFFXTool(ffxPath)
 }
 
 func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, error) {

@@ -209,12 +209,10 @@ pub async fn repo_package_manifest_list(
 }
 
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
-    let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
-        .copy_mode(cmd.copy_mode)
-        .delivery_blob_type(cmd.delivery_blob_type);
+    let mut repo_builder = PmRepository::builder(cmd.repo_path.clone()).copy_mode(cmd.copy_mode);
 
-    if let Some(path) = &cmd.blobfs_compression_path {
-        repo_builder = repo_builder.blobfs_compression_path(path.clone());
+    if let Some(blob_type) = cmd.delivery_blob_type {
+        repo_builder = repo_builder.delivery_blob_type(Some(blob_type.try_into()?));
     }
 
     if let Some(path) = &cmd.blob_repo_dir {
@@ -540,7 +538,6 @@ mod tests {
             depfile: None,
             copy_mode: CopyMode::Copy,
             delivery_blob_type: None,
-            blobfs_compression_path: None,
             ignore_missing_packages: false,
             blob_manifest: None,
             blob_repo_dir: None,

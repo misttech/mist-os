@@ -56,7 +56,7 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	}
 
 	// Publish the config to the repo.
-	ffx, err := ffx.NewFFXTool("host-tools/ffx", "host_x64/blobfs-compression")
+	ffx, err := ffx.NewFFXTool("host-tools/ffx")
 	if err != nil {
 		t.Fatalf("failed to create FFXTool: %s", err)
 	}
@@ -210,7 +210,7 @@ func TestPublish(t *testing.T) {
 		t.Fatalf("Delivery blob does not exist '%s'. %s", pkgMerkle, err)
 	}
 
-	ffx, err := ffx.NewFFXTool("host-tools/ffx", "host_x64/blobfs-compression")
+	ffx, err := ffx.NewFFXTool("host-tools/ffx")
 	if err != nil {
 		t.Fatalf("failed to create FFXTool: %s", err)
 	}
