@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "trace/client.shard.cml" ],
     collections: [
         {
             name: "media-tests",
@@ -24,9 +25,6 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
-
-                // Tests can produce traces.
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: [ "#media-tests" ],

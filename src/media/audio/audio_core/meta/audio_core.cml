@@ -5,6 +5,7 @@
     include: [
         "//sdk/lib/inspect/client.shard.cml",
         "//sdk/lib/syslog/client.shard.cml",
+        "//sdk/lib/trace/use.shard.cml",
     ],
     program: {
         // The binary is specified by a shard.
@@ -31,7 +32,6 @@
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.thermal.ClientStateConnector",
-                "fuchsia.tracing.provider.Registry",
             ],
         },
         {

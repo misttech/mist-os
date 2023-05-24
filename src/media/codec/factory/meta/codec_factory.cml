@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -44,7 +45,6 @@
             protocol: [
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.sysinfo.SysInfo",
-                "fuchsia.tracing.provider.Registry",
             ],
         },
         {
@@ -57,7 +57,6 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: [

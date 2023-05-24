@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "trace/client.shard.cml" ],
     collections: [
         {
             name: "drm-tests",
@@ -26,9 +27,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
-
-                // Tests can produce trace.
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: "#drm-tests",
