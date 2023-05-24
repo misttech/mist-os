@@ -50,7 +50,7 @@ class VirtualAudioUtil {
     CLEAR_FORMAT_RANGES,
     SET_CLOCK_DOMAIN,
     SET_INITIAL_CLOCK_RATE,
-    SET_FIFO_DEPTH,
+    SET_TRANSFER_BYTES,
     SET_EXTERNAL_DELAY,
     SET_RING_BUFFER_RESTRICTIONS,
     SET_GAIN_PROPS,
@@ -93,7 +93,7 @@ class VirtualAudioUtil {
       {"clear-format", Command::CLEAR_FORMAT_RANGES},
       {"domain", Command::SET_CLOCK_DOMAIN},
       {"initial-rate", Command::SET_INITIAL_CLOCK_RATE},
-      {"fifo", Command::SET_FIFO_DEPTH},
+      {"transfer", Command::SET_TRANSFER_BYTES},
       {"delay", Command::SET_EXTERNAL_DELAY},
       {"rb", Command::SET_RING_BUFFER_RESTRICTIONS},
       {"gain-props", Command::SET_GAIN_PROPS},
@@ -133,7 +133,7 @@ class VirtualAudioUtil {
 
   static constexpr uint8_t kDefaultFormatRangeOption = 0;
 
-  static constexpr uint32_t kDefaultFifoDepth = 0x100;
+  static constexpr uint32_t kDefaultTransferBytes = 0x100;
   static constexpr int64_t kDefaultExternalDelayNsec = zx::msec(1).get();
   static constexpr uint8_t kDefaultRingBufferOption = 0;
 
@@ -176,7 +176,7 @@ class VirtualAudioUtil {
   bool ClearFormatRanges();
   bool SetClockDomain(const std::string& clock_domain_str);
   bool SetInitialClockRate(const std::string& initial_clock_rate_str);
-  bool SetFifoDepth(const std::string& fifo_str);
+  bool SetTransferBytes(const std::string& transfer_bytes_str);
   bool SetExternalDelay(const std::string& delay_str);
   bool SetRingBufferRestrictions(const std::string& rb_restr_str);
   bool SetGainProps(const std::string& gain_props_str);
@@ -489,8 +489,8 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
     case Command::CLEAR_FORMAT_RANGES:
       success = ClearFormatRanges();
       break;
-    case Command::SET_FIFO_DEPTH:
-      success = SetFifoDepth(value);
+    case Command::SET_TRANSFER_BYTES:
+      success = SetTransferBytes(value);
       break;
     case Command::SET_EXTERNAL_DELAY:
       success = SetExternalDelay(value);
@@ -604,7 +604,7 @@ void VirtualAudioUtil::Usage() {
   printf("  --domain[=<NUM>]\t  Set device clock domain (default 0)\n");
   printf(
       "  --initial-rate[=<NUM>]  Set initial device clock rate in PPM [-1000, 1000] (default 0)\n");
-  printf("  --fifo[=<BYTES>]\t  Set the FIFO depth, in bytes (default 256)\n");
+  printf("  --transfer[=<BYTES>]\t  Set the transfer bytes, in bytes (default 256)\n");
   printf("  --delay[=<MSEC>]\t  Set external delay (default 1 ms)\n");
   printf(
       "  --rb[=<NUM>]\t\t  Set ring-buffer restrictions [0,2] (default 48k-72k frames mod 6k)\n");
@@ -839,9 +839,10 @@ bool VirtualAudioUtil::ClearFormatRanges() {
   return true;
 }
 
-bool VirtualAudioUtil::SetFifoDepth(const std::string& fifo_str) {
-  config()->set_driver_transfer_bytes(
-      (fifo_str.empty() ? kDefaultFifoDepth : fxl::StringToNumber<uint32_t>(fifo_str)));
+bool VirtualAudioUtil::SetTransferBytes(const std::string& transfer_bytes_str) {
+  config()->set_driver_transfer_bytes((transfer_bytes_str.empty()
+                                           ? kDefaultTransferBytes
+                                           : fxl::StringToNumber<uint32_t>(transfer_bytes_str)));
   return true;
 }
 
