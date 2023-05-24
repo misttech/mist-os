@@ -333,7 +333,7 @@ rustc_binary("starnix_kernel_bin") {
     features += [ "in_thread_exceptions" ]
   }
   if (starnix_disable_logging) {
-    features += [ "disable_logging" ]
+    features = [ "disable_logging" ]
   }
   if (starnix_disable_tracing) {
     features += [ "disable_tracing" ]

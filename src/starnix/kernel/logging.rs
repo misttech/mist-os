@@ -2,88 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::types::{pid_t, Errno};
 use fuchsia_zircon as zx;
-use std::ffi::CString;
+use std::{cell::RefCell, fmt};
 
-#[cfg(not(feature = "disable_logging"))]
-mod enabled {
-    use super::*;
-    use std::{fmt, sync::Arc};
-
-    #[derive(Clone)]
-    pub struct Span(Arc<tracing::Span>);
-    pub struct SpanGuard<'a>(tracing::span::Entered<'a>);
-
-    /// Used to track the current thread's logical context.
-    /// The thread with this set is used to service syscalls for a specific user thread, and this
-    /// describes the user thread's identity.
-    struct TaskDebugInfo {
-        pid: pid_t,
-        tid: pid_t,
-        command: String,
-    }
-
-    impl fmt::Display for TaskDebugInfo {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}:{}[{}]", self.pid, self.tid, self.command)
-        }
-    }
-
-    impl Span {
-        pub fn new(pid: pid_t, tid: pid_t, command: &CString) -> Self {
-            let debug_info =
-                TaskDebugInfo { pid, tid, command: command.to_string_lossy().to_string() };
-            // We wrap this in an Arc, since when we enter the span, the lifetimte of the returned
-            // guard is '_ therefore limiting our ability to get exclusive references to the Task
-            // within the scope of the Entered guard.
-            Self(Arc::new(tracing::info_span!("", tag = %debug_info)))
-        }
-
-        pub fn update(&self, pid: pid_t, tid: pid_t, command: &CString) {
-            let debug_info =
-                TaskDebugInfo { pid, tid, command: command.to_string_lossy().to_string() };
-            let debug_info = debug_info.to_string();
-            self.0.record("tag", &debug_info.as_str());
-        }
-
-        pub fn enter(&self) -> SpanGuard<'_> {
-            SpanGuard(self.0.enter())
-        }
-    }
-}
-
-#[cfg(feature = "disable_logging")]
-mod disabled {
-    use super::*;
-
-    #[derive(Clone)]
-    pub struct Span;
-    pub struct SpanGuard;
-
-    impl Span {
-        pub fn new(pid: pid_t, tid: pid_t, command: &CString) -> Self {
-            Span
-        }
-
-        pub fn enter(&self) -> SpanGuard {
-            SpanGuard
-        }
-
-        pub fn update(&self, _pid: pid_t, _tid: pid_t, _command: &CString) {}
-    }
-}
-
-#[cfg(not(feature = "disable_logging"))]
-pub use enabled::*;
-
-#[cfg(feature = "disable_logging")]
-pub use disabled::*;
+use crate::task::CurrentTask;
+use crate::types::{pid_t, Errno};
 
 macro_rules! log {
     (level = $level:ident, $($arg:tt)*) => {{
         #[cfg(not(feature = "disable_logging"))]
-        tracing::$level!($($arg)*);
+        {
+            $crate::logging::with_current_task_info(|_task_info| {
+                tracing::$level!(tag = %_task_info, $($arg)*);
+            });
+        }
     }};
 }
 
@@ -160,6 +92,55 @@ fn truncate_name(name: &[u8]) -> std::ffi::CString {
 
 pub fn set_zx_name(obj: &impl zx::AsHandleRef, name: &[u8]) {
     obj.set_name(&truncate_name(name)).map_err(impossible_error).unwrap();
+}
+
+/// Set the context for log messages from this thread. Should only be called when a thread has been
+/// created to execute a user-level task, and should only be called once at the start of that
+/// thread's execution.
+pub fn set_current_task_info(current_task: &CurrentTask) {
+    CURRENT_TASK_INFO.with(|task_info| {
+        *task_info.borrow_mut() = TaskDebugInfo::User {
+            pid: current_task.task.thread_group.leader,
+            tid: current_task.id,
+            command: current_task.task.command().to_string_lossy().to_string(),
+        };
+    });
+}
+
+/// Access this thread's task info for debugging. Intended for use internally by Starnix's log
+/// macros.
+///
+/// *Do not use this for kernel logic.* If you need access to the current pid/tid/etc for the
+/// purposes of writing kernel logic beyond logging for debugging purposes, those should be accessed
+/// through the `CurrentTask` type as an argument explicitly passed to your function.
+pub fn with_current_task_info<T>(f: impl FnOnce(&(dyn fmt::Display)) -> T) -> T {
+    CURRENT_TASK_INFO.with(|task_info| f(&task_info.borrow()))
+}
+
+/// Used to track the current thread's logical context.
+enum TaskDebugInfo {
+    /// The thread with this set is used for internal logic within the starnix kernel.
+    Kernel,
+    /// The thread with this set is used to service syscalls for a specific user thread, and this
+    /// describes the user thread's identity.
+    User { pid: pid_t, tid: pid_t, command: String },
+}
+
+// TODO(b/280356702) replace this with a tracing span
+thread_local! {
+    /// When a thread in this kernel is started, it is a kthread by default. Once the thread
+    /// becomes aware of the user-level task it is executing, this thread-local should be set to
+    /// include that info.
+    static CURRENT_TASK_INFO: RefCell<TaskDebugInfo> = RefCell::new(TaskDebugInfo::Kernel);
+}
+
+impl fmt::Display for TaskDebugInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Kernel => write!(f, "kthread"),
+            Self::User { pid, tid, command } => write!(f, "{}:{}[{}]", pid, tid, command),
+        }
+    }
 }
 
 #[cfg(test)]
