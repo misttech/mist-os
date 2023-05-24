@@ -127,6 +127,13 @@ impl<I: Instant> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<I> {
     }
 }
 
+/// The flags for an IP device.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct IpDeviceFlags {
+    /// Is the device enabled?
+    pub ip_enabled: bool,
+}
+
 /// The state common to all IP devices.
 #[derive(GenericOverIp)]
 #[cfg_attr(test, derive(Debug))]
@@ -145,6 +152,9 @@ pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIp
     /// The default TTL (IPv4) or hop limit (IPv6) for outbound packets sent
     /// over this device.
     pub default_hop_limit: RwLock<NonZeroU8>,
+
+    /// The flags for this device.
+    flags: Mutex<IpDeviceFlags>,
 }
 
 impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv4>>
@@ -196,6 +206,16 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.ipv4.ip_state.default_hop_limit.write()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv4>> for DualStackIpDeviceState<I> {
+    type Data = IpDeviceFlags;
+    type Guard<'l> = crate::sync::LockGuard<'l, IpDeviceFlags>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Guard<'_> {
+        self.ipv4.ip_state.flags.lock()
     }
 }
 
@@ -251,12 +271,23 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>
     }
 }
 
+impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv6>> for DualStackIpDeviceState<I> {
+    type Data = IpDeviceFlags;
+    type Guard<'l> = crate::sync::LockGuard<'l, IpDeviceFlags>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Guard<'_> {
+        self.ipv6.ip_state.flags.lock()
+    }
+}
+
 impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<Instant, I> {
     fn default() -> IpDeviceState<Instant, I> {
         IpDeviceState {
             addrs: Default::default(),
             multicast_groups: Default::default(),
             default_hop_limit: RwLock::new(DEFAULT_HOP_LIMIT),
+            flags: Default::default(),
         }
     }
 }
@@ -357,12 +388,63 @@ impl<I: Instant> AsMut<IpDeviceState<I, Ipv4>> for Ipv4DeviceState<I> {
     }
 }
 
+/// IPv4 device configurations and flags.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Ipv4DeviceConfigurationAndFlags {
+    /// The IPv4 device configuration.
+    pub config: Ipv4DeviceConfiguration,
+    /// The IPv4 device flags.
+    pub flags: IpDeviceFlags,
+}
+
+impl AsRef<IpDeviceConfiguration> for Ipv4DeviceConfigurationAndFlags {
+    fn as_ref(&self) -> &IpDeviceConfiguration {
+        self.config.as_ref()
+    }
+}
+
+impl AsMut<IpDeviceConfiguration> for Ipv4DeviceConfigurationAndFlags {
+    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
+        self.config.as_mut()
+    }
+}
+
+impl AsRef<IpDeviceFlags> for Ipv4DeviceConfigurationAndFlags {
+    fn as_ref(&self) -> &IpDeviceFlags {
+        &self.flags
+    }
+}
+
+/// IPv6 device configurations and flags.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Ipv6DeviceConfigurationAndFlags {
+    /// The IPv6 device configuration.
+    pub config: Ipv6DeviceConfiguration,
+    /// The IPv6 device flags.
+    pub flags: IpDeviceFlags,
+}
+
+impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfigurationAndFlags {
+    fn as_ref(&self) -> &IpDeviceConfiguration {
+        self.config.as_ref()
+    }
+}
+
+impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfigurationAndFlags {
+    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
+        self.config.as_mut()
+    }
+}
+
+impl AsRef<IpDeviceFlags> for Ipv6DeviceConfigurationAndFlags {
+    fn as_ref(&self) -> &IpDeviceFlags {
+        &self.flags
+    }
+}
+
 /// Configurations common to all IP devices.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct IpDeviceConfiguration {
-    /// Is IP enabled for this device.
-    pub ip_enabled: bool,
-
     /// Is a Group Messaging Protocol (GMP) enabled for this device?
     ///
     /// If `gmp_enabled` is false, multicast groups will still be added to

@@ -46,8 +46,10 @@ use crate::{
             slaac::{SlaacConfiguration, SlaacHandler, SlaacTimerId},
             state::{
                 AddrConfig, DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration,
-                IpDeviceState, IpDeviceStateIpExt, Ipv4DeviceConfiguration, Ipv4DeviceState,
-                Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceState,
+                IpDeviceFlags, IpDeviceState, IpDeviceStateIpExt, Ipv4DeviceConfiguration,
+                Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddressFlags,
+                Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
+                Ipv6DeviceState,
             },
         },
         gmp::{
@@ -472,6 +474,18 @@ pub(crate) trait IpDeviceStateContext<I: IpDeviceIpExt, C: InstantContext>:
         AddressId = Self::AddressId,
     >;
 
+    /// Calls the function with immutable access to the device's flags.
+    ///
+    /// Note that this trait should only provide immutable access to the flags.
+    /// Changes to the IP device flags must only be performed while synchronizing
+    /// with the IP device configuration, so mutable access to the flags is through
+    /// `WithIpDeviceConfigurationMutInner::with_configuration_and_flags_mut`.
+    fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
     /// Adds an IP address for the device.
     fn add_ip_address(
         &mut self,
@@ -562,8 +576,16 @@ pub(crate) trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, C: InstantC
         &mut self,
     ) -> (&I::Configuration, Self::IpDeviceStateCtx<'_>);
 
-    /// Returns a mutable reference to a device's IP configuration.
-    fn configuration_mut(&mut self) -> &mut I::Configuration;
+    /// Calls the function with a mutable reference to a device's IP
+    /// configuration and flags.
+    fn with_configuration_and_flags_mut<
+        O,
+        F: FnOnce(&mut I::Configuration, &mut IpDeviceFlags) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
 }
 
 /// The execution context for IP devices.
@@ -1394,8 +1416,10 @@ pub(crate) fn add_ipv4_addr_subnet<
     device_id: &SC::DeviceId,
     addr_sub: AddrSubnet<Ipv4Addr>,
 ) -> Result<(), ExistsError> {
-    sync_ctx.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
-        let address_state = match config.ip_config.ip_enabled {
+    sync_ctx.with_ip_device_configuration(device_id, |_config, mut sync_ctx| {
+        let address_state = match sync_ctx
+            .with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled)
+        {
             true => IpAddressState::Assigned,
             false => IpAddressState::Unavailable,
         };
@@ -1449,19 +1473,19 @@ fn add_ipv6_addr_subnet_with_config<
     device_id: &SC::DeviceId,
     addr_sub: AddrSubnet<Ipv6Addr>,
     addr_config: AddrConfig<C::Instant>,
-    device_config: &Ipv6DeviceConfiguration,
+    // Not used but required to make sure that the caller is currently holding a
+    // a reference to the IP device's IP configuration as a way to prove that
+    // caller has synchronized this operation with other accesses to the IP
+    // device configuration.
+    _device_config: &Ipv6DeviceConfiguration,
 ) -> Result<SC::AddressId, ExistsError> {
     let addr_sub = addr_sub.to_unicast();
 
     let addr_id = sync_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
     assert_eq!(addr_id.addr(), addr_sub.addr().into_specified());
 
-    let Ipv6DeviceConfiguration {
-        dad_transmits: _,
-        max_router_solicitations: _,
-        slaac_config: _,
-        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _, forwarding_enabled: _ },
-    } = device_config;
+    let ip_enabled =
+        sync_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
     let state = match ip_enabled {
         true => IpAddressState::Tentative,
@@ -1474,7 +1498,7 @@ fn add_ipv6_addr_subnet_with_config<
         state,
     });
 
-    if *ip_enabled {
+    if ip_enabled {
         // NB: We don't start DAD if the device is disabled. DAD will be
         // performed when the device is enabled for all addressed.
         DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, &addr_id)
@@ -1592,24 +1616,34 @@ pub(crate) fn send_ip_frame<
     sync_ctx.send_ip_frame(ctx, device_id, local_addr, body)
 }
 
-pub(crate) fn get_ipv4_configuration<
+pub(crate) fn get_ipv4_configuration_and_flags<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
     SC: IpDeviceConfigurationContext<Ipv4, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
-) -> Ipv4DeviceConfiguration {
-    sync_ctx.with_ip_device_configuration(device_id, |config, _ctx| config.clone())
+) -> Ipv4DeviceConfigurationAndFlags {
+    sync_ctx.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
+        sync_ctx.with_ip_device_flags(device_id, |flags| Ipv4DeviceConfigurationAndFlags {
+            config: config.clone(),
+            flags: flags.clone(),
+        })
+    })
 }
 
-pub(crate) fn get_ipv6_configuration<
+pub(crate) fn get_ipv6_configuration_and_flags<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: IpDeviceConfigurationContext<Ipv6, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
-) -> Ipv6DeviceConfiguration {
-    sync_ctx.with_ip_device_configuration(device_id, |config, _ctx| config.clone())
+) -> Ipv6DeviceConfigurationAndFlags {
+    sync_ctx.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
+        sync_ctx.with_ip_device_flags(device_id, |flags| Ipv6DeviceConfigurationAndFlags {
+            config: config.clone(),
+            flags: flags.clone(),
+        })
+    })
 }
 
 /// An update to IP device configuration.
@@ -1689,19 +1723,28 @@ pub(crate) fn update_ipv4_configuration<
     }
 
     sync_ctx.with_ip_device_configuration_mut(device_id, |mut inner| {
-        let config = inner.configuration_mut();
-        let ip_config_updates = ip_config.map(
-            |IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled }| {
-                (
-                    get_prev_next_and_update(&mut config.ip_config.ip_enabled, ip_enabled),
-                    get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
-                    get_prev_next_and_update(
-                        &mut config.ip_config.forwarding_enabled,
-                        forwarding_enabled,
-                    ),
+        let ip_config_updates =
+            inner.with_configuration_and_flags_mut(device_id, |config, flags| {
+                ip_config.map(
+                    |IpDeviceConfigurationUpdate {
+                         ip_enabled,
+                         gmp_enabled,
+                         forwarding_enabled,
+                     }| {
+                        (
+                            get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled),
+                            get_prev_next_and_update(
+                                &mut config.ip_config.gmp_enabled,
+                                gmp_enabled,
+                            ),
+                            get_prev_next_and_update(
+                                &mut config.ip_config.forwarding_enabled,
+                                forwarding_enabled,
+                            ),
+                        )
+                    },
                 )
-            },
-        );
+            });
 
         let (config, mut sync_ctx) = inner.ip_device_configuration_and_ctx();
         let sync_ctx = &mut sync_ctx;
@@ -1789,27 +1832,40 @@ pub(crate) fn update_ipv6_configuration<
     }
 
     sync_ctx.with_ipv6_device_configuration_mut(device_id, |mut inner| {
-        let config = inner.configuration_mut();
-        let dad_transmits_updates =
-            get_prev_next_and_update(&mut config.dad_transmits, dad_transmits);
-        let max_router_solicitations_updates = get_prev_next_and_update(
-            &mut config.max_router_solicitations,
-            max_router_solicitations,
-        );
-        let slaac_config_updates = get_prev_next_and_update(&mut config.slaac_config, slaac_config);
-        let ip_config_updates = ip_config.map(
-            |IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled }| {
-                let config = inner.configuration_mut();
-                (
-                    get_prev_next_and_update(&mut config.ip_config.ip_enabled, ip_enabled),
-                    get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
-                    get_prev_next_and_update(
-                        &mut config.ip_config.forwarding_enabled,
-                        forwarding_enabled,
-                    ),
-                )
-            },
-        );
+        let (
+            dad_transmits_updates,
+            max_router_solicitations_updates,
+            slaac_config_updates,
+            ip_config_updates,
+        ) = inner.with_configuration_and_flags_mut(device_id, |config, flags| {
+            (
+                get_prev_next_and_update(&mut config.dad_transmits, dad_transmits),
+                get_prev_next_and_update(
+                    &mut config.max_router_solicitations,
+                    max_router_solicitations,
+                ),
+                get_prev_next_and_update(&mut config.slaac_config, slaac_config),
+                ip_config.map(
+                    |IpDeviceConfigurationUpdate {
+                         ip_enabled,
+                         gmp_enabled,
+                         forwarding_enabled,
+                     }| {
+                        (
+                            get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled),
+                            get_prev_next_and_update(
+                                &mut config.ip_config.gmp_enabled,
+                                gmp_enabled,
+                            ),
+                            get_prev_next_and_update(
+                                &mut config.ip_config.forwarding_enabled,
+                                forwarding_enabled,
+                            ),
+                        )
+                    },
+                ),
+            )
+        });
 
         let (config, mut sync_ctx) = inner.ipv6_device_configuration_and_ctx();
         let sync_ctx = &mut sync_ctx;
@@ -1875,14 +1931,12 @@ pub(crate) fn update_ipv6_configuration<
 pub(super) fn is_ip_device_enabled<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceConfigurationContext<I, C>,
+    SC: IpDeviceStateContext<I, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> bool {
-    sync_ctx.with_ip_device_configuration(device_id, |state, _ctx| {
-        AsRef::<IpDeviceConfiguration>::as_ref(state).ip_enabled
-    })
+    sync_ctx.with_ip_device_flags(device_id, |flags| flags.ip_enabled)
 }
 
 /// Removes IPv4 state for the device without emitting events.
@@ -1896,12 +1950,13 @@ pub(crate) fn clear_ipv4_device_state<
 ) {
     sync_ctx.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
         let Ipv4DeviceConfiguration {
-            ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = config;
-
         let sync_ctx = &mut sync_ctx;
+        let ip_enabled =
+            sync_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
-        if *ip_enabled {
+        if ip_enabled {
             disable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
         }
         if *gmp_enabled {
@@ -1924,12 +1979,13 @@ pub(crate) fn clear_ipv6_device_state<
             dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
-            ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = config;
-
         let sync_ctx = &mut sync_ctx;
+        let ip_enabled =
+            sync_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
-        if *ip_enabled {
+        if ip_enabled {
             disable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
         }
 
@@ -1987,16 +2043,17 @@ pub(crate) mod testutil {
         })
     }
 
-    pub(crate) trait UpdateIpDeviceConfigurationTestIpExt: Ip {
-        type IpDeviceConfiguration: AsRef<IpDeviceConfiguration>
+    pub(crate) trait UpdateIpDeviceConfigurationAndFlagsTestIpExt: Ip {
+        type IpDeviceConfigurationAndFlags: AsRef<IpDeviceConfiguration>
+            + AsRef<IpDeviceFlags>
             + AsMut<IpDeviceConfiguration>
             + PartialEq
             + Debug;
 
-        fn get_ip_configuration(
+        fn get_ip_configuration_and_flags(
             sync_ctx: &FakeSyncCtx,
             device: &DeviceId<FakeNonSyncCtx>,
-        ) -> Self::IpDeviceConfiguration;
+        ) -> Self::IpDeviceConfigurationAndFlags;
 
         fn update_ip_configuration(
             sync_ctx: &FakeSyncCtx,
@@ -2024,14 +2081,14 @@ pub(crate) mod testutil {
         }
     }
 
-    impl UpdateIpDeviceConfigurationTestIpExt for Ipv4 {
-        type IpDeviceConfiguration = Ipv4DeviceConfiguration;
+    impl UpdateIpDeviceConfigurationAndFlagsTestIpExt for Ipv4 {
+        type IpDeviceConfigurationAndFlags = Ipv4DeviceConfigurationAndFlags;
 
-        fn get_ip_configuration(
+        fn get_ip_configuration_and_flags(
             sync_ctx: &FakeSyncCtx,
             device: &DeviceId<FakeNonSyncCtx>,
-        ) -> Self::IpDeviceConfiguration {
-            crate::device::get_ipv4_configuration(sync_ctx, device)
+        ) -> Self::IpDeviceConfigurationAndFlags {
+            crate::device::get_ipv4_configuration_and_flags(sync_ctx, device)
         }
 
         fn update_ip_configuration(
@@ -2050,14 +2107,14 @@ pub(crate) mod testutil {
         }
     }
 
-    impl UpdateIpDeviceConfigurationTestIpExt for Ipv6 {
-        type IpDeviceConfiguration = Ipv6DeviceConfiguration;
+    impl UpdateIpDeviceConfigurationAndFlagsTestIpExt for Ipv6 {
+        type IpDeviceConfigurationAndFlags = Ipv6DeviceConfigurationAndFlags;
 
-        fn get_ip_configuration(
+        fn get_ip_configuration_and_flags(
             sync_ctx: &FakeSyncCtx,
             device: &DeviceId<FakeNonSyncCtx>,
-        ) -> Self::IpDeviceConfiguration {
-            crate::device::get_ipv6_configuration(sync_ctx, device)
+        ) -> Self::IpDeviceConfigurationAndFlags {
+            crate::device::get_ipv6_configuration_and_flags(sync_ctx, device)
         }
 
         fn update_ip_configuration(
@@ -2099,7 +2156,8 @@ mod tests {
     use crate::{
         device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
         ip::{
-            device::testutil::UpdateIpDeviceConfigurationTestIpExt, gmp::GmpDelayedReportTimerId,
+            device::testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt,
+            gmp::GmpDelayedReportTimerId,
         },
         testutil::{
             assert_empty, Ctx, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx,
@@ -2568,7 +2626,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn update_ip_device_configuration_err<I: Ip + UpdateIpDeviceConfigurationTestIpExt>() {
+    fn update_ip_device_configuration_err<I: Ip + UpdateIpDeviceConfigurationAndFlagsTestIpExt>() {
         let FakeCtx { sync_ctx, mut non_sync_ctx } = FakeCtx::default();
         let sync_ctx = &sync_ctx;
 
@@ -2580,21 +2638,26 @@ mod tests {
         .expect("create the loopback interface")
         .into();
 
-        let original_state = I::get_ip_configuration(sync_ctx, &loopback_device_id);
+        let original_state = I::get_ip_configuration_and_flags(sync_ctx, &loopback_device_id);
         assert_eq!(
             I::update_ip_configuration(
                 sync_ctx,
                 &mut non_sync_ctx,
                 &loopback_device_id,
                 IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(!original_state.as_ref().ip_enabled),
-                    gmp_enabled: Some(!original_state.as_ref().gmp_enabled),
+                    ip_enabled: Some(!AsRef::<IpDeviceFlags>::as_ref(&original_state).ip_enabled),
+                    gmp_enabled: Some(
+                        !AsRef::<IpDeviceConfiguration>::as_ref(&original_state).gmp_enabled
+                    ),
                     forwarding_enabled: Some(true),
                 },
             ),
             Err(NotSupportedError),
         );
-        assert_eq!(original_state, I::get_ip_configuration(sync_ctx, &loopback_device_id));
+        assert_eq!(
+            original_state,
+            I::get_ip_configuration_and_flags(sync_ctx, &loopback_device_id)
+        );
     }
 
     #[test]

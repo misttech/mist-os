@@ -648,7 +648,8 @@ mod tests {
         },
         ip::{
             device::{
-                testutil::UpdateIpDeviceConfigurationTestIpExt as _, Ipv6DeviceConfigurationUpdate,
+                testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt as _,
+                Ipv6DeviceConfigurationUpdate,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             receive_ip_packet, FrameDestination,

@@ -1878,7 +1878,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device, _): (_, _, SlaacConfiguration) =
             initialize_with_temporary_addresses_enabled();
         let mut sync_ctx = &sync_ctx;
-        let config = crate::device::get_ipv6_configuration(&sync_ctx, &device);
+        let config = crate::device::get_ipv6_configuration_and_flags(&sync_ctx, &device);
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             sync_ctx,
             &mut non_sync_ctx,
@@ -1886,7 +1886,7 @@ mod tests {
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: Some(SlaacConfiguration {
                     enable_stable_addresses: true,
-                    ..config.slaac_config
+                    ..config.config.slaac_config
                 }),
                 ..Default::default()
             },

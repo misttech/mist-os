@@ -64,8 +64,10 @@ use crate::{
             integration::SyncCtxWithIpDeviceConfiguration,
             nud::{BufferNudHandler, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
             state::{
-                AddrConfig, AssignedAddress as _, DualStackIpDeviceState, Ipv4DeviceConfiguration,
-                Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration,
+                AddrConfig, AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags,
+                Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv6AddressEntry,
+                Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration,
+                Ipv6DeviceConfigurationAndFlags,
             },
             BufferIpDeviceContext, DelIpv6Addr, DualStackDeviceContext, DualStackDeviceStateRef,
             IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
@@ -551,6 +553,16 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
     type IpDeviceAddressCtx<'a> =
         Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpDeviceAddresses<Ipv4>>;
 
+    fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        with_ip_device_state(self, device_id, |mut state| {
+            cb(&*state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>())
+        })
+    }
+
     fn add_ip_address(
         &mut self,
         device_id: &Self::DeviceId,
@@ -938,6 +950,16 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
 {
     type IpDeviceAddressCtx<'a> =
         Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpDeviceAddresses<Ipv6>>;
+
+    fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        with_ip_device_state(self, device_id, |mut state| {
+            cb(&*state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>())
+        })
+    }
 
     fn add_ip_address(
         &mut self,
@@ -2123,20 +2145,20 @@ pub(crate) fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
     }
 }
 
-/// Gets the IPv4 Configuration for a `device`.
-pub fn get_ipv4_configuration<NonSyncCtx: NonSyncContext>(
+/// Gets the IPv4 configuration and flags for a `device`.
+pub fn get_ipv4_configuration_and_flags<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
-) -> Ipv4DeviceConfiguration {
-    crate::ip::device::get_ipv4_configuration(&mut Locked::new(sync_ctx), device)
+) -> Ipv4DeviceConfigurationAndFlags {
+    crate::ip::device::get_ipv4_configuration_and_flags(&mut Locked::new(sync_ctx), device)
 }
 
-/// Gets the IPv6 Configuration for a `device`.
-pub fn get_ipv6_configuration<NonSyncCtx: NonSyncContext>(
+/// Gets the IPv6 configuration and flags for a `device`.
+pub fn get_ipv6_configuration_and_flags<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
-) -> Ipv6DeviceConfiguration {
-    crate::ip::device::get_ipv6_configuration(&mut Locked::new(sync_ctx), device)
+) -> Ipv6DeviceConfigurationAndFlags {
+    crate::ip::device::get_ipv6_configuration_and_flags(&mut Locked::new(sync_ctx), device)
 }
 
 /// Updates the IPv4 configuration for a device.

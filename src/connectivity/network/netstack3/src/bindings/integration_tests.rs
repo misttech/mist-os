@@ -852,7 +852,8 @@ fn get_slaac_secret<'s>(
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
     test_stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
         let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
-        netstack3_core::device::get_ipv6_configuration(sync_ctx, &device)
+        netstack3_core::device::get_ipv6_configuration_and_flags(sync_ctx, &device)
+            .config
             .slaac_config
             .temporary_address_configuration
             .map(|t| t.secret_key)

@@ -957,7 +957,8 @@ fn get_configuration(ctx: &Ctx, id: BindingId) -> fnet_interfaces_admin::Configu
     fnet_interfaces_admin::Configuration {
         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
             forwarding: Some(
-                netstack3_core::device::get_ipv4_configuration(&sync_ctx, &core_id)
+                netstack3_core::device::get_ipv4_configuration_and_flags(&sync_ctx, &core_id)
+                    .config
                     .ip_config
                     .forwarding_enabled,
             ),
@@ -965,7 +966,8 @@ fn get_configuration(ctx: &Ctx, id: BindingId) -> fnet_interfaces_admin::Configu
         }),
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             forwarding: Some(
-                netstack3_core::device::get_ipv6_configuration(&sync_ctx, &core_id)
+                netstack3_core::device::get_ipv6_configuration_and_flags(&sync_ctx, &core_id)
+                    .config
                     .ip_config
                     .forwarding_enabled,
             ),

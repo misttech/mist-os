@@ -123,6 +123,7 @@ pub(crate) enum Ipv4StateNextPacketId {}
 pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceAddresses<I>(PhantomData<I>, Never);
+pub(crate) struct IpDeviceFlags<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceDefaultHopLimit<I>(PhantomData<I>, Never);
 pub(crate) enum Ipv6DeviceRouterSolicitations {}
 pub(crate) enum Ipv6DeviceRouteDiscovery {}
@@ -212,7 +213,9 @@ impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceGmp<Ipv4>);
 impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);
 impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceGmp<Ipv6>);
 impl_lock_after!(IpDeviceGmp<Ipv6> => IpDeviceAddresses<Ipv6>);
-impl_lock_after!(IpDeviceAddresses<Ipv6> => Ipv6DeviceAddressState);
+impl_lock_after!(IpDeviceAddresses<Ipv6> => IpDeviceFlags<Ipv4>);
+impl_lock_after!(IpDeviceFlags<Ipv4> => IpDeviceFlags<Ipv6>);
+impl_lock_after!(IpDeviceFlags<Ipv6> => Ipv6DeviceAddressState);
 impl_lock_after!(Ipv6DeviceAddressState => IpDeviceDefaultHopLimit<Ipv4>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
 impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);

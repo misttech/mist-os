@@ -12,7 +12,7 @@ use core::{
     ops::{Deref as _, DerefMut as _},
 };
 
-use lock_order::{relation::LockBefore, Locked};
+use lock_order::{lock::LockFor, relation::LockBefore, Locked};
 use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
@@ -50,8 +50,9 @@ use crate::{
                 SlaacContext,
             },
             state::{
-                AddrConfig, IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6AddressFlags,
-                Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
+                AddrConfig, DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
+                Ipv4DeviceConfiguration, Ipv6AddressFlags, Ipv6AddressState,
+                Ipv6DeviceConfiguration, SlaacConfig,
             },
             DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext,
             RemovedReason,
@@ -564,6 +565,8 @@ impl<'a, I: gmp::IpExt + IpDeviceIpExt, C: NonSyncContext>
         C,
     >
 where
+    Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
+        device::IpDeviceStateContext<I, C, DeviceId = crate::DeviceId<C>>,
     for<'s> SyncCtxWithIpDeviceConfiguration<
         's,
         &'s I::Configuration,
@@ -572,6 +575,10 @@ where
     >: IpDeviceStateContext<I, C, DeviceId = Self::DeviceId>
         + GmpHandler<I, C>
         + NudIpHandler<I, C>,
+    DualStackIpDeviceState<C::Instant>:
+        LockFor<crate::lock_ordering::IpDeviceFlags<I>, Data = IpDeviceFlags>,
+    crate::lock_ordering::IpDeviceConfiguration<I>:
+        LockBefore<crate::lock_ordering::IpDeviceFlags<I>>,
 {
     type IpDeviceStateCtx<'s> = SyncCtxWithIpDeviceConfiguration<'s, &'s I::Configuration, crate::lock_ordering::IpDeviceConfiguration<I>, C> where Self: 's;
 
@@ -583,9 +590,19 @@ where
         (config, SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|r| r) })
     }
 
-    fn configuration_mut(&mut self) -> &mut I::Configuration {
-        let Self { config, sync_ctx: _ } = self;
-        *config
+    fn with_configuration_and_flags_mut<
+        O,
+        F: FnOnce(&mut I::Configuration, &mut IpDeviceFlags) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        let Self { config, sync_ctx } = self;
+        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
+            let mut flags = state.lock::<crate::lock_ordering::IpDeviceFlags<I>>();
+            cb(*config, &mut *flags)
+        })
     }
 }
 
@@ -1108,6 +1125,15 @@ where
     type IpDeviceAddressCtx<'b> =
         <Locked<&'a SyncCtx<C>, L> as device::IpDeviceStateContext<I, C>>::IpDeviceAddressCtx<'b>;
 
+    fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        let Self { config: _, sync_ctx } = self;
+        device::IpDeviceStateContext::<I, C>::with_ip_device_flags(sync_ctx, device_id, cb)
+    }
+
     fn add_ip_address(
         &mut self,
         device_id: &Self::DeviceId,
@@ -1220,12 +1246,18 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, C: NonSyncContext> IgmpContext
     ) -> O {
         let Self { config, sync_ctx } = self;
         let Ipv4DeviceConfiguration {
-            ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = Borrow::borrow(&*config);
 
         crate::device::with_ip_device_state(sync_ctx, device, |mut state| {
+            // Note that changes to `ip_enabled` is not possible in this context
+            // since IP enabled changes are only performed while the IP device
+            // configuration lock is held exclusively. Since we have access to
+            // the IP device configuration here (`config`), we know changes to
+            // IP enabled are not possible.
+            let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-            let enabled = *ip_enabled && *gmp_enabled;
+            let enabled = ip_enabled && *gmp_enabled;
             cb(GmpState { enabled, groups: &mut state })
         })
     }
@@ -1283,12 +1315,13 @@ impl<
             dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
-            ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = Borrow::borrow(&*config);
 
         crate::device::with_ip_device_state(sync_ctx, device, |mut state| {
+            let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-            let enabled = *ip_enabled && *gmp_enabled;
+            let enabled = ip_enabled && *gmp_enabled;
             cb(GmpState { enabled, groups: &mut state })
         })
     }
