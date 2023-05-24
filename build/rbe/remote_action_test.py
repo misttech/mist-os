@@ -1692,15 +1692,12 @@ remote_metadata: {{
 """
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'xyzzy'
+            log_record = remote_action.ReproxyLogEntry.parse_action_log(rrpl)
             with mock.patch.object(
                     os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext(
                     ) as mock_setxattr:
-                remote_action.make_download_stubs(
-                    files=[p],
-                    dirs=[],
-                    working_dir_abs=tdp,
-                    rrpl=rrpl,
-                    build_id=build_id)
+                log_record.make_download_stubs(
+                    files=[p], dirs=[], working_dir_abs=tdp, build_id=build_id)
 
             link = tdp / p
             self.assertTrue(link.is_symlink())
@@ -1752,15 +1749,12 @@ remote_metadata: {{
 """
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'yzzyx'
+            log_record = remote_action.ReproxyLogEntry.parse_action_log(rrpl)
             with mock.patch.object(
                     os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext(
                     ) as mock_setxattr:
-                remote_action.make_download_stubs(
-                    files=[],
-                    dirs=[p],
-                    working_dir_abs=tdp,
-                    rrpl=rrpl,
-                    build_id=build_id)
+                log_record.make_download_stubs(
+                    files=[], dirs=[p], working_dir_abs=tdp, build_id=build_id)
 
             link = tdp / p
             self.assertTrue(link.is_symlink())
@@ -1885,22 +1879,27 @@ remote_metadata: {{
         options = action.options
         self.assertIn(download_option, options)
         logdir = '/fake/tmp/rpl/logz.932874'
+        fake_log_record = remote_action.ReproxyLogEntry(dict())
         with mock.patch.object(remote_action, '_reproxy_log_dir',
                                return_value=logdir) as mock_log_dir:
-            with mock.patch.object(remote_action,
-                                   'make_download_stubs') as mock_stub:
-                with mock.patch.object(
-                        remote_action.RemoteAction, '_run_maybe_remotely',
-                        return_value=cl_utils.SubprocessResult(0)) as mock_run:
-                    exit_code = action.run()
-        self.assertEqual(exit_code, 0)
+            with mock.patch.object(
+                    remote_action.ReproxyLogEntry, 'parse_action_log',
+                    return_value=fake_log_record) as mock_parse_log:
+                with mock.patch.object(remote_action.ReproxyLogEntry,
+                                       'make_download_stubs') as mock_stub:
+                    with mock.patch.object(
+                            remote_action.RemoteAction, '_run_maybe_remotely',
+                            return_value=cl_utils.SubprocessResult(
+                                0)) as mock_run:
+                        exit_code = action.run()
+            self.assertEqual(exit_code, 0)
         mock_run.assert_called()
         mock_log_dir.assert_called_once()
+        mock_parse_log.assert_called_with(Path(output + '.rrpl'))
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
             working_dir_abs=working_dir,
-            rrpl=Path(output + '.rrpl'),
             build_id=logdir,
         )
 
@@ -1940,7 +1939,7 @@ remote_metadata: {{
                                    'parse_action_log',
                                    return_value=log_record) as mock_parse_log:
                 with mock.patch.object(
-                        remote_action,
+                        remote_action.ReproxyLogEntry,
                         '_write_download_stub') as mock_write_stub:
                     with mock.patch.object(remote_action.DownloadStubInfo,
                                            'download') as mock_download:

@@ -407,6 +407,52 @@ class ReproxyLogEntry(object):
             build_id=build_id,
         )
 
+    def _write_download_stub(
+        self,
+        path: Path,
+        build_id: str,
+        working_dir_abs: Path,
+    ):
+        """Write a single stub file that can be used to fetch a blob later.
+
+        Args:
+          path: the full path of the output file or dir, absolute.
+          build_id: a unique identifier for a particular build (reproxy) session.
+          working_dir_abs: working dir.
+        """
+        stub_info = self.make_download_stub_info(path, build_id)
+        stub_info.create(working_dir_abs)
+
+    def make_download_stubs(
+        self,
+        files: Iterable[Path],
+        dirs: Iterable[Path],
+        working_dir_abs: Path,
+        build_id: str,
+    ):
+        """Establish placeholders from which real artifacts can be retrieved later.
+
+        Args:
+          files: files to create download stubs for.
+          dirs: directories to create download stubs for.
+          working_dir_abs: absolute path to current working dir, relative to which
+              files are created.
+          build_id: any string that corresponds to a unique build.
+        """
+        # TODO: the following could be parallelized
+        for f in files:
+            self._write_download_stub(
+                path=f,
+                build_id=build_id,
+                working_dir_abs=working_dir_abs,
+            )
+        for d in dirs:
+            self._write_download_stub(
+                path=d,
+                build_id=build_id,
+                working_dir_abs=working_dir_abs,
+            )
+
     @staticmethod
     def parse_action_log(log: Path) -> 'ReproxyLogEntry':
         with open(log) as f:
@@ -703,25 +749,6 @@ class DownloadStubInfo(object):
         return status
 
 
-def _write_download_stub(
-    path: Path,
-    log_record: ReproxyLogEntry,
-    build_id: str,
-    working_dir_abs: Path,
-):
-    """Write a single stub file that can be used to fetch a blob later.
-
-    Args:
-      path: the full path of the output file or dir, absolute.
-      log_record: data from a parsed .rrpl, containing files/digests.
-        path must correspond to a file or dir output in this record.
-      build_id: a unique identifier for a particular build (reproxy) session.
-      working_dir_abs: working dir.
-    """
-    stub_info = log_record.make_download_stub_info(path, build_id)
-    stub_info.create(working_dir_abs)
-
-
 def get_download_stub_file(path: Path) -> Optional[Path]:
     if not path.is_symlink():
         return None
@@ -789,46 +816,6 @@ def _download_blob(
         ],
         cwd=working_dir_abs,
     )
-
-
-def make_download_stubs(
-    files: Iterable[Path],
-    dirs: Iterable[Path],
-    working_dir_abs: Path,
-    rrpl: Path,
-    build_id: str,
-) -> ReproxyLogEntry:
-    """Establish placeholders from which real artifacts can be retrieved later.
-
-    Args:
-      files: files to create download stubs for.
-      dirs: directories to create download stubs for.
-      working_dir_abs: absolute path to current working dir, relative to which
-          files are created.
-      rrpl: single-action reproxy log (reproxy.LogRecord), which contains
-          file digests.  The non-reduced .rpl format is also acceptable.
-      build_id: any string that corresponds to a unique build.
-
-    Returns:
-      the ReproxyLogEntry that was parsed.
-    """
-    log_record = ReproxyLogEntry.parse_action_log(rrpl)
-    # TODO: the following could be parallelized
-    for f in files:
-        _write_download_stub(
-            path=f,
-            log_record=log_record,
-            build_id=build_id,
-            working_dir_abs=working_dir_abs,
-        )
-    for d in dirs:
-        _write_download_stub(
-            path=d,
-            log_record=log_record,
-            build_id=build_id,
-            working_dir_abs=working_dir_abs,
-        )
-    return log_record
 
 
 class RemoteAction(object):
@@ -1305,11 +1292,13 @@ class RemoteAction(object):
     def _process_download_stubs(self):
         self.vmsg("Creating download stubs for remote outputs.")
         build_id = _reproxy_log_dir()  # unique per build
-        log_record = make_download_stubs(
+        log_record = ReproxyLogEntry.parse_action_log(self._action_log)
+
+        # Create stubs, even for artifacts that are always_download-ed.
+        log_record.make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
             working_dir_abs=self.working_dir,
-            rrpl=self._action_log,
             build_id=build_id,
         )
         # Download outputs that were explicitly requested.
