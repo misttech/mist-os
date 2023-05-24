@@ -541,5 +541,10 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "There was an internal error running tests: Fidl(ClientChannelClosed { status: Status(PEER_CLOSED)",
 			Type:   swarmingOutputType,
 		},
+		// For fxbug.dev/127372.
+		&stringInLogCheck{
+			String: "FFX Daemon was told not to autostart",
+			Type:   swarmingOutputType,
+		},
 	}
 }
