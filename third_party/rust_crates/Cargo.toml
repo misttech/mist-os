@@ -624,7 +624,7 @@ deps = [
   ":memchr-v2_4_0",
   ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
-  ":once_cell-v1_5_2",
+  ":once_cell-v1_17_1",
   ":signal-hook-registry-v1_3_0",
   ":socket2-v0_4_4",
 ]

@@ -523,7 +523,7 @@ group("num-traits") {
 }
 
 group("once_cell") {
-  public_deps = [ ":once_cell-v1_5_2" ]
+  public_deps = [ ":once_cell-v1_17_1" ]
 }
 
 if (current_os == "fuchsia") {
@@ -6641,25 +6641,27 @@ rust_library("numtoa-v0_1_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("once_cell-v1_5_2") {
+rust_library("once_cell-v1_17_1") {
   crate_name = "once_cell"
-  crate_root = "//third_party/rust_crates/vendor/once_cell-1.5.2/src/lib.rs"
-  output_name = "once_cell-706b9fb730eeb6c2"
+  crate_root = "//third_party/rust_crates/vendor/once_cell-1.17.1/src/lib.rs"
+  output_name = "once_cell-283c53dba5ff9f5a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":parking_lot-v0_11_1" ]
+  deps += [ ":parking_lot_core-v0_9_6" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=706b9fb730eeb6c2",
-    "-Cextra-filename=-706b9fb730eeb6c2",
+    "--edition=2021",
+    "-Cmetadata=283c53dba5ff9f5a",
+    "-Cextra-filename=-283c53dba5ff9f5a",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"parking_lot\"",
+    "--cfg=feature=\"parking_lot_core\"",
+    "--cfg=feature=\"race\"",
     "--cfg=feature=\"std\"",
   ]
 
@@ -7081,7 +7083,7 @@ rust_library("pem-v0_8_3") {
 
   deps = []
   deps += [ ":base64-v0_13_0" ]
-  deps += [ ":once_cell-v1_5_2" ]
+  deps += [ ":once_cell-v1_17_1" ]
   deps += [ ":regex-v1_5_6" ]
 
   rustenv = []
@@ -10906,7 +10908,7 @@ rust_library("tokio-v1_19_2") {
     deps += [ ":memchr-v2_4_0" ]
     deps += [ ":mio-v0_8_5" ]
     deps += [ ":num_cpus-v1_13_0" ]
-    deps += [ ":once_cell-v1_5_2" ]
+    deps += [ ":once_cell-v1_17_1" ]
     deps += [ ":signal-hook-registry-v1_3_0" ]
     deps += [ ":socket2-v0_4_4" ]
   }

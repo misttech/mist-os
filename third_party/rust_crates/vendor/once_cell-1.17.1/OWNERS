@@ -11,7 +11,7 @@ include /src/lib/diagnostics/OWNERS
 include /src/lib/gcs/OWNERS
 include /src/lib/ui/OWNERS
 include /src/lib/ui/carnelian/OWNERS
-include /src/proc/OWNERS
+include /src/starnix/OWNERS
 include /src/security/lib/scrutiny/OWNERS
 include /src/storage/OWNERS
 include /src/sys/component_manager/OWNERS
