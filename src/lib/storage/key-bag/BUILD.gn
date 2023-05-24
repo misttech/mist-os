@@ -41,8 +41,5 @@ fuchsia_unittest_package("key-bag-tests") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":key-bag-tests",
-    "c:tests",
-  ]
+  deps = [ ":key-bag-tests" ]
 }
