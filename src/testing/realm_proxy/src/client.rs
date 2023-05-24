@@ -45,7 +45,7 @@ impl RealmFactoryClient {
             bail!("operation error {:?}", result.unwrap_err());
         }
 
-        Ok(RealmProxyClient::from_proxy(realm_proxy))
+        Ok(RealmProxyClient::from(realm_proxy))
     }
 }
 
@@ -66,11 +66,20 @@ pub struct RealmProxyClient {
     inner: RealmProxy_Proxy,
 }
 
-impl RealmProxyClient {
-    pub fn from_proxy(proxy: RealmProxy_Proxy) -> Self {
-        Self { inner: proxy }
+impl From<RealmProxy_Proxy> for RealmProxyClient {
+    fn from(value: RealmProxy_Proxy) -> Self {
+        Self { inner: value }
     }
+}
 
+impl From<ClientEnd<RealmProxy_Marker>> for RealmProxyClient {
+    fn from(value: ClientEnd<RealmProxy_Marker>) -> Self {
+        let inner = value.into_proxy().expect("ClientEnd::into_proxy");
+        Self { inner }
+    }
+}
+
+impl RealmProxyClient {
     // Connects to the RealmProxy service.
     pub fn connect() -> Result<Self, Error> {
         let inner = connect_to_protocol::<RealmProxy_Marker>()?;
