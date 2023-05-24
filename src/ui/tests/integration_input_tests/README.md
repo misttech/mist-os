@@ -1,9 +1,9 @@
 # Integration Input Tests
 
 This collection of tests exercises the input dispatch paths in core components,
-such as Scenic, Root Presenter, and Input Pipeline. They are intended to be
-fairly minimal, free of flakiness, and standalone - the entire test is in one
-file.
+such as Scenic and Input Pipeline (as integrated as a part of Scene Manager).
+They are intended to be fairly minimal, free of flakiness, and standalone -
+the entire test is in one file.
 
 ## Building tests
 
@@ -12,6 +12,7 @@ sherlock), include the `integration_input_tests` test package in your build
 args either directly:
 
 <!-- TODO(fxbug.dev/119212): Remove the web_engine lines when resolved. -->
+
 ```
 fx set ... \
   --with //src/chromium:web_engine \

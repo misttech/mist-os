@@ -1,40 +1,23 @@
 # Writing integration tests for graphics, input, and accessibility
 
-## Checklist
+## Existing tools
 
-1.  Use RealmBuilder to ensure that your tests are running with a new instance
-    of component topology with each run. Use gtest::RealLoopFixture for creating
-    your test fixture. If you want your tests to be CTS compatible, use
-    zxtest::Test instead.
-2.  Do not use CML `injected-services` to construct component topology. (It
-    shares the same component instances between different test runs.)
-3.  Set up `fuchsia.hardware.display.Provider` by
-    bundling[`fake-hardware-display-controller-provider-cmv2-component`](https://cs.opensource.google/fuchsia/fuchsia/+/master:src/ui/bin/hardware_display_controller_provider/BUILD.gn;l=29)
-    with the test package.
-4.  Create a CFv2 wrapper component for `Root Presenter` around its CFv1
-    component `component_v1_for_test`. Bundle this component with the test
-    package. It prevents the actual input driver from interacting with the test.
-    Invoke Root Presenter from the test package's URL. E.g.,
-    `fuchsia-pkg://touch-input-test#meta/root_presenter.cmx`.
-5.  Bundle [Scenic](/src/ui/scenic/BUILD.gn)'s `component_v2` with the test's
-    package. It ensures that the test uses the Scenic it was built with. Invoke
-    Scenic using the relative URL. E.g., `#meta/scenic.cm`.
-6.  Don't invoke components from *another* test's package!
-7.  No sleeps or waits, unless the API is deficient. Every action by the test is
-    gated on a logical condition that the test can observe. E.g., inject touch
-    events only when the test observes the child view is actually connected to
-    the view tree and vending content to hit.
+Consider streamlining the building of your RealmBuilder test realm using tools in //src/ui/testing/ such as the following:
+
+- [UITestRealm](///src/ui/testing/ui_test_realm/README.md), a library to manage test realms on behalf of UI integration test clients.
+- [test_ui_stack](///src/ui/testing/test_ui_stack/README.md), a library to provide UI-specific testing capabilities to test clients both in-
+  and out-of-tree
 
 ## Guidelines for writing integration tests
 
-We have Fuchsia-based *products* built on the Fuchsia *platform*. As Fuchsia
+We have Fuchsia-based _products_ built on the Fuchsia _platform_. As Fuchsia
 platform developers, we want to ship a solid platform, and validate that the the
-*platform* works correctly for all our supported *products*. Integration tests
+_platform_ works correctly for all our supported _products_. Integration tests
 ensure we uphold correctness and stability of platform functionality that spans
 two or more components, via our prebuilt binaries (such as Scenic) and API
 contracts (over FIDL). This is especially valuable in validating our ongoing
 platform migrations. One example is the set of touch dispatch paths, such as
-from Input Pipeline to Scenic to Chromium.
+from Scene Manager to Scenic to a UI client.
 
 ### Models of production
 
@@ -57,7 +40,7 @@ dedicated
 [API surface](/sdk/fidl/fuchsia.input.injection/input_device_registry.fidl) on
 Input Pipeline to accept injections in a test scenario.
 
-The important thing is that the test gives us *confidence* that evolution of
+The important thing is that the test gives us _confidence_ that evolution of
 platform code and platform protocols will not break existing product scenarios.
 
 ### No flakes
@@ -77,6 +60,11 @@ tests going wrong, and most of them can be dealt with by enforcing hermeticity
 at various levels. We talk about these first. A final challenge is to author
 tests that model enough of the interesting complexity on just the platform side,
 so that we know complex product scenarios don't break with platform evolution.
+
+In general this translates to no sleeps or waits. If a test requires sleeps or waits, this is a bug and should be treated appropriately.
+Every action by the test should be gated on a logical condition that the test
+can observe. E.g., inject touch events only when the test observes the child
+view is actually connected to the view tree and vending content to hit.
 
 ### Precarious stack of stuff
 
@@ -109,7 +97,7 @@ Product owners benefit by increased confidence in the platform's reliability.
 Deterministic, flake-free tests increase the signal-to-noise ratio from test
 runs. They make life better.
 
-When your tests rain down flakes every day, we ignore these tests, and they
+When our tests rain down flakes every day, we ignore these tests, and they
 become noise. But when we try to fix the source of flakes, it often reveals a
 defect in our practices, or APIs, or documentation, which we can fix (think
 "impact"). Each of these hermeticity goals address a real problem that someone
@@ -118,11 +106,9 @@ becomes better.
 
 #### Why all this emphasis on integration tests?
 
-Fuchsia's platform teams have important migrations in progress that affect
+Fuchsia's platform teams often have important migrations in progress that affect
 products. Integration tests are a critical method of guaranteeing that our
 platform changes are safe and stable with respect to our product partners.
-Examples: Components Framework v2, Input API migration, Flatland API migration,
-etc.
 
 #### What about CTS tests?
 
@@ -143,7 +129,7 @@ our tests more reliable.
 
 All components used in the test should come from the same test package. This can
 be verified by examining the fuchsia-pkg URLs launched in the test; they should
-reference the test package.
+reference the test package. Don't invoke components from _another_ test's package!
 
 If we don't have package hermeticity, and a component C is defined in the
 universe U, then the C launched will come from U, instead of your locally
@@ -152,12 +138,6 @@ rebuilds everything from scratch. However, it is definitely an issue for local
 development, where it causes surprises - another sharp corner to trap the
 unwary. That is, a fix to C won't necessarily run in your test, and hampers
 developer productivity.
-
-There is a further advantage to package hermeticity. For those components that
-read from the `config-data` package, this practice allows a test package to
-define their own config-data for the components they contain. In fact, this is
-the only way to define a piece of custom config-data for a test. For example,
-the display rotation in Root Presenter is conveyed with config-data.
 
 ### Environment hermeticity
 
@@ -171,20 +151,20 @@ test, thereby preventing inter-test state pollution.
 
 The advantages of doing so are:
 
-*   The test is far more reproducible, as the initial component state is always
-    known to be good.
-*   It's trivial to run the test hundreds of times in a tight loop, thus
-    speeding up flake detection.
-*   The test author can adjust the environment more precisely, and more
-    flexibly, than otherwise possible.
+- The test is far more reproducible, as the initial component state is always
+  known to be good.
+- It's trivial to run the test hundreds of times in a tight loop, thus
+  speeding up flake detection.
+- The test author can adjust the environment more precisely, and more
+  flexibly, than otherwise possible.
 
 #### No to `injected-services`
 
 In component framework v2, it's possible to declare
 [`injected-services`](https://fuchsia.dev/fuchsia-src/development/components/v2/migration/tests?hl=en#injected-services)
 in a test's CML manifest. Declaring `injected-services` is somewhat of an
-anti-pattern. It, too, also constructs a test environment, but *all the test
-executions* run in the *same environment*. If a service component had dirtied
+anti-pattern. It, too, also constructs a test environment, but _all the test
+executions_ run in the _same environment_. If a service component had dirtied
 state, a subsequent `TEST_F` execution will inadvertently run against that
 dirtied state.
 
@@ -192,7 +172,7 @@ dirtied state.
 
 All components in the test should not be exposed to the actual root environment.
 For FIDL protocols, this is not so much an issue. However, there are other types
-of capabilities where CF v1 has leaks. A good example is access to device
+of capabilities that have leaks. A good example is access to device
 capabilities, such as `/dev/class/input-report` and
 `/dev/class/display-coordinator`. Components that declare access to device
 capabilities will actually access these capabilities, on the real device, in a
@@ -201,21 +181,13 @@ test environment.
 We can gain capability hermeticity by relying on a reasonable fake. Two
 examples.
 
-*   The display controller, with some configuration, can be faked out. A
-    subsequent advantage is that graphics tests can be run in parallel!
-    *   One downside is that it's not easy to physically observe what the
-        graphical state is, because the test no longer drives the real display.
-        So development can be a little harder.
-*   The input devices are faked out with an injection FIDL, and that's how tests
-    can trigger custom input. However, the component that receives injections
-    still needs to avoid declaring access to `/dev/class/input-report`! The
-    recommendation here is to put a `/dev`-less copy of the component manifest
-    into the test package.
-    *   Example:
-        [root_presenter.cmx](/src/ui/bin/root_presenter/meta/root_presenter.cmx)
-        (production) vs
-        [root_presenter_base.cmx](/src/ui/bin/root_presenter/meta/root_presenter_base.cmx)
-        (production, minus `/dev/class/input-report`).
+- The display controller, with some configuration, can be faked out. A
+  subsequent advantage is that graphics tests can be run in parallel!
+  - One downside is that it's not easy to physically observe what the
+    graphical state is, because the test no longer drives the real display.
+    So development can be a little harder.
+- The input devices are faked out with an injection FIDL, and that's how tests
+  can trigger custom input.
 
 ## Synchronization challenges
 
@@ -261,10 +233,7 @@ is constructed using the Realm Builder
 [library](/docs/development/testing/components/realm_builder). This library is
 used to construct the test [Realm](/docs/concepts/components/v2/realms) in which
 the components under test operate. The test suite, hereafter test driver
-component, is a v2 component. This is in contrast to the components in the
-constructed realm, e.g. `scenic`, that are at the moment v1 components. This is
-so because Realm Builder provides a v1 "bridge" that allows for Realms
-constructed to include v1 and v2 components.
+component, is a component.
 
 Realm Builder (and CFv2 in general) allows us to be explicit about what
 capabilities are routed to and from components. This is crucial for testing
@@ -278,42 +247,6 @@ target is explicitly written in the test
 [file](/src/ui/tests/integration_input_tests/touch/touch-input-test.cc) during
 Realm construction.
 
-Since the Realm is populated by v1 components at the moment, it's worth
-mentioning how this works at a high level. Components added to a Realm
-constructed with Realm Builder work in the same way as typical Realm
-construction statically. In other words, Realm Builder doesn't do anything
-special. It simply allows for the construction of Realms at runtime, instead of
-statically via manifests. It generates the necessary manifests and clauses, e.g.
-offer capability foo to #child-a, behind the scene when a user invokes a method
-like `realm_builder->AddRoute(...)`. For v1 components, this is somewhat still
-true. The major difference is that Realm Builder constructs a wrapper v2
-component to launch a v1 component. When the wrapper component is started, it
-launches the v1 component by creating a singleton
-`fuchsia.sys.NestedEnvironment`. This NestedEnvironment will only contain the v1
-component, and won't contain any services except for those explicitly routed to
-it during Realm construction.
-
-A sample diagram of a Realm constructed with RealmBuilder would look like:
-
-```
-    <root>
-    /    \
-```
-
-<wrapper> <wrapper> / \
-scenic.cmx root_presenter.cmx
-
-In production, the environment would look more like:
-
-```
- <appmgr>
-     |
- <modular>
- /       \
-```
-
-scenic.cmx root_presenter.cmx
-
 ## Modeling complex scenarios
 
 The graphics API allows each product to generate an arbitrarily complex scene
@@ -323,12 +256,10 @@ topologies" that are stable and suitable for the product to build on.
 It's a valuable exercise to capture each of these core topologies in our
 platform integration tests. Some examples:
 
-*   Touch dispatch to the Chromium runner.
-    *   Chromium employs a two-view topology as part of its JS sandboxing
-        strategy. Having a test ensures that Chromium is correctly using our
-        APIs, and that our changes don't accidentally break Chromium.
-*   One parent view and two child views, using assorted runners, to ensure touch
-    dispatch is routed to the correct view.
+- Touch dispatch to clients which nest multiple views within a single client.
+  - Some Fuchsia clients employ a two-view topology for security reasons, to isolate a view which receipted input from one which displays graphics. Having a test which exercises this topology ensures that these clients are correctly using our APIs, and that our changes don't accidentally break this contract.
+- One parent view and two child views to ensure touch
+  dispatch is routed to the correct view.
 
 Developing new models are also how we test new topologies and interaction
 patterns to make sure the APIs are sensible and usable, and serve as as a

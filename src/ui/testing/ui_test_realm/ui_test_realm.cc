@@ -390,8 +390,8 @@ void UITestRealm::Build() {
   // declaration for every a11y configuration tested.
   ConfigureAccessibility();
 
-  // Route config data directories to appropriate recipients (currently, scenic,
-  // scene manager, and root presenter are the only use cases for config files.
+  // Route config data directories to appropriate recipients (currently, scenic
+  // and scene manager are the only use cases for config files.
   RouteConfigData();
 
   // Configure Scene Manager if it is in use as the scene owner. This includes:
