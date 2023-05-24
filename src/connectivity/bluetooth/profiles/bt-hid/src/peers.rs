@@ -80,15 +80,18 @@ impl Peers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_profile_server;
-    use {async_test_helpers::run_while, async_utils::PollExt, fuchsia_async as fasync};
+
+    use async_test_helpers::run_while;
+    use async_utils::PollExt;
+    use fuchsia_async as fasync;
+    use test_profile_server;
 
     #[fuchsia::test]
     fn search_result_creates_peer_task() {
         // Set up peers.
         let mut exec = fasync::TestExecutor::new();
         let test_profile_server::TestProfileServerEndpoints { proxy, client, mut test_server } =
-            test_profile_server::new(
+            test_profile_server::TestProfileServer::new(
                 None,                                                             // Advertisement
                 Some(bredr::ServiceClassProfileIdentifier::HumanInterfaceDevice), // Search
             );

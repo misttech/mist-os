@@ -19,9 +19,6 @@ mod peers;
 mod protocol;
 mod sdp_data;
 
-#[cfg(test)]
-mod test_profile_server;
-
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     debug!("Started HID component.");

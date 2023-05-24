@@ -30,6 +30,24 @@ rustc_library("profile-client") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+rustc_library("test-profile-server") {
+  edition = "2021"
+  testonly = true
+
+  deps = [
+    ":profile-client",
+    "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
+    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:futures",
+  ]
+
+  source_root = "src/test/lib.rs"
+  sources = [ "src/test/lib.rs" ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
 fuchsia_unittest_package("profile-client-tests") {
   deps = [ ":profile-client_test" ]
 }
