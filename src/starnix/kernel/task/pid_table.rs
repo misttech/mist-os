@@ -105,6 +105,11 @@ impl PidTable {
         self.table.iter().flat_map(|(pid, entry)| entry.group.as_ref().and(Some(*pid))).collect()
     }
 
+    /// Returns the task ids for all the currently running tasks.
+    pub fn task_ids(&self) -> Vec<pid_t> {
+        self.table.iter().flat_map(|(pid, entry)| entry.task.as_ref().and(Some(*pid))).collect()
+    }
+
     pub fn last_pid(&self) -> pid_t {
         self.last_pid
     }

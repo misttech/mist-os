@@ -478,13 +478,26 @@ impl LoadavgFile {
 }
 impl DynamicFileSource for LoadavgFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let (num_tasks, last_pid) = {
+        let (runnable_tasks, existing_tasks, last_pid) = {
             let kernel = self.0.upgrade().ok_or(errno!(EIO))?;
-            let pids = kernel.pids.read();
-            (pids.len(), pids.last_pid())
+            let pid_table = kernel.pids.read();
+
+            let curr_tids = pid_table.task_ids();
+            let mut runnable_tasks = 0;
+            for pid in &curr_tids {
+                if let Some(task) = pid_table.get_task(*pid) {
+                    if task.state_code() == TaskStateCode::Running {
+                        runnable_tasks += 1;
+                    }
+                };
+            }
+
+            let existing_tasks = pid_table.process_ids().len() + curr_tids.len();
+            (runnable_tasks, existing_tasks, pid_table.last_pid())
         };
+
         // TODO: Collect and report load stats.
-        writeln!(sink, "0.50 0.50 0.50 1/{} {}", num_tasks, last_pid)?;
+        writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
         Ok(())
     }
 }
