@@ -1035,11 +1035,11 @@ pub fn sys_seccomp(
             current_task.add_seccomp_filter(args, flags)
         }
         SECCOMP_GET_ACTION_AVAIL => {
-            if flags != 0 {
+            if flags != 0 || args.is_null() {
                 return error!(EINVAL);
             }
-            not_implemented!("seccomp not implemented");
-            error!(ENOSYS)
+            let action: u32 = current_task.mm.read_object(UserRef::new(args))?;
+            SeccompState::is_action_available(action)
         }
         SECCOMP_GET_NOTIF_SIZES => {
             if flags != 0 {

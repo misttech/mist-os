@@ -283,6 +283,19 @@ TEST(SeccompTest, PrctlGetSeccomp) {
   });
 }
 
+TEST(SeccompTest, GetActionAvail) {
+  uint32_t actions[] = {SECCOMP_RET_ALLOW,       SECCOMP_RET_ERRNO, SECCOMP_RET_KILL_PROCESS,
+                        SECCOMP_RET_KILL_THREAD, SECCOMP_RET_LOG,   SECCOMP_RET_TRAP};
+
+  for (unsigned long i = 0; i < ARRAY_SIZE(actions); i++) {
+    EXPECT_EQ(0, syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, actions + i));
+  }
+  uint32_t illegal = 0xcafebeef;
+
+  EXPECT_EQ(-1, syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &illegal));
+  EXPECT_EQ(EOPNOTSUPP, errno);
+}
+
 TEST(SeccompTest, ErrnoIsMaxFFF) {
   ForkHelper helper;
   helper.RunInForkedProcess([] {

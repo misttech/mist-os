@@ -9,6 +9,7 @@ use ubpf::program::EbpfProgram;
 use crate::logging::log_warn;
 use crate::signals::{send_signal, SignalDetail, SignalInfo};
 use crate::syscalls::decls::Syscall;
+use crate::syscalls::SyscallResult;
 use crate::task::{CurrentTask, ExitStatus, Task};
 use crate::types::*;
 
@@ -308,6 +309,24 @@ impl SeccompState {
             SECCOMP_RET_KILL_PROCESS | _ => {
                 task.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
                 Some(errno_from_code!(0))
+            }
+        }
+    }
+
+    pub fn is_action_available(action: u32) -> Result<SyscallResult, Errno> {
+        match action & !SECCOMP_RET_DATA {
+            SECCOMP_RET_ALLOW
+            | SECCOMP_RET_ERRNO
+            | SECCOMP_RET_KILL_PROCESS
+            | SECCOMP_RET_KILL_THREAD
+            | SECCOMP_RET_LOG
+            | SECCOMP_RET_TRAP => Ok(().into()),
+            // TODO(fxbug.dev/126644): Implement these.
+            SECCOMP_RET_TRACE | SECCOMP_RET_USER_NOTIF => {
+                error!(EOPNOTSUPP)
+            }
+            _ => {
+                error!(EOPNOTSUPP)
             }
         }
     }
