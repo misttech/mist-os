@@ -1,4 +1,4 @@
 {{ range $_, $project := .AllProjects }}
-{{ $project.Name}} [{{ $project.Root }}]{{ range $_, $searchResult := $project.LicenseFileSearchResults }}
- -> {{ $searchResult.LicenseData.LibraryName }} [{{$searchResult.LicenseData.File.RelPath}}]{{ end }}
+{{ $project.Name}} [{{ $project.Root }}]{{ range $_, $licenseFile := $project.LicenseFiles }}
+ -> {{$licenseFile.RelPath}}{{ end }}
 {{ end }}
