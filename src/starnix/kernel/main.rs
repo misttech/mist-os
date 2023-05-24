@@ -10,7 +10,7 @@
 #[macro_use]
 extern crate macro_rules_attribute;
 
-use crate::execution::create_container;
+use crate::execution::maybe_create_container_from_startup_handles;
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -90,7 +90,9 @@ async fn main() -> Result<(), Error> {
         fuchsia_trace::Scope::Thread
     );
 
-    let container = create_container().await?;
+    let container = maybe_create_container_from_startup_handles()
+        .await?
+        .expect("missing /container_config/config");
 
     maybe_serve_lifecycle();
 

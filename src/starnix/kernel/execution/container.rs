@@ -65,7 +65,7 @@ impl std::ops::Deref for ConfigWrapper {
 }
 
 /// Returns the configuration object for the container being run by this `starnix_kernel`.
-fn get_config() -> ConfigWrapper {
+fn get_config() -> Option<ConfigWrapper> {
     if let Ok(config_bytes) = std::fs::read("/container_config/config") {
         let program_dict: fdata::Dictionary =
             fidl::unpersist(&config_bytes).expect("Failed to unpersist the program dictionary.");
@@ -87,7 +87,7 @@ fn get_config() -> ConfigWrapper {
         let svc_dir = fruntime::take_startup_handle(kernel_config::CONTAINER_SVC_HANDLE_INFO)
             .map(zx::Channel::from_handle);
 
-        ConfigWrapper {
+        Some(ConfigWrapper {
             config: Config {
                 apex_hack,
                 features,
@@ -100,28 +100,9 @@ fn get_config() -> ConfigWrapper {
             pkg_dir,
             outgoing_dir,
             svc_dir,
-        }
+        })
     } else {
-        const COMPONENT_PKG_PATH: &str = "/pkg";
-        let (server, dir) = zx::Channel::create();
-        let pkg_dir = if fdio::open(
-            COMPONENT_PKG_PATH,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            server,
-        )
-        .is_ok()
-        {
-            Some(dir)
-        } else {
-            None
-        };
-        // Default to the configuration that is provided by structured config.
-        ConfigWrapper {
-            config: Config::take_from_startup_handle(),
-            pkg_dir,
-            outgoing_dir: None,
-            svc_dir: None,
-        }
+        None
     }
 }
 
@@ -158,11 +139,20 @@ enum ExposedServices {
     Container(fstarcontainer::ControllerRequestStream),
 }
 
-/// Creates a new container.
-pub async fn create_container() -> Result<Arc<Container>, Error> {
+/// Attempts to read /container_config/config and the startup handles to create a container.
+///
+/// Returns None if /container_config/config does not exist.
+///
+/// This function will be replaced with a version that starts a container from ComponentStartInfo,
+/// but this function exists to make a soft transition.
+pub async fn maybe_create_container_from_startup_handles() -> Result<Option<Arc<Container>>, Error>
+{
+    Ok(if let Some(config) = get_config() { Some(create_container(config).await?) } else { None })
+}
+
+async fn create_container(mut config: ConfigWrapper) -> Result<Arc<Container>, Error> {
     trace_duration!(trace_category_starnix!(), trace_name_create_container!());
     const DEFAULT_INIT: &str = "/container/init";
-    let mut config = get_config();
 
     // Install container svc into the kernel namespace
     let svc_dir = if let Some(svc_dir) = config.svc_dir.take() {
