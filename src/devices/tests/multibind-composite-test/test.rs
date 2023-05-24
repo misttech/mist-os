@@ -26,7 +26,7 @@ async fn start_driver_test_realm(use_dfv2: bool) -> Result<RealmInstance> {
 }
 
 // Tests that the legacy and spec composites are successfully assembled, bound, and
-// added to the topology in DFv2.
+// added to the topology in DFv1.
 #[fasync::run_singlethreaded(test)]
 async fn test_composites_v1() -> Result<()> {
     let instance = start_driver_test_realm(false).await?;
@@ -49,6 +49,8 @@ async fn test_composites_v1() -> Result<()> {
 
 // Tests that the legacy and spec composites are successfully assembled, bound, and
 // added to the topology in DFv2.
+// TODO(fxb/122531): Re-enable after fixing multibind in DFv2.
+#[ignore]
 #[fasync::run_singlethreaded(test)]
 async fn test_composites_v2() -> Result<()> {
     let instance = start_driver_test_realm(true).await?;

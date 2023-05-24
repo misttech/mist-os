@@ -637,18 +637,16 @@ std::optional<std::string> DriverRunner::BindNodeToResult(
 
 zx::result<> DriverRunner::BindNodeToSpec(
     Node& node, fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents) {
-  auto result = composite_node_spec_manager_.BindParentSpec(parents, node.weak_from_this(), true);
+  // TODO(fxb/122531): Re-enable multibind and add the node to |composite_parents_|.
+  auto result = composite_node_spec_manager_.BindParentSpec(parents, node.weak_from_this(),
+                                                            /* enable_multibind */ false);
   if (result.is_error()) {
     if (result.error_value() != ZX_ERR_NOT_FOUND) {
       LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
            node.name().c_str());
     }
-
     return result.take_error();
   }
-
-  std::weak_ptr node_weak = node.shared_from_this();
-  composite_parents_.emplace(node.MakeComponentMoniker(), node_weak);
 
   auto composite_list = result.value();
   if (composite_list.empty()) {
