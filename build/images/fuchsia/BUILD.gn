@@ -246,18 +246,6 @@ if (is_fuchsia) {
   # Fuchsia
   ##################################################
 
-  # Copy the fvm.blob.sparse.blk to the old location for assembled images.
-  # TODO(fxbug.dev/82077): Delete this once clients do not depend on the old path.
-
-  if (!fxfs_blob) {
-    copy("copy_fvm_blob_sparse") {
-      testonly = fuchsia_zbi_testonly
-      sources = [ "${target_out_dir}/fuchsia/fvm.blob.sparse.blk" ]
-      outputs = [ old_fvm_blob_sparse_path ]
-      deps = [ ":fuchsia_assembly" ]
-    }
-  }
-
   # The `:fuchsia` target assembles the main Fuchsia image, for all non-bringup
   # product definitions.
   #
@@ -276,10 +264,6 @@ if (is_fuchsia) {
       ":scrutiny_x_smoke_test",
       ":update",
     ]
-
-    if (!fxfs_blob && include_fvm_blob_sparse) {
-      public_deps += [ ":copy_fvm_blob_sparse" ]
-    }
 
     metadata = {
       # Only include the update package(s) manifest(s) in metadata collection.

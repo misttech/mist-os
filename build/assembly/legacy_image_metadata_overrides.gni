@@ -7,10 +7,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 
 # TODO(fxbug.dev/81569): Burn this down.
 
-# TODO(fxbug.dev/82077): Remove these once clients switch to the new paths
-old_fvm_blob_sparse_path =
-    "${root_out_dir}/obj/build/images/fvm.blob.sparse.blk"
-
 # For //build/images/fuchsia:fuchsia_assembly.
 legacy_fuchsia_image_metadata_overrides = {
   zbi = {
@@ -99,11 +95,6 @@ legacy_fuchsia_image_metadata_overrides = {
       # Hack: Infra expects bootserver_pave to be present
       # in the GN graph for this image to be built.
       bootserver_pave = []
-
-      # TODO(fxbug.dev/82077): Remove these overrides once clients do not
-      # depend on the old path.
-      label = "//build/images/fuchsia:copy_fvm_blobf_sparse($default_toolchain)"
-      path = rebase_path(old_fvm_blob_sparse_path, root_build_dir)
     }
 
     fvm_fastboot = {
