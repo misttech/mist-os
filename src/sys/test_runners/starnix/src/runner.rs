@@ -41,7 +41,7 @@ pub async fn handle_runner_requests(
     Ok(())
 }
 
-/// Serves a `ftest::SuiteRequestStream` from `directory_channel`.
+/// Serves a `ftest::SuiteRequestStream` within the `outgoing_dir` of `start_info`.
 ///
 /// This function is used to serve a `ftest::SuiteRequestStream` in the outgoing directory of a test
 /// component. This is what the test framework connects to to run test cases.
@@ -49,7 +49,6 @@ pub async fn handle_runner_requests(
 /// When the returned future completes, the outgoing directory has finished serving requests.
 ///
 /// # Parameters
-///   - `kernels_dir`: The root directory for the starnix_kernel instance's configuration.
 ///   - `start_info`: The start info associated with the test component, used to instantiate
 ///                   the starnix_kernel.
 ///   - `controller`: The server end of the component controller for the test component.
