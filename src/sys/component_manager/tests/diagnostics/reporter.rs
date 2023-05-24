@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect},
+    diagnostics_reader::{
+        assert_data_tree, AnyProperty, ArchiveReader, DiagnosticsHierarchy, Inspect,
+    },
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_fs,
 };
@@ -28,6 +30,43 @@ async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64
     contents.parse::<u64>().unwrap()
 }
 
+fn get_data(
+    hierarchy: &DiagnosticsHierarchy,
+    moniker: &str,
+    task: &str,
+) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+    let path = ["stats", "measurements", "components", moniker, task];
+    let node = hierarchy.get_child_by_path(&path).expect("found stats node");
+    let cpu_times = node
+        .get_property("cpu_times")
+        .expect("found cpu")
+        .int_array()
+        .expect("cpu are ints")
+        .raw_values();
+    let queue_times = node
+        .get_property("queue_times")
+        .expect("found queue")
+        .int_array()
+        .expect("queue are ints")
+        .raw_values();
+    let timestamps = node
+        .get_property("timestamps")
+        .expect("found timestamps")
+        .int_array()
+        .expect("timestamps are ints")
+        .raw_values();
+    (timestamps.into_owned(), cpu_times.into_owned(), queue_times.into_owned())
+}
+
+fn assert_component_data(hierarchy: &DiagnosticsHierarchy, moniker: &str, koid: u64) {
+    let (timestamps, cpu_times, queue_times) = get_data(hierarchy, moniker, &koid.to_string());
+    assert_eq!(timestamps.len(), 2);
+    assert_eq!(cpu_times.len(), 2);
+    assert_eq!(queue_times.len(), 2);
+    assert_eq!(cpu_times[0], 0);
+    assert_eq!(queue_times[0], 0);
+}
+
 #[fuchsia::main]
 async fn main() {
     let data = ArchiveReader::new()
@@ -43,7 +82,8 @@ async fn main() {
     let reporter_job_koid = get_job_koid("./reporter", &realm_query).await;
 
     assert_eq!(data.len(), 1, "expected 1 match: {:?}", data);
-    assert_data_tree!(data[0].payload.as_ref().unwrap(), root: {
+    let hierarchy = data[0].payload.as_ref().unwrap();
+    assert_data_tree!(hierarchy, root: {
         "fuchsia.inspect.Health": {
             start_timestamp_nanos: AnyProperty,
             status: "OK"
@@ -66,7 +106,7 @@ async fn main() {
                 time: AnyProperty,
             },
         },
-        cpu_stats: contains {
+        stats: contains {
             measurements: {
                 component_count: 3u64,
                 task_count: 3u64,
@@ -82,34 +122,16 @@ async fn main() {
                     "<component_manager>": contains {},
                     "root/archivist": {
                         archivist_job_koid.to_string() => {
-                            "@samples": {
-                                "0": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: 0u64,
-                                    queue_time: 0u64,
-                                },
-                                "1": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: AnyProperty,
-                                    queue_time: AnyProperty,
-                                }
-                            }
+                            timestamps: AnyProperty,
+                            cpu_times: AnyProperty,
+                            queue_times: AnyProperty,
                         }
                     },
                     "root/reporter": {
                         reporter_job_koid.to_string() => {
-                            "@samples": {
-                                "0": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: 0u64,
-                                    queue_time: 0u64,
-                                },
-                                "1": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: AnyProperty,
-                                    queue_time: AnyProperty,
-                                }
-                            }
+                            timestamps: AnyProperty,
+                            cpu_times: AnyProperty,
+                            queue_times: AnyProperty,
                         }
                     },
                 }
@@ -124,4 +146,7 @@ async fn main() {
             failed_allocations: 0u64,
         }
     });
+
+    assert_component_data(hierarchy, "root/archivist", archivist_job_koid);
+    assert_component_data(hierarchy, "root/reporter", reporter_job_koid);
 }

@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::diagnostics::cpu::constants::{
-        COMPONENT_CPU_MAX_SAMPLES, CPU_SAMPLE_PERIOD, MEASUREMENT_EPSILON,
-    },
+    crate::diagnostics::cpu::constants::*,
     core::cmp::Reverse,
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fuchsia_inspect::{self as inspect, ArrayProperty},
+    fuchsia_zircon as zx,
     injectable_time::TimeSource,
-    lazy_static::lazy_static,
     std::cmp::max,
     std::cmp::{Eq, Ord, PartialEq, PartialOrd},
     std::collections::BinaryHeap,
@@ -17,15 +15,6 @@ use {
     std::ops::{AddAssign, SubAssign},
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref TIMESTAMP: inspect::StringReference = "timestamp".into();
-    static ref CPU_TIME: inspect::StringReference = "cpu_time".into();
-    static ref QUEUE_TIME: inspect::StringReference = "queue_time".into();
-    static ref SAMPLES: inspect::StringReference = "@samples".into();
-    static ref SAMPLE_INDEXES: Vec<inspect::StringReference> =
-        (0..COMPONENT_CPU_MAX_SAMPLES).map(|x| x.to_string().into()).collect();
-}
 
 #[derive(Debug, Clone, Default, PartialOrd, Eq, Ord, PartialEq)]
 pub struct Measurement {
@@ -45,13 +34,6 @@ impl Measurement {
 
     pub fn clone_with_time(m: &Self, timestamp: zx::Time) -> Self {
         Self { timestamp, cpu_time: *m.cpu_time(), queue_time: *m.queue_time() }
-    }
-
-    /// Records the measurement data to the given inspect `node`.
-    pub fn record_to_node(&self, node: &inspect::Node) {
-        node.record_int(&*TIMESTAMP, self.timestamp.into_nanos());
-        node.record_int(&*CPU_TIME, self.cpu_time.into_nanos());
-        node.record_int(&*QUEUE_TIME, self.queue_time.into_nanos());
     }
 
     /// The measured cpu time.
@@ -271,15 +253,20 @@ impl MeasurementsQueue {
         }
     }
 
-    pub fn record_to_node(&self, parent: &inspect::Node) {
-        let samples = parent.create_child(&*SAMPLES);
+    pub fn record_to_node(&self, node: &inspect::Node) {
         // gather measurements ordered oldest -> newest
+        let count = self.values.len();
+        let timestamps = node.create_int_array(TIMESTAMPS, count);
+        let cpu_times = node.create_int_array(CPU_TIMES, count);
+        let queue_times = node.create_int_array(QUEUE_TIMES, count);
         for (i, measurement) in self.iter_sorted().rev().enumerate() {
-            let child = samples.create_child(&SAMPLE_INDEXES[i]);
-            measurement.record_to_node(&child);
-            samples.record(child);
+            timestamps.set(i, measurement.timestamp.into_nanos());
+            cpu_times.set(i, measurement.cpu_time.into_nanos());
+            queue_times.set(i, measurement.queue_time.into_nanos());
         }
-        parent.record(samples);
+        node.record(timestamps);
+        node.record(cpu_times);
+        node.record(queue_times);
     }
 }
 

@@ -8,6 +8,9 @@ use std::time::Duration;
 pub const CPU_SAMPLE_PERIOD: Duration = Duration::from_secs(60);
 pub const COMPONENT_CPU_MAX_SAMPLES: usize = 60;
 pub const MAX_DEAD_TASKS: usize = 90;
+pub const TIMESTAMPS: &'static str = "timestamps";
+pub const CPU_TIMES: &'static str = "cpu_times";
+pub const QUEUE_TIMES: &'static str = "queue_times";
 
 lazy_static! {
     pub static ref MEASUREMENT_EPSILON: Duration = CPU_SAMPLE_PERIOD / 6;

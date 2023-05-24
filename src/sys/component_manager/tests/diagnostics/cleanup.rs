@@ -25,7 +25,7 @@ async fn main() {
 
     let data = reader.snapshot::<Inspect>().await.expect("got inspect data");
     assert_data_tree!(data[0].payload.as_ref().unwrap(), root: contains {
-        cpu_stats: contains {
+        stats: contains {
             measurements: contains {
                 component_count: 4u64,
                 task_count: 4u64,
@@ -66,7 +66,7 @@ async fn main() {
     // associated, so it's cleaned up. Retry until we see this.
     let data = reader.snapshot::<Inspect>().await.expect("got inspect data");
     assert_data_tree!(data[0].payload.as_ref().unwrap(), root: contains {
-        cpu_stats: contains {
+        stats: contains {
             measurements: contains {
                 component_count: 4u64,
                 task_count: 4u64,

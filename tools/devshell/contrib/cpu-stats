@@ -360,7 +360,7 @@ def get_v1_samples(content):
 def get_v2_samples(content):
   try:
     component_manager = get_component_payload(content, '<component_manager>')
-    components = component_manager['root']['cpu_stats']['measurements']['components']
+    components = component_manager['root']['stats']['measurements']['components']
   except KeyError as e:
     raise ProcessError(f'Missing key: {e}')
   except ProcessError:
@@ -373,12 +373,11 @@ def get_v2_samples(content):
 
   for (moniker, component_stats) in components.items():
     for (_task_koid, task_stats) in component_stats.items():
-      for (_index, sample) in task_stats['@samples'].items():
-        samples[moniker][sample['timestamp']] = {
-            'cpu_time': sample['cpu_time'],
-            'queue_time': sample['queue_time']
+      for (i, timestamp) in enumerate(task_stats['timestamps']):
+        samples[moniker][timestamp] = {
+            'cpu_time': task_stats['cpu_times'][i],
+            'queue_time': task_stats['queue_times'][i]
         }
-
   return samples
 
 

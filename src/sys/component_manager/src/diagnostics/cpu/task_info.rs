@@ -295,17 +295,14 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::diagnostics::cpu::testing::FakeTask;
+    use assert_matches::assert_matches;
+    use diagnostics_hierarchy::ArrayContent;
+    use fuchsia_inspect::testing::assert_data_tree;
+    use injectable_time::FakeTime;
     use inspect::testing::DiagnosticsHierarchyGetter;
-
-    use {
-        super::*,
-        crate::diagnostics::cpu::testing::FakeTask,
-        assert_matches::assert_matches,
-        diagnostics_hierarchy::ArrayContent,
-        fuchsia_inspect::testing::{assert_data_tree, AnyProperty},
-        injectable_time::{FakeTime, MonotonicTime},
-        std::sync::Arc,
-    };
+    use std::sync::Arc;
 
     async fn take_measurement_then_tick_clock<
         'a,
@@ -368,6 +365,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn write_inspect() {
+        let time = Arc::new(FakeTime::new());
         let mut task = TaskInfo::try_from(
             FakeTask::new(
                 1,
@@ -385,29 +383,22 @@ mod tests {
                 ],
             ),
             None, /* histogram */
-            Arc::new(MonotonicTime::new()),
+            time.clone(),
         )
         .unwrap();
 
+        time.set_ticks(1);
         task.measure_if_no_parent().await;
+        time.set_ticks(2);
         task.measure_if_no_parent().await;
 
         let inspector = inspect::Inspector::default();
         task.record_to_node(inspector.root());
         assert_data_tree!(inspector, root: {
             "1": {
-                "@samples": {
-                    "0": {
-                        cpu_time: 2i64,
-                        queue_time: 4i64,
-                        timestamp: AnyProperty,
-                    },
-                    "1": {
-                        cpu_time: 6i64,
-                        queue_time: 8i64,
-                        timestamp: AnyProperty,
-                    }
-                }
+                timestamps: vec![1i64, 2],
+                cpu_times: vec![2i64, 6],
+                queue_times: vec![4i64, 8],
             }
         });
     }
@@ -448,12 +439,13 @@ mod tests {
 
         let hierarchy = inspector.get_diagnostics_hierarchy();
         for top_level in &hierarchy.children {
-            for i in 0..COMPONENT_CPU_MAX_SAMPLES {
-                let index = i.to_string();
-                let child =
-                    hierarchy.get_child_by_path(&[&top_level.name, "@samples", &index]).unwrap();
-                assert_eq!(child.name, index);
-            }
+            let child = hierarchy.get_child(&top_level.name).unwrap();
+            let timestamps = child.get_property("timestamps").unwrap().int_array().unwrap();
+            assert_eq!(timestamps.len(), COMPONENT_CPU_MAX_SAMPLES);
+            let cpu_times = child.get_property("cpu_times").unwrap().int_array().unwrap();
+            assert_eq!(cpu_times.len(), COMPONENT_CPU_MAX_SAMPLES);
+            let queue_times = child.get_property("queue_times").unwrap().int_array().unwrap();
+            assert_eq!(queue_times.len(), COMPONENT_CPU_MAX_SAMPLES);
         }
     }
 

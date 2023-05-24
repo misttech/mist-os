@@ -795,7 +795,7 @@ impl BuiltinEnvironment {
 
         // Set up the Component Tree Diagnostics runtime statistics.
         let component_tree_stats =
-            ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
+            ComponentTreeStats::new(inspector.root().create_child("stats")).await;
         component_tree_stats.track_component_manager_stats().await;
         component_tree_stats.start_measuring().await;
         model.root().hooks.install(component_tree_stats.hooks()).await;

@@ -98,7 +98,7 @@ impl FakeRuntime {
     pub fn new(container: FakeDiagnosticsContainer) -> Self {
         Self::new_with_start_times(
             container,
-            IncrementingFakeTime::new(0, std::time::Duration::from_nanos(0)),
+            IncrementingFakeTime::new(0, std::time::Duration::from_nanos(1)),
         )
     }
 

@@ -18,7 +18,7 @@ use {
     selectors::{self, ValidateExt},
     serde::Deserialize,
     std::{
-        borrow::Borrow,
+        borrow::{Borrow, Cow},
         cmp::Ordering,
         collections::BTreeMap,
         convert::TryFrom,
@@ -545,6 +545,23 @@ impl<T: Add<Output = T> + AddAssign + Copy + MulAssign + Bounded> ArrayContent<T
                 let buckets = Self::buckets_for_exp_hist(values)?;
                 Ok(Self::Buckets(buckets))
             }
+        }
+    }
+
+    /// Returns the number of items in the array.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Values(vals) => vals.len(),
+            Self::Buckets(buckets) => buckets.len(),
+        }
+    }
+
+    /// Returns the raw values of this Array content. In the case of a histogram, returns the
+    /// bucket counts.
+    pub fn raw_values(&self) -> Cow<'_, Vec<T>> {
+        match self {
+            Self::Values(values) => Cow::Borrowed(&values),
+            Self::Buckets(buckets) => Cow::Owned(buckets.iter().map(|b| b.count).collect()),
         }
     }
 

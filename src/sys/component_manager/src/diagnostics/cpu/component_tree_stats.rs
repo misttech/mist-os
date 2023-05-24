@@ -19,10 +19,8 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
     fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, HistogramProperty},
-    fuchsia_inspect_contrib::nodes::BoundedListNode,
-    fuchsia_zircon::sys as zx_sys,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_inspect::{self as inspect, ArrayProperty, HistogramProperty},
+    fuchsia_zircon::{self as zx, sys as zx_sys, HandleBased},
     futures::{
         channel::{mpsc, oneshot},
         lock::Mutex,
@@ -33,7 +31,7 @@ use {
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
     std::{
         boxed::Box,
-        collections::BTreeMap,
+        collections::{BTreeMap, VecDeque},
         fmt::Debug,
         sync::{Arc, Weak},
     },
@@ -114,7 +112,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         );
 
         let histograms_node = node.create_child("histograms");
-        let totals = AggregatedStats::new(node.create_child("@total"));
+        let totals = Mutex::new(AggregatedStats::new());
         let (snd, rcv) = mpsc::unbounded();
         let this = Arc::new(Self {
             tree: Mutex::new(BTreeMap::new()),
@@ -123,7 +121,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             histograms_node,
             processing_times,
             sampler_task: Mutex::new(None),
-            totals: Mutex::new(totals),
+            totals,
             diagnostics_waiter_task_sender: snd,
             _wait_diagnostics_drain: fasync::Task::spawn(async move {
                 rcv.for_each_concurrent(None, |rx| async move { rx.await }).await;
@@ -150,12 +148,25 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             }
             .boxed()
         });
+
         let weak_self_clone_for_fut = weak_self.clone();
         this.node.record_lazy_child("recent_usage", move || {
             let weak_self_clone = weak_self_clone_for_fut.clone();
             async move {
                 if let Some(this) = weak_self_clone.upgrade() {
                     Ok(this.write_recent_usage_to_inspect().await)
+                } else {
+                    Ok(inspect::Inspector::default())
+                }
+            }
+            .boxed()
+        });
+        let weak_self_for_fut = weak_self.clone();
+        this.node.record_lazy_child("@total", move || {
+            let weak_self_clone = weak_self_for_fut.clone();
+            async move {
+                if let Some(this) = weak_self_clone.upgrade() {
+                    Ok(this.write_totals_to_inspect().await)
                 } else {
                     Ok(inspect::Inspector::default())
                 }
@@ -217,6 +228,12 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     async fn write_recent_usage_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
         let inspector = inspect::Inspector::default();
         self.totals.lock().await.write_recents_to(inspector.root());
+        inspector
+    }
+
+    async fn write_totals_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
+        let inspector = inspect::Inspector::default();
+        self.totals.lock().await.write_totals_to(inspector.root());
         inspector
     }
 
@@ -304,7 +321,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             tasks.remove(&koid);
         }
 
-        self.totals.lock().await.update(aggregated);
+        self.totals.lock().await.insert(aggregated);
         self.processing_times.insert((zx::Time::get_monotonic() - start).into_nanos());
     }
 
@@ -481,44 +498,51 @@ impl Hook for ComponentTreeStats<DiagnosticsTask> {
 }
 
 struct AggregatedStats {
-    /// Holds historical aggregated CPU usage stats.
-    node: BoundedListNode,
-
-    /// Second most recent total recorded.
-    previous_measurement: Option<Measurement>,
-
-    /// Most recent total recorded.
-    recent_measurement: Option<Measurement>,
+    /// A queue storing all total measurements. The last one is the most recent.
+    measurements: VecDeque<Measurement>,
 }
 
 impl AggregatedStats {
-    fn new(node: inspect::Node) -> Self {
-        let node = BoundedListNode::new(node, COMPONENT_CPU_MAX_SAMPLES);
-        Self { node, previous_measurement: None, recent_measurement: None }
+    fn new() -> Self {
+        Self { measurements: VecDeque::with_capacity(COMPONENT_CPU_MAX_SAMPLES) }
     }
 
-    fn update(&mut self, measurement: Measurement) {
-        let child = self.node.create_entry();
-        child.atomic_update(|node| {
-            node.record_int("timestamp", measurement.timestamp().into_nanos());
-            node.record_int("cpu_time", measurement.cpu_time().into_nanos());
-            node.record_int("queue_time", measurement.queue_time().into_nanos());
-        });
-        self.previous_measurement = self.recent_measurement.take();
-        self.recent_measurement = Some(measurement);
+    fn insert(&mut self, measurement: Measurement) {
+        while self.measurements.len() >= COMPONENT_CPU_MAX_SAMPLES {
+            self.measurements.pop_front();
+        }
+        self.measurements.push_back(measurement);
+    }
+
+    fn write_totals_to(&self, node: &inspect::Node) {
+        let count = self.measurements.len();
+        let timestamps = node.create_int_array(TIMESTAMPS, count);
+        let cpu_times = node.create_int_array(CPU_TIMES, count);
+        let queue_times = node.create_int_array(QUEUE_TIMES, count);
+        for (i, measurement) in self.measurements.iter().enumerate() {
+            timestamps.set(i, measurement.timestamp().into_nanos());
+            cpu_times.set(i, measurement.cpu_time().into_nanos());
+            queue_times.set(i, measurement.queue_time().into_nanos());
+        }
+        node.record(timestamps);
+        node.record(cpu_times);
+        node.record(queue_times);
     }
 
     fn write_recents_to(&self, node: &inspect::Node) {
-        if let Some(measurement) = &self.previous_measurement {
+        if self.measurements.is_empty() {
+            return;
+        }
+        if self.measurements.len() >= 2 {
+            let measurement = self.measurements.get(self.measurements.len() - 2).unwrap();
             node.record_int("previous_cpu_time", measurement.cpu_time().into_nanos());
             node.record_int("previous_queue_time", measurement.queue_time().into_nanos());
             node.record_int("previous_timestamp", measurement.timestamp().into_nanos());
         }
-        if let Some(measurement) = &self.recent_measurement {
-            node.record_int("recent_cpu_time", measurement.cpu_time().into_nanos());
-            node.record_int("recent_queue_time", measurement.queue_time().into_nanos());
-            node.record_int("recent_timestamp", measurement.timestamp().into_nanos());
-        }
+        let measurement = self.measurements.get(self.measurements.len() - 1).unwrap();
+        node.record_int("recent_cpu_time", measurement.cpu_time().into_nanos());
+        node.record_int("recent_queue_time", measurement.queue_time().into_nanos());
+        node.record_int("recent_timestamp", measurement.timestamp().into_nanos());
     }
 }
 
@@ -532,7 +556,7 @@ mod tests {
         },
         cm_rust_testing::ComponentDeclBuilder,
         diagnostics_hierarchy::DiagnosticsHierarchy,
-        fuchsia_inspect::testing::{assert_data_tree, AnyProperty},
+        fuchsia_inspect::testing::{assert_data_tree, AnyProperty, DiagnosticsHierarchyGetter},
         fuchsia_zircon::{AsHandleRef, DurationNum},
         injectable_time::{FakeTime, IncrementingFakeTime},
         moniker::AbsoluteMoniker,
@@ -543,7 +567,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let stats = ComponentTreeStats::new_with_timesource(
-            inspector.root().create_child("cpu_stats"),
+            inspector.root().create_child("stats"),
             clock.clone(),
         )
         .await;
@@ -582,46 +606,22 @@ mod tests {
 
         // Data is produced by `measure`
         // Both recent and previous exist
-        assert_eq!(
-            stats.totals.lock().await.recent_measurement.as_ref().unwrap().cpu_time().into_nanos(),
-            1180,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .recent_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2360,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .cpu_time()
-                .into_nanos(),
-            1160,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2320,
-        );
+        {
+            let totals = stats.totals.lock().await;
+            let recent_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 1)
+                .expect("there's at least one measurement");
+            assert_eq!(recent_measurement.cpu_time().into_nanos(), 1180);
+            assert_eq!(recent_measurement.queue_time().into_nanos(), 2360);
+
+            let previous_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 2)
+                .expect("there's a previous measurement");
+            assert_eq!(previous_measurement.cpu_time().into_nanos(), 1160);
+            assert_eq!(previous_measurement.queue_time().into_nanos(), 2320,);
+        }
 
         // Terminate all tasks
         for i in 0..10 {
@@ -646,136 +646,63 @@ mod tests {
         }
 
         // Data is produced by measure_dead_tasks
-        assert_eq!(
-            stats.totals.lock().await.recent_measurement.as_ref().unwrap().cpu_time().into_nanos(),
-            1180,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .recent_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2360,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .cpu_time()
-                .into_nanos(),
-            1160,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2320,
-        );
+        {
+            let totals = stats.totals.lock().await;
+            let recent_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 1)
+                .expect("there's at least one measurement");
+            assert_eq!(recent_measurement.cpu_time().into_nanos(), 1180);
+            assert_eq!(recent_measurement.queue_time().into_nanos(), 2360);
+
+            let previous_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 2)
+                .expect("there's a previous measurement");
+            assert_eq!(previous_measurement.cpu_time().into_nanos(), 1160);
+            assert_eq!(previous_measurement.queue_time().into_nanos(), 2320);
+        }
 
         // Data is produced by measure_dead_tasks
         stats.measure().await;
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
 
-        assert_eq!(
-            stats.totals.lock().await.recent_measurement.as_ref().unwrap().cpu_time().into_nanos(),
-            1200,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .recent_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2400,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .cpu_time()
-                .into_nanos(),
-            1180,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2360,
-        );
+        {
+            let totals = stats.totals.lock().await;
+            let recent_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 1)
+                .expect("there's at least one measurement");
+            assert_eq!(recent_measurement.cpu_time().into_nanos(), 1200);
+            assert_eq!(recent_measurement.queue_time().into_nanos(), 2400);
+
+            let previous_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 2)
+                .expect("there's a previous measurement");
+            assert_eq!(previous_measurement.cpu_time().into_nanos(), 1180);
+            assert_eq!(previous_measurement.queue_time().into_nanos(), 2360);
+        }
 
         stats.measure().await;
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
 
-        assert_eq!(
-            stats.totals.lock().await.recent_measurement.as_ref().unwrap().cpu_time().into_nanos(),
-            1200,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .recent_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2400,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .cpu_time()
-                .into_nanos(),
-            1200, // 1200 now because "previous" and "most recent" mean the same thing when
-                  // everything is dead
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2400,
-        );
+        {
+            let totals = stats.totals.lock().await;
+            let recent_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 1)
+                .expect("there's at least one measurement");
+            assert_eq!(recent_measurement.cpu_time().into_nanos(), 1200);
+            assert_eq!(recent_measurement.queue_time().into_nanos(), 2400);
+
+            let previous_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 2)
+                .expect("there's a previous measurement");
+            assert_eq!(previous_measurement.cpu_time().into_nanos(), 1200);
+            assert_eq!(previous_measurement.queue_time().into_nanos(), 2400);
+        }
 
         // Push all the measurements in the queues out. @totals should still be accurate
         for _ in 0..COMPONENT_CPU_MAX_SAMPLES {
@@ -788,47 +715,22 @@ mod tests {
         assert_eq!(stats.tree.lock().await.len(), 0);
 
         // Expect that cumulative totals are still around, plus a post-termination measurement
-        assert_eq!(
-            stats.totals.lock().await.recent_measurement.as_ref().unwrap().cpu_time().into_nanos(),
-            1200,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .recent_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2400,
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .cpu_time()
-                .into_nanos(),
-            1200, // 1200 now because "previous" and "most recent" mean the same thing when
-                  // everything is dead
-        );
-        assert_eq!(
-            stats
-                .totals
-                .lock()
-                .await
-                .previous_measurement
-                .as_ref()
-                .unwrap()
-                .queue_time()
-                .into_nanos(),
-            2400,
-        );
+        {
+            let totals = stats.totals.lock().await;
+            let recent_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 1)
+                .expect("there's at least one measurement");
+            assert_eq!(recent_measurement.cpu_time().into_nanos(), 1200);
+            assert_eq!(recent_measurement.queue_time().into_nanos(), 2400);
+
+            let previous_measurement = totals
+                .measurements
+                .get(totals.measurements.len() - 2)
+                .expect("there's a previous measurement");
+            assert_eq!(previous_measurement.cpu_time().into_nanos(), 1200);
+            assert_eq!(previous_measurement.queue_time().into_nanos(), 2400);
+        }
     }
 
     #[fuchsia::test]
@@ -836,7 +738,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let stats = ComponentTreeStats::new_with_timesource(
-            inspector.root().create_child("cpu_stats"),
+            inspector.root().create_child("stats"),
             clock.clone(),
         )
         .await;
@@ -910,7 +812,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("cpu_stats"),
+                inspector.root().create_child("stats"),
                 clock.clone(),
             )
             .await,
@@ -966,7 +868,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("cpu_stats"),
+                inspector.root().create_child("stats"),
                 clock.clone(),
             )
             .await,
@@ -991,7 +893,7 @@ mod tests {
         stats.measure().await;
 
         assert_data_tree!(inspector, root: {
-            cpu_stats: contains {
+            stats: contains {
                 measurements: contains {
                     components: {
                         "moniker-0": contains {},
@@ -1028,42 +930,32 @@ mod tests {
 
         stats.prune_dead_tasks(max_dead_tasks).await;
 
+        let hierarchy = inspector.get_diagnostics_hierarchy();
         assert_data_tree!(inspector, root: {
-            cpu_stats: contains {
+            stats: contains {
                 measurements: contains {
                     components: {
                         "@aggregated": {
-                            "@samples": {
-                                "0": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: 0i64,
-                                    queue_time: 0i64,
-                                },
-                                "1": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: 6i64,
-                                    queue_time: 6i64,
-                                },
-                                "2": {
-                                    timestamp: AnyProperty,
-                                    cpu_time: 12i64,
-                                    queue_time: 12i64,
-                                },
-                            }
+                            "timestamps": AnyProperty,
+                            "cpu_times": vec![0i64, 6i64, 12i64],
+                            "queue_times": vec![0i64, 6i64, 12i64],
                         },
-
                         "moniker-6": contains {},
                         "moniker-7": contains {},
                     }
                 }
             }
         });
+        let (timestamps, _, _) = get_data(&hierarchy, "@aggregated", None);
+        assert_eq!(timestamps.len(), 3);
+        assert!(timestamps[1] > timestamps[0]);
+        assert!(timestamps[2] > timestamps[1]);
     }
 
     #[fuchsia::test]
     async fn total_holds_sum_of_stats() {
         let inspector = inspect::Inspector::default();
-        let stats = ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
+        let stats = ComponentTreeStats::new(inspector.root().create_child("stats")).await;
         stats.measure().await;
         stats
             .track_ready(
@@ -1108,24 +1000,24 @@ mod tests {
 
         stats.measure().await;
         let hierarchy = inspect::reader::read(&inspector).await.expect("read inspect hierarchy");
-        let total_cpu_time = get_total_property(&hierarchy, 1, "cpu_time");
-        let total_queue_time = get_total_property(&hierarchy, 1, "queue_time");
-        assert_eq!(total_cpu_time, 2 + 1);
-        assert_eq!(total_queue_time, 4 + 3);
+        let (timestamps, cpu_times, queue_times) = get_data_at(&hierarchy, &["stats", "@total"]);
+        assert_eq!(timestamps.len(), 2);
+        assert_eq!(cpu_times, vec![0, 2 + 1]);
+        assert_eq!(queue_times, vec![0, 4 + 3]);
 
         stats.measure().await;
         let hierarchy = inspect::reader::read(&inspector).await.expect("read inspect hierarchy");
-        let total_cpu_time = get_total_property(&hierarchy, 2, "cpu_time");
-        let total_queue_time = get_total_property(&hierarchy, 2, "queue_time");
-        assert_eq!(total_cpu_time, 6 + 5);
-        assert_eq!(total_queue_time, 8 + 7);
+        let (timestamps, cpu_times, queue_times) = get_data_at(&hierarchy, &["stats", "@total"]);
+        assert_eq!(timestamps.len(), 3);
+        assert_eq!(cpu_times, vec![0, 2 + 1, 6 + 5]);
+        assert_eq!(queue_times, vec![0, 4 + 3, 8 + 7]);
     }
 
     #[fuchsia::test]
     async fn recent_usage() {
         // Set up the test
         let inspector = inspect::Inspector::default();
-        let stats = ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
+        let stats = ComponentTreeStats::new(inspector.root().create_child("stats")).await;
         stats.measure().await;
 
         stats
@@ -1175,7 +1067,7 @@ mod tests {
         // Verify initially there's no second most recent measurement since we only
         // have the initial measurement written.
         assert_data_tree!(&hierarchy, root: contains {
-            cpu_stats: contains {
+            stats: contains {
                 recent_usage: {
                     previous_cpu_time: 0i64,
                     previous_queue_time: 0i64,
@@ -1189,9 +1081,11 @@ mod tests {
 
         // Verify that the recent values are equal to the total values.
         let initial_timestamp = get_recent_property(&hierarchy, "recent_timestamp");
-        assert_eq!(2 + 1, get_total_property(&hierarchy, 1, "cpu_time"));
-        assert_eq!(4 + 3, get_total_property(&hierarchy, 1, "queue_time"));
-        assert_eq!(initial_timestamp, get_total_property(&hierarchy, 1, "timestamp"));
+        let (timestamps, cpu_times, queue_times) = get_data_at(&hierarchy, &["stats", "@total"]);
+        assert_eq!(timestamps.len(), 2);
+        assert_eq!(timestamps[1], initial_timestamp);
+        assert_eq!(cpu_times, vec![0, 2 + 1]);
+        assert_eq!(queue_times, vec![0, 4 + 3]);
 
         // Add one measurement
         stats.measure().await;
@@ -1199,7 +1093,7 @@ mod tests {
 
         // Verify that previous is now there and holds the previously recent values.
         assert_data_tree!(&hierarchy, root: contains {
-            cpu_stats: contains {
+            stats: contains {
                 recent_usage: {
                     previous_cpu_time: 2 + 1i64,
                     previous_queue_time: 4 + 3i64,
@@ -1219,7 +1113,7 @@ mod tests {
     #[fuchsia::test]
     async fn component_stats_are_available_in_inspect() {
         let inspector = inspect::Inspector::default();
-        let stats = ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
+        let stats = ComponentTreeStats::new(inspector.root().create_child("stats")).await;
         stats
             .track_ready(
                 ExtendedMoniker::ComponentInstance(vec!["a"].try_into().unwrap()),
@@ -1243,53 +1137,47 @@ mod tests {
 
         stats.measure().await;
 
-        assert_data_tree!(inspector, root: {
-            cpu_stats: contains {
+        let hierarchy = inspector.get_diagnostics_hierarchy();
+        assert_data_tree!(hierarchy, root: {
+            stats: contains {
                 measurements: contains {
                     components: {
                         "a": {
                             "1": {
-                                "@samples": {
-                                    "0": {
-                                        timestamp: AnyProperty,
-                                        cpu_time: 2i64,
-                                        queue_time: 4i64,
-                                    }
-                                }
+                                timestamps: AnyProperty,
+                                cpu_times: vec![2i64],
+                                queue_times: vec![4i64],
                             }
                         }
                     }
                 }
             }
         });
+        let (timestamps, _, _) = get_data(&hierarchy, "a", Some("1"));
+        assert_eq!(timestamps.len(), 1);
 
         // Add another measurement
         stats.measure().await;
 
-        assert_data_tree!(inspector, root: {
-            cpu_stats: contains {
+        let hierarchy = inspector.get_diagnostics_hierarchy();
+        assert_data_tree!(hierarchy, root: {
+            stats: contains {
                 measurements: contains {
                     components: {
                         "a": {
                             "1": {
-                                "@samples": {
-                                    "0": {
-                                        timestamp: AnyProperty,
-                                        cpu_time: 2i64,
-                                        queue_time: 4i64,
-                                    },
-                                    "1": {
-                                        timestamp: AnyProperty,
-                                        cpu_time: 6i64,
-                                        queue_time: 8i64,
-                                    }
-                                }
+                                timestamps: AnyProperty,
+                                cpu_times: vec![2i64, 6],
+                                queue_times: vec![4i64, 8],
                             }
                         }
                     }
                 }
             }
         });
+        let (timestamps, _, _) = get_data(&hierarchy, "a", Some("1"));
+        assert_eq!(timestamps.len(), 2);
+        assert!(timestamps[1] > timestamps[0]);
     }
 
     #[fuchsia::test]
@@ -1304,25 +1192,12 @@ mod tests {
         let koid =
             fuchsia_runtime::job_default().basic_info().expect("got basic info").koid.raw_koid();
 
-        assert_data_tree!(test.builtin_environment.inspector, root: contains {
-            cpu_stats: contains {
-                measurements: contains {
-                    components: contains {
-                        "<component_manager>": {
-                            koid.to_string() => {
-                                "@samples": {
-                                    "0": {
-                                        cpu_time: AnyProperty,
-                                        queue_time: AnyProperty,
-                                        timestamp: AnyProperty,
-                                    },
-                                }
-                            }
-                        },
-                    },
-                },
-            },
-        });
+        let hierarchy = test.builtin_environment.inspector.get_diagnostics_hierarchy();
+        let (timestamps, cpu_times, queue_times) =
+            get_data(&hierarchy, "<component_manager>", Some(&koid.to_string()));
+        assert_eq!(timestamps.len(), 1);
+        assert_eq!(cpu_times.len(), 1);
+        assert_eq!(queue_times.len(), 1);
     }
 
     #[fuchsia::test]
@@ -1334,7 +1209,7 @@ mod tests {
         clock.add_ticks(20);
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("cpu_stats"),
+                inspector.root().create_child("stats"),
                 clock.clone(),
             )
             .await,
@@ -1399,40 +1274,21 @@ mod tests {
         }
 
         assert_data_tree!(inspector, root: {
-            cpu_stats: contains {
+            stats: contains {
                 measurements: contains {
                     components: {
                         "parent": {
                             "1": {
-                                "@samples": {
-                                    // Taken when this task started.
-                                    "0": {
-                                        timestamp: 3i64,
-                                        cpu_time: 0i64,
-                                        queue_time: 0i64,
-                                    },
-                                    "1": {
-                                        timestamp: AnyProperty,
-                                        cpu_time: 20i64,
-                                        queue_time: 40i64,
-                                    }
-                                }
+                                "timestamps": AnyProperty,
+                                "cpu_times": vec![0i64, 20],
+                                "queue_times": vec![0i64, 40],
                             },
                         },
                         "child": {
                             "2": {
-                                "@samples": {
-                                    "0": {
-                                        timestamp: 8i64,
-                                        cpu_time: 0i64,
-                                        queue_time: 0i64,
-                                    },
-                                    "1": {
-                                        timestamp: AnyProperty,
-                                        cpu_time: 2i64,
-                                        queue_time: 4i64,
-                                    }
-                                }
+                                "timestamps": AnyProperty,
+                                "cpu_times": vec![0i64, 2],
+                                "queue_times": vec![0i64, 4],
                             }
                         }
                     }
@@ -1447,7 +1303,7 @@ mod tests {
         let clock = Arc::new(FakeTime::new());
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("cpu_stats"),
+                inspector.root().create_child("stats"),
                 clock.clone(),
             )
             .await,
@@ -1528,19 +1384,49 @@ mod tests {
         assert_eq!(stats.tasks.lock().await.len(), 1);
     }
 
-    fn get_total_property(hierarchy: &DiagnosticsHierarchy, index: usize, property: &str) -> i64 {
+    fn get_recent_property(hierarchy: &DiagnosticsHierarchy, name: &str) -> i64 {
         *hierarchy
-            .get_property_by_path(&vec!["cpu_stats", "@total", &index.to_string(), property])
+            .get_property_by_path(&vec!["stats", "recent_usage", name])
             .unwrap()
             .int()
             .unwrap()
     }
 
-    fn get_recent_property(hierarchy: &DiagnosticsHierarchy, name: &str) -> i64 {
-        *hierarchy
-            .get_property_by_path(&vec!["cpu_stats", "recent_usage", name])
-            .unwrap()
-            .int()
-            .unwrap()
+    fn get_data(
+        hierarchy: &DiagnosticsHierarchy,
+        moniker: &str,
+        task: Option<&str>,
+    ) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+        let mut path = vec!["stats", "measurements", "components", moniker];
+        if let Some(task) = task {
+            path.push(task);
+        }
+        get_data_at(&hierarchy, &path)
+    }
+
+    fn get_data_at(
+        hierarchy: &DiagnosticsHierarchy,
+        path: &[&str],
+    ) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+        let node = hierarchy.get_child_by_path(&path).expect("found stats node");
+        let cpu_times = node
+            .get_property("cpu_times")
+            .expect("found cpu")
+            .int_array()
+            .expect("cpu are ints")
+            .raw_values();
+        let queue_times = node
+            .get_property("queue_times")
+            .expect("found queue")
+            .int_array()
+            .expect("queue are ints")
+            .raw_values();
+        let timestamps = node
+            .get_property("timestamps")
+            .expect("found timestamps")
+            .int_array()
+            .expect("timestamps are ints")
+            .raw_values();
+        (timestamps.into_owned(), cpu_times.into_owned(), queue_times.into_owned())
     }
 }
