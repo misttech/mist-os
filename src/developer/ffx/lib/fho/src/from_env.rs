@@ -9,7 +9,6 @@ use ffx_config::EnvironmentContext;
 use ffx_fidl::{DaemonError, VersionInfo};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
-use selectors::{self, VerboseError};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -197,53 +196,6 @@ impl TryFromEnv for ffx_config::Sdk {
     }
 }
 
-/// The implementation of the decorator returned by [`selector`] and [`selector_timeout`]
-pub struct WithSelector<P> {
-    selector: String,
-    timeout: Duration,
-    _p: PhantomData<fn() -> P>,
-}
-
-#[async_trait(?Send)]
-impl<P: Proxy + 'static> TryFromEnvWith for WithSelector<P> {
-    type Output = P;
-    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
-            .with_user_message(|| {
-                format!("Failed creating proxy for selector {}", self.selector)
-            })?;
-        let _ = selectors::parse_selector::<VerboseError>(&self.selector)
-            .with_bug_context(|| format!("Parsing selector {}", self.selector))?;
-        let retry_count = 1;
-        let mut tries = 0;
-        // TODO(fxbug.dev/113143): Remove explicit retries/timeouts here so they can be
-        // configurable instead.
-        let rcs_instance = loop {
-            tries += 1;
-            let res = env.injector.remote_factory().await;
-            if res.is_ok() || tries > retry_count {
-                break res;
-            }
-        }?;
-        // TODO(fxbug.dev/126721): remove this and just take monikers. For now we can take
-        // advantage of the fact that the selector has been parsed and validated already.
-        // So we can just extract the moniker out of it and remove selector-related escaping.
-        let mut parts = self.selector.split(":expose:");
-        let moniker = parts.next().unwrap().replace("\\:", ":");
-        let moniker = format!("/{moniker}");
-        let capability_name = parts.next().unwrap();
-        rcs::connect_with_timeout_at(
-            self.timeout,
-            &moniker,
-            &capability_name,
-            &rcs_instance,
-            server_end.into_channel(),
-        )
-        .await?;
-        Ok(proxy)
-    }
-}
-
 /// The implementation of the decorator returned by [`moniker`] and [`moniker_timeout`]
 pub struct WithMoniker<P> {
     moniker: String,
@@ -276,32 +228,6 @@ impl<P: Proxy + 'static> TryFromEnvWith for WithMoniker<P> {
         )
         .await?;
         Ok(proxy)
-    }
-}
-
-/// A decorator for proxy types in [`crate::ffxtool`] implementations so you can
-/// specify the selector string for the proxy you're loading.
-///
-/// Example:
-///
-/// ```rust
-/// #[derive(FfxTool)]
-/// struct Tool {
-///     #[with(fho::selector("core/selector/thing"))]
-///     foo_proxy: FooProxy,
-/// }
-/// ```
-pub fn selector<P: Proxy>(selector: impl AsRef<str>) -> WithSelector<P> {
-    selector_timeout(selector, 15)
-}
-
-/// Like [`selector`], but lets you also specify an override for the default
-/// timeout.
-pub fn selector_timeout<P: Proxy>(selector: impl AsRef<str>, timeout_secs: u64) -> WithSelector<P> {
-    WithSelector {
-        selector: selector.as_ref().to_owned(),
-        timeout: Duration::from_secs(timeout_secs),
-        _p: Default::default(),
     }
 }
 
