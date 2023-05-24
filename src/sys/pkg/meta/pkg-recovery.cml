@@ -8,6 +8,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/offer.shard.cml",
     ],
     children: [
         {
@@ -68,7 +69,6 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: [
