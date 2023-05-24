@@ -41,11 +41,8 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.media.playback.Player",
-                "fuchsia.media.SessionAudioConsumerFactory",
-            ],
-            from: "#mediaplayer",
+            protocol: [ "fuchsia.media.SessionAudioConsumerFactory" ],
+            from: "#audio_consumer",
             to: "#session-manager",
         },
         {

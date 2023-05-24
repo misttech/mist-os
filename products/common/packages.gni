@@ -8,7 +8,7 @@ declare_args() {
     "//src/media/audio/bundles:services",
     "//src/power:battery",
     "//src/ui/bin/brightness_manager",
-    "//src/media/playback/bundles:services",
+    "//src/media/audio/consumer/bundles:services",
     "//src/session",
     "//src/ui/bin/terminal",
     "//src/ui/bin/tiles-session",

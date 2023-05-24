@@ -10,6 +10,7 @@ group("audio") {
     ":tests",
     ":tools",
     "audio_core",
+    "consumer",
     "drivers",
     "examples",
     "lib",
@@ -31,6 +32,7 @@ group("tests") {
   deps = [
     ":audio-fuzzers",
     "audio_core:tests",
+    "consumer:tests",
     "drivers:tests",
     "examples:tests",
     "lib:tests",

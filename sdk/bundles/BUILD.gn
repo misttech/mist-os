@@ -38,9 +38,9 @@ group("core-tools") {
     "//src/flutter:flutter_jit_product",
     "//src/fonts",
     "//src/media/audio/bundles:services",
+    "//src/media/audio/consumer/bundles:services",
     "//src/media/bundles:tools",
     "//src/media/codec/bundles:services",
-    "//src/media/playback/bundles:services",
     "//src/media/sessions/bundles:services",
     "//src/modular/bundles:framework",
 

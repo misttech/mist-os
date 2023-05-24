@@ -21,11 +21,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.media.SessionAudioConsumerFactory",
-            from: "#mediaplayer",
-            to: "#test_manager",
-        },
-        {
             protocol: [
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioCore",

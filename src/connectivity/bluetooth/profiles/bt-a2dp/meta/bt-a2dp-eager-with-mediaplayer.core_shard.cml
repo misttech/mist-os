@@ -19,7 +19,7 @@
             // depending on product config. #mediaplayer is the source of this capability in
             // workstation, which is the configuration that use bt-a2dp-eager.
             protocol: "fuchsia.media.SessionAudioConsumerFactory",
-            from: "#mediaplayer",
+            from: "#audio_consumer",
             to: "#bt-a2dp",
             dependency: "weak_for_migration",
         },
