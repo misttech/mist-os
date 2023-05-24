@@ -52,10 +52,9 @@ NetworkDevice::NetworkDevice(zx_device_t* bus_device, zx::bti bti_handle,
               },
       }) {}
 
-NetworkDevice::~NetworkDevice() { LTRACE_ENTRY; }
+NetworkDevice::~NetworkDevice() {}
 
 zx_status_t NetworkDevice::Init() {
-  LTRACE_ENTRY;
   fbl::AutoLock lock(&state_lock_);
 
   // Reset the device and read our configuration.
@@ -63,10 +62,10 @@ zx_status_t NetworkDevice::Init() {
   virtio_net_config_t config;
   CopyDeviceConfig(&config, sizeof(config));
 
-  LTRACEF("mac %02x:%02x:%02x:%02x:%02x:%02x\n", config.mac[0], config.mac[1], config.mac[2],
-          config.mac[3], config.mac[4], config.mac[5]);
-  LTRACEF("status %u\n", config.status);
-  LTRACEF("max_virtqueue_pairs  %u\n", config.max_virtqueue_pairs);
+  zxlogf(DEBUG, "mac %02x:%02x:%02x:%02x:%02x:%02x", config.mac[0], config.mac[1], config.mac[2],
+         config.mac[3], config.mac[4], config.mac[5]);
+  zxlogf(DEBUG, "status %u", config.status);
+  zxlogf(DEBUG, "max_virtqueue_pairs  %u", config.max_virtqueue_pairs);
 
   static_assert(sizeof(config.mac) == sizeof(mac_.octets));
   std::copy(std::begin(config.mac), std::end(config.mac), mac_.octets.begin());
@@ -111,7 +110,6 @@ uint16_t NetworkDevice::NegotiateHeaderLength() {
 }
 
 void NetworkDevice::DdkRelease() {
-  LTRACE_ENTRY;
   {
     fbl::AutoLock lock(&state_lock_);
     ifc_.clear();
@@ -130,7 +128,6 @@ void NetworkDevice::IrqRingUpdate() {
 }
 
 bool NetworkDevice::IrqRingUpdateInternal() {
-  LTRACE_ENTRY;
   network::SharedAutoLock state_lock(&state_lock_);
   if (!ifc_.is_valid()) {
     return false;
@@ -185,8 +182,10 @@ bool NetworkDevice::IrqRingUpdateInternal() {
       ZX_ASSERT_MSG(used_elem->len >= virtio_hdr_len_,
                     "got buffer (%u) smaller than virtio header (%u)", used_elem->len,
                     virtio_hdr_len_);
-      LTRACEF("Receiving %d bytes (hdrlen = %u):\n", len, virtio_hdr_len_);
-      LTRACE_DO(virtio_dump_desc(&desc));
+      zxlogf(TRACE, "Receiving %d bytes (hdrlen = %u):", len, virtio_hdr_len_);
+      if (zxlog_level_enabled(TRACE)) {
+        virtio_dump_desc(&desc);
+      }
       *rx_part_it++ = {
           .id = in_flight.buffer_id,
           .offset = virtio_hdr_len_,
@@ -214,7 +213,6 @@ bool NetworkDevice::IrqRingUpdateInternal() {
 }
 
 void NetworkDevice::IrqConfigChange() {
-  LTRACE_ENTRY;
   network::SharedAutoLock lock(&state_lock_);
   if (!ifc_.is_valid()) {
     return;
@@ -236,7 +234,6 @@ port_status_t NetworkDevice::ReadStatus() const {
 }
 
 zx_status_t NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
-  LTRACE_ENTRY;
   fbl::AutoLock lock(&state_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
   ifc_.AddPort(kPortId, this, &network_port_protocol_ops_);
@@ -245,7 +242,6 @@ zx_status_t NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protoc
 
 void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback callback,
                                            void* cookie) {
-  LTRACE_ENTRY;
   zx_status_t status = [this]() {
     // Always reset the device and reconfigure so we know where we are.
     DeviceReset();
@@ -286,7 +282,6 @@ void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback ca
 
 void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback callback,
                                           void* cookie) {
-  LTRACE_ENTRY;
   DeviceReset();
   WaitForDeviceReset();
 
@@ -338,7 +333,6 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
 }
 
 void NetworkDevice::NetworkDeviceImplGetInfo(device_info_t* out_info) {
-  LTRACE_ENTRY;
   *out_info = {
       .tx_depth = tx_depth_,
       .rx_depth = rx_depth_,
@@ -355,7 +349,6 @@ void NetworkDevice::NetworkDeviceImplGetInfo(device_info_t* out_info) {
 }
 
 void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t buf_count) {
-  LTRACE_ENTRY;
   network::SharedAutoLock lock(&state_lock_);
   std::lock_guard tx_lock(tx_lock_);
   for (const auto& buffer : cpp20::span(buf_list, buf_count)) {
@@ -425,8 +418,10 @@ void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t
         .ring_id = id,
     });
     // Submit the descriptor and notify the back-end.
-    LTRACE_DO(virtio_dump_desc(desc));
-    LTRACEF("Sending %zu bytes (hdrlen = %u):\n", data.length, virtio_hdr_len_);
+    if (zxlog_level_enabled(TRACE)) {
+      virtio_dump_desc(desc);
+    }
+    zxlogf(TRACE, "Sending %zu bytes (hdrlen = %u):", data.length, virtio_hdr_len_);
     tx_.SubmitChain(id);
   }
   if (!tx_.NoNotify()) {
@@ -436,7 +431,6 @@ void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t
 
 void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list,
                                                   size_t buf_count) {
-  LTRACE_ENTRY;
   network::SharedAutoLock lock(&state_lock_);
   std::lock_guard rx_lock(rx_lock_);
   for (const auto& buffer : cpp20::span(buf_list, buf_count)) {
@@ -467,8 +461,10 @@ void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_l
         .ring_id = id,
     });
     // Submit the descriptor and notify the back-end.
-    LTRACE_DO(virtio_dump_desc(desc));
-    LTRACEF("Queueing rx space with %zu bytes:\n", data.length);
+    if (zxlog_level_enabled(TRACE)) {
+      virtio_dump_desc(desc);
+    }
+    zxlogf(TRACE, "Queueing rx space with %zu bytes:", data.length);
     rx_.SubmitChain(id);
   }
   if (!rx_.NoNotify()) {
@@ -479,7 +475,6 @@ void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_l
 void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                                 network_device_impl_prepare_vmo_callback callback,
                                                 void* cookie) {
-  LTRACE_ENTRY;
   zx_status_t status = [this, &vmo_id, &vmo]() {
     fbl::AutoLock vmo_lock(&state_lock_);
     return vmo_store_.RegisterWithKey(vmo_id, std::move(vmo));
@@ -488,7 +483,6 @@ void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
 }
 
 void NetworkDevice::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
-  LTRACE_ENTRY;
   fbl::AutoLock vmo_lock(&state_lock_);
   if (zx::result<zx::vmo> status = vmo_store_.Unregister(vmo_id); status.status_value() != ZX_OK) {
     zxlogf(ERROR, "failed to release vmo id = %d: %s", vmo_id, status.status_string());
@@ -496,7 +490,6 @@ void NetworkDevice::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
 }
 
 void NetworkDevice::NetworkPortGetInfo(port_info_t* out_info) {
-  LTRACE_ENTRY;
   static constexpr uint8_t kRxTypesList[] = {
       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};
   static constexpr tx_support_t kTxTypesList[] = {{
@@ -512,14 +505,10 @@ void NetworkDevice::NetworkPortGetInfo(port_info_t* out_info) {
   };
 }
 
-void NetworkDevice::NetworkPortGetStatus(port_status_t* out_status) {
-  LTRACE_ENTRY;
-  *out_status = ReadStatus();
-}
+void NetworkDevice::NetworkPortGetStatus(port_status_t* out_status) { *out_status = ReadStatus(); }
 
-void NetworkDevice::NetworkPortSetActive(bool active) { LTRACE_ENTRY; }
+void NetworkDevice::NetworkPortSetActive(bool active) {}
 void NetworkDevice::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  LTRACE_ENTRY;
   *out_mac_ifc = {
       .ops = &mac_addr_protocol_ops_,
       .ctx = this,
@@ -527,12 +516,10 @@ void NetworkDevice::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
 }
 
 void NetworkDevice::MacAddrGetAddress(uint8_t* out_mac) {
-  LTRACE_ENTRY;
   std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac);
 }
 
 void NetworkDevice::MacAddrGetFeatures(features_t* out_features) {
-  LTRACE_ENTRY;
   *out_features = {
       .multicast_filter_count = 0,
       .supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
@@ -541,7 +528,6 @@ void NetworkDevice::MacAddrGetFeatures(features_t* out_features) {
 
 void NetworkDevice::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
                                    size_t multicast_macs_count) {
-  LTRACE_ENTRY;
   /* We only support promiscuous mode, nothing to do */
   ZX_ASSERT_MSG(mode == MODE_PROMISCUOUS, "unsupported mode %d", mode);
   ZX_ASSERT_MSG(multicast_macs_count == 0, "unsupported multicast count %zu", multicast_macs_count);
