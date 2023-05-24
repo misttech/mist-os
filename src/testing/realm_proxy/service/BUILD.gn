@@ -13,11 +13,13 @@ rustc_binary("main") {
   deps = [
     ":config_lib",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/lib/fidl_server",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]

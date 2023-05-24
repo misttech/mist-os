@@ -32,7 +32,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.testing.harness.RealmProxy" ],
+            protocol: [
+                "fuchsia.testing.harness.RealmFactory",
+                "fuchsia.testing.harness.RealmProxy",
+            ],
             from: "#test_realm_proxy",
             to: "#test_suite",
         },

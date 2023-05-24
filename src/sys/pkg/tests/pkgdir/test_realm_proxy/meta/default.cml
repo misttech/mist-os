@@ -4,7 +4,7 @@
 {
     include: [
         "//src/sys/test_runners/tmp_storage.shard.cml",
-        "//src/testing/realm_proxy/service/meta/service.shard.cml",
+        "//src/testing/realm_proxy/service/meta/realm_proxy.shard.cml",
     ],
     program: {
         runner: "elf",

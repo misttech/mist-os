@@ -41,8 +41,6 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// TODO(123330): Create a macro to reduce boilerplate like the code below when defining FIDL services.
-
 struct Server {
     event_pairs: Vec<fidl::EventPair>,
 }

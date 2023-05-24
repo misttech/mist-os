@@ -4,6 +4,12 @@
 library fuchsia.testing.harness;
 
 using zx;
+using fuchsia.io;
+
+/// The maximum number of characters allowed in a FIDL protocol name.
+/// This is set to the maximum length of filesystem node name because
+/// we generally use the filesystem for protocol discovery.
+const MAX_PROTOCOL_LEN uint64 = fuchsia.io.MAX_NAME_LENGTH;
 
 /// This protocol mediates a test suite's access to a component under test.
 ///
@@ -19,11 +25,64 @@ using zx;
 /// [ConnectToNamedProtocol] with the name of a fuchsia.io protocol and start
 /// testing. By running this test suite with different proxies that initialize
 /// different filesystems, we can use the same suite to validate each system.
+///
+/// Prefer to connect to RealmFactory instead to obtain an instance of RealmProxy;
+/// in the future RealmProxy will no longer be discoverable TODO(fxb/126679).
 @discoverable
 protocol RealmProxy {
     /// Connects [server_end] to the [protocol] from this proxy's namespace.
     ConnectToNamedProtocol(resource struct {
-        protocol string:1000;
+        protocol string:MAX_PROTOCOL_LEN;
         server_end zx.Handle:CHANNEL;
+    }) -> () error OperationError;
+};
+
+/// A RealmFactory creates a test realm and returns a RealmProxy connection to it.
+///
+/// Using a RealmFactory is just like using RealmBuilder except the server of this
+/// protocol creates the realm instance while the client of this protocol tells
+/// the server how the realm should be created. In almost all cases the server is
+/// using RealmBuilder internally to create the realm.
+///
+/// This protocol is a minimal description of a RealmFactory. It does not provide any
+/// methods to configure the realm before it is created. If you require more complex
+/// setup, consider consider composing this protocol with your own FIDL. For example,
+/// if you need to allow test cases to provide configuration data to the test realm,
+/// you might write a new FIDL protocol like this:
+///
+/// ```
+/// protocol MyRealmFactory {
+///     /// Adds the CreateRealm method to this protocol.
+///     compose fuchsia.testing.harness.RealmFactory;
+///
+///     /// Provides the given configuration data to the test realm.
+///     /// This must be called before CreateRealm;
+///     AddConfig(resource struct {
+///         config_data zx.Handle:VMO;
+///     }) -> ();
+/// }
+/// ```
+///
+/// Test cases that use your FIDL protocol can call AddConfig to provide config data
+/// and then call CreateRealm to create the test realm. Your server implementation must
+/// somehow supply the given configuration data to the realm that it creates.
+///
+/// In general, RealmFactory protocols are stateful: test cases call several methods
+/// to configure the test realm before calling CreateRealm and the server uses the values
+/// it has accumulated to create the realm instance. A single connection to the
+/// RealmFactory protocol can be used to create a single realm instance; Calling
+/// CreateRealm more than once over the same connection should return an UNSUPPORTED
+/// error. Each test case should create its own connection, and test cases that need many
+/// realm instances should open multiple connections.
+///
+/// In some cases, a test case may need multiple realm instances to interact with one
+/// another. This use-case should be taken into consideration when designing the realm
+/// factory server and RealmFactory protocol that support that particular testing
+/// scenario.
+@discoverable
+closed protocol RealmFactory {
+    /// Creates a new realm and binds the given RealmProxy server end to it.
+    CreateRealm(resource struct {
+        realm_server server_end:RealmProxy;
     }) -> () error OperationError;
 };

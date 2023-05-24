@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/testing/realm_proxy/service/meta/service.shard.cml" ],
+    include: [
+        "//src/testing/realm_proxy/service/meta/realm_factory.shard.cml",
+        "//src/testing/realm_proxy/service/meta/realm_proxy.shard.cml",
+    ],
     program: {
         runner: "elf",
         binary: "bin/default_test_realm_proxy",
@@ -10,14 +13,18 @@
     config: {
         proxied_component_url: {
             type: "string",
-            max_size: 512,
+
+            // This matches fuchsia.io.MAX_NAME_LENGTH.
+            max_size: 255,
         },
         proxied_protocols: {
             type: "vector",
             max_count: 128,
             element: {
                 type: "string",
-                max_size: 512,
+
+                // This matches fuchsia.io.MAX_NAME_LENGTH.
+                max_size: 255,
             },
         },
     },

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 // This shard declares the minimum capability routing required to implement a
-// test realm proxy. It exposes fuchsia.testing.harness.RealmProxy and
+// test realm factory. It exposes fuchsia.testing.harness.RealmFactory and
 // routes some basic services to the child #realm_builder component.
-// All test realm proxy services should include this shard.
+// All test realm factory services should include this shard.
 {
     include: [
         "inspect/client.shard.cml",
