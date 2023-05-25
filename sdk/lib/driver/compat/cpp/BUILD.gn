@@ -28,6 +28,14 @@ sdk_source_set("cpp") {
   ]
 }
 
+source_set("logging") {
+  sources = [
+    "logging.cc",
+    "logging.h",
+  ]
+  public_deps = [ "//sdk/lib/driver/logging/cpp" ]
+}
+
 source_set("symbols") {
   sources = [ "symbols.h" ]
 }
@@ -37,6 +45,7 @@ test("test") {
   sources = [ "test.cc" ]
   deps = [
     ":cpp",
+    ":logging",
     "//src/lib/storage/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

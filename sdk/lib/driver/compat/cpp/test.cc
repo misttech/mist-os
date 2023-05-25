@@ -5,6 +5,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/compat/cpp/connect.h>
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/fdio/directory.h>
 
 #include <memory>
@@ -56,4 +57,26 @@ TEST(CompatConnectTest, Connection) {
   });
   loop.RunUntilIdle();
   ASSERT_EQ(sync_completion_wait(&shutdown, zx::duration::infinite().get()), ZX_OK);
+}
+
+TEST(LoggingTest, LogLevelEnabled) {
+  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                     fidl::WireClient<fuchsia_logger::LogSink>{});
+  driver_initialize_logger(&logger);
+  ASSERT_FALSE(zxlog_level_enabled(TRACE));
+  ASSERT_TRUE(zxlog_level_enabled(DEBUG));
+  ASSERT_TRUE(zxlog_level_enabled(ERROR));
+  driver_initialize_logger(nullptr);
+}
+
+TEST(LoggingTest, LogOutput) {
+  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                     fidl::WireClient<fuchsia_logger::LogSink>{});
+  driver_initialize_logger(&logger);
+  zxlogf(TRACE, "Trace %d", 0);
+  zxlogf(DEBUG, "Debug %d", 1);
+  zxlogf(INFO, "Info %d", 2);
+  zxlogf(WARNING, "Warning %d", 3);
+  zxlogf(ERROR, "Error %d", 4);
+  driver_initialize_logger(nullptr);
 }
