@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.posix.socket.packet/cpp/wire.h>
+#include <fidl/fuchsia.sys2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -18,10 +19,10 @@
 
 namespace {
 
+constexpr char kRealmQueryPath[] = "/svc/fuchsia.sys2.RealmQuery.root";
+constexpr char kNetstackMoniker[] = "./core/network/netstack";
 constexpr char kRootDirectory[] = "/";
 constexpr char kServiceDirectory[] = "/svc";
-constexpr char kNetstackExposedDir[] =
-    "/hub-v2/children/core/children/network/children/netstack/out/svc";
 constexpr const char* kPacketSocketProviderName =
     fidl::DiscoverableProtocolName<fuchsia_posix_socket_packet::Provider>;
 
@@ -96,26 +97,26 @@ __attribute__((constructor)) void init_packet_socket_provider() {
     }
 
     // Add the packet socket provider service to our composed service directory
-    // by reaching into netstack's exposed directory via hub(-v2).
-    //
-    // https://fuchsia.dev/fuchsia-src/concepts/components/v2/hub?hl=en
+    // by reaching into netstack's exposed directory.
     {
-      zx::result netstack_exposed_dir = component::OpenServiceRoot(kNetstackExposedDir);
-      switch (zx_status_t status = netstack_exposed_dir.status_value(); status) {
-        case ZX_OK:
-          break;
-        case ZX_ERR_NOT_FOUND:
-          // Most likely in the non-root realm.
-          return;
-        default:
-          ZX_PANIC("component::OpenServiceRoot(%s): %s", kNetstackExposedDir,
-                   zx_status_get_string(status));
-      }
+      zx::result realm_query = component::Connect<fuchsia_sys2::RealmQuery>(kRealmQueryPath);
+      ZX_ASSERT_MSG(realm_query.is_ok(), "Failed to connect to %s: %s", kRealmQueryPath,
+                    realm_query.status_string());
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+      ZX_ASSERT_MSG(endpoints.is_ok(), "Failed to create endpoints: %s", endpoints.status_string());
+      fidl::WireResult open_dir =
+          fidl::WireCall(realm_query.value())
+              ->Open(kNetstackMoniker, fuchsia_sys2::OpenDirType::kExposedDir,
+                     fuchsia_io::OpenFlags::kRightReadable, fuchsia_io::ModeType(), ".",
+                     std::move(endpoints->server));
+      ZX_ASSERT_MSG(open_dir.ok(), "Failed to open %s: %s", kNetstackMoniker,
+                    open_dir.status_string());
 
       composed_svc_dir.AddService(
           kPacketSocketProviderName,
           std::make_unique<vfs::Service>(
-              [netstack_exposed_dir = std::move(netstack_exposed_dir.value())](
+              [netstack_exposed_dir =
+                   fidl::ClientEnd<fuchsia_io::Directory>(endpoints->client.TakeChannel())](
                   zx::channel request, async_dispatcher_t* dispatcher) mutable {
                 zx::result result = component::ConnectAt(
                     netstack_exposed_dir.borrow(),
