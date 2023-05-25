@@ -11,6 +11,8 @@
 extern crate macro_rules_attribute;
 
 use crate::execution::Container;
+use crate::lock::Mutex;
+use crate::logging::log_warn;
 use anyhow::{anyhow, Error};
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
@@ -118,6 +120,7 @@ async fn main() -> Result<(), Error> {
     maybe_serve_lifecycle();
 
     let (root_client_end, root_server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+    let maybe_root_server_end = Mutex::new(Some(root_server_end));
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc")
@@ -132,18 +135,28 @@ async fn main() -> Result<(), Error> {
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
     if let Some(local_container) = execution::maybe_create_container_from_startup_handles().await? {
-        execution::expose_root(&local_container, root_server_end)?;
-        container.set(local_container).await.map_err(|_| anyhow!("container initialized twice"))?;
+        let local_container = container
+            .set(local_container)
+            .await
+            .map_err(|_| anyhow!("container initialized twice"))?;
+        if let Some(root_server_end) = maybe_root_server_end.lock().take() {
+            execution::expose_root(local_container, root_server_end)?;
+        }
     }
 
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
             KernelServices::ContainerRunner(stream) => {
-                container
+                let local_container = container
                     .get_or_try_init(|| execution::create_component_from_stream(stream))
                     .await
                     .expect("failed to start container");
+                if let Some(root_server_end) = maybe_root_server_end.lock().take() {
+                    let _ = execution::expose_root(local_container, root_server_end).map_err(|e| {
+                        log_warn!("failed to expose linux_root: {}", e);
+                    });
+                }
             }
             KernelServices::ComponentRunner(stream) => {
                 execution::serve_component_runner(stream, container.wait().await.clone())
