@@ -24,9 +24,10 @@
 #
 action("bazel_sdk_tests") {
   testonly = true
-  script = "//build/bazel_sdk/tests/scripts/bazel_test.sh"
+  script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
   inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
   outputs = [ "$target_gen_dir/$target_name.stamp" ]
+  depfile = "$target_gen_dir/$target_name.d"
 
   _output_base = target_gen_dir + "/output_base"
   _output_user_root = target_gen_dir + "/output_user_root"
@@ -40,6 +41,7 @@ action("bazel_sdk_tests") {
     "--target_cpu=${target_cpu}",
     "--bazel=" + rebase_path(inputs[0], root_build_dir),
     "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
+    "--depfile=" + rebase_path(depfile, root_build_dir),
     "--quiet",
   ]
   deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
