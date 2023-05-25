@@ -74,6 +74,7 @@ class VirtualAudioUtil {
     SET_STREAM_CONFIG,
     SET_DAI,
     SET_CODEC,
+    SET_COMPOSITE,
     WAIT,
     HELP,
     INVALID,
@@ -118,6 +119,7 @@ class VirtualAudioUtil {
       {"stream", Command::SET_STREAM_CONFIG},
       {"dai", Command::SET_DAI},
       {"codec", Command::SET_CODEC},
+      {"composite", Command::SET_COMPOSITE},
       {"wait", Command::WAIT},
       {"help", Command::HELP},
       {"?", Command::HELP},
@@ -565,6 +567,10 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
       config()->set_device_type(fuchsia::virtualaudio::DeviceType::CODEC);
       success = true;
       break;
+    case Command::SET_COMPOSITE:
+      config()->set_device_type(fuchsia::virtualaudio::DeviceType::COMPOSITE);
+      success = true;
+      break;
     case Command::WAIT:
       success = WaitForKey();
       break;
@@ -588,9 +594,10 @@ void VirtualAudioUtil::Usage() {
   printf("\nValid options:\n");
 
   printf("\n  By default, a virtual device of type StreamConfig and direction Output is used\n");
-  printf("  --codec\t\t\t  Switch to a Codec configuration with the same direction\n");
-  printf("  --dai\t\t\t  Switch to a Dai configuration with the same direction\n");
-  printf("  --stream\t\t\t  Switch to a StreamConfig configuration with the same direction\n");
+  printf("  --codec    \t\t  Switch to a Codec configuration with the same direction\n");
+  printf("  --composite\t\t  Switch to a Composite configuration with the same direction\n");
+  printf("  --dai      \t\t  Switch to a Dai configuration with the same direction\n");
+  printf("  --stream   \t\t  Switch to a StreamConfig configuration with the same direction\n");
   printf("  --in\t\t\t  Switch to an Input configuration (same device type)\n");
   printf("  --out\t\t\t  Switch to an Output configuration (same device type)\n");
 

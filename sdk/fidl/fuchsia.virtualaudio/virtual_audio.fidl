@@ -300,6 +300,9 @@ type DeviceType = flexible enum {
 
     /// Device supports the fuchsia.hardware.audio/Codec protocol.
     CODEC = 3;
+
+    /// Device supports the fuchsia.hardware.audio/Composite protocol.
+    COMPOSITE = 4;
 };
 
 type Error = flexible enum {
