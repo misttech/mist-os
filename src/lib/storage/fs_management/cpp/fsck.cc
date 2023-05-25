@@ -94,8 +94,6 @@ zx_status_t Fsck(std::string_view device_path, DiskFormat df, const FsckOptions&
   }
 
   switch (df) {
-    case kDiskFormatFactoryfs:
-      return FsckNativeFs(device_path_str.c_str(), options, cb, GetBinaryPath("factoryfs").c_str());
     case kDiskFormatMinfs:
       return FsckNativeFs(device_path_str.c_str(), options, cb, GetBinaryPath("minfs").c_str());
     case kDiskFormatFxfs:

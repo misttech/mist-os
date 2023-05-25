@@ -784,7 +784,7 @@ async fn wait_for_successful_exit(process: Process) -> Result<(), CommandError> 
 mod tests {
     use {
         super::*,
-        crate::{BlobCompression, BlobEvictionPolicy, Blobfs, F2fs, Factoryfs, Fxfs, Minfs},
+        crate::{BlobCompression, BlobEvictionPolicy, Blobfs, F2fs, Fxfs, Minfs},
         fuchsia_async as fasync,
         ramdevice_client::RamdiskClient,
         remote_block_device::{BlockClient as _, RemoteBlockClient},
@@ -1238,67 +1238,6 @@ mod tests {
         serving.shutdown().await.expect("failed to shutdown f2fs");
 
         std::fs::File::open(test_path).expect_err("test file was not unbound");
-    }
-
-    #[fuchsia::test]
-    async fn factoryfs_custom_config() {
-        let block_size = 512;
-        let mut ramdisk = ramdisk(block_size).await;
-        let config = Factoryfs { verbose: true };
-        let mut factoryfs = new_fs(&mut ramdisk, config).await;
-
-        factoryfs.format().await.expect("failed to format factoryfs");
-        factoryfs.fsck().await.expect("failed to fsck factoryfs");
-        let _ = factoryfs.serve().await.expect("failed to serve factoryfs");
-
-        ramdisk.destroy().await.expect("failed to destroy ramdisk");
-    }
-
-    #[fuchsia::test]
-    async fn factoryfs_format_fsck_success() {
-        let block_size = 512;
-        let mut ramdisk = ramdisk(block_size).await;
-        let mut factoryfs = new_fs(&mut ramdisk, Factoryfs::default()).await;
-
-        factoryfs.format().await.expect("failed to format factoryfs");
-        factoryfs.fsck().await.expect("failed to fsck factoryfs");
-
-        ramdisk.destroy().await.expect("failed to destroy ramdisk");
-    }
-
-    #[fuchsia::test]
-    async fn factoryfs_format_serve_shutdown() {
-        let block_size = 512;
-        let mut ramdisk = ramdisk(block_size).await;
-        let mut factoryfs = new_fs(&mut ramdisk, Factoryfs::default()).await;
-
-        factoryfs.format().await.expect("failed to format factoryfs");
-        let serving = factoryfs.serve().await.expect("failed to serve factoryfs");
-        serving.shutdown().await.expect("failed to shutdown factoryfs");
-
-        ramdisk.destroy().await.expect("failed to destroy ramdisk");
-    }
-
-    #[fuchsia::test]
-    async fn factoryfs_bind_to_path() {
-        let block_size = 512;
-        let mut ramdisk = ramdisk(block_size).await;
-        let mut factoryfs = new_fs(&mut ramdisk, Factoryfs::default()).await;
-
-        factoryfs.format().await.expect("failed to format factoryfs");
-        {
-            let mut serving = factoryfs.serve().await.expect("failed to serve factoryfs");
-            serving.bind_to_path("/test-factoryfs-path").expect("bind_to_path failed");
-
-            // factoryfs is read-only, so just check that we can open the root directory.
-            {
-                let file = std::fs::File::open("/test-factoryfs-path")
-                    .expect("failed to open root directory");
-                file.metadata().expect("failed to get metadata");
-            }
-        }
-
-        std::fs::File::open("/test-factoryfs-path").expect_err("factoryfs path is still bound");
     }
 
     // TODO(fxbug.dev/93066): Re-enable this test; it depends on Fxfs failing repeated calls to

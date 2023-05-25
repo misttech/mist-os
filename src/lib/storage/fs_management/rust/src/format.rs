@@ -20,7 +20,6 @@ pub enum DiskFormat {
     Blobfs,
     Fvm,
     Zxcrypt,
-    FactoryFs,
     BlockVerity,
     VbMeta,
     BootPart,
@@ -42,7 +41,6 @@ impl DiskFormat {
             Self::Blobfs => "blobfs",
             Self::Fvm => "fvm",
             Self::Zxcrypt => "zxcrypt",
-            Self::FactoryFs => "factoryfs",
             Self::BlockVerity => "block verity",
             Self::VbMeta => "vbmeta",
             Self::BootPart => "bootpart",
@@ -64,7 +62,6 @@ impl From<&str> for DiskFormat {
             "blobfs" => Self::Blobfs,
             "fvm" => Self::Fvm,
             "zxcrypt" => Self::Zxcrypt,
-            "factoryfs" => Self::FactoryFs,
             "block verity" => Self::BlockVerity,
             "vbmeta" => Self::VbMeta,
             "bootpart" => Self::BootPart,
@@ -165,10 +162,6 @@ async fn detect_disk_format_res(block_proxy: &BlockProxy) -> Result<DiskFormat, 
         return Ok(DiskFormat::Blobfs);
     }
 
-    if data.starts_with(&constants::FACTORYFS_MAGIC) {
-        return Ok(DiskFormat::FactoryFs);
-    }
-
     if data.starts_with(&constants::VB_META_MAGIC) {
         return Ok(DiskFormat::VbMeta);
     }
@@ -256,7 +249,6 @@ mod tests {
             DiskFormat::Blobfs,
             DiskFormat::Fvm,
             DiskFormat::Zxcrypt,
-            DiskFormat::FactoryFs,
             DiskFormat::BlockVerity,
             DiskFormat::VbMeta,
             DiskFormat::BootPart,
@@ -330,16 +322,6 @@ mod tests {
         let mut data = vec![0; 4096];
         data[0..constants::BLOBFS_MAGIC.len()].copy_from_slice(&constants::BLOBFS_MAGIC);
         assert_eq!(get_detected_disk_format(&data, 1000, 512).await.unwrap(), DiskFormat::Blobfs);
-    }
-
-    #[fuchsia::test]
-    async fn detect_format_factory_fs() {
-        let mut data = vec![0; 4096];
-        data[0..constants::FACTORYFS_MAGIC.len()].copy_from_slice(&constants::FACTORYFS_MAGIC);
-        assert_eq!(
-            get_detected_disk_format(&data, 1000, 512).await.unwrap(),
-            DiskFormat::FactoryFs
-        );
     }
 
     #[fuchsia::test]

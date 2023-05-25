@@ -125,10 +125,6 @@ DiskFormat DetectDiskFormatImpl(fidl::UnownedClientEnd<fblock::Block> device,
     return kDiskFormatBlobfs;
   }
 
-  if (!memcmp(data, kFactoryfsMagic, sizeof(kFactoryfsMagic))) {
-    return kDiskFormatFactoryfs;
-  }
-
   if (!memcmp(data, kVbmetaMagic, sizeof(kVbmetaMagic))) {
     return kDiskFormatVbmeta;
   }
@@ -291,8 +287,6 @@ __EXPORT std::string DiskFormatBinaryPath(DiskFormat fs_type) {
       return GetBinaryPath("f2fs");
     case kDiskFormatFat:
       return GetBinaryPath("fatfs");
-    case kDiskFormatFactoryfs:
-      return GetBinaryPath("factoryfs");
     case kDiskFormatFxfs:
     case kDiskFormatCount:
     case kDiskFormatUnknown:
@@ -300,6 +294,7 @@ __EXPORT std::string DiskFormatBinaryPath(DiskFormat fs_type) {
     case kDiskFormatMbr:
     case kDiskFormatFvm:
     case kDiskFormatZxcrypt:
+    case kDiskFormatFactoryfs:
     case kDiskFormatBlockVerity:
     case kDiskFormatVbmeta:
     case kDiskFormatBootpart:

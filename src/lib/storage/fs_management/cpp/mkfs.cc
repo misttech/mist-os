@@ -103,8 +103,6 @@ zx_status_t Mkfs(const char* device_path, DiskFormat df, LaunchCallback cb,
   }
 
   switch (df) {
-    case kDiskFormatFactoryfs:
-      return MkfsNativeFs(GetBinaryPath("factoryfs").c_str(), device_path, cb, options);
     case kDiskFormatMinfs:
       return MkfsNativeFs(GetBinaryPath("minfs").c_str(), device_path, cb, options);
     case kDiskFormatFxfs:

@@ -115,10 +115,7 @@ fuchsia_test_package("fs-management-rust-tests") {
     ":open_partition_test-component",
     ":static-child-test-component",
   ]
-  deps = [
-    "//src/storage/bin/factoryfs",
-    "//src/storage/bin/minfs",
-  ]
+  deps = [ "//src/storage/bin/minfs" ]
 }
 
 group("tests") {

@@ -504,38 +504,3 @@ impl FSConfig for F2fs {
         format::DiskFormat::F2fs
     }
 }
-
-/// Factoryfs Filesystem Configuration
-/// If fields are None or false, they will not be set in arguments.
-#[derive(Clone, Default)]
-pub struct Factoryfs {
-    pub verbose: bool,
-}
-
-impl Factoryfs {
-    /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
-    }
-}
-
-impl FSConfig for Factoryfs {
-    // TODO(fxbug.dev/117437): launch factoryfs as a component so we can remove the legacy mode.
-    fn mode(&self) -> Mode<'_> {
-        Mode::Legacy(LegacyConfig {
-            binary_path: cstr!("/pkg/bin/factoryfs"),
-            generic_args: {
-                let mut args = vec![];
-                if self.verbose {
-                    args.push(cstr!("--verbose"));
-                }
-                args
-            },
-            ..Default::default()
-        })
-    }
-
-    fn disk_format(&self) -> format::DiskFormat {
-        format::DiskFormat::FactoryFs
-    }
-}
