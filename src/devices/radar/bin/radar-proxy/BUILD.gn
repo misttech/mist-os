@@ -47,20 +47,6 @@ fuchsia_component_manifest("manifest-base") {
   manifest = "meta/radar-proxy-base.shard.cml"
 }
 
-fuchsia_structured_config_values("disable-burst-reader-proxying-config") {
-  cm_label = ":manifest-base"
-  values = {
-    proxy_radar_burst_reader = false
-  }
-}
-
-fuchsia_structured_config_values("enable-burst-reader-proxying-config") {
-  cm_label = ":manifest-base"
-  values = {
-    proxy_radar_burst_reader = true
-  }
-}
-
 fuchsia_component("radar-proxy-component-with-injector") {
   component_name = "radar-proxy"
   manifest = "meta/radar-proxy-with-injector.cml"

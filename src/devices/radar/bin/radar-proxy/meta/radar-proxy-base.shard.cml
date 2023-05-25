@@ -21,7 +21,4 @@
             from: "self",
         },
     ],
-    config: {
-        proxy_radar_burst_reader: { type: "bool" },
-    },
 }
