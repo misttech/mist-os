@@ -111,6 +111,10 @@ class CompositeDeviceManager
   std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeListInfo(
       fidl::AnyArena& arena) const;
 
+  // Trigger a rebind of all the nodes that are currently used in composite
+  // devices. This should only be used by tests.
+  void RebindNodes();
+
  private:
   void AddCompositeDevice(AddCompositeDeviceRequest& request,
                           AddCompositeDeviceCompleter::Sync& completer) override;
@@ -120,6 +124,10 @@ class CompositeDeviceManager
   async_dispatcher_t* dispatcher_;
   fit::function<void()> rebind_callback_;
 
+  // A list of nodes that have been bound to composite devices.
+  // In DFv1 a node can be bound to multiple composite devices, so we keep
+  // these around for rebinding.
+  std::list<std::weak_ptr<Node>> nodes_;
   std::vector<std::unique_ptr<CompositeDeviceAssembler>> assemblers_;
 };
 
