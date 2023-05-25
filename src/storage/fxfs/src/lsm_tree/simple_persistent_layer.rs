@@ -50,7 +50,7 @@ use {
             PER_BLOCK_SEEK_VERSION,
         },
     },
-    anyhow::{bail, ensure, Context, Error},
+    anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
     byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt},
     fprint::TypeFingerprint,
@@ -159,12 +159,13 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
             - (BLOCK_SEEK_ENTRY_SIZE * (usize::from(self.item_count) - index));
         let res = self.buffer.read_u16::<LittleEndian>();
         self.buffer.pos = old_buffer_pos;
-        let offset = res?;
-        ensure!(
-            u64::from(offset) < self.layer.layer_info.block_size
-                && usize::try_from(offset).unwrap() > BLOCK_HEADER_SIZE,
-            FxfsError::Inconsistent
-        );
+        let offset = res.context("Failed to read offset")?;
+        if u64::from(offset) >= self.layer.layer_info.block_size
+            || usize::try_from(offset).unwrap() <= BLOCK_HEADER_SIZE
+        {
+            return Err(anyhow!(FxfsError::Inconsistent))
+                .context(format!("Offset {} is out of valid range.", offset));
+        }
         Ok(offset)
     }
 }
@@ -177,7 +178,12 @@ impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
                 self.item = None;
                 return Ok(());
             }
-            let len = self.layer.object_handle.read(self.pos, self.buffer.buffer.as_mut()).await?;
+            let len = self
+                .layer
+                .object_handle
+                .read(self.pos, self.buffer.buffer.as_mut())
+                .await
+                .context("Reading during advance")?;
             self.buffer.pos = 0;
             self.buffer.len = len;
             debug!(
@@ -238,10 +244,10 @@ fn block_split(size: u64, block_size: u64) -> Result<(u64, u64), Error> {
     // When the number of blocks is such that all seek blocks are completely filled to support
     // the associated number of data blocks, adding one block more would be impossible. So check
     // that we don't have an extra seek block that would be empty.
-    ensure!(
-        seek_block_count == 0 || (seek_block_count - 1) * entries_per_block < data_block_count - 1,
-        FxfsError::Inconsistent
-    );
+    if seek_block_count != 0 && (seek_block_count - 1) * entries_per_block >= data_block_count - 1 {
+        return Err(anyhow!(FxfsError::Inconsistent))
+            .context(format!("Invalid blocks to split: {}", blocks));
+    }
     Ok((data_block_count, seek_block_count))
 }
 
@@ -254,7 +260,7 @@ async fn parse_seek_table(
     mut buffer: Buffer<'_>,
 ) -> Result<(Option<Vec<u64>>, u64), Error> {
     let size = object_handle.get_size();
-    ensure!(size < u64::MAX - layer_info.block_size, FxfsError::Inconsistent);
+    ensure!(size < u64::MAX - layer_info.block_size, FxfsError::TooBig);
     if layer_info.key_value_version < INTERBLOCK_SEEK_VERSION {
         return Ok((None, size));
     }
@@ -271,11 +277,16 @@ async fn parse_seek_table(
     let mut bytes_read = 0;
     while seek_table.len() < data_block_count as usize {
         if buffer_position >= bytes_read {
-            // Check if we ran out before the seek table ended.
-            ensure!(position < size, FxfsError::Inconsistent);
+            if position >= size {
+                return Err(anyhow!(FxfsError::Inconsistent)
+                    .context("Not enough space for expected seek table"));
+            }
             // `read` demands that everything be block aligned, so it is expected to read at least
             // a whole block, which must be divisible by 8.
-            bytes_read = object_handle.read(position, buffer.as_mut()).await?;
+            bytes_read = object_handle
+                .read(position, buffer.as_mut())
+                .await
+                .context("Reading seek table blocks")?;
             position += bytes_read as u64;
             buffer_position = 0;
         }
@@ -283,7 +294,10 @@ async fn parse_seek_table(
         buffer_position += 8;
         // Should be in strict ascending order, otherwise something's broken, or we've gone off
         // the end and we're reading zeroes.
-        ensure!(prev <= next, FxfsError::Inconsistent);
+        if prev > next {
+            return Err(anyhow!(FxfsError::Inconsistent))
+                .context(format!("Seek table entry out of order, {:?} > {:?}", prev, next));
+        }
         prev = next;
         seek_table.push(next);
     }
@@ -307,7 +321,12 @@ impl SimplePersistentLayer {
         };
 
         // We expect the layer block size to be a multiple of the physical block size.
-        ensure!(layer_info.block_size % physical_block_size == 0, FxfsError::Inconsistent);
+        if layer_info.block_size % physical_block_size != 0 {
+            return Err(anyhow!(FxfsError::Inconsistent)).context(format!(
+                "{} not a multiple of physical block size {}",
+                layer_info.block_size, physical_block_size
+            ));
+        }
         ensure!(layer_info.block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
 
         let (seek_table, data_size) = parse_seek_table(&object_handle, &layer_info, buffer).await?;
@@ -333,7 +352,7 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
         let (key, excluded) = match bound {
             Bound::Unbounded => {
                 let mut iterator = Iterator::new(self, first_block_offset);
-                iterator.advance().await?;
+                iterator.advance().await.context("Unbounded seek advance")?;
                 return Ok(Box::new(iterator));
             }
             Bound::Included(k) => (k, false),
@@ -367,7 +386,7 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             ),
         };
         let mut left = Iterator::new(self, left_offset);
-        left.advance().await?;
+        left.advance().await.context("Initial seek advance")?;
         match left.get() {
             None => return Ok(Box::new(left)),
             Some(item) => match item.key.cmp_upper_bound(key) {
@@ -416,7 +435,10 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             // If the size is zero then we don't touch the iterator.
             while left_index < (right_index - 1) {
                 let mid_index = left_index + ((right_index - left_index) / 2);
-                left.buffer.pos = left.offset_for_index(mid_index.into())? as usize;
+                left.buffer.pos = left
+                    .offset_for_index(mid_index.into())
+                    .context("Read index offset for binary search")?
+                    as usize;
                 left.item_index = u16::try_from(mid_index).unwrap();
                 // Only deserialize the key while searching.
                 let current_key = K::deserialize_from_version(
@@ -462,13 +484,16 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             // within the "left" buffer.
             if right_index < left.item_count {
                 right = left;
-                right.buffer.pos = right.offset_for_index(right_index.into())? as usize;
+                right.buffer.pos = right
+                    .offset_for_index(right_index.into())
+                    .context("Read index for offset of right pointer")?
+                    as usize;
                 right.item_index = u16::try_from(right_index).unwrap();
                 right.advance().await?;
             } else if right.item.is_none() {
                 // This is cheap if we're actually off the end, but otherwise it catches when we
                 // need to look inside the next block.
-                right.advance().await?;
+                right.advance().await.context("Seek to start of next block")?;
             }
             return Ok(Box::new(right));
         } else {

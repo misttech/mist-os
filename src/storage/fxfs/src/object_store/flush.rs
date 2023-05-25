@@ -86,10 +86,14 @@ impl ObjectStore {
         }
 
         let layer_file_sizes = if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
-            self.flush_locked().await?;
+            self.flush_locked().await.with_context(|| {
+                format!("Failed to flush object store {}", self.store_object_id)
+            })?;
             None
         } else {
-            Some(self.flush_unlocked().await?)
+            Some(self.flush_unlocked().await.with_context(|| {
+                format!("Failed to flush object store {}", self.store_object_id)
+            })?)
         };
 
         if trace {
