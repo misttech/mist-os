@@ -818,24 +818,12 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
                 "AllUnixDomainSockets/UnboundUnixStreamSocketPairTest.SendtoWithoutConnect/*",
 
-                // splice_test, splice() isn't implemented: fxbug.dev/119324
-                "SpliceTest.FromPipeMaxFileSize",
-                "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
-                "SpliceTest.ToPipeEOF",
-                "SpliceTest.FromPipeMultiple",
-                "SpliceTest.FromPipe",
-                "SpliceTest.TwoPipesPartialRead",
-                "SpliceTest.TwoPipesPartialWrite",
-                "SpliceTest.FromPipeOffset",
-                "SpliceTest.NonBlocking",
-                "SpliceTest.TwoPipesCircular",
-                "SpliceTest.FromPipeWithConcurrentIo",
+                // splice_test, tee() isn't implemented.
                 "TeeTest.SamePipe",
                 "TeeTest.TwoPipesPartialRead",
                 "TeeTest.RegularFile",
                 "TeeTest.NonBlocking",
                 "TeeTest.TwoPipesPartialWrite",
-                "SpliceTest.WriteOverflow",
 
                 // stat_test
                 "StatTest.StatxIgnoreNoAutomount",
@@ -1072,11 +1060,7 @@
                 "AllConnectedSockets/DataTransferStressTest.BigDataTransfer/*",
                 "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.ZeroWriteAllowed/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.ZeroLengthMessageFDDiscarded/*",
-                "SpliceTest.ToPipe",
-                "SpliceTest.ToPipeOffset",
-                "SpliceTest.TwoPipes",
                 "TeeTest.BlockingWrite",
-                "SpliceTest.Blocking",
                 "TeeTest.MultiPage",
                 "TeeTest.Blocking",
                 "TimerTest.ProcessKilledOnCPUHardLimit",
@@ -1170,6 +1154,12 @@
                 // partial_bad_buffer_test
                 // Passes in debian image, remove.
                 "PartialBadBufferTest*",
+
+                // Requires more rlimit support. Hangs without.
+                "SpliceTest.FromPipeMaxFileSize",
+
+                // Requires alarms. Hangs without.
+                "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
 
                 // pty_test
                 //TODO(fxbug.dev/126724): Re-enable once flake is resolved.

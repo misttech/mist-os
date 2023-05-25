@@ -36,7 +36,6 @@ pub type RwLockWriteGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockWrite
 /// Lock `m1` and `m2` in a consistent order (using the memory address of m1 and m2 and returns the
 /// associated guard. This ensure that `ordered_lock(m1, m2)` and `ordered_lock(m2, m1)` will not
 /// deadlock.
-#[cfg(test)]
 pub fn ordered_lock<'a, T>(
     m1: &'a Mutex<T>,
     m2: &'a Mutex<T>,

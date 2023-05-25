@@ -671,6 +671,10 @@ impl FileObject {
         self.ops().as_any().downcast_ref::<T>()
     }
 
+    pub fn is_non_blocking(&self) -> bool {
+        self.flags().contains(OpenFlags::NONBLOCK)
+    }
+
     pub fn blocking_op<T, Op>(
         &self,
         current_task: &CurrentTask,
@@ -688,18 +692,25 @@ impl FileObject {
         };
 
         // Run the operation a first time without registering a waiter in case no wait is needed.
-        let result = op();
-        if self.flags().contains(OpenFlags::NONBLOCK) || !is_partial(&result) {
-            return result.map(BlockableOpsResult::value);
+        {
+            // result must be destroyed before entering the wait loop, in case it owns some
+            // resources
+            let result = op();
+            if self.is_non_blocking() || !is_partial(&result) {
+                return result.map(BlockableOpsResult::value);
+            }
         }
 
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
             self.wait_async(current_task, &waiter, events, WaitCallback::none());
-            let result = op();
-            if !is_partial(&result) {
-                return result.map(BlockableOpsResult::value);
+            {
+                // result must be destroyed before waiting, in case it owns some resources
+                let result = op();
+                if !is_partial(&result) {
+                    return result.map(BlockableOpsResult::value);
+                }
             }
             waiter.wait_until(current_task, deadline.unwrap_or(zx::Time::INFINITE)).map_err(
                 |e| {
@@ -711,6 +722,14 @@ impl FileObject {
                 },
             )?;
         }
+    }
+
+    pub fn is_seekable(&self) -> bool {
+        self.ops().is_seekable()
+    }
+
+    pub fn has_persistent_offsets(&self) -> bool {
+        self.ops().has_persistent_offsets()
     }
 
     /// Common implementation for `read` and `read_at`.
@@ -754,6 +773,17 @@ impl FileObject {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
+        self.read_raw(current_task, offset, data)
+    }
+
+    /// Delegate the read operation to FileOps after executing the common permission check. This
+    /// calls does not handle any operation related to file offsets.
+    pub fn read_raw(
+        &self,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         self.read_internal(|| self.ops.read(self, current_task, offset, data))
     }
 
@@ -804,6 +834,17 @@ impl FileObject {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
+        self.write_raw(current_task, offset, data)
+    }
+
+    /// Delegate the write operation to FileOps after executing the common permission check. This
+    /// calls does not handle any operation related to file offsets.
+    pub fn write_raw(
+        &self,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
         self.write_internal(current_task, || {
             let _guard = self.node().append_lock.read(current_task)?;
             self.ops().write(self, current_task, offset, data)

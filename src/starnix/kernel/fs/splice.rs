@@ -7,15 +7,16 @@ use {
         fs::{
             buffers::{InputBuffer, InputBufferCallback},
             pipe::PipeFileObject,
-            FdNumber, FileHandle, SeekOrigin,
+            FdNumber, FileHandle,
         },
+        lock::{ordered_lock, MutexGuard},
         logging::{log_warn, not_implemented},
         mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
         task::CurrentTask,
         types::{errno, error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
     },
     fuchsia_zircon as zx,
-    std::{sync::Arc, usize},
+    std::{cmp::Ordering, sync::Arc, usize},
 };
 
 /// An input buffer that reads from a VMO in PAGE_SIZE segments
@@ -131,9 +132,11 @@ pub fn sendfile(
     Ok(num_bytes_written)
 }
 
+#[derive(Debug)]
 struct SplicedFile {
     file: FileHandle,
-    is_pipe: bool,
+    offset_ref: UserRef<off_t>,
+    offset: Option<usize>,
 }
 
 impl SplicedFile {
@@ -143,11 +146,10 @@ impl SplicedFile {
         offset_ref: UserRef<off_t>,
     ) -> Result<Self, Errno> {
         let file = current_task.files.get(fd)?;
-        let seekable = file.seek(current_task, 0, SeekOrigin::Cur).is_ok();
-        let _offset = if offset_ref.is_null() {
+        let offset = if offset_ref.is_null() {
             None
         } else {
-            if !seekable {
+            if !file.is_seekable() {
                 return error!(ESPIPE);
             }
             let offset = current_task.mm.read_object(offset_ref)?;
@@ -157,8 +159,45 @@ impl SplicedFile {
                 Some(offset as usize)
             }
         };
-        let is_pipe = file.downcast_file::<PipeFileObject>().is_some();
-        Ok(Self { file, is_pipe })
+        Ok(Self { file, offset_ref, offset })
+    }
+
+    fn maybe_as_pipe(&self) -> Option<&PipeFileObject> {
+        self.file.downcast_file::<PipeFileObject>()
+    }
+
+    /// Returns the effective offset at which to execute read/write
+    /// - Return None if the file has no persistent offsets, and all read/write must happen at 0.
+    /// - Returns Some(self.offset) if the offset has been specified by the user
+    /// - Returns Some(*file_offset) otherwise
+    fn effective_offset(&self, file_offset: &MutexGuard<'_, off_t>) -> Option<usize> {
+        self.file.has_persistent_offsets().then(|| self.offset.unwrap_or(**file_offset as usize))
+    }
+
+    fn update_offset(
+        &self,
+        current_task: &CurrentTask,
+        offset_guard: &mut MutexGuard<'_, off_t>,
+        spliced: usize,
+    ) -> Result<(), Errno> {
+        match &self.offset {
+            None if self.file.has_persistent_offsets() => {
+                // The file has persistent offsets, and the user didn't specify an offset. The
+                // internal file offset must be updated.
+                **offset_guard += spliced as off_t;
+                Ok(())
+            }
+            Some(v) => {
+                // The file is seekable and the user specified an offset. The new offset must be
+                // written back to userspace.
+                current_task
+                    .mm
+                    .write_object(self.offset_ref, &((*v + spliced) as off_t))
+                    .map(|_| ())
+            }
+            // Nothing to be done.
+            _ => Ok(()),
+        }
     }
 }
 
@@ -168,7 +207,7 @@ pub fn splice(
     off_in: UserRef<off_t>,
     fd_out: FdNumber,
     off_out: UserRef<off_t>,
-    _len: usize,
+    len: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
     const KNOWN_FLAGS: u32 =
@@ -178,6 +217,8 @@ pub fn splice(
         return error!(EINVAL);
     }
 
+    let non_blocking = flags & uapi::SPLICE_F_NONBLOCK != 0;
+
     let file_in = SplicedFile::new(current_task, fd_in, off_in)?;
     let file_out = SplicedFile::new(current_task, fd_out, off_out)?;
 
@@ -186,17 +227,44 @@ pub fn splice(
         return error!(EINVAL);
     }
 
-    // Splice can only be used when one of the files is a pipe.
-    if !file_in.is_pipe && !file_out.is_pipe {
-        return error!(EINVAL);
-    }
-
     // The 2 fds cannot refer to the same pipe.
-    if Arc::ptr_eq(&file_in.file.name.entry.node, &file_out.file.name.entry.node) {
+    let node_cmp = Arc::as_ptr(&file_in.file.name.entry.node)
+        .cmp(&Arc::as_ptr(&file_out.file.name.entry.node));
+    if node_cmp == Ordering::Equal {
         return error!(EINVAL);
     }
 
-    // TODO(fxbug.dev/119324) implement splice().
-    not_implemented!("splice");
-    error!(ENOSYS)
+    // Lock offsets.
+    let (mut file_in_offset_guard, mut file_out_offset_guard) =
+        ordered_lock(&file_in.file.offset, &file_out.file.offset);
+
+    let spliced = match (file_in.maybe_as_pipe(), file_out.maybe_as_pipe()) {
+        // Splice can only be used when one of the files is a pipe.
+        (None, None) => error!(EINVAL),
+        (pipe_in, Some(pipe_out)) if pipe_in.is_none() || node_cmp == Ordering::Less => pipe_out
+            .splice_from(
+                current_task,
+                &file_out.file,
+                &file_in.file,
+                file_in.effective_offset(&file_in_offset_guard),
+                len,
+                non_blocking,
+            ),
+        (Some(pipe_in), _) => pipe_in.splice_to(
+            current_task,
+            &file_in.file,
+            &file_out.file,
+            file_out.effective_offset(&file_out_offset_guard),
+            len,
+            non_blocking,
+        ),
+        _ => unreachable!(),
+    }?;
+
+    // Update both file offset before returning in case of error writing back to
+    // userspace.
+    let update_offset_in = file_in.update_offset(current_task, &mut file_in_offset_guard, spliced);
+    file_out.update_offset(current_task, &mut file_out_offset_guard, spliced)?;
+    update_offset_in?;
+    Ok(spliced)
 }

@@ -198,7 +198,7 @@ impl VmoFileObject {
             return error!(EINVAL);
         }
 
-        let buf = data.read_all()?;
+        let buf = data.peek_all()?;
 
         let mut info = file.node().info_write();
         let mut write_end = offset + want_write;
@@ -260,6 +260,7 @@ impl VmoFileObject {
         if update_content_size {
             info.size = write_end;
         }
+        data.advance(want_write)?;
         Ok(want_write)
     }
 

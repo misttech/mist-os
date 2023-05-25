@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::arch::uapi::blksize_t;
 use crate::fs::{buffers::*, *};
-use crate::lock::Mutex;
+use crate::lock::{Mutex, MutexGuard};
 use crate::mm::MemoryAccessorExt;
 use crate::mm::PAGE_SIZE;
 use crate::signals::*;
@@ -22,6 +22,7 @@ fn round_up(value: usize, increment: usize) -> usize {
     (value + (increment - 1)) & !(increment - 1)
 }
 
+#[derive(Debug)]
 pub struct Pipe {
     messages: MessageQueue,
 
@@ -116,8 +117,13 @@ impl Pipe {
         !self.messages.is_empty() || (self.writer_count == 0 && self.had_writer)
     }
 
-    fn is_writable(&self) -> bool {
-        self.messages.available_capacity() > 0 && self.had_reader
+    /// Returns whether the pipe can accommodate at least part of a message of length `data_size`.
+    fn is_writable(&self, data_size: usize) -> bool {
+        // POSIX requires that a write smaller than PIPE_BUF be atomic, but requires no
+        // atomicity for writes larger than this.
+        self.had_reader
+            && (self.messages.available_capacity() >= data_size
+                || data_size > uapi::PIPE_BUF as usize)
     }
 
     pub fn read(&mut self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
@@ -150,13 +156,11 @@ impl Pipe {
             return error!(EPIPE);
         }
 
-        // POSIX requires that a write smaller than PIPE_BUF be atomic, but requires no
-        // atomicity for writes larger than this.
-        if data.available() <= uapi::PIPE_BUF as usize {
-            self.messages.write_datagram(data, None, &mut vec![])
-        } else {
-            self.messages.write_stream(data, None, &mut vec![])
+        if !self.is_writable(data.available()) {
+            return error!(EAGAIN);
         }
+
+        self.messages.write_stream(data, None, &mut vec![])
     }
 
     fn query_events(&self) -> FdEvents {
@@ -173,7 +177,7 @@ impl Pipe {
             }
         }
 
-        if self.is_writable() {
+        if self.is_writable(1) {
             if self.reader_count == 0 && self.had_reader {
                 events |= FdEvents::POLLERR;
             }
@@ -217,6 +221,14 @@ impl Pipe {
             }
             _ => default_ioctl(request),
         }
+    }
+
+    fn notify_read(&self) {
+        self.waiters.notify_fd_events(FdEvents::POLLOUT);
+    }
+
+    fn notify_write(&self) {
+        self.waiters.notify_fd_events(FdEvents::POLLIN);
     }
 }
 
@@ -306,7 +318,7 @@ impl FileOps for PipeFileObject {
                 let mut pipe = self.pipe.lock();
                 let actual = pipe.read(data)?;
                 if actual > 0 {
-                    pipe.waiters.notify_fd_events(FdEvents::POLLOUT);
+                    pipe.notify_read();
                 }
                 Ok(BlockableOpsResult::Done(actual))
             },
@@ -330,7 +342,7 @@ impl FileOps for PipeFileObject {
                 match pipe.write(current_task, data) {
                     Ok(chunk) => {
                         if chunk > 0 {
-                            pipe.waiters.notify_fd_events(FdEvents::POLLIN);
+                            pipe.notify_write();
                         }
                     }
                     Err(errno) if errno == EPIPE && data.bytes_read() > 0 => {
@@ -382,5 +394,293 @@ impl FileOps for PipeFileObject {
         user_addr: UserAddress,
     ) -> Result<SyscallResult, Errno> {
         self.pipe.lock().ioctl(file, current_task, request, user_addr)
+    }
+}
+
+/// An OutputBuffer that will write the data to `pipe`.
+#[derive(Debug)]
+struct SpliceOutputBuffer<'a> {
+    pipe: &'a mut Pipe,
+    len: usize,
+    available: usize,
+}
+
+impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
+    fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
+        let mut bytes = vec![0; self.available];
+        let result = callback(&mut bytes)?;
+        if result > 0 {
+            self.pipe.messages.write_message(bytes.into());
+            self.pipe.notify_write();
+        }
+        Ok(result)
+    }
+
+    fn available(&self) -> usize {
+        self.available
+    }
+
+    fn bytes_written(&self) -> usize {
+        self.len - self.available
+    }
+}
+
+/// An InputBuffer that will read the data from `pipe`.
+#[derive(Debug)]
+struct SpliceInputBuffer<'a> {
+    pipe: &'a mut Pipe,
+    len: usize,
+    available: usize,
+}
+
+impl<'a> InputBuffer for SpliceInputBuffer<'a> {
+    fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
+        let mut read = 0;
+        let mut available = self.available;
+        for message in self.pipe.messages.messages() {
+            let to_read = std::cmp::min(available, message.len());
+            let result = callback(&message.data.bytes()[0..to_read])?;
+            if result > to_read {
+                return error!(EINVAL);
+            }
+            read += result;
+            available -= result;
+            if result != to_read {
+                break;
+            }
+        }
+        Ok(read)
+    }
+
+    fn available(&self) -> usize {
+        self.available
+    }
+
+    fn bytes_read(&self) -> usize {
+        self.len - self.available
+    }
+
+    fn drain(&mut self) -> usize {
+        let result = self.available;
+        self.available = 0;
+        result
+    }
+
+    fn advance(&mut self, mut length: usize) -> Result<(), Errno> {
+        if length == 0 {
+            return Ok(());
+        }
+        if length > self.available {
+            return error!(EINVAL);
+        }
+        self.available -= length;
+        while let Some(mut message) = self.pipe.messages.read_message() {
+            if let Some(data) = message.data.split_off(length) {
+                // Some data is left in the message. Push it back.
+                self.pipe.messages.write_front(data.into());
+            }
+            length -= message.len();
+            if length == 0 {
+                self.pipe.notify_read();
+                return Ok(());
+            }
+        }
+        panic!();
+    }
+}
+
+impl PipeFileObject {
+    /// Returns the result of `pregen` and a lock on pipe, once `condition` returns true, ensuring
+    /// `pregen` is run before the pipe is locked.
+    ///
+    /// This will wait on `events` if the file is opened in blocking mode. If the file is opened in
+    /// not blocking mode and `condition` is not realized, this will return EAGAIN.
+    fn wait_for_condition<'a, F, G, V>(
+        &'a self,
+        current_task: &CurrentTask,
+        file: &FileHandle,
+        condition: F,
+        pregen: G,
+        events: FdEvents,
+    ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
+    where
+        F: Fn(&Pipe) -> bool,
+        G: Fn() -> Result<V, Errno>,
+    {
+        file.blocking_op(
+            current_task,
+            || {
+                let other = pregen()?;
+                let pipe = self.pipe.lock();
+                if condition(&pipe) {
+                    Ok(BlockableOpsResult::Done((other, pipe)))
+                } else {
+                    Ok(BlockableOpsResult::Partial((other, pipe)))
+                }
+            },
+            events,
+            None,
+        )
+    }
+
+    /// Lock the pipe for reading, after having run `pregen`.
+    fn lock_pipe_for_reading_with<'a, G, V>(
+        &'a self,
+        current_task: &CurrentTask,
+        file: &FileHandle,
+        pregen: G,
+        non_blocking: bool,
+    ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
+    where
+        G: Fn() -> Result<V, Errno>,
+    {
+        if non_blocking {
+            let other = pregen()?;
+            let pipe = self.pipe.lock();
+            if !pipe.is_readable() {
+                return error!(EAGAIN);
+            }
+            Ok((other, pipe))
+        } else {
+            self.wait_for_condition(
+                current_task,
+                file,
+                |pipe| pipe.is_readable(),
+                pregen,
+                FdEvents::POLLIN | FdEvents::POLLHUP,
+            )
+        }
+    }
+
+    fn lock_pipe_for_reading<'a>(
+        &'a self,
+        current_task: &CurrentTask,
+        file: &FileHandle,
+        non_blocking: bool,
+    ) -> Result<MutexGuard<'a, Pipe>, Errno> {
+        self.lock_pipe_for_reading_with(current_task, file, || Ok(()), non_blocking).map(|(_, l)| l)
+    }
+
+    /// Lock the pipe for writing, after having run `pregen`.
+    fn lock_pipe_for_writing_with<'a, G, V>(
+        &'a self,
+        current_task: &CurrentTask,
+        file: &FileHandle,
+        pregen: G,
+        non_blocking: bool,
+        len: usize,
+    ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
+    where
+        G: Fn() -> Result<V, Errno>,
+    {
+        if non_blocking {
+            let other = pregen()?;
+            let pipe = self.pipe.lock();
+            if !pipe.is_writable(len) {
+                return error!(EAGAIN);
+            }
+            Ok((other, pipe))
+        } else {
+            self.wait_for_condition(
+                current_task,
+                file,
+                |pipe| pipe.is_writable(len),
+                pregen,
+                FdEvents::POLLOUT,
+            )
+        }
+    }
+
+    fn lock_pipe_for_writing<'a>(
+        &'a self,
+        current_task: &CurrentTask,
+        file: &FileHandle,
+        non_blocking: bool,
+        len: usize,
+    ) -> Result<MutexGuard<'a, Pipe>, Errno> {
+        self.lock_pipe_for_writing_with(current_task, file, || Ok(()), non_blocking, len)
+            .map(|(_, l)| l)
+    }
+
+    /// Splice from this pipe to the `to` pipe.
+    fn splice_to_pipe(from: &mut Pipe, to: &mut Pipe, len: usize) -> Result<usize, Errno> {
+        if len == 0 {
+            return Ok(0);
+        }
+        let len = std::cmp::min(
+            len,
+            std::cmp::min(from.messages.len(), to.messages.available_capacity()),
+        );
+        let mut left = len;
+        while let Some(mut message) = from.messages.read_message() {
+            if let Some(data) = message.data.split_off(left) {
+                // Some data is left in the message. Push it back.
+                from.messages.write_front(data.into());
+            }
+            left -= message.len();
+            to.messages.write_message(message);
+            if left == 0 {
+                from.notify_read();
+                to.notify_write();
+                return Ok(len);
+            }
+        }
+        panic!();
+    }
+
+    /// splice from the given file handle to this pipe.
+    pub fn splice_from(
+        &self,
+        current_task: &CurrentTask,
+        self_file: &FileHandle,
+        from: &FileHandle,
+        offset: Option<usize>,
+        len: usize,
+        non_blocking: bool,
+    ) -> Result<usize, Errno> {
+        // If both ends are pipes, locks on pipes must be taken such that the lock on this object
+        // is always taken before the lock on the other.
+        if let Some(pipe_file_object) = from.downcast_file::<PipeFileObject>() {
+            let (mut write_pipe, mut read_pipe) = pipe_file_object.lock_pipe_for_reading_with(
+                current_task,
+                from,
+                || self.lock_pipe_for_writing(current_task, self_file, non_blocking, len),
+                non_blocking,
+            )?;
+            return Self::splice_to_pipe(&mut read_pipe, &mut write_pipe, len);
+        }
+
+        let mut pipe = self.lock_pipe_for_writing(current_task, self_file, non_blocking, len)?;
+        let len = std::cmp::min(len, pipe.messages.available_capacity());
+        let mut buffer = SpliceOutputBuffer { pipe: &mut pipe, len, available: len };
+        from.read_raw(current_task, offset.unwrap_or(0), &mut buffer)
+    }
+
+    pub fn splice_to(
+        &self,
+        current_task: &CurrentTask,
+        self_file: &FileHandle,
+        to: &FileHandle,
+        offset: Option<usize>,
+        len: usize,
+        non_blocking: bool,
+    ) -> Result<usize, Errno> {
+        // If both ends are pipes, locks on pipes must be taken such that the lock on this object
+        // is always taken before the lock on the other.
+        if let Some(pipe_file_object) = to.downcast_file::<PipeFileObject>() {
+            let (mut read_pipe, mut write_pipe) = pipe_file_object.lock_pipe_for_writing_with(
+                current_task,
+                to,
+                || self.lock_pipe_for_reading(current_task, self_file, non_blocking),
+                non_blocking,
+                len,
+            )?;
+            return Self::splice_to_pipe(&mut read_pipe, &mut write_pipe, len);
+        }
+        let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
+
+        let len = std::cmp::min(len, pipe.messages.len());
+        let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
+        to.write_raw(current_task, offset.unwrap_or(0), &mut buffer)
     }
 }

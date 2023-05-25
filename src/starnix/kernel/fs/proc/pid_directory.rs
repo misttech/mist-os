@@ -562,13 +562,18 @@ impl FileOps for MemFile {
         match task.state_code() {
             TaskStateCode::Zombie => Ok(0),
             TaskStateCode::Running | TaskStateCode::Sleeping => {
-                let mut addr = UserAddress::default() + offset;
-                data.read_each(&mut |bytes| {
-                    let actual =
-                        task.mm.write_memory_partial(addr, bytes).map_err(|_| errno!(EIO))?;
-                    addr += actual;
+                let addr = UserAddress::default() + offset;
+                let mut written = 0;
+                let result = data.peek_each(&mut |bytes| {
+                    let actual = task
+                        .mm
+                        .write_memory_partial(addr + written, bytes)
+                        .map_err(|_| errno!(EIO))?;
+                    written += actual;
                     Ok(actual)
-                })
+                });
+                data.advance(written)?;
+                result
             }
         }
     }

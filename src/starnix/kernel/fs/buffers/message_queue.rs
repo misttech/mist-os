@@ -28,6 +28,7 @@ impl MessageReadInfo {
 }
 
 /// A `MessageQueue` stores a FIFO sequence of messages.
+#[derive(Debug)]
 pub struct MessageQueue {
     /// The messages stored in the message queue.
     ///
@@ -56,6 +57,10 @@ impl MessageQueue {
     /// amount of data in the buffer.
     pub fn capacity(&self) -> usize {
         self.capacity
+    }
+
+    pub fn messages(&self) -> impl Iterator<Item = &Message> {
+        self.messages.iter()
     }
 
     /// Sets the capacity of the message queue to the provided number of bytes.
@@ -274,7 +279,7 @@ impl MessageQueue {
     }
 
     /// Writes a message to the front of the message queue.
-    fn write_front(&mut self, message: Message) {
+    pub fn write_front(&mut self, message: Message) {
         self.length += message.len();
         self.messages.push_front(message);
     }

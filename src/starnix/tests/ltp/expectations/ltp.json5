@@ -167,7 +167,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dirtyc0w_child.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dirtyc0w_shmem.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dirtyc0w_shmem_child.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dirtypipe.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dup03.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dup06.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_dup201.cm",
