@@ -34,6 +34,7 @@ fuchsia_component("validator-component") {
 }
 
 fuchsia_package("validator") {
+  testonly = true
   package_name = "log-encoding-validator"
   deps = [ ":validator-component" ]
 }
