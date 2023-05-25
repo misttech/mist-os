@@ -25,16 +25,20 @@ _common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-# TODO(fxbug.dev/100020): Split this into -with/out-injector targets and only build the source files
-# needed.
-executable("radar-proxy-bin") {
-  output_name = "radar_proxy"
+executable("radar-proxy-bin-with-injector") {
   sources = [
     "burst-injector.cc",
     "main.cc",
-    "radar-provider-proxy.cc",
     "radar-reader-proxy.cc",
     "reader-instance.cc",
+  ]
+  deps = _common_deps
+}
+
+executable("radar-proxy-bin-without-injector") {
+  sources = [
+    "main.cc",
+    "radar-provider-proxy.cc",
   ]
   deps = _common_deps
 }
@@ -65,7 +69,7 @@ fuchsia_structured_config_cpp_elf_lib("config") {
 fuchsia_component("radar-proxy-component-with-injector") {
   component_name = "radar-proxy"
   manifest = "meta/radar-proxy-with-injector.cml"
-  deps = [ ":radar-proxy-bin" ]
+  deps = [ ":radar-proxy-bin-with-injector" ]
 }
 
 fuchsia_package("radar-proxy-with-injector") {
@@ -76,7 +80,7 @@ fuchsia_package("radar-proxy-with-injector") {
 fuchsia_component("radar-proxy-component-without-injector") {
   component_name = "radar-proxy"
   manifest = "meta/radar-proxy-without-injector.cml"
-  deps = [ ":radar-proxy-bin" ]
+  deps = [ ":radar-proxy-bin-without-injector" ]
 }
 
 fuchsia_package("radar-proxy-without-injector") {
@@ -91,13 +95,12 @@ group("radar-proxy") {
 group("radar-proxy-shard") {
 }
 
-test("radar-proxy-test-bin") {
+test("radar-proxy-test-bin-with-injection") {
   sources = [
     "burst-injector.cc",
-    "radar-provider-proxy.cc",
-    "radar-proxy-test.cc",
     "radar-reader-proxy.cc",
     "reader-instance.cc",
+    "test/radar-reader-proxy-test.cc",
   ]
   deps = [
            "//sdk/lib/driver/runtime/testing/cpp",
@@ -107,13 +110,37 @@ test("radar-proxy-test-bin") {
          ] + _common_deps
 }
 
-fuchsia_unittest_package("radar-proxy-test") {
+fuchsia_unittest_component("radar-proxy-test-component-with-injection") {
+  deps = [ ":radar-proxy-test-bin-with-injection" ]
+}
+
+test("radar-proxy-test-bin-without-injection") {
+  sources = [
+    "radar-provider-proxy.cc",
+    "test/radar-provider-proxy-test.cc",
+  ]
+  deps = [
+           "//sdk/lib/driver/runtime/testing/cpp",
+           "//src/devices/bin/driver_runtime",
+           "//zircon/system/ulib/sync",
+           "//zircon/system/ulib/zxtest",
+         ] + _common_deps
+}
+
+fuchsia_unittest_component("radar-proxy-test-component-without-injection") {
+  deps = [ ":radar-proxy-test-bin-without-injection" ]
+}
+
+fuchsia_test_package("radar-proxy-test") {
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  deps = [ ":radar-proxy-test-bin" ]
+  test_components = [
+    ":radar-proxy-test-component-with-injection",
+    ":radar-proxy-test-component-without-injection",
+  ]
 }
 
 group("tests") {

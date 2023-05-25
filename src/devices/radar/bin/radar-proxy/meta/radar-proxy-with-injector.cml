@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 {
     include: [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy-base.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/radar-proxy-bin-with-injector",
+    },
     capabilities: [
         {
             protocol: [ "fuchsia.hardware.radar.RadarBurstInjector" ],

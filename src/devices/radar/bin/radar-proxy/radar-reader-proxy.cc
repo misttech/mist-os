@@ -9,6 +9,12 @@
 
 namespace radar {
 
+std::unique_ptr<RadarProxy> RadarProxy::Create(async_dispatcher_t* dispatcher,
+                                               RadarDeviceConnector* connector) {
+  FX_LOGS(INFO) << "Burst reader proxying enabled";
+  return std::make_unique<radar::RadarReaderProxy>(dispatcher, connector);
+}
+
 RadarReaderProxy::~RadarReaderProxy() {
   // Close out any outstanding requests before destruction to avoid triggering an assert.
   for (auto& [server, completer] : connect_requests_) {

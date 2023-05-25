@@ -65,15 +65,7 @@ int main(int argc, const char** argv) {
   std::unique_ptr<radar::RadarProxy> proxy;
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-
-  const auto config = config::Config::TakeFromStartupHandle();
-  if (config.proxy_radar_burst_reader()) {
-    FX_LOGS(INFO) << "Burst reader proxying enabled";
-    proxy = std::make_unique<radar::RadarReaderProxy>(loop.dispatcher(), &connector);
-  } else {
-    FX_LOGS(INFO) << "Burst reader proxying disabled";
-    proxy = std::make_unique<radar::RadarProviderProxy>(loop.dispatcher(), &connector);
-  }
+  proxy = radar::RadarProxy::Create(loop.dispatcher(), &connector);
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
 
@@ -93,6 +85,10 @@ int main(int argc, const char** argv) {
     return -1;
   }
 
+  // TODO(fxbug.dev/100020): Structured config isn't really needed now that there are two separate
+  // build targets for the reader/provider proxying cases. Make the proxy implementation handle this
+  // instead.
+  const auto config = config::Config::TakeFromStartupHandle();
   if (config.proxy_radar_burst_reader()) {
     result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstInjector>(
         [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {

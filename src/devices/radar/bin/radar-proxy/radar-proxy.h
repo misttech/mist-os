@@ -6,8 +6,10 @@
 #define SRC_DEVICES_RADAR_BIN_RADAR_PROXY_RADAR_PROXY_H_
 
 #include <fidl/fuchsia.hardware.radar/cpp/fidl.h>
+#include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 
+#include <memory>
 #include <string>
 
 #include "src/lib/fsl/io/device_watcher.h"
@@ -36,6 +38,9 @@ class RadarDeviceConnector {
 class RadarProxy : public fidl::Server<fuchsia_hardware_radar::RadarBurstReaderProvider> {
  public:
   static constexpr char kRadarDeviceDirectory[] = "/dev/class/radar";
+
+  static std::unique_ptr<RadarProxy> Create(async_dispatcher_t* dispatcher,
+                                            RadarDeviceConnector* connector);
 
   RadarProxy()
       : device_watcher_(fsl::DeviceWatcher::Create(

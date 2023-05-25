@@ -6,7 +6,15 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <memory>
+
 namespace radar {
+
+std::unique_ptr<RadarProxy> RadarProxy::Create(async_dispatcher_t* dispatcher,
+                                               RadarDeviceConnector* connector) {
+  FX_LOGS(INFO) << "Burst reader proxying disabled";
+  return std::make_unique<radar::RadarProviderProxy>(dispatcher, connector);
+}
 
 RadarProviderProxy::~RadarProviderProxy() {
   // Close out any outstanding requests before destruction to avoid triggerig an assert.

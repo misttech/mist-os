@@ -3,4 +3,8 @@
 // found in the LICENSE file.
 {
     include: [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy-base.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/radar-proxy-bin-without-injector",
+    },
 }
