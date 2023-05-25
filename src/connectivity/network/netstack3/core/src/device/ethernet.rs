@@ -989,7 +989,7 @@ pub(super) fn get_mtu<
 /// any future conflicting gratuitous ARPs to be ignored.
 // TODO(rheacock): remove `cfg(test)` when this is used. Will probably be called
 // by a pub fn in the device mod.
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(super) fn insert_static_arp_table_entry<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C> + NudHandler<Ipv4, EthernetLinkDevice, C>,
@@ -1013,7 +1013,7 @@ pub(super) fn insert_static_arp_table_entry<
 /// address so that lookups succeed immediately, without doing address
 /// resolution.
 // TODO(rheacock): Remove when this is called from non-test code.
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(super) fn insert_ndp_table_entry<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C> + NudHandler<Ipv6, EthernetLinkDevice, C>,

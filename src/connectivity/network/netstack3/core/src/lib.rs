@@ -4,24 +4,22 @@
 
 //! A networking stack.
 
-#![cfg_attr(not(fuzz), no_std)]
+#![no_std]
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
 #![deny(missing_docs, unreachable_patterns)]
-// Turn off checks for dead code, but only when building for fuzzing or
-// benchmarking. This allows fuzzers and benchmarks to be written as part of
-// the crate, with access to test utilities, without a bunch of build errors
-// due to unused code. These checks are turned back on in the 'fuzz' and
-// 'benchmark' modules.
-#![cfg_attr(any(fuzz, benchmark), allow(dead_code, unused_imports, unused_macros))]
+// Turn off checks for dead code, but only when building for benchmarking.
+// benchmarking. This allows the benchmarks to be written as part of the crate,
+// with access to test utilities, without a bunch of build errors due to unused
+// code. These checks are turned back on in the 'benchmark' module.
+#![cfg_attr(benchmark, allow(dead_code, unused_imports, unused_macros))]
 
 // TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove
 // this module.
 extern crate fakealloc as alloc;
 
 // TODO(https://github.com/dtolnay/thiserror/pull/64): remove this module.
-#[cfg(not(fuzz))]
 extern crate fakestd as std;
 
 #[macro_use]
@@ -35,16 +33,13 @@ pub(crate) mod convert;
 pub mod data_structures;
 pub mod device;
 pub mod error;
-#[cfg(fuzz)]
-mod fuzz;
 pub mod ip;
 mod lock_ordering;
 pub mod socket;
 pub mod sync;
-#[cfg(test)]
-mod testutil;
-pub mod trace;
-pub(crate) use trace::trace_duration;
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutil;
+mod trace;
 pub mod transport;
 
 use alloc::vec::Vec;
@@ -69,6 +64,7 @@ use crate::{
     },
     transport::{TransportLayerState, TransportLayerTimerId},
 };
+pub(crate) use trace::trace_duration;
 
 /// Map an expression over either version of one or more addresses.
 ///

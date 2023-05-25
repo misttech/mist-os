@@ -297,33 +297,39 @@ pub trait TracingContext {
 /// implementations to be composed easily - any container type need only provide
 /// the appropriate `AsRef` and/or `AsMut` implementations, and the blanket impl
 /// will take care of the rest.
-#[cfg(test)]
-pub(crate) mod testutil {
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutil {
+    #[cfg(test)]
+    use alloc::vec;
     use alloc::{
         boxed::Box,
         collections::{BinaryHeap, HashMap},
         format,
         string::String,
-        vec,
         vec::Vec,
     };
     use core::{
         fmt::{self, Debug, Formatter},
         hash::Hash,
-        iter::FromIterator,
-        marker::PhantomData,
         ops::{self, RangeBounds},
     };
+    #[cfg(test)]
+    use core::{iter::FromIterator, marker::PhantomData};
 
+    #[cfg(test)]
     use assert_matches::assert_matches;
+    #[cfg(test)]
     use derivative::Derivative;
+    #[cfg(test)]
     use packet::Buf;
     use rand_xorshift::XorShiftRng;
 
     use super::*;
+    #[cfg(test)]
+    use crate::device::EthernetDeviceId;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::{EthernetDeviceId, EthernetWeakDeviceId},
+        device::EthernetWeakDeviceId,
         testutil::FakeCryptoRng,
         Instant,
     };
@@ -336,6 +342,7 @@ pub(crate) mod testutil {
     }
 
     impl FakeInstant {
+        #[cfg(test)]
         pub(crate) const LATEST: FakeInstant = FakeInstant { offset: Duration::MAX };
 
         fn saturating_add(self, dur: Duration) -> FakeInstant {
@@ -402,6 +409,7 @@ pub(crate) mod testutil {
 
     impl FakeInstantCtx {
         /// Advance the current time by the given duration.
+        #[cfg(test)]
         pub(crate) fn sleep(&mut self, dur: Duration) {
             self.time.offset += dur;
         }
@@ -474,6 +482,7 @@ pub(crate) mod testutil {
 
     impl<Id: Clone> FakeTimerCtx<Id> {
         /// Get an ordered list of all currently-scheduled timers.
+        #[cfg(test)]
         pub(crate) fn timers(&self) -> Vec<(FakeInstant, Id)> {
             self.timers
                 .clone()
@@ -521,6 +530,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<Id: Debug + Clone + Hash + Eq> FakeTimerCtx<Id> {
         /// Asserts that `self` contains exactly the timers in `timers`.
         ///
@@ -685,7 +695,92 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) trait FakeTimerCtxExt<Id: Clone>: AsMut<FakeTimerCtx<Id>> + Sized {
+    /// Adds methods for interacting with [`FakeTimerCtx`] and its wrappers.
+    pub trait FakeTimerCtxExt<Id> {
+        /// Triggers the next timer, if any, by calling `f` on it.
+        ///
+        /// `trigger_next_timer` triggers the next timer, if any, advances the
+        /// internal clock to the timer's scheduled time, and returns its ID.
+        fn trigger_next_timer<C, F: FnMut(C, &mut Self, Id)>(&mut self, ctx: C, f: F)
+            -> Option<Id>;
+
+        /// Skips the current time forward until `instant`, triggering all
+        /// timers until then, inclusive, by calling `f` on them.
+        ///
+        /// Returns the timers which were triggered.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `instant` is in the past.
+        fn trigger_timers_until_instant<F: FnMut(&mut Self, Id)>(
+            &mut self,
+            instant: FakeInstant,
+            f: F,
+        ) -> Vec<Id>;
+
+        /// Skips the current time forward by `duration`, triggering all timers
+        /// until then, inclusive, by calling `f` on them.
+        ///
+        /// Returns the timers which were triggered.
+        fn trigger_timers_for<F: FnMut(&mut Self, Id)>(
+            &mut self,
+            duration: Duration,
+            f: F,
+        ) -> Vec<Id>;
+
+        /// Triggers timers and expects them to be the given timers.
+        ///
+        /// The number of timers to be triggered is taken to be the number of
+        /// timers produced by `timers`. Timers may be triggered in any order.
+        ///
+        /// # Panics
+        ///
+        /// Panics under the following conditions:
+        /// - Fewer timers could be triggered than expected
+        /// - Timers were triggered that were not expected
+        /// - Timers that were expected were not triggered
+        #[track_caller]
+        fn trigger_timers_and_expect_unordered<
+            I: IntoIterator<Item = Id>,
+            F: FnMut(&mut Self, Id),
+        >(
+            &mut self,
+            timers: I,
+            f: F,
+        ) where
+            Id: Debug + Hash + Eq;
+
+        /// Triggers timers until `instant` and expects them to be the given
+        /// timers.
+        ///
+        /// Like `trigger_timers_and_expect_unordered`, except that timers will
+        /// only be triggered until `instant` (inclusive).
+        fn trigger_timers_until_and_expect_unordered<
+            I: IntoIterator<Item = Id>,
+            F: FnMut(&mut Self, Id),
+        >(
+            &mut self,
+            instant: FakeInstant,
+            timers: I,
+            f: F,
+        ) where
+            Id: Debug + Hash + Eq;
+
+        /// Triggers timers for `duration` and expects them to be the given
+        /// timers.
+        ///
+        /// Like `trigger_timers_and_expect_unordered`, except that timers will
+        /// only be triggered for `duration` (inclusive).
+        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, F: FnMut(&mut Self, Id)>(
+            &mut self,
+            duration: Duration,
+            timers: I,
+            f: F,
+        ) where
+            Id: Debug + Hash + Eq;
+    }
+
+    impl<Ctx: AsMut<FakeTimerCtx<Id>>, Id: Clone> FakeTimerCtxExt<Id> for Ctx {
         /// Triggers the next timer, if any, by calling `f` on it.
         ///
         /// `trigger_next_timer` triggers the next timer, if any, advances the
@@ -847,6 +942,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn handle_timer_helper_with_sc_ref_mut<
         'a,
         Id,
@@ -860,14 +956,13 @@ pub(crate) mod testutil {
         move |non_sync_ctx, id| f(sync_ctx, non_sync_ctx, id)
     }
 
+    #[cfg(test)]
     pub(crate) fn handle_timer_helper_with_sc_ref<'a, Id, SC, C, F: FnMut(&SC, &mut C, Id) + 'a>(
         sync_ctx: &'a SC,
         mut f: F,
     ) -> impl FnMut(&mut C, Id) + 'a {
         move |non_sync_ctx, id| f(sync_ctx, non_sync_ctx, id)
     }
-
-    impl<Id: Clone, T: AsMut<FakeTimerCtx<Id>>> FakeTimerCtxExt<Id> for T {}
 
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {
@@ -891,11 +986,13 @@ pub(crate) mod testutil {
 
     impl<Meta> FakeFrameCtx<Meta> {
         /// Take all frames sent so far.
+        #[cfg(test)]
         pub(crate) fn take_frames(&mut self) -> Vec<(Meta, Vec<u8>)> {
             core::mem::take(&mut self.frames)
         }
 
         /// Get the frames sent so far.
+        #[cfg(test)]
         pub(crate) fn frames(&self) -> &[(Meta, Vec<u8>)] {
             self.frames.as_slice()
         }
@@ -955,7 +1052,8 @@ pub(crate) mod testutil {
     }
 
     impl<E: Debug> FakeEventCtx<E> {
-        pub fn take(&mut self) -> Vec<E> {
+        #[cfg(test)]
+        pub(crate) fn take(&mut self) -> Vec<E> {
             // Any client that calls `take()` is opting into watching events
             // and must watch them all.
             self.must_watch_all_events = true;
@@ -970,6 +1068,7 @@ pub(crate) mod testutil {
     }
 
     impl FakeCounterCtx {
+        #[cfg(test)]
         pub(crate) fn get_counter_val(&self, key: &str) -> usize {
             *self.counters.get(key).unwrap_or(&0)
         }
@@ -1000,7 +1099,7 @@ pub(crate) mod testutil {
 
     /// A test helper used to provide an implementation of a non-synchronized
     /// context.
-    pub(crate) struct FakeNonSyncCtx<TimerId, Event: Debug, State> {
+    pub struct FakeNonSyncCtx<TimerId, Event: Debug, State> {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId>,
         events: FakeEventCtx<Event>,
@@ -1024,6 +1123,7 @@ pub(crate) mod testutil {
 
     impl<TimerId, Event: Debug, State> FakeNonSyncCtx<TimerId, Event, State> {
         /// Seed the testing RNG with a specific value.
+        #[cfg(test)]
         pub(crate) fn seed_rng(&mut self, seed: u128) {
             self.rng = FakeCryptoRng::new_xorshift(seed);
         }
@@ -1033,18 +1133,22 @@ pub(crate) mod testutil {
         ///
         /// If any timers are scheduled to fire in the given duration, future
         /// use of this `FakeSyncCtx` may have surprising or buggy behavior.
+        #[cfg(test)]
         pub(crate) fn sleep_skip_timers(&mut self, duration: Duration) {
             self.timers.instant.sleep(duration);
         }
 
+        #[cfg(test)]
         pub(crate) fn timer_ctx(&self) -> &FakeTimerCtx<TimerId> {
             &self.timers
         }
 
+        #[cfg(test)]
         pub(crate) fn take_events(&mut self) -> Vec<Event> {
             self.events.take()
         }
 
+        #[cfg(test)]
         pub(crate) fn frame_ctx(
             &self,
         ) -> &FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>> {
@@ -1057,6 +1161,7 @@ pub(crate) mod testutil {
             &mut self.frames
         }
 
+        #[cfg(test)]
         pub(crate) fn state(&self) -> &State {
             &self.state
         }
@@ -1065,6 +1170,7 @@ pub(crate) mod testutil {
             &mut self.state
         }
 
+        #[cfg(test)]
         pub(crate) fn counter_ctx(&self) -> &FakeCounterCtx {
             &self.counters
         }
@@ -1134,15 +1240,18 @@ pub(crate) mod testutil {
         fn duration(&self, _: &'static CStr) {}
     }
 
+    #[cfg(test)]
     #[derive(Default)]
     pub(crate) struct FakeCtxWithSyncCtx<SC, TimerId, Event: Debug, NonSyncCtxState> {
         pub(crate) sync_ctx: SC,
         pub(crate) non_sync_ctx: FakeNonSyncCtx<TimerId, Event, NonSyncCtxState>,
     }
 
+    #[cfg(test)]
     pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, NonSyncCtxState> =
         FakeCtxWithSyncCtx<FakeSyncCtx<S, Meta, DeviceId>, TimerId, Event, NonSyncCtxState>;
 
+    #[cfg(test)]
     impl<S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState> FakeNetworkContext
         for FakeCtx<S, Id, Meta, Event, DeviceId, NonSyncCtxState>
     {
@@ -1150,6 +1259,7 @@ pub(crate) mod testutil {
         type SendMeta = Meta;
     }
 
+    #[cfg(test)]
     impl<SC, Id, Event: Debug, NonSyncCtxState> AsRef<FakeInstantCtx>
         for FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
     {
@@ -1158,6 +1268,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<SC, Id, Event: Debug, NonSyncCtxState> AsRef<FakeTimerCtx<Id>>
         for FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
     {
@@ -1166,6 +1277,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<SC, Id, Event: Debug, NonSyncCtxState> AsMut<FakeTimerCtx<Id>>
         for FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
     {
@@ -1174,6 +1286,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState> AsMut<FakeFrameCtx<Meta>>
         for FakeCtx<S, Id, Meta, Event, DeviceId, NonSyncCtxState>
     {
@@ -1182,6 +1295,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState: Default>
         FakeCtx<S, Id, Meta, Event, DeviceId, NonSyncCtxState>
     {
@@ -1199,6 +1313,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<SC, Id, Event: Debug, NonSyncCtxState: Default>
         FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
     {
@@ -1207,6 +1322,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     #[derive(Derivative)]
     #[derivative(Default(bound = "Outer: Default, S: Default"))]
     pub(crate) struct WrappedFakeSyncCtx<Outer, S, Meta, DeviceId> {
@@ -1214,12 +1330,14 @@ pub(crate) mod testutil {
         pub(crate) outer: Outer,
     }
 
+    #[cfg(test)]
     impl<Outer, S, Meta, DeviceId> WrappedFakeSyncCtx<Outer, S, Meta, DeviceId> {
         pub(crate) fn with_inner_and_outer_state(inner: S, outer: Outer) -> Self {
             Self { inner: FakeSyncCtx::with_state(inner), outer }
         }
     }
 
+    #[cfg(test)]
     impl<Outer, S, Meta, DeviceId> AsRef<FakeSyncCtx<S, Meta, DeviceId>>
         for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
     {
@@ -1228,6 +1346,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<Outer, S, Meta, DeviceId> AsMut<FakeSyncCtx<S, Meta, DeviceId>>
         for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
     {
@@ -1238,6 +1357,7 @@ pub(crate) mod testutil {
 
     /// A test helper used to provide an implementation of a synchronized
     /// context.
+    #[cfg(test)]
     #[derive(Derivative)]
     #[derivative(Default(bound = "S: Default"))]
     pub(crate) struct FakeSyncCtx<S, Meta, DeviceId> {
@@ -1246,18 +1366,21 @@ pub(crate) mod testutil {
         _devices_marker: PhantomData<DeviceId>,
     }
 
+    #[cfg(test)]
     impl<S, Meta, DeviceId> AsRef<FakeSyncCtx<S, Meta, DeviceId>> for FakeSyncCtx<S, Meta, DeviceId> {
         fn as_ref(&self) -> &FakeSyncCtx<S, Meta, DeviceId> {
             self
         }
     }
 
+    #[cfg(test)]
     impl<S, Meta, DeviceId> AsMut<FakeSyncCtx<S, Meta, DeviceId>> for FakeSyncCtx<S, Meta, DeviceId> {
         fn as_mut(&mut self) -> &mut FakeSyncCtx<S, Meta, DeviceId> {
             self
         }
     }
 
+    #[cfg(test)]
     impl<S, Meta, DeviceId> FakeSyncCtx<S, Meta, DeviceId> {
         /// Constructs a `FakeSyncCtx` with the given state and default
         /// `FakeTimerCtx`, and `FakeFrameCtx`.
@@ -1299,12 +1422,14 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>> for FakeSyncCtx<S, Meta, DeviceId> {
         fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
             &mut self.frames
         }
     }
 
+    #[cfg(test)]
     impl<Outer, S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>>
         for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
     {
@@ -1313,6 +1438,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<B: BufferMut, S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState>
         SendFrameContext<FakeNonSyncCtx<Id, Event, NonSyncCtxState>, B, Meta>
         for FakeSyncCtx<S, Meta, DeviceId>
@@ -1327,6 +1453,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     #[derive(Debug)]
     pub(crate) struct PendingFrameData<CtxId, Meta> {
         pub(crate) dst_context: CtxId,
@@ -1334,12 +1461,14 @@ pub(crate) mod testutil {
         pub(crate) frame: Vec<u8>,
     }
 
+    #[cfg(test)]
     pub(crate) type PendingFrame<CtxId, Meta> = InstantAndData<PendingFrameData<CtxId, Meta>>;
 
     /// A fake network, composed of many `FakeSyncCtx`s.
     ///
     /// Provides a utility to have many contexts keyed by `CtxId` that can
     /// exchange frames.
+    #[cfg(test)]
     pub(crate) struct FakeNetwork<CtxId, RecvMeta, Ctx: FakeNetworkContext, Links>
     where
         Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
@@ -1385,12 +1514,14 @@ pub(crate) mod testutil {
     }
 
     /// The result of a single step in a `FakeNetwork`
+    #[cfg(test)]
     #[derive(Debug)]
     pub(crate) struct StepResult {
         pub(crate) timers_fired: usize,
         pub(crate) frames_sent: usize,
     }
 
+    #[cfg(test)]
     impl StepResult {
         fn new(timers_fired: usize, frames_sent: usize) -> Self {
             Self { timers_fired, frames_sent }
@@ -1411,6 +1542,7 @@ pub(crate) mod testutil {
     #[derive(Debug)]
     pub(crate) struct LoopLimitReachedError;
 
+    #[cfg(test)]
     impl<CtxId, RecvMeta, Ctx, Links> FakeNetwork<CtxId, RecvMeta, Ctx, Links>
     where
         CtxId: Eq + Hash + Copy + Debug,
@@ -1675,6 +1807,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<CtxId, Links>
         FakeNetwork<
             CtxId,
@@ -1721,47 +1854,49 @@ pub(crate) mod testutil {
         }
     }
 
+    #[cfg(test)]
     impl<RecvMeta, SC, Id, Event, CtxId, Links, NonSyncCtxState>
-        FakeNetwork<
-            CtxId,
-            RecvMeta,
-            FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>,
-            Links,
-        >
-    where
-        Id: Copy,
-        Event: Debug,
-        CtxId: Eq + Hash + Copy + Debug,
-        Links: FakeNetworkLinks<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta, RecvMeta, CtxId>,
-        FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>: FakeNetworkContext<TimerId=Id> + AsMut<FakeFrameCtx<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta>>
-    {
-        pub(crate) fn with_context<
-            K: Into<CtxId>,
-            O,
-            F: FnOnce(&mut FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>) -> O,
-        >(
-            &mut self,
-            context: K,
-            f: F,
-        ) -> O {
-            f(self.context(context))
-        }
-
-        /// Retrieves a `FakeSyncCtx` named `context`.
-        pub(crate) fn sync_ctx<K: Into<CtxId>>(
-            &mut self,
-            context: K,
-        ) -> &mut SC {
-            let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ } = self.context(context);
-            sync_ctx
-        }
+    FakeNetwork<
+        CtxId,
+        RecvMeta,
+        FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>,
+        Links,
+    >
+where
+    Id: Copy,
+    Event: Debug,
+    CtxId: Eq + Hash + Copy + Debug,
+    Links: FakeNetworkLinks<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta, RecvMeta, CtxId>,
+    FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>: FakeNetworkContext<TimerId=Id> + AsMut<FakeFrameCtx<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta>>
+{
+    pub(crate) fn with_context<
+        K: Into<CtxId>,
+        O,
+        F: FnOnce(&mut FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>) -> O,
+    >(
+        &mut self,
+        context: K,
+        f: F,
+    ) -> O {
+        f(self.context(context))
     }
+
+    /// Retrieves a `FakeSyncCtx` named `context`.
+    pub(crate) fn sync_ctx<K: Into<CtxId>>(
+        &mut self,
+        context: K,
+    ) -> &mut SC {
+        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ } = self.context(context);
+        sync_ctx
+    }
+}
 
     /// Creates a new [`FakeNetwork`] of legacy [`Ctx`] contexts in a simple
     /// two-host configuration.
     ///
     /// Two hosts are created with the given names. Packets emitted by one
     /// arrive at the other and vice-versa.
+    #[cfg(test)]
     pub(crate) fn new_legacy_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
         a_id: CtxId,
         a: crate::testutil::FakeCtx,
@@ -1792,6 +1927,7 @@ pub(crate) mod testutil {
         )
     }
 
+    #[cfg(test)]
     mod tests {
         use crate::device::testutil::FakeDeviceId;
 

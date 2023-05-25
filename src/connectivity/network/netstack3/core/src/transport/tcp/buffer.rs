@@ -638,7 +638,7 @@ pub trait IntoBuffers<R: ReceiveBuffer, S: SendBuffer> {
     fn into_buffers(self, buffer_sizes: BufferSizes) -> (R, S);
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for () {
     fn into_buffers(self, buffer_sizes: BufferSizes) -> (R, S) {
         // Ignore buffer sizes since this is a test-only impl.

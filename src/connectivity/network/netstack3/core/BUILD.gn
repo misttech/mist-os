@@ -33,7 +33,6 @@ lib_sources = [
   "src/device/socket.rs",
   "src/device/state.rs",
   "src/error.rs",
-  "src/fuzz.rs",
   "src/ip/device/dad.rs",
   "src/ip/device/integration.rs",
   "src/ip/device/mod.rs",
@@ -85,6 +84,9 @@ lib_deps = [
   # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
   # remove this module.
   "fakealloc",
+
+  # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
+  "fakestd",
   "lock-order",
   "//src/connectivity/lib/net-types",
   "//src/connectivity/lib/packet-formats",
@@ -118,20 +120,17 @@ lib_test_deps = [
   "//third_party/rust_crates:tracing-subscriber",
 ]
 
-lib_not_fuzz_deps = [
-  # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-  "fakestd",
-]
-
 lib_instrumented_deps = [ "sync:netstack3_sync_instrumented" ]
 
 lib_not_instrumented_deps = [ "sync:netstack3_sync_not_instrumented" ]
+
+lib_testutils_deps = [ "//third_party/rust_crates:rand_xorshift" ]
 
 rustc_library("netstack3-core") {
   version = "0.1.0"
   edition = "2021"
 
-  deps = lib_deps + lib_not_fuzz_deps + lib_not_instrumented_deps
+  deps = lib_deps + lib_not_instrumented_deps
 
   features = []
 
@@ -145,21 +144,10 @@ rustc_library("netstack3-core") {
 rustc_library("netstack3-core-instrumented") {
   version = "0.1.0"
   edition = "2021"
+  with_unit_tests = true
 
-  deps = lib_deps + lib_not_fuzz_deps + lib_instrumented_deps
-
-  features = [ "instrumented" ]
-
-  sources = lib_sources
-
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-}
-
-rustc_test("netstack3-core_test") {
-  name = "netstack3_core_lib_test"
-  edition = "2021"
-
-  deps = lib_deps + lib_test_deps + lib_not_fuzz_deps + lib_instrumented_deps
+  deps = lib_deps + lib_instrumented_deps
+  test_deps = lib_test_deps
 
   features = [ "instrumented" ]
 
@@ -170,7 +158,24 @@ rustc_test("netstack3-core_test") {
 
 fuchsia_unittest_package("netstack3-core-test-package") {
   package_name = "netstack3-core-test"
-  deps = [ ":netstack3-core_test" ]
+  deps = [ ":netstack3-core-instrumented_test" ]
+}
+
+# A variant of the netstack3-core library that exposes test utilities.
+rustc_library("netstack3-core-testutils") {
+  version = "0.1.0"
+  edition = "2021"
+
+  deps = lib_deps + lib_instrumented_deps + lib_testutils_deps
+
+  features = [
+    "instrumented",
+    "testutils",
+  ]
+
+  sources = lib_sources
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 config("benchmark") {
@@ -186,38 +191,33 @@ rustc_library("netstack3-core-benchmarks") {
   testonly = true
   with_unit_tests = true
   sources = lib_sources
-  deps = lib_deps + lib_test_deps + lib_not_fuzz_deps +
-         lib_not_instrumented_deps + [ "//third_party/rust_crates:criterion" ]
+  deps = lib_deps + lib_test_deps + lib_not_instrumented_deps +
+         [ "//third_party/rust_crates:criterion" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   configs += [ ":benchmark" ]
-}
-
-config("fuzz") {
-  rustflags = [
-    "--cfg=fuzz",
-    "--cfg=test",
-  ]
 }
 
 rustc_fuzzer("fuzz-single-device") {
   edition = "2021"
   rustfunction = "single_device_arbitrary_packets"
+  source_root = "fuzz/src/lib.rs"
 
-  sources = lib_sources
-  deps = lib_deps + lib_test_deps + lib_instrumented_deps + [
-           "//src/connectivity/lib/fuzz-util",
-           "//src/connectivity/lib/net-declare",
-           "//src/connectivity/lib/net-types",
-           "//src/lib/fuzzing/rust:fuzz",
-           "//src/lib/network/packet",
-           "//third_party/rust_crates:arbitrary",
-           "//third_party/rust_crates:lazy_static",
-           "//third_party/rust_crates:tracing",
-           "//third_party/rust_crates:tracing-subscriber",
-         ]
+  sources = [ "fuzz/src/lib.rs" ]
+  deps = [
+    ":netstack3-core-testutils",
+    "//src/connectivity/lib/fuzz-util",
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
+    "//src/lib/fuzzing/rust:fuzz",
+    "//src/lib/network/packet",
+    "//third_party/rust_crates:arbitrary",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
+  ]
 
   features = [
-    "instrumented",
     # Logging is turned off by default so that the fuzzer can run faster. It can
     # be enabled to be included in the output the fuzzer prints (only on
     # failure) by enabling any of the following features. Enabling multiple is
@@ -228,7 +228,6 @@ rustc_fuzzer("fuzz-single-device") {
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  configs += [ ":fuzz" ]
 }
 
 fuchsia_fuzzer_component("fuzz-single-device-component") {
@@ -250,8 +249,8 @@ group("tests") {
   testonly = true
   public_deps = [
     ":netstack3-core-fuzzers",
+    ":netstack3-core-instrumented_test($host_toolchain)",
     ":netstack3-core-test-package",
-    ":netstack3-core_test($host_toolchain)",
     "lock-order:tests",
     "sync:tests",
   ]

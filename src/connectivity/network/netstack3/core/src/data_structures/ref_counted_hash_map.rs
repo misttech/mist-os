@@ -156,13 +156,13 @@ impl<T: Eq + Hash> RefCountedHashSet<T> {
     }
 
     /// Returns the number of values in the set.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn len(&self) -> usize {
         self.inner.inner.len()
     }
 
     /// Iterates over values and reference counts.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn iter_counts(&self) -> impl Iterator<Item = (&'_ T, NonZeroUsize)> + '_ {
         self.inner.inner.iter().map(|(key, (count, ()))| (key, *count))
     }

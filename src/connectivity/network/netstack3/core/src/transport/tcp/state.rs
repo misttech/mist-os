@@ -2496,13 +2496,6 @@ mod test {
         }
     }
 
-    /// Sensible defaults only for testing.
-    impl Default for BufferSizes {
-        fn default() -> Self {
-            BufferSizes { send: WindowSize::DEFAULT.into(), receive: WindowSize::DEFAULT.into() }
-        }
-    }
-
     /// A buffer that can't read or write for test purpose.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
     struct NullBuffer;

@@ -233,6 +233,16 @@ pub struct BufferSizes {
     /// The size of the receive buffer.
     pub receive: usize,
 }
+/// Sensible defaults only for testing.
+#[cfg(any(test, feature = "testutils"))]
+impl Default for BufferSizes {
+    fn default() -> Self {
+        BufferSizes {
+            send: seqnum::WindowSize::DEFAULT.into(),
+            receive: seqnum::WindowSize::DEFAULT.into(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct OptionalBufferSizes {

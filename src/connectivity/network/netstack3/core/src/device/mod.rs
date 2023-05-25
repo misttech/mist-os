@@ -1948,7 +1948,7 @@ pub fn add_ethernet_device_with_state<
 }
 
 /// Adds a new Ethernet device to the stack.
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
@@ -2100,7 +2100,7 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncC
 /// any future conflicting gratuitous ARPs to be ignored.
 // TODO(rheacock): remove `cfg(test)` when this is used. Will probably be
 // called by a pub fn in the device mod.
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(super) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
@@ -2126,7 +2126,7 @@ pub(super) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
 /// address so that lookups succeed immediately, without doing address
 /// resolution.
 // TODO(rheacock): Remove when this is called from non-test code.
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
@@ -2208,13 +2208,16 @@ pub fn update_ipv6_configuration<NonSyncCtx: NonSyncContext>(
     crate::ip::device::update_ipv6_configuration(&mut Locked::new(sync_ctx), ctx, device, config)
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
 
+    #[cfg(test)]
     use net_types::ip::IpVersion;
 
-    use crate::{ip::device::IpDeviceConfigurationUpdate, testutil::Ctx};
+    use crate::ip::device::IpDeviceConfigurationUpdate;
+    #[cfg(test)]
+    use crate::testutil::Ctx;
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
     pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
@@ -2268,6 +2271,7 @@ pub(crate) mod testutil {
     impl<D: StrongId<Weak = FakeWeakDeviceId<Self>>> FakeStrongDeviceId for D {}
 
     /// Calls [`receive_frame`], with a [`Ctx`].
+    #[cfg(test)]
     pub(crate) fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
         Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<NonSyncCtx>,
         device: EthernetDeviceId<NonSyncCtx>,
@@ -2300,6 +2304,7 @@ pub(crate) mod testutil {
     }
 
     /// Enables or disables IP packet routing on `device`.
+    #[cfg(test)]
     pub(crate) fn set_forwarding_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
         sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
@@ -2335,6 +2340,7 @@ pub(crate) mod testutil {
     }
 
     /// Returns whether IP packet routing is enabled on `device`.
+    #[cfg(test)]
     pub(crate) fn is_forwarding_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
         sync_ctx: &SyncCtx<NonSyncCtx>,
         device: &DeviceId<NonSyncCtx>,
@@ -2352,6 +2358,7 @@ pub(crate) mod testutil {
 
     /// A device ID type that supports identifying more than one distinct
     /// device.
+    #[cfg(test)]
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
     pub(crate) enum MultipleDevicesId {
         A,
@@ -2359,24 +2366,28 @@ pub(crate) mod testutil {
         C,
     }
 
+    #[cfg(test)]
     impl MultipleDevicesId {
         pub(crate) fn all() -> [Self; 3] {
             [Self::A, Self::B, Self::C]
         }
     }
 
+    #[cfg(test)]
     impl core::fmt::Display for MultipleDevicesId {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             core::fmt::Debug::fmt(self, f)
         }
     }
 
+    #[cfg(test)]
     impl Id for MultipleDevicesId {
         fn is_loopback(&self) -> bool {
             false
         }
     }
 
+    #[cfg(test)]
     impl StrongId for MultipleDevicesId {
         type Weak = FakeWeakDeviceId<Self>;
     }

@@ -7,9 +7,8 @@
 //! This module contains microbenchmarks for the Netstack3 Core, built on top
 //! of Criterion.
 
-// Enable dead code warnings for benchmarks (disabled in `lib.rs`), unless
-// fuzzing is enabled.
-#![cfg_attr(not(fuzz), warn(dead_code, unused_imports, unused_macros))]
+// Enable dead code warnings for benchmarks (disabled in `lib.rs`).
+#![warn(dead_code, unused_imports, unused_macros)]
 
 use alloc::vec;
 

@@ -4,28 +4,38 @@
 
 //! Testing-related utilities.
 
-use alloc::{borrow::ToOwned, collections::HashMap, vec, vec::Vec};
+#[cfg(test)]
+use alloc::vec;
+use alloc::{borrow::ToOwned, collections::HashMap, vec::Vec};
+#[cfg(test)]
+use core::time::Duration;
 use core::{
     ffi::CStr,
     fmt::Debug,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    time::Duration,
 };
 
 use net_types::{
     ethernet::Mac,
-    ip::{
-        AddrSubnet, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
-        SubnetEither,
-    },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
+    ip::{AddrSubnet, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, SubnetEither},
+    UnicastAddr, Witness,
+};
+#[cfg(test)]
+use net_types::{
+    ip::{IpAddress, IpInvariant, Subnet},
+    MulticastAddr, SpecifiedAddr,
 };
 use packet::{Buf, BufferMut};
+#[cfg(test)]
 use packet_formats::ip::IpProto;
-use rand::{self, CryptoRng, Rng as _, RngCore, SeedableRng};
+#[cfg(test)]
+use rand::Rng as _;
+use rand::{self, CryptoRng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
+#[cfg(test)]
 use tracing::Subscriber;
+#[cfg(test)]
 use tracing_subscriber::{
     fmt::{
         format::{self, FormatEvent, FormatFields},
@@ -34,10 +44,15 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
+#[cfg(test)]
+use crate::{
+    context::{testutil::InstantAndData, InstantContext},
+    ip::SendIpPacketMeta,
+};
 use crate::{
     context::{
-        testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
-        EventContext, InstantContext, RngContext, TimerContext, TracingContext,
+        testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx},
+        EventContext, RngContext, TimerContext, TracingContext,
     },
     device::{
         ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
@@ -48,7 +63,7 @@ use crate::{
         device::IpDeviceEvent,
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
-        IpLayerEvent, SendIpPacketMeta,
+        IpLayerEvent,
     },
     transport::{
         tcp::{buffer::RingBuffer, socket::NonSyncContext, BufferSizes},
@@ -62,7 +77,7 @@ pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// Context available during the execution of the netstack.
 #[derive(Default)]
-pub(crate) struct Ctx<NonSyncCtx: crate::NonSyncContext> {
+pub struct Ctx<NonSyncCtx: crate::NonSyncContext> {
     /// The synchronized context.
     pub sync_ctx: SyncCtx<NonSyncCtx>,
     /// The non-synchronized context.
@@ -90,6 +105,7 @@ impl<NonSyncCtx: crate::NonSyncContext + Default> Ctx<NonSyncCtx> {
 /// `assert_empty` drains `into_iter.into_iter()` and asserts that zero
 /// items are produced. It panics with a message which includes the produced
 /// items if this assertion fails.
+#[cfg(test)]
 #[track_caller]
 pub(crate) fn assert_empty<I: IntoIterator>(into_iter: I)
 where
@@ -109,6 +125,7 @@ where
 /// benchmarks as normal tests when the `benchmark` feature is disabled.
 ///
 /// See the `bench!` macro for details on how this module is used.
+#[cfg(test)]
 pub(crate) mod benchmarks {
     /// A trait to allow faking of the `test::Bencher` type.
     pub(crate) trait Bencher {
@@ -148,25 +165,22 @@ pub(crate) mod benchmarks {
 }
 
 #[derive(Default)]
-pub(crate) struct FakeNonSyncCtxState {
+/// Non-sync context state held by [`FakeNonSyncCtx`].
+pub struct FakeNonSyncCtxState {
     icmpv4_replies: HashMap<IcmpConnId<Ipv4>, Vec<(u16, Vec<u8>)>>,
     icmpv6_replies: HashMap<IcmpConnId<Ipv6>, Vec<(u16, Vec<u8>)>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeNonSyncCtx>>,
     pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
 }
 
-// Use the `Never` type for the `crate::context::testutil::FakeCtx`'s frame
-// metadata type. This ensures that we don't accidentally send frames to its
-// `FakeFrameCtx`, which isn't actually used (instead, we use the
-// `FakeFrameCtx` stored in `FakeEventDispatcher`). Note that this doesn't
-// prevent code from attempting to read from this context (code which only
-// accesses the frame contents rather than the frame metadata will still
-// compile).
-pub(crate) type FakeCtx = Ctx<FakeNonSyncCtx>;
-pub(crate) type FakeSyncCtx = SyncCtx<FakeNonSyncCtx>;
+/// Shorthand for [`Ctx`] with a [`FakeNonSyncCtx`].
+pub type FakeCtx = Ctx<FakeNonSyncCtx>;
+/// Shorthand for [`SyncCtx`] that uses a [`FakeNonSyncCtx`].
+pub type FakeSyncCtx = SyncCtx<FakeNonSyncCtx>;
 
+/// Test-only implementation of [`crate::NonSyncContext`].
 #[derive(Default)]
-pub(crate) struct FakeNonSyncCtx(
+pub struct FakeNonSyncCtx(
     crate::context::testutil::FakeNonSyncCtx<TimerId<Self>, DispatchedEvent, FakeNonSyncCtxState>,
 );
 
@@ -289,6 +303,7 @@ impl NonSyncContext for FakeNonSyncCtx {
     }
 }
 
+#[cfg(test)]
 impl FakeNonSyncCtx {
     pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
         self.frame_ctx_mut().take_frames()
@@ -308,7 +323,7 @@ impl FakeNonSyncCtx {
 ///
 /// This is obviously insecure. Don't use it except in testing!
 #[derive(Clone, Debug)]
-pub(crate) struct FakeCryptoRng<R>(R);
+pub struct FakeCryptoRng<R>(R);
 
 impl Default for FakeCryptoRng<XorShiftRng> {
     fn default() -> FakeCryptoRng<XorShiftRng> {
@@ -372,6 +387,7 @@ pub(crate) fn new_rng(mut seed: u128) -> XorShiftRng {
 ///
 /// This function can be used for tests that weed out weirdness that can
 /// happen with certain random number sequences.
+#[cfg(test)]
 pub(crate) fn with_fake_rngs<F: Fn(FakeCryptoRng<XorShiftRng>)>(iterations: u128, f: F) {
     for seed in 0..iterations {
         f(FakeCryptoRng::new_xorshift(seed))
@@ -379,6 +395,7 @@ pub(crate) fn with_fake_rngs<F: Fn(FakeCryptoRng<XorShiftRng>)>(iterations: u128
 }
 
 /// Invokes a function multiple times with different RNG seeds.
+#[cfg(test)]
 pub(crate) fn run_with_many_seeds<F: FnMut(u128)>(mut f: F) {
     // Arbitrary seed.
     let mut rng = new_rng(0x0fe50fae6c37593d71944697f1245847);
@@ -387,8 +404,10 @@ pub(crate) fn run_with_many_seeds<F: FnMut(u128)>(mut f: F) {
     }
 }
 
+#[cfg(test)]
 struct SimpleFormatter;
 
+#[cfg(test)]
 impl<S, N> FormatEvent<S, N> for SimpleFormatter
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
@@ -410,6 +429,7 @@ where
 /// Call this method at the beginning of the test for which logging is desired.
 /// This function sets global program state, so all tests that run after this
 /// function is called will use the logger.
+#[cfg(test)]
 pub(crate) fn set_logger_for_test() {
     tracing::subscriber::set_global_default(
         tracing_subscriber::fmt()
@@ -425,11 +445,13 @@ pub(crate) fn set_logger_for_test() {
 }
 
 /// Get the counter value for a `key`.
+#[cfg(test)]
 pub(crate) fn get_counter_val(ctx: &FakeNonSyncCtx, key: &str) -> usize {
     ctx.counter_ctx().get_counter_val(key)
 }
 
 /// An extension trait for `Ip` providing test-related functionality.
+#[cfg(test)]
 pub(crate) trait TestIpExt: crate::ip::IpExt + crate::ip::IpLayerIpExt {
     /// Either [`FAKE_CONFIG_V4`] or [`FAKE_CONFIG_V6`].
     const FAKE_CONFIG: FakeEventDispatcherConfig<Self::Addr>;
@@ -450,6 +472,7 @@ pub(crate) trait TestIpExt: crate::ip::IpExt + crate::ip::IpLayerIpExt {
     fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr>;
 }
 
+#[cfg(test)]
 impl TestIpExt for Ipv4 {
     const FAKE_CONFIG: FakeEventDispatcherConfig<Ipv4Addr> = FAKE_CONFIG_V4;
 
@@ -474,6 +497,7 @@ impl TestIpExt for Ipv4 {
     }
 }
 
+#[cfg(test)]
 impl TestIpExt for Ipv6 {
     const FAKE_CONFIG: FakeEventDispatcherConfig<Ipv6Addr> = FAKE_CONFIG_V6;
 
@@ -502,6 +526,7 @@ impl TestIpExt for Ipv6 {
 ///
 /// `FakeEventDispatcherConfig` describes a simple network with two IP hosts
 /// - one remote and one local - both on the same Ethernet network.
+#[cfg(test)]
 #[derive(Clone)]
 pub(crate) struct FakeEventDispatcherConfig<A: IpAddress> {
     /// The subnet of the local Ethernet network.
@@ -518,6 +543,7 @@ pub(crate) struct FakeEventDispatcherConfig<A: IpAddress> {
 }
 
 /// A `FakeEventDispatcherConfig` with reasonable values for an IPv4 network.
+#[cfg(test)]
 pub(crate) const FAKE_CONFIG_V4: FakeEventDispatcherConfig<Ipv4Addr> = unsafe {
     FakeEventDispatcherConfig {
         subnet: Subnet::new_unchecked(Ipv4Addr::new([192, 168, 0, 0]), 16),
@@ -529,6 +555,7 @@ pub(crate) const FAKE_CONFIG_V4: FakeEventDispatcherConfig<Ipv4Addr> = unsafe {
 };
 
 /// A `FakeEventDispatcherConfig` with reasonable values for an IPv6 network.
+#[cfg(test)]
 pub(crate) const FAKE_CONFIG_V6: FakeEventDispatcherConfig<Ipv6Addr> = unsafe {
     FakeEventDispatcherConfig {
         subnet: Subnet::new_unchecked(
@@ -546,6 +573,7 @@ pub(crate) const FAKE_CONFIG_V6: FakeEventDispatcherConfig<Ipv6Addr> = unsafe {
     }
 };
 
+#[cfg(test)]
 impl<A: IpAddress> FakeEventDispatcherConfig<A> {
     /// Creates a copy of `self` with all the remote and local fields reversed.
     pub(crate) fn swap(&self) -> Self {
@@ -572,7 +600,7 @@ impl<A: IpAddress> FakeEventDispatcherConfig<A> {
 /// producing a `Context<FakeEventDispatcher>` with all of the appropriate
 /// state configured.
 #[derive(Clone, Default)]
-pub(crate) struct FakeEventDispatcherBuilder {
+pub struct FakeEventDispatcherBuilder {
     devices: Vec<(UnicastAddr<Mac>, Option<(IpAddr, SubnetEither)>)>,
     arp_table_entries: Vec<(usize, Ipv4Addr, UnicastAddr<Mac>)>,
     ndp_table_entries: Vec<(usize, UnicastAddr<Ipv6Addr>, UnicastAddr<Mac>)>,
@@ -584,6 +612,7 @@ pub(crate) struct FakeEventDispatcherBuilder {
 impl FakeEventDispatcherBuilder {
     /// Construct a `FakeEventDispatcherBuilder` from a
     /// `FakeEventDispatcherConfig`.
+    #[cfg(test)]
     pub(crate) fn from_config<A: IpAddress>(
         cfg: FakeEventDispatcherConfig<A>,
     ) -> FakeEventDispatcherBuilder {
@@ -616,7 +645,7 @@ impl FakeEventDispatcherBuilder {
     ///
     /// `add_device` returns a key which can be used to refer to the device in
     /// future calls to `add_arp_table_entry` and `add_device_route`.
-    pub(crate) fn add_device(&mut self, mac: UnicastAddr<Mac>) -> usize {
+    pub fn add_device(&mut self, mac: UnicastAddr<Mac>) -> usize {
         let idx = self.devices.len();
         self.devices.push((mac, None));
         idx
@@ -626,6 +655,7 @@ impl FakeEventDispatcherBuilder {
     ///
     /// `add_device_with_ip` is like `add_device`, except that it takes an
     /// associated IP address and subnet to assign to the device.
+    #[cfg(test)]
     pub(crate) fn add_device_with_ip<A: IpAddress>(
         &mut self,
         mac: UnicastAddr<Mac>,
@@ -639,6 +669,7 @@ impl FakeEventDispatcherBuilder {
     }
 
     /// Add an ARP table entry for a device's ARP table.
+    #[cfg(test)]
     pub(crate) fn add_arp_table_entry(
         &mut self,
         device: usize,
@@ -649,6 +680,7 @@ impl FakeEventDispatcherBuilder {
     }
 
     /// Add an NDP table entry for a device's NDP table.
+    #[cfg(test)]
     pub(crate) fn add_ndp_table_entry(
         &mut self,
         device: usize,
@@ -659,7 +691,7 @@ impl FakeEventDispatcherBuilder {
     }
 
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
-    pub(crate) fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
+    pub fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
         self.build_with_modifications(|_| {})
     }
 
@@ -764,6 +796,7 @@ impl FakeEventDispatcherBuilder {
 
 /// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
 /// `FakeEventDispatcherBuilder`.
+#[cfg(test)]
 pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     builder: &mut FakeEventDispatcherBuilder,
     device: usize,
@@ -801,6 +834,7 @@ impl FakeNetworkContext for FakeCtx {
 
 impl FakeNonSyncCtx {
     /// Takes all the received ICMP replies for a given `conn`.
+    #[cfg(test)]
     pub(crate) fn take_icmp_replies<I: Ip>(&mut self, conn: IcmpConnId<I>) -> Vec<(u16, Vec<u8>)> {
         I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
             (IpInvariant(self), conn),
@@ -891,6 +925,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNonSyncCtx) {
     loop {
         let rx_available = core::mem::take(&mut ctx.state_mut().rx_available);
@@ -906,7 +941,8 @@ pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNon
 
 /// Wraps all events emitted by Core into a single enum type.
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub(crate) enum DispatchedEvent {
+#[allow(missing_docs)]
+pub enum DispatchedEvent {
     IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
     IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
     IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
@@ -1015,6 +1051,7 @@ impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSync
     }
 }
 
+#[cfg(test)]
 pub(crate) fn handle_timer(
     FakeCtx { sync_ctx, non_sync_ctx }: &mut FakeCtx,
     _ctx: &mut (),

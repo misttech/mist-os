@@ -4,14 +4,22 @@
 
 #![warn(dead_code, unused_imports, unused_macros)]
 
+extern crate netstack3_core_testutils as netstack3_core;
+
 use core::{convert::TryInto as _, time::Duration};
 
 use arbitrary::{Arbitrary, Unstructured};
 use fuzz_util::Fuzzed;
 use net_declare::net_mac;
 use net_types::{
-    ip::{IpAddress, Ipv4Addr, Ipv6Addr, Mtu},
+    ip::{IpAddress, Ipv4Addr, Ipv6Addr},
     UnicastAddr,
+};
+use netstack3_core::{
+    context::testutil::FakeTimerCtxExt as _,
+    device::EthernetDeviceId,
+    testutil::{Ctx, FakeCtx, FakeNonSyncCtx},
+    TimerId,
 };
 use packet::{
     serialize::{Buf, SerializeError},
@@ -24,13 +32,6 @@ use packet_formats::{
     ipv6::Ipv6PacketBuilder,
     tcp::TcpSegmentBuilder,
     udp::UdpPacketBuilder,
-};
-
-use crate::{
-    context::testutil::{handle_timer_helper_with_sc_ref, FakeTimerCtxExt},
-    device::{ethernet, EthernetDeviceId},
-    testutil::{Ctx, DEFAULT_INTERFACE_METRIC},
-    TimerId,
 };
 
 mod print_on_panic {
@@ -337,20 +338,20 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
 }
 
 fn dispatch(
-    Ctx { sync_ctx, non_sync_ctx }: &mut crate::testutil::FakeCtx,
-    device_id: &EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
+    Ctx { sync_ctx, non_sync_ctx }: &mut FakeCtx,
+    device_id: &EthernetDeviceId<FakeNonSyncCtx>,
     action: FuzzAction,
 ) {
     use FuzzAction::*;
     match action {
         ReceiveFrame(ArbitraryFrame { frame_type: _, buf, description: _ }) => {
-            crate::device::receive_frame(sync_ctx, non_sync_ctx, device_id, buf)
+            netstack3_core::device::receive_frame(sync_ctx, non_sync_ctx, device_id, buf)
         }
         AdvanceTime(SmallDuration(duration)) => {
-            let _: Vec<TimerId<_>> = non_sync_ctx.trigger_timers_for(
-                duration,
-                handle_timer_helper_with_sc_ref(&*sync_ctx, crate::handle_timer),
-            );
+            let _: Vec<TimerId<_>> = non_sync_ctx
+                .trigger_timers_for(duration, |non_sync_ctx, id| {
+                    netstack3_core::handle_timer(sync_ctx, non_sync_ctx, id)
+                });
         }
     }
 }
@@ -359,22 +360,18 @@ fn dispatch(
 pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
     print_on_panic::initialize_logging();
 
-    let mut ctx = crate::testutil::FakeCtx::default();
-    let FuzzInput { actions } = input;
+    let mut builder = netstack3_core::testutil::FakeEventDispatcherBuilder::default();
+    let device_index = builder.add_device(UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap());
 
-    let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-    let device_id = crate::device::add_ethernet_device(
-        sync_ctx,
-        UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap(),
-        ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
-        DEFAULT_INTERFACE_METRIC,
-    );
-    crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &device_id.clone().into());
+    let (mut ctx, ethernet_devices) = builder.build();
+    let device_id = &ethernet_devices[device_index];
+
+    let FuzzInput { actions } = input;
 
     tracing::info!("Processing {} actions", actions.len());
     for action in actions {
         tracing::info!("{}", action);
-        dispatch(&mut ctx, &device_id, action);
+        dispatch(&mut ctx, device_id, action);
     }
 
     // No panic occurred, so clear the log for the next run.
