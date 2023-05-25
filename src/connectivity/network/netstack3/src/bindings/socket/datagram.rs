@@ -1657,7 +1657,11 @@ where
                 value_bytes: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                // TODO(https://fxbug.dev/123057): Actually implement SetSendBuffer.
+                //
+                // Currently, UDP sending in Netstack3 is synchronous, so it's not clear what a
+                // sensible implementation would look like.
+                responder_send!(responder, Ok(()));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSendBuffer { responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));

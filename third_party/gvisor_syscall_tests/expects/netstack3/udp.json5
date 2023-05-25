@@ -63,7 +63,6 @@
                 "AllInetTests/UdpSocketTest.Getsockname/*",
                 "AllInetTests/UdpSocketTest.ReadShutdownNonblockPendingData/*",
                 "AllInetTests/UdpSocketTest.RecvBufLimits/*",
-                "AllInetTests/UdpSocketTest.SendPacketLargerThanSendBufOnNonBlockingSocket/*",
                 "AllInetTests/UdpSocketTest.SoNoCheck/*",
                 "AllInetTests/UdpSocketTest.SoNoCheckOffByDefault/*",
                 "AllInetTests/UdpSocketTest.SoTimestamp/*",
