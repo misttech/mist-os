@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef VIRTIO_VIRTIO_H_
+#define VIRTIO_VIRTIO_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -59,7 +60,7 @@
 #define VIRTIO_ISR_QUEUE_INT 0x1
 #define VIRTIO_ISR_DEV_CFG_INT 0x2
 
-#define VIRTIO_F_VERSION_1 32
+#define VIRTIO_F_VERSION_1 (1ul << 32)
 
 __BEGIN_CDECLS
 
@@ -145,3 +146,5 @@ typedef struct virtio_pci_common_cfg {
 #define VIRTIO_DEV_TYPE_SOCKET VIRTIO_LEGACY_DEV_TYPE(VIRTIO_DEV_ID_SOCKET)
 
 __END_CDECLS
+
+#endif  // VIRTIO_VIRTIO_H_

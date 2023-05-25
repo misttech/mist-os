@@ -356,29 +356,29 @@ void PciModernBackend::RingKick(uint16_t ring_index) {
   *ptr = ring_index;
 }
 
-bool PciModernBackend::ReadFeature(uint32_t feature) {
+bool PciModernBackend::ReadSingleFeature(uint32_t bit_offset) {
   fbl::AutoLock guard(&lock());
-  uint32_t select = feature / 32;
-  uint32_t bit = feature % 32;
+  uint32_t select = bit_offset / 32;
+  uint32_t bit = bit_offset % 32;
   uint32_t val;
 
   MmioWrite(&common_cfg_->device_feature_select, select);
   MmioRead(&common_cfg_->device_feature, &val);
   bool is_set = (val & (1u << bit)) != 0;
-  zxlogf(DEBUG, "%s: read feature bit %u = %u", tag(), feature, is_set);
+  zxlogf(DEBUG, "%s: read feature bit at offset %u = %u", tag(), bit_offset, is_set);
   return is_set;
 }
 
-void PciModernBackend::SetFeature(uint32_t feature) {
+void PciModernBackend::SetSingleFeature(uint32_t bit_offset) {
   fbl::AutoLock guard(&lock());
-  uint32_t select = feature / 32;
-  uint32_t bit = feature % 32;
+  uint32_t select = bit_offset / 32;
+  uint32_t bit = bit_offset % 32;
   uint32_t val;
 
   MmioWrite(&common_cfg_->driver_feature_select, select);
   MmioRead(&common_cfg_->driver_feature, &val);
   MmioWrite(&common_cfg_->driver_feature, val | (1u << bit));
-  zxlogf(DEBUG, "%s: feature bit %u now set", tag(), feature);
+  zxlogf(DEBUG, "%s: feature bit at offset %u now set", tag(), bit_offset);
 }
 
 zx_status_t PciModernBackend::ConfirmFeatures() {

@@ -34,8 +34,6 @@ class FakeBackend : public Backend {
 
   zx_status_t Bind() override { return ZX_OK; }
   void Unbind() override {}
-  bool ReadFeature(uint32_t bit) override { return false; }
-  void SetFeature(uint32_t bit) override { ZX_ASSERT(state_ != State::DRIVER_OK); }
   zx_status_t ConfirmFeatures() override { return ZX_OK; }
   void DriverStatusOk() override {
     ZX_ASSERT_MSG(state_ == State::DEVICE_STATUS_ACK, "State: %d", state_);
@@ -105,6 +103,9 @@ class FakeBackend : public Backend {
   State DeviceState() const { return state_; }
 
  protected:
+  bool ReadSingleFeature(uint32_t bit_offset) override { return false; }
+  void SetSingleFeature(uint32_t bit_offset) override { ZX_ASSERT(state_ != State::DRIVER_OK); }
+
   // virtio header register offsets.
   static constexpr uint16_t kDeviceFeatures = 0;
   static constexpr uint16_t kGuestFeatures = 4;

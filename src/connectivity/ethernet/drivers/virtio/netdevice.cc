@@ -95,8 +95,8 @@ zx_status_t NetworkDevice::Init() {
 }
 
 uint16_t NetworkDevice::NegotiateHeaderLength() {
-  if (DeviceFeatureSupported(VIRTIO_F_VERSION_1)) {
-    DriverFeatureAck(VIRTIO_F_VERSION_1);
+  if (DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
+    DriverFeaturesAck(VIRTIO_F_VERSION_1);
     return sizeof(virtio_net_hdr_t);
   }
   // 5.1.6.1 Legacy Interface: Device Operation.

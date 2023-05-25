@@ -62,17 +62,6 @@ class FakeBackendForNetdeviceTest : public FakeBackend {
     tx_ring_started_ = false;
   }
 
-  void SetFeature(uint32_t bit) override { feature_bits_ |= bit; }
-
-  bool ReadFeature(uint32_t bit) override {
-    switch (bit) {
-      case VIRTIO_F_VERSION_1:
-        return support_feature_v1_;
-      default:
-        return FakeBackend::ReadFeature(bit);
-    }
-  }
-
   zx_status_t SetRing(uint16_t index, uint16_t count, zx_paddr_t pa_desc, zx_paddr_t pa_avail,
                       zx_paddr_t pa_used) override {
     switch (index) {
@@ -94,15 +83,27 @@ class FakeBackendForNetdeviceTest : public FakeBackend {
 
   bool rx_ring_started() const { return rx_ring_started_; }
   bool tx_ring_started() const { return tx_ring_started_; }
-  uint32_t feature_bits() const { return feature_bits_; }
+  uint64_t feature_bits() const { return feature_bits_; }
   void SetSupportFeatureV1(bool v1) { support_feature_v1_ = v1; }
+
+ protected:
+  void SetSingleFeature(uint32_t bit_offset) override { feature_bits_ |= (1ul << bit_offset); }
+
+  bool ReadSingleFeature(uint32_t bit_offset) override {
+    switch (1ul << bit_offset) {
+      case VIRTIO_F_VERSION_1:
+        return support_feature_v1_;
+      default:
+        return FakeBackend::ReadSingleFeature(bit_offset);
+    }
+  }
 
  private:
   sync_completion_t completion_;
   bool rx_ring_started_ = false;
   bool tx_ring_started_ = false;
   bool support_feature_v1_ = false;
-  uint32_t feature_bits_ = 0;
+  uint64_t feature_bits_ = 0;
 };
 
 class NetworkDeviceTests : public zxtest::Test,

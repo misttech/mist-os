@@ -132,34 +132,32 @@ void PciLegacyBackend::RingKick(uint16_t ring_index) {
   zxlogf(TRACE, "%s: kicked ring %u", tag(), ring_index);
 }
 
-bool PciLegacyBackend::ReadFeature(uint32_t feature) {
+bool PciLegacyBackend::ReadSingleFeature(uint32_t bit_offset) {
   // Legacy PCI back-end can only support one feature word.
-  if (feature >= 32) {
+  if (bit_offset >= 32) {
     return false;
   }
 
   fbl::AutoLock guard(&lock());
   uint32_t val;
 
-  ZX_DEBUG_ASSERT((feature & (feature - 1)) == 0);
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_DEVICE_FEATURES, &val);
-  bool is_set = (val & (1u << feature)) > 0;
-  zxlogf(TRACE, "%s: read feature bit %u = %u", tag(), feature, is_set);
+  bool is_set = (val & (1u << bit_offset)) > 0;
+  zxlogf(TRACE, "%s: read feature bit at offset %u = %u", tag(), bit_offset, is_set);
   return is_set;
 }
 
-void PciLegacyBackend::SetFeature(uint32_t feature) {
+void PciLegacyBackend::SetSingleFeature(uint32_t bit_offset) {
   // Legacy PCI back-end can only support one feature word.
-  if (feature >= 32) {
+  if (bit_offset >= 32) {
     return;
   }
 
   fbl::AutoLock guard(&lock());
   uint32_t val;
-  ZX_DEBUG_ASSERT((feature & (feature - 1)) == 0);
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_DRIVER_FEATURES, &val);
-  legacy_io_->Write(bar0_base_ + VIRTIO_PCI_DRIVER_FEATURES, val | (1u << feature));
-  zxlogf(TRACE, "%s: feature bit %u now set", tag(), feature);
+  legacy_io_->Write(bar0_base_ + VIRTIO_PCI_DRIVER_FEATURES, val | (1u << bit_offset));
+  zxlogf(TRACE, "%s: feature bit at offset %u now set", tag(), bit_offset);
 }
 
 // Virtio v0.9.5 does not support the FEATURES_OK negotiation so this should
