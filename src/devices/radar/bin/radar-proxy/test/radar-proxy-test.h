@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.radar/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/fdio/directory.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
 
@@ -165,22 +167,37 @@ class RadarProxyTest : public zxtest::Test, public RadarDeviceConnector {
     ASSERT_OK(proxy_loop_.StartThread("Radar proxy"));
     ASSERT_OK(driver_loop_.StartThread("Radar driver"));
 
-    zx::result endpoints =
-        fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
-    ASSERT_TRUE(endpoints.is_ok());
+    {
+      zx::result endpoints =
+          fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
+      ASSERT_TRUE(endpoints.is_ok());
 
-    dut_client_.Bind(std::move(endpoints->client));
-    EXPECT_TRUE(fdf::RunOnDispatcherSync(proxy_loop_.dispatcher(), [&]() {
-                  fidl::BindServer(proxy_loop_.dispatcher(), std::move(endpoints->server), &dut_);
-                }).is_ok());
+      dut_client_.Bind(std::move(endpoints->client));
+      EXPECT_TRUE(fdf::RunOnDispatcherSync(proxy_loop_.dispatcher(), [&]() {
+                    fidl::BindServer(proxy_loop_.dispatcher(), std::move(endpoints->server), &dut_);
+                  }).is_ok());
+    }
 
-    endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
-    ASSERT_TRUE(endpoints.is_ok());
+    {
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+      ASSERT_TRUE(endpoints.is_ok());
+
+      outgoing_client_ = std::move(endpoints->client);
+      EXPECT_TRUE(fdf::RunOnDispatcherSync(proxy_loop_.dispatcher(), [&]() {
+                    outgoing_.emplace(proxy_loop_.dispatcher());
+                    EXPECT_TRUE(dut_.AddProtocols(&(*outgoing_)).is_ok());
+                    EXPECT_TRUE(outgoing_->Serve(std::move(endpoints->server)).is_ok());
+                  }).is_ok());
+    }
   }
 
   void TearDown() override {
     // Make sure the proxy doesn't try to reconnect after the loop has been stopped.
     UnbindRadarDevice();
+
+    // Destroy the outgoing directory on the proxy thread.
+    EXPECT_TRUE(
+        fdf::RunOnDispatcherSync(proxy_loop_.dispatcher(), [&]() { outgoing_.reset(); }).is_ok());
 
     // dut_ must outlive the loop in order to prevent FIDL callbacks from keeping dangling
     // references to them.
@@ -248,7 +265,9 @@ class RadarProxyTest : public zxtest::Test, public RadarDeviceConnector {
   }
 
   void BindInjector(fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
-    dut_.BindInjector(std::move(server_end));
+    constexpr char kInjectorProtocolPath[] = "/svc/fuchsia.hardware.radar.RadarBurstInjector";
+    EXPECT_OK(fdio_service_connect_at(outgoing_client_.channel().get(), kInjectorProtocolPath,
+                                      server_end.TakeChannel().release()));
   }
 
   // Visible for testing.
@@ -263,6 +282,8 @@ class RadarProxyTest : public zxtest::Test, public RadarDeviceConnector {
 
   bool provider_connect_fail_ = false;
   sync_completion_t device_connected_;
+  std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ClientEnd<fuchsia_io::Directory> outgoing_client_;
 };
 
 }  // namespace radar

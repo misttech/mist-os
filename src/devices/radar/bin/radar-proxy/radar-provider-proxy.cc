@@ -34,6 +34,20 @@ void RadarProviderProxy::Connect(ConnectRequest& request, ConnectCompleter::Sync
   }
 }
 
+zx::result<> RadarProviderProxy::AddProtocols(component::OutgoingDirectory* const outgoing) {
+  zx::result result =
+      outgoing->AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstReaderProvider>(
+          [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> server_end) {
+            fidl::BindServer(dispatcher_, std::move(server_end), this);
+          });
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add RadarBurstReaderProvider protocol: " << result.status_string();
+    return result;
+  }
+
+  return zx::ok();
+}
+
 void RadarProviderProxy::DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                                      const std::string& filename) {
   if (!radar_client_) {

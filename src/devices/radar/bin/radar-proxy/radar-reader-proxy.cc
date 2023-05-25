@@ -43,6 +43,29 @@ void RadarReaderProxy::DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory>
   }
 }
 
+zx::result<> RadarReaderProxy::AddProtocols(component::OutgoingDirectory* const outgoing) {
+  zx::result result =
+      outgoing->AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstReaderProvider>(
+          [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> server_end) {
+            fidl::BindServer(dispatcher_, std::move(server_end), this);
+          });
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add RadarBurstReaderProvider protocol: " << result.status_string();
+    return result;
+  }
+
+  result = outgoing->AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstInjector>(
+      [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
+        BindInjector(std::move(server_end));
+      });
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add RadarBurstInjector protocol: " << result.status_string();
+    return result;
+  }
+
+  return zx::ok();
+}
+
 void RadarReaderProxy::ResizeVmoPool(const size_t count) {
   ZX_DEBUG_ASSERT(burst_properties_);
 
@@ -155,19 +178,6 @@ void RadarReaderProxy::OnInjectorUnbound(BurstInjector* const injector) {
   StopBurstInjection();
 }
 
-void RadarReaderProxy::BindInjector(
-    fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
-  if (injector_ || pending_injector_client_) {
-    server_end.Close(ZX_ERR_ALREADY_BOUND);
-  } else if (burst_properties_) {
-    injector_.emplace(dispatcher_, std::move(server_end), this);
-  } else {
-    // We haven't connected to the driver to read out the burst properties yet, so stash this
-    // request until we're ready.
-    pending_injector_client_ = std::move(server_end);
-  }
-}
-
 void RadarReaderProxy::on_fidl_error(const fidl::UnbindInfo info) {
   FX_PLOGS(ERROR, info.status()) << "Connection to radar device closed, attempting to reconnect";
   HandleFatalError(info.status());
@@ -243,6 +253,19 @@ void RadarReaderProxy::OnBurst2(
   const uint32_t vmo_id = event.burst()->vmo_id();
   const cpp20::span<const uint8_t> burst_data{vmo_pool_[vmo_id].start(), burst_properties_->size()};
   SendBurst(burst_data, last_burst_timestamp_);
+}
+
+void RadarReaderProxy::BindInjector(
+    fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
+  if (injector_ || pending_injector_client_) {
+    server_end.Close(ZX_ERR_ALREADY_BOUND);
+  } else if (burst_properties_) {
+    injector_.emplace(dispatcher_, std::move(server_end), this);
+  } else {
+    // We haven't connected to the driver to read out the burst properties yet, so stash this
+    // request until we're ready.
+    pending_injector_client_ = std::move(server_end);
+  }
 }
 
 bool RadarReaderProxy::ValidateDevice(

@@ -18,7 +18,6 @@
 #include "radar-provider-proxy.h"
 #include "radar-proxy.h"
 #include "radar-reader-proxy.h"
-#include "src/devices/radar/bin/radar-proxy/config.h"
 #include "src/lib/fsl/io/device_watcher.h"
 
 namespace radar {
@@ -75,30 +74,9 @@ int main(int argc, const char** argv) {
     return -1;
   }
 
-  result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstReaderProvider>(
-      [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> server_end) {
-        fidl::BindServer(loop.dispatcher(), std::move(server_end), proxy.get());
-      });
-
+  result = proxy->AddProtocols(&outgoing);
   if (result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to add RadarBurstReaderProvider protocol: " << result.status_string();
     return -1;
-  }
-
-  // TODO(fxbug.dev/100020): Structured config isn't really needed now that there are two separate
-  // build targets for the reader/provider proxying cases. Make the proxy implementation handle this
-  // instead.
-  const auto config = config::Config::TakeFromStartupHandle();
-  if (config.proxy_radar_burst_reader()) {
-    result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstInjector>(
-        [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) {
-          proxy->BindInjector(std::move(server_end));
-        });
-
-    if (result.is_error()) {
-      FX_LOGS(ERROR) << "Failed to add RadarBurstInjector protocol: " << result.status_string();
-      return -1;
-    }
   }
 
   return loop.Run();

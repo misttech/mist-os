@@ -8,10 +8,12 @@
 #include <fidl/fuchsia.hardware.radar/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
+#include <lib/zx/result.h>
 
 #include <memory>
 #include <string>
 
+#include "sdk/lib/component/outgoing/cpp/outgoing_directory.h"
 #include "src/lib/fsl/io/device_watcher.h"
 
 namespace radar {
@@ -54,8 +56,7 @@ class RadarProxy : public fidl::Server<fuchsia_hardware_radar::RadarBurstReaderP
   virtual void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                            const std::string& filename) = 0;
 
-  virtual void BindInjector(
-      fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) = 0;
+  virtual zx::result<> AddProtocols(component::OutgoingDirectory* outgoing) = 0;
 
  private:
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;

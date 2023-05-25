@@ -33,8 +33,7 @@ class RadarReaderProxy : public RadarProxy,
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
   void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                    const std::string& filename) override;
-  void BindInjector(
-      fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end) override;
+  zx::result<> AddProtocols(component::OutgoingDirectory* outgoing) override;
 
   // ReaderInstanceManager
   void ResizeVmoPool(size_t vmo_count) override;
@@ -70,6 +69,8 @@ class RadarReaderProxy : public RadarProxy,
 
     const uint8_t* start() const { return reinterpret_cast<uint8_t*>(mapped_vmo.start()); }
   };
+
+  void BindInjector(fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstInjector> server_end);
 
   bool ValidateDevice(fidl::ClientEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> client_end);
 

@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/test.gni")
 
 _common_deps = [
-  ":config",
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp",
   "//sdk/lib/component/incoming/cpp",
   "//sdk/lib/component/outgoing/cpp",
@@ -62,10 +61,6 @@ fuchsia_structured_config_values("enable-burst-reader-proxying-config") {
   }
 }
 
-fuchsia_structured_config_cpp_elf_lib("config") {
-  cm_label = ":manifest-base"
-}
-
 fuchsia_component("radar-proxy-component-with-injector") {
   component_name = "radar-proxy"
   manifest = "meta/radar-proxy-with-injector.cml"
@@ -88,12 +83,13 @@ fuchsia_package("radar-proxy-without-injector") {
   deps = [ ":radar-proxy-component-without-injector" ]
 }
 
-# TODO(fxbug.dev/100020): Remove these once the board file no longer depends on them.
-group("radar-proxy") {
-}
-
-group("radar-proxy-shard") {
-}
+_test_deps = [
+  "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+  "//sdk/lib/driver/runtime/testing/cpp",
+  "//src/devices/bin/driver_runtime",
+  "//zircon/system/ulib/sync",
+  "//zircon/system/ulib/zxtest",
+]
 
 test("radar-proxy-test-bin-with-injection") {
   sources = [
@@ -102,12 +98,7 @@ test("radar-proxy-test-bin-with-injection") {
     "reader-instance.cc",
     "test/radar-reader-proxy-test.cc",
   ]
-  deps = [
-           "//sdk/lib/driver/runtime/testing/cpp",
-           "//src/devices/bin/driver_runtime",
-           "//zircon/system/ulib/sync",
-           "//zircon/system/ulib/zxtest",
-         ] + _common_deps
+  deps = _common_deps + _test_deps
 }
 
 fuchsia_unittest_component("radar-proxy-test-component-with-injection") {
@@ -119,12 +110,7 @@ test("radar-proxy-test-bin-without-injection") {
     "radar-provider-proxy.cc",
     "test/radar-provider-proxy-test.cc",
   ]
-  deps = [
-           "//sdk/lib/driver/runtime/testing/cpp",
-           "//src/devices/bin/driver_runtime",
-           "//zircon/system/ulib/sync",
-           "//zircon/system/ulib/zxtest",
-         ] + _common_deps
+  deps = _common_deps + _test_deps
 }
 
 fuchsia_unittest_component("radar-proxy-test-component-without-injection") {
