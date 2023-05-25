@@ -40,7 +40,7 @@ class FakeRegistrar final : public Registrar {
 
   // Returns a promise to return the next |ControllerProvider| handle sent to this object via the
   // |fuchsia.fuzzer.Registrar/Register| FIDL method.
-  ZxPromise<ControllerProviderHandle> TakeProvider();
+  Promise<ControllerProviderHandle> TakeProvider();
 
  private:
   fidl::Binding<Registrar> binding_;

@@ -33,33 +33,39 @@ class EngineIntegrationTest : public AsyncTest {
   void SetUp() override;
 
   ComponentContext* context() { return context_.get(); }
+  OptionsPtr options() const { return options_; }
+  ControllerPtr& controller() { return controller_; }
 
-  // Returns the path to the binary relative to "/pkg".
-  virtual std::string program_binary() const = 0;
+  // Adds an argument to the command line used to spawn the engine process.
+  void AddArg(std::string_view arg);
 
-  // Returns the URL of the component that owns the binary.
-  virtual std::string component_url() const = 0;
+  // Returns a promise to create a fake registry component and spawn the engine.
+  ZxPromise<> StartEngine();
 
-  // Returns any additional command line arguments.
-  virtual std::vector<std::string> extra_args() const = 0;
+  // Returns a promise to connect to the `fuchsia.fuzzer.Controller`.
+  ZxPromise<> Connect();
 
-  // Returns the channel to the debug data service for fuzzer coverage.
-  virtual zx::channel fuzz_coverage() = 0;
+  // Returns a promise to use the provided `controller` to wait for the engine to produce a
+  // non-empty artifact. Returns the artifact and current status when the promise completes via
+  // `out_artifact` and `out_status`, respectively.
+  ZxPromise<> GetArtifactAndStatus(Artifact* out_artifact, Status* out_status);
 
-  // Set the options to configure the controller with.
-  virtual void set_options(Options& options) const = 0;
-
-  // Creates fake registry and coverage components, and spawns the engine.
-  ZxPromise<ControllerPtr> Start();
+  // Returns a promise to wait for the engine process to exit and returns its exit code.
+  ZxPromise<int64_t> WaitForEngine();
 
   void TearDown() override;
 
   // Integration tests.
 
-  void Crash();
+  void RunBounded();
+  void TryCrashingInput();
+  void RunAsTest();
 
  private:
   ComponentContextPtr context_;
+  OptionsPtr options_;
+  ControllerPtr controller_;
+  std::vector<std::string> cmdline_;
   std::unique_ptr<ChildProcess> engine_;
   ControllerProviderPtr provider_;
   std::unique_ptr<FakeRegistrar> registrar_;

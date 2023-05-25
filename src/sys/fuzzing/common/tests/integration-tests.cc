@@ -12,67 +12,96 @@
 
 namespace fuzzing {
 
-using ::fuchsia::fuzzer::FUZZ_MODE;
+// Test fixtures.
 
 void EngineIntegrationTest::SetUp() {
   AsyncTest::SetUp();
   context_ = ComponentContextForTest::Create(executor());
   engine_ = std::make_unique<ChildProcess>(executor());
+  options_ = MakeOptions();
 }
 
-ZxPromise<ControllerPtr> EngineIntegrationTest::Start() {
+void EngineIntegrationTest::AddArg(std::string_view arg) { cmdline_.emplace_back(arg); }
+
+ZxPromise<> EngineIntegrationTest::StartEngine() {
   registrar_ = std::make_unique<FakeRegistrar>(executor());
   return fpromise::make_promise([this]() -> ZxResult<> {
            fidl::InterfaceHandle<Registrar> registrar = registrar_->NewBinding();
            engine_->Reset();
-           if (auto status = engine_->AddArg(program_binary()); status != ZX_OK) {
-             return fpromise::error(status);
-           }
-           if (auto status = engine_->AddArg(component_url()); status != ZX_OK) {
-             return fpromise::error(status);
-           }
-           for (const auto& arg : extra_args()) {
+           for (const auto& arg : cmdline_) {
              if (auto status = engine_->AddArg(arg); status != ZX_OK) {
                return fpromise::error(status);
              }
-           }
-           if (auto status = engine_->AddArg(FUZZ_MODE); status != ZX_OK) {
-             return fpromise::error(status);
            }
            if (auto status = engine_->AddChannel(ComponentContextForTest::kRegistrarId,
                                                  registrar.TakeChannel());
                status != ZX_OK) {
              return fpromise::error(status);
            }
-           if (auto status =
-                   engine_->AddChannel(ComponentContextForTest::kCoverageId, fuzz_coverage());
-               status != ZX_OK) {
-             return fpromise::error(status);
-           }
            return fpromise::ok();
          })
       .and_then([this]() { return AsZxResult(engine_->Spawn()); })
-      .and_then(registrar_->TakeProvider())
-      .and_then([this, controller = ControllerPtr(), fut = ZxFuture<>()](
-                    Context& context,
-                    ControllerProviderHandle& handle) mutable -> ZxResult<ControllerPtr> {
-        if (!fut) {
-          auto request = controller.NewRequest(executor()->dispatcher());
-          provider_ = handle.Bind();
-          Bridge<> bridge;
-          provider_->Connect(std::move(request), bridge.completer.bind());
-          fut = ConsumeBridge(bridge);
+      .wrap_with(scope_);
+}
+
+ZxPromise<> EngineIntegrationTest::Connect() {
+  FX_DCHECK(registrar_);
+  Bridge<> bridge1;
+  ZxBridge<> bridge2;
+  return registrar_->TakeProvider()
+      .then([this, completer = std::move(bridge1.completer)](
+                Result<ControllerProviderHandle>& result) mutable -> ZxResult<> {
+        if (result.is_error()) {
+          FX_LOGS(ERROR) << "Failed to get handle for the controller provider.";
+          return fpromise::error(ZX_ERR_INTERNAL);
         }
-        if (!fut(context)) {
-          return fpromise::pending();
+        auto handle = result.take_value();
+        provider_ = handle.Bind();
+        provider_->Connect(controller_.NewRequest(executor()->dispatcher()), completer.bind());
+        return fpromise::ok();
+      })
+      .and_then(ConsumeBridge(bridge1))
+      .and_then([this, completer = std::move(bridge2.completer)]() mutable -> ZxResult<> {
+        controller_->Configure(CopyOptions(*options_), ZxBind<>(std::move(completer)));
+        return fpromise::ok();
+      })
+      .and_then(ConsumeBridge(bridge2))
+      .and_then([this]() {
+        // Get the controller's current artifact, which should be empty.
+        return WatchArtifact(executor(), controller_);
+      })
+      .and_then([](Artifact& artifact) -> ZxResult<> {
+        if (!artifact.is_empty()) {
+          FX_LOGS(ERROR) << "Artifact is not empty upon connection: fuzz_result="
+                         << artifact.fuzz_result();
+          return fpromise::error(ZX_ERR_BAD_STATE);
         }
-        if (fut.is_error()) {
-          return fpromise::error(fut.error());
-        }
-        return fpromise::ok(std::move(controller));
+        return fpromise::ok();
       })
       .wrap_with(scope_);
 }
+
+ZxPromise<> EngineIntegrationTest::GetArtifactAndStatus(Artifact* out_artifact,
+                                                        Status* out_status) {
+  Bridge<Status> bridge;
+  // Wait for an update to the controller's artifact. For this to be a "hanging get", a previous
+  // call to `WatchArtifact` is needed to get the "baseline" value; see `Connect` above.
+  return WatchArtifact(executor(), controller_)
+      .and_then([this, out_artifact, completer = std::move(bridge.completer)](
+                    Artifact& artifact) mutable -> ZxResult<> {
+        *out_artifact = std::move(artifact);
+        controller_->GetStatus(completer.bind());
+        return fpromise::ok();
+      })
+      .and_then(ConsumeBridge(bridge))
+      .and_then([out_status](Status& status) mutable -> ZxResult<> {
+        *out_status = std::move(status);
+        return fpromise::ok();
+      })
+      .wrap_with(scope_);
+}
+
+ZxPromise<int64_t> EngineIntegrationTest::WaitForEngine() { return engine_->Wait(); }
 
 void EngineIntegrationTest::TearDown() {
   Schedule(engine_->Kill());
@@ -80,31 +109,60 @@ void EngineIntegrationTest::TearDown() {
   AsyncTest::TearDown();
 }
 
-void EngineIntegrationTest::Crash() {
-  ControllerPtr controller;
-  FUZZING_EXPECT_OK(Start(), &controller);
+// Integration tests.
+
+void EngineIntegrationTest::RunBounded() {
+  options()->set_runs(100);
+  options()->set_max_input_size(3);
+
+  FUZZING_EXPECT_OK(StartEngine().and_then(Connect()));
   RunUntilIdle();
 
-  Artifact actual;
-  FUZZING_EXPECT_OK(WatchArtifact(executor(), controller), &actual);
+  ZxBridge<> bridge;
+  controller()->Fuzz(ZxBind<>(std::move(bridge.completer)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge));
   RunUntilIdle();
-  EXPECT_TRUE(actual.is_empty());
 
-  FUZZING_EXPECT_OK(WatchArtifact(executor(), controller), &actual);
-  Input input("FUZZ");
-  ZxBridge<> bridge1;
-  controller->TryOne(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_OK(ConsumeBridge(bridge1));
-  RunUntilIdle();
-  ASSERT_FALSE(actual.is_empty());
-  EXPECT_EQ(actual.fuzz_result(), FuzzResult::CRASH);
-
-  Bridge<Status> bridge2;
-  controller->GetStatus(bridge2.completer.bind());
+  Artifact artifact;
   Status status;
-  FUZZING_EXPECT_OK(ConsumeBridge(bridge2), &status);
+  FUZZING_EXPECT_OK(GetArtifactAndStatus(&artifact, &status));
   RunUntilIdle();
+
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::NO_ERRORS);
+  EXPECT_FALSE(artifact.has_input());
+
+  // The use of a seed corpus and an input pipelining means we may go over the
+  // number of runs by a bit.
+  ASSERT_TRUE(status.has_runs());
+  EXPECT_GE(status.runs(), 100U);
+}
+
+void EngineIntegrationTest::TryCrashingInput() {
+  FUZZING_EXPECT_OK(StartEngine().and_then(Connect()));
+  RunUntilIdle();
+
+  Input input("FUZZ");
+  ZxBridge<> bridge;
+  controller()->TryOne(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge.completer)));
+  FUZZING_EXPECT_OK(ConsumeBridge(bridge));
+  RunUntilIdle();
+
+  Artifact artifact;
+  Status status;
+  FUZZING_EXPECT_OK(GetArtifactAndStatus(&artifact, &status));
+  RunUntilIdle();
+
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::CRASH);
   EXPECT_TRUE(status.has_elapsed());
+}
+
+void EngineIntegrationTest::RunAsTest() {
+  // When run as a test, the fuzzer does not have a controller to connect to.
+  int64_t exit_code = -1;
+  FUZZING_EXPECT_OK(StartEngine().and_then(WaitForEngine()), &exit_code);
+  RunUntilIdle();
+
+  EXPECT_EQ(exit_code, 0);
 }
 
 }  // namespace fuzzing

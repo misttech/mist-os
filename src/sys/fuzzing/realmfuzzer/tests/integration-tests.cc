@@ -8,35 +8,34 @@
 
 namespace fuzzing {
 
-using fuchsia::fuzzer::CoverageDataProvider;
-
 // Test fixtures.
 
-class RealmFuzzerTest : public EngineIntegrationTest {
+class RealmFuzzerTestIntegrationTest : public EngineIntegrationTest {
  protected:
-  std::string program_binary() const override { return "bin/realmfuzzer_engine"; }
-
-  std::string component_url() const override {
-    return "fuchsia-pkg://fuchsia.com/realmfuzzer-integration-tests#meta/fake.cm";
+  void SetUp() override {
+    EngineIntegrationTest::SetUp();
+    AddArg("bin/realmfuzzer_engine");
+    AddArg(kFakeFuzzerUrl);
+    AddArg("data/corpus");
   }
+};
 
-  std::vector<std::string> extra_args() const override { return {}; }
-
-  zx::channel fuzz_coverage() override {
-    fidl::InterfaceHandle<CoverageDataProvider> provider_handle;
-    if (auto status = context()->Connect(provider_handle.NewRequest()); status != ZX_OK) {
-      FX_LOGS(FATAL) << "Failed to connect to fuzz_coverage: " << zx_status_get_string(status);
-    }
-    return provider_handle.TakeChannel();
+class RealmFuzzerIntegrationTest : public RealmFuzzerTestIntegrationTest {
+ protected:
+  void SetUp() override {
+    RealmFuzzerTestIntegrationTest::SetUp();
+    AddArg(fuchsia::fuzzer::FUZZ_MODE);
   }
-
-  void set_options(Options& options) const override {}
 };
 
 // Integration tests.
 
-#define ENGINE_INTEGRATION_TEST RealmFuzzerTest
-#include "src/sys/fuzzing/common/tests/integration-tests.inc"
+#define ENGINE_INTEGRATION_TEST RealmFuzzerIntegrationTest
+#include "src/sys/fuzzing/common/tests/fuzzer-integration-tests.inc"
+#undef ENGINE_INTEGRATION_TEST
+
+#define ENGINE_INTEGRATION_TEST RealmFuzzerTestIntegrationTest
+#include "src/sys/fuzzing/common/tests/fuzzer-test-integration-tests.inc"
 #undef ENGINE_INTEGRATION_TEST
 
 }  // namespace fuzzing

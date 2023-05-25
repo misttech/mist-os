@@ -360,7 +360,7 @@ ZxPromise<Artifact> LibFuzzerRunner::Cleanse(Input input) {
       .and_then([input = std::move(input)](Artifact& artifact) mutable {
         // A quirk of libFuzzer's cleanse workflow is that it returns no error and an empty input if
         // the input doesn't crash or is already "clean", and doesn't distinguish between the two.
-        if (artifact.input().size() != 0) {
+        if (artifact.has_input()) {
           input = artifact.take_input();
         }
         return fpromise::ok(Artifact(FuzzResult::CLEANSED, std::move(input)));
@@ -672,13 +672,13 @@ ZxPromise<Artifact> LibFuzzerRunner::RunAsync() {
         return std::move(result);
       })
       .and_then([this](const FuzzResult& fuzz_result) -> ZxResult<Artifact> {
-        Input result_input;
         if (files::IsFile(kResultInputPath)) {
-          result_input = ReadInputFromFile(kResultInputPath);
-        } else if (!result_input_pathname_.empty()) {
-          result_input = ReadInputFromFile(result_input_pathname_);
+          return fpromise::ok(Artifact(fuzz_result, ReadInputFromFile(kResultInputPath)));
         }
-        return fpromise::ok(Artifact(fuzz_result, std::move(result_input)));
+        if (!result_input_pathname_.empty()) {
+          return fpromise::ok(Artifact(fuzz_result, ReadInputFromFile(result_input_pathname_)));
+        }
+        return fpromise::ok(Artifact(fuzz_result));
       });
 }
 

@@ -12,44 +12,36 @@ namespace fuzzing {
 // doing so when another debugger like zxdb is needed to investigate failed tests.
 #define LIBFUZZER_ALLOW_DEBUG 0
 
-class LibFuzzerTest : public EngineIntegrationTest {
+class LibFuzzerTestIntegrationTest : public EngineIntegrationTest {
  protected:
-  std::string program_binary() const override { return "bin/libfuzzer_engine"; }
-
-  std::string component_url() const override {
-    return "fuchsia-pkg://fuchsia.com/libfuzzer-integration-tests#meta/fake.cm";
+  void SetUp() override {
+    EngineIntegrationTest::SetUp();
+    options()->set_debug(LIBFUZZER_ALLOW_DEBUG);
+    AddArg("bin/libfuzzer_engine");
+    AddArg(kFakeFuzzerUrl);
+    AddArg("bin/libfuzzer_test_fuzzer");
+    AddArg("data/corpus");
   }
-
-  std::vector<std::string> extra_args() const override {
-    return {
-        "bin/libfuzzer_test_fuzzer",
-    };
-  }
-
-  zx::channel fuzz_coverage() override {
-    // The libfuzzer engine doesn't use published debug data, so this can just be a dummy channel.
-    zx::channel channel;
-    if (auto status = zx::channel::create(0, &channel_, &channel); status != ZX_OK) {
-      FX_LOGS(FATAL) << "Failed to create channel: " << zx_status_get_string(status);
-    }
-    return channel;
-  }
-
-  void set_options(Options& options) const override {
-    // See notes on LIBFUZZER_ALLOW_DEBUG above.
-    options.set_debug(LIBFUZZER_ALLOW_DEBUG);
-  }
-
- private:
-  zx::channel channel_;
 };
 
 #undef LIBFUZZER_ALLOW_DEBUG
 
+class LibFuzzerIntegrationTest : public LibFuzzerTestIntegrationTest {
+ protected:
+  void SetUp() override {
+    LibFuzzerTestIntegrationTest::SetUp();
+    AddArg(fuchsia::fuzzer::FUZZ_MODE);
+  }
+};
+
 // Integration tests.
 
-#define ENGINE_INTEGRATION_TEST LibFuzzerTest
-#include "src/sys/fuzzing/common/tests/integration-tests.inc"
+#define ENGINE_INTEGRATION_TEST LibFuzzerIntegrationTest
+#include "src/sys/fuzzing/common/tests/fuzzer-integration-tests.inc"
+#undef ENGINE_INTEGRATION_TEST
+
+#define ENGINE_INTEGRATION_TEST LibFuzzerTestIntegrationTest
+#include "src/sys/fuzzing/common/tests/fuzzer-test-integration-tests.inc"
 #undef ENGINE_INTEGRATION_TEST
 
 }  // namespace fuzzing

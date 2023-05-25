@@ -28,8 +28,6 @@ void FakeRegistrar::Register(std::string url, ControllerProviderHandle provider,
   callback();
 }
 
-ZxPromise<ControllerProviderHandle> FakeRegistrar::TakeProvider() {
-  return receiver_.Receive().or_else([] { return fpromise::error(ZX_ERR_CANCELED); });
-}
+Promise<ControllerProviderHandle> FakeRegistrar::TakeProvider() { return receiver_.Receive(); }
 
 }  // namespace fuzzing

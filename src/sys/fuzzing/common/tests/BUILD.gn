@@ -5,9 +5,10 @@
 source_set("integration-tests-lib") {
   testonly = true
   sources = [
+    "fuzzer-integration-tests.inc",
+    "fuzzer-test-integration-tests.inc",
     "integration-tests.cc",
     "integration-tests.h",
-    "integration-tests.inc",
   ]
   deps = [
     "//sdk/lib/fdio",

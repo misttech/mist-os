@@ -405,12 +405,12 @@ Status RealmFuzzerRunner::CollectStatus() {
 
   std::vector<ProcessStats> all_stats;
   all_stats.reserve(std::min<size_t>(process_proxies_.size(), MAX_PROCESS_STATS));
-  for (auto& process_proxy : process_proxies_) {
+  for (auto& [target_id, process_proxy] : process_proxies_) {
     if (all_stats.size() == all_stats.capacity()) {
       break;
     }
     ProcessStats stats;
-    auto status = process_proxy.second->GetStats(&stats);
+    auto status = process_proxy->GetStats(&stats);
     if (status == ZX_OK) {
       all_stats.push_back(stats);
     } else {
@@ -418,7 +418,6 @@ Status RealmFuzzerRunner::CollectStatus() {
     }
   }
   status.set_process_stats(std::move(all_stats));
-
   return status;
 }
 
