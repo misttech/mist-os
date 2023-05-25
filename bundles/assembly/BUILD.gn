@@ -1328,6 +1328,28 @@ assembly_input_bundle("ui_package_user_and_userdebug") {
   base_packages = [ "//src/ui:ui_minimal_package" ]
 }
 
+# Fan support
+#
+# feature_set_levels: utility, minimal
+# build-types: all
+#
+assembly_input_bundle("fan") {
+  base_packages = [ "//src/devices/thermal/bin/fan-controller" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/devices/thermal/bin/fan-controller/meta/fan-controller.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Example assembly input bundle for testing
 #
 # Restricted for testing assembly itself (and to provide example code)

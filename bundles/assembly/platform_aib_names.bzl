@@ -67,6 +67,7 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "fonts",
     "radar_proxy_without_injector",
+    "fan",
 ]
 
 USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [

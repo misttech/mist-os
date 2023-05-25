@@ -32,6 +32,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/starnix.rs",
     "src/subsystems/storage.rs",
     "src/subsystems/swd.rs",
+    "src/subsystems/thermal.rs",
     "src/subsystems/ui.rs",
     "src/subsystems/virtualization.rs",
   ]

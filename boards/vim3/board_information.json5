@@ -6,6 +6,7 @@
 {
     name: "vim3",
     provided_features: [
+        "fuchsia::fan",
         "fuchsia::usb_peripheral_support",
     ],
 }

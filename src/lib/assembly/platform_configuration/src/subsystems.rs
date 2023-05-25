@@ -39,6 +39,7 @@ mod session;
 mod starnix;
 mod storage;
 mod swd;
+mod thermal;
 mod ui;
 mod virtualization;
 
@@ -241,6 +242,9 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'storage' subsystem")?;
+
+    thermal::ThermalSubsystem::define_configuration(context, &(), builder)
+        .context("Configuring the 'thermal' subsystem")?;
 
     ui::UiSubsystem::define_configuration(context, &config.platform.ui, builder)
         .context("Configuring the 'ui' subsystem")?;
