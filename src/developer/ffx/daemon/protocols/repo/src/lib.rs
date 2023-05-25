@@ -420,30 +420,18 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
             };
 
             // Checking for registration alias conflicts.
-            for (registration_repo_name, targets) in pkg::config::get_registrations().await {
-                for (existing_target_nodename, existing_target_info) in targets {
-                    // Only check aliases for current target.
-                    if existing_target_nodename != target_nodename {
-                        continue;
-                    }
-                    // Ignore checks on existing repository.
-                    if registration_repo_name == repo_name.to_string() {
-                        continue;
-                    }
-                    if let Some(existing_aliases) = &existing_target_info.aliases {
-                        if !existing_aliases.is_disjoint(&aliases) {
-                            tracing::error!(
-                                "Conflict found for aliases of repo registrations ['{registration_repo_name}','{repo_name}'] for target '{target_nodename}'.",
-                            );
-
-                            if alias_conflict_mode
-                                == RepositoryRegistrationAliasConflictMode::ErrorOut
-                            {
-                                return Err(ffx::RepositoryError::ConflictingRegistration);
-                            }
-                        }
-                    }
-                }
+            let check_alias_conflict = pkg::config::check_registration_alias_conflict(
+                repo_name.as_str(),
+                target_nodename.as_str(),
+                aliases.clone().into_iter().collect(),
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!("{e}");
+                ffx::RepositoryError::ConflictingRegistration
+            });
+            if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
+                check_alias_conflict?
             }
 
             (config, aliases)

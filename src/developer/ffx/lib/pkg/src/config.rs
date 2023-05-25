@@ -7,7 +7,7 @@ use ffx_config::{self, ConfigLevel};
 use fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget};
 use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const CONFIG_KEY_REPOSITORIES: &str = "repository.repositories";
 const CONFIG_KEY_REGISTRATIONS: &str = "repository.registrations";
@@ -375,14 +375,54 @@ pub async fn remove_registration(repo_name: &str, target_identifier: &str) -> Re
         .await
 }
 
+pub async fn check_registration_alias_conflict(
+    repo_name: &str,
+    target_identifier: &str,
+    aliases: Vec<String>,
+) -> Result<()> {
+    let aliases = BTreeSet::from_iter(aliases.into_iter());
+
+    for (registration_repo_name, targets) in get_registrations().await {
+        for (existing_target_nodename, existing_target_info) in targets {
+            // Only check aliases for current target.
+            if existing_target_nodename.as_str() != target_identifier {
+                continue;
+            }
+
+            // Ignore checks on existing repository.
+            if registration_repo_name.as_str() == repo_name {
+                continue;
+            }
+
+            if let Some(existing_aliases) = &existing_target_info.aliases {
+                let alias_intersection: Vec<String> =
+                    existing_aliases.intersection(&aliases).cloned().collect();
+                if alias_intersection.len() > 0 {
+                    // Alias conflict found... construct useful message.
+                    let comma_separated_aliases = alias_intersection.join(", ");
+
+                    let alias_intersection_message = if alias_intersection.len() > 1 {
+                        format!("Aliases '{comma_separated_aliases}' are")
+                    } else {
+                        format!("Alias '{comma_separated_aliases}' is")
+                    };
+
+                    return Err(anyhow!(
+                        "Alias conflict found while registering '{repo_name}' for target '{target_identifier}'. {alias_intersection_message} in use for existing registration: '{registration_repo_name}'. To fix alias registration conflict, de-register older registration with: $ ffx target repository deregister -r {registration_repo_name}",
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        maplit::btreemap,
-        pretty_assertions::assert_eq,
-        serde_json::json,
-        std::{collections::BTreeSet, future::Future},
+        super::*, maplit::btreemap, pretty_assertions::assert_eq, serde_json::json,
+        std::future::Future,
     };
 
     const CONFIG_KEY_ROOT: &str = "repository";
@@ -654,6 +694,31 @@ mod tests {
             // Remove the registration.
             remove_registration("repo", "target").await.unwrap();
             assert_eq!(get_registration("repo", "target").await.unwrap(), None);
+        });
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_registration_alias_conflict() {
+        run_async_test(async {
+            let target_identifier = "target1";
+
+            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
+                .level(Some(ConfigLevel::User))
+                .set(json!({
+                    "repo1": {
+                        target_identifier: {
+                            "repo_name": "repo1",
+                            "target_identifier": target_identifier,
+                            "aliases": ["fuchsia.com"],
+                            "storage_type": (),
+                        },
+                    },
+                }))
+                .await
+                .unwrap();
+
+            assert_eq!(check_registration_alias_conflict("repo2", target_identifier, vec!["fuchsia.com".to_string()]).await.unwrap_err().to_string(), anyhow!("Alias conflict found while registering 'repo2' for target 'target1'. Alias 'fuchsia.com' is in use for existing registration: 'repo1'. To fix alias registration conflict, de-register older registration with: $ ffx target repository deregister -r repo1").to_string());
         });
     }
 

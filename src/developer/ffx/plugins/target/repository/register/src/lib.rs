@@ -73,13 +73,9 @@ async fn register(
             ffx_bail!(
                 "Error while registering repository: {:#}\n\
                 Repository '{repo_name}' has an alias conflict in its registration.\n\
-                Resolve alias conflict in registration config by finding the conflict with:\n\
+                Locate and run de-registeration command specified in the Daemon log:\n\
                 \n\
-                $ ffx target repository list
-                \n\
-                Then removing the conflicting alias with:\n\
-                \n\
-                $ ffx target repository deregister --repository $CONFLICTING_REPO_NAME",
+                $ ffx daemon log | grep \"Alias conflict found while registering '{repo_name}'\"",
                 err,
             )
         }
