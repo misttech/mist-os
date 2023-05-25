@@ -9,42 +9,12 @@ if (is_host) {
   rustc_binary("bin") {
     name = "testgen"
     edition = "2021"
-
-    with_unit_tests = true
-    test_environments = [ host_env ]
-    deps = [
-      "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-      "//src/lib/fidl/rust/fidl",
-      "//third_party/rust_crates:ansi_term",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:chrono",
-      "//third_party/rust_crates:regex",
-    ]
     source_root = "src/main.rs"
-    sources = [
-      "src/args.rs",
-      "src/cm_parser.rs",
-      "src/generate_build.rs",
-      "src/generate_cpp_test.rs",
-      "src/generate_manifest.rs",
-      "src/generate_rust_test.rs",
-      "src/main.rs",
-      "src/test_code.rs",
-    ]
-    inputs = [
-      "src/templates/template_rust_manifest",
-      "src/templates/template_rust_BUILD",
-      "src/templates/template_rust_mock_function",
-      "src/templates/template_rust_test_function",
-      "src/templates/template_rust_connect_function",
-      "src/templates/template_cpp_mock_function",
-      "src/templates/template_cpp_test_function",
-      "src/templates/template_cpp_manifest",
-      "src/templates/template_cpp_BUILD",
-      "src/templates/template_copyright",
-    ]
+    sources = [ "src/main.rs" ]
+    inputs = []
+    deps = [ "//third_party/rust_crates:anyhow" ]
   }
+
   install_host_tools("host") {
     deps = [ ":bin" ]
     outputs = [ "testgen" ]
@@ -53,14 +23,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  deps = [ ":bin_test($host_toolchain)" ]
-
-  # coverage builders injects extra capabilities to the components-under-test,
-  # see fxbug.dev/84878, this causes the generated code to be different.
-  if (!is_coverage) {
-    deps += [
-      "//tools/testgen/compiletest:tests",
-      "//tools/testgen/goldentest:tests",
-    ]
-  }
+  deps = []
 }
