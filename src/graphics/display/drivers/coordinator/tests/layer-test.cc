@@ -45,7 +45,7 @@ class LayerTest : public TestBase {
     return image;
   }
 
-  static void MakeLayerCurrent(Layer& layer, fbl::SinglyLinkedList<LayerNode*>& current_layers) {
+  static void MakeLayerCurrent(Layer& layer, fbl::DoublyLinkedList<LayerNode*>& current_layers) {
     current_layers.push_front(&layer.current_node_);
   }
 
@@ -151,7 +151,7 @@ TEST_F(LayerTest, CleanUpImage) {
 }
 
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
-  fbl::SinglyLinkedList<LayerNode*> current_layers;
+  fbl::DoublyLinkedList<LayerNode*> current_layers;
 
   Layer layer(1);
   fhd::wire::ImageConfig image_config = {
@@ -248,7 +248,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 }
 
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
-  fbl::SinglyLinkedList<LayerNode*> current_layers;
+  fbl::DoublyLinkedList<LayerNode*> current_layers;
 
   Layer layer(1);
   fhd::wire::ImageConfig image_config = {

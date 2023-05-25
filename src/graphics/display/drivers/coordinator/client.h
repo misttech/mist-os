@@ -85,7 +85,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
 
   int current_layer_count() const { return static_cast<int>(current_.layer_count); }
   const display_config_t* current_config() const { return &current_; }
-  const fbl::SinglyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
+  const fbl::DoublyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
 
  private:
   display_config_t current_;
@@ -96,8 +96,8 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
 
   bool pending_layer_change_;
   bool pending_apply_layer_change_;
-  fbl::SinglyLinkedList<LayerNode*> pending_layers_;
-  fbl::SinglyLinkedList<LayerNode*> current_layers_;
+  fbl::DoublyLinkedList<LayerNode*> pending_layers_;
+  fbl::DoublyLinkedList<LayerNode*> current_layers_;
 
   fbl::Array<CoordinatorPixelFormat> pixel_formats_;
   fbl::Array<CoordinatorCursorInfo> cursor_infos_;
@@ -297,6 +297,14 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // Returns true if a current layer has been modified.
   bool CleanUpImage(Image& image);
   void CleanUpCaptureImage(uint64_t id);
+
+  // Displays' pending layers list may have been changed by pending
+  // SetDisplayLayers() operations.
+  //
+  // Restores the pending layer lists of all the Displays to their current
+  // (applied) layer list state respectively, undoing all pending changes to
+  // the layer lists.
+  void SetAllConfigPendingLayersToCurrentLayers();
 
   Controller* controller_;
   ClientProxy* proxy_;

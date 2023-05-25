@@ -12,7 +12,6 @@
 #include <memory>
 
 #include <fbl/intrusive_double_list.h>
-#include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -25,7 +24,7 @@ class Layer;
 class LayerTest;
 class Client;
 
-struct LayerNode : public fbl::SinglyLinkedListable<LayerNode*> {
+struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
   Layer* layer;
 };
 
@@ -92,7 +91,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
 
   // Adds the pending_layer_ to a display list, at z_index. Returns false if the pending_layer_ is
   // currently in use.
-  bool AddToConfig(fbl::SinglyLinkedList<LayerNode*>* list, uint32_t z_index);
+  bool AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_index);
 
   void SetPrimaryConfig(fuchsia_hardware_display::wire::ImageConfig image_config);
   void SetPrimaryPosition(fuchsia_hardware_display::wire::Transform transform,

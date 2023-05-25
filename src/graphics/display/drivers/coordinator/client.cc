@@ -546,20 +546,10 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
     for (auto& layer : layers_) {
       layer.DiscardChanges();
     }
-    // Reset each config's pending layers to their current layers. Clear
-    // all displays first in case layers were moved between displays.
+    // Reset pending layers lists of all displays to their current layers
+    // respectively.
+    SetAllConfigPendingLayersToCurrentLayers();
     for (auto& config : configs_) {
-      config.pending_layers_.clear();
-    }
-    for (auto& config : configs_) {
-      fbl::SinglyLinkedList<LayerNode*> current_layers;
-      for (auto& layer_node : config.current_layers_) {
-        current_layers.push_front(&layer_node.layer->pending_node_);
-      }
-      while (!current_layers.is_empty()) {
-        auto layer = current_layers.pop_front();
-        config.pending_layers_.push_front(layer);
-      }
       config.pending_layer_change_ = false;
       config.pending_layer_change_property_.Set(false);
 
@@ -621,32 +611,30 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
 
     // If there was a layer change, update the current layers list.
     if (display_config.pending_layer_change_) {
-      fbl::SinglyLinkedList<LayerNode*> new_current;
-      for (auto& layer_node : display_config.pending_layers_) {
-        new_current.push_front(&layer_node.layer->current_node_);
+      for (LayerNode& layer_node : display_config.pending_layers_) {
+        Layer* layer = layer_node.layer;
+        // Rebuild current layer lists from pending layer lists.
+        display_config.current_layers_.push_back(&layer->current_node_);
       }
-
-      while (!new_current.is_empty()) {
+      for (LayerNode& layer_node : display_config.current_layers_) {
+        Layer* layer = layer_node.layer;
         // Don't migrate images between displays if there are pending images. See
         // Controller::ApplyConfig for more details.
-        auto* layer = new_current.pop_front();
-        if (layer->layer->current_display_id_ != display_config.id &&
-            layer->layer->displayed_image_ && !layer->layer->waiting_images_.is_empty()) {
+        if (layer->current_display_id_ != display_config.id && layer->displayed_image_ &&
+            !layer->waiting_images_.is_empty()) {
           {
             fbl::AutoLock lock(controller_->mtx());
-            controller_->AssertMtxAliasHeld(layer->layer->displayed_image_->mtx());
-            layer->layer->displayed_image_->StartRetire();
+            controller_->AssertMtxAliasHeld(layer->displayed_image_->mtx());
+            layer->displayed_image_->StartRetire();
           }
-          layer->layer->displayed_image_ = nullptr;
+          layer->displayed_image_ = nullptr;
 
           // This doesn't need to be reset anywhere, since we really care about the last
           // display this layer was shown on. Ignoring the 'null' display could cause
           // unusual layer changes to trigger this unnecessary, but that's not wrong.
-          layer->layer->current_display_id_ = display_config.id;
+          layer->current_display_id_ = display_config.id;
         }
-        layer->layer->current_layer_.z_index = layer->layer->pending_layer_.z_index;
-
-        display_config.current_layers_.push_front(layer);
+        layer->current_layer_.z_index = layer->pending_layer_.z_index;
       }
       display_config.pending_layer_change_ = false;
       display_config.pending_layer_change_property_.Set(false);
@@ -1381,6 +1369,25 @@ void Client::CleanUpCaptureImage(uint64_t id) {
   auto image = capture_images_.find(id);
   if (image.IsValid()) {
     capture_images_.erase(image);
+  }
+}
+
+void Client::SetAllConfigPendingLayersToCurrentLayers() {
+  // Layers may have been moved between displays, so we must be extra careful
+  // to avoid inserting a Layer in a display's pending list while it's
+  // already moved to another Display's pending list.
+  //
+  // We side-step this problem by clearing all pending lists before inserting
+  // any Layer in them, so that we can guarantee that for every Layer, its
+  // `pending_node_` is not in any Display's pending list.
+  for (auto& config : configs_) {
+    config.pending_layers_.clear();
+  }
+  for (auto& config : configs_) {
+    // Rebuild the pending layers list from current layers list.
+    for (LayerNode& layer_node : config.current_layers_) {
+      config.pending_layers_.push_back(&layer_node.layer->pending_node_);
+    }
   }
 }
 
