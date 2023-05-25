@@ -40,8 +40,28 @@
 namespace amlogic_display {
 
 namespace {
+
+// List of supported pixel formats.
+// TODO(fxbug.dev/69236): Add more supported formats.
+constexpr std::array<fuchsia_images2::wire::PixelFormat, 2> kSupportedPixelFormats = {
+    fuchsia_images2::wire::PixelFormat::kBgra32,
+    fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+};
+
+constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 2> kSupportedBanjoPixelFormats = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+};
+
 constexpr uint32_t kCanvasLittleEndian64Bit = 7;
 constexpr uint32_t kBufferAlignment = 64;
+
+bool IsFormatSupported(fuchsia_images2::wire::PixelFormat format) {
+  return std::find(kSupportedPixelFormats.begin(), kSupportedPixelFormats.end(), format) !=
+         kSupportedPixelFormats.end();
+}
 
 void SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType format,
                                       uint64_t modifier,
@@ -135,7 +155,7 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
   if (display_attached_) {
     added_display_info_t info{.is_standard_srgb_out = false};  // Random default
     added_display_args_t args;
-    vout_->PopulateAddedDisplayArgs(&args, display_id_);
+    vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
     dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
     vout_->OnDisplaysChanged(info);
   }
@@ -902,7 +922,7 @@ int AmlogicDisplay::HpdThread() {
 
       display_attached_ = true;
       vout_->DisplayConnected();
-      vout_->PopulateAddedDisplayArgs(&args, display_id_);
+      vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
       display_added = true;
       hpd_gpio_.SetPolarity(GPIO_POLARITY_LOW);
     } else if (!hpd && display_attached_) {
@@ -971,7 +991,8 @@ zx_status_t AmlogicDisplay::Bind() {
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  SetFormatSupportCheck([this](auto format) { return vout_->IsFormatSupported(format); });
+  SetFormatSupportCheck(
+      [](fuchsia_images2::wire::PixelFormat format) { return IsFormatSupported(format); });
 
   {
     display_panel_t display_info;

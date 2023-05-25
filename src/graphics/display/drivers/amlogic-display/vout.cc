@@ -15,20 +15,6 @@ namespace amlogic_display {
 
 namespace {
 
-// List of supported pixel formats.
-// TODO(fxb/69236): Add more supported formats.
-constexpr std::array<fuchsia_images2::wire::PixelFormat, 2> kSupportedPixelFormats = {
-    fuchsia_images2::wire::PixelFormat::kBgra32,
-    fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
-};
-
-constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 2> kSupportedBanjoPixelFormats = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kBgra32),
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-};
-
 // List of supported features
 struct supported_features_t {
   bool hpd;
@@ -185,7 +171,9 @@ zx_status_t Vout::RestartDisplay() {
   return ZX_OK;
 }
 
-void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id) {
+void Vout::PopulateAddedDisplayArgs(
+    added_display_args_t* args, uint64_t display_id,
+    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {
   switch (type_) {
     case VoutType::kDsi:
       args->display_id = display_id;
@@ -193,8 +181,8 @@ void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display
       args->panel.params.height = dsi_.height;
       args->panel.params.width = dsi_.width;
       args->panel.params.refresh_rate_e2 = 6000;  // Just guess that it's 60fps
-      args->pixel_format_list = kSupportedBanjoPixelFormats.data();
-      args->pixel_format_count = kSupportedBanjoPixelFormats.size();
+      args->pixel_format_list = pixel_formats.data();
+      args->pixel_format_count = pixel_formats.size();
       args->cursor_info_count = 0;
       break;
     case VoutType::kHdmi:
@@ -202,19 +190,14 @@ void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display
       args->edid_present = true;
       args->panel.i2c.ops = &i2c_impl_protocol_ops_;
       args->panel.i2c.ctx = this;
-      args->pixel_format_list = kSupportedBanjoPixelFormats.data();
-      args->pixel_format_count = kSupportedBanjoPixelFormats.size();
+      args->pixel_format_list = pixel_formats.data();
+      args->pixel_format_count = pixel_formats.size();
       args->cursor_info_count = 0;
       break;
     default:
       zxlogf(ERROR, "Unrecognized vout type %u\n", type_);
       return;
   }
-}
-
-bool Vout::IsFormatSupported(fuchsia_images2::wire::PixelFormat format) {
-  return std::find(std::begin(kSupportedPixelFormats), std::end(kSupportedPixelFormats), format) !=
-         std::end(kSupportedPixelFormats);
 }
 
 void Vout::DisplayConnected() {

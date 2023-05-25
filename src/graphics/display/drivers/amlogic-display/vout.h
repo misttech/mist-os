@@ -31,8 +31,9 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   zx_status_t RestartDisplay();
 
-  void PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id);
-  bool IsFormatSupported(fuchsia_images2::wire::PixelFormat format);
+  void PopulateAddedDisplayArgs(
+      added_display_args_t* args, uint64_t display_id,
+      cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
 
   VoutType type() { return type_; }
   bool supports_hpd() const { return supports_hpd_; }
