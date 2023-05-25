@@ -41,6 +41,7 @@ $FFX \
     create-system \
     --image-assembly-config $PRODUCT_ASSEMBLY_OUTDIR/image_assembly.json \
     --images $IMAGES_CONFIG_PATH \
+    {mode_arg} \
     --outdir $OUTDIR
 """
 
@@ -194,6 +195,10 @@ def _fuchsia_product_create_system_impl(ctx):
     ffx_inputs += ctx.files.product_assembly
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
+    shell_src = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE.format(
+        mode_arg = "--mode " + ctx.attr.mode if ctx.attr.mode else "",
+    )
+
     shell_env = {
         "FFX": ffx_tool.path,
         "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
@@ -211,7 +216,7 @@ def _fuchsia_product_create_system_impl(ctx):
             # in outputs.
             ffx_isolate_dir,
         ],
-        command = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE,
+        command = shell_src,
         env = shell_env,
         progress_message = "Assembly Create-system for %s" % ctx.label.name,
     )
@@ -244,6 +249,9 @@ fuchsia_product_create_system = rule(
             providers = [FuchsiaProductAssemblyInfo],
             mandatory = True,
         ),
+        "mode": attr.string(
+            doc = "Mode indicating where to place packages",
+        ),
         "_sdk_manifest": attr.label(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
@@ -258,6 +266,7 @@ def fuchsia_product_image(
         platform_aibs,
         image,
         board_config = None,
+        create_system_mode = None,
         **kwargs):
     fuchsia_product_assembly(
         name = name + "_product_assembly",
@@ -271,5 +280,6 @@ def fuchsia_product_image(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
         image = image,
+        mode = create_system_mode,
         **kwargs
     )
