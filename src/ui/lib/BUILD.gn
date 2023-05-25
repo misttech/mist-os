@@ -12,7 +12,6 @@ group("tests") {
     "focus_chain_provider:tests",
     "input-device-constants:tests",
     "input_pipeline:tests",
-    "key_util:test",
     "scene_management:scene_management_tests",
     "yuv:test",
   ]

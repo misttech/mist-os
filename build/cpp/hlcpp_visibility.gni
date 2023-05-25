@@ -356,7 +356,6 @@ hlcpp_visibility = [
   "//src/ui/input/tests/hid:*",
   "//src/ui/lib/display:*",
   "//src/ui/lib/escher:*",
-  "//src/ui/lib/key_util:*",
   "//src/ui/scenic/bin:*",
   "//src/ui/scenic/lib/allocation:*",
   "//src/ui/scenic/lib/annotation:*",

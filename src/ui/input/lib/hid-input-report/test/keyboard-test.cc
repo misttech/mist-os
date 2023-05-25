@@ -15,7 +15,6 @@
 
 #include "src/ui/input/lib/hid-input-report/device.h"
 #include "src/ui/input/lib/hid-input-report/test/test.h"
-#include "src/ui/lib/key_util/key_util.h"
 
 namespace {
 

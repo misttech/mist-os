@@ -5,6 +5,8 @@
 #ifndef SRC_UI_INPUT_LIB_HID_INPUT_REPORT_KEYBOARD_H_
 #define SRC_UI_INPUT_LIB_HID_INPUT_REPORT_KEYBOARD_H_
 
+#include <fuchsia/ui/input/cpp/fidl.h>
+
 #include <set>
 
 #include "src/ui/input/lib/hid-input-report/device.h"
