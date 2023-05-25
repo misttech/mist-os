@@ -49,13 +49,8 @@ class TransferRequestProcessor : public RequestProcessor {
   }
   // TODO(fxbug.dev/124835): |SendUpiu()| and |SendScsiUpiu()| have many of the same behaviours and
   // should be combined into a single method.
-  zx::result<ResponseUpiu> SendScsiUpiu(std::unique_ptr<struct scsi_xfer> xfer, uint8_t slot);
-
-  // Create a scsi transfer and add it to the transfer list. The added transfer is processed by the
-  // scsi thread. If |event| is nullptr, then the SCSI command is executed synchronously.
-  zx::result<> QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_t lun, void *buffer,
-                                const zx_paddr_t *buffer_phys, void *cmd_data,
-                                sync_completion_t *event);
+  zx::result<ResponseUpiu> SendScsiUpiu(std::unique_ptr<struct scsi_xfer> xfer, uint8_t slot,
+                                        bool sync);
 
  private:
   friend class UfsTest;

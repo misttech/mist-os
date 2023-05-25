@@ -27,6 +27,13 @@ constexpr uint32_t kMaxLun = 8;
 constexpr uint32_t kDeviceInitTimeoutMs = 2000;
 constexpr uint32_t kHostControllerTimeoutUs = 1000;
 
+enum WellKnownLuns {
+  kReportLuns = 0x81,
+  kUfsDevice = 0xd0,
+  kBoot = 0xb0,
+  kRpmb = 0xc4,
+};
+
 enum NotifyEvent {
   kInit = 0,
   kReset,
@@ -39,12 +46,25 @@ enum NotifyEvent {
 };
 
 struct BlockDevice {
-  bool is_scanned = false;
+  bool is_present = false;
   std::string name;
   uint8_t lun = 0;
-  off_t total_size = 0;
   size_t block_size = 0;
-  uint32_t block_count = 0;
+  uint64_t block_count = 0;
+};
+
+struct IoCommand {
+  void Complete(zx_status_t status) { completion_cb(cookie, status, &op); }
+
+  block_op_t op;
+  block_impl_queue_callback completion_cb;
+  void *cookie;
+
+  uint8_t lun_id;
+  uint32_t block_size_bytes;
+  uint64_t block_count;
+
+  list_node_t node;
 };
 
 class Ufs;
@@ -76,12 +96,14 @@ class Ufs : public UfsDeviceType {
   inspect::Node &inspect_node() { return inspect_node_; }
 
   fdf::MmioBuffer &GetMmio() { return mmio_; }
-  BlockDevice &GetBlockDevice(uint8_t lun) { return block_devices_[lun]; }
 
   TransferRequestProcessor &GetTransferRequestProcessor() const {
     ZX_DEBUG_ASSERT(transfer_request_processor_ != nullptr);
     return *transfer_request_processor_;
   }
+
+  // Synchronously handle block operations delivered to the logical unit.
+  void HandleBlockOp(IoCommand *io_cmd);
 
   // Used to register a platform-specific NotifyEventCallback, which handles variants and quirks for
   // each host interface platform.
@@ -101,7 +123,19 @@ class Ufs : public UfsDeviceType {
 
   sync_completion_t &GetScsiEvent() { return scsi_event_; }
 
-  void QueueScsiCommand(std::unique_ptr<scsi_xfer> xfer);
+  // Create a scsi transfer and add it to the transfer list. The added transfer is processed by the
+  // scsi thread. If |event| is nullptr, then the SCSI command is executed synchronously.
+  zx::result<> QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_t lun,
+                                std::array<zx_paddr_t, 2> buffer_phys, sync_completion_t *event);
+
+  // for test
+  BlockDevice &GetBlockDevice(uint8_t lun) {
+    ZX_ASSERT_MSG(lun < kMaxLun, "Invalid lun %d", lun);
+    return block_devices_[lun];
+  }
+  uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
+  DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
+  GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
 
  private:
   friend class UfsTest;
@@ -116,6 +150,8 @@ class Ufs : public UfsDeviceType {
   zx_status_t Init();
   zx::result<> InitController();
   zx::result<> InitDeviceInterface();
+  zx::result<> GetControllerDescriptor();
+  zx::result<> ScanLogicalUnits();
 
   zx_status_t EnableHostController();
   zx_status_t DisableHostController();
@@ -128,21 +164,7 @@ class Ufs : public UfsDeviceType {
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
 
-  // TODO(fxbug.dev/124835): Remove mock information when logical unit is implemented.
-  static constexpr size_t kMockBlockSize = 4096;
-  static constexpr uint32_t kMockTotalDeviceCapacity = (1 << 24);  // 16MB
-
-  BlockDevice block_devices_[kMaxLun]{
-      // TODO(fxbug.dev/124835): Temporarily add a single block device since block device scan is
-      // not yet implemented.
-      {
-          true,
-          "mock-device",
-          0,
-          kMockTotalDeviceCapacity,
-          kMockBlockSize,
-          static_cast<uint32_t>(kMockTotalDeviceCapacity / kMockBlockSize),
-      }};
+  BlockDevice block_devices_[kMaxLun];
 
   // TODO(fxbug.dev/124835): Replace SCSI thread to I/O thread
   thrd_t scsi_thread_ = 0;
@@ -156,8 +178,14 @@ class Ufs : public UfsDeviceType {
 
   std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
 
+  // Controller internal information.
+  uint32_t logical_unit_count_ = 0;
+
   // Callback function to perform when the host controller is notified.
   HostControllerCallback host_controller_callback_;
+
+  DeviceDescriptor device_descriptor_;
+  GeometryDescriptor geometry_descriptor_;
 
   bool driver_shutdown_ = false;
 };

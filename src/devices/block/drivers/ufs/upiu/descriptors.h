@@ -13,6 +13,7 @@
 namespace ufs {
 
 // UFS Specification Version 3.1, section 14.1 "UFS Descriptors".
+// All descriptors use big-endian byte ordering.
 enum class DescriptorType {
   kDevice = 0x00,
   kConfiguration = 0x01,
@@ -25,6 +26,7 @@ enum class DescriptorType {
 };
 
 // UFS Specification Version 3.1, section 14.1.4.2 "Device Descriptor".
+// DeviceDescriptor use big-endian byte ordering.
 struct DeviceDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -77,6 +79,7 @@ struct DeviceDescriptor {
 static_assert(sizeof(DeviceDescriptor) == 89, "DeviceDescriptor struct must be 89 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.3 "Configuration Descriptor".
+// ConfigurationDescriptor use big-endian byte ordering.
 struct UnitDescriptorConfigurableParameters {
   uint8_t bLUEnable;
   uint8_t bBootLunID;
@@ -127,6 +130,7 @@ static_assert(sizeof(ConfigurationDescriptor) == (22 + 27 * 8),
               "ConfigurationDescriptor struct must be 238 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.4 "Geometry Descriptor".
+// GeometryDescriptor use big-endian byte ordering.
 struct GeometryDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -178,6 +182,7 @@ struct GeometryDescriptor {
 static_assert(sizeof(GeometryDescriptor) == 87, "GeometryDescriptor struct must be 87 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.5 "Unit Descriptor".
+// UnitDescriptor use big-endian byte ordering.
 struct UnitDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -205,6 +210,7 @@ struct UnitDescriptor {
 static_assert(sizeof(UnitDescriptor) == 45, "UnitDescriptor struct must be 45 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.6 "RPMB Unit Descriptor".
+// RpmbUnitDescriptor use big-endian byte ordering.
 struct RpmbUnitDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -228,6 +234,7 @@ struct RpmbUnitDescriptor {
 static_assert(sizeof(RpmbUnitDescriptor) == 35, "RpmbUnitDescriptor struct must be 35 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.7 "Power Parameters Descriptor".
+// PowerParametersDescriptor use big-endian byte ordering.
 struct PowerParametersDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -239,6 +246,7 @@ static_assert(sizeof(PowerParametersDescriptor) == 98,
               "PowerParametersDescriptor struct must be 98 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.8 "Interconnect Descriptor".
+// InterconnectDescriptor use big-endian byte ordering.
 struct InterconnectDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -248,6 +256,7 @@ struct InterconnectDescriptor {
 static_assert(sizeof(InterconnectDescriptor) == 6, "InterconnectDescriptor struct must be 6 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.9 ~ 13 "String Descriptor".
+// StringDescriptor use big-endian byte ordering.
 struct StringDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;
@@ -256,6 +265,7 @@ struct StringDescriptor {
 static_assert(sizeof(StringDescriptor) == 254, "StringDescriptor struct must be 254 bytes");
 
 // UFS Specification Version 3.1, section 14.1.4.14 "Device Health Descriptor".
+// DeviceHealthDescriptor use big-endian byte ordering.
 struct DeviceHealthDescriptor {
   uint8_t bLength;
   uint8_t bDescriptorIDN;

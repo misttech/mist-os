@@ -66,14 +66,14 @@ zx_status_t CopyPhysicalRegionToBuffer(
       break;
     }
 
-    auto data_buffer_or = PrdtMapAndGetVirtualAddress(mock_device, prdt_upiu);
-    if (data_buffer_or.is_error()) {
-      return data_buffer_or.status_value();
+    auto data_buffer = PrdtMapAndGetVirtualAddress(mock_device, prdt_upiu);
+    if (data_buffer.is_error()) {
+      return data_buffer.status_value();
     }
 
     uint64_t data_buffer_size = prdt_upiu.data_byte_count() + 1;
     uint64_t transfer_count = std::min(data_buffer_size, buffer.size() - cur_pos);
-    std::memcpy(buffer.data() + cur_pos, data_buffer_or.value(), transfer_count);
+    std::memcpy(buffer.data() + cur_pos, data_buffer.value(), transfer_count);
 
     cur_pos += transfer_count;
   }

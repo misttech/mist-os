@@ -96,9 +96,6 @@ class RequestUpiu {
   // TransferRequestDescriptorDataDirection determines whether the target device will read or write
   // the system memory area pointed to by the PRDT.
   virtual TransferRequestDescriptorDataDirection GetDataDirection() const = 0;
-  // Determine whether to send the UPIU as sync or async. If sync, wait for a response from the
-  // UPIU.
-  virtual bool IsSync() const = 0;
 
   // Get the offset that ResponseUpiu will be written to.
   virtual uint16_t GetResponseOffset() const = 0;
@@ -177,9 +174,6 @@ class CommandUpiu : public RequestUpiu {
   void *GetData() override { return static_cast<void *>(&data_); }
   UpiuHeader &GetHeader() override { return data_.header; }
 
-  // TODO(fxbug.dev/124835): Commands that require async operation should inherit |IsSync()| and
-  // return false.
-  bool IsSync() const override { return true; }
   TransferRequestDescriptorDataDirection GetDataDirection() const override {
     return TransferRequestDescriptorDataDirection::kNone;
   }
@@ -256,7 +250,6 @@ class TaskManagementRequestUpiu : public RequestUpiu {
 
   void *GetData() override { return static_cast<void *>(&data_); }
   UpiuHeader &GetHeader() override { return data_.header; }
-  bool IsSync() const override { return true; }
   TransferRequestDescriptorDataDirection GetDataDirection() const override {
     return TransferRequestDescriptorDataDirection::kNone;
   }
@@ -397,7 +390,6 @@ class QueryRequestUpiu : public RequestUpiu {
 
   void *GetData() override { return static_cast<void *>(&data_); }
   UpiuHeader &GetHeader() override { return data_.header; }
-  bool IsSync() const override { return true; }
   TransferRequestDescriptorDataDirection GetDataDirection() const override {
     return TransferRequestDescriptorDataDirection::kNone;
   }
@@ -456,7 +448,6 @@ class NopOutUpiu : public RequestUpiu {
 
   void *GetData() override { return static_cast<void *>(&data_); }
   UpiuHeader &GetHeader() override { return data_.header; }
-  bool IsSync() const override { return true; }
   TransferRequestDescriptorDataDirection GetDataDirection() const override {
     return TransferRequestDescriptorDataDirection::kNone;
   }

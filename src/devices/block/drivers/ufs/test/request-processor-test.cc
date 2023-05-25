@@ -331,7 +331,8 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
 
   xfer->done = &xfer->local_event;
 
-  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(std::move(xfer), slot.value());
+  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(std::move(xfer), slot.value(),
+                                                                   /*sync=*/true);
   ASSERT_EQ(response.status_value(), ZX_OK);
 
   // Check that the SCSI UPIU is copied into the command descriptor.

@@ -23,11 +23,10 @@ TEST_F(ScsiCommandTest, Read10) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   const uint8_t kTestLun = 0;
-  const uint32_t kPageSize = zx_system_get_page_size();
 
   uint32_t block_offset = 0;
   uint16_t block_count = 1;
-  uint32_t block_size = kPageSize;
+  uint32_t block_size = kMockBlockSize;
 
   // Write test data to the mock device
   char buf[kMockBlockSize];
@@ -40,29 +39,29 @@ TEST_F(ScsiCommandTest, Read10) {
   fzl::VmoMapper mapper;
   zx::pmt pmt;
 
-  auto paddrs = MapAndGetPhysicalAddress(ZX_BTI_PERM_WRITE, unowned_vmo, mapper, pmt, 0,
-                                         block_count * kPageSize);
+  auto paddrs =
+      MapAndPinVmo(ZX_BTI_PERM_WRITE, unowned_vmo, mapper, pmt, 0, block_count * block_size);
   ASSERT_EQ(paddrs.status_value(), ZX_OK);
   auto upiu = std::make_unique<ScsiRead10Upiu>(block_offset, block_count, block_size, 0, 0);
 
-  auto result = ufs_->GetTransferRequestProcessor().QueueScsiCommand(
-      std::move(upiu), kTestLun, mapper.start(), paddrs.value().data(), nullptr, nullptr);
+  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, paddrs.value(), nullptr);
   ASSERT_EQ(result.status_value(), ZX_OK);
 
   // Check the read data
   std::cout << "mapper=" << static_cast<char *>(mapper.start()) << ", buf=" << buf << std::endl;
   ASSERT_EQ(memcmp(mapper.start(), buf, kMockBlockSize), 0);
+
+  pmt.unpin();
 }
 
 TEST_F(ScsiCommandTest, Write10) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   const uint8_t kTestLun = 0;
-  const uint32_t kPageSize = zx_system_get_page_size();
 
   uint32_t block_offset = 0;
   uint16_t block_count = 1;
-  uint32_t block_size = kPageSize;
+  uint32_t block_size = kMockBlockSize;
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(kMockBlockSize, 0, &vmo));
@@ -70,14 +69,13 @@ TEST_F(ScsiCommandTest, Write10) {
   fzl::VmoMapper mapper;
   zx::pmt pmt;
 
-  auto paddrs = MapAndGetPhysicalAddress(ZX_BTI_PERM_READ, unowned_vmo, mapper, pmt, 0,
-                                         block_count * kPageSize);
+  auto paddrs =
+      MapAndPinVmo(ZX_BTI_PERM_READ, unowned_vmo, mapper, pmt, 0, block_count * block_size);
   ASSERT_EQ(paddrs.status_value(), ZX_OK);
   auto upiu = std::make_unique<ScsiWrite10Upiu>(block_offset, block_count, block_size, 0, 0);
   std::strcpy(static_cast<char *>(mapper.start()), "test");
 
-  auto result = ufs_->GetTransferRequestProcessor().QueueScsiCommand(
-      std::move(upiu), kTestLun, mapper.start(), paddrs.value().data(), nullptr, nullptr);
+  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, paddrs.value(), nullptr);
   ASSERT_EQ(result.status_value(), ZX_OK);
 
   // Read test data form the mock device
@@ -87,13 +85,14 @@ TEST_F(ScsiCommandTest, Write10) {
   // Check the written data
   std::cout << "mapper=" << static_cast<char *>(mapper.start()) << ", buf=" << buf << std::endl;
   ASSERT_EQ(memcmp(mapper.start(), buf, kMockBlockSize), 0);
+
+  pmt.unpin();
 }
 
 TEST_F(ScsiCommandTest, RequestSense) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   const uint8_t kTestLun = 0;
-  const uint32_t kPageSize = zx_system_get_page_size();
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(kMockBlockSize, 0, &vmo));
@@ -102,20 +101,22 @@ TEST_F(ScsiCommandTest, RequestSense) {
   zx::pmt pmt;
 
   uint16_t block_count = 1;
+  uint32_t block_size = kMockBlockSize;
 
-  auto paddrs = MapAndGetPhysicalAddress(ZX_BTI_PERM_WRITE, unowned_vmo, mapper, pmt, 0,
-                                         block_count * kPageSize);
+  auto paddrs =
+      MapAndPinVmo(ZX_BTI_PERM_WRITE, unowned_vmo, mapper, pmt, 0, block_count * block_size);
   ASSERT_EQ(paddrs.status_value(), ZX_OK);
 
   auto upiu = std::make_unique<ScsiRequestSenseUpiu>();
-  auto result = ufs_->GetTransferRequestProcessor().QueueScsiCommand(
-      std::move(upiu), kTestLun, mapper.start(), paddrs.value().data(), nullptr, nullptr);
+  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, paddrs.value(), nullptr);
   ASSERT_EQ(result.status_value(), ZX_OK);
 
   ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(mapper.start());
   ASSERT_EQ(sense_data->resp_code, 0x70);
   ASSERT_EQ(sense_data->valid, 0);
   ASSERT_EQ(sense_data->sense_key, 0);
+
+  pmt.unpin();
 }
 
 TEST_F(ScsiCommandTest, SynchronizeCache10) {
@@ -127,8 +128,7 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
   uint16_t block_count = 1;
 
   auto cache_upiu = std::make_unique<ScsiSynchronizeCache10Upiu>(block_offset, block_count);
-  auto result = ufs_->GetTransferRequestProcessor().QueueScsiCommand(
-      std::move(cache_upiu), kTestLun, nullptr, nullptr, nullptr, nullptr);
+  auto result = ufs_->QueueScsiCommand(std::move(cache_upiu), kTestLun, {0, 0}, nullptr);
   ASSERT_EQ(result.status_value(), ZX_OK);
 }
 

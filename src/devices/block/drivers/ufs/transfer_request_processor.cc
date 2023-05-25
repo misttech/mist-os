@@ -12,17 +12,20 @@
 namespace ufs {
 
 namespace {
-void FillPrdt(PhysicalRegionDescriptionTableEntry *prdt, zx_paddr_t buffer_physical_address,
-              uint32_t prdt_count, uint32_t data_length) {
+void FillPrdt(PhysicalRegionDescriptionTableEntry *prdt,
+              std::array<zx_paddr_t, 2> buffer_physical_addresses, uint32_t prdt_count,
+              uint32_t data_length) {
+  ZX_ASSERT(prdt_count <= 2);
+
   for (uint32_t i = 0; i < prdt_count; ++i) {
+    ZX_ASSERT(buffer_physical_addresses[i] != 0);
     uint32_t byte_count = data_length < kPrdtEntryDataLength ? data_length : kPrdtEntryDataLength;
-    prdt->set_data_base_address(static_cast<uint32_t>(buffer_physical_address & 0xffffffff));
-    prdt->set_data_base_address_upper(static_cast<uint32_t>(buffer_physical_address >> 32));
+    prdt->set_data_base_address(static_cast<uint32_t>(buffer_physical_addresses[i] & 0xffffffff));
+    prdt->set_data_base_address_upper(static_cast<uint32_t>(buffer_physical_addresses[i] >> 32));
     prdt->set_data_byte_count(byte_count - 1);
 
     ++prdt;
     data_length -= byte_count;
-    buffer_physical_address += byte_count;
   }
   ZX_DEBUG_ASSERT(data_length == 0);
 }
@@ -111,7 +114,7 @@ zx::result<void *> TransferRequestProcessor::SendUpiu(RequestUpiu &request) {
   request.GetHeader().task_tag = slot.value();
 
   if (zx::result<> result = SendCommand(slot.value(), request.GetDataDirection(), response_offset,
-                                        response_length, 0, 0, request.IsSync());
+                                        response_length, 0, 0, /*sync=*/true);
       result.is_error()) {
     zxlogf(ERROR, "Failed to send UPIU: %s", result.status_string());
     return result.take_error();
@@ -121,7 +124,7 @@ zx::result<void *> TransferRequestProcessor::SendUpiu(RequestUpiu &request) {
 }
 
 zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<scsi_xfer> xfer,
-                                                                uint8_t slot) {
+                                                                uint8_t slot, bool sync) {
   ScsiCommandUpiu *request = xfer->upiu.get();
 
   const uint16_t response_offset = request->GetResponseOffset();
@@ -156,7 +159,7 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
         request_list_.GetDescriptorBuffer<PhysicalRegionDescriptionTableEntry>(slot, prdt_offset);
     memset(prdt, 0, prdt_length);
   }
-  FillPrdt(prdt, xfer->buffer_phy, prdt_entry_count, data_transfer_length);
+  FillPrdt(prdt, xfer->buffer_phys, prdt_entry_count, data_transfer_length);
 
   request->GetHeader().lun = xfer->lun;
   request->GetHeader().task_tag = slot;  // Record the slot number to |task_tag| for debugging.
@@ -177,7 +180,8 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
     zxlogf(TRACE, "4. SCSI: PRDT = 0x%lx",
            request_list_.GetSlot(slot).command_descriptor_io.phys() + response_offset +
                response_length);
-    zxlogf(TRACE, "5. SCSI: Data Buffer = 0x%lx", xfer->buffer_phy);
+    zxlogf(TRACE, "5. SCSI: Data Buffer = 0x%lx, 0x%lx", xfer->buffer_phys[0],
+           xfer->buffer_phys[1]);
     zxlogf(TRACE, "6. SCSI: PRDT prdt_offset = %hu, prdt_length = %hu, prdt_entry_count = %d",
            prdt_offset, prdt_length, prdt_entry_count);
   }
@@ -188,9 +192,8 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
     request_slot.xfer = std::move(xfer);
   }
 
-  if (zx::result<> result =
-          SendCommand(slot, request->GetDataDirection(), response_offset, response_length,
-                      prdt_offset, prdt_length, request->IsSync());
+  if (zx::result<> result = SendCommand(slot, request->GetDataDirection(), response_offset,
+                                        response_length, prdt_offset, prdt_length, sync);
       result.is_error()) {
     ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(response->GetSenseData());
     zxlogf(ERROR, "Failed to send scsi command upiu, response code 0x%x, sense key 0x%x",
@@ -199,49 +202,6 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
   }
 
   return zx::ok(*response);
-}
-
-zx::result<> TransferRequestProcessor::QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu,
-                                                        uint8_t lun, void *buffer,
-                                                        const zx_paddr_t *buffer_phys,
-                                                        void *cmd_data, sync_completion_t *event) {
-  auto xfer = std::make_unique<scsi_xfer>();
-  sync_completion_t *local_event = &xfer->local_event;
-  BlockDevice &block_device = controller_.GetBlockDevice(lun);
-
-  xfer->lun = lun;
-  xfer->op = upiu->GetOpcode();
-  if (upiu->GetStartLba().has_value()) {
-    xfer->start_lba = upiu->GetStartLba().value();
-  } else {
-    xfer->start_lba = 0;
-  }
-  xfer->block_count = upiu->GetTransferBytes() / block_device.block_size;
-  xfer->upiu = std::move(upiu);
-  xfer->buffer = buffer;
-  xfer->buffer_phy = (buffer_phys == nullptr) ? 0 : buffer_phys[0];
-  xfer->cmd_data = cmd_data;
-  xfer->status = ZX_OK;
-
-  xfer->block_size = static_cast<uint32_t>(block_device.block_size);
-
-  xfer->done = event ? event : &xfer->local_event;
-  sync_completion_reset(xfer->done);
-
-  controller_.QueueScsiCommand(std::move(xfer));
-
-  if (event) {
-    return zx::ok();
-  }
-
-  // Sync request, so wait until transfer is done.
-  zx_status_t status = sync_completion_wait(local_event, ZX_MSEC(GetTimeoutMsec()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed waiting for event %d", status);
-    return zx::error(ZX_ERR_TIMED_OUT);
-  }
-
-  return zx::ok();
 }
 
 void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,

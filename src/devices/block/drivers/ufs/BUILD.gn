@@ -27,6 +27,7 @@ group("tests") {
 
 source_set("shared") {
   sources = [
+    "logical_unit.cc",
     "request_list.cc",
     "transfer_request_processor.cc",
     "ufs.cc",
@@ -88,6 +89,7 @@ test_deps = [
 test("ufs-unit-tests-bin") {
   output_name = "ufs-unit-tests"
   sources = [
+    "test/block-op-test.cc",
     "test/init-test.cc",
     "test/mock-device/fake-dma-handler.cc",
     "test/mock-device/query-request-processor.cc",

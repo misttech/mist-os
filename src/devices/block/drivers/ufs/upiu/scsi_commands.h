@@ -105,9 +105,7 @@ struct scsi_xfer
   ScsiOpcode op;
   uint64_t start_lba;
   uint64_t block_count;
-  void *buffer;
-  zx_paddr_t buffer_phy;
-  void *cmd_data;
+  std::array<zx_paddr_t, 2> buffer_phys;
   sync_completion_t *done;
   sync_completion_t local_event;
   zx_status_t status;
@@ -227,6 +225,10 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
 
     set_fua(fua);
     set_fua_nv(0);
+
+    if (group_num) {
+      set_group_num(group_num);
+    }
   }
 
   TransferRequestDescriptorDataDirection GetDataDirection() const override {
@@ -460,8 +462,6 @@ class ScsiUnmapUpiu : public ScsiCommandUpiu {
   DEF_SUBFIELD(data_.cdb[9], 7, 0, control);
 
   explicit ScsiUnmapUpiu(uint16_t param_len) : ScsiCommandUpiu(ScsiOpcode::kUnmap) {
-    data_.expected_data_transfer_length = htobe32(param_len);
-
     set_anchor(0);
     set_group_num(0);
 

@@ -28,6 +28,8 @@ class UfsTest : public zxtest::Test {
 
   void TearDown() override;
 
+  void CheckControllerDescriptor();
+
   zx_status_t DisableController() { return ufs_->DisableHostController(); }
   zx_status_t EnableController() { return ufs_->EnableHostController(); }
 
@@ -37,12 +39,11 @@ class UfsTest : public zxtest::Test {
                            uint16_t prdt_len, bool sync);
 
   // Map the data vmo to the address space and assign physical addresses. Currently, it only
-  // supports 8KB vmo. So, we get two physical addresses.
-  zx::result<std::array<zx_paddr_t, 2>> MapAndGetPhysicalAddress(uint32_t option,
-                                                                 zx::unowned_vmo &vmo,
-                                                                 fzl::VmoMapper &mapper,
-                                                                 zx::pmt &pmt, uint64_t offset_vmo,
-                                                                 uint64_t length);
+  // supports 8KB vmo. So, we get two physical addresses. The return value is the physical address
+  // of the pinned memory.
+  zx::result<std::array<zx_paddr_t, 2>> MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,
+                                                     fzl::VmoMapper &mapper, zx::pmt &pmt,
+                                                     uint64_t offset_vmo, uint64_t length);
 
  protected:
   std::shared_ptr<zx_device> fake_root_;

@@ -94,6 +94,7 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   device_desc_.bLength = sizeof(DeviceDescriptor);
   device_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kDevice);
   device_desc_.bDeviceSubClass = 0x01;
+  device_desc_.bNumberWLU = 0x04;
   device_desc_.bInitPowerMode = 0x01;
   device_desc_.bHighPriorityLUN = 0x7F;
   device_desc_.wSpecVersion = htobe16(0x0310);
