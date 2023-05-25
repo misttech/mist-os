@@ -48,17 +48,6 @@ protocol ProcessAccessor {
         content zx.Handle:VMO;
     }) -> () error fuchsia.posix.Errno;
 
-    /// Returns the `length` bytes of the memory of the process at `address` in
-    /// the `content` vmo. Th returned vmo's content size must always be exactly
-    /// `length`.
-    @transitional
-    ReadMemory(struct {
-        address uint64;
-        length uint64;
-    }) -> (resource struct {
-        content zx.Handle:VMO;
-    }) error fuchsia.posix.Errno;
-
     /// Execute the given `request` and returns the associated `response`. Any
     /// failure will interrupt further processing and fail this operation and
     /// the associated errno will be then returned.

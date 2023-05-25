@@ -6575,7 +6575,6 @@ pub mod tests {
         let mut next_fd = 0;
         let mut fds: TestFdTable = Default::default();
         'event_loop: while let Some(event) = stream.try_next().await? {
-            #[allow(unreachable_patterns)]
             match event {
                 fbinder::ProcessAccessorRequest::WriteMemory { address, content, responder } => {
                     let size = content.get_content_size()?;
@@ -6610,7 +6609,6 @@ pub mod tests {
                     }
                     responder.send(Ok(response))?;
                 }
-                _ => {}
             }
         }
         Ok(fds)
