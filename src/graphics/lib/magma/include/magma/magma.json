@@ -6,7 +6,7 @@
                 "ordinal": 46,
                 "name": "magma_device_import",
                 "type": "magma_status_t",
-                "description": "Imports and takes ownership of a channel to a device.",
+                "description": "Imports and takes ownership of a channel to a device. Takes ownership of |device_channel| on both success and failure.",
                 "arguments": [
                     {
                         "name": "device_channel",
@@ -196,7 +196,7 @@
                 "ordinal": 84,
                 "name": "magma_connection_import_buffer",
                 "type": "magma_status_t",
-                "description": "Imports and takes ownership of the buffer referred to by the given handle.",
+                "description": "Imports and takes ownership of the buffer referred to by the given handle. Takes ownership of |buffer_handle| on both success and failure.",
                 "arguments": [
                     {
                         "name": "connection",
@@ -270,7 +270,7 @@
                 "ordinal": 90,
                 "name": "magma_connection_import_semaphore",
                 "type": "magma_status_t",
-                "description": "Imports and takes ownership of the semaphore referred to by the given handle.",
+                "description": "Imports and takes ownership of the semaphore referred to by the given handle. Takes ownership of |semaphore_handle| on both success and failure.",
                 "arguments": [
                     {
                         "name": "connection",

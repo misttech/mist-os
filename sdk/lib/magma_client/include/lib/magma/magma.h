@@ -44,7 +44,8 @@ extern "C" {
 #endif
 
 ///
-/// \brief Imports and takes ownership of a channel to a device.
+/// \brief Imports and takes ownership of a channel to a device. Takes ownership of |device_channel|
+///        on both success and failure.
 /// \param device_channel A channel connecting to a gpu class device.
 /// \param device_out Returned device.
 ///
@@ -142,7 +143,8 @@ MAGMA_EXPORT void magma_connection_release_buffer(
     magma_buffer_t buffer);
 
 ///
-/// \brief Imports and takes ownership of the buffer referred to by the given handle.
+/// \brief Imports and takes ownership of the buffer referred to by the given handle. Takes
+///        ownership of |buffer_handle| on both success and failure.
 /// \param connection An open connection.
 /// \param buffer_handle A valid handle.
 /// \param size_out The size of the buffer in bytes.
@@ -177,7 +179,8 @@ MAGMA_EXPORT void magma_connection_release_semaphore(
     magma_semaphore_t semaphore);
 
 ///
-/// \brief Imports and takes ownership of the semaphore referred to by the given handle.
+/// \brief Imports and takes ownership of the semaphore referred to by the given handle. Takes
+///        ownership of |semaphore_handle| on both success and failure.
 /// \param connection An open connection.
 /// \param semaphore_handle A valid semaphore handle.
 /// \param semaphore_out The returned semaphore.
