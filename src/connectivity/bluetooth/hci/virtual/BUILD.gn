@@ -41,6 +41,7 @@ source_set("common") {
     "//src/connectivity/bluetooth/lib/fidl",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
+    "//third_party/pigweed/backends/pw_log:dfv1",
     "//third_party/pigweed/backends/pw_random:zircon_random_generator",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-default",

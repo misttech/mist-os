@@ -5,7 +5,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/ddk/driver.h>
 #include <sys/stat.h>
 
 #include <cstdio>
@@ -30,10 +29,6 @@ const char kUsageString[] =
 const char kDefaultHCIDev[] = "/dev/class/bt-hci/000";
 
 }  // namespace
-
-// TODO(armansito): Make this tool not depend on drivers/bluetooth/lib and avoid
-// this hack.
-PW_LOG_DECLARE_FAKE_DRIVER();
 
 int main(int argc, char* argv[]) {
   auto cl = fxl::CommandLineFromArgcArgv(argc, argv);

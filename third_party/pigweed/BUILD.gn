@@ -55,7 +55,6 @@ source_set("pw_log") {
 group("tests") {
   testonly = true
   deps = [
-    "backends/pw_log/dfv1:tests",
     "backends/pw_random:tests",
   ]
 }

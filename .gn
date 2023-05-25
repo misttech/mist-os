@@ -62,7 +62,7 @@ default_args = {
 
   # Specify Pigweed backends for Fuchsia.
   pw_assert_BACKEND = "//third_party/pigweed/backends/pw_assert"
-  pw_log_BACKEND = "//third_party/pigweed/backends/pw_log/dfv1"
+  pw_log_BACKEND = "//third_party/pigweed/backends/pw_log"
   pw_chrono_SYSTEM_CLOCK_BACKEND =
       "//third_party/pigweed/src/pw_chrono_stl:system_clock"
 

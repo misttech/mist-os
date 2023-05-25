@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_DFV1_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
-#define THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_DFV1_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
-
-#include <lib/ddk/driver.h>
+#ifndef THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
+#define THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
 
 #include "pw_preprocessor/arguments.h"
 #include "pw_preprocessor/compiler.h"
@@ -28,21 +26,4 @@ PW_EXTERN_C_END
 // runtime.
 #define PW_LOG_FLAG_IGNORE 1 << 3
 
-// This global symbol needs to defined when the dfv1 log backend is used outside of a driver.
-#define PW_LOG_DECLARE_FAKE_DRIVER() zx_driver_rec_t __zircon_driver_rec__ = {}
-
-namespace pw_log_ddk {
-
-// Returns the part of a path following the final '/', or the whole path if there is no '/'.
-constexpr const char* BaseName(const char* path) {
-  for (const char* c = path; c && (*c != '\0'); c++) {
-    if (*c == '/') {
-      path = c + 1;
-    }
-  }
-  return path;
-}
-
-}  // namespace pw_log_ddk
-
-#endif  // THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_DFV1_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
+#endif  // THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
