@@ -1651,7 +1651,7 @@ pub(crate) mod testutil {
         /// Returns the smallest `FakeInstant` greater than or equal to the
         /// current time for which an event is available. If no events are
         /// available, returns `None`.
-        fn next_step(&self) -> Option<FakeInstant> {
+        pub(crate) fn next_step(&self) -> Option<FakeInstant> {
             // Get earliest timer in all contexts.
             let next_timer = self
                 .contexts
