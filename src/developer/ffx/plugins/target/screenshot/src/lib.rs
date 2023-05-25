@@ -113,6 +113,8 @@ pub async fn screenshot_impl<W: Write>(
     let file_proxy = client_end.into_proxy().expect("could not create file proxy");
 
     let mut img_data = read_data(&file_proxy).await?;
+    // VMO in |file_proxy| may be padded for alignment.
+    img_data.resize((img_size.width * img_size.height * 4).try_into().unwrap(), 0);
 
     match cmd.format {
         Format::PNG => {
@@ -159,7 +161,7 @@ fn save_as_bgra(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
 
 // TODO(fxbug.dev/108647): Use rgba format when available.
 fn save_as_rgba(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
-    bgra_to_rbga(img_data);
+    bgra_to_rgba(img_data);
 
     screenshot_file_path.set_extension("rgba");
     let mut screenshot_file = create_file(screenshot_file_path);
@@ -168,7 +170,7 @@ fn save_as_rgba(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
 
 // TODO(fxbug.dev/103742): Use png format when available.
 fn save_as_png(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>, img_size: SizeU) {
-    bgra_to_rbga(img_data);
+    bgra_to_rgba(img_data);
 
     screenshot_file_path.set_extension("png");
     let screenshot_file = create_file(screenshot_file_path);
@@ -183,7 +185,7 @@ fn save_as_png(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>, img_s
 }
 
 /// Performs inplace BGRA -> RGBA.
-fn bgra_to_rbga(img_data: &mut Vec<u8>) {
+fn bgra_to_rgba(img_data: &mut Vec<u8>) {
     let bytes_per_pixel = 4;
     let mut blue_pos = 0;
     let mut red_pos = 2;
