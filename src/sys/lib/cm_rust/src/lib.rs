@@ -2591,7 +2591,7 @@ mod tests {
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                             collection: None,
-                            name: "test".to_string(),
+                            name: "netstack".to_string(),
                         })),
                         source_name: Some("stopped".to_string()),
                         scope: Some(vec![
@@ -3003,7 +3003,7 @@ mod tests {
                             availability: Availability::Optional,
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
-                            source: UseSource::Child("test".to_string()),
+                            source: UseSource::Child("netstack".to_string()),
                             scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".to_string())]),
                             source_name: CapabilityName::from("stopped"),
                             target_path: CapabilityPath::from_str("/svc/test").unwrap(),

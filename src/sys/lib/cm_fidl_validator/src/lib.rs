@@ -664,40 +664,34 @@ impl<'a> ValidationContext<'a> {
     fn validate_use_decl(&mut self, use_: &'a fdecl::Use) {
         match use_ {
             fdecl::Use::Service(u) => {
-                self.validate_use_source(
+                self.validate_use_fields(
+                    "UseService",
                     u.source.as_ref(),
                     u.source_name.as_ref(),
+                    u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
-                    "UseService",
-                    "source",
                 );
-                check_name(u.source_name.as_ref(), "UseService", "source_name", &mut self.errors);
-                check_path(u.target_path.as_ref(), "UseService", "target_path", &mut self.errors);
             }
             fdecl::Use::Protocol(u) => {
-                self.validate_use_source(
+                self.validate_use_fields(
+                    "UseProtocol",
                     u.source.as_ref(),
                     u.source_name.as_ref(),
+                    u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
-                    "UseProtocol",
-                    "source",
                 );
-                check_name(u.source_name.as_ref(), "UseProtocol", "source_name", &mut self.errors);
-                check_path(u.target_path.as_ref(), "UseProtocol", "target_path", &mut self.errors);
             }
             fdecl::Use::Directory(u) => {
-                self.validate_use_source(
+                self.validate_use_fields(
+                    "UseDirectory",
                     u.source.as_ref(),
                     u.source_name.as_ref(),
+                    u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
-                    "UseDirectory",
-                    "source",
                 );
-                check_name(u.source_name.as_ref(), "UseDirectory", "source_name", &mut self.errors);
-                check_path(u.target_path.as_ref(), "UseDirectory", "target_path", &mut self.errors);
                 if u.rights.is_none() {
                     self.errors.push(Error::missing_field("UseDirectory", "rights"));
                 }
@@ -706,48 +700,63 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Use::Storage(u) => {
-                check_name(u.source_name.as_ref(), "UseStorage", "source_name", &mut self.errors);
-                check_path(u.target_path.as_ref(), "UseStorage", "target_path", &mut self.errors);
-                check_use_availability("UseStorage", u.availability.as_ref(), &mut self.errors);
+                const SOURCE: Option<fdecl::Ref> = Some(fdecl::Ref::Parent(fdecl::ParentRef {}));
+                const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
+                    Some(fdecl::DependencyType::Strong);
+                self.validate_use_fields(
+                    "UseStorage",
+                    SOURCE.as_ref(),
+                    u.source_name.as_ref(),
+                    u.target_path.as_ref(),
+                    DEPENDENCY_TYPE.as_ref(),
+                    u.availability.as_ref(),
+                );
             }
             fdecl::Use::EventStream(u) => {
-                self.validate_event_stream(u);
-                check_use_availability("UseEventStream", u.availability.as_ref(), &mut self.errors);
+                const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
+                    Some(fdecl::DependencyType::Strong);
+                let decl = "UseEventStream";
+                self.validate_use_fields(
+                    decl,
+                    u.source.as_ref(),
+                    u.source_name.as_ref(),
+                    u.target_path.as_ref(),
+                    DEPENDENCY_TYPE.as_ref(),
+                    u.availability.as_ref(),
+                );
+                // Additional validation.
+                match u.source {
+                    Some(fdecl::Ref::Child(_)) | Some(fdecl::Ref::Parent(_)) => {
+                        // Allowed.
+                    }
+                    Some(fdecl::Ref::Framework(_)) => match &u.scope {
+                        Some(value) if value.is_empty() => {
+                            self.errors.push(Error::invalid_field(decl, "scope"));
+                        }
+                        Some(_) => {}
+                        None => {
+                            self.errors.push(Error::missing_field(decl, "scope"));
+                        }
+                    },
+                    Some(fdecl::Ref::Self_(_)) | Some(fdecl::Ref::Debug(_)) => {
+                        // Allowed in general but not for event streams, add an error.
+                        self.errors.push(Error::invalid_field(decl, "source"));
+                    }
+                    Some(fdecl::Ref::Collection(_)) | Some(fdecl::RefUnknown!()) | None => {
+                        // Already handled by validate_use_fields.
+                    }
+                }
+                if let Some(scope) = &u.scope {
+                    for reference in scope {
+                        if !matches!(reference, fdecl::Ref::Child(_) | fdecl::Ref::Collection(_)) {
+                            self.errors.push(Error::invalid_field(decl, "scope"));
+                        }
+                    }
+                }
             }
-            _ => {
+            fdecl::UseUnknown!() => {
                 self.errors.push(Error::invalid_field("Component", "use"));
             }
-        }
-    }
-
-    fn validate_event_stream(&mut self, u: &fdecl::UseEventStream) {
-        match u.source {
-            Some(fdecl::Ref::Child(_)) | Some(fdecl::Ref::Parent(_)) => {}
-            Some(fdecl::Ref::Framework(_)) => match &u.scope {
-                Some(value) if value.is_empty() => {
-                    self.errors.push(Error::invalid_field("UseEventStream", "scope"));
-                }
-                Some(_) => {}
-                None => {
-                    self.errors.push(Error::missing_field("UseEventStream", "scope"));
-                }
-            },
-            _ => {
-                self.errors.push(Error::invalid_field("UseEventStream", "source"));
-            }
-        }
-        if let Some(scope) = &u.scope {
-            for reference in scope {
-                if !matches!(reference, fdecl::Ref::Child(_) | fdecl::Ref::Collection(_)) {
-                    self.errors.push(Error::invalid_field("UseEventStream", "scope"));
-                }
-            }
-        }
-        check_path(u.target_path.as_ref(), "UseEventStream", "target_path", &mut self.errors);
-        if let Some(name) = &u.source_name {
-            check_name(Some(name), "UseEventStream", "source_name", &mut self.errors);
-        } else {
-            self.errors.push(Error::missing_field("UseEventStream", "source_name"));
         }
     }
 
@@ -804,7 +813,11 @@ impl<'a> ValidationContext<'a> {
                     };
                     if used_paths.insert(path, capability).is_some() {
                         // Disallow multiple capabilities for the same path.
-                        self.errors.push(Error::duplicate_field(capability.decl, "path", path));
+                        self.errors.push(Error::duplicate_field(
+                            capability.decl,
+                            "target_path",
+                            path,
+                        ));
                     }
                 }
                 _ => {}
@@ -854,38 +867,24 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    // disallow (use from #child dependency=strong) && (offer to #child from self)
-    // - err: `use` must have dependency=weak to prevent cycle
-    // add strong dependencies to dependency graph, so we can check for cycles
-    fn validate_use_source(
+    fn validate_use_fields(
         &mut self,
+        decl: &str,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
+        target_path: Option<&'a String>,
         dependency_type: Option<&fdecl::DependencyType>,
         availability: Option<&'a fdecl::Availability>,
-        decl: &str,
-        field: &str,
     ) {
         match source {
             Some(fdecl::Ref::Parent(_)) => {}
             Some(fdecl::Ref::Framework(_)) => {}
             Some(fdecl::Ref::Debug(_)) => {}
             Some(fdecl::Ref::Self_(_)) => {}
-            Some(fdecl::Ref::Capability(capability)) => {
-                if !self.all_capability_ids.contains(capability.name.as_str()) {
-                    self.errors.push(Error::invalid_capability(decl, field, &capability.name));
-                } else if dependency_type == Some(&fdecl::DependencyType::Strong) {
-                    self.add_strong_dep(
-                        source_name,
-                        DependencyNode::try_from_ref(source),
-                        Some(DependencyNode::Self_),
-                    );
-                }
-            }
             Some(fdecl::Ref::Child(child)) => {
-                if !self.all_children.contains_key(&child.name as &str) {
-                    self.errors.push(Error::invalid_child(decl, field, &child.name));
-                } else if dependency_type == Some(&fdecl::DependencyType::Strong) {
+                if self.validate_child_ref(decl, "source", &child, OfferType::Static)
+                    && dependency_type == Some(&fdecl::DependencyType::Strong)
+                {
                     self.add_strong_dep(
                         source_name,
                         DependencyNode::try_from_ref(source),
@@ -893,15 +892,29 @@ impl<'a> ValidationContext<'a> {
                     );
                 }
             }
-            Some(_) => {
-                self.errors.push(Error::invalid_field(decl, field));
+            Some(fdecl::Ref::Capability(c)) => {
+                if self.validate_source_capability(&c, decl, "source")
+                    && dependency_type == Some(&fdecl::DependencyType::Strong)
+                {
+                    self.add_strong_dep(
+                        source_name,
+                        DependencyNode::try_from_ref(source),
+                        Some(DependencyNode::Self_),
+                    );
+                }
+            }
+            Some(fdecl::Ref::Collection(_)) | Some(fdecl::RefUnknown!()) => {
+                self.errors.push(Error::invalid_field(decl, "source"));
             }
             None => {
-                self.errors.push(Error::missing_field(decl, field));
+                self.errors.push(Error::missing_field(decl, "source"));
             }
         };
+        check_name(source_name, decl, "source_name", &mut self.errors);
+        check_path(target_path, decl, "target_path", &mut self.errors);
         check_use_availability(decl, availability, &mut self.errors);
 
+        // Only allow `weak` dependency with `use from child`.
         let is_use_from_child = match source {
             Some(fdecl::Ref::Child(_)) => true,
             _ => false,
@@ -1319,22 +1332,22 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    fn validate_source_collection(&mut self, collection: &fdecl::CollectionRef, decl_type: &str) {
-        if !check_name(
-            Some(&collection.name),
-            decl_type,
-            "source.collection.name",
-            &mut self.errors,
-        ) {
-            return;
-        }
-        if !self.all_collections.contains(&collection.name as &str) {
+    fn validate_source_collection(
+        &mut self,
+        collection: &fdecl::CollectionRef,
+        decl_type: &str,
+    ) -> bool {
+        let num_errors = self.errors.len();
+        if check_name(Some(&collection.name), decl_type, "source.collection.name", &mut self.errors)
+            && !self.all_collections.contains(&collection.name as &str)
+        {
             self.errors.push(Error::invalid_collection(
                 decl_type,
                 "source",
                 &collection.name as &str,
             ));
         }
+        num_errors == self.errors.len()
     }
 
     fn validate_filtered_service_fields(
@@ -1367,10 +1380,14 @@ impl<'a> ValidationContext<'a> {
         capability: &fdecl::CapabilityRef,
         decl_type: &str,
         field: &str,
-    ) {
-        if !self.all_capability_ids.contains(capability.name.as_str()) {
+    ) -> bool {
+        let num_errors = self.errors.len();
+        if check_name(Some(&capability.name), decl_type, "source.capability.name", &mut self.errors)
+            && !self.all_capability_ids.contains(capability.name.as_str())
+        {
             self.errors.push(Error::invalid_capability(decl_type, field, &capability.name));
         }
+        num_errors == self.errors.len()
     }
 
     fn validate_storage_source(&mut self, source_name: &String, decl_type: &str) {
@@ -1976,11 +1993,13 @@ impl<'a> ValidationContext<'a> {
             | Some(fdecl::Ref::VoidType(_))
             | Some(fdecl::Ref::Framework(_)) => {}
             Some(fdecl::Ref::Child(child)) => {
-                let _ = self.validate_child_ref(decl, "source", &child, offer_type);
+                self.validate_child_ref(decl, "source", &child, offer_type);
             }
-            Some(fdecl::Ref::Capability(c)) => self.validate_source_capability(c, decl, "source"),
+            Some(fdecl::Ref::Capability(c)) => {
+                self.validate_source_capability(c, decl, "source");
+            }
             Some(fdecl::Ref::Collection(c)) if collection_source == CollectionSource::Allow => {
-                self.validate_source_collection(c, decl)
+                self.validate_source_collection(c, decl);
             }
             Some(_) => self.errors.push(Error::invalid_field(decl, "source")),
             None => self.errors.push(Error::missing_field(decl, "source")),
@@ -2910,11 +2929,6 @@ mod tests {
                         target_path: None,
                         ..Default::default()
                     }),
-                    fdecl::Use::Storage(fdecl::UseStorage {
-                        source_name: Some("cache".to_string()),
-                        target_path: None,
-                        ..Default::default()
-                    }),
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source_name: None,
                         source: None,
@@ -2937,10 +2951,9 @@ mod tests {
                 Error::missing_field("UseDirectory", "rights"),
                 Error::missing_field("UseStorage", "source_name"),
                 Error::missing_field("UseStorage", "target_path"),
-                Error::missing_field("UseStorage", "target_path"),
-                Error::invalid_field("UseEventStream", "source"),
-                Error::missing_field("UseEventStream", "target_path"),
+                Error::missing_field("UseEventStream", "source"),
                 Error::missing_field("UseEventStream", "source_name"),
+                Error::missing_field("UseEventStream", "target_path"),
             ])),
         },
         test_validate_missing_program_info => {
@@ -2957,87 +2970,74 @@ mod tests {
                 Error::missing_field("Program", "info")
             ])),
         },
-        test_validate_uses_invalid_identifiers_service => {
+        test_validate_uses_invalid_identifiers => {
             input = {
                 let mut decl = new_component_decl();
                 decl.uses = Some(vec![
                     fdecl::Use::Service(fdecl::UseService {
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                        source: Some(fdecl::Ref::Capability(fdecl::CapabilityRef {
+                            name: "^bad".to_string(),
+                        })),
                         source_name: Some("foo/".to_string()),
-                        target_path: Some("/".to_string()),
+                        target_path: Some("a/foo".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_field("UseService", "source_name"),
-                Error::invalid_field("UseService", "target_path"),
-            ])),
-        },
-        test_validate_uses_invalid_identifiers_protocol => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
                     fdecl::Use::Protocol(fdecl::UseProtocol {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "^bad".to_string(),
+                            collection: None,
+                        })),
                         source_name: Some("foo/".to_string()),
-                        target_path: Some("/".to_string()),
+                        target_path: Some("b/foo".to_string()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_field("UseProtocol", "source_name"),
-                Error::invalid_field("UseProtocol", "target_path"),
-            ])),
-        },
-        test_validate_uses_invalid_identifiers_directory => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
                     fdecl::Use::Directory(fdecl::UseDirectory {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "^bad".to_string(),
+                            collection: None,
+                        })),
                         source_name: Some("foo/".to_string()),
-                        target_path: Some("/".to_string()),
+                        target_path: Some("c".to_string()),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: Some("/foo".to_string()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::Storage(fdecl::UseStorage {
+                        source_name: Some("foo/".to_string()),
+                        target_path: Some("d".to_string()),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::EventStream(fdecl::UseEventStream {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "^bad".to_string(),
+                            collection: None,
+                        })),
+                        source_name: Some("foo/".to_string()),
+                        target_path: Some("e".to_string()),
                         ..Default::default()
                     }),
                 ]);
                 decl
             },
             result = Err(ErrorList::new(vec![
+                Error::invalid_field("UseService", "source.capability.name"),
+                Error::invalid_field("UseService", "source_name"),
+                Error::invalid_field("UseService", "target_path"),
+                Error::invalid_field("UseProtocol", "source.child.name"),
+                Error::invalid_field("UseProtocol", "source_name"),
+                Error::invalid_field("UseProtocol", "target_path"),
+                Error::invalid_field("UseDirectory", "source.child.name"),
                 Error::invalid_field("UseDirectory", "source_name"),
                 Error::invalid_field("UseDirectory", "target_path"),
                 Error::invalid_field("UseDirectory", "subdir"),
-            ])),
-        },
-        test_validate_uses_invalid_identifiers_storage => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
-                    fdecl::Use::Storage(fdecl::UseStorage {
-                        source_name: Some("/cache".to_string()),
-                        target_path: Some("/".to_string()),
-                        ..Default::default()
-                    }),
-                    fdecl::Use::Storage(fdecl::UseStorage {
-                        source_name: Some("temp".to_string()),
-                        target_path: Some("tmp".to_string()),
-                        ..Default::default()
-                    }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
                 Error::invalid_field("UseStorage", "source_name"),
                 Error::invalid_field("UseStorage", "target_path"),
-                Error::invalid_field("UseStorage", "target_path"),
+                Error::invalid_field("UseEventStream", "source.child.name"),
+                Error::invalid_field("UseEventStream", "source_name"),
+                Error::invalid_field("UseEventStream", "target_path"),
             ])),
         },
         test_validate_uses_missing_source => {
@@ -4368,8 +4368,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::duplicate_field("UseProtocol", "path", "/bar"),
-                Error::duplicate_field("UseDirectory", "path", "/bar"),
+                Error::duplicate_field("UseProtocol", "target_path", "/bar"),
+                Error::duplicate_field("UseDirectory", "target_path", "/bar"),
             ])),
         },
         // exposes
