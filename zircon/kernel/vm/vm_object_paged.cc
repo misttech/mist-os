@@ -1882,11 +1882,11 @@ void VmObjectPaged::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, Range
   for (auto& m : mapping_list_) {
     m.assert_object_lock();
     if (op == RangeChangeOp::Unmap) {
-      m.AspaceUnmapVmoRangeLocked(aligned_offset, aligned_len);
+      m.AspaceUnmapLockedObject(aligned_offset, aligned_len);
     } else if (op == RangeChangeOp::RemoveWrite) {
-      m.AspaceRemoveWriteVmoRangeLocked(aligned_offset, aligned_len);
+      m.AspaceRemoveWriteLockedObject(aligned_offset, aligned_len);
     } else if (op == RangeChangeOp::DebugUnpin) {
-      m.AspaceDebugUnpinLocked(aligned_offset, aligned_len);
+      m.AspaceDebugUnpinLockedObject(aligned_offset, aligned_len);
     } else {
       panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
     }

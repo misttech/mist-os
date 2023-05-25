@@ -414,7 +414,7 @@ bool VmMapping::ObjectRangeToVaddrRange(uint64_t offset, uint64_t len, vaddr_t* 
   return true;
 }
 
-void VmMapping::AspaceUnmapVmoRangeLocked(uint64_t offset, uint64_t len) const {
+void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
   canary_.Assert();
 
   // NOTE: must be acquired with the vmo lock held, but doesn't need to take
@@ -438,7 +438,7 @@ void VmMapping::AspaceUnmapVmoRangeLocked(uint64_t offset, uint64_t len) const {
   // If we're currently faulting and are responsible for the vmo code to be calling
   // back to us, detect the recursion and abort here.
   // The specific path we're avoiding is if the VMO calls back into us during
-  // vmo->LookupPagesLocked() via AspaceUnmapVmoRangeLocked(). If we set this flag we're short
+  // vmo->LookupPagesLocked() via AspaceUnmapLockedObject(). If we set this flag we're short
   // circuiting the unmap operation so that we don't do extra work.
   if (unlikely(currently_faulting_)) {
     LTRACEF("recursing to ourself, abort\n");
@@ -462,7 +462,7 @@ void VmMapping::AspaceUnmapVmoRangeLocked(uint64_t offset, uint64_t len) const {
   ASSERT(status == ZX_OK);
 }
 
-void VmMapping::AspaceRemoveWriteVmoRangeLocked(uint64_t offset, uint64_t len) const {
+void VmMapping::AspaceRemoveWriteLockedObject(uint64_t offset, uint64_t len) const {
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
           this, object_offset_, size_, offset, len);
 
@@ -520,7 +520,7 @@ void VmMapping::AspaceRemoveWriteVmoRangeLocked(uint64_t offset, uint64_t len) c
   ASSERT(status == ZX_OK);
 }
 
-void VmMapping::AspaceDebugUnpinLocked(uint64_t offset, uint64_t len) const {
+void VmMapping::AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) const {
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
           this, object_offset_, size_, offset, len);
 
@@ -778,7 +778,7 @@ zx_status_t VmMapping::DecommitRange(size_t offset, size_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
   // VmObject::DecommitRange will typically call back into our instance's
-  // VmMapping::AspaceUnmapVmoRangeLocked.
+  // VmMapping::AspaceUnmapLockedObject.
   return object_->DecommitRange(object_offset_locked() + offset, len);
 }
 
@@ -910,8 +910,8 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
 
   // set the currently faulting flag for any recursive calls the vmo may make back into us
   // The specific path we're avoiding is if the VMO calls back into us during
-  // vmo->LookupPagesLocked() via AspaceUnmapVmoRangeLocked(). Since we're responsible for that
-  // page, signal to ourself to skip the unmap operation.
+  // vmo->LookupPagesLocked() via AspaceUnmapLockedObject(). Since we're responsible for
+  // that page, signal to ourself to skip the unmap operation.
   DEBUG_ASSERT(!currently_faulting_);
   currently_faulting_ = true;
   auto cleanup = fit::defer([&]() {
