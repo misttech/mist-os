@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::AsyncChannel;
-use fidl_fuchsia_component_runner as fcrunner;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::execution::{execute_task, Container};
 use crate::fs::buffers::*;
 use crate::fs::devpts::create_main_and_replica;
-use crate::fs::file_server::serve_file;
+use crate::fs::file_server::serve_file_at;
 use crate::fs::fuchsia::create_fuchsia_pipe;
 use crate::fs::socket::VsockSocket;
 use crate::fs::*;
@@ -27,21 +27,23 @@ use crate::types::*;
 
 use super::*;
 
-/// Returns a DirectoryProxy to the root of the initial namespace of the container.
-pub fn expose_root(container: &Arc<Container>) -> Result<fio::DirectoryProxy, Error> {
+pub fn expose_root(
+    container: &Arc<Container>,
+    server_end: ServerEnd<fio::NodeMarker>,
+) -> Result<(), Error> {
     let system_task = container.kernel.kthreads.system_task();
     let root_file = system_task.open_file(b"/", OpenFlags::RDONLY)?;
-    let client = serve_file(system_task, &root_file)?;
-    Ok(fio::DirectoryProxy::new(AsyncChannel::from_channel(client.into_channel())?))
+    serve_file_at(server_end, system_task, &root_file)?;
+    Ok(())
 }
 
 pub async fn serve_component_runner(
-    mut request_stream: fcrunner::ComponentRunnerRequestStream,
+    mut request_stream: frunner::ComponentRunnerRequestStream,
     container: Arc<Container>,
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
-            fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+            frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 let container = container.clone();
                 fasync::Task::local(async move {
                     if let Err(e) = start_component(start_info, controller, container).await {

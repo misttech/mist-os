@@ -25,9 +25,18 @@ pub fn serve_file(
     current_task: &CurrentTask,
     file: &FileHandle,
 ) -> Result<ClientEnd<fio::NodeMarker>, Errno> {
+    let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+    serve_file_at(server_end, current_task, file)?;
+    Ok(client_end)
+}
+
+pub fn serve_file_at(
+    server_end: ServerEnd<fio::NodeMarker>,
+    current_task: &CurrentTask,
+    file: &FileHandle,
+) -> Result<(), Errno> {
     // Reopen file object to not share state with the given FileObject.
     let file = file.name.open(current_task, file.flags(), false)?;
-    let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     let open_flags = file.flags();
     let kernel = current_task.kernel();
     // TODO(security): Switching to the `system_task` here loses track of the credentials from
@@ -41,13 +50,12 @@ pub fn serve_file(
             scope.clone(),
             open_flags.into(),
             path::Path::dot(),
-            server,
+            server_end,
         );
         scope.wait().await;
     })
     .detach();
-
-    Ok(client)
+    Ok(())
 }
 
 /// A representation of `file` for the rust vfs.

@@ -16,7 +16,6 @@
         {
             name: "kernels",
             durability: "single_run",
-            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [
@@ -26,11 +25,6 @@
         },
         {
             protocol: [ "fuchsia.component.runner.ComponentRunner" ],
-        },
-        {
-            directory: "kernels",
-            rights: [ "r*" ],
-            path: "/kernels",
         },
     ],
     use: [

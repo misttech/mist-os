@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, bail, Error};
+use fidl::endpoints::ServerEnd;
 use fidl::AsyncChannel;
+use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
@@ -15,9 +17,8 @@ use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Task as _;
-use futures::FutureExt;
-use futures::StreamExt;
-use runner::get_value;
+use futures::{FutureExt, StreamExt, TryStreamExt};
+use runner::{get_program_string, get_program_strvec, get_value};
 use starnix_kernel_config::Config;
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -106,6 +107,56 @@ fn get_config() -> Option<ConfigWrapper> {
     }
 }
 
+fn get_ns_entry(
+    ns: &mut Option<Vec<frunner::ComponentNamespaceEntry>>,
+    entry_name: &str,
+) -> Option<zx::Channel> {
+    ns.as_mut().and_then(|ns| {
+        ns.iter_mut()
+            .find(|entry| entry.path == Some(entry_name.to_string()))
+            .and_then(|entry| entry.directory.take())
+            .map(|dir| dir.into_channel())
+    })
+}
+
+fn get_config_from_component_start_info(
+    mut start_info: frunner::ComponentStartInfo,
+) -> ConfigWrapper {
+    let get_strvec = |key| {
+        get_program_strvec(&start_info, key).map(|value| value.to_owned()).unwrap_or_default()
+    };
+
+    let get_string = |key| get_program_string(&start_info, key).unwrap_or_default().to_owned();
+
+    let apex_hack = get_strvec("apex_hack");
+    let features = get_strvec("features");
+    let init = get_strvec("init");
+    let kernel_cmdline = get_string("kernel_cmdline");
+    let mounts = get_strvec("mounts");
+    let name = get_string("name");
+    let startup_file_path = get_string("startup_file_path");
+
+    let mut ns = start_info.ns.take();
+    let pkg_dir = get_ns_entry(&mut ns, "/pkg");
+    let svc_dir = get_ns_entry(&mut ns, "/svc");
+    let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
+
+    ConfigWrapper {
+        config: Config {
+            apex_hack,
+            features,
+            init,
+            kernel_cmdline,
+            mounts,
+            name,
+            startup_file_path,
+        },
+        pkg_dir,
+        outgoing_dir,
+        svc_dir,
+    }
+}
+
 fn get_config_strvec(dict: &fdata::Dictionary, key: &str) -> Option<Vec<String>> {
     match get_value(dict, key) {
         Some(fdata::DictionaryValue::StrVec(values)) => Some(values.clone()),
@@ -136,7 +187,7 @@ pub struct Container {
 /// The services that are exposed in the container component's outgoing directory.
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
-    Container(fstarcontainer::ControllerRequestStream),
+    ContainerController(fstarcontainer::ControllerRequestStream),
 }
 
 /// Attempts to read /container_config/config and the startup handles to create a container.
@@ -147,10 +198,31 @@ enum ExposedServices {
 /// but this function exists to make a soft transition.
 pub async fn maybe_create_container_from_startup_handles() -> Result<Option<Arc<Container>>, Error>
 {
-    Ok(if let Some(config) = get_config() { Some(create_container(config).await?) } else { None })
+    Ok(if let Some(config) = get_config() {
+        Some(create_container(config, None).await?)
+    } else {
+        None
+    })
 }
 
-async fn create_container(mut config: ConfigWrapper) -> Result<Arc<Container>, Error> {
+pub async fn create_component_from_stream(
+    mut request_stream: frunner::ComponentRunnerRequestStream,
+) -> Result<Arc<Container>, Error> {
+    if let Some(event) = request_stream.try_next().await? {
+        match event {
+            frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                let config = get_config_from_component_start_info(start_info);
+                return create_container(config, Some(controller)).await;
+            }
+        }
+    }
+    bail!("did not receive Start request");
+}
+
+async fn create_container(
+    mut config: ConfigWrapper,
+    controller: Option<ServerEnd<frunner::ComponentControllerMarker>>,
+) -> Result<Arc<Container>, Error> {
     trace_duration!(trace_category_starnix!(), trace_name_create_container!());
     const DEFAULT_INIT: &str = "/container/init";
 
@@ -210,6 +282,16 @@ async fn create_container(mut config: ConfigWrapper) -> Result<Arc<Container>, E
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
 
+        // Notify the client that the container is exiting.
+        if let Some(controller) = controller {
+            let _ = match result {
+                Ok(ExitStatus::Exit(0)) => controller.close_with_epitaph(zx::Status::OK),
+                _ => controller.close_with_epitaph(zx::Status::from_raw(
+                    fcomponent::Error::InstanceDied.into_primitive() as i32,
+                )),
+            };
+        }
+
         // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
         fruntime::job_default().kill().expect("Failed to kill job");
     });
@@ -224,8 +306,10 @@ async fn create_container(mut config: ConfigWrapper) -> Result<Arc<Container>, E
         // Add `ComponentRunner` to the exposed services of the container, and then serve the
         // outgoing directory.
         let mut outgoing_directory = ServiceFs::new_local();
-        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::ComponentRunner);
-        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Container);
+        outgoing_directory
+            .dir("svc")
+            .add_fidl_service(ExposedServices::ComponentRunner)
+            .add_fidl_service(ExposedServices::ContainerController);
         outgoing_directory
             .serve_connection(outgoing_dir_channel.into())
             .map_err(|_| errno!(EINVAL))?;
@@ -248,7 +332,7 @@ async fn create_container(mut config: ConfigWrapper) -> Result<Arc<Container>, E
                         })
                         .detach();
                     }
-                    ExposedServices::Container(request_stream) => {
+                    ExposedServices::ContainerController(request_stream) => {
                         fasync::Task::local(async move {
                             serve_container_controller(request_stream, container_clone.clone())
                                 .await

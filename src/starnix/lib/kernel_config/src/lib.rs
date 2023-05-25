@@ -118,7 +118,7 @@ pub fn generate_kernel_config(
 /// collection.
 ///
 /// Used to avoid creating children with the same name.
-fn generate_kernel_name(name: &str) -> String {
+pub fn generate_kernel_name(name: &str) -> String {
     let random_id: String = rand::thread_rng()
         .sample_iter(&rand::distributions::Alphanumeric)
         .take(7)

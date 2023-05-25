@@ -16,12 +16,13 @@
     capabilities: [
         {
             runner: "starnix",
-            path: "/svc/fuchsia.component.runner.ComponentRunner",
+            path: "/svc/fuchsia.starnix.container.Runner",
         },
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
                 "fuchsia.starnix.container.Controller",
+                "fuchsia.starnix.container.Runner",
             ],
         },
     ],
@@ -68,6 +69,10 @@
         },
         {
             protocol: [ "fuchsia.component.runner.ComponentRunner" ],
+            from: "self",
+        },
+        {
+            protocol: [ "fuchsia.starnix.container.Runner" ],
             from: "self",
         },
         {

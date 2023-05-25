@@ -98,6 +98,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/storage/ext4:ext4_metadata",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:derivative",
