@@ -131,9 +131,15 @@ files = {
   zbi = "${assembly_outdir}/${labels.assembly_name}.${_image_suffix}"
   vbmeta = "${assembly_outdir}/${labels.assembly_name}.vbmeta"
 
-  # Final output image and vbmeta (the files at the above paths are copied here)
-  final_zbi = "${root_out_dir}/" + rebase_path(zbi, assembly_outdir)
-  final_vbmeta = "${root_out_dir}/" + rebase_path(vbmeta, assembly_outdir)
+  if (use_bazel_images_only) {
+    # Final image and vbmeta are not copied to root in Bazel assembly.
+    final_zbi = zbi
+    final_vbmeta = vbmeta
+  } else {
+    # Final output image and vbmeta (the files at the above paths are copied here)
+    final_zbi = "${root_out_dir}/" + rebase_path(zbi, assembly_outdir)
+    final_vbmeta = "${root_out_dir}/" + rebase_path(vbmeta, assembly_outdir)
+  }
 
   # Recovery output image and vbmeta
   if (recovery_is_zedboot) {

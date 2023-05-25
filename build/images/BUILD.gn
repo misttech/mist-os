@@ -251,6 +251,10 @@ group("default-images") {
 
   deps = default_image_deps
 
+  # Downstream tools (e.g. bundle_fetcher in infra) relies on metadata generated
+  # by product_metadata, so keeping this dep for Bazel assembly.
+  deps += [ "//build/images/flash:product_metadata" ]
+
   # Prune unsupported targets when Bazel assembly is enabled. This makes sure
   # the build:
   #
@@ -264,7 +268,6 @@ group("default-images") {
     deps += [
       "//build/images/flash:fastboot_manifest",
       "//build/images/flash:flash_script",
-      "//build/images/flash:product_metadata",
       "//build/images/tools:fastboot($host_toolchain)",
     ]
 
