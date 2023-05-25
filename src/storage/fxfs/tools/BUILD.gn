@@ -20,6 +20,7 @@ if (is_host) {
       "//src/storage/fxfs/crypto/insecure",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:chrono",
+      "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:zstd",
       "//third_party/zstd",
     ]
@@ -76,6 +77,7 @@ if (is_host) {
     binary_path = "${root_out_dir}/fxfs"
     deps = [
       ":fxfs_tool($host_toolchain)",
+      "//src/storage/fxfs/testdata:golden_image_manifest",
       "//src/storage/fxfs/testdata:golden_images",
     ]
     args = [

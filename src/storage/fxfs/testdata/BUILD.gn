@@ -13,4 +13,15 @@ if (is_host) {
     sources = fxfs_golden_images
     outputs = [ "$root_out_dir/fxfs_golden_images/{{source_file_part}}" ]
   }
+
+  generated_file("golden_image_manifest_gen") {
+    output_conversion = "json"
+    contents = fxfs_golden_images
+    outputs = [ "$root_out_dir/fxfs_golden_images/golden_image_manifest.json" ]
+  }
+
+  host_test_data("golden_image_manifest") {
+    sources = [ "$root_out_dir/fxfs_golden_images/golden_image_manifest.json" ]
+    deps = [ ":golden_image_manifest_gen" ]
+  }
 }

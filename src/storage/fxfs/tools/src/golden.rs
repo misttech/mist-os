@@ -4,7 +4,7 @@
 
 use {
     crate::ops,
-    anyhow::{bail, Context, Error},
+    anyhow::{bail, ensure, Context, Error},
     chrono::Local,
     fxfs::{
         filesystem::{mkfs_with_default, Filesystem, FxFilesystem, SyncOptions},
@@ -12,6 +12,7 @@ use {
     },
     fxfs_crypto::Crypt,
     fxfs_insecure_crypto::InsecureCrypt,
+    serde_json,
     std::{
         io::Write,
         path::{Path, PathBuf},
@@ -24,6 +25,7 @@ const IMAGE_BLOCKS: u64 = 8192;
 const IMAGE_BLOCK_SIZE: u32 = 1024;
 const EXPECTED_FILE_CONTENT: &[u8; 8] = b"content.";
 const FXFS_GOLDEN_IMAGE_DIR: &str = "src/storage/fxfs/testdata";
+const FXFS_GOLDEN_IMAGE_MANIFEST: &str = "golden_image_manifest.json";
 const PROJECT_ID: u64 = 4;
 
 /// Uses FUCHSIA_DIR environment variable to generate a path to the expected location of golden
@@ -118,7 +120,8 @@ pub async fn create_image() -> Result<(), Error> {
         .as_bytes(),
     )?;
     file.write_all(b"fxfs_golden_images = [\n")?;
-    let paths = std::fs::read_dir(golden_image_dir()?)?.collect::<Result<Vec<_>, _>>()?;
+    let mut paths = std::fs::read_dir(golden_image_dir()?)?.collect::<Result<Vec<_>, _>>()?;
+    paths.sort_unstable_by_key(|path| path.path().to_str().unwrap().to_string());
     for file_name in
         paths.iter().map(|e| e.file_name()).filter(|x| x.to_str().unwrap().ends_with(".zstd"))
     {
@@ -172,21 +175,29 @@ pub async fn check_images(image_root: Option<String>) -> Result<(), Error> {
         None => golden_image_dir()?,
     };
 
-    // First check that there exists an image for the current version.
-    let path = image_root.join(latest_image_filename());
-    if std::fs::metadata(path.as_path()).is_err() {
-        bail!(
-            "Golden image is missing for version {} ({}). Please run 'fx fxfs create_golden'",
-            LATEST_VERSION,
-            path.display()
-        )
-    }
+    let mut golden_files: Vec<String> = {
+        let manifest_path = image_root.clone().join(FXFS_GOLDEN_IMAGE_MANIFEST);
+        let manifest_contents =
+            std::fs::read_to_string(manifest_path.clone()).with_context(|| {
+                format!("Failed to read golden manifest: {}", manifest_path.display())
+            })?;
+        serde_json::from_str(&manifest_contents).with_context(|| {
+            format!("Failed to parse manifest json: {}", manifest_path.display())
+        })?
+    };
+
+    // First check that there exists an image for the latest version.
+    ensure!(
+        golden_files.contains(&latest_image_filename()),
+        "Golden image is missing for version {} ({}). Please run 'fx fxfs create_golden'",
+        LATEST_VERSION,
+        latest_image_filename()
+    );
+
     // Next ensure that we can parse all golden images and validate expected content.
-    let mut paths = std::fs::read_dir(image_root)?.collect::<Result<Vec<_>, _>>()?;
-    paths.sort_unstable_by_key(|path| path.path().to_str().unwrap().to_string());
-    for path_buf in
-        paths.iter().map(|e| e.path().clone()).filter(|x| x.to_str().unwrap().ends_with(".zstd"))
-    {
+    golden_files.sort();
+    for golden_file in golden_files {
+        let path_buf = image_root.clone().join(golden_file);
         println!("------------------------------------------------------------------------");
         println!("Validating golden image: {}", path_buf.file_name().unwrap().to_str().unwrap());
         println!("------------------------------------------------------------------------");
