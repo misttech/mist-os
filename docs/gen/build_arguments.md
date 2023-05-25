@@ -6126,6 +6126,14 @@ Default pip requirements file for all Pigweed based projects.
 
 From //third_party/pigweed/src/pw_build/python.gni:30
 
+### pw_build_PYLINT_OUTPUT_FORMAT
+
+Output format for pylint. Options include "text" and "colorized".
+
+**Current value (from the default):** `"colorized"`
+
+From //third_party/pigweed/src/pw_build/python.gni:38
+
 ### pw_build_PYTHON_BUILD_VENV
 
 Default gn build virtualenv target.
@@ -6319,7 +6327,7 @@ From //third_party/pigweed/src/pw_function/BUILD.gn:27
 
 Backend for the pw_log module.
 
-**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log/dfv1"`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
 From //.gn:65
 
@@ -6327,7 +6335,7 @@ From //.gn:65
 
 From //third_party/pigweed/src/pw_log/backend.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log/dfv1"`
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
 From //.gn:65
 
