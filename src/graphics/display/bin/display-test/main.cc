@@ -155,16 +155,6 @@ static bool bind_display(const char* coordinator, fbl::Vector<Display>* displays
   return true;
 }
 
-bool import_gamma_tables(uint64_t id, float gamma) {
-  fidl::Array<float, 256> r;
-  fidl::Array<float, 256> g;
-  fidl::Array<float, 256> b;
-  generate_gamma_table(gamma, r.data());
-  generate_gamma_table(gamma, g.data());
-  generate_gamma_table(gamma, b.data());
-  return dc->ImportGammaTable(id, r, g, b).ok();
-}
-
 Display* find_display(fbl::Vector<Display>& displays, const char* id_str) {
   uint64_t id = strtoul(id_str, nullptr, 10);
   if (id != 0) {  // 0 is the invalid id, and luckily what strtoul returns on failure
@@ -595,10 +585,6 @@ void usage(void) {
       "                           <o> is a value between [0 1] inclusive\n"
       "--enable-compression     : Enable framebuffer compression.\n"
       "--apply-config-once      : Apply configuration once in single buffer mode.\n"
-      "--gamma g                : Enable Gamma Correction.\n"
-      "                           <g> is the gamma correction value\n"
-      "                           Valid values between [1.0 3.0]"
-      "                           For Linear gamma, use g = 1\n"
       "--clamp-rgb c            : Set minimum RGB value [0 255].\n"
       "--configs-per-vsync n    : Number of configs applied per vsync\n"
       "--pattern pattern        : Image pattern to use - 'checkerboard' (default) or 'border'\n"
@@ -720,7 +706,6 @@ int main(int argc, const char* argv[]) {
   uint32_t fgcolor_rgba = 0xffff0000;  // red (default)
   uint32_t bgcolor_rgba = 0xffffffff;  // white (default)
   bool use_color_correction = false;
-  float gamma = std::nanf("");
   int clamp_rgb = -1;
 
   testing::display::ColorCorrectionArgs color_correction_args;
@@ -793,14 +778,6 @@ int main(int argc, const char* argv[]) {
       verify_capture = true;
       argv += 1;
       argc -= 1;
-    } else if (strcmp(argv[0], "--gamma") == 0) {
-      gamma = std::stof(argv[1]);
-      if (gamma < 1 || gamma > 3) {
-        usage();
-        return -1;
-      }
-      argv += 2;
-      argc -= 2;
     } else if (strcmp(argv[0], "--clamp-rgb") == 0) {
       clamp_rgb = atoi(argv[1]);
       if (clamp_rgb < 0 || clamp_rgb > 255) {
@@ -904,14 +881,6 @@ int main(int argc, const char* argv[]) {
   if (use_color_correction) {
     for (auto& d : displays) {
       d.apply_color_correction(true);
-    }
-  }
-
-  constexpr uint64_t gamma_id = 1;
-  if (!std::isnan(gamma)) {
-    if (!import_gamma_tables(gamma_id, gamma)) {
-      printf("Error importing gamma table\n");
-      return -1;
     }
   }
 
@@ -1117,14 +1086,6 @@ int main(int argc, const char* argv[]) {
     // This delay is used to skew the timing between vsync and ApplyConfiguration
     // in order to observe any tearing effects
     zx_nanosleep(zx_deadline_after(ZX_MSEC(delay)));
-
-    // Check to see if we should set gamma correction
-    if (!std::isnan(gamma)) {
-      if (!dc->SetDisplayGammaTable(displays[0].id(), gamma_id).ok()) {
-        printf("Could not set Gamma Table\n");
-        return -1;
-      }
-    }
 
     fhd::wire::ConfigStamp expected_stamp = {.value = fhd::wire::kInvalidConfigStampValue};
     if (!max_apply_configs || i < max_apply_configs) {
