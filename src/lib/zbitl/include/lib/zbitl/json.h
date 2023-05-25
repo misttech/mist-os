@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_JSON_H_
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_JSON_H_
 
+#include <lib/zbi-format/internal/storage.h>
 #include <lib/zbi-format/zbi.h>
 
 #include <optional>
@@ -123,7 +124,7 @@ void JsonWriteZbi(Writer&& writer, Zbi&& zbi, std::optional<uint32_t> offset = {
   auto advance_offset = [&offset](uint32_t payload_length) {
     if (offset) {
       *offset += static_cast<uint32_t>(sizeof(zbi_header_t));
-      *offset += ZBI_ALIGN(payload_length);
+      *offset += AlignedPayloadLength(payload_length);
     }
   };
 

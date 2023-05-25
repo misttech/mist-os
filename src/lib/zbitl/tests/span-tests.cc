@@ -71,7 +71,7 @@ TEST(ZbitlViewStringTests, TooSmallForNextHeader) {
   // iteration should result in error, specifically `kExpectedError`.
   std::string zbi;
   {
-    const zbi_header_t header = ZBI_CONTAINER_HEADER(sizeof(zbi_header_t));
+    const zbi_header_t header = zbitl::ContainerHeader(sizeof(zbi_header_t));
     zbi.append(reinterpret_cast<const char*>(&header), sizeof(header));
   }
   zbitl::View<std::string_view> view(zbi);
@@ -104,7 +104,7 @@ void CheckInvalidPayloadSizeDetected(uint32_t claimed_size, uint32_t actual_size
   std::string zbi;
   {
     const zbi_header_t header =
-        ZBI_CONTAINER_HEADER(sizeof(zbi_header_t));  // Fits one item header.
+        zbitl::ContainerHeader(sizeof(zbi_header_t));  // Fits one item header.
     zbi.append(reinterpret_cast<const char*>(&header), sizeof(header));
   }
   {

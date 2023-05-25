@@ -76,8 +76,7 @@ int TurduckenTest::Main(Zbi::iterator kernel_item) {
     ZX_PANIC("Don't like the taste of %.*s!", static_cast<int>(flavor->size()), flavor->data());
   }
 
-  const uint32_t extra_space = static_cast<uint32_t>(
-      sizeof(zbi_header_t) + ZBI_ALIGN(static_cast<uint32_t>(extra_option.size())));
+  const uint32_t extra_space = zbitl::AlignedItemLength(static_cast<uint32_t>(extra_option.size()));
   printf("%s: %u extra space for %zu chars of new option text\n", test_name(), extra_space,
          extra_option.size());
 

@@ -10,22 +10,94 @@ using namespace std::literals;
 
 namespace zbitl {
 
+// TODO(fxbug.dev/127846): Consider some way of generating this.
 std::string_view TypeName(uint32_t type) {
-#define TYPE(code, name, extension) \
-  case code:                        \
-    return name##sv;
-  switch (type) { ZBI_ALL_TYPES(TYPE) }
-#undef TYPE
+  using namespace std::string_view_literals;
+
+  switch (type) {
+    case ZBI_TYPE_CONTAINER:
+      return "CONTAINER"sv;
+    case ZBI_TYPE_KERNEL_X64:
+      return "KERNEL_X64"sv;
+    case ZBI_TYPE_KERNEL_ARM64:
+      return "KERNEL_ARM64"sv;
+    case ZBI_TYPE_KERNEL_RISCV64:
+      return "KERNEL_RISCV64"sv;
+    case ZBI_TYPE_DISCARD:
+      return "DISCARD"sv;
+    case ZBI_TYPE_STORAGE_RAMDISK:
+      return "RAMDISK"sv;
+    case ZBI_TYPE_STORAGE_BOOTFS:
+      return "BOOTFS"sv;
+    case ZBI_TYPE_STORAGE_BOOTFS_FACTORY:
+      return "BOOTFS_FACTORY"sv;
+    case ZBI_TYPE_STORAGE_KERNEL:
+      return "KERNEL"sv;
+    case ZBI_TYPE_CMDLINE:
+      return "CMDLINE"sv;
+    case ZBI_TYPE_CRASHLOG:
+      return "CRASHLOG"sv;
+    case ZBI_TYPE_NVRAM:
+      return "NVRAM"sv;
+    case ZBI_TYPE_PLATFORM_ID:
+      return "PLATFORM_ID"sv;
+    case ZBI_TYPE_CPU_CONFIG:
+      return "CPU_CONFIG"sv;
+    case ZBI_TYPE_CPU_TOPOLOGY:
+      return "CPU_TOPOLOGY"sv;
+    case ZBI_TYPE_MEM_CONFIG:
+      return "MEM_CONFIG"sv;
+    case ZBI_TYPE_KERNEL_DRIVER:
+      return "KERNEL_DRIVER"sv;
+    case ZBI_TYPE_ACPI_RSDP:
+      return "ACPI_RSDP"sv;
+    case ZBI_TYPE_SMBIOS:
+      return "SMBIOS"sv;
+    case ZBI_TYPE_EFI_SYSTEM_TABLE:
+      return "EFI_SYSTEM_TABLE"sv;
+    case ZBI_TYPE_FRAMEBUFFER:
+      return "FRAMEBUFFER"sv;
+    case ZBI_TYPE_DRV_MAC_ADDRESS:
+      return "DRV_MAC_ADDRESS"sv;
+    case ZBI_TYPE_DRV_PARTITION_MAP:
+      return "DRV_PARTITION_MAP"sv;
+    case ZBI_TYPE_DRV_BOARD_PRIVATE:
+      return "DRV_BOARD_PRIVATE"sv;
+    case ZBI_TYPE_DRV_BOARD_INFO:
+      return "DRV_BOARD_INFO"sv;
+    case ZBI_TYPE_IMAGE_ARGS:
+      return "IMAGE_ARGS"sv;
+    case ZBI_TYPE_BOOT_VERSION:
+      return "BOOT_VERSION"sv;
+    case ZBI_TYPE_HW_REBOOT_REASON:
+      return "HW_REBOOT_REASON"sv;
+    case ZBI_TYPE_SERIAL_NUMBER:
+      return "SERIAL_NUMBER"sv;
+    case ZBI_TYPE_BOOTLOADER_FILE:
+      return "BOOTLOADER_FILE"sv;
+    case ZBI_TYPE_DEVICETREE:
+      return "DEVICETREE"sv;
+    case ZBI_TYPE_SECURE_ENTROPY:
+      return "ENTROPY"sv;
+    case ZBI_TYPE_EFI_MEMORY_ATTRIBUTES_TABLE:
+      return "EFI_MEMORY_ATTRIBUTES_TABLE"sv;
+  }
   return {};
 }
 
 std::string_view TypeExtension(uint32_t type) {
-#define TYPE(code, name, extension) \
-  case code:                        \
-    return extension##sv;
-  switch (type) { ZBI_ALL_TYPES(TYPE) }
-#undef TYPE
-  return {};
+  using namespace std::string_view_literals;
+
+  switch (type) {
+    case ZBI_TYPE_CMDLINE:
+    case ZBI_TYPE_IMAGE_ARGS:
+    case ZBI_TYPE_SERIAL_NUMBER:
+      return ".txt"sv;
+
+    case ZBI_TYPE_DEVICETREE:
+      return ".dtb";
+  }
+  return ".bin"sv;
 }
 
 bool TypeIsStorage(uint32_t type) {

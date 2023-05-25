@@ -5,6 +5,7 @@
 #include <lib/fit/defer.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
+#include <lib/zbitl/item.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,16 +18,20 @@
 #include <zxtest/zxtest.h>
 
 const char kTestKernel[] = "4567";
-constexpr size_t kKernelPayloadLen = ZBI_ALIGN(static_cast<uint32_t>(sizeof(kTestKernel)));
+constexpr size_t kKernelPayloadLen =
+    zbitl::AlignedPayloadLength(static_cast<uint32_t>(sizeof(kTestKernel)));
 
 const char kTestCmdline[] = "0123";
-constexpr size_t kCmdlinePayloadLen = ZBI_ALIGN(static_cast<uint32_t>(sizeof(kTestCmdline)));
+constexpr size_t kCmdlinePayloadLen =
+    zbitl::AlignedPayloadLength(static_cast<uint32_t>(sizeof(kTestCmdline)));
 
 const char kTestRD[] = "0123456789";
-constexpr size_t kRdPayloadLen = ZBI_ALIGN(static_cast<uint32_t>(sizeof(kTestRD)));
+constexpr size_t kRdPayloadLen =
+    zbitl::AlignedPayloadLength(static_cast<uint32_t>(sizeof(kTestRD)));
 
 const char kTestBootfs[] = "abcdefghijklmnopqrs";
-constexpr size_t kBootfsPayloadLen = ZBI_ALIGN(static_cast<uint32_t>(sizeof(kTestBootfs)));
+constexpr size_t kBootfsPayloadLen =
+    zbitl::AlignedPayloadLength(static_cast<uint32_t>(sizeof(kTestBootfs)));
 
 typedef struct test_zbi {
   // Bootdata header.
@@ -46,7 +51,7 @@ typedef struct test_zbi {
 } test_zbi_t;
 
 typedef struct single_entry_test_zbi {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   zbi_header_t entry_header;
   int8_t entry_payload[8];
 } single_entry_test_zbi_t;
@@ -181,13 +186,13 @@ TEST(ZbiTests, ZbiTestInitNullBuffer) {
 
 // TODO(fxbug.dev/52665): Consider pulling out the check logic into a common helper.
 TEST(ZbiTests, ZbiTestCheckEmptyContainer) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
 
   ASSERT_EQ(zbi_check(&container, nullptr), ZBI_RESULT_OK);
 }
 
 TEST(ZbiTests, ZbiTestCheckEmptyContainerWithErr) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   zbi_header_t* err = nullptr;
 
   EXPECT_EQ(zbi_check(&container, &err), ZBI_RESULT_OK);
@@ -195,14 +200,14 @@ TEST(ZbiTests, ZbiTestCheckEmptyContainerWithErr) {
 }
 
 TEST(ZbiTests, ZbiTestCheckContainerBadType) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.type = 0;
 
   ASSERT_EQ(zbi_check(&container, nullptr), ZBI_RESULT_BAD_TYPE);
 }
 
 TEST(ZbiTests, ZbiTestCheckContainerBadTypeWithErr) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.type = 0;
   zbi_header_t* err = nullptr;
 
@@ -211,28 +216,28 @@ TEST(ZbiTests, ZbiTestCheckContainerBadTypeWithErr) {
 }
 
 TEST(ZbiTests, ZbiTestCheckContainerBadExtra) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.extra = 0;
 
   ASSERT_EQ(zbi_check(&container, nullptr), ZBI_RESULT_BAD_MAGIC);
 }
 
 TEST(ZbiTests, ZbiTestCheckContainerBadMagic) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.magic = 0;
 
   ASSERT_EQ(zbi_check(&container, nullptr), ZBI_RESULT_BAD_MAGIC);
 }
 
 TEST(ZbiTests, ZbiTestCheckContainerBadVersion) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.flags &= ~ZBI_FLAGS_VERSION;
 
   ASSERT_EQ(zbi_check(&container, nullptr), ZBI_RESULT_BAD_VERSION);
 }
 
 TEST(ZbiTests, ZbiTestCheckContainerBadCrc32) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   // Entries with no checksum must have the crc32 field set to ZBI_ITEM_NO_CRC32.
   container.flags &= ~ZBI_FLAGS_CRC32;
   container.crc32 = 0;
@@ -348,7 +353,7 @@ TEST(ZbiTests, ZbiTestCheckCompleteTestZbiNull) {
 }
 
 TEST(ZbiTests, ZbiTestCheckCompleteTestZbiTruncated) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.length = 0;
 
   ASSERT_EQ(zbi_check_bootable(&container, nullptr), ZBI_RESULT_ERR_TRUNCATED);
@@ -386,13 +391,13 @@ TEST(ZbiTests, ZbiTestForEachTestZbiNull) {
 }
 
 TEST(ZbiTests, ZbiTestForEachTestZbiNullCallback) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
 
   ASSERT_EQ(zbi_for_each(&container, nullptr, nullptr), ZBI_RESULT_ERROR);
 }
 
 TEST(ZbiTests, ZbiTestForEachTestZbiContainer) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   uint32_t count = 0;
 
   // The callback should be invoked with ZBI items and not the container.
@@ -538,7 +543,7 @@ TEST(ZbiTests, ZbiTestCreateEntryTestZbiNotContainer) {
 
 // create entry tests
 TEST(ZbiTests, ZbiTestCreateEntryTestZbiCapacitySmallerThanCurrentSize) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.length = 2;
   void* payload = nullptr;
 
@@ -546,7 +551,7 @@ TEST(ZbiTests, ZbiTestCreateEntryTestZbiCapacitySmallerThanCurrentSize) {
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryTestZbiFull) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   void* payload = nullptr;
 
   ASSERT_EQ(zbi_create_entry(&container, /*capacity=*/sizeof(container), 0, 0, 0,
@@ -586,13 +591,13 @@ TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiNull) {
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiNullPayload) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
 
   ASSERT_EQ(zbi_create_entry_with_payload(&container, 0, 0, 0, 0, nullptr, 0), ZBI_RESULT_ERROR);
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiCrc32NotSupported) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   void* payload = nullptr;
 
   ASSERT_EQ(zbi_create_entry_with_payload(&container, 0, 0, 0, ZBI_FLAGS_CRC32, &payload, 0),
@@ -600,7 +605,7 @@ TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiCrc32NotSupported) {
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestPayloadTooBig) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   void* payload = nullptr;
   size_t payload_length = std::numeric_limits<uint32_t>::max();
   ASSERT_EQ(zbi_create_entry_with_payload(&container, 0, 0, 0, 0, &payload, payload_length + 1),
@@ -608,7 +613,7 @@ TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestPayloadTooBig) {
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiNotContainer) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.type = 0;
   void* payload = nullptr;
 
@@ -617,7 +622,7 @@ TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiNotContainer) {
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiCapacitySmallerThanCurrentSize) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   container.length = 2;
   void* payload = nullptr;
 
@@ -626,7 +631,7 @@ TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiCapacitySmallerThanCurrentSiz
 }
 
 TEST(ZbiTests, ZbiTestCreateEntryWithPayloadTestZbiSectionTooLarge) {
-  zbi_header_t container = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t container = zbi_container_header(0);
   void* payload = nullptr;
 
   ASSERT_EQ(zbi_create_entry_with_payload(&container, /*capacity=*/1, 0, 0, 0, &payload,
@@ -784,50 +789,50 @@ TEST(ZbiTests, ZbiTestExtendTestZbi) {
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiDstNull) {
-  zbi_header_t zbi = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t zbi = zbi_container_header(0);
 
   ASSERT_EQ(zbi_extend(nullptr, 0, &zbi), ZBI_RESULT_ERROR);
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiSrcNull) {
-  zbi_header_t zbi = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t zbi = zbi_container_header(0);
 
   ASSERT_EQ(zbi_extend(&zbi, 0, nullptr), ZBI_RESULT_ERROR);
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiDstNotContainer) {
-  zbi_header_t src = ZBI_CONTAINER_HEADER(0);
-  zbi_header_t dst = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t src = zbi_container_header(0);
+  zbi_header_t dst = zbi_container_header(0);
   dst.type = 0;
 
   ASSERT_EQ(zbi_extend(&dst, 0, &src), ZBI_RESULT_BAD_TYPE);
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiSrcNotContainer) {
-  zbi_header_t src = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t src = zbi_container_header(0);
   src.type = 0;
-  zbi_header_t dst = ZBI_CONTAINER_HEADER(0);
+  zbi_header_t dst = zbi_container_header(0);
 
   ASSERT_EQ(zbi_extend(&dst, 0, &src), ZBI_RESULT_BAD_TYPE);
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiCapacitySmallerThanDstLength) {
-  zbi_header_t src = ZBI_CONTAINER_HEADER(0);
-  zbi_header_t dst = ZBI_CONTAINER_HEADER(1);
+  zbi_header_t src = zbi_container_header(0);
+  zbi_header_t dst = zbi_container_header(1);
 
   ASSERT_EQ(zbi_extend(&dst, 0, &src), ZBI_RESULT_TOO_BIG);
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiCapacitySmallerThanDstAlignedLength) {
-  zbi_header_t src = ZBI_CONTAINER_HEADER(0);
-  zbi_header_t dst = ZBI_CONTAINER_HEADER(6);
+  zbi_header_t src = zbi_container_header(0);
+  zbi_header_t dst = zbi_container_header(6);
 
   ASSERT_EQ(zbi_extend(&dst, /*capacity=*/7, &src), ZBI_RESULT_TOO_BIG);
 }
 
 TEST(ZbiTests, ZbiTestExtendTestZbiSrcTooLarge) {
-  zbi_header_t src = ZBI_CONTAINER_HEADER(ZBI_ALIGNMENT + 1);
-  zbi_header_t dst = ZBI_CONTAINER_HEADER(ZBI_ALIGNMENT);
+  zbi_header_t src = zbi_container_header(ZBI_ALIGNMENT + 1);
+  zbi_header_t dst = zbi_container_header(ZBI_ALIGNMENT);
 
   ASSERT_EQ(zbi_extend(&dst, /*capacity=*/ZBI_ALIGNMENT, &src), ZBI_RESULT_TOO_BIG);
 }
@@ -911,7 +916,7 @@ TEST(ZbiTests, ZbiTestNoOverflow) {
   ASSERT_EQ(zbi_init(src_buffer, kUsableBufferSize + 1), ZBI_RESULT_OK);
 
   ASSERT_EQ(zbi_create_entry_with_payload(
-                src_buffer, ZBI_ALIGN(kUsableBufferSize + 1), ZBI_TYPE_CMDLINE,
+                src_buffer, zbitl::AlignedPayloadLength(kUsableBufferSize + 1), ZBI_TYPE_CMDLINE,
                 0,  // Extra
                 0,  // Flags
                 test_data,

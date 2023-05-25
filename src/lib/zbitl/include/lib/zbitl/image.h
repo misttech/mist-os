@@ -63,10 +63,9 @@ class Image : public View<Storage> {
       current_length = container_result.value().length;
     }
 
-    const uint32_t size = sizeof(zbi_header_t) + current_length;
+    const uint32_t size = AlignedItemLength(current_length);
     const uint32_t new_item_offset = size;
-    const uint32_t new_size =
-        ZBI_ALIGN(new_item_offset + static_cast<uint32_t>(sizeof(new_header)) + new_header.length);
+    const uint32_t new_size = new_item_offset + AlignedItemLength(new_header);
     // Overflow would have happened if `new_size` is now less than or equal to
     // any of the constituent elements in its defining sum, including
     // `ZBI_ALIGNMENT`; this reduces to the following predicate.
@@ -83,7 +82,7 @@ class Image : public View<Storage> {
           Error{"cannot write item header", new_item_offset, std::move(result.error_value())}};
     }
 
-    uint32_t padding_size = ZBI_ALIGN(new_header.length) - new_header.length;
+    uint32_t padding_size = AlignedPayloadLength(new_header.length) - new_header.length;
     if (padding_size > 0) {
       uint32_t payload_end =
           new_item_offset + static_cast<uint32_t>(sizeof(new_header)) + new_header.length;
@@ -221,7 +220,7 @@ class Image : public View<Storage> {
     ZX_ASSERT(item.next_is_end());
 
     const uint32_t old_length = item->header->length;
-    ZX_ASSERT(new_length <= ZBI_ALIGN(old_length));
+    ZX_ASSERT(new_length <= AlignedPayloadLength(old_length));
 
     if (new_length == old_length) {
       return fit::ok(item);
@@ -236,7 +235,7 @@ class Image : public View<Storage> {
       }};
     }
 
-    if (auto result = ResetContainer(item.payload_offset() + ZBI_ALIGN(new_length));
+    if (auto result = ResetContainer(item.payload_offset() + AlignedPayloadLength(new_length));
         result.is_error()) {
       return result.take_error();
     }
@@ -269,7 +268,7 @@ class Image : public View<Storage> {
       }};
     }
     if (auto result =
-            this->WriteHeader(ZBI_CONTAINER_HEADER(new_size - uint32_t{sizeof(zbi_header_t)}), 0);
+            this->WriteHeader(ContainerHeader(new_size - uint32_t{sizeof(zbi_header_t)}), 0);
         result.is_error()) {
       return fit::error{Error{"cannot write container header", 0, std::move(result.error_value())}};
     }

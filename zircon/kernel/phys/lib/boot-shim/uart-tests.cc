@@ -10,6 +10,7 @@
 #include <lib/uart/null.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/image.h>
+#include <lib/zbitl/item.h>
 
 #include <array>
 
@@ -20,8 +21,7 @@ namespace {
 using boot_shim::UartItem;
 
 TEST(UartItemTest, SetItemWithNullDriverIsNoOp) {
-  std::array<std::byte, 2 * sizeof(zbi_header_t) + ZBI_ALIGN(sizeof(uart::null::Driver().config()))>
-      data;
+  std::array<std::byte, 2 * zbitl::AlignedItemLength(sizeof(uart::null::Driver().config()))> data;
   zbitl::Image<cpp20::span<std::byte>> image(data);
   ASSERT_TRUE(image.clear().is_ok());
   size_t clear_image_size = image.size_bytes();
@@ -36,8 +36,7 @@ TEST(UartItemTest, SetItemWithNullDriverIsNoOp) {
 }
 
 TEST(UartItemTest, SetItemWithMmioDriver) {
-  std::array<std::byte,
-             2 * sizeof(zbi_header_t) + ZBI_ALIGN(sizeof(uart::ns8250::MmioDriver().config()))>
+  std::array<std::byte, 2 * zbitl::AlignedItemLength(sizeof(uart::ns8250::MmioDriver().config()))>
       data;
   zbitl::Image<cpp20::span<std::byte>> image(data);
   ASSERT_TRUE(image.clear().is_ok());
@@ -64,8 +63,7 @@ TEST(UartItemTest, SetItemWithMmioDriver) {
 
 #if defined(__x86_64__) || defined(__i386__)
 TEST(UartItemTest, SetItemWithPioDriver) {
-  std::array<std::byte,
-             2 * sizeof(zbi_header_t) + ZBI_ALIGN(sizeof(uart::ns8250::PioDriver().config()))>
+  std::array<std::byte, 2 * zbitl::AlignedItemLength(sizeof(uart::ns8250::PioDriver().config()))>
       data;
   zbitl::Image<cpp20::span<std::byte>> image(data);
   ASSERT_TRUE(image.clear().is_ok());

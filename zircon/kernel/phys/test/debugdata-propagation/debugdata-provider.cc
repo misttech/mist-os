@@ -7,6 +7,7 @@
 #include <lib/boot-shim/debugdata.h>
 #include <lib/zbi-format/internal/debugdata.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/item.h>
 #include <lib/zbitl/items/debugdata.h>
 #include <stdio.h>
 #include <turducken.h>
@@ -40,8 +41,8 @@ int TurduckenTest::Main(Zbi::iterator kernel_item) {
 
   // Command line item marking debug data as set. Account for null terminator that will be added by
   // snprintf.
-  extra_capacity += static_cast<uint32_t>(
-      sizeof(zbi_header_t) + ZBI_ALIGN(kDebugdataProvided.length() + kTrue.length() + 1));
+  extra_capacity += zbitl::AlignedItemLength(
+      static_cast<uint32_t>(kDebugdataProvided.length() + kTrue.length() + 1));
   Load(kernel_item, kernel_item, kernel_item.view().end(), extra_capacity);
 
   // Add the cmdline

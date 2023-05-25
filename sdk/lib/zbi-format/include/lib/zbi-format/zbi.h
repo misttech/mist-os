@@ -9,46 +9,11 @@
 #include <stdint.h>
 #endif
 
-// Zircon Boot Image format (ZBI).
-//
-// A Zircon Boot Image consists of a container header followed by boot
-// items.  Each boot item has a header (zbi_header_t) and then a payload of
-// zbi_header_t.length bytes, which can be any size.  The zbi_header_t.type
-// field indicates how to interpret the payload.  Many types specify an
-// additional type-specific header that begins a variable-sized payload.
-// zbi_header_t.length does not include the zbi_header_t itself, but does
-// include any type-specific headers as part of the payload.  All fields in
-// all header formats are little-endian.
-//
-// Padding bytes appear after each item as needed to align the payload size
-// up to a ZBI_ALIGNMENT (8-byte) boundary.  This padding is not reflected
-// in the zbi_header_t.length value.
-//
-// A bootable ZBI can be booted by a Zircon-compatible boot loader.
-// It contains one ZBI_TYPE_KERNEL_{ARCH} boot item that must come first,
-// followed by any number of additional boot items whose number, types,
-// and details much comport with that kernel's expectations.
-//
-// A partial ZBI cannot be booted, and is only used during the build process.
-// It contains one or more boot items and can be combined with a kernel and
-// other ZBIs to make a bootable ZBI.
-
 // All items begin at an 8-byte aligned offset into the image.
 #ifdef __ASSEMBLER__
 #define ZBI_ALIGNMENT (8)
 #else
 #define ZBI_ALIGNMENT (8u)
-#endif
-
-// Round n up to the next 8 byte boundary
-#ifndef __ASSEMBLER__
-#ifdef __cplusplus
-constexpr
-#endif
-    static inline uint32_t
-    ZBI_ALIGN(uint32_t n) {
-  return ((n + ZBI_ALIGNMENT - 1) & -ZBI_ALIGNMENT);
-}
 #endif
 
 // LSW of sha256("bootdata")
@@ -102,44 +67,6 @@ typedef struct {
 } zbi_header_t;
 #endif
 
-// Be sure to add new types to ZBI_ALL_TYPES.
-// clang-format off
-#define ZBI_ALL_TYPES(macro) \
-    macro(ZBI_TYPE_CONTAINER, "CONTAINER", ".bin") \
-    macro(ZBI_TYPE_KERNEL_X64, "KERNEL_X64", ".bin") \
-    macro(ZBI_TYPE_KERNEL_ARM64, "KERNEL_ARM64", ".bin") \
-    macro(ZBI_TYPE_KERNEL_RISCV64, "KERNEL_RISCV64", ".bin") \
-    macro(ZBI_TYPE_DISCARD, "DISCARD", ".bin") \
-    macro(ZBI_TYPE_STORAGE_RAMDISK, "RAMDISK", ".bin") \
-    macro(ZBI_TYPE_STORAGE_BOOTFS, "BOOTFS", ".bin") \
-    macro(ZBI_TYPE_STORAGE_BOOTFS_FACTORY, "BOOTFS_FACTORY", ".bin") \
-    macro(ZBI_TYPE_STORAGE_KERNEL, "KERNEL", ".bin") \
-    macro(ZBI_TYPE_CMDLINE, "CMDLINE", ".txt") \
-    macro(ZBI_TYPE_CRASHLOG, "CRASHLOG", ".bin") \
-    macro(ZBI_TYPE_NVRAM, "NVRAM", ".bin") \
-    macro(ZBI_TYPE_PLATFORM_ID, "PLATFORM_ID", ".bin") \
-    macro(ZBI_TYPE_CPU_CONFIG, "CPU_CONFIG", ".bin") /* Deprecated */ \
-    macro(ZBI_TYPE_CPU_TOPOLOGY, "CPU_TOPOLOGY", ".bin") \
-    macro(ZBI_TYPE_MEM_CONFIG, "MEM_CONFIG", ".bin") \
-    macro(ZBI_TYPE_KERNEL_DRIVER, "KERNEL_DRIVER", ".bin") \
-    macro(ZBI_TYPE_ACPI_RSDP, "ACPI_RSDP", ".bin") \
-    macro(ZBI_TYPE_SMBIOS, "SMBIOS", ".bin") \
-    macro(ZBI_TYPE_EFI_SYSTEM_TABLE, "EFI_SYSTEM_TABLE", ".bin") \
-    macro(ZBI_TYPE_FRAMEBUFFER, "FRAMEBUFFER", ".bin") \
-    macro(ZBI_TYPE_DRV_MAC_ADDRESS, "DRV_MAC_ADDRESS", ".bin") \
-    macro(ZBI_TYPE_DRV_PARTITION_MAP, "DRV_PARTITION_MAP", ".bin") \
-    macro(ZBI_TYPE_DRV_BOARD_PRIVATE, "DRV_BOARD_PRIVATE", ".bin") \
-    macro(ZBI_TYPE_DRV_BOARD_INFO, "DRV_BOARD_INFO", ".bin") \
-    macro(ZBI_TYPE_IMAGE_ARGS, "IMAGE_ARGS", ".txt") \
-    macro(ZBI_TYPE_BOOT_VERSION, "BOOT_VERSION", ".bin") \
-    macro(ZBI_TYPE_HW_REBOOT_REASON, "HW_REBOOT_REASON", ".bin") \
-    macro(ZBI_TYPE_SERIAL_NUMBER, "SERIAL_NUMBER", ".txt") \
-    macro(ZBI_TYPE_BOOTLOADER_FILE, "BOOTLOADER_FILE", ".bin") \
-    macro(ZBI_TYPE_DEVICETREE, "DEVICETREE", ".dtb") \
-    macro(ZBI_TYPE_SECURE_ENTROPY, "ENTROPY", ".bin") \
-    macro(ZBI_TYPE_EFI_MEMORY_ATTRIBUTES_TABLE, "EFI_MEMORY_ATTRIBUTES_TABLE", ".bin")
-// clang-format on
-
 // Each ZBI starts with a container header.
 //     length:          Total size of the image after this header.
 //                      This includes all item headers, payloads, and padding.
@@ -149,38 +76,17 @@ typedef struct {
 //     flags:           Must be ZBI_FLAGS_VERSION and no other flags.
 #define ZBI_TYPE_CONTAINER (0x544f4f42)  // BOOT
 
-// Define a container header in assembly code.  The symbol name is defined
-// as a local label; use .global symbol to make it global.  The length
-// argument can use assembly label arithmetic like any immediate operand.
-#ifdef __ASSEMBLER__
-// clang-format off
-#define ZBI_CONTAINER_HEADER(symbol, length)    \
-    .balign ZBI_ALIGNMENT;                      \
-    symbol:                                     \
-        .int ZBI_TYPE_CONTAINER;                \
-        .int (length);                          \
-        .int ZBI_CONTAINER_MAGIC;               \
-        .int ZBI_FLAGS_VERSION;                  \
-        .int 0;                                 \
-        .int 0;                                 \
-        .int ZBI_ITEM_MAGIC;                    \
-        .int ZBI_ITEM_NO_CRC32;                 \
-    .size symbol, . - symbol;                   \
-    .type symbol, %object
-// clang-format on
-#else
-#define ZBI_CONTAINER_HEADER(length)                                                            \
-  {                                                                                             \
-    ZBI_TYPE_CONTAINER, (length), ZBI_CONTAINER_MAGIC, ZBI_FLAGS_VERSION, 0, 0, ZBI_ITEM_MAGIC, \
-        ZBI_ITEM_NO_CRC32,                                                                      \
-  }
-#endif
-
 #define ZBI_TYPE_KERNEL_PREFIX (0x004e524b)   // KRN\0
 #define ZBI_TYPE_KERNEL_MASK (0x00FFFFFF)     // Mask to compare to the prefix.
 #define ZBI_TYPE_KERNEL_X64 (0x4c4e524b)      // KRNL
 #define ZBI_TYPE_KERNEL_ARM64 (0x384e524b)    // KRN8
 #define ZBI_TYPE_KERNEL_RISCV64 (0x564e524b)  // KRNV
+
+/// Numeric prefix for driver metadata types.
+#define ZBI_TYPE_DRIVER_METADATA_PREFIX (0x0000006d);  // 'm\0\0\0'
+
+/// Mask to compare against TYPE_DRIVER_METADATA_PREFIX.
+#define ZBI_TYPE_DRIVER_METADATA_MASK (0x000000ff)
 
 // A discarded item that should just be ignored.  This is used for an
 // item that was already processed and should be ignored by whatever
@@ -188,37 +94,6 @@ typedef struct {
 // this information, but avoided copying data around to remove it from
 // the ZBI item stream.
 #define ZBI_TYPE_DISCARD (0x50494b53)  // SKIP
-
-// ZBI_TYPE_STORAGE_* types represent an image that might otherwise
-// appear on some block storage device, i.e. a RAM disk of some sort.
-// All zbi_header_t fields have the same meanings for all these types.
-// The interpretation of the payload (after possible decompression) is
-// indicated by the specific zbi_header_t.type value.
-//
-// **Note:** The ZBI_TYPE_STORAGE_* types are not a long-term stable ABI.
-//  - Items of these types are always packed for a specific version of the
-//    kernel and userland boot services, often in the same build that compiles
-//    the kernel.
-//  - These item types are **not** expected to be synthesized or
-//    examined by boot loaders.
-//  - New versions of the `zbi` tool will usually retain the ability to
-//    read old formats and non-default switches to write old formats, for
-//    diagnostic use.
-//
-// The zbi_header_t.extra field always gives the exact size of the
-// original, uncompressed payload.  That equals zbi_header_t.length when
-// the payload is not compressed.  If ZBI_FLAGS_STORAGE_COMPRESSED is set in
-// zbi_header_t.flags, then the payload is compressed.
-//
-// **Note:** Magic-number and header bytes at the start of the compressed
-// payload indicate the compression algorithm and parameters.  The set of
-// compression formats is not a long-term stable ABI.
-//  - Zircon [userboot](../../../../docs/userboot.md) and core services
-//    do the decompression.  A given kernel build's `userboot` will usually
-//    only support one particular compression format.
-//  - The `zbi` tool will usually retain the ability to compress and
-//    decompress for old formats, and can be used to convert between formats.
-#define ZBI_FLAGS_STORAGE_COMPRESSED (0x00000001)
 
 // A virtual disk image.  This is meant to be treated as if it were a
 // storage device.  The payload (after decompression) is the contents of
@@ -312,9 +187,6 @@ typedef struct {
 // A copy of the boot version stored within the sysconfig
 // partition
 #define ZBI_TYPE_BOOT_VERSION (0x53525642)  // BVRS
-
-// ZBI_TYPE_DRV_* types (LSB is 'm') contain driver metadata.
-#define ZBI_TYPE_DRV_METADATA(type) (((type)&0xFF) == 0x6D)  // 'm'
 
 // MAC address for Ethernet, Wifi, Bluetooth, etc.  zbi_header_t.extra
 // is a board-specific index to specify which device the MAC address

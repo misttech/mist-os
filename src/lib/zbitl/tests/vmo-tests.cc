@@ -241,7 +241,7 @@ void TestLargeFileDecompression() {
 
   typename TestTraits::Context context;
   ASSERT_NO_FATAL_FAILURE(
-      TestTraits::Create(2 * sizeof(zbi_header_t) + ZBI_ALIGN(kLargeZstdCompressedSize), &context));
+      TestTraits::Create(2 * zbitl::AlignedItemLength(kLargeZstdCompressedSize), &context));
   zbitl::Image image(context.TakeStorage());
 
   {

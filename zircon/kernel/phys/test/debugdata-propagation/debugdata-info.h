@@ -7,6 +7,7 @@
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/item.h>
 
 #include <array>
 #include <string_view>
@@ -24,7 +25,7 @@ struct Debugdata {
     return static_cast<uint32_t>(sink.size() + payload.size() + log.size() + vmo_name.size());
   }
 
-  constexpr uint32_t aligned_size() const { return ZBI_ALIGN(size()); }
+  constexpr uint32_t aligned_size() const { return zbitl::AlignedPayloadLength(size()); }
 };
 
 inline constexpr auto kDebugdataItems = cpp20::to_array<Debugdata>({

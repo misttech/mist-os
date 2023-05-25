@@ -32,6 +32,7 @@ sdk_source_set("zbi-format") {
     "include/lib/zbi-format/internal/deprecated-cpu.h",
     "include/lib/zbi-format/internal/debugdata.h",
     "include/lib/zbi-format/internal/efi.h",
+    "include/lib/zbi-format/internal/storage.h",
   ]
 
   public_configs = [ ":include" ]

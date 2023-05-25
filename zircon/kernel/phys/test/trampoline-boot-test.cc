@@ -221,7 +221,7 @@ constexpr uint32_t GetCommandLinePayloadLength() {
 
 constexpr uint64_t GetCommandLineItemLength() {
   // Aligned zbi_header | payload.
-  return sizeof(zbi_header_t) + ZBI_ALIGN(GetCommandLinePayloadLength());
+  return zbitl::AlignedItemLength(GetCommandLinePayloadLength());
 }
 
 void UpdateCommandLineZbiItem(uint64_t kernel_load_address, uint64_t data_load_address,

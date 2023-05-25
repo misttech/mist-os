@@ -11,6 +11,12 @@ library_headers("headers") {
   visibility = [ "../*" ]
 
   headers = []
+
+  public_deps = [
+    # <lib/arch/zbi-boot.h> has #include <lib/zbi-format/zbi.h>.
+    # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>
+    "//sdk/lib/zbi-format",
+  ]
 }
 
 static_library("riscv64") {

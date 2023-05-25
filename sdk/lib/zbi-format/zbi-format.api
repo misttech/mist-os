@@ -7,5 +7,5 @@
   "pkg/zbi-format/include/lib/zbi-format/memory.h": "946aa3a9cfa88280ab3b06047442395b",
   "pkg/zbi-format/include/lib/zbi-format/partition.h": "e9a3b09946a9dbc16c9c1d8c5e67c56a",
   "pkg/zbi-format/include/lib/zbi-format/reboot.h": "43ab297770d9d76a75d8ef16950eee34",
-  "pkg/zbi-format/include/lib/zbi-format/zbi.h": "d58c3fb9fb8ba6b8a6ca03d8cf2a8fc9"
+  "pkg/zbi-format/include/lib/zbi-format/zbi.h": "c720986c51b45d7c4b2572cf4920d7aa"
 }

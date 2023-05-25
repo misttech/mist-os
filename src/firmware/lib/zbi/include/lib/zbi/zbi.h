@@ -30,6 +30,21 @@
 
 __BEGIN_CDECLS
 
+// Round n up to the next 8 byte boundary
+static inline uint32_t zbi_align(uint32_t n) { return ((n + ZBI_ALIGNMENT - 1) & -ZBI_ALIGNMENT); }
+
+static inline zbi_header_t zbi_container_header(uint32_t length) {
+  zbi_header_t header = {
+      .type = ZBI_TYPE_CONTAINER,
+      .length = length,
+      .extra = ZBI_CONTAINER_MAGIC,
+      .flags = ZBI_FLAGS_VERSION,
+      .magic = ZBI_ITEM_MAGIC,
+      .crc32 = ZBI_ITEM_NO_CRC32,
+  };
+  return header;
+}
+
 // Represents (the headers of) a bootable ZBI, loaded into memory by the boot
 // loader.
 typedef struct {

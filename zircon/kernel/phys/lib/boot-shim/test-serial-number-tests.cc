@@ -7,6 +7,7 @@
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/boot-shim/test-helper.h>
 #include <lib/boot-shim/test-serial-number.h>
+#include <lib/zbitl/item.h>
 
 #include <zxtest/zxtest.h>
 
@@ -28,7 +29,7 @@ TEST(BootShimTests, TestSerialNumberItem) {
   auto result = item.Init(TestShim::InputZbi(buffer));
   EXPECT_TRUE(result.is_ok());
 
-  EXPECT_EQ(sizeof(zbi_header_t) + ZBI_ALIGN(3), item.size_bytes());
+  EXPECT_EQ(zbitl::AlignedItemLength(3), item.size_bytes());
 
   EXPECT_TRUE(shim.AppendItems(zbi).is_ok());
 

@@ -7,6 +7,7 @@
 #include "lib/boot-shim/debugdata.h"
 
 #include <lib/zbi-format/internal/debugdata.h>
+#include <lib/zbitl/item.h>
 #include <zircon/assert.h>
 
 #include <limits>
@@ -19,7 +20,7 @@ size_t DebugdataItem::payload_size_bytes() const {
     for (std::string_view str : {sink_name_, vmo_name_, vmo_name_suffix_, log_}) {
       size += str.size();
     }
-    size = ZBI_ALIGN(static_cast<uint32_t>(size)) + sizeof(zbi_debugdata_t);
+    size = zbitl::AlignedPayloadLength(static_cast<uint32_t>(size)) + sizeof(zbi_debugdata_t);
   }
   return size;
 }
@@ -48,7 +49,8 @@ auto DebugdataItem::AppendItems(DataZbi& zbi) -> fit::result<DataZbi::Error> {
   }
 
   // Skip over any needed alignment padding.
-  payload = payload.subspan(ZBI_ALIGN(static_cast<uint32_t>(used_size)) - used_size);
+  payload =
+      payload.subspan(zbitl::AlignedPayloadLength(static_cast<uint32_t>(used_size)) - used_size);
 
   ZX_ASSERT_MSG(payload.size_bytes() >= sizeof(zbi_debugdata_t),
                 "%zu bytes left for %zu-byte trailer", payload.size_bytes(),

@@ -10,6 +10,7 @@
 #include <lib/zbi-format/internal/debugdata.h>
 #include <lib/zbi-format/reboot.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/item.h>
 #include <lib/zbitl/items/debugdata.h>
 
 #include <cstring>
@@ -35,7 +36,8 @@ constexpr size_t kStringsSize =
     kSinkName.size() + kVmoName.size() + kVmoNameSuffix.size() + kLog.size();
 
 constexpr size_t kFullSize =
-    ZBI_ALIGN(static_cast<uint32_t>(sizeof(kContents) + kStringsSize)) + sizeof(zbi_debugdata_t);
+    zbitl::AlignedPayloadLength(static_cast<uint32_t>(sizeof(kContents) + kStringsSize)) +
+    sizeof(zbi_debugdata_t);
 
 TEST(BootShimTests, DebugdataItemUninitialized) {
   boot_shim::testing::TestHelper test;
@@ -103,8 +105,7 @@ TEST(BootShimTests, DebugdataItemLogNoContents) {
   item.Init(kSinkName, kVmoName, kVmoNameSuffix);
   item.set_log(kLog);
 
-  EXPECT_EQ(sizeof(zbi_header_t) + ZBI_ALIGN(static_cast<uint32_t>(kStringsSize)) +
-                sizeof(zbi_debugdata_t),
+  EXPECT_EQ(zbitl::AlignedItemLength(static_cast<uint32_t>(kStringsSize)) + sizeof(zbi_debugdata_t),
             item.size_bytes());
 
   EXPECT_TRUE(shim.AppendItems(zbi).is_ok());

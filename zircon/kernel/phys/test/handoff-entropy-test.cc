@@ -29,7 +29,7 @@ bool ValidZbiItem() {
 
   ktl::array<uint8_t, crypto::kMinEntropyBytes> entropy = {1, 2, 3};
 
-  ktl::array<uint8_t, 2 * sizeof(zbi_header_t) + ZBI_ALIGN(crypto::kMinEntropyBytes)> buffer = {};
+  ktl::array<uint8_t, 2 * zbitl::AlignedItemLength(crypto::kMinEntropyBytes)> buffer = {};
   zbitl::Image<ktl::span<ktl::byte>> view(ktl::as_writable_bytes(ktl::span<uint8_t>(buffer)));
   ASSERT_TRUE(view.clear().is_ok());
 

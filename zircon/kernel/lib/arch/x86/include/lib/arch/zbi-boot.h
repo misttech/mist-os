@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 #define ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 
+#include <lib/arch/internal/zbi-constants.h>
 #include <lib/arch/zbi.h>
 #include <zircon/assert.h>
 
@@ -14,13 +15,13 @@
 
 namespace arch {
 
-constexpr uint32_t kZbiBootKernelType = ZBI_TYPE_KERNEL_X64;
+constexpr uint32_t kZbiBootKernelType = ARCH_ZBI_KERNEL_TYPE;
 
 // Alignment required for kernel ZBI passed to arch::ZbiBoot.
-constexpr uintptr_t kZbiBootKernelAlignment = 1 << 12;
+constexpr uintptr_t kZbiBootKernelAlignment = ARCH_ZBI_KERNEL_ALIGNMENT;
 
-// Alignment required for data ZBI passed ot arch::ZbiBoot.
-constexpr uintptr_t kZbiBootDataAlignment = 1 << 12;
+// Alignment required for data ZBI passed to arch::ZbiBoot.
+constexpr uintptr_t kZbiBootDataAlignment = ARCH_ZBI_DATA_ALIGNMENT;
 
 // Hand off to a ZBI kernel already loaded in memory.  The kernel and data ZBIs
 // are already loaded at arbitrary 4K-aligned physical addresses.  This is

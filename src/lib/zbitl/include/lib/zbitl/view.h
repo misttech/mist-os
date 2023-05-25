@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <lib/cksum.h>
 #include <lib/fit/result.h>
+#include <lib/zbi-format/internal/storage.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
 
@@ -358,10 +359,7 @@ class View {
     template <typename ImageStorage>
     friend class Image;
 
-    uint32_t next_item_offset() const {
-      return offset_ + static_cast<uint32_t>(sizeof(zbi_header_t)) +
-             ZBI_ALIGN(value_.header->length);
-    }
+    uint32_t next_item_offset() const { return offset_ + AlignedItemLength(*value_.header); }
 
     bool next_is_end() const { return next_item_offset() == view_->size_bytes(); }
 
@@ -430,7 +428,7 @@ class View {
       const uint32_t payload_offset =
           next_item_offset + static_cast<uint32_t>(sizeof(zbi_header_t));
       const uint32_t payload_size = value_.header->length;
-      const uint32_t aligned_payload_size = ZBI_ALIGN(payload_size);
+      const uint32_t aligned_payload_size = AlignedPayloadLength(payload_size);
       if (payload_offset > view_->limit_ ||
           aligned_payload_size < payload_size ||  // ensure aligned size didn't overflow
           aligned_payload_size > view_->limit_ - payload_offset) {
@@ -835,7 +833,7 @@ class View {
     if (auto result = Copy(to, offset, length, sizeof(zbi_header_t)); result.is_error()) {
       return std::move(result).take_error();
     }
-    const zbi_header_t header = ZBI_CONTAINER_HEADER(length);
+    const zbi_header_t header = ContainerHeader(length);
     ByteView out{reinterpret_cast<const std::byte*>(&header), sizeof(header)};
     if (auto result = CopyTraits::Write(to, 0, out); result.is_error()) {
       return fit::error{ErrorType{
@@ -896,7 +894,7 @@ class View {
     }
 
     // Write the new container header.
-    const zbi_header_t hdr = ZBI_CONTAINER_HEADER(length);
+    const zbi_header_t hdr = ContainerHeader(length);
     ByteView out{reinterpret_cast<const std::byte*>(&hdr), sizeof(hdr)};
     if (auto result = CopyTraits::Write(new_storage, 0, out); result.is_error()) {
       return fit::error{ErrorType{

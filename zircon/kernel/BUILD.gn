@@ -642,6 +642,7 @@ if (is_kernel) {
       ":raw",
       ":zircon.elf",
       ":zircon.elf.rsp",
+      "//zircon/kernel/lib/arch:headers",
       "//zircon/kernel/lib/version:headers",
     ]
 

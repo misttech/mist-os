@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_RISCV64_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 #define ZIRCON_KERNEL_LIB_ARCH_RISCV64_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 
+#include <lib/arch/internal/zbi-constants.h>
 #include <lib/arch/zbi.h>
 #include <zircon/assert.h>
 
@@ -14,13 +15,13 @@
 
 namespace arch {
 
-constexpr uint32_t kZbiBootKernelType = ZBI_TYPE_KERNEL_RISCV64;
+constexpr uint32_t kZbiBootKernelType = ARCH_ZBI_KERNEL_TYPE;
 
 // Alignment required for kernel ZBI passed to arch::ZbiBoot.
-constexpr uintptr_t kZbiBootKernelAlignment = 1 << 12;
+constexpr uintptr_t kZbiBootKernelAlignment = ARCH_ZBI_KERNEL_ALIGNMENT;
 
 // Alignment required for data ZBI passed to arch::ZbiBoot.
-constexpr uintptr_t kZbiBootDataAlignment = 1 << 12;
+constexpr uintptr_t kZbiBootDataAlignment = ARCH_ZBI_DATA_ALIGNMENT;
 
 [[noreturn]] inline void ZbiBootRaw(uintptr_t entry, void* data, uint64_t hartid) {
   // Clear the stack and frame pointers and the link register so no misleading

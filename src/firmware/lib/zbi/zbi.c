@@ -151,7 +151,7 @@ zbi_result_t zbi_for_each(const void* base, const zbi_foreach_cb_t callback, voi
       return ZBI_RESULT_ERR_TRUNCATED;
     }
 
-    offset = ZBI_ALIGN(offset + entryHeader->length + sizeof(zbi_header_t));
+    offset = zbi_align(offset + entryHeader->length + sizeof(zbi_header_t));
   }
 
   return ZBI_RESULT_OK;
@@ -228,7 +228,7 @@ zbi_result_t zbi_create_entry(void* base, size_t capacity, uint32_t type, uint32
   hdr->length += (uint32_t)sizeof(*new_header) + new_header->length;
   if (hdr->length % ZBI_ALIGNMENT != 0) {
     // It was already verified that the capacity can fit the aligned length.
-    uint32_t aligned_length = ZBI_ALIGN(hdr->length);
+    uint32_t aligned_length = zbi_align(hdr->length);
     memset((uint8_t*)(hdr + 1) + hdr->length, 0, aligned_length - hdr->length);
     hdr->length = aligned_length;
   }
@@ -288,7 +288,7 @@ zbi_result_t zbi_extend(void* dst_buffer, size_t capacity, const void* src_buffe
 
   // Make sure there's enough space in the destination buffer to contain the
   // source.
-  const uint32_t dst_size = ZBI_ALIGN(dst->length + sizeof(*dst));
+  const uint32_t dst_size = zbi_align(dst->length + sizeof(*dst));
 
   // This captures the situation where there's not even enough space to have
   // padding between this section and the next.

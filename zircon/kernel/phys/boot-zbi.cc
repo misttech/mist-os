@@ -402,7 +402,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     // The data ZBI is perfect where it is.  Just overwrite where the end
     // of the kernel item was copied from with the new container header.
     auto hdr = reinterpret_cast<zbi_header_t*>(data_.storage().data());
-    hdr[0] = ZBI_CONTAINER_HEADER(static_cast<uint32_t>(data_load_size - sizeof(zbi_header_t)));
+    hdr[0] = zbitl::ContainerHeader(static_cast<uint32_t>(data_load_size - sizeof(zbi_header_t)));
   } else {
     // There's an aligned spot before the data ZBI's first item where we can
     // insert both a new container header and an item header to sop up the
@@ -414,7 +414,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     ZX_ASSERT(data_address > aligned_data_address);
     ZX_ASSERT(data_address - aligned_data_address >= sizeof(hdr[1]));
     ZX_ASSERT(discard_size < data_size);
-    hdr[0] = ZBI_CONTAINER_HEADER(static_cast<uint32_t>(data_size - sizeof(zbi_header_t)));
+    hdr[0] = zbitl::ContainerHeader(static_cast<uint32_t>(data_size - sizeof(zbi_header_t)));
     hdr[1] = zbitl::SanitizeHeader({
         .type = ZBI_TYPE_DISCARD,
         .length = static_cast<uint32_t>(discard_size),

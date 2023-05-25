@@ -29,7 +29,7 @@ static constexpr zbi_header_t kValidItemHeader = {
     .crc32 = 123,
 };
 
-static constexpr zbi_header_t kValidContainerHeader = ZBI_CONTAINER_HEADER(0);
+static constexpr zbi_header_t kValidContainerHeader = zbitl::ContainerHeader(0);
 
 inline void CheckTwoItemZbi(uint32_t type1, uint32_t type2, bool expect_ok) {
   constexpr size_t kPayloadSize = ZBI_ALIGNMENT;
@@ -43,7 +43,7 @@ inline void CheckTwoItemZbi(uint32_t type1, uint32_t type2, bool expect_ok) {
   };
 
   const TwoItemZbi contents = {
-      .header = ZBI_CONTAINER_HEADER(sizeof(contents.items)),
+      .header = zbitl::ContainerHeader(sizeof(contents.items)),
       .items =
           {
               {

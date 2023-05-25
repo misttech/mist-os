@@ -10,6 +10,7 @@
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/internal/bootfs.h>
+#include <lib/zbi-format/internal/storage.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
@@ -1379,10 +1380,6 @@ class Item final {
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Item);
 
-  static const char* TypeName(uint32_t zbi_type) { return ItemTypeInfo(zbi_type).name; }
-
-  static const char* TypeExtension(uint32_t zbi_type) { return ItemTypeInfo(zbi_type).extension; }
-
   static bool ParseTypeName(std::string name, uint32_t* abi_type,
                             std::optional<uint32_t>* max_size) {
     if (auto pos = name.find_first_of(':'); pos != std::string::npos) {
@@ -1397,9 +1394,17 @@ class Item final {
     } else {
       *max_size = std::nullopt;
     }
-    for (const auto& t : kItemTypes_) {
-      if (!strcasecmp(t.name, name.c_str())) {
-        *abi_type = t.type;
+    auto case_insensitive_equal = [](char a, char b) -> bool {
+      return std::tolower(a) == std::tolower(b);
+    };
+    for (uint32_t type : zbitl::kItemTypes) {
+      std::string_view type_name = zbitl::TypeName(type);
+      if (name.size() != type_name.size()) {
+        continue;
+      }
+      if (std::equal(name.begin(), name.end(), type_name.begin(), type_name.end(),
+                     case_insensitive_equal)) {
+        *abi_type = type;
         return true;
       }
     }
@@ -1410,20 +1415,21 @@ class Item final {
   static std::filesystem::path ExtractedFileName(unsigned int n, uint32_t zbi_type, bool raw) {
     std::filesystem::path path;
     char buf[32];
-    const auto info = ItemTypeInfo(zbi_type);
-    if (info.name) {
+    std::string_view type_name = zbitl::TypeName(zbi_type);
+    if (type_name.empty()) {
+      snprintf(buf, sizeof(buf), "%03u.%08x", n, zbi_type);
+      path = buf;
+    } else {
       snprintf(buf, sizeof(buf), "%03u.", n);
       std::string name(buf);
-      name += info.name;
+      name += type_name;
       for (auto& c : name) {
         c = static_cast<unsigned char>(std::tolower(c));
       }
       path = std::move(name);
-    } else {
-      snprintf(buf, sizeof(buf), "%03u.%08x", n, zbi_type);
-      path = buf;
     }
-    path += (raw && info.extension) ? info.extension : ".zbi";
+    std::string_view ext = zbitl::TypeExtension(zbi_type);
+    path += (raw && !ext.empty()) ? ext : ".zbi";
     return path;
   }
 
@@ -1434,10 +1440,12 @@ TYPE can be hexadecimal or a name string (case-insensitive).\n\
 Extracted items use the file names shown below:\n\
     --type               --extract-item             --extract-raw\n\
 ");
-    for (const auto& t : kItemTypes_) {
-      const auto zbi_name = ExtractedFileName(1, t.type, false);
-      const auto raw_name = ExtractedFileName(1, t.type, true);
-      fprintf(out, "    %-20s %-26s %s\n", t.name, zbi_name.c_str(), raw_name.c_str());
+    for (uint32_t type : zbitl::kItemTypes) {
+      const auto zbi_name = ExtractedFileName(1, type, false);
+      const auto raw_name = ExtractedFileName(1, type, true);
+      std::string_view type_name = zbitl::TypeName(type);
+      fprintf(out, "    %-20.*s %-26s %s\n", static_cast<int>(type_name.size()), type_name.data(),
+              zbi_name.c_str(), raw_name.c_str());
     }
   }
 
@@ -1445,7 +1453,7 @@ Extracted items use the file names shown below:\n\
 
   uint32_t PayloadSize() const { return header_.length; }
 
-  uint32_t TotalSize() const { return sizeof(header_) + ZBI_ALIGN(PayloadSize()); }
+  uint32_t TotalSize() const { return zbitl::AlignedItemLength(PayloadSize()); }
 
   zbi_header_t CheckHeader() const {
     if (header_.flags & ZBI_FLAGS_CRC32) {
@@ -1465,13 +1473,15 @@ Extracted items use the file names shown below:\n\
 
   void Describe(uint32_t pos) const {
     zbi_header_t header = CheckHeader();
-    const char* type_name = TypeName(type());
-    if (!type_name) {
+    std::string_view type_name = zbitl::TypeName(type());
+    if (type_name.empty()) {
       printf("%08x: %08x UNKNOWN (type=%08x)\n", pos, header.length, header.type);
     } else if (zbitl::TypeIsStorage(type())) {
-      printf("%08x: %08x %s (size=%08x)\n", pos, header.length, type_name, header.extra);
+      printf("%08x: %08x %.*s (size=%08x)\n", pos, header.length,
+             static_cast<int>(type_name.size()), type_name.data(), header.extra);
     } else {
-      printf("%08x: %08x %s\n", pos, header.length, type_name);
+      printf("%08x: %08x %.*s\n", pos, header.length, static_cast<int>(type_name.size()),
+             type_name.data());
     }
     if (header.flags & ZBI_FLAGS_CRC32) {
       printf("        :          MAGIC=%08x CRC=%08x\n", header.magic, header.crc32);
@@ -1509,13 +1519,15 @@ Extracted items use the file names shown below:\n\
 
   void EmitJsonContents(rapidjson::PrettyWriter<rapidjson::FileWriteStream>& writer,
                         const char* key) {
+    using namespace std::string_view_literals;
+
     if (AlreadyCompressed()) {
       CreateFromCompressed(*this)->EmitJsonContents(writer, key);
     } else {
       if (IsUncompressedBootfs()) {
         writer.Key(key);
         EmitJsonBootFS(writer);
-      } else if (auto ext = TypeExtension(header_.type); ext != nullptr && !strcmp(ext, ".txt")) {
+      } else if (auto ext = zbitl::TypeExtension(header_.type); ext == ".txt"sv) {
         writer.Key(key);
         EmitJsonCmdline(writer);
       } else if (zbitl::TypeIsKernel(header_.type) && !payload_.empty() &&
@@ -1549,7 +1561,7 @@ Extracted items use the file names shown below:\n\
     assert(Aligned(out->WritePosition()));
     uint32_t wrote = compress_ ? StreamCompressed(out) : StreamRaw(out);
     assert(out->WritePosition() % ZBI_ALIGNMENT == wrote % ZBI_ALIGNMENT);
-    uint32_t aligned = ZBI_ALIGN(wrote);
+    uint32_t aligned = zbitl::AlignedPayloadLength(wrote);
     if (aligned > wrote) {
       static const std::byte padding[ZBI_ALIGNMENT]{};
       out->Write(Iovec(padding, aligned - wrote));
@@ -1811,7 +1823,7 @@ Extracted items use the file names shown below:\n\
       item->Stream(&out);
     }
 
-    const zbi_header_t header = ZBI_CONTAINER_HEADER(out.WritePosition() - payload_start);
+    const zbi_header_t header = zbitl::ContainerHeader(out.WritePosition() - payload_start);
     assert(Aligned(header.length));
     out.PatchHeader(header, header_start);
   }
@@ -1853,20 +1865,6 @@ Extracted items use the file names shown below:\n\
     const char* name;
     const char* extension;
   };
-  static constexpr const ItemTypeInfo kItemTypes_[] = {
-#define kITemTypes_Element(type, name, extension) {type, name, extension},
-      ZBI_ALL_TYPES(kITemTypes_Element)
-#undef kitemtypes_element
-  };
-
-  static constexpr ItemTypeInfo ItemTypeInfo(uint32_t zbi_type) {
-    for (const auto& t : kItemTypes_) {
-      if (t.type == zbi_type) {
-        return t;
-      }
-    }
-    return {};
-  }
 
   static constexpr zbi_header_t NewHeader(uint32_t type, uint32_t size) {
     return {
@@ -2078,8 +2076,6 @@ Extracted items use the file names shown below:\n\
     writer.EndArray();
   }
 };
-
-constexpr decltype(Item::kItemTypes_) Item::kItemTypes_;
 
 // DirectoryTreeBuilder keeps pointers to elements, so this must be a
 // container with stable element pointers across insertions.

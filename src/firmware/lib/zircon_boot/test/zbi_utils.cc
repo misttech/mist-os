@@ -4,6 +4,7 @@
 
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
 
 #include <vector>
@@ -12,6 +13,8 @@
 
 namespace {
 
+constexpr uint32_t ZbiAlign(uint32_t n) { return ((n + ZBI_ALIGNMENT - 1) & -ZBI_ALIGNMENT); }
+
 TEST(ZbiTests, ZbiFileItemAppend) {
   constexpr char kFileName[] = "file name";
   constexpr size_t kFileNameLen = sizeof(kFileName) - 1;
@@ -19,7 +22,7 @@ TEST(ZbiTests, ZbiFileItemAppend) {
   struct {
     zbi_header_t header;
     zbi_header_t file_hdr;
-    uint8_t file_payload[ZBI_ALIGN(1 + kFileNameLen + sizeof(kFileContent))];
+    uint8_t file_payload[ZbiAlign(1 + kFileNameLen + sizeof(kFileContent))];
   } test_zbi;
   ASSERT_EQ(zbi_init(&test_zbi, sizeof(test_zbi)), ZBI_RESULT_OK);
   ASSERT_EQ(AppendZbiFile(&test_zbi.header, sizeof(test_zbi), kFileName, kFileContent,

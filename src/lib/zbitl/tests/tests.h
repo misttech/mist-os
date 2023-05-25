@@ -1098,12 +1098,12 @@ void TestAppending() {
       auto result = image.Append(zbi_header_t{.type = kItemType, .length = 99});
       ASSERT_FALSE(result.is_error()) << ViewErrorString(std::move(result).error_value());
       EXPECT_EQ(result.value()->header->length, 99u);
-      EXPECT_EQ(image.size_bytes(), size_before + sizeof(zbi_header_t) + ZBI_ALIGN(99));
+      EXPECT_EQ(image.size_bytes(), size_before + zbitl::AlignedItemLength(99));
 
       auto trim_result = image.TrimLastItem(result.value(), 33u);
       ASSERT_FALSE(trim_result.is_error()) << ViewErrorString(std::move(trim_result).error_value());
       EXPECT_EQ(trim_result.value()->header->length, 33u);
-      EXPECT_EQ(image.size_bytes(), size_before + sizeof(zbi_header_t) + ZBI_ALIGN(33));
+      EXPECT_EQ(image.size_bytes(), size_before + zbitl::AlignedItemLength(33));
     }
   }
 
