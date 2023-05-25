@@ -43,7 +43,7 @@ To see the current list of metrics, look at a recent successful build
 from the [terminal.x64 CI builder] and look at the output under the
 step named "summary perf test results" (the "stdout" link).
 
-[terminal.x64 CI builder]: <https://ci.chromium.org/p/fuchsia/builders/global.ci/terminal.x64-release-nuc_in_basic_envs>
+[terminal.x64 CI builder]: <https://ci.chromium.org/p/fuchsia/builders/global.ci/terminal.x64-release>
 
 The metric names currently in use do not always follow these naming
 guidelines. No large-scale renamings of the metric names have been
