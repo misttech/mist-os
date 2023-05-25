@@ -286,12 +286,9 @@ impl FileOps for DevPtmxFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || self.terminal.main_read(current_task, data).map(BlockableOpsResult::Done),
-            FdEvents::POLLIN | FdEvents::POLLHUP,
-            None,
-        )
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            self.terminal.main_read(current_task, data).map(BlockableOpsResult::Done)
+        })
     }
 
     fn write(
@@ -302,12 +299,9 @@ impl FileOps for DevPtmxFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || self.terminal.main_write(current_task, data).map(BlockableOpsResult::Done),
-            FdEvents::POLLOUT | FdEvents::POLLHUP,
-            None,
-        )
+        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
+            self.terminal.main_write(current_task, data).map(BlockableOpsResult::Done)
+        })
     }
 
     fn wait_async(
@@ -383,12 +377,9 @@ impl FileOps for DevPtsFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || self.terminal.replica_read(current_task, data).map(BlockableOpsResult::Done),
-            FdEvents::POLLIN | FdEvents::POLLHUP,
-            None,
-        )
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            self.terminal.replica_read(current_task, data).map(BlockableOpsResult::Done)
+        })
     }
 
     fn write(
@@ -399,12 +390,9 @@ impl FileOps for DevPtsFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || self.terminal.replica_write(current_task, data).map(BlockableOpsResult::Done),
-            FdEvents::POLLOUT | FdEvents::POLLHUP,
-            None,
-        )
+        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
+            self.terminal.replica_write(current_task, data).map(BlockableOpsResult::Done)
+        })
     }
 
     fn wait_async(

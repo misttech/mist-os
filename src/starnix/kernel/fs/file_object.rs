@@ -678,9 +678,9 @@ impl FileObject {
     pub fn blocking_op<T, Op>(
         &self,
         current_task: &CurrentTask,
-        mut op: Op,
         events: FdEvents,
         deadline: Option<zx::Time>,
+        mut op: Op,
     ) -> Result<T, Errno>
     where
         Op: FnMut() -> Result<BlockableOpsResult<T>, Errno>,

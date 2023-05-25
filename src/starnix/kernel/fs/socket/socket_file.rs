@@ -121,7 +121,7 @@ impl SocketFile {
             op().map(BlockableOpsResult::value)
         } else {
             let deadline = self.socket.send_timeout().map(zx::Time::after);
-            file.blocking_op(current_task, op, FdEvents::POLLOUT | FdEvents::POLLHUP, deadline)
+            file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, deadline, op)
         }
     }
 
@@ -165,7 +165,7 @@ impl SocketFile {
             op().map(BlockableOpsResult::value)
         } else {
             let deadline = deadline.or_else(|| self.socket.receive_timeout().map(zx::Time::after));
-            match file.blocking_op(current_task, op, FdEvents::POLLIN | FdEvents::POLLHUP, deadline)
+            match file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, deadline, op)
             {
                 Err(e) if e == EAGAIN && self.wait_all(current_task, flags) => Ok(read_all_info),
                 result => result,

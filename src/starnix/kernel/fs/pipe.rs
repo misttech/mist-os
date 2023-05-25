@@ -312,19 +312,14 @@ impl FileOps for PipeFileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || {
-                let mut pipe = self.pipe.lock();
-                let actual = pipe.read(data)?;
-                if actual > 0 {
-                    pipe.notify_read();
-                }
-                Ok(BlockableOpsResult::Done(actual))
-            },
-            FdEvents::POLLIN | FdEvents::POLLHUP,
-            None,
-        )
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            let mut pipe = self.pipe.lock();
+            let actual = pipe.read(data)?;
+            if actual > 0 {
+                pipe.notify_read();
+            }
+            Ok(BlockableOpsResult::Done(actual))
+        })
     }
 
     fn write(
@@ -335,30 +330,25 @@ impl FileOps for PipeFileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || {
-                let mut pipe = self.pipe.lock();
-                match pipe.write(current_task, data) {
-                    Ok(chunk) => {
-                        if chunk > 0 {
-                            pipe.notify_write();
-                        }
+        file.blocking_op(current_task, FdEvents::POLLOUT, None, || {
+            let mut pipe = self.pipe.lock();
+            match pipe.write(current_task, data) {
+                Ok(chunk) => {
+                    if chunk > 0 {
+                        pipe.notify_write();
                     }
-                    Err(errno) if errno == EPIPE && data.bytes_read() > 0 => {
-                        return Ok(BlockableOpsResult::Done(data.bytes_read()))
-                    }
-                    Err(errno) => return Err(errno),
-                };
-                if data.available() > 0 {
-                    Ok(BlockableOpsResult::Partial(data.bytes_read()))
-                } else {
-                    Ok(BlockableOpsResult::Done(data.bytes_read()))
                 }
-            },
-            FdEvents::POLLOUT,
-            None,
-        )
+                Err(errno) if errno == EPIPE && data.bytes_read() > 0 => {
+                    return Ok(BlockableOpsResult::Done(data.bytes_read()))
+                }
+                Err(errno) => return Err(errno),
+            };
+            if data.available() > 0 {
+                Ok(BlockableOpsResult::Partial(data.bytes_read()))
+            } else {
+                Ok(BlockableOpsResult::Done(data.bytes_read()))
+            }
+        })
     }
 
     fn wait_async(
@@ -507,20 +497,15 @@ impl PipeFileObject {
         F: Fn(&Pipe) -> bool,
         G: Fn() -> Result<V, Errno>,
     {
-        file.blocking_op(
-            current_task,
-            || {
-                let other = pregen()?;
-                let pipe = self.pipe.lock();
-                if condition(&pipe) {
-                    Ok(BlockableOpsResult::Done((other, pipe)))
-                } else {
-                    Ok(BlockableOpsResult::Partial((other, pipe)))
-                }
-            },
-            events,
-            None,
-        )
+        file.blocking_op(current_task, events, None, || {
+            let other = pregen()?;
+            let pipe = self.pipe.lock();
+            if condition(&pipe) {
+                Ok(BlockableOpsResult::Done((other, pipe)))
+            } else {
+                Ok(BlockableOpsResult::Partial((other, pipe)))
+            }
+        })
     }
 
     /// Lock the pipe for reading, after having run `pregen`.

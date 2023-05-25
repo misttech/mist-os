@@ -195,12 +195,10 @@ pub fn sys_accept4(
 ) -> Result<FdNumber, Errno> {
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
-    let accepted_socket = file.blocking_op(
-        current_task,
-        || socket.accept().map(BlockableOpsResult::Done),
-        FdEvents::POLLIN | FdEvents::POLLHUP,
-        None,
-    )?;
+    let accepted_socket =
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            socket.accept().map(BlockableOpsResult::Done)
+        })?;
 
     if !user_socket_address.is_null() {
         let address_bytes = accepted_socket.getpeername()?;

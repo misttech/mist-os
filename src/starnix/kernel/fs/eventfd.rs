@@ -62,31 +62,26 @@ impl FileOps for EventFdFileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || {
-                let mut written_data = [0; DATA_SIZE];
-                data.read_exact(&mut written_data)?;
-                let add_value = u64::from_ne_bytes(written_data);
-                if add_value == u64::MAX {
-                    return error!(EINVAL);
-                }
+        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
+            let mut written_data = [0; DATA_SIZE];
+            data.read_exact(&mut written_data)?;
+            let add_value = u64::from_ne_bytes(written_data);
+            if add_value == u64::MAX {
+                return error!(EINVAL);
+            }
 
-                // The maximum value of the counter is u64::MAX - 1
-                let mut inner = self.inner.lock();
-                let headroom = u64::MAX - inner.value;
-                if headroom < add_value {
-                    return error!(EAGAIN);
-                }
-                inner.value += add_value;
-                if inner.value > 0 {
-                    inner.wait_queue.notify_fd_events(FdEvents::POLLIN);
-                }
-                Ok(BlockableOpsResult::Done(DATA_SIZE))
-            },
-            FdEvents::POLLOUT | FdEvents::POLLHUP,
-            None,
-        )
+            // The maximum value of the counter is u64::MAX - 1
+            let mut inner = self.inner.lock();
+            let headroom = u64::MAX - inner.value;
+            if headroom < add_value {
+                return error!(EAGAIN);
+            }
+            inner.value += add_value;
+            if inner.value > 0 {
+                inner.wait_queue.notify_fd_events(FdEvents::POLLIN);
+            }
+            Ok(BlockableOpsResult::Done(DATA_SIZE))
+        })
     }
 
     fn read(
@@ -97,37 +92,32 @@ impl FileOps for EventFdFileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(
-            current_task,
-            || {
-                if data.available() < DATA_SIZE {
-                    return error!(EINVAL);
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            if data.available() < DATA_SIZE {
+                return error!(EINVAL);
+            }
+
+            let mut inner = self.inner.lock();
+            if inner.value == 0 {
+                return error!(EAGAIN);
+            }
+
+            let return_value = match self.eventfd_type {
+                EventFdType::Counter => {
+                    let start_value = inner.value;
+                    inner.value = 0;
+                    start_value
                 }
-
-                let mut inner = self.inner.lock();
-                if inner.value == 0 {
-                    return error!(EAGAIN);
+                EventFdType::Semaphore => {
+                    inner.value -= 1;
+                    1
                 }
+            };
+            data.write_all(&return_value.to_ne_bytes())?;
+            inner.wait_queue.notify_fd_events(FdEvents::POLLOUT);
 
-                let return_value = match self.eventfd_type {
-                    EventFdType::Counter => {
-                        let start_value = inner.value;
-                        inner.value = 0;
-                        start_value
-                    }
-                    EventFdType::Semaphore => {
-                        inner.value -= 1;
-                        1
-                    }
-                };
-                data.write_all(&return_value.to_ne_bytes())?;
-                inner.wait_queue.notify_fd_events(FdEvents::POLLOUT);
-
-                Ok(BlockableOpsResult::Done(DATA_SIZE))
-            },
-            FdEvents::POLLIN | FdEvents::POLLHUP,
-            None,
-        )
+            Ok(BlockableOpsResult::Done(DATA_SIZE))
+        })
     }
 
     fn wait_async(
