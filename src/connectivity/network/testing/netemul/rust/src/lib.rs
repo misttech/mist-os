@@ -9,12 +9,12 @@
 /// Methods for creating and interacting with virtualized guests in netemul tests.
 pub mod guest;
 
-use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, ops::DerefMut as _, path::Path};
+use std::{borrow::Cow, num::NonZeroU64, ops::DerefMut as _, path::Path};
 
 use fidl_fuchsia_hardware_network as fnetwork;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
-use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientExt, ClientProviderExt};
+use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fidl_fuchsia_net_ext::{self as fnet_ext};
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
@@ -27,13 +27,11 @@ use fidl_fuchsia_netemul_network as fnetemul_network;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
-use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use net_types::{ip::Ipv4Addr, SpecifiedAddr};
 
 use anyhow::{anyhow, Context as _};
 use futures::{
-    future::{ready, FutureExt as _, TryFutureExt as _},
+    future::{FutureExt as _, TryFutureExt as _},
     SinkExt as _, StreamExt as _, TryStreamExt as _,
 };
 use net_declare::fidl_subnet;
@@ -953,12 +951,7 @@ pub struct TestInterface<'a> {
     id: u64,
     control: fnet_interfaces_ext::admin::Control,
     device_control: Option<fnet_interfaces_admin::DeviceControlProxy>,
-    dhcp_client_task: futures::lock::Mutex<Option<DhcpClientTask>>,
-}
-
-struct DhcpClientTask {
-    client: fnet_dhcp::ClientProxy,
-    task: fasync::Task<()>,
+    dhcp_client_task: futures::lock::Mutex<Option<fnet_dhcp_ext::testutil::DhcpClientTask>>,
 }
 
 impl<'a> std::fmt::Debug for TestInterface<'a> {
@@ -1151,72 +1144,9 @@ impl<'a> TestInterface<'a> {
         provider.check_presence().await.expect("check presence should succeed");
 
         let client = provider.new_client_ext(id, fnet_dhcp_ext::default_new_client_params());
-
         let control = control.clone();
-
         let stack = self.connect_stack().expect("connect stack");
-
-        let task = DhcpClientTask {
-            client: client.clone(),
-            task: fasync::Task::spawn(async move {
-                let mut final_routers = fnet_dhcp_ext::configuration_stream(client)
-                    .scan((), |(), item| {
-                        ready(match item {
-                            Err(e) => match e {
-                                // Observing `PEER_CLOSED` is expected after the
-                                // client is shut down, so rather than returning an
-                                // error, simply end the stream.
-                                fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
-                                    status: zx::Status::PEER_CLOSED,
-                                    protocol_name: _,
-                                }) => None,
-                                fnet_dhcp_ext::Error::Fidl(_)
-                                | fnet_dhcp_ext::Error::ApiViolation(_)
-                                | fnet_dhcp_ext::Error::ForwardingEntry(_)
-                                | fnet_dhcp_ext::Error::WrongExitReason(_)
-                                | fnet_dhcp_ext::Error::MissingExitReason => Some(Err(e)),
-                            },
-                            Ok(_) => Some(item),
-                        })
-                    })
-                    .try_fold(
-                        HashSet::<SpecifiedAddr<Ipv4Addr>>::new(),
-                        |mut routers,
-                         fnet_dhcp_ext::Configuration {
-                             address,
-                             dns_servers: _,
-                             routers: new_routers,
-                         }| {
-                            let control = &control;
-                            let stack = &stack;
-                            async move {
-                                address
-                                    .expect("should have address")
-                                    .add_to(control)
-                                    .expect("add address should succeed");
-
-                                fnet_dhcp_ext::apply_new_routers(
-                                    id,
-                                    stack,
-                                    &mut routers,
-                                    new_routers,
-                                )
-                                .await
-                                .expect("applying new routers should succeed");
-                                Ok(routers)
-                            }
-                        },
-                    )
-                    .await
-                    .expect("watch_configuration should succeed");
-
-                // DHCP client is being shut down, so we should remove all the routers.
-                fnet_dhcp_ext::apply_new_routers(id, &stack, &mut final_routers, Vec::new())
-                    .await
-                    .expect("removing all routers should succeed");
-            }),
-        };
-
+        let task = fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, stack, control);
         *dhcp_client_task = Some(task);
         Ok(())
     }
@@ -1240,12 +1170,8 @@ impl<'a> TestInterface<'a> {
         let Self { endpoint: _, realm: _, id: _, control: _, device_control: _, dhcp_client_task } =
             self;
         let mut dhcp_client_task = dhcp_client_task.lock().await;
-        if let Some(DhcpClientTask { client, task }) = dhcp_client_task.deref_mut().take() {
-            client
-                .shutdown_ext(client.take_event_stream())
-                .await
-                .expect("client shutdown should succeed");
-            task.await;
+        if let Some(task) = dhcp_client_task.deref_mut().take() {
+            task.shutdown().await.expect("client shutdown should succeed");
         }
     }
 

@@ -24,7 +24,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
     "//src/connectivity/lib/net-declare",
-    "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/ping",
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/guest:fuchsia.netemul.guest_rust",

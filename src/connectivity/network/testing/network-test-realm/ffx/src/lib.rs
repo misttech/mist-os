@@ -179,6 +179,30 @@ async fn handle_command(
                 }
             }
         }
+        ntr_args::Subcommand::DhcpClient(ntr_args::DhcpClient { subcommand }) => match subcommand {
+            ntr_args::DhcpClientSubcommand::Start(ntr_args::DhcpClientStart { interface_id }) => (
+                controller
+                    .start_out_of_stack_dhcpv4_client(
+                        &fntr::ControllerStartOutOfStackDhcpv4ClientRequest {
+                            interface_id: Some(interface_id),
+                            ..Default::default()
+                        },
+                    )
+                    .await,
+                "start_out_of_stack_dhcpv4_client",
+            ),
+            ntr_args::DhcpClientSubcommand::Stop(ntr_args::DhcpClientStop { interface_id }) => (
+                controller
+                    .stop_out_of_stack_dhcpv4_client(
+                        &fntr::ControllerStopOutOfStackDhcpv4ClientRequest {
+                            interface_id: Some(interface_id),
+                            ..Default::default()
+                        },
+                    )
+                    .await,
+                "stop_out_of_stack_dhcpv4_client",
+            ),
+        },
     };
 
     result
@@ -446,6 +470,58 @@ mod test {
                     .expect("expected request of type StopDhcpv6Client")
                     .send(Ok(()))
                     .expect("failed to send StopDhcpv6Client response");
+            },
+        )
+        .await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn dhcp_client_start() {
+        net_test_realm_command_test(
+            ntr_args::Subcommand::DhcpClient(ntr_args::DhcpClient {
+                subcommand: ntr_args::DhcpClientSubcommand::Start(ntr_args::DhcpClientStart {
+                    interface_id: INTERFACE_ID,
+                }),
+            }),
+            |request| {
+                let (request, responder) = request
+                    .into_start_out_of_stack_dhcpv4_client()
+                    .expect("expected request of type StartOutOfStackDhcpv4Client");
+                assert_matches!(
+                    request,
+                    fntr::ControllerStartOutOfStackDhcpv4ClientRequest {
+                        interface_id: Some(interface_id),
+                        ..
+                    } if interface_id == INTERFACE_ID
+                );
+                responder
+                    .send(Ok(()))
+                    .expect("failed to send StartOutOfStackDhcpv4Client response");
+            },
+        )
+        .await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn dhcp_client_stop() {
+        net_test_realm_command_test(
+            ntr_args::Subcommand::DhcpClient(ntr_args::DhcpClient {
+                subcommand: ntr_args::DhcpClientSubcommand::Stop(ntr_args::DhcpClientStop {
+                    interface_id: INTERFACE_ID,
+                }),
+            }),
+            |request| {
+                let (request, responder) = request
+                    .into_stop_out_of_stack_dhcpv4_client()
+                    .expect("expected request of type StopOutOfStackDhcpv4Client");
+                assert_matches!(
+                    request,
+                    fntr::ControllerStopOutOfStackDhcpv4ClientRequest {
+                        interface_id: Some(interface_id),
+                        ..
+                    } if interface_id == INTERFACE_ID
+                );
+                responder.send(Ok(())).expect("failed to send StopOutOfStackDhcpv4Client response");
             },
         )
         .await;

@@ -11,20 +11,24 @@ use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fnet_debug;
+use fidl_fuchsia_net_dhcp as fnet_dhcp;
+use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use futures_lite::FutureExt as _;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryFrom as _;
+use std::num::NonZeroU64;
 use tracing::{error, info, warn};
 
 /// URL for the realm that contains the hermetic network components with a
@@ -783,6 +787,9 @@ struct Controller {
         u64,
         futures::stream::BoxStream<'static, (u64, Result<fnet_dhcpv6_ext::WatchItem, fidl::Error>)>,
     >,
+
+    // Task used to interact with the out-of-stack DHCP client.
+    dhcp_client_tasks: HashMap<NonZeroU64, fnet_dhcp_ext::testutil::DhcpClientTask>,
 }
 
 impl Controller {
@@ -793,6 +800,7 @@ impl Controller {
             multicast_v4_socket: None,
             multicast_v6_socket: None,
             dhcpv6_client_stream_map: async_utils::stream::StreamMap::empty(),
+            dhcp_client_tasks: HashMap::new().into(),
         }
     }
 
@@ -892,8 +900,83 @@ impl Controller {
                 };
                 responder.send(result)?;
             }
+            fntr::ControllerRequest::StartOutOfStackDhcpv4Client {
+                payload: fntr::ControllerStartOutOfStackDhcpv4ClientRequest { interface_id, .. },
+                responder,
+            } => {
+                let result = self.start_dhcpv4_client_out_of_stack(interface_id).await;
+                responder.send(result)?;
+            }
+            fntr::ControllerRequest::StopOutOfStackDhcpv4Client {
+                payload: fntr::ControllerStopOutOfStackDhcpv4ClientRequest { interface_id, .. },
+                responder,
+            } => {
+                let result = self.stop_dhcpv4_out_of_stack(interface_id).await;
+                responder.send(result)?;
+            }
         }
         Ok(())
+    }
+
+    async fn start_dhcpv4_client_out_of_stack(
+        &mut self,
+        id: Option<u64>,
+    ) -> Result<(), fntr::Error> {
+        let Self {
+            mutated_interface_ids: _,
+            hermetic_network_connector,
+            multicast_v4_socket: _,
+            multicast_v6_socket: _,
+            dhcpv6_client_stream_map: _,
+            dhcp_client_tasks,
+        } = self;
+        let id = id.ok_or(fntr::Error::InvalidArguments)?;
+        let id = NonZeroU64::new(id).ok_or(fntr::Error::InvalidArguments)?;
+        let vacant_entry = match dhcp_client_tasks.entry(id) {
+            Entry::Occupied(_) => return Err(fntr::Error::InvalidArguments),
+            Entry::Vacant(entry) => entry,
+        };
+
+        let hermetic_network_connector = hermetic_network_connector
+            .as_ref()
+            .ok_or(fntr::Error::HermeticNetworkRealmNotRunning)?;
+
+        let provider =
+            hermetic_network_connector.connect_to_protocol::<fnet_dhcp::ClientProviderMarker>()?;
+        provider
+            .check_presence()
+            .await
+            .expect("dhcp client should be included in hermetic network realm");
+
+        let client = provider.new_client_ext(id, fnet_dhcp_ext::default_new_client_params());
+        let control =
+            connect_to_interface_admin_control(id.into(), hermetic_network_connector).await?;
+        let stack = hermetic_network_connector.connect_to_protocol::<fnet_stack::StackMarker>()?;
+        let poll_task = fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, stack, control);
+        let _: &mut fnet_dhcp_ext::testutil::DhcpClientTask = vacant_entry.insert(poll_task);
+        Ok(())
+    }
+
+    async fn stop_dhcpv4_out_of_stack(&mut self, id: Option<u64>) -> Result<(), fntr::Error> {
+        let Self {
+            mutated_interface_ids: _,
+            hermetic_network_connector: _,
+            multicast_v4_socket: _,
+            multicast_v6_socket: _,
+            dhcpv6_client_stream_map: _,
+            dhcp_client_tasks,
+        } = self;
+        let id = id.ok_or(fntr::Error::InvalidArguments)?;
+        let id = NonZeroU64::new(id).ok_or(fntr::Error::InvalidArguments)?;
+        dhcp_client_tasks
+            .remove(&id)
+            .ok_or(fntr::Error::Dhcpv4ClientNotRunning)?
+            .shutdown()
+            .await
+            .map_err(|err| {
+                error!("failed to shutdown client with err {}", err);
+                fntr::Error::Dhcpv4ClientShutdownFailed
+            })
     }
 
     /// Returns the `socket2::Socket` that should be used join or leave
@@ -1094,7 +1177,9 @@ impl Controller {
                 | fntr::Error::InvalidArguments
                 | fntr::Error::PingFailed
                 | fntr::Error::TimeoutExceeded
-                | fntr::Error::Dhcpv6ClientNotRunning => e,
+                | fntr::Error::Dhcpv6ClientNotRunning
+                | fntr::Error::Dhcpv4ClientNotRunning
+                | fntr::Error::Dhcpv4ClientShutdownFailed => e,
             })?;
         }
 
@@ -1362,7 +1447,9 @@ impl Controller {
                 | fntr::Error::PingFailed
                 | fntr::Error::StubNotRunning
                 | fntr::Error::TimeoutExceeded
-                | fntr::Error::Dhcpv6ClientNotRunning => e,
+                | fntr::Error::Dhcpv6ClientNotRunning
+                | fntr::Error::Dhcpv4ClientNotRunning
+                | fntr::Error::Dhcpv4ClientShutdownFailed => e,
             })?;
         }
 

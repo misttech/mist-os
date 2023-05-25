@@ -42,6 +42,7 @@ pub enum Subcommand {
     StopHermeticNetworkRealm(StopHermeticNetworkRealm),
     StopStub(StopStub),
     Dhcpv6Client(Dhcpv6Client),
+    DhcpClient(DhcpClient),
 }
 
 #[derive(argh::FromArgs, Debug, PartialEq)]
@@ -206,6 +207,39 @@ pub struct Dhcpv6ClientStart {
 #[argh(subcommand, name = "stop")]
 /// Stops all DHCPv6 clients.
 pub struct Dhcpv6ClientStop {}
+
+#[derive(argh::FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "dhcp-client")]
+/// DHCP client commands.
+pub struct DhcpClient {
+    #[argh(subcommand)]
+    pub subcommand: DhcpClientSubcommand,
+}
+
+#[derive(argh::FromArgs, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum DhcpClientSubcommand {
+    Start(DhcpClientStart),
+    Stop(DhcpClientStop),
+}
+
+#[derive(argh::FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "start")]
+/// Start a DHCP client.
+pub struct DhcpClientStart {
+    #[argh(positional)]
+    /// the interface to run the DHCP client on
+    pub interface_id: u64,
+}
+
+#[derive(argh::FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "stop")]
+/// Stops all DHCP clients.
+pub struct DhcpClientStop {
+    #[argh(positional)]
+    /// the interface to run the DHCP client on
+    pub interface_id: u64,
+}
 
 fn parse_netstack_type(value: &str) -> Result<fntr::Netstack, String> {
     match &value.to_lowercase()[..] {

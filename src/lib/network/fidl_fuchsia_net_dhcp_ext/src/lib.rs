@@ -298,6 +298,98 @@ impl ClientExt for fnet_dhcp::ClientProxy {
     }
 }
 
+/// Contains types used when testing the DHCP client.
+pub mod testutil {
+    use super::*;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon as zx;
+    use futures::{future::ready, StreamExt as _};
+
+    /// Task for polling the DHCP client.
+    pub struct DhcpClientTask {
+        client: fnet_dhcp::ClientProxy,
+        task: fasync::Task<()>,
+    }
+
+    impl DhcpClientTask {
+        /// Creates and returns an async task that polls the DHCP client.
+        pub fn new(
+            client: fnet_dhcp::ClientProxy,
+            id: NonZeroU64,
+            stack: fnet_stack::StackProxy,
+            control: fnet_interfaces_ext::admin::Control,
+        ) -> DhcpClientTask {
+            DhcpClientTask {
+                client: client.clone(),
+                task: fasync::Task::spawn(async move {
+                    let mut final_routers =
+                        configuration_stream(client)
+                            .scan((), |(), item| {
+                                ready(match item {
+                                    Err(e) => match e {
+                                        // Observing `PEER_CLOSED` is expected after the
+                                        // client is shut down, so rather than returning an
+                                        // error, simply end the stream.
+                                        Error::Fidl(fidl::Error::ClientChannelClosed {
+                                            status: zx::Status::PEER_CLOSED,
+                                            protocol_name: _,
+                                        }) => None,
+                                        Error::Fidl(_)
+                                        | Error::ApiViolation(_)
+                                        | Error::ForwardingEntry(_)
+                                        | Error::WrongExitReason(_)
+                                        | Error::MissingExitReason => Some(Err(e)),
+                                    },
+                                    Ok(item) => Some(Ok(item)),
+                                })
+                            })
+                            .try_fold(
+                                HashSet::<SpecifiedAddr<Ipv4Addr>>::new(),
+                                |mut routers,
+                                 Configuration {
+                                     address,
+                                     dns_servers: _,
+                                     routers: new_routers,
+                                 }| {
+                                    let control = &control;
+                                    let stack = &stack;
+                                    async move {
+                                        address
+                                            .expect("should have address")
+                                            .add_to(control)
+                                            .expect("add address should succeed");
+
+                                        apply_new_routers(id, stack, &mut routers, new_routers)
+                                            .await
+                                            .expect("applying new routers should succeed");
+                                        Ok(routers)
+                                    }
+                                },
+                            )
+                            .await
+                            .expect("watch_configuration should succeed");
+
+                    // DHCP client is being shut down, so we should remove all the routers.
+                    apply_new_routers(id, &stack, &mut final_routers, Vec::new())
+                        .await
+                        .expect("removing all routers should succeed");
+                }),
+            }
+        }
+
+        /// Shuts down the running DHCP client and waits for the poll task to complete.
+        pub async fn shutdown(self) -> Result<(), Error> {
+            let DhcpClientTask { client, task } = self;
+            client
+                .shutdown_ext(client.take_event_stream())
+                .await
+                .expect("client shutdown should succeed");
+            task.await;
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{ClientExt as _, Error};

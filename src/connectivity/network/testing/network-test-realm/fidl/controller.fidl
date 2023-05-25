@@ -41,6 +41,10 @@ type Error = strict enum {
     ADDRESS_UNREACHABLE = 12;
     /// A DHCPv6 client was expected to be running, but none was found.
     DHCPV6_CLIENT_NOT_RUNNING = 13;
+    /// A DHCPv4 client was expected to be running, but none was found.
+    DHCPV4_CLIENT_NOT_RUNNING = 14;
+    /// Failed to shutdown the DHCPv4 client.
+    DHCPV4_CLIENT_SHUTDOWN_FAILED = 15;
 };
 
 /// A controller for creating and manipulating the Network Test Realm.
@@ -274,4 +278,23 @@ closed protocol Controller {
     ///
     /// * error `DHCPV6_CLIENT_NOT_RUNNING` if no DHCPv6 client is running.
     strict StopDhcpv6Client() -> () error Error;
+
+    /// Starts a DHCPv4 client on the provided interface.
+    ///
+    /// + request `interface_id` the interface to start a DHCPv4 client on.
+    ///     Required.
+    strict StartOutOfStackDhcpv4Client(table {
+        1: interface_id fuchsia.net.InterfaceId;
+    }) -> () error Error;
+
+    /// Stops the DHCPv4 client on the provided interface.
+    ///
+    /// + request `interface_id` the interface to stop a DHCPv4 client client on.
+    ///     Required.
+    /// * error `DHCPV4_CLIENT_NOT_RUNNING` if no DHCPv4 client is running.
+    /// * error `DHCPV4_CLIENT_SHUTDOWN_FAILED` if shutting down the DHCPv4 client
+    ///   failed.
+    strict StopOutOfStackDhcpv4Client(table {
+        1: interface_id fuchsia.net.InterfaceId;
+    }) -> () error Error;
 };

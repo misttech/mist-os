@@ -8,5 +8,26 @@
             name: "netstack",
             url: "#meta/netstack3-debug.cm",
         },
+
+        // TODO(https://fxbug.dev/125773): This is transitional. Once the DHCP
+        // client is being used by both netstacks, it should be moved into
+        // the shard.
+        {
+            name: "dhcp-client",
+            url: "#meta/dhcp-client.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.posix.socket.packet.Provider",
+            from: "#netstack",
+            to: "#dhcp-client",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.net.dhcp.ClientProvider",
+            from: "#dhcp-client",
+        },
     ],
 }
