@@ -75,7 +75,7 @@ class JsonInstance : public FilesystemInstance {
     if (filesystem_.is_component()) {
       const std::string& name = filesystem_.GetTraits().name;
       mkfs_options.component_child_name = name.c_str();
-      mkfs_options.component_url = "#meta/" + name;
+      mkfs_options.component_url = "#meta/" + name + ".cm";
     }
     return FsFormat(device_path_, filesystem_.format(), mkfs_options,
                     filesystem_.GetTraits().is_multi_volume);
@@ -87,7 +87,7 @@ class JsonInstance : public FilesystemInstance {
     if (filesystem_.is_component()) {
       const std::string& name = filesystem_.GetTraits().name;
       mount_options.component_child_name = name.c_str();
-      mount_options.component_url = "#meta/" + name;
+      mount_options.component_url = "#meta/" + name + ".cm";
     }
     auto fs = FsMount(device_path_, mount_path, filesystem_.format(), mount_options,
                       filesystem_.GetTraits().is_multi_volume);
@@ -108,7 +108,7 @@ class JsonInstance : public FilesystemInstance {
     if (filesystem_.is_component()) {
       const std::string& name = filesystem_.GetTraits().name;
       options.component_child_name = name.c_str();
-      options.component_url = "#meta/" + name;
+      options.component_url = "#meta/" + name + ".cm";
     }
     auto status = zx::make_result(fs_management::Fsck(device_path_.c_str(), filesystem_.format(),
                                                       options, fs_management::LaunchStdioSync));
