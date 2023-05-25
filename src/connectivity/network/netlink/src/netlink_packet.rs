@@ -4,7 +4,7 @@
 
 //! Utilities for interacting with the `netlink-packet-*` suite 3p crates.
 
-use netlink_packet_core::{ErrorBuffer, ErrorMessage, NetlinkHeader};
+use netlink_packet_core::{buffer::NETLINK_HEADER_LEN, ErrorBuffer, ErrorMessage, NetlinkHeader};
 use netlink_packet_utils::{Emitable as _, Parseable as _};
 
 /// Returns a newly created [`ErrorMessage`] with the given error code.
@@ -12,19 +12,20 @@ use netlink_packet_utils::{Emitable as _, Parseable as _};
 // `netlink-packet-core` crate does not expose a public method for constructing
 // the type. This isn't all that surprising, as we're probably the only user of
 // the crate acting as a "server" and typically, clients won't need to construct
-// and error. Adding such a constructor upstream may be worth looking into at a
+// an error. Adding such a constructor upstream may be worth looking into at a
 // later date.
 // TODO(https://issuetracker.google.com/283136408): Use this to send Acks.
 #[allow(dead_code)]
 pub(crate) fn new_error_message(code: i32, header: NetlinkHeader) -> ErrorMessage {
-    assert_eq!(header.buffer_len(), 16);
-    let mut buffer = [0; 16];
+    assert_eq!(header.buffer_len(), NETLINK_HEADER_LEN);
+    let mut buffer = [0; NETLINK_HEADER_LEN];
     header.emit(&mut buffer);
-    let buffer = code.to_le_bytes().into_iter().chain(buffer.into_iter()).collect::<Vec<_>>();
+    let buffer = code.to_ne_bytes().into_iter().chain(buffer.into_iter()).collect::<Vec<_>>();
     ErrorMessage::parse(
-        &ErrorBuffer::new_checked(&buffer).expect("parse ErrorBuffer from raw bytes"),
+        &ErrorBuffer::new_checked(&buffer)
+            .expect("buffer should have a valid `ErrorBuffer` format"),
     )
-    .expect("parse ErrorMessage from ErrorBuffer")
+    .expect("buffer should have a valid `ErrorMessage` format")
 }
 
 #[cfg(test)]
