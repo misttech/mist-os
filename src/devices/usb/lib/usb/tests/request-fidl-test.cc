@@ -237,4 +237,68 @@ TEST(RequestFidlTest, MixedTest) {
   EXPECT_EQ((*iter2.begin()).second, 32);
 }
 
+TEST(RequestFidlTest, PoolTest) {
+  usb::FidlRequestPool pool;
+  EXPECT_TRUE(pool.Empty());
+
+  pool.Add(usb::FidlRequest(usb::EndpointType::BULK));
+  EXPECT_TRUE(pool.Full());
+  usb::FidlRequest control(usb::EndpointType::CONTROL);
+  control.add_vmo_id(9, 2, 0).add_vmo_id(1, 4, 0);
+  pool.Add(std::move(control));
+  EXPECT_TRUE(pool.Full());
+
+  {
+    auto req = pool.Get();
+    EXPECT_TRUE(req.has_value());
+    EXPECT_FALSE(pool.Empty());
+    EXPECT_FALSE(pool.Full());
+    EXPECT_EQ(req->request().information()->Which(),
+              fuchsia_hardware_usb_request::RequestInfo::Tag::kBulk);
+
+    pool.Put(std::move(*req));
+    EXPECT_TRUE(pool.Full());
+  }
+
+  {
+    auto req = pool.Get();
+    EXPECT_TRUE(req.has_value());
+    EXPECT_FALSE(pool.Empty());
+    EXPECT_FALSE(pool.Full());
+    EXPECT_EQ(req->request().information()->Which(),
+              fuchsia_hardware_usb_request::RequestInfo::Tag::kControl);
+    EXPECT_EQ(req->request().data()->size(), 2);
+    EXPECT_EQ(req->request().data()->at(0).buffer()->vmo_id().value(), 9);
+    EXPECT_EQ(req->request().data()->at(0).size(), 2);
+    EXPECT_EQ(req->request().data()->at(0).offset(), 0);
+    EXPECT_EQ(req->request().data()->at(1).buffer()->vmo_id().value(), 1);
+    EXPECT_EQ(req->request().data()->at(1).size(), 4);
+    EXPECT_EQ(req->request().data()->at(1).offset(), 0);
+  }
+
+  {
+    auto req = pool.Remove();
+    EXPECT_TRUE(req.has_value());
+    EXPECT_TRUE(pool.Empty());
+
+    pool.Put(std::move(*req));
+    EXPECT_TRUE(pool.Full());
+  }
+
+  {
+    auto req = pool.Remove();
+    EXPECT_TRUE(req.has_value());
+    EXPECT_TRUE(pool.Empty());
+  }
+
+  {
+    auto req = pool.Remove();
+    EXPECT_FALSE(req.has_value());
+  }
+
+  // Make sure that we are able to destruct even with requests sitting in the pool.
+  pool.Add(usb::FidlRequest(usb::EndpointType::BULK));
+  EXPECT_TRUE(pool.Full());
+}
+
 }  // namespace

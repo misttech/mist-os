@@ -51,6 +51,12 @@ source_set("usb-fidl") {
     "include/usb/usb-request.h",
     "include/usb/usb.h",
   ]
+  public_deps = [
+    # usb-fidl needs these for now. May be removed in a future where we don't hack usb_request_physmap, etc.
+    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_c",
+    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_c",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
   ]
