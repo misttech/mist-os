@@ -40,7 +40,6 @@ source_set("tests_not_requiring_hardware") {
 
   deps = [
     ":test_deps",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/lib/driver/runtime/testing/loop_fixture:gtest",
     "//sdk/lib/fdio",
     "//src/graphics/lib/magma/tests/helper:msd_stubs",
@@ -93,6 +92,5 @@ group("test_deps") {
     "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
     "//src/graphics/lib/magma/tests/mock:mmio",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/fbl",
   ]
 }

@@ -8,7 +8,6 @@
 
 #include <gtest/gtest.h>
 
-#include "fbl/algorithm.h"
 #include "mock/mock_mmio.h"
 #include "platform_buffer.h"
 #include "src/graphics/drivers/msd-arm-mali/src/power_manager.h"
