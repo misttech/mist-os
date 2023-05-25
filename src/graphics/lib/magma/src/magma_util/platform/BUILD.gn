@@ -10,7 +10,10 @@ config("platform_include_config") {
 
 config("tracing") {
   if (magma_enable_tracing) {
-    defines = [ "MAGMA_ENABLE_TRACING" ]
+    defines = [
+      "MAGMA_ENABLE_TRACING",
+      "MAGMA_ENABLE_TRACE_VTHREAD",
+    ]
   }
 }
 

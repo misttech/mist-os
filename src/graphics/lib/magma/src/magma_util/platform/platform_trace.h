@@ -5,10 +5,9 @@
 #ifndef PLATFORM_TRACE_H
 #define PLATFORM_TRACE_H
 
-#if MAGMA_ENABLE_TRACING
+#if defined(MAGMA_ENABLE_TRACING)
 #include <lib/trace/event.h>
 
-#include "trace-vthread/event_vthread.h"
 #define TRACE_NONCE_DECLARE(x) uint64_t x = TRACE_NONCE()
 #else
 #define TRACE_ENABLED() (false)
@@ -25,6 +24,11 @@
 #define TRACE_FLOW_BEGIN(category, name, id, args...)
 #define TRACE_FLOW_STEP(category, name, id, args...)
 #define TRACE_FLOW_END(category, name, id, args...)
+#endif
+
+#if defined(MAGMA_ENABLE_TRACE_VTHREAD)
+#include "trace-vthread/event_vthread.h"
+#else
 #define TRACE_VTHREAD_DURATION_BEGIN(category, name, vthread_name, vthread_id, timestamp, args...)
 #define TRACE_VTHREAD_DURATION_END(category, name, vthread_name, vthread_id, timestamp, args...)
 #define TRACE_VTHREAD_FLOW_BEGIN(category, name, vthread_name, vthread_id, flow_id, timestamp, \
