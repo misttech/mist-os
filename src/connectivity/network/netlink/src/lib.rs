@@ -14,6 +14,7 @@
 mod client;
 pub mod messaging;
 mod multicast_groups;
+mod netlink_packet;
 pub mod protocol_family;
 mod routes;
 

@@ -38,6 +38,7 @@ rustc_library("netlink") {
     "src/lib.rs",
     "src/messaging.rs",
     "src/multicast_groups.rs",
+    "src/netlink_packet.rs",
     "src/protocol_family.rs",
     "src/routes.rs",
   ]
