@@ -34,6 +34,12 @@ class BluetoothAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_request_discovery(self) -> None:
         """Test case for bluetooth.request_discovery()"""
+
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.bluetooth.request_discovery(True)
+            return
+
         self.device.bluetooth.request_discovery(True)
 
 

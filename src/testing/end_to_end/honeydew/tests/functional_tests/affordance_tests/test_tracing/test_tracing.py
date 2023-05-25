@@ -47,6 +47,14 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 * `tracing.stop()`
                 * `tracing.terminate()`
         """
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.tracing.initialize()
+                self.device.tracing.start()
+                self.device.tracing.stop()
+                self.device.tracing.terminate()
+            return
+
         # Initialize Tracing Session.
         self.device.tracing.initialize()
 
@@ -69,6 +77,12 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 * `tracing.stop()`
                 * `tracing.terminate_and_download(directory="/tmp/")`
         """
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.tracing.terminate_and_download(
+                    directory="/tmp", trace_file="trace.fxt")
+            return
+
         # Initialize Tracing Session.
         self.device.tracing.initialize()
 

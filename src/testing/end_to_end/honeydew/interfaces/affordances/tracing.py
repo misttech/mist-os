@@ -14,8 +14,9 @@ class Tracing(abc.ABC):
     # List all the public methods in alphabetical order
     @abc.abstractmethod
     def initialize(
-            self, categories: Optional[List[str]],
-            buffer_size: Optional[int]) -> None:
+            self,
+            categories: Optional[List[str]] = None,
+            buffer_size: Optional[int] = None) -> None:
         """Initializes a trace sessions.
 
         Args:

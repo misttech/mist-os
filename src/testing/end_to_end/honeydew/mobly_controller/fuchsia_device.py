@@ -109,11 +109,14 @@ def _get_fuchsia_device_info(
         if attr.startswith("_"):
             continue
 
-        attr_type: Any | None = getattr(type(fuchsia_device), attr, None)
-        if isinstance(attr_type, properties.DynamicProperty):
-            device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
-        elif isinstance(attr_type, properties.PersistentProperty):
-            device_info["persistent"][attr] = getattr(fuchsia_device, attr)
+        try:
+            attr_type: Any | None = getattr(type(fuchsia_device), attr, None)
+            if isinstance(attr_type, properties.DynamicProperty):
+                device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
+            elif isinstance(attr_type, properties.PersistentProperty):
+                device_info["persistent"][attr] = getattr(fuchsia_device, attr)
+        except NotImplementedError:
+            pass
 
     return device_info
 
@@ -161,11 +164,11 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         device_config["ssh_private_key"] = config["ssh_key"]
 
     if config.get("transport"):
-        transport: str = config["transport"].upper()
+        transport: str = config["transport"]
 
-        if transport == "SL4F":
+        if transport == "sl4f":
             device_config["transport"] = transports.TRANSPORT.SL4F
-        elif transport in ["FUCHSIA_CONTROLLER", "FUCHSIA-CONTROLLER", "FC"]:
+        elif transport in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
             device_config["transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
         else:
             raise ValueError(

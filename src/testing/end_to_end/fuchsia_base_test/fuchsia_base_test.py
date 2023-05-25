@@ -6,8 +6,9 @@
 
 import enum
 import logging
-from typing import List
+from typing import Dict, List
 
+from honeydew import transports
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
@@ -53,9 +54,8 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         # wouldn't want to miss those FFX logs
         ffx.setup(logs_dir=f"{self.log_path}/ffx/")
 
-        self.fuchsia_devices: List[
-            fuchsia_device.FuchsiaDevice] = self.register_controller(
-                fuchsia_device_mobly_controller)
+        self.fuchsia_devices: List[fuchsia_device.FuchsiaDevice] = \
+            self.register_controller(fuchsia_device_mobly_controller)
 
     def setup_test(self) -> None:
         """setup_test is called once before running each test.
@@ -119,9 +119,107 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         for fx_device in self.fuchsia_devices:
             try:
                 fx_device.snapshot(directory=directory)
+            except NotImplementedError:
+                _LOGGER.warning(
+                    "Taking snapshot is not yet supported by %s",
+                    fx_device.device_name)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.warning(
                     "Unable to take snapshot of %s", fx_device.device_name)
+
+    def _get_controller_configs(self,
+                                controller_type: str) -> List[Dict[str, str]]:
+        """Return testbed config associated with a specific Mobly Controller.
+
+        Args:
+            controller_type: Controller type that is included in mobly testbed.
+                Ex: 'FuchsiaDevice', 'AndroidDevice' etc
+
+        Returns:
+            Config specified in the testbed file that is associated with
+            controller type provided.
+
+        Example:
+            ```
+            TestBeds:
+            - Name: Testbed-One-X64
+                Controllers:
+                  FuchsiaDevice:
+                    - name: fuchsia-54b2-038b-6e90
+                      ssh_private_key: ~/.ssh/fuchsia_ed25519
+                      transport: default
+            ```
+
+            For above specified testbed file, calling
+            ```
+            get_controller_configs(controller_type="FuchsiaDevice")
+            ```
+            will return
+            ```
+            [
+                {
+                    'name': 'fuchsia-54b2-038b-6e90',
+                    'ssh_private_key': '~/.ssh/fuchsia_ed25519',
+                    'transport': 'default'
+                }
+            ]
+            ```
+        """
+        for controller_name, controller_configs in \
+            self.controller_configs.items():
+            if controller_name == controller_type:
+                return controller_configs
+        return []
+
+    def _get_device_config(
+            self, controller_type: str, identifier_key: str,
+            identifier_value: str) -> Dict[str, str]:
+        """Return testbed config associated with a specific device of a
+        particular mobly controller type.
+
+        Args:
+            controller_type: Controller type that is included in mobly testbed.
+                Ex: 'FuchsiaDevice', 'AndroidDevice' etc
+            identifier_key: Key to identify the specific device.
+                Ex: 'name', 'nodename' etc
+            identifier_value: Value to match from list of devices.
+                Ex: 'fuchsia-emulator' etc
+
+        Returns:
+            Config specified in the testbed file that is associated with
+            controller type provided.
+
+        Example:
+            ```
+            TestBeds:
+            - Name: Testbed-One-X64
+                Controllers:
+                  FuchsiaDevice:
+                    - name: fuchsia-54b2-038b-6e90
+                      ssh_private_key: ~/.ssh/fuchsia_ed25519
+                      transport: default
+            ```
+
+            For above specified testbed file, calling
+            ```
+                get_testbed_config(
+                    controller_type="FuchsiaDevice",
+                    identifier_key="name",
+                    identifier_value="fuchsia-emulator")
+            ```
+            will return
+            ```
+            {
+                'name': 'fuchsia-54b2-038b-6e90',
+                'ssh_private_key': '~/.ssh/fuchsia_ed25519',
+                'transport': 'default'
+            }
+            ```
+        """
+        for controller_config in self._get_controller_configs(controller_type):
+            if controller_config[identifier_key] == identifier_value:
+                return controller_config
+        return {}
 
     def _health_check(self) -> None:
         """Ensure all FuchsiaDevice objects are healthy."""
@@ -129,6 +227,28 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             "Performing health checks on all the FuchsiaDevice objects...")
         for fx_device in self.fuchsia_devices:
             fx_device.health_check()
+
+    def _is_fuchsia_controller_based_device(
+            self, fx_device: fuchsia_device.FuchsiaDevice) -> bool:
+        """Checks the testbed config and returns if the device is using
+        Fuchsia-Controller based transport.
+
+        Args:
+            fx_device: FuchsiaDevice object
+
+        Returns:
+            True if transport is set to Fuchsia-Controller, else False
+        """
+        device_config: Dict[str, str] = self._get_device_config(
+            controller_type="FuchsiaDevice",
+            identifier_key="name",
+            identifier_value=fx_device.device_name)
+
+        if device_config.get("transport", transports.DEFAULT_TRANSPORT.value
+                            ) in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
+            return True
+
+        return False
 
     def _process_user_params(self) -> None:
         """Reads, processes and stores the test params used by this module."""

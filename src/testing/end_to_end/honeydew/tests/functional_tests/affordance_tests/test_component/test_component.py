@@ -40,12 +40,22 @@ class ComponentAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_component_list(self) -> None:
         """Test case for component.list()"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.component.list()
+            return
+
         component_list: List[str] = self.device.component.list()
         asserts.assert_is_instance(component_list, list)
         asserts.assert_in(ROOT_CM_URL, component_list)
 
     def test_component_search(self) -> None:
         """Test case for component.search()"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.component.search(name=SYS_MGR_V1_CMX_NAME)
+            return
+
         asserts.assert_true(
             self.device.component.search(name=SYS_MGR_V1_CMX_NAME),
             msg=f"{SYS_MGR_V1_CMX_NAME} component expected to be found")

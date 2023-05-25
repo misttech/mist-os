@@ -66,7 +66,9 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
             Default is "fuchsia".
 
     Raises:
-        errors.FuchsiaDeviceError: Failed to instantiate.
+        errors.SSHCommandError: if SSH connection check fails.
+        errors.FFXCommandError: if FFX connection check fails.
+        errors.Sl4fError: if SL4F connection check fails.
     """
 
     def __init__(
@@ -99,7 +101,7 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
             Device type.
 
         Raises:
-            errors.FuchsiaDeviceError: On failure.
+            errors.FfxCommandError: In case of failure.
         """
         return self.ffx.get_target_type()
 

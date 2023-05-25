@@ -7,9 +7,13 @@
 import logging
 import os
 import tempfile
+from typing import Dict
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew import custom_types
+from honeydew import transports
+from honeydew.device_classes.fuchsia_controller import \
+    fuchsia_device as fc_fuchsia_device
 from honeydew.device_classes.sl4f import fuchsia_device as sl4f_fuchsia_device
 from honeydew.interfaces.device_classes import bluetooth_capable_device
 from honeydew.interfaces.device_classes import component_capable_device
@@ -27,15 +31,23 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         """setup_class is called once before running tests.
 
         It does the following things:
-            * Assigns dut variable with FuchsiaDevice object
+            * Assigns device variable with FuchsiaDevice object
+              Note - If there are multiple Fuchsia devices listed in mobly
+                     testbed then first device will be used.
+            * Assigns device_config variable with testbed config associated with
+              this device
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
     def test_device_instance(self) -> None:
         """Test case to make sure DUT is a FuchsiaDevice"""
-        asserts.assert_is_instance(
-            self.device, sl4f_fuchsia_device.FuchsiaDevice)
+        if self._is_fuchsia_controller_based_device(self.device):
+            asserts.assert_is_instance(
+                self.device, fc_fuchsia_device.FuchsiaDevice)
+        else:
+            asserts.assert_is_instance(
+                self.device, sl4f_fuchsia_device.FuchsiaDevice)
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
@@ -52,30 +64,50 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
             self.device, component_capable_device.ComponentCapableDevice)
 
     def test_device_type(self) -> None:
-        """Test case for serial_number"""
+        """Test case for device_type"""
         asserts.assert_equal(
             self.device.device_type,
             self.user_params["expected_values"]["device_type"])
 
     def test_manufacturer(self) -> None:
         """Test case for manufacturer"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.manufacturer
+            return
+
         asserts.assert_equal(
             self.device.manufacturer,
             self.user_params["expected_values"]["manufacturer"])
 
     def test_model(self) -> None:
         """Test case for model"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.model
+            return
+
         asserts.assert_equal(
             self.device.model, self.user_params["expected_values"]["model"])
 
     def test_product_name(self) -> None:
         """Test case for product_name"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.product_name
+            return
+
         asserts.assert_equal(
             self.device.product_name,
             self.user_params["expected_values"]["product_name"])
 
     def test_serial_number(self) -> None:
         """Test case for serial_number"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.serial_number
+            return
+
         # Note - Some devices such as FEmu, X64 does not have a serial_number.
         # So do not include "serial_number" in params.yml file if device does
         # not have a serial_number.
@@ -85,6 +117,10 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_firmware_version(self) -> None:
         """Test case for firmware_version"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.firmware_version
+            return
 
         # Note - If "firmware_version" is specified in "expected_values" in
         # params.yml then compare with it.
@@ -97,6 +133,13 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_log_message_to_device(self) -> None:
         """Test case for log_message_to_device()"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.log_message_to_device(
+                    message="This is a test ERROR message",
+                    level=custom_types.LEVEL.ERROR)
+            return
+
         self.device.log_message_to_device(
             message="This is a test ERROR message",
             level=custom_types.LEVEL.ERROR)
@@ -111,10 +154,20 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_reboot(self) -> None:
         """Test case for reboot()"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.reboot()
+            return
+
         self.device.reboot()
 
     def test_snapshot(self) -> None:
         """Test case for snapshot()"""
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.snapshot(directory="/tmp",)
+            return
+
         with tempfile.TemporaryDirectory() as tmpdir:
             self.device.snapshot(directory=tmpdir, snapshot_file="snapshot.zip")
             exists: bool = os.path.exists(f"{tmpdir}/snapshot.zip")

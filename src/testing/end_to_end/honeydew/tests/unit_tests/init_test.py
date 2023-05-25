@@ -11,6 +11,9 @@ from unittest import mock
 
 import honeydew
 from honeydew import errors
+from honeydew.device_classes.fuchsia_controller import \
+    generic_fuchsia_device as fc_generic_fuchsia_device
+from honeydew.device_classes.fuchsia_controller import x64 as fc_x64
 from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.device_classes.sl4f import x64 as sl4f_x64
@@ -134,6 +137,62 @@ class InitTests(unittest.TestCase):
         mock_sl4f_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
+    @mock.patch.object(
+        honeydew.fc_generic_fuchsia_device.fuchsia_device.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.fc_generic_fuchsia_device.fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class",
+        return_value=fc_generic_fuchsia_device.GenericFuchsiaDevice,
+        autospec=True)
+    def test_create_device_return_fc_default_device(
+            self, mock_get_device_class, mock_ssh_check_connection,
+            mock_ffx_check_connection) -> None:
+        """Test case for honeydew.create_device() where it returns
+        Fuchsia-Controller based default fuchsia device object."""
+        self.assertIsInstance(
+            honeydew.create_device(
+                device_name="fuchsia-emulator",
+                ssh_private_key="/tmp/pkey",
+                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER),
+            fc_generic_fuchsia_device.GenericFuchsiaDevice)
+
+        mock_get_device_class.assert_called()
+        mock_ssh_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
+
+    @mock.patch.object(
+        honeydew.device_classes.fuchsia_controller.x64.fuchsia_device.
+        ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.fuchsia_controller.x64.fuchsia_device.
+        ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class", return_value=fc_x64.X64, autospec=True)
+    def test_create_device_return_fc_specific_device(
+            self, mock_get_device_class, mock_ssh_check_connection,
+            mock_ffx_check_connection) -> None:
+        """Test case for honeydew.create_device() where it returns a
+        Fuchsia-Controller based specific fuchsia device object."""
+        self.assertIsInstance(
+            honeydew.create_device(
+                device_name="fuchsia-1234",
+                ssh_private_key="/tmp/pkey",
+                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER),
+            fc_x64.X64)
+
+        mock_get_device_class.assert_called()
+        mock_ssh_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
+
     @mock.patch(
         "honeydew._get_device_class",
         side_effect=RuntimeError("mock runtime error"),
@@ -165,6 +224,23 @@ class InitTests(unittest.TestCase):
 
         mock_get_device_class.assert_called_once()
 
+    @mock.patch(
+        "honeydew._get_device_class",
+        return_value=fc_generic_fuchsia_device.GenericFuchsiaDevice,
+        autospec=True)
+    def test_get_all_affordances_for_fc_based_device(
+            self, mock_get_device_class) -> None:
+        """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
+        based device."""
+        expected_affordances: list[str] = ["bluetooth", "component", "tracing"]
+
+        self.assertEqual(
+            honeydew.get_all_affordances(
+                device_name="fuchsia-emulator",
+                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER),
+            expected_affordances)
+        mock_get_device_class.assert_called_once()
+
     def test_get_device_classes(self) -> None:
         """Test case for honeydew.get_device_classes()."""
         device_classes_path: str = os.path.dirname(
@@ -175,6 +251,11 @@ class InitTests(unittest.TestCase):
             honeydew.device_classes.sl4f.generic_fuchsia_device.
             GenericFuchsiaDevice,
             honeydew.device_classes.sl4f.x64.X64,
+            honeydew.device_classes.fuchsia_controller.fuchsia_device.
+            FuchsiaDevice,
+            honeydew.device_classes.fuchsia_controller.generic_fuchsia_device.
+            GenericFuchsiaDevice,
+            honeydew.device_classes.fuchsia_controller.x64.X64,
         }
         self.assertEqual(
             honeydew.get_device_classes(
@@ -267,18 +348,48 @@ class InitTests(unittest.TestCase):
     @mock.patch.object(
         honeydew.ffx_transport.FFX,
         "get_target_type",
-        return_value="something",
+        return_value="qemu-x64",
         autospec=True)
-    def test_get_device_class_raises_run_time_error(
+    def test_get_device_class_return_default_fc_device(
             self, mock_get_target_type) -> None:
-        """Test case for honeydew._get_device_class() raising RunTimeError
-        exception."""
-        with self.assertRaises(RuntimeError):
+        """Test case for honeydew.create_device() where it returns generic
+        Fuchsia-Controller based fuchsia device class implementation."""
+        expected_device_class: Type[fuchsia_device.FuchsiaDevice] = \
+            fc_generic_fuchsia_device.GenericFuchsiaDevice
+
+        self.assertEqual(
             honeydew._get_device_class(
                 device_name="fuchsia-emulator",
-                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER)
+                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER),
+            expected_device_class)
 
         mock_get_target_type.assert_called()
+
+    @mock.patch(
+        "honeydew._get_all_register_device_classes",
+        return_value={fc_x64.X64},
+        autospec=True)
+    @mock.patch.object(
+        honeydew.ffx_transport.FFX,
+        "get_target_type",
+        return_value="x64",
+        autospec=True)
+    def test_get_device_class_return_specific_fc_device(
+            self, mock_get_target_type,
+            mock_get_all_register_device_classes) -> None:
+        """Test case for honeydew._get_device_class() where it returns a
+        specific Fuchsia-Controller based fuchsia device class
+        implementation."""
+        expected_device_class: Type[fuchsia_device.FuchsiaDevice] = fc_x64.X64
+
+        self.assertEqual(
+            honeydew._get_device_class(
+                device_name="fuchsia-emulator",
+                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER),
+            expected_device_class)
+
+        mock_get_target_type.assert_called()
+        mock_get_all_register_device_classes.assert_called_once()
 
 
 if __name__ == "__main__":

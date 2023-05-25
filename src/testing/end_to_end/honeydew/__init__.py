@@ -15,6 +15,8 @@ from typing import Any, List, Optional, Set, Type
 from honeydew import device_classes
 from honeydew import errors
 from honeydew import transports
+from honeydew.device_classes.fuchsia_controller import \
+    generic_fuchsia_device as fc_generic_fuchsia_device
 from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -25,6 +27,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _DEVICE_CLASSES_MODULE = "honeydew.device_classes"
 _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
+_DEFAULT_TRANSPORT = transports.TRANSPORT.SL4F
 
 
 # pytype: disable=not-instantiable
@@ -204,9 +207,6 @@ def _get_device_class(
 
     Returns:
         Device class type.
-
-    Raises:
-        RuntimeError: if device class not found.
     """
     ffx: ffx_transport.FFX = ffx_transport.FFX(target=device_name)
     product_type: str = ffx.get_target_type()
@@ -224,16 +224,17 @@ def _get_device_class(
 
     if transport == transports.TRANSPORT.SL4F:
         default_device_class: Type[fuchsia_device.FuchsiaDevice] = \
-        sl4f_generic_fuchsia_device.GenericFuchsiaDevice
+            sl4f_generic_fuchsia_device.GenericFuchsiaDevice
         _LOGGER.info(
             "Returning '%s' which is the default implementation for '%s' " \
             "using '%s' transport",
             default_device_class.__name__, device_name, transport.value)
         return default_device_class
     else:  # transports.TRANSPORT.FUCHSIA_CONTROLLER
-        _LOGGER.info(
-            "No default implementation exist for '%s' using transport '%s'",
-            device_name, transport)
-        raise RuntimeError(
-            f"Didn't find any implementation '{device_name}' using " \
-            f"'{transport.value}' transport")
+        default_device_class: Type[fuchsia_device.FuchsiaDevice] = \
+            fc_generic_fuchsia_device.GenericFuchsiaDevice
+    _LOGGER.info(
+        "Returning '%s' which is the default implementation for '%s' " \
+        "using '%s' transport",
+        default_device_class.__name__, device_name, transport.value)
+    return default_device_class
