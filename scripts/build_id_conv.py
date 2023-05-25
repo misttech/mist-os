@@ -7,9 +7,10 @@
 This script allows for the conversion between ids.txt and .build-id formats.
 """
 
+import argparse
+import errno
 import os
 import sys
-import argparse
 
 # rel_to is expected to be absolute
 def abs_path(path, rel_to):
@@ -45,7 +46,7 @@ def mkdir(path):
     try:
         os.makedirs(path)
     except OSError as e:
-        if e.errno != os.errno.EEXIST:
+        if e.errno != errno.EEXIST:
             raise e
 
 def touch(path):
