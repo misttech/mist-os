@@ -4,7 +4,8 @@
 
 use {
     anyhow::{anyhow, format_err, Error},
-    fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, Proxy as _, RequestStream},
+    fidl::endpoints::{create_proxy, ClientEnd, DiscoverableProtocolMarker, RequestStream},
+    fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_fs_realm as fs_realm,
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio,
@@ -47,17 +48,19 @@ impl FsRealmState {
     async fn mount(
         &self,
         mount_name: &str,
-        device: ClientEnd<BlockMarker>,
+        device: ClientEnd<ControllerMarker>,
         options: fs_realm::MountOptions,
     ) -> Result<(), Error> {
         let mut locked_running_filesystems = self.running_filesystems.lock().await;
-        // Check that `mount_name` is not already in `running_filesystems`
+        // Check that `mount_name` is not already in `running_filesystems`.
         if locked_running_filesystems.contains_key(mount_name) {
             return Err(anyhow!("a filesystem is already mounted at {mount_name}"));
         }
-        let device_proxy = device.into_proxy()?;
-        let format = detect_disk_format(&device_proxy).await;
-        let device = ClientEnd::<BlockMarker>::new(device_proxy.into_channel().unwrap().into());
+
+        let device = device.into_proxy()?;
+        let (block_proxy, block_server) = create_proxy::<BlockMarker>()?;
+        device.connect_to_device_fidl(block_server.into_channel())?;
+        let format = detect_disk_format(&block_proxy).await;
         let mut filesystem = match format {
             DiskFormat::Blobfs => {
                 let blobfs = Blobfs {
@@ -68,18 +71,16 @@ impl FsRealmState {
                     ),
                     ..Default::default()
                 };
-                Filesystem::deprecated_do_not_use_from_block_device(device, blobfs)?
+                Filesystem::new(device, blobfs)
             }
-            DiskFormat::F2fs => {
-                Filesystem::deprecated_do_not_use_from_block_device(device, F2fs::default())?
-            }
+            DiskFormat::F2fs => Filesystem::new(device, F2fs::default()),
             DiskFormat::Minfs => {
                 let minfs = Minfs {
                     verbose: options.verbose.unwrap_or(false),
                     readonly: options.read_only.unwrap_or(false),
                     ..Default::default()
                 };
-                Filesystem::deprecated_do_not_use_from_block_device(device, minfs)?
+                Filesystem::new(device, minfs)
             }
             _ => {
                 return Err(anyhow!(
@@ -128,23 +129,24 @@ fn blob_compression(compression: Option<String>) -> Option<BlobCompression> {
 
 async fn format(
     name: &str,
-    device: ClientEnd<BlockMarker>,
+    device: ClientEnd<ControllerMarker>,
     options: fs_realm::FormatOptions,
 ) -> Result<(), Error> {
+    let device = device.into_proxy()?;
     let mut filesystem = match name.as_ref() {
         "blobfs" => {
             let blobfs = Blobfs { verbose: options.verbose.unwrap_or(false), ..Default::default() };
-            Filesystem::deprecated_do_not_use_from_block_device(device, blobfs)?
+            Filesystem::new(device, blobfs)
         }
-        "fxfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Fxfs::default())?,
-        "f2fs" => Filesystem::deprecated_do_not_use_from_block_device(device, F2fs::default())?,
+        "fxfs" => Filesystem::new(device, Fxfs::default()),
+        "f2fs" => Filesystem::new(device, F2fs::default()),
         "minfs" => {
             let minfs = Minfs {
                 verbose: options.verbose.unwrap_or(false),
                 fvm_data_slices: options.fvm_data_slices.unwrap_or(0),
                 ..Default::default()
             };
-            Filesystem::deprecated_do_not_use_from_block_device(device, minfs)?
+            Filesystem::new(device, minfs)
         }
         _ => {
             return Err(anyhow!(
@@ -155,12 +157,13 @@ async fn format(
     filesystem.format().await
 }
 
-async fn check(name: &str, device: ClientEnd<BlockMarker>) -> Result<(), Error> {
+async fn check(name: &str, device: ClientEnd<ControllerMarker>) -> Result<(), Error> {
+    let device = device.into_proxy()?;
     let mut filesystem = match name.as_ref() {
-        "blobfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Blobfs::default())?,
-        "fxfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Fxfs::default())?,
-        "f2fs" => Filesystem::deprecated_do_not_use_from_block_device(device, F2fs::default())?,
-        "minfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Minfs::default())?,
+        "blobfs" => Filesystem::new(device, Blobfs::default()),
+        "fxfs" => Filesystem::new(device, Fxfs::default()),
+        "f2fs" => Filesystem::new(device, F2fs::default()),
+        "minfs" => Filesystem::new(device, Minfs::default()),
         _ => {
             return Err(anyhow!(
                 "Invalid disk format: fsck only supports blobfs, fxfs, f2fs, and minfs"

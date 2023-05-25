@@ -8,7 +8,7 @@ rustc_binary("fsck") {
   sources = [ "src/main.rs" ]
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/lib/fdio",
     "//src/lib/fidl/rust/fidl",

@@ -7,8 +7,8 @@ use {
     argh::FromArgs,
     component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType},
     fidl::endpoints::create_endpoints,
-    fidl_fuchsia_fs_realm::{ControllerMarker, FormatOptions},
-    fidl_fuchsia_hardware_block::BlockMarker,
+    fidl_fuchsia_device::ControllerMarker,
+    fidl_fuchsia_fs_realm as fs_realm,
     fidl_fuchsia_sys2::RealmQueryMarker,
     fuchsia_component::client::{connect_channel_to_protocol_at_path, connect_to_protocol_at_path},
     fuchsia_zircon as zx,
@@ -42,11 +42,11 @@ async fn main() -> Result<(), Error> {
     let device_path = opt.device_path;
     let filesystem = opt.filesystem;
 
-    let mut format_options = FormatOptions::default();
+    let mut format_options = fs_realm::FormatOptions::default();
     format_options.verbose = opt.verbose;
     format_options.fvm_data_slices = opt.fvm_data_slices;
 
-    let (client_end, server_end) = create_endpoints::<BlockMarker>();
+    let (client_end, server_end) = create_endpoints::<ControllerMarker>();
     connect_channel_to_protocol_at_path(server_end.into_channel(), &device_path)?;
 
     // Connect to fs_realm
@@ -54,7 +54,7 @@ async fn main() -> Result<(), Error> {
     let realm_query_proxy =
         connect_to_protocol_at_path::<RealmQueryMarker>(REALM_QUERY_SERVICE_PATH)?;
     let moniker = "./core/fs_realm".try_into().unwrap();
-    let fs_realm_proxy = connect_to_instance_protocol_at_dir_root::<ControllerMarker>(
+    let fs_realm_proxy = connect_to_instance_protocol_at_dir_root::<fs_realm::ControllerMarker>(
         &moniker,
         OpenDirType::Exposed,
         &realm_query_proxy,

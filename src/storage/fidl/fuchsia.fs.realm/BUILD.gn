@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.fs.realm") {
   sources = [ "realm.fidl" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.block",
+    "//sdk/fidl/fuchsia.device",
     "//sdk/fidl/fuchsia.io",
     "//zircon/vdso/zx",
   ]

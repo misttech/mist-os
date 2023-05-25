@@ -4,7 +4,7 @@
 library fuchsia.fs.realm;
 
 using zx;
-using fuchsia.hardware.block;
+using fuchsia.device;
 using fuchsia.io;
 
 type MountOptions = resource table {
@@ -22,7 +22,7 @@ type FormatOptions = resource table {
 protocol Controller {
     /// Mounts a filesystem on a block device.
     Mount(resource struct {
-        device client_end:fuchsia.hardware.block.Block;
+        device client_end:fuchsia.device.Controller;
         name string:fuchsia.io.MAX_FILENAME;
         options MountOptions;
     }) -> () error zx.Status;
@@ -34,7 +34,7 @@ protocol Controller {
 
     /// Formats a block device with a particular filesystem format
     Format(resource struct {
-        device client_end:fuchsia.hardware.block.Block;
+        device client_end:fuchsia.device.Controller;
         name string:fuchsia.io.MAX_FILENAME;
         options FormatOptions;
     }) -> () error zx.Status;
@@ -42,7 +42,7 @@ protocol Controller {
     /// Checks the consistency of the filesystem formatted on
     /// the block device
     Check(resource struct {
-        device client_end:fuchsia.hardware.block.Block;
+        device client_end:fuchsia.device.Controller;
         name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
 };

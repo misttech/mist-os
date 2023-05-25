@@ -70,18 +70,6 @@ impl Filesystem {
         Self::from_boxed_config(block_device, Box::new(config))
     }
 
-    /// Creates a new `Filesystem`.
-    // TODO(https://fxbug.dev/123994): Remove this, it relies on multiplexing.
-    pub fn deprecated_do_not_use_from_block_device<FSC: FSConfig + 'static>(
-        block_device: ClientEnd<fidl_fuchsia_hardware_block::BlockMarker>,
-        config: FSC,
-    ) -> Result<Self, Error> {
-        let controller: ClientEnd<fidl_fuchsia_device::ControllerMarker> =
-            block_device.into_channel().into();
-        let controller = controller.into_proxy()?;
-        Ok(Self::new(controller, config))
-    }
-
     /// Creates a new `Filesystem`. Takes a boxed config.
     pub fn from_boxed_config(
         block_device: fidl_fuchsia_device::ControllerProxy,
