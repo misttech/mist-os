@@ -133,6 +133,15 @@ void Consumer::MaybeCompletePendingCreateStreamSinkRequest() {
     RemoveAddedPayloadBuffers();
   }
 
+  // Compression isn't currently supported. Close the |StreamSink| server end indicating invalid
+  // args.
+  if (pending_stream_sink_request_.compression() != nullptr) {
+    FX_LOGS(WARNING) << "Compression not supported, compression type "
+                     << pending_stream_sink_request_.compression()->type() << " requested";
+    pending_stream_sink_request_.stream_sink_request().Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
   fit::result<fidl::OneWayError> result = renderer_->SetPcmStreamType(
       {{.type = std::move(pending_stream_sink_request_.stream_type())}});
   if (result.is_error()) {
@@ -297,7 +306,7 @@ void Consumer::EndOfStream(EndOfStreamCompleter::Sync& completer) {
     return;
   }
 
-  // TODO(126765): May need to add logic to send OnEndOfStream, if the client needs it.
+  // TODO(fxbug.dev/126765): May need to add logic to send OnEndOfStream, if the client needs it.
   fit::result<fidl::OneWayError> result = renderer_->EndOfStream();
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to EndOfStream: " << result.error_value().status_string();

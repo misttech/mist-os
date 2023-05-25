@@ -6,8 +6,8 @@
 #include <fidl/fuchsia.media/cpp/markers.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/status.h>
+#include <zircon/errors.h>
 
-#include <algorithm>
 #include <iterator>
 
 #include <gtest/gtest.h>
@@ -142,10 +142,8 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     std::vector<zx_koid_t> buffer_koids;
     for (auto& buffer : buffers) {
       EXPECT_EQ(ZX_OK, zx::vmo::create(buffer_size, 0, &buffer));
+      buffer_koids.push_back(GetKoid(buffer));
     }
-
-    std::transform(buffers.begin(), buffers.end(), std::back_inserter(buffer_koids),
-                   [](auto& buffer) { return GetKoid(buffer); });
 
     fuchsia_media::AudioStreamType stream_type{{
         .sample_format = sample_format,
@@ -237,7 +235,6 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     fake_gain_control_.reset();
   }
 
- private:
   template <typename Protocol>
   class AsyncEventHandler : public fidl::AsyncEventHandler<Protocol> {
    public:
@@ -250,6 +247,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     fit::function<void(fidl::UnbindInfo)> fidl_error_callback_;
   };
 
+ private:
   std::unique_ptr<FakeAudioCore> fake_audio_core_;
   std::unique_ptr<FakeAudioRenderer> fake_audio_renderer_;
   std::unique_ptr<FakeGainControl> fake_gain_control_;
@@ -283,10 +281,8 @@ TEST_F(AudioConsumerTests, CreateStreamSinkTwice) {
   std::vector<zx_koid_t> buffer_koids;
   for (auto& buffer : buffers) {
     EXPECT_EQ(ZX_OK, zx::vmo::create(kBufferSize, 0, &buffer));
+    buffer_koids.push_back(GetKoid(buffer));
   }
-
-  std::transform(buffers.begin(), buffers.end(), std::back_inserter(buffer_koids),
-                 [](auto& buffer) { return GetKoid(buffer); });
 
   fuchsia_media::AudioStreamType stream_type{{.sample_format = kSampleFormat,
                                               .channels = kChannels,
@@ -772,6 +768,52 @@ TEST_F(AudioConsumerTests, GainControlUnbound) {
   EXPECT_TRUE(consumer_under_test_unbound());
   EXPECT_TRUE(stream_sink_under_test_unbound());
   EXPECT_TRUE(volume_control_under_test_unbound());
+
+  CleanUp();
+}
+
+// Tests that compressed formats are explicitly rejected.
+TEST_F(AudioConsumerTests, RejectCompressed) {
+  CreateConsumerUnderTest();
+
+  std::vector<zx::vmo> buffers(kBufferCount);
+  std::vector<zx_koid_t> buffer_koids;
+  for (auto& buffer : buffers) {
+    EXPECT_EQ(ZX_OK, zx::vmo::create(kBufferSize, 0, &buffer));
+    buffer_koids.push_back(GetKoid(buffer));
+  }
+
+  fuchsia_media::AudioStreamType stream_type{{
+      .sample_format = kSampleFormat,
+      .channels = kChannels,
+      .frames_per_second = kFramesPerSecond,
+  }};
+
+  zx::result stream_sink_endpoints = fidl::CreateEndpoints<fuchsia_media::StreamSink>();
+  EXPECT_TRUE(stream_sink_endpoints.is_ok());
+
+  auto compression = std::make_unique<fuchsia_media::Compression>();
+  compression->type() = fuchsia_media::kAudioEncodingAac;
+
+  fit::result result = consumer_under_test()->CreateStreamSink({{
+      .buffers = std::move(buffers),
+      .stream_type = std::move(stream_type),
+      .compression = std::move(compression),
+      .stream_sink_request = std::move(stream_sink_endpoints->server),
+  }});
+  EXPECT_TRUE(result.is_ok());
+
+  zx_status_t unbind_status = ZX_OK;
+  AsyncEventHandler<fuchsia_media::StreamSink> stream_sink_event_handler(
+      [&unbind_status](fidl::UnbindInfo unbind_info) { unbind_status = unbind_info.status(); });
+
+  fidl::Client<fuchsia_media::StreamSink> stream_sink = fidl::Client(
+      std::move(stream_sink_endpoints->client), dispatcher(), &stream_sink_event_handler);
+
+  RunLoopUntilIdle();
+
+  // Expect that the stream sink has been closed with epitaph |ZX_ERR_INVALID_ARGS|.
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, unbind_status);
 
   CleanUp();
 }
