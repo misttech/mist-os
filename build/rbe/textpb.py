@@ -5,11 +5,14 @@
 """Generic utilities for working with text protobufs (without schema).
 """
 
+import argparse
 import enum
 import collections
 import dataclasses
 import re
+import sys
 
+from pathlib import Path
 from typing import Any, Dict, Iterable, Sequence
 
 
@@ -32,7 +35,7 @@ class Token(object):
 _FIELD_NAME_RE = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*:')
 _SPACE_RE = re.compile(r'[ \t]+')
 _NEWLINE_RE = re.compile(r'\r?\n')
-_STRING_RE = re.compile(r'\"[^"]*\"')
+_STRING_RE = re.compile(r'\"([^"\\]|\\")*\"')  # Allow escaped quotes inside
 _VALUE_RE = re.compile(r'[^ \t\r\n]+')  # Anything text that is not space
 
 
@@ -94,6 +97,7 @@ def _lex(lines: Iterable[str]) -> Iterable[Token]:
     for line in lines:
         yield from _lex_line(line)
 
+
 class ParseError(ValueError):
 
     def __init__(self, msg: str):
@@ -103,12 +107,13 @@ class ParseError(ValueError):
 def _auto_dict(values: Sequence[Any]):
     """Convert sequences of key-value pairs to dictionaries."""
     if len(values) == 0:
-      return values
+        return values
 
-    if all(isinstance(v, dict) and v.keys() == {'key', 'value'} for v in values):
-      # assume keys are unique quoted strings
-      # 'key' and 'value' should not be repeated fields
-      return {v['key'][0].text.strip('"'): v['value'][0] for v in values}
+    if all(isinstance(v, dict) and v.keys() == {'key', 'value'}
+           for v in values):
+        # assume keys are unique quoted strings
+        # 'key' and 'value' should not be repeated fields
+        return {v['key'][0].text.strip('"'): v['value'][0] for v in values}
 
     return values
 
@@ -143,19 +148,25 @@ def _parse_block(tokens: Iterable[Token],
                     "Unexpected end-of-block at top-level before EOF.")
             break
 
+        if field.type != TokenType.FIELD_NAME:
+            raise ParseError(f"Expected a field name, but got {field}.")
+
+        key = field.text[:-1]  # removes trailing ':'
         try:
             value_or_block = next(tokens)
         except StopIteration:
-            raise ParseError("Unexpected EOF, expecting a value or start-of-block.")
+            raise ParseError(
+                "Unexpected EOF, expecting a value or start-of-block.")
 
-        key = field.text[:-1]
         if value_or_block.type == TokenType.START_BLOCK:
-            result[key].append(_parse_block(tokens, top=False))
+            value = _parse_block(tokens, top=False)
         elif value_or_block.type in {TokenType.STRING_VALUE,
                                      TokenType.OTHER_VALUE}:
-            result[key].append(value_or_block)
+            value = value_or_block  # a Token
         else:
-            raise ParseError(f"Unexpected token: {value_or_block.text}")
+            raise ParseError(f"Unexpected token: {value_or_block}")
+
+        result[key].append(value)
 
     # End of block, post-process key-value pairs into dictionaries.
     return {k: _auto_dict(v) for k, v in result.items()}
@@ -180,3 +191,32 @@ def parse(lines: Iterable[str]) -> Dict[str, Sequence[Any]]:
     return _parse_tokens(
         token for token in _lex(lines)
         if token.type not in {TokenType.SPACE, TokenType.NEWLINE})
+
+
+def _main_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Parse any text proto and show its representation.",
+        argument_default=None,
+    )
+    parser.add_argument(
+        "input",
+        type=Path,
+        metavar="FILE",
+        help="The text proto file to parse",
+    )
+    return parser
+
+
+_MAIN_ARG_PARSER = _main_arg_parser()
+
+
+def main(argv: Sequence[str]) -> int:
+    args = _MAIN_ARG_PARSER.parse_args(argv)
+    with open(args.input) as f:
+        data = parse(f)
+    print(data)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -82,6 +82,11 @@ class LexTests(unittest.TestCase):
                 textpb.Token(
                     text='"with space"', type=textpb.TokenType.STRING_VALUE)
             ])
+        self._test_tokens(
+            [
+                textpb.Token(
+                    text='"\\"escaped\\""', type=textpb.TokenType.STRING_VALUE)
+            ])
 
     def test_nonstring_values(self):
         self._test_tokens(
@@ -247,6 +252,54 @@ class ParseTests(unittest.TestCase):
             },
         )
 
+    def test_mixed_levels(self):
+        self.assertEqual(
+            textpb.parse(
+                [
+                    'outer: {'
+                    '  inner: {',
+                    '    status: GOOD',
+                    '  }',
+                    '  middle: 77',
+                    '  middle: 55',
+                    '}',
+                    'magic: "wand"',
+                ]),
+            {
+                'outer':
+                    [
+                        {
+                            'inner':
+                                [
+                                    {
+                                        'status':
+                                            [
+                                                textpb.Token(
+                                                    text='GOOD',
+                                                    type=textpb.TokenType.
+                                                    OTHER_VALUE)
+                                            ]
+                                    }
+                                ],
+                            'middle':
+                                [
+                                    textpb.Token(
+                                        text='77',
+                                        type=textpb.TokenType.OTHER_VALUE),
+                                    textpb.Token(
+                                        text='55',
+                                        type=textpb.TokenType.OTHER_VALUE)
+                                ],
+                        }
+                    ],
+                'magic':
+                    [
+                        textpb.Token(
+                            text='"wand"', type=textpb.TokenType.STRING_VALUE)
+                    ],
+            },
+        )
+
     def test_nested_dictionaries(self):
         self.assertEqual(
             textpb.parse(
@@ -373,8 +426,13 @@ class ParseTests(unittest.TestCase):
         with self.assertRaisesRegex(textpb.ParseError, 'Unexpected EOF'):
             textpb.parse(['foo: '])
 
+    def test_expected_field(self):
+        with self.assertRaisesRegex(textpb.ParseError, 'Expected a field name'):
+            textpb.parse(['"value"'])
+
     def test_expected_value(self):
-        with self.assertRaisesRegex(textpb.ParseError, 'Unexpected token: }'):
+        with self.assertRaisesRegex(textpb.ParseError,
+                                    'Unexpected token: .*END_BLOCK'):
             textpb.parse(['foo: }'])
 
 
