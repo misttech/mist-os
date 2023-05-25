@@ -32,5 +32,5 @@ executable('vkreadback',
     sources,
     include_directories: [inc_top, inc_vulkan, inc_gtest],
     cpp_args: ['-DVULKAN_HPP_NO_EXCEPTIONS=1', '-std=c++17'],
-    link_args: '-lvulkan',
+    link_args: [ '-static-libstdc++', '-lvulkan' ],
 )
