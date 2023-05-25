@@ -55,6 +55,8 @@ license_data("licenses_data") {
   prune_targets = [
     "//prebuilt/third_party/android/aemu/release/linux-x64",
     "//src/developer/ffx/plugins/emulator",
+    "//vendor/third_party/eigen3",
+    "//vendor/third_party/eigen3/",
   ]
 }
 

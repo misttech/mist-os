@@ -46,8 +46,7 @@
       "//tools/check-licenses/util/testdata/example/depB",
       "//tools/check-licenses/util/testdata/example/depB:depB",
       "//tools/check-licenses/util/testdata/example/depC/depC.txt",
-      "//tools/check-licenses/util/testdata/example/depD",
-      "//tools/check-licenses/util/testdata/example/depD:depD"
+      "//tools/check-licenses/util/testdata/example/depD"
     ],
     "script": "//build/rbe/output-scanner.sh",
     "inputs": [
@@ -79,8 +78,7 @@
       "//tools/check-licenses/util/testdata/example/depB",
       "//tools/check-licenses/util/testdata/example/depB:depB",
       "//tools/check-licenses/util/testdata/example/depC/depC.txt",
-      "//tools/check-licenses/util/testdata/example/depD",
-      "//tools/check-licenses/util/testdata/example/depD:depD"
+      "//tools/check-licenses/util/testdata/example/depD"
     ],
     "script": "//build/rbe/output-scanner.sh",
     "inputs": [
@@ -104,7 +102,6 @@
       "//tools/check-licenses/util/testdata/example/depB",
       "//tools/check-licenses/util/testdata/example/depB:depB"
     ],
-    "cleanDeps": [],
     "toolchain": "//build/toolchain/fuchsia:x64",
     "is_clean": true
   },
@@ -115,7 +112,6 @@
       "//tools/check-licenses/util/testdata/example/depB",
       "//tools/check-licenses/util/testdata/example/depB:depB"
     ],
-    "cleanDeps": [],
     "toolchain": "//build/toolchain/fuchsia:x64",
     "is_clean": true
   }

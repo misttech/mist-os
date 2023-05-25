@@ -104,6 +104,15 @@ func (g *Gen) FilterTargetsInDependencyTree(rootTarget string, excludeTargets ma
 					toProcessNext = append(toProcessNext, depTarget)
 				}
 			}
+
+			var cleanDepsFilter []string
+			for _, d := range t.CleanDeps {
+				if excludeTargets[d] {
+					continue
+				}
+				cleanDepsFilter = append(cleanDepsFilter, d)
+			}
+			t.CleanDeps = cleanDepsFilter
 		}
 		toProcess = toProcessNext
 	}
