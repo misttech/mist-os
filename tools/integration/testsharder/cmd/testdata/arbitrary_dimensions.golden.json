@@ -1,6 +1,6 @@
 [
     {
-        "name": "Linux",
+        "name": "Linux-other_dimension:bar",
         "tests": [
             {
                 "name": "host_x64/bar.sh",
@@ -16,7 +16,27 @@
                         "value": "0"
                     }
                 ]
-            },
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "os": "Linux",
+                "other_dimension": "bar"
+            }
+        },
+        "deps": [
+            "host_x64/bar.sh"
+        ],
+        "timeout_secs": 0,
+        "summary": {
+            "tests": null
+        },
+        "image_overrides": {}
+    },
+    {
+        "name": "Linux-other_dimension:foo",
+        "tests": [
             {
                 "name": "host_x64/foo.sh",
                 "path": "host_x64/foo.sh",
@@ -41,7 +61,6 @@
             }
         },
         "deps": [
-            "host_x64/bar.sh",
             "host_x64/foo.sh"
         ],
         "timeout_secs": 0,

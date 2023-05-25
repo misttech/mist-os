@@ -5,6 +5,7 @@
 package testsharder
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -12,6 +13,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	pm_build "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/build"
@@ -170,49 +174,27 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 		testListEntries = make(map[string]build.TestListEntry)
 	}
 
-	// Logic to get the environment name at this stage have to include information
-	// from the test specification that is not necessarily used in other
-	// usages of the environmentName function.
-	calcShardName := func(env build.Environment, spec build.TestSpec) string {
-		envName := environmentName(env)
-		if spec.Test.Isolated {
-			envName = fmt.Sprintf("%s-%s", envName, normalizeTestName(spec.Test.Name))
-		}
-		return envName
-	}
+	slices.Sort(opts.Tags)
 
-	type env struct {
-		shardName string
-		env       build.Environment
-	}
-
-	// Collect the order of the shards so our shard ordering is deterministic with
-	// respect to the input.
-	envs := []env{}
+	envs := make(map[string]build.Environment)
 	envToSuites := make(map[string][]build.TestSpec)
 	for _, spec := range specs {
 		for _, e := range spec.Envs {
-			if !stringSlicesEq(opts.Tags, e.Tags) {
+			// Tags should not differ by ordering.
+			slices.Sort(e.Tags)
+			if !slices.Equal(opts.Tags, e.Tags) {
 				continue
 			}
 
-			// Tags should not differ by ordering.
-			sortableTags := sort.StringSlice(opts.Tags)
-			sortableTags.Sort()
-			e.Tags = []string(sortableTags)
-
-			shardName := calcShardName(e, spec)
-			specs, ok := envToSuites[shardName]
-			if !ok {
-				envs = append(envs, env{shardName: shardName, env: e})
-			}
-			envToSuites[shardName] = append(specs, spec)
+			key := environmentKey(e)
+			envs[key] = e
+			envToSuites[key] = append(envToSuites[key], spec)
 		}
 	}
 
-	shards := make([]*Shard, 0, len(envs))
-	for _, e := range envs {
-		specs, _ := envToSuites[e.shardName]
+	shards := []*Shard{}
+	for envKey, e := range envs {
+		specs, _ := envToSuites[envKey]
 
 		sort.Slice(specs, func(i, j int) bool {
 			return specs[i].Test.Name < specs[j].Test.Name
@@ -226,16 +208,12 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 				test.updateFromTestList(testListEntry)
 			}
 			if spec.Test.Isolated {
-				// TODO(https://fxbug.dev/122883): At the time of writting this
-				// todo, all the tests that use ImageOverrides (boot tests) are
-				// Isolated, this might not be true for ever. Would be nice to
-				// have a specific branch that covers the case of a test with
-				// ImageOverrides independently of it being Isolated.
+				name := fmt.Sprintf("%s-%s", environmentName(e), normalizeTestName(spec.Test.Name))
 				shards = append(shards, &Shard{
-					Name:           e.shardName,
+					Name:           name,
 					Tests:          []Test{test},
 					ImageOverrides: spec.ImageOverrides,
-					Env:            e.env,
+					Env:            e,
 				})
 			} else {
 				tests = append(tests, test)
@@ -243,16 +221,80 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 		}
 		if len(tests) > 0 {
 			shards = append(shards, &Shard{
-				Name:  e.shardName,
+				Name:  environmentName(e),
 				Tests: tests,
-				Env:   e.env,
+				Env:   e,
 			})
 		}
 	}
+
+	makeShardNamesUnique(shards)
+
 	return shards
 }
 
-// EnvironmentName returns a name for an environment.
+// makeShardNamesUnique updates `shards` in-place to ensure that no two shards
+// have the same name, by grouping together shards with the same name and
+// appending a suffix to the name of each duplicate-named shard using any
+// environment dimensions that distinguish it from the others.
+//
+// This assumes that `Env.Dimensions` is always sufficient to distinguish two
+// shards with the same name.
+func makeShardNamesUnique(shards []*Shard) {
+	sameNameShards := make(map[string][]*Shard)
+	for _, s := range shards {
+		sameNameShards[s.Name] = append(sameNameShards[s.Name], s)
+	}
+
+	for _, dupes := range sameNameShards {
+		if len(dupes) < 2 {
+			continue
+		}
+		common := commonDimensions(dupes)
+		for _, shard := range dupes {
+			var tokens []string
+			dims := maps.Keys(shard.Env.Dimensions)
+			slices.Sort(dims)
+			for _, dim := range dims {
+				if _, ok := common[dim]; !ok {
+					tokens = append(tokens, dim+":"+shard.Env.Dimensions[dim])
+				}
+			}
+			if len(tokens) > 0 {
+				shard.Name += "-" + strings.Join(tokens, "-")
+			}
+		}
+	}
+}
+
+// commonDimensions calculates the intersection of the environment dimensions of
+// a set of shards.
+func commonDimensions(shards []*Shard) map[string]string {
+	res := make(map[string]string)
+	if len(shards) == 0 {
+		return res
+	}
+
+	maps.Copy(res, shards[0].Env.Dimensions)
+
+	for i := 1; i < len(shards); i++ {
+		maps.DeleteFunc(res, func(k, v string) bool {
+			v2, ok := shards[i].Env.Dimensions[k]
+			return !ok || v != v2
+		})
+	}
+	return res
+}
+
+func environmentKey(env build.Environment) string {
+	b, err := json.Marshal(env)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+// EnvironmentName returns a human-readable name for an environment.
 func environmentName(env build.Environment) string {
 	tokens := []string{}
 	addToken := func(s string) {

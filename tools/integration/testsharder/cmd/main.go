@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
@@ -118,6 +120,7 @@ func mainImpl(ctx context.Context) error {
 }
 
 type buildModules interface {
+	Args() build.Args
 	Images() []build.Image
 	Platforms() []build.DimensionSet
 	TestSpecs() []build.TestSpec
@@ -146,6 +149,31 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 	testListEntries, err := build.LoadTestList(testListPath)
 	if err != nil {
 		return err
+	}
+
+	// The "cpu" dimension for host and emulator tests has an effective default
+	// value set by the recipes corresponding to the value of the "target_cpu"
+	// GN arg. If test X sets "cpu" to its default value and test Y doesn't set
+	// "cpu", the two tests should still be sharded together.
+	//
+	// TODO(olivernewman): It's hacky to hardcode the defaults here when they're
+	// actually applied by recipes. Centralize the default values in the build
+	// system.
+	testSpecs := m.TestSpecs()
+	var defaultCPU string
+	if err := m.Args().Get("target_cpu", &defaultCPU); err != nil {
+		return fmt.Errorf("failed to look up value of target_cpu arg: %w", err)
+	}
+	for ti := range testSpecs {
+		for ei, env := range testSpecs[ti].Envs {
+			dt := env.Dimensions.DeviceType()
+			// Only applies to host and emulator tests.
+			if dt == "" || strings.HasSuffix(dt, "EMU") {
+				if _, ok := env.Dimensions["cpu"]; !ok {
+					testSpecs[ti].Envs[ei].Dimensions["cpu"] = defaultCPU
+				}
+			}
+		}
 	}
 	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts)
 
@@ -317,11 +345,36 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		defer f.Close()
 	}
 
+	slices.SortFunc(shards, func(a, b *testsharder.Shard) bool {
+		return a.Name < b.Name
+	})
+
 	encoder := json.NewEncoder(f)
 	// Use 4-space indents so golden files are compatible with `fx format-code`.
 	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(&shards); err != nil {
 		return fmt.Errorf("failed to encode shards: %v", err)
 	}
+
+	// All shard names must be unique. Validate this *after* emitting the shards
+	// so that it's easy to look at the output to see why dupes may have
+	// occurred.
+	if dupes := duplicatedShardNames(shards); len(dupes) > 0 {
+		return fmt.Errorf("some shard names are repeated: %s", strings.Join(dupes, ", "))
+	}
 	return nil
+}
+
+func duplicatedShardNames(shards []*testsharder.Shard) []string {
+	nameCounts := make(map[string]int)
+	for _, s := range shards {
+		nameCounts[s.Name]++
+	}
+	var dupes []string
+	for name, count := range nameCounts {
+		if count > 1 {
+			dupes = append(dupes, name)
+		}
+	}
+	return dupes
 }

@@ -1,44 +1,5 @@
 [
     {
-        "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
-        "tests": [
-            {
-                "name": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
-                "path": "",
-                "label": "//src/something:boot-test(//build/toolchain/fuchsia:x64)",
-                "os": "fuchsia",
-                "cpu": "x64",
-                "log_settings": {},
-                "isolated": true,
-                "runs": 1,
-                "run_algorithm": "STOP_ON_SUCCESS",
-                "tags": [
-                    {
-                        "key": "hermetic",
-                        "value": "true"
-                    },
-                    {
-                        "key": "expected_duration_milliseconds",
-                        "value": "0"
-                    }
-                ]
-            }
-        ],
-        "environment": {
-            "dimensions": {
-                "device_type": "AEMU"
-            }
-        },
-        "timeout_secs": 602,
-        "summary": {
-            "tests": null
-        },
-        "image_overrides": {
-            "zbi": "zbi-images-overrides"
-        }
-    },
-    {
         "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm",
         "tests": [
             {
@@ -66,6 +27,47 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
+                "device_type": "AEMU"
+            }
+        },
+        "timeout_secs": 602,
+        "summary": {
+            "tests": null
+        },
+        "image_overrides": {
+            "zbi": "zbi-images-overrides"
+        }
+    },
+    {
+        "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
+        "tests": [
+            {
+                "name": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
+                "path": "",
+                "label": "//src/something:boot-test(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "isolated": true,
+                "runs": 1,
+                "run_algorithm": "STOP_ON_SUCCESS",
+                "tags": [
+                    {
+                        "key": "hermetic",
+                        "value": "true"
+                    },
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ]
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
                 "device_type": "AEMU"
             }
         },

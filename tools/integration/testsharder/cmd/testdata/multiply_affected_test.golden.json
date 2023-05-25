@@ -1,5 +1,37 @@
 [
     {
+        "name": "AEMU",
+        "tests": [
+            {
+                "name": "fuchsia-pkg://fuchsia.com/unaffected-test#meta/unaffected-test.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/unaffected-test#meta/unaffected-test.cm",
+                "path": "",
+                "label": "//src/something:unaffected-test(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "1000"
+                    }
+                ]
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "device_type": "AEMU"
+            }
+        },
+        "timeout_secs": 604,
+        "summary": {
+            "tests": null
+        },
+        "image_overrides": {}
+    },
+    {
         "name": "affected:AEMU",
         "tests": [
             {
@@ -24,41 +56,11 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
                 "device_type": "AEMU"
             }
         },
         "timeout_secs": 842,
-        "summary": {
-            "tests": null
-        },
-        "image_overrides": {}
-    },
-    {
-        "name": "AEMU",
-        "tests": [
-            {
-                "name": "fuchsia-pkg://fuchsia.com/unaffected-test#meta/unaffected-test.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/unaffected-test#meta/unaffected-test.cm",
-                "path": "",
-                "label": "//src/something:unaffected-test(//build/toolchain/fuchsia:x64)",
-                "os": "fuchsia",
-                "cpu": "x64",
-                "log_settings": {},
-                "runs": 1,
-                "tags": [
-                    {
-                        "key": "expected_duration_milliseconds",
-                        "value": "1000"
-                    }
-                ]
-            }
-        ],
-        "environment": {
-            "dimensions": {
-                "device_type": "AEMU"
-            }
-        },
-        "timeout_secs": 604,
         "summary": {
             "tests": null
         },
@@ -88,6 +90,7 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
                 "device_type": "AEMU"
             }
         },

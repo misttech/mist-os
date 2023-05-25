@@ -1,5 +1,61 @@
 [
     {
+        "name": "AEMU",
+        "tests": [
+            {
+                "name": "fuchsia-pkg://fuchsia.com/nonhermetic2#meta/nonhermetic2.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/nonhermetic2#meta/nonhermetic2.cm",
+                "path": "",
+                "label": "//src/something:nonhermetic2(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "hermetic",
+                        "value": "false"
+                    },
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "240000"
+                    }
+                ]
+            },
+            {
+                "name": "fuchsia-pkg://fuchsia.com/nonhermetic1#meta/nonhermetic1.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/nonhermetic1#meta/nonhermetic1.cm",
+                "path": "",
+                "label": "//src/something:nonhermetic1(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "hermetic",
+                        "value": "false"
+                    },
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "240000"
+                    }
+                ]
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "device_type": "AEMU"
+            }
+        },
+        "timeout_secs": 1564,
+        "summary": {
+            "tests": null
+        },
+        "image_overrides": {}
+    },
+    {
         "name": "affected:AEMU-(1)",
         "tests": [
             {
@@ -47,6 +103,7 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
                 "device_type": "AEMU"
             }
         },
@@ -104,61 +161,7 @@
         ],
         "environment": {
             "dimensions": {
-                "device_type": "AEMU"
-            }
-        },
-        "timeout_secs": 1564,
-        "summary": {
-            "tests": null
-        },
-        "image_overrides": {}
-    },
-    {
-        "name": "AEMU",
-        "tests": [
-            {
-                "name": "fuchsia-pkg://fuchsia.com/nonhermetic2#meta/nonhermetic2.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/nonhermetic2#meta/nonhermetic2.cm",
-                "path": "",
-                "label": "//src/something:nonhermetic2(//build/toolchain/fuchsia:x64)",
-                "os": "fuchsia",
                 "cpu": "x64",
-                "log_settings": {},
-                "runs": 1,
-                "tags": [
-                    {
-                        "key": "hermetic",
-                        "value": "false"
-                    },
-                    {
-                        "key": "expected_duration_milliseconds",
-                        "value": "240000"
-                    }
-                ]
-            },
-            {
-                "name": "fuchsia-pkg://fuchsia.com/nonhermetic1#meta/nonhermetic1.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/nonhermetic1#meta/nonhermetic1.cm",
-                "path": "",
-                "label": "//src/something:nonhermetic1(//build/toolchain/fuchsia:x64)",
-                "os": "fuchsia",
-                "cpu": "x64",
-                "log_settings": {},
-                "runs": 1,
-                "tags": [
-                    {
-                        "key": "hermetic",
-                        "value": "false"
-                    },
-                    {
-                        "key": "expected_duration_milliseconds",
-                        "value": "240000"
-                    }
-                ]
-            }
-        ],
-        "environment": {
-            "dimensions": {
                 "device_type": "AEMU"
             }
         },
@@ -214,6 +217,7 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
                 "device_type": "AEMU"
             }
         },

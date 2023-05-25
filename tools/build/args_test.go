@@ -19,14 +19,15 @@ func TestArgs(t *testing.T) {
 		t.Fatalf("failed to unmarshal arguments: %v", err)
 	}
 
-	val, err := args.BoolValue("bool_var")
+	var val bool
+	err := args.Get("bool_var", &val)
 	if err != nil {
 		t.Fatalf("failed to determine value of boolean argument: %v", err)
 	} else if val != true {
 		t.Fatalf("expected the value under |bool_var| to be true")
 	}
 
-	val, err = args.BoolValue("nonexistent_var")
+	err = args.Get("nonexistent_var", &val)
 	if err != ErrArgNotSet {
 		t.Fatalf("expected ErrArgNotSet and not %v", err)
 	}

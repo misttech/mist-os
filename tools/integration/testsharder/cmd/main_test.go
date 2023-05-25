@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -77,8 +78,6 @@ func TestExecute(t *testing.T) {
 		{
 			// Two tests whose dimensions differ only by some random dimension
 			// ("other_dimension") should still be sharded separately.
-			// TODO(http://b/276316631): This is not the case currently and
-			// should be fixed.
 			name: "arbitrary dimensions",
 			testSpecs: []build.TestSpec{
 				{
@@ -584,6 +583,10 @@ func (m *fakeModules) Images() []build.Image {
 			Type: "kernel",
 		},
 	}
+}
+
+func (m *fakeModules) Args() build.Args {
+	return build.Args{"target_cpu": json.RawMessage(`"x64"`)}
 }
 
 func (m *fakeModules) TestListLocation() []string               { return []string{testListPath} }

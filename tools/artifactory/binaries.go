@@ -52,11 +52,13 @@ func debugBinaryUploads(ctx context.Context, mods binModules, debugNamespace, bu
 	var fuchsiaBuildIDs []string
 	buildIDSet := make(map[string]string)
 
-	breakpadEmitted, err := mods.Args().BoolValue(outputBreakpadSymsArg)
+	var breakpadEmitted bool
+	err := mods.Args().Get(outputBreakpadSymsArg, &breakpadEmitted)
 	if err != nil && err != build.ErrArgNotSet {
 		return nil, nil, nil, fmt.Errorf("failed to determine whether breakpad symbols were output in the build: %v", err)
 	}
-	gsymEmitted, err := mods.Args().BoolValue(outputGSYMArg)
+	var gsymEmitted bool
+	err = mods.Args().Get(outputGSYMArg, &gsymEmitted)
 	if err != nil && err != build.ErrArgNotSet {
 		return nil, nil, nil, fmt.Errorf("failed to determine whether GSYM was output in the build: %v", err)
 	}

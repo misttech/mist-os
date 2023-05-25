@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	pm_build "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/build"
@@ -25,7 +26,13 @@ const (
 // Note that just printing a list of shard pointers will print a list of memory addresses,
 // which would make for an unhelpful error message.
 func assertEqual(t *testing.T, expected, actual []*Shard) {
-	if diff := cmp.Diff(expected, actual); diff != "" {
+	opts := cmp.Options{
+		// We don't care about ordering of shards.
+		cmpopts.SortSlices(func(s1, s2 *Shard) bool {
+			return s1.Name < s2.Name
+		}),
+	}
+	if diff := cmp.Diff(expected, actual, opts...); diff != "" {
 		t.Fatalf("shards mismatch: (-want + got):\n%s", diff)
 	}
 }
@@ -379,4 +386,63 @@ func TestMakeShards(t *testing.T) {
 		// The PkgRepo dirname should be the same so no change is expected in the shards.
 		assertEqual(t, expected, actual)
 	})
+}
+
+func TestMakeShardNamesUnique(t *testing.T) {
+	shards := []*Shard{
+		{
+			Name: "foo",
+			Env: build.Environment{
+				Dimensions: build.DimensionSet{
+					"same_key_and_value": "1",
+				},
+			},
+		},
+		{
+			Name: "foo",
+			Env: build.Environment{
+				Dimensions: build.DimensionSet{
+					"same_key_and_value": "1",
+					"same_key":           "1",
+					"other_key":          "blah",
+				},
+			},
+		},
+		{
+			Name: "foo",
+			Env: build.Environment{
+				Dimensions: build.DimensionSet{
+					"same_key_and_value": "1",
+					"same_key":           "2",
+				},
+			},
+		},
+		{
+			// Should not be updated.
+			Name: "bar",
+			Env: build.Environment{
+				Dimensions: build.DimensionSet{
+					"a": "1",
+					"b": "1",
+				},
+			},
+		},
+	}
+	makeShardNamesUnique(shards)
+
+	wantNames := []string{
+		"foo",
+		"foo-other_key:blah-same_key:1",
+		"foo-same_key:2",
+		"bar",
+	}
+
+	var gotNames []string
+	for _, shard := range shards {
+		gotNames = append(gotNames, shard.Name)
+	}
+
+	if diff := cmp.Diff(wantNames, gotNames); diff != "" {
+		t.Errorf("Wrong shard names (-want +got):\n%s", diff)
+	}
 }

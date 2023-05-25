@@ -15,14 +15,12 @@ var ErrArgNotSet = errors.New("arg not set")
 // Args represents the GN arguments set in the build.
 type Args map[string]json.RawMessage
 
-// BoolValue returns the value of a boolean GN arg set in the build. If unset,
-// ErrArgNotSet will be returned.
-func (args Args) BoolValue(name string) (bool, error) {
+// Get returns the value of a GN arg set in the build. If unset, ErrArgNotSet
+// will be returned.
+func (args Args) Get(name string, v any) error {
 	msg, ok := args[name]
 	if !ok {
-		return false, ErrArgNotSet
+		return ErrArgNotSet
 	}
-	var val bool
-	err := json.Unmarshal(msg, &val)
-	return val, err
+	return json.Unmarshal(msg, v)
 }

@@ -38,6 +38,7 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
                 "device_type": "AEMU"
             }
         },
