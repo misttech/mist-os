@@ -233,6 +233,7 @@ class WatchForTarget(Step):
                 repository_registered = True
                 ctx.log(
                     f"{target_name} found. Registered 'devhost.fuchsia.com'")
+                self._check_target_compatability(ctx, target_name)
             elif repository_registered and not target_up:
                 ctx.log(
                     f"{target_name} lost. Waiting for target to come back online."
@@ -244,6 +245,33 @@ class WatchForTarget(Step):
     def cleanup(self, ctx):
         pass
 
+    def _check_target_compatability(self, ctx, target):
+        ctx.log("checking for target compatibility")
+        ctx.ffx().run("--target", target, "target", "wait", "-t", "60")
+        result = json.loads(
+            ctx.ffx().run("--target", target, "target", "show", "--json"))
+
+        sdk_version = ""
+        product = ""
+        board = ""
+        for entry in result:
+            if entry["label"] == "build":
+                for child in entry["child"]:
+                    label = child["label"]
+                    if label == "version":
+                        sdk_version = child["value"]
+                    elif label == "product":
+                        product = child["value"]
+                    elif label == "board":
+                        board = child["value"]
+
+        product_dot_board = f"{product}.{board}"
+        if ctx.sdk_id != sdk_version or ctx.pb_name != product_dot_board:
+            ctx.log(f"WARNING: the target {target} might not be compatible with your SDK.")
+            ctx.log("If you experience unexpected errors, try updating your target or")
+            ctx.log("restarting this program with the correct target.")
+            ctx.log(f"Expected SDK id: {ctx.sdk_id}, Target SDK id: {sdk_version}")
+            ctx.log(f"Expected product: {ctx.pb_name}, Target product: {product_dot_board}")
 
 class Runner:
 
