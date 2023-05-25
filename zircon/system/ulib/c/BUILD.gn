@@ -67,6 +67,7 @@ group("unittests") {
 config("internal.config") {
   visibility = [ "./*" ]
   configs = [ "//zircon/third_party/ulib/musl:headers" ]
+  defines = [ "LIBC_COPT_USE_C_ASSERT=1" ]
   include_dirs = [ llvm_libc ]
 }
 
