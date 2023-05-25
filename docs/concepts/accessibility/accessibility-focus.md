@@ -26,7 +26,7 @@ Other strategies exist and are expected to be implemented as the platform mature
 
 ## Future work
 
-Other assistive technologies may bennefit from the a11y focus, such as a switch access. This feature is not implemented yet.
+Other assistive technologies may benefit from the a11y focus, such as a switch access. "Switch access" feature is not implemented yet.
 
 [semantics]: /docs/concepts/accessibility/semantics.md
 [focus-chain]: /docs/development/graphics/scenic/concepts/focus_chain.md

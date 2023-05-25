@@ -1,5 +1,3 @@
-> **_ATTENTION:_** This document describes the behavior of Scenic's GFX API which is currently being replaced by the [Flatland API](/docs/concepts/ui/scenic/flatland/index.md). Workstation currently uses Flatland only, and Smart Display will be converted to use Flatland as well. If working with Flatland, please refer to the [Flatland documentation](/docs/concepts/ui/index.md).
-
 ## Scenic Views, view focus, and focus chain
 
 ## View focus
@@ -22,20 +20,6 @@ to fire.
 
 ## Transfer of view focus
 
-### Initiated by user input
-
-View focus can shift from view to view, as the user interacts with the UI.
-Scenic's policy is to transfer view focus when a pointer starts interacting with
-a view. The authority to transfer view focus to an arbitrary view arises from
-the user (more specifically, the user's input).
-
-For touch devices, the start of a finger's touch triggers a view focus transfer.
-
-For mouse devices, a primary button click triggers a view focus transfer. This
-policy follows the UI principle of "direct manipulation".
-
-Note: Scenic does not trigger a view focus transfer with mouse hover.
-
 ### Initiated programmatically
 
 In some cases, it is desirable to shift view focus in a programmatic manner. For
@@ -51,6 +35,21 @@ the requestor view's subtree, hence requestor and requestee are related by view
 tree ancestry.
 
 The policy details are listed below, but requires exposition of the focus chain.
+
+### Initiated by user input
+
+When `pointer_auto_focus` is set to true, Scenic shifts focus from view to view
+as the user interacts with the UI. (Smart displays set that value to false, and
+use the programmatic focus change scheme described in the previous section.)
+
+Focus transfer occurs in the following situations:
+
+- On touch devices, the start of a finger's touch triggers a focus transfer to
+  the view that is touched.
+- On mouse devices, a primary button click triggers a focus transfer to the view
+  that is clicked. This policy follows the UI principle of "direct manipulation."
+  Scenic does not trigger a focus transfer with mouse hover, even if
+  `pointer_auto_focus` is set to true.
 
 ## Focus chain: focus path in a view tree
 
