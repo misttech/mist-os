@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fs-host/common.h"
+#include "src/storage/lib/host/common.h"
 
 #include <assert.h>
 #include <getopt.h>

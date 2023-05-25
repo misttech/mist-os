@@ -15,10 +15,10 @@ executable("minfs") {
   sources = [ "main.cc" ]
   deps = [
     "//src/lib/storage/vfs/cpp/journal",
+    "//src/storage/lib/host",
     "//src/storage/minfs",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fs-host",
     "//zircon/system/ulib/zx",
   ]
 

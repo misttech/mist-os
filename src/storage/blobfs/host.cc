@@ -35,7 +35,6 @@
 #include <fbl/array.h>
 #include <fbl/macros.h>
 #include <fbl/unique_fd.h>
-#include <fs-host/common.h>
 #include <safemath/checked_math.h>
 #include <safemath/safe_conversions.h>
 
@@ -63,6 +62,7 @@
 #include "src/storage/blobfs/iterator/node_populator.h"
 #include "src/storage/blobfs/iterator/vector_extent_iterator.h"
 #include "src/storage/blobfs/node_finder.h"
+#include "src/storage/lib/host/common.h"
 
 using digest::Digest;
 using digest::MerkleTreeCreator;

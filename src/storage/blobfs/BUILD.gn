@@ -205,7 +205,7 @@ static_library("blobfs") {
       "fsck_host.cc",
       "host.cc",
     ]
-    deps += [ "//zircon/system/ulib/fs-host" ]
+    deps += [ "//src/storage/lib/host" ]
   }
 
   defines = []

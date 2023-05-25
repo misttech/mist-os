@@ -15,8 +15,8 @@ source_set("blobfs_creator") {
     "//src/lib/chunked-compression:chunked-compression",
     "//src/lib/digest",
     "//src/storage/blobfs",
+    "//src/storage/lib/host",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fs-host",
   ]
   deps = [
     "//sdk/lib/fit",

@@ -13,12 +13,12 @@
 
 #include <fbl/array.h>
 #include <fbl/vector.h>
-#include <fs-host/common.h>
 
 #include "src/lib/chunked-compression/multithreaded-chunked-compressor.h"
 #include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/host.h"
+#include "src/storage/lib/host/common.h"
 
 class BlobfsCreator : public FsCreator {
  public:

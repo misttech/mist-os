@@ -2,11 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/zx_library.gni")
-
-zx_library("fs-host") {
-  sdk = "source"
-  sdk_headers = [ "fs-host/common.h" ]
+source_set("host") {
+  public = [ "common.h" ]
   sources = [ "common.cc" ]
   deps = [ "//zircon/system/ulib/fbl" ]
 }

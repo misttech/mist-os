@@ -10,8 +10,7 @@
 #include <memory>
 #include <utility>
 
-#include <fs-host/common.h>
-
+#include "src/storage/lib/host/common.h"
 #include "src/storage/minfs/host.h"
 
 class MinfsCreator : public FsCreator {

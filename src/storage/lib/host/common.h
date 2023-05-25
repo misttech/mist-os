@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FS_HOST_COMMON_H_
-#define FS_HOST_COMMON_H_
+#ifndef SRC_STORAGE_LIB_HOST_COMMON_H_
+#define SRC_STORAGE_LIB_HOST_COMMON_H_
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -171,4 +171,4 @@ class FsCreator {
   std::optional<std::filesystem::path> json_output_path_;
 };
 
-#endif  // FS_HOST_COMMON_H_
+#endif  // SRC_STORAGE_LIB_HOST_COMMON_H_
