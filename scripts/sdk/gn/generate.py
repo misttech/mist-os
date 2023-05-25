@@ -167,7 +167,7 @@ class GNBuilder(Frontend):
             # copy them explicitly.
             for atom in metadata['parts']:
                 if atom['type'] in ['data', 'companion_host_tool',
-                                    'documentation', 'host_tool']:
+                                    'documentation', 'host_tool', 'ffx_tool']:
                     self.copy_file(atom['meta'])
 
             # There are dart components in the Core SDK which are not part
@@ -225,6 +225,24 @@ class GNBuilder(Frontend):
                 indent=2,
                 sort_keys=True,
                 separators=(',', ': '))
+
+    def _install_ffx_tool_atom_files(self, root, collections):
+        """Copies the file collections (generic or target specific) in an
+        ffx_tool atom.
+
+        The executable and executable_metadata 'collections' in an ffx_tool
+        atom are single files, while any other collection is a list of
+        additional files.
+        """
+        for collection, files in collections.items():
+            if collection == "executable" or collection == "executable_metadata":
+                # These are always expected to be a single file, so 'files'
+                # is actually a single file.
+                self.copy_file(files, root, 'tools')
+            else:
+                # Anything else is expected to be multiple files, so we copy
+                # them in plural.
+                self.copy_files(files, root, 'tools')
 
     # Handlers for SDK atoms
 
@@ -335,6 +353,13 @@ class GNBuilder(Frontend):
         if 'target_files' in atom:
             for files in atom['target_files'].values():
                 self.copy_files(files, atom['root'], 'tools')
+
+    def install_ffx_tool_atom(self, atom):
+        if 'files' in atom:
+            self._install_ffx_tool_atom_files(atom['root'], atom['files'])
+        if 'target_files' in atom:
+            for files in atom['target_files'].values():
+                self._install_ffx_tool_atom_files(atom['root'], files)
 
     def install_loadable_module_atom(self, atom):
         name = atom['name']
