@@ -387,15 +387,11 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
   ZX_ASSERT(config);
   ZX_ASSERT(config_stamp);
 
-  if (config_stamps_.empty()) {
-    // Initialize the sequence number for the first configuration applied to the pipe.
-    constexpr uint64_t kInitialConfigStampSequenceNumber = 1ul;
-    sequence_number_of_config_stamps_front.emplace(kInitialConfigStampSequenceNumber);
-  }
-  config_stamps_.push_back(*config_stamp);
-
-  auto sequence_number_of_current_config_stamp =
-      *sequence_number_of_config_stamps_front + config_stamps_.size() - 1;
+  // The values of the config stamps in `pending_eviction_config_stamps_` must
+  // be strictly increasing.
+  ZX_ASSERT(pending_eviction_config_stamps_.empty() ||
+            pending_eviction_config_stamps_.back().value < config_stamp->value);
+  pending_eviction_config_stamps_.push_back(*config_stamp);
 
   registers::pipe_arming_regs_t regs;
   registers::PipeRegs pipe_regs(pipe_id_);
@@ -450,9 +446,9 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
     bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));
     bottom_color.set_g(encode_pipe_color_component(static_cast<uint8_t>(color >> 8)));
     bottom_color.set_b(encode_pipe_color_component(static_cast<uint8_t>(color)));
-    sequence_number_of_config_with_color_layer_ = sequence_number_of_current_config_stamp;
+    config_stamp_with_color_layer_ = *config_stamp;
   } else {
-    sequence_number_of_config_with_color_layer_ = std::nullopt;
+    config_stamp_with_color_layer_ = std::nullopt;
   }
 
   regs.pipe_bottom_color = bottom_color.reg_value();
@@ -468,15 +464,14 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
       }
     }
     ConfigurePrimaryPlane(plane, primary, !!config->cc_flags, &scaler_1_claimed, &regs,
-                          sequence_number_of_current_config_stamp, get_gtt_region_fn,
-                          get_pixel_format);
+                          *config_stamp, get_gtt_region_fn, get_pixel_format);
   }
   cursor_layer_t* cursor = nullptr;
   if (config->layer_count &&
       config->layer_list[config->layer_count - 1]->type == LAYER_TYPE_CURSOR) {
     cursor = &config->layer_list[config->layer_count - 1]->cfg.cursor;
   }
-  ConfigureCursorPlane(cursor, !!config->cc_flags, &regs, sequence_number_of_current_config_stamp);
+  ConfigureCursorPlane(cursor, !!config->cc_flags, &regs, *config_stamp);
 
   if (platform_ != registers::Platform::kTigerLake) {
     pipe_regs.CscMode().FromValue(regs.csc_mode).WriteTo(mmio_space_);
@@ -501,8 +496,7 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
 
 void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary,
                                  bool enable_csc, bool* scaler_1_claimed,
-                                 registers::pipe_arming_regs_t* regs,
-                                 uint64_t config_stamp_sequence_number,
+                                 registers::pipe_arming_regs_t* regs, config_stamp_t config_stamp,
                                  const SetupGttImageFunc& setup_gtt_image,
                                  const GetImagePixelFormatFunc& get_pixel_format) {
   registers::PipeRegs pipe_regs(pipe_id());
@@ -713,13 +707,11 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   plane_surface.set_surface_base_addr(base_address >> plane_surface.kRShiftCount);
   regs->plane_surf[plane_num] = plane_surface.reg_value();
 
-  sequence_number_of_latest_config_stamp_with_image_[image->handle] =
-      static_cast<int64_t>(config_stamp_sequence_number);
+  latest_config_stamp_with_image_[image->handle] = config_stamp;
 }
 
 void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                                registers::pipe_arming_regs_t* regs,
-                                uint64_t config_stamp_sequence_number) {
+                                registers::pipe_arming_regs_t* regs, config_stamp_t config_stamp) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
@@ -764,29 +756,32 @@ void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
   cursor_base.set_cursor_base(base_address >> cursor_base.kPageShift);
   regs->cur_base = cursor_base.reg_value();
 
-  sequence_number_of_latest_config_stamp_with_image_[cursor->image.handle] =
-      static_cast<int64_t>(config_stamp_sequence_number);
+  latest_config_stamp_with_image_[cursor->image.handle] = config_stamp;
 }
 
 std::optional<config_stamp_t> Pipe::GetVsyncConfigStamp(
     const std::vector<uint64_t>& image_handles) {
-  int64_t sequence_number_of_oldest_config_on_vsync_frame = std::numeric_limits<int64_t>::max();
+  std::optional<config_stamp_t> oldest_config_stamp = std::nullopt;
 
-  if (sequence_number_of_config_with_color_layer_) {
-    sequence_number_of_oldest_config_on_vsync_frame =
-        std::min(sequence_number_of_oldest_config_on_vsync_frame,
-                 *sequence_number_of_config_with_color_layer_);
+  if (config_stamp_with_color_layer_) {
+    oldest_config_stamp = *config_stamp_with_color_layer_;
   }
   for (const uint64_t handle : image_handles) {
-    auto config_it = sequence_number_of_latest_config_stamp_with_image_.find(handle);
-    if (config_it == sequence_number_of_latest_config_stamp_with_image_.end()) {
+    auto config_it = latest_config_stamp_with_image_.find(handle);
+    if (config_it == latest_config_stamp_with_image_.end()) {
       continue;
     }
-    sequence_number_of_oldest_config_on_vsync_frame =
-        std::min(sequence_number_of_oldest_config_on_vsync_frame, config_it->second);
+
+    if (oldest_config_stamp.has_value()) {
+      oldest_config_stamp = {
+          .value = std::min(oldest_config_stamp->value, config_it->second.value),
+      };
+    } else {
+      oldest_config_stamp = config_it->second;
+    }
   }
 
-  if (sequence_number_of_oldest_config_on_vsync_frame == std::numeric_limits<int64_t>::max()) {
+  if (!oldest_config_stamp) {
     // Display device may carry garbage contents in the registers, for example
     // if the driver restarted. In that case none of the images stored in the
     // device register will be recognized by the driver, so we just return a
@@ -794,32 +789,27 @@ std::optional<config_stamp_t> Pipe::GetVsyncConfigStamp(
     zxlogf(DEBUG, "%s: NO valid images for the display.", __func__);
     return std::nullopt;
   }
-  if (config_stamps_.empty() || !sequence_number_of_config_stamps_front.has_value()) {
+  if (pending_eviction_config_stamps_.empty()) {
     // Vsync signals could be sent to the driver before the first
     // ApplyConfiguration() is called. In that case the Vsync signal should be
     // just ignored by the driver, so we return a null config stamp.
     zxlogf(DEBUG, "%s: No config has been applied.", __func__);
     return std::nullopt;
   }
-  if (sequence_number_of_config_stamps_front > sequence_number_of_oldest_config_on_vsync_frame) {
-    zxlogf(ERROR, "%s: Device returns a config with seqno (%lu) that is already evicted.", __func__,
-           sequence_number_of_oldest_config_on_vsync_frame);
+  if (pending_eviction_config_stamps_.front().value > oldest_config_stamp->value) {
+    zxlogf(ERROR, "%s: Device returns a config (%lu) that is already evicted.", __func__,
+           oldest_config_stamp->value);
     return std::nullopt;
   }
 
-  // Since config stamps in the linked list have consecutive sequence numbers,
-  // we can just remove the first |sequence_number_of_oldest_config_on_vsync_frame
-  // - *sequence_number_of_config_stamps_front| elements to evict all
-  // config stamps older than that with sequence number
-  // |sequence_number_of_oldest_config_on_vsync_frame|.
-  config_stamps_.erase(
-      config_stamps_.begin(),
-      std::next(config_stamps_.begin(), sequence_number_of_oldest_config_on_vsync_frame -
-                                            *sequence_number_of_config_stamps_front));
-  sequence_number_of_config_stamps_front.emplace(sequence_number_of_oldest_config_on_vsync_frame);
+  // Evict all pending config stamps older than the current one from Vsync.
+  while (!pending_eviction_config_stamps_.empty() &&
+         pending_eviction_config_stamps_.front().value < oldest_config_stamp->value) {
+    pending_eviction_config_stamps_.pop_front();
+  }
 
-  ZX_DEBUG_ASSERT(!config_stamps_.empty());
-  return config_stamps_.front();
+  ZX_DEBUG_ASSERT(!pending_eviction_config_stamps_.empty());
+  return pending_eviction_config_stamps_.front();
 }
 
 void Pipe::SetColorConversionOffsets(bool preoffsets, const float vals[3]) {
