@@ -4,9 +4,8 @@
 
 use {
     anyhow::Context as _,
-    fidl::HandleBased as _,
     fidl_fuchsia_io as fio,
-    futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _},
+    futures::{future::Either, stream::StreamExt as _, AsyncReadExt as _, AsyncWriteExt as _},
     std::io::StdoutLock,
     termion::raw::IntoRawMode as _,
 };
@@ -58,10 +57,9 @@ impl Stdout<'_> {
 }
 
 /// Concurrently:
-///   * locks stdin and copies the input to `socket`
-///   * reads data from `socket` and writes it to `stdout`
-/// Finishes when either of those tasks finish.
-/// `socket` must have ZX_RIGHT_DUPLICATE.
+///   1. locks stdin and copies the input to `socket`
+///   2. reads data from `socket` and writes it to `stdout`
+/// Finishes when the remote end of the socket closes (when (2) completes).
 pub async fn connect_socket_to_stdio(
     socket: fidl::Socket,
     stdout: Stdout<'_>,
@@ -78,66 +76,63 @@ where
     R: std::io::Read,
 {
     // Use a separate thread to read from stdin without blocking the executor.
-    //
-    // Instead of duplicating the socket with a syscall, we could create a fuchsia_async::Socket
-    // and then use AsyncReadExt::split to create read and write halves. The downside to this
-    // approach is that fuchsia_async::Socket::from_socket registers the socket as a receiver of
-    // the current thread's executor and receivers must not outlive their executor. So, we would
-    // then need to make sure the socket passed to the thread created by fuchsia_async::unblock
-    // is dropped before the calling thread's executor is dropped. We could do this by having
-    // the future returned by this fn not complete until the socket is dropped, but that fails if
-    // the caller does not poll the returned future to completion (and the failure presents as a
-    // panic [0] when the calling thread's executor is dropped and it would be difficult to trace
-    // the error back to this).
-    //
-    // The downside to the duplicate_handle approach is that it requires the socket to have
-    // ZX_RIGHT_DUPLICATE.
-    //
-    // [0] https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/fuchsia-async/src/runtime/fuchsia/executor/common.rs;l=282-285;drc=ab0b08e52812d159026dc7e101620d57d7aead10
-    #[cfg(target_os = "fuchsia")]
-    let rights = fidl::handle::fuchsia_handles::Rights::SAME_RIGHTS;
-    #[cfg(not(target_os = "fuchsia"))]
-    let rights = fidl::handle::non_fuchsia_handles::Rights::SAME_RIGHTS;
-
-    let socket_out = socket.duplicate_handle(rights).context("duplicating socket")?;
-    let mut socket_in =
-        fuchsia_async::Socket::from_socket(socket).context("creating async socket_in")?;
-
-    let stdin_to_socket = fuchsia_async::unblock(move || {
-        let mut executor = fuchsia_async::LocalExecutor::new();
-        executor.run_singlethreaded(async move {
-            let mut socket_out = fuchsia_async::Socket::from_socket(socket_out)
-                .context("creating async socket_out")?;
+    let (stdin_send, mut stdin_recv) = futures::channel::mpsc::unbounded();
+    let _: std::thread::JoinHandle<_> = std::thread::Builder::new()
+        .name("connect_socket_to_stdio stdin thread".into())
+        .spawn(move || {
             let mut stdin = stdin();
             let mut buf = [0u8; fio::MAX_BUF as usize];
             loop {
-                let bytes_read = stdin.read(&mut buf).context("reading from stdin")?;
+                let bytes_read = stdin.read(&mut buf)?;
                 if bytes_read == 0 {
                     return Ok::<(), anyhow::Error>(());
                 }
-                socket_out.write_all(&buf[..bytes_read]).await.context("writing to socket")?;
-                socket_out.flush().await.context("flushing socket")?;
+                let () = stdin_send.unbounded_send(buf[..bytes_read].to_vec())?;
             }
-        })?;
+        })
+        .context("spawning stdin thread")?;
+
+    let (mut socket_in, mut socket_out) =
+        fuchsia_async::Socket::from_socket(socket).context("creating async socket_in")?.split();
+
+    let stdin_to_socket = async move {
+        while let Some(stdin) = stdin_recv.next().await {
+            socket_out.write_all(&stdin).await.context("writing to socket")?;
+            socket_out.flush().await.context("flushing socket")?;
+        }
         Ok::<(), anyhow::Error>(())
-    });
+    };
+
+    let socket_to_stdout = async move {
+        loop {
+            let mut buf = [0u8; fio::MAX_BUF as usize];
+            let bytes_read = socket_in.read(&mut buf).await.context("reading from socket")?;
+            if bytes_read == 0 {
+                break;
+            }
+            stdout.write_all(&buf[..bytes_read]).context("writing to stdout")?;
+            stdout.flush().context("flushing stdout")?;
+        }
+        Ok::<(), anyhow::Error>(())
+    };
 
     Ok(async move {
-        futures::select! {
-            res = stdin_to_socket.fuse() => res,
-            res = async move {
-                loop {
-                    let mut buf = [0u8; fio::MAX_BUF as usize];
-                    let bytes_read = socket_in.read(&mut buf).await.context("reading from socket")?;
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    stdout.write_all(&buf[..bytes_read]).context("writing to stdout")?;
-                    stdout.flush().context("flushing stdout")?;
-                }
-                Ok(())
-            }.fuse() => res,
-        }
+        futures::pin_mut!(stdin_to_socket);
+        futures::pin_mut!(socket_to_stdout);
+        Ok(match futures::future::select(stdin_to_socket, socket_to_stdout).await {
+            Either::Left((stdin_to_socket, socket_to_stdout)) => {
+                let () = stdin_to_socket?;
+                // Wait for output even after stdin closes. The remote may be responding to the
+                // final input, or the remote may not be reading from stdin at all (consider
+                // "bash -c $CMD").
+                let () = socket_to_stdout.await?;
+            }
+            Either::Right((socket_to_stdout, _)) => {
+                let () = socket_to_stdout?;
+                // No reason to wait for stdin because the socket is closed so writing stdin to it
+                // would fail.
+            }
+        })
     })
 }
 
@@ -149,29 +144,20 @@ mod tests {
     async fn stdin_to_socket() {
         let (socket, socket_remote) = fidl::Socket::create_stream();
 
-        let () = connect_socket_to_stdio_impl(socket_remote, || &b"test input"[..], vec![])
-            .unwrap()
-            .await
-            .unwrap();
+        let connect_fut =
+            connect_socket_to_stdio_impl(socket_remote, || &b"test input"[..], vec![]).unwrap();
 
-        let mut out = vec![0u8; 100];
-        let bytes_read;
-        loop {
-            match socket.read(&mut out) {
-                Ok(n) => {
-                    bytes_read = n;
-                    break;
-                }
-                Err(fidl::Status::SHOULD_WAIT) => {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                    continue;
-                }
-                Err(e) => panic!("unexpected error {e:?}"),
-            }
-        }
+        let (connect_res, bytes_from_socket) = futures::join!(connect_fut, async move {
+            let mut socket = fuchsia_async::Socket::from_socket(socket).unwrap();
+            let mut out = vec![0u8; 100];
+            let bytes_read = socket.read(&mut out).await.unwrap();
+            drop(socket);
+            out.resize(bytes_read, 0);
+            out
+        });
+        let () = connect_res.unwrap();
 
-        assert_eq!(bytes_read, 10);
-        assert_eq!(&out[..bytes_read], &b"test input"[..]);
+        assert_eq!(bytes_from_socket, &b"test input"[..]);
     }
 
     #[fuchsia::test]
