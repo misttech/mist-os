@@ -499,7 +499,7 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
       break;
     case PDEV_PID_AMLOGIC_A311D:
       if (first_cluster_vreg.is_error() || second_cluster_vreg.is_error()) {
-        zxlogf(ERROR, "Invalid args. Sherlock requires first cluster vreg and second cluster vreg");
+        zxlogf(ERROR, "Invalid args. A311D requires first cluster vreg and second cluster vreg");
         return ZX_ERR_INTERNAL;
       }
       power_impl_device = std::make_unique<AmlPower>(parent, std::move(first_cluster_vreg.value()),

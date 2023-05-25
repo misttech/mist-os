@@ -11,17 +11,17 @@ using fuchsia.hardware.clock;
 using fuchsia.platform;
 using fuchsia.hardware.power;
 
-primary node "power-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.power.BIND_FIDL_PROTOCOL.SERVICE;
-  fuchsia.BIND_POWER_DOMAIN == fuchsia.amlogic.platform.a311d.POWER_DOMAIN.ARM_CORE_BIG;
-}
-
 node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
   fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.CPU;
   fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+}
+
+primary node "power-01" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.power.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.BIND_POWER_DOMAIN == fuchsia.amlogic.platform.a311d.POWER_DOMAIN.ARM_CORE_BIG;
 }
 
 node "clock-pll-div16-01" {

@@ -22,8 +22,8 @@
 namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-constexpr amlogic_cpu::PerfDomainId kPdArmA53 = 1;
-constexpr amlogic_cpu::PerfDomainId kPdArmA73 = 2;
+constexpr amlogic_cpu::PerfDomainId kPdArmA73 = 1;
+constexpr amlogic_cpu::PerfDomainId kPdArmA53 = 2;
 
 const std::vector<fpbus::Mmio> cpu_mmios{
     {{
