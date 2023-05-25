@@ -728,3 +728,74 @@ async fn light_sensor_handler_input_event_handler() {
     request_task.await;
     task.await;
 }
+
+// Ensure a default value of 0.0 is not returned for the lux.
+#[fuchsia::test(allow_stalls = false)]
+async fn light_sensor_handler_subscriber_queue() {
+    let sensor_configuration = SensorConfiguration {
+        vendor_id: VENDOR_ID,
+        product_id: PRODUCT_ID,
+        rgbc_to_lux_coefficients: Rgbc { red: 1.5, green: 1.6, blue: 1.7, clear: 1.8 },
+        si_scaling_factors: Rgbc { red: 1.1, green: 1.2, blue: 1.3, clear: 1.4 },
+        settings: get_adjustment_settings(),
+    };
+
+    let (device_proxy, _, task) = get_mock_device_proxy();
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration);
+
+    let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
+        create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
+    // Register stream so subscriber is created.
+    let request_task = Task::local({
+        let handler = Rc::clone(&handler);
+        async move {
+            handler.handle_light_sensor_request_stream(stream).await.expect("can register");
+        }
+    });
+
+    let watch_task = Task::local(async move {
+        // Wait for the results in a separate task while we trigger the event below.
+        let reading = sensor_proxy.watch().await.expect("watch called");
+        drop(sensor_proxy);
+        reading
+    });
+
+    let input_event = InputEvent {
+        device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
+            device_proxy,
+            rgbc: Rgbc { red: 1, green: 2, blue: 3, clear: 14747 },
+        }),
+        device_descriptor: InputDeviceDescriptor::LightSensor(LightSensorDeviceDescriptor {
+            vendor_id: VENDOR_ID,
+            product_id: PRODUCT_ID,
+            device_id: 3,
+            sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
+        }),
+        event_time: Time::get_monotonic(),
+        handled: Handled::No,
+        trace_id: None,
+    };
+
+    // Trigger the first event. The first event will trigger an override of the settings on the
+    // device, and will not send out any update. It will report that it was handled.
+    let events = Rc::clone(&handler).handle_input_event(input_event.clone()).await;
+
+    assert_eq!(events.len(), 1);
+    let event = &events[0];
+    assert_eq!(event.handled, Handled::Yes);
+    drop(events);
+
+    // Trigger the second event. The data should match what was used in
+    // `light_sensor_handler_get_calibrated_data` so the same results will be returned.
+    let events = handler.handle_input_event(input_event).await;
+
+    assert_eq!(events.len(), 1);
+    let event = &events[0];
+    assert_eq!(event.handled, Handled::Yes);
+
+    let reading = watch_task.await;
+    assert!(reading.calculated_lux != Some(0.0));
+    drop(events);
+    request_task.await;
+    task.await;
+}
