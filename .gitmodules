@@ -628,3 +628,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/cppdap
 	name = third_party/github.com/google/cppdap
 	ignore = all
+[submodule "third_party/pyjson5/src"]
+	path = third_party/pyjson5/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/dpranke/pyjson5
+	name = third_party/pyjson5
+	ignore = all
