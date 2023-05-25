@@ -210,6 +210,13 @@ impl<I: Debug + Eq> SocketMapAddrStateSpec for PosixAddrState<I> {
         }
     }
 
+    fn contains_id(&self, id: &Self::Id) -> bool {
+        match self {
+            Self::Exclusive(x) => id == x,
+            Self::ReusePort(ids) => ids.contains(id),
+        }
+    }
+
     fn try_get_inserter<'a, 'b>(
         &'b mut self,
         new_sharing_state: &'a PosixSharingOptions,

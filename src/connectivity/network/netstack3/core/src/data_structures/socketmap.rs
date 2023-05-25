@@ -251,8 +251,13 @@ where
 }
 
 impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> OccupiedEntry<'a, K, V> {
+    /// Gets a reference to the key for the entry.
+    pub(crate) fn key(&self) -> &K {
+        let Self(SocketMap { map: _, len: _ }, key) = self;
+        key
+    }
+
     /// Retrieves the value referenced by this entry.
-    #[todo_unused::todo_unused("https://fxbug.dev/96320")]
     pub(crate) fn get(&self) -> &V {
         let Self(SocketMap { map, len: _ }, key) = self;
         let MapValue { descendant_counts: _, value } = map.get(key).unwrap();
@@ -297,7 +302,7 @@ impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> OccupiedEntry<'a, K, V> {
         socketmap
     }
 
-    /// Removes the value from the map and returns both.
+    /// Removes the value from the map and returns the value and map.
     pub(crate) fn remove_from_map(self) -> (V, &'a mut SocketMap<K, V>) {
         let Self(socketmap, key) = self;
         let SocketMap { map, len } = socketmap;

@@ -31,7 +31,7 @@ use crate::{
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
-        AddrVec,
+        AddrVec, Connection as BoundConnection, ConvertSocketTypeState, SocketId,
     },
     trace_duration,
     transport::tcp::{
@@ -302,11 +302,8 @@ where
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
-    let (conn, _, addr) = sockets
-        .socketmap
-        .conns_mut()
-        .get_by_id_mut(&conn_id)
-        .expect("inconsistent state: invalid connection id");
+    let (conn, _, addr) =
+        conn_id.get_from_bound_state_mut(&mut sockets.bound_state).expect("invalid connection");
 
     let Connection { acceptor, state, ip_sock, defunct, socket_options, soft_error: _ } = conn;
 
@@ -368,7 +365,10 @@ where
                 // enter Closed state, and the user has already promised
                 // not to use the connection again, we can remove the
                 // connection from the socketmap.
-                assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id), Some(_));
+                let (_state, _sharing, addr) = BoundConnection::from_socket_state(
+                    conn_id.get_bound_state_entry(&mut sockets.bound_state).remove(),
+                );
+                assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id, &addr), Ok(()));
                 let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
                 return ConnectionIncomingSegmentDisposition::FoundSocket;
             }
@@ -484,9 +484,9 @@ where
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
-    let socketmap = &mut sockets.socketmap;
+    let Sockets { port_alloc: _, inactive: _, socketmap, bound_state } = sockets;
     let (maybe_listener, sharing, listener_addr) =
-        socketmap.listeners().get_by_id(&listener_id).expect("invalid listener_id");
+        listener_id.get_from_bound_state(bound_state).expect("invalid listener");
 
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
         incoming_addrs;
@@ -593,7 +593,10 @@ where
         // this approach has the benefit of not accidentally persisting the old
         // state that we don't want.
         if let Some(tw_reuse) = tw_reuse {
-            assert_matches!(socketmap.conns_mut().remove(&tw_reuse), Some(_));
+            let (_conn, _sharing, conn_addr) = BoundConnection::from_socket_state(
+                tw_reuse.get_bound_state_entry(bound_state).remove(),
+            );
+            assert_matches!(socketmap.conns_mut().remove(&tw_reuse, &conn_addr), Ok(()));
             assert_matches!(ctx.cancel_timer(TimerId::new::<I>(tw_reuse)), Some(_));
         }
         let conn_id = socketmap
@@ -606,27 +609,35 @@ where
                     },
                     device: bound_device,
                 },
-                Connection {
-                    acceptor: Some(Acceptor::Pending(ListenerId(
-                        listener_index,
-                        IpVersionMarker::default(),
-                    ))),
-                    state,
-                    ip_sock,
-                    defunct: false,
-                    socket_options,
-                    soft_error: None,
-                },
                 sharing,
+                |addr, sharing| {
+                    let state = Connection {
+                        acceptor: Some(Acceptor::Pending(ListenerId(
+                            listener_index,
+                            IpVersionMarker::default(),
+                        ))),
+                        state,
+                        ip_sock,
+                        defunct: false,
+                        socket_options,
+                        soft_error: None,
+                    };
+                    let entry = bound_state.push_entry(
+                        |index| SocketId::Connection(index.into()),
+                        BoundConnection::to_socket_state((state, sharing, addr)),
+                    );
+                    <BoundConnection as ConvertSocketTypeState<
+                        IpPortSpec<I, SC::WeakDeviceId>,
+                        _,
+                    >>::from_socket_id_ref(entry.key())
+                    .clone()
+                },
             )
             .expect("failed to create a new connection")
             .id();
         assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id),), None);
-        let (maybe_listener, _, _): (_, &ListenerSharingState, &ListenerAddr<_, _, _>) = sockets
-            .socketmap
-            .listeners_mut()
-            .get_by_id_mut(&listener_id)
-            .expect("the listener must still be active");
+        let (maybe_listener, _, _): (_, &mut ListenerSharingState, &mut ListenerAddr<_, _, _>) =
+            listener_id.get_from_bound_state_mut(&mut sockets.bound_state).expect("invalid ID");
 
         match maybe_listener {
             MaybeListener::Bound(_bound) => {
