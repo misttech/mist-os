@@ -114,6 +114,9 @@ fuchsia.rust_inspect.benchmarks: Node/create_child
 fuchsia.rust_inspect.benchmarks: Node/create_double_array/128
 fuchsia.rust_inspect.benchmarks: Node/create_double_array/240
 fuchsia.rust_inspect.benchmarks: Node/create_double_array/32
+fuchsia.rust_inspect.benchmarks: Node/create_double_array_and_fill/128
+fuchsia.rust_inspect.benchmarks: Node/create_double_array_and_fill/240
+fuchsia.rust_inspect.benchmarks: Node/create_double_array_and_fill/32
 fuchsia.rust_inspect.benchmarks: Node/create_double_exponential_histogram/128
 fuchsia.rust_inspect.benchmarks: Node/create_double_exponential_histogram/240
 fuchsia.rust_inspect.benchmarks: Node/create_double_exponential_histogram/32
@@ -124,6 +127,9 @@ fuchsia.rust_inspect.benchmarks: Node/create_double_property
 fuchsia.rust_inspect.benchmarks: Node/create_int_array/128
 fuchsia.rust_inspect.benchmarks: Node/create_int_array/240
 fuchsia.rust_inspect.benchmarks: Node/create_int_array/32
+fuchsia.rust_inspect.benchmarks: Node/create_int_array_and_fill/128
+fuchsia.rust_inspect.benchmarks: Node/create_int_array_and_fill/240
+fuchsia.rust_inspect.benchmarks: Node/create_int_array_and_fill/32
 fuchsia.rust_inspect.benchmarks: Node/create_int_exponential_histogram/128
 fuchsia.rust_inspect.benchmarks: Node/create_int_exponential_histogram/240
 fuchsia.rust_inspect.benchmarks: Node/create_int_exponential_histogram/32
@@ -143,6 +149,9 @@ fuchsia.rust_inspect.benchmarks: Node/create_string_array/32
 fuchsia.rust_inspect.benchmarks: Node/create_uint_array/128
 fuchsia.rust_inspect.benchmarks: Node/create_uint_array/240
 fuchsia.rust_inspect.benchmarks: Node/create_uint_array/32
+fuchsia.rust_inspect.benchmarks: Node/create_uint_array_and_fill/128
+fuchsia.rust_inspect.benchmarks: Node/create_uint_array_and_fill/240
+fuchsia.rust_inspect.benchmarks: Node/create_uint_array_and_fill/32
 fuchsia.rust_inspect.benchmarks: Node/create_uint_exponential_histogram/128
 fuchsia.rust_inspect.benchmarks: Node/create_uint_exponential_histogram/240
 fuchsia.rust_inspect.benchmarks: Node/create_uint_exponential_histogram/32

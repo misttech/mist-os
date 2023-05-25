@@ -10,9 +10,12 @@ use fuchsia_inspect::{
 };
 use inspect_format::Container;
 use num::{pow, traits::FromPrimitive, One};
+use once_cell::sync::OnceCell;
 use rand::Rng;
-use std::ops::{Add, Mul};
-use std::time::Duration;
+use std::{
+    ops::{Add, Mul},
+    time::Duration,
+};
 
 const NAME: &str = "name";
 
@@ -189,12 +192,34 @@ macro_rules! bench_numeric_array_property_fn {
                 mut bench: criterion::Benchmark,
                 array_size: usize
             ) -> criterion::Benchmark {
+                static ARRAY_DATA: OnceCell<Vec<$type>> = OnceCell::new();
+                ARRAY_DATA.get_or_init(|| {
+                    let mut data = Vec::with_capacity(array_size);
+                    for i in 0..array_size {
+                        data.push(i as $type);
+                    }
+                    data
+                });
                 bench = bench.with_function(
                     format!("Node/create_{}_array/{}", stringify!($name), array_size),
                     move |b| {
                         let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_drop(|| root.[<create_ $name _array>](NAME, array_size));
+                    });
+                bench = bench.with_function(
+                    format!("Node/create_{}_array_and_fill/{}", stringify!($name), array_size),
+                    move |b| {
+                        let inspector = Inspector::default();
+                        let root = inspector.root();
+                        b.iter_with_large_drop(|| {
+                            let array = root.[<create_ $name _array>](NAME, array_size);
+                            let data = ARRAY_DATA.get().unwrap();
+                            for (i, value) in data.iter().enumerate() {
+                                array.set(i, *value);
+                            }
+                            array
+                        });
                     });
                 bench = bench.with_function(
                     format!("{}/set/{}", $Array, array_size),
