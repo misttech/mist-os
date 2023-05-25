@@ -92,11 +92,11 @@ async fn gatt_service_delegate(
         match request {
             LocalServiceRequest::ReadValue { responder, .. } => {
                 let battery_level = state.get_level();
-                let _ = responder.send(&mut Ok(vec![battery_level]));
+                let _ = responder.send(Ok(&[battery_level]));
             }
             LocalServiceRequest::WriteValue { responder, .. } => {
                 // Writing to the battery level characteristic is not permitted.
-                let _ = responder.send(&mut Err(gatt::Error::WriteRequestRejected));
+                let _ = responder.send(Err(gatt::Error::WriteRequestRejected));
             }
             LocalServiceRequest::CharacteristicConfiguration {
                 peer_id, notify, responder, ..
