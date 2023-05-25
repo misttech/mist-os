@@ -11,6 +11,31 @@ use crate::types::{errno, from_status_like_fdio, uapi, Errno};
 
 pub const HAS_VDSO: bool = true;
 
+fn calculate_ticks_offset() -> i64 {
+    let mut ticks_offset: i64 = i64::MIN;
+    let mut min_read_diff: i64 = i64::MAX;
+    // Assuming zx_get_ticks() is based on the TSC, estimate the offset between the raw value
+    // from `rdtsc` and the ticks as returned by zx_get_ticks(). Since the reads will not be
+    // made at the same time, the result will not be presice, so do the estimation several
+    // times and choose the measurement with the smallest error bars.
+    // TODO(fxb/127692): Obtain this value from Zircon
+    for _i in 0..5 {
+        let raw_ticks;
+        let zx_read_first = zx::ticks_get();
+        unsafe {
+            raw_ticks = _rdtsc();
+        }
+        let zx_read_second = zx::ticks_get();
+        let read_diff = zx_read_second - zx_read_first;
+        if read_diff < min_read_diff {
+            min_read_diff = read_diff;
+            let midpoint = zx_read_first + read_diff / 2;
+            ticks_offset = midpoint - raw_ticks as i64;
+        }
+    }
+    ticks_offset
+}
+
 /// Overwrite the constants in the vDSO with the values obtained from Zircon.
 pub fn set_vdso_constants(vdso_vmo: &zx::Vmo) -> Result<(), Errno> {
     let headers = elf_parse::Elf64Headers::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
@@ -20,15 +45,7 @@ pub fn set_vdso_constants(vdso_vmo: &zx::Vmo) -> Result<(), Errno> {
     let clock = zx::Clock::create(zx::ClockOpts::MONOTONIC | zx::ClockOpts::AUTO_START, None)
         .expect("failed to create clock");
     let details = clock.get_details().expect("Failed to get clock details");
-    let zx_ticks = zx::ticks_get();
-    let raw_ticks;
-    unsafe {
-        raw_ticks = _rdtsc();
-    }
-    // Compute the offset as a difference between the value returned by zx_get_ticks() and the value
-    // in the register. This is not precise as the reads are not synchronised.
-    // TODO(fxb/124586): Support updates to this value.
-    let ticks_offset = zx_ticks - (raw_ticks as i64);
+    let ticks_offset = calculate_ticks_offset();
 
     let vdso_consts: uapi::vdso_constants = uapi::vdso_constants {
         raw_ticks_to_ticks_offset: ticks_offset,
