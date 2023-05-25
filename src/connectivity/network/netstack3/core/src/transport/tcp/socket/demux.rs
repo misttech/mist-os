@@ -33,6 +33,7 @@ use crate::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
         AddrVec,
     },
+    trace_duration,
     transport::tcp::{
         buffer::SendPayload,
         segment::{Options, Segment},
@@ -160,6 +161,8 @@ fn handle_incoming_packet<I, B, C, SC>(
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
+    trace_duration!(ctx, "tcp::handle_incoming_packet");
+
     let any_usable_conn = match addrs_to_search.try_fold(None, |tw_reuse, addr| {
         match addr {
             // Connections are always searched before listeners because they

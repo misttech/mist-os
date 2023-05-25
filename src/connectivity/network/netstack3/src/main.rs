@@ -21,6 +21,8 @@ fn main() -> Result<(), anyhow::Error> {
     // operations are allowed.
     let mut executor = fuchsia_async::SendExecutor::new(1 /* num_threads */);
 
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+
     let seed = NetstackSeed::default();
     executor.run(seed.serve())
 }

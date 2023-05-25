@@ -78,7 +78,7 @@ use crate::{
         types::RawMetric,
     },
     sync::{PrimaryRc, RwLock, StrongRc, WeakRc},
-    BufferNonSyncContext, NonSyncContext, SyncCtx,
+    trace_duration, BufferNonSyncContext, NonSyncContext, SyncCtx,
 };
 
 /// A device.
@@ -2002,6 +2002,7 @@ pub fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
     device: &EthernetDeviceId<NonSyncCtx>,
     buffer: B,
 ) {
+    trace_duration!(ctx, "device::receive_frame");
     self::ethernet::receive_frame(&mut Locked::new(sync_ctx), ctx, device, buffer)
 }
 

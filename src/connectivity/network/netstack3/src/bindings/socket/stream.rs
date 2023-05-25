@@ -63,6 +63,7 @@ use crate::bindings::{
         IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
         ZXSIO_SIGNAL_INCOMING,
     },
+    trace_duration,
     util::{
         ConversionContext, DeviceNotFoundError, IntoCore, IntoFidl, NeedsDataNotifier,
         NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
@@ -437,6 +438,7 @@ impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
         let nread = self.out_of_order.read_with(|avail| {
             let mut total = 0;
             for chunk in avail {
+                trace_duration!("zx::Socket::write");
                 let written = match self.socket.write(*chunk) {
                     Ok(n) => n,
                     Err(zx::Status::BAD_STATE | zx::Status::PEER_CLOSED) => {
@@ -566,6 +568,7 @@ impl SendBufferWithZirconSocket {
         }
         let write_result =
             self.ready_to_send.writable_regions().into_iter().try_fold(0, |acc, b| {
+                trace_duration!("zx::Socket::read");
                 match self.socket.read(b) {
                     Ok(n) => {
                         if n == b.len() {

@@ -6,6 +6,7 @@
 
 use alloc::{borrow::ToOwned, collections::HashMap, vec, vec::Vec};
 use core::{
+    ffi::CStr,
     fmt::Debug,
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -36,7 +37,7 @@ use tracing_subscriber::{
 use crate::{
     context::{
         testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
-        EventContext, InstantContext, RngContext, TimerContext,
+        EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
     device::{
         ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
@@ -244,6 +245,12 @@ impl RngContext for FakeNonSyncCtx {
         let Self(this) = self;
         this.rng()
     }
+}
+
+impl TracingContext for FakeNonSyncCtx {
+    type DurationScope = ();
+
+    fn duration(&self, _: &'static CStr) {}
 }
 
 impl NonSyncContext for FakeNonSyncCtx {

@@ -50,7 +50,7 @@ use tracing::warn;
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
-    context::TimerContext,
+    context::{TimerContext, TracingContext},
     data_structures::{
         id_map::{self, Entry as IdMapEntry, EntryKey, IdMap},
         id_map_collection::IdMapCollectionKey,
@@ -123,7 +123,7 @@ impl TimerId {
 /// |     v                  v      |
 /// |receive buffer     send buffer |
 /// +-------------------------------+
-pub trait NonSyncContext: TimerContext<TimerId> {
+pub trait NonSyncContext: TimerContext<TimerId> + TracingContext {
     /// Receive buffer used by TCP.
     type ReceiveBuffer: ReceiveBuffer;
     /// Send buffer used by TCP.

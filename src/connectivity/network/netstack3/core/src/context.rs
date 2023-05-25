@@ -80,7 +80,7 @@
 //!
 //! [`ArpContext`]: crate::device::arp::ArpContext
 
-use core::time::Duration;
+use core::{ffi::CStr, time::Duration};
 
 use lock_order::Locked;
 use packet::{BufferMut, Serializer};
@@ -272,6 +272,21 @@ pub trait CounterContext {
 pub trait EventContext<T> {
     /// Handles `event`.
     fn on_event(&mut self, event: T);
+}
+
+/// A context for emitting tracing data.
+pub trait TracingContext {
+    /// The scope of a trace duration.
+    ///
+    /// Its lifetime corresponds to the beginning and end of the duration.
+    type DurationScope;
+
+    /// Writes a duration event which ends when the returned scope is dropped.
+    ///
+    /// Durations describe work which is happening synchronously on one thread.
+    /// Care should be taken to avoid a duration's scope spanning an `await`
+    /// point in asynchronous code.
+    fn duration(&self, name: &'static CStr) -> Self::DurationScope;
 }
 
 /// Fake implementations of context traits.
@@ -973,6 +988,16 @@ pub(crate) mod testutil {
         }
     }
 
+    /// A fake [`TracingContext`].
+    #[derive(Default)]
+    pub struct FakeTracingCtx;
+
+    impl TracingContext for FakeTracingCtx {
+        type DurationScope = ();
+
+        fn duration(&self, _: &'static CStr) {}
+    }
+
     /// A test helper used to provide an implementation of a non-synchronized
     /// context.
     pub(crate) struct FakeNonSyncCtx<TimerId, Event: Debug, State> {
@@ -1101,6 +1126,12 @@ pub(crate) mod testutil {
         fn on_event(&mut self, event: Event) {
             self.events.on_event(event)
         }
+    }
+
+    impl<Id, Event: Debug, State> TracingContext for FakeNonSyncCtx<Id, Event, State> {
+        type DurationScope = ();
+
+        fn duration(&self, _: &'static CStr) {}
     }
 
     #[derive(Default)]

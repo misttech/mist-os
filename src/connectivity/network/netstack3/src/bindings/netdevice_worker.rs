@@ -34,7 +34,7 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
+    devices, interfaces_admin, trace_duration, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
     Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx, DEFAULT_INTERFACE_METRIC,
 };
 
@@ -119,6 +119,8 @@ impl NetdeviceWorker {
                 tracing::debug!("dropping frame for port {:?}, no device mapping available", port);
                 continue;
             };
+
+            trace_duration!("netdevice::recv");
 
             // TODO(https://fxbug.dev/100873): pass strongly owned buffers down
             // to the stack instead of copying it out.
@@ -449,6 +451,8 @@ impl PortHandler {
     }
 
     pub(crate) fn send(&self, frame: &[u8]) -> Result<(), SendError> {
+        trace_duration!("netdevice::send");
+
         let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
             self;
         // NB: We currently send on a dispatcher, so we can't wait for new

@@ -43,6 +43,8 @@ pub mod socket;
 pub mod sync;
 #[cfg(test)]
 mod testutil;
+pub mod trace;
+pub(crate) use trace::trace_duration;
 pub mod transport;
 
 use alloc::vec::Vec;
@@ -58,7 +60,7 @@ use packet::{Buf, BufferMut, EmptyBuf};
 use tracing::trace;
 
 use crate::{
-    context::{CounterContext, EventContext, RngContext, TimerContext},
+    context::{CounterContext, EventContext, RngContext, TimerContext, TracingContext},
     device::{DeviceId, DeviceLayerState, DeviceLayerTimerId},
     ip::{
         device::{DualStackDeviceHandler, Ipv4DeviceTimerId, Ipv6DeviceTimerId},
@@ -228,6 +230,7 @@ pub trait NonSyncContext:
     + transport::tcp::socket::NonSyncContext
     + device::DeviceLayerEventDispatcher
     + device::socket::NonSyncContext<DeviceId<Self>>
+    + TracingContext
     + 'static
 {
 }
@@ -248,6 +251,7 @@ impl<
             + transport::tcp::socket::NonSyncContext
             + device::DeviceLayerEventDispatcher
             + device::socket::NonSyncContext<DeviceId<Self>>
+            + TracingContext
             + 'static,
     > NonSyncContext for C
 {

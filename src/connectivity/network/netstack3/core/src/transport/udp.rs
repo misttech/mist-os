@@ -35,7 +35,7 @@ use thiserror::Error;
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
-    context::{CounterContext, InstantContext, RngContext},
+    context::{CounterContext, InstantContext, RngContext, TracingContext},
     data_structures::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged as _},
@@ -66,7 +66,7 @@ use crate::{
         SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
-    transport, SyncCtx,
+    trace_duration, transport, SyncCtx,
 };
 
 /// A builder for UDP layer state.
@@ -828,11 +828,13 @@ pub trait NonSyncContext<I: IcmpIpExt> {
 
 /// The non-synchronized context for UDP.
 pub trait StateNonSyncContext<I: IpExt>:
-    InstantContext + RngContext + NonSyncContext<I> + CounterContext
+    InstantContext + RngContext + NonSyncContext<I> + CounterContext + TracingContext
 {
 }
-impl<I: IpExt, C: InstantContext + RngContext + NonSyncContext<I> + CounterContext>
-    StateNonSyncContext<I> for C
+impl<
+        I: IpExt,
+        C: InstantContext + RngContext + NonSyncContext<I> + CounterContext + TracingContext,
+    > StateNonSyncContext<I> for C
 {
 }
 
@@ -993,6 +995,7 @@ impl<
         dst_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
     ) -> Result<(), (B, TransportReceiveError)> {
+        trace_duration!(ctx, "udp::receive_ip_packet");
         trace!("received UDP packet: {:x?}", buffer.as_mut());
         let src_ip = src_ip.into();
 

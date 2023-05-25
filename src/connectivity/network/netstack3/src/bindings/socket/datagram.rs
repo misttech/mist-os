@@ -56,6 +56,7 @@ use crate::bindings::{
         queue::{BodyLen, MessageQueue},
         worker::{self, SocketWorker},
     },
+    trace_duration,
     util::{
         DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
@@ -2251,6 +2252,8 @@ where
         (Option<fnet::SocketAddress>, Vec<u8>, fposix_socket::DatagramSocketRecvControlData, u32),
         fposix::Errno,
     > {
+        trace_duration!("datagram::recv_msg");
+
         let Self { ctx: _, data: BindingData { peer_event: _, info, messages } } = self;
         let mut messages = messages.lock();
         let front = if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
@@ -2288,6 +2291,8 @@ where
         addr: Option<fnet::SocketAddress>,
         data: Vec<u8>,
     ) -> Result<i64, fposix::Errno> {
+        trace_duration!("datagram::send_msg");
+
         let remote_addr = addr.map(I::SocketAddress::from_sock_addr).transpose()?;
 
         let mut ctx = self.ctx.clone();

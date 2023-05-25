@@ -17,13 +17,14 @@ use packet::{Buf, BufferMut, SerializeError, Serializer};
 use thiserror::Error;
 
 use crate::{
-    context::{CounterContext, InstantContext, NonTestCtxMarker},
+    context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
     ip::{
         device::state::IpDeviceStateIpExt,
         types::{NextHop, ResolvedRoute},
         AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceContext, IpExt, IpLayerIpExt,
         ResolveRouteError, SendIpPacketMeta,
     },
+    trace_duration,
 };
 
 /// An execution context defining a type of IP socket.
@@ -322,8 +323,11 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // raw IP sockets once we support those.
 
 /// The non-synchronized execution context for IP sockets.
-pub(super) trait IpSocketNonSyncContext: InstantContext + CounterContext {}
-impl<C: InstantContext + CounterContext> IpSocketNonSyncContext for C {}
+pub(super) trait IpSocketNonSyncContext:
+    InstantContext + CounterContext + TracingContext
+{
+}
+impl<C: InstantContext + CounterContext + TracingContext> IpSocketNonSyncContext for C {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
@@ -462,6 +466,8 @@ fn send_ip_packet<
     body: S,
     mtu: Option<u32>,
 ) -> Result<(), (S, IpSockSendError)> {
+    trace_duration!(ctx, "ip::send_packet");
+
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
         socket;
 
@@ -885,7 +891,7 @@ pub(crate) mod testutil {
     use crate::{
         context::{
             testutil::{FakeCounterCtx, FakeInstant, FakeInstantCtx, FakeNonSyncCtx, FakeSyncCtx},
-            RngContext, SendFrameContext,
+            RngContext, SendFrameContext, TracingContext,
         },
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
@@ -930,7 +936,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
+            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx> + TracingContext,
             DeviceId: FakeStrongDeviceId + 'static,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
@@ -976,7 +982,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
+            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx> + TracingContext,
             DeviceId: FakeStrongDeviceId + 'static,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
@@ -1222,7 +1228,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
+            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx> + TracingContext,
             D: FakeStrongDeviceId + 'static,
             Meta,
         > TransportIpContext<I, C> for FakeSyncCtx<FakeBufferIpSocketCtx<I, D>, Meta, D>

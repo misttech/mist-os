@@ -4,7 +4,10 @@
 {
     // TODO(https://fxbug.dev/91474): Only include the network-test-realm shard
     // in non-prod builds.
-    include: [ "//src/connectivity/network/meta/test-collection.shard.cml" ],
+    include: [
+        "//src/connectivity/network/meta/test-collection.shard.cml",
+        "trace/client.shard.cml",
+    ],
     children: [
         {
             name: "dhcpd",
@@ -68,14 +71,6 @@
                 "#dhcpd",
                 "#netstack",
             ],
-        },
-        {
-            // TODO(https://fxbug.dev/85450): Only add this offer on the tracing
-            // variant of the network component.
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: [ "#netstack" ],
-            availability: "optional",
         },
         {
             protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],

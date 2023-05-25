@@ -56,7 +56,10 @@ use thiserror::Error;
 use tracing::{debug, trace};
 
 use crate::{
-    context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},
+    context::{
+        CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler,
+        TracingContext,
+    },
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     ip::{
@@ -590,13 +593,13 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
 
 /// The non-synchronized execution context for the IP layer.
 pub(crate) trait IpLayerNonSyncContext<I: Ip, DeviceId>:
-    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + CounterContext
+    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + CounterContext + TracingContext
 {
 }
 impl<
         I: Ip,
         DeviceId,
-        C: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + CounterContext,
+        C: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + CounterContext + TracingContext,
     > IpLayerNonSyncContext<I, DeviceId> for C
 {
 }

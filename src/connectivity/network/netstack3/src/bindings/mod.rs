@@ -28,6 +28,7 @@ mod verifier_worker;
 use std::{
     collections::HashMap,
     convert::TryFrom as _,
+    ffi::CStr,
     future::Future,
     num::NonZeroU16,
     ops::Deref,
@@ -68,7 +69,9 @@ use net_types::{
 };
 use netstack3_core::{
     add_ip_addr_subnet,
-    context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
+    context::{
+        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
+    },
     data_structures::id_map::IdMap,
     device::{
         loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
@@ -269,6 +272,29 @@ impl InstantContext for BindingsNonSyncCtxImpl {
 }
 
 impl CounterContext for BindingsNonSyncCtxImpl {}
+
+impl TracingContext for BindingsNonSyncCtxImpl {
+    type DurationScope = fuchsia_trace::DurationScope<'static>;
+
+    fn duration(&self, name: &'static CStr) -> fuchsia_trace::DurationScope<'static> {
+        fuchsia_trace::duration(cstr::cstr!("net"), name, &[])
+    }
+}
+
+/// Convenience wrapper around the [`fuchsia_trace::duration`] macro that always
+/// uses the "net" tracing category.
+///
+/// [`fuchsia_trace::duration`] uses RAII to begin and end the duration by tying
+/// the scope of the duration to the lifetime of the object it returns. This
+/// macro encapsulates that logic such that the trace duration will end when the
+/// scope in which the macro is called ends.
+macro_rules! trace_duration {
+    ($name:expr) => {
+        fuchsia_trace::duration!("net", $name);
+    };
+}
+
+pub(crate) use trace_duration;
 
 #[derive(Default)]
 pub struct RngImpl(CoreMutex<OsRng>);
