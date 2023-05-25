@@ -1486,22 +1486,19 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         self.with_tcp_sockets_mut(|sockets| {
             let (listener, listener_sharing, addr) =
                 id.get_from_bound_state_mut(&mut sockets.bound_state).expect("missing listener");
-            let entry = sockets
-                .socketmap
-                .listeners_mut()
-                .entry(&id.into(), &addr)
-                .expect("invalid listener id");
+            let id = id.into();
+            let entry =
+                sockets.socketmap.listeners_mut().entry(&id, &addr).expect("invalid listener id");
             let ListenerSharingState { sharing, listening } = listener_sharing;
             debug_assert!(!*listening, "invalid bound ID that has a listener socket");
             let sharing = *sharing;
 
             let new_sharing = ListenerSharingState { sharing, listening: true };
-            let entry = match entry.try_update_sharing(&listener_sharing, new_sharing.clone()) {
-                Ok(entry) => {
+            match entry.try_update_sharing(&listener_sharing, new_sharing.clone()) {
+                Ok(()) => {
                     *listener_sharing = new_sharing;
-                    entry
                 }
-                Err((UpdateSharingError, _entry)) => return Err(ListenError::ListenerExists),
+                Err(UpdateSharingError) => return Err(ListenError::ListenerExists),
             };
 
             match listener {
@@ -1516,7 +1513,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     unreachable!("invalid bound id that points to a listener entry")
                 }
             }
-            let MaybeListenerId(index, _marker) = entry.id();
+            let MaybeListenerId(index, _marker) = id;
             Ok(ListenerId(index, IpVersionMarker::default()))
         })
     }
@@ -1786,9 +1783,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 let ListenerSharingState { sharing: _, listening } = sharing;
                 assert!(*listening, "listener {id:?} is not listening");
                 let new_sharing = ListenerSharingState { listening: false, ..sharing.clone() };
-                let entry = match entry.try_update_sharing(sharing, new_sharing.clone()) {
-                    Ok(entry) => entry,
-                    Err((e, _entry)) => {
+                match entry.try_update_sharing(sharing, new_sharing.clone()) {
+                    Ok(()) => (),
+                    Err(e) => {
                         unreachable!(
                             "downgrading a TCP listener to bound should not fail, got {e:?}"
                         )
@@ -1798,7 +1795,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 let Listener { backlog: _, pending, ready, buffer_sizes: _, socket_options: _ } =
                     maybe_listener.maybe_shutdown().expect("must be a listener");
                 *sharing = new_sharing;
-                drop(entry);
 
                 for conn_id in pending.into_iter().chain(
                     ready
@@ -2291,12 +2287,12 @@ fn set_reuseaddr_maybe_listener<I: IpLayerIpExt, C: NonSyncContext, SC: SyncCont
         }
         let new_sharing = ListenerSharingState { listening: false, sharing: new_sharing };
         match entry.try_update_sharing(old_sharing, new_sharing.clone()) {
-            Ok(_entry) => {
+            Ok(()) => {
                 let (_, sharing, _) = bound_state;
                 *sharing = new_sharing;
                 Ok(())
             }
-            Err((UpdateSharingError, _entry)) => Err(SetReuseAddrError),
+            Err(UpdateSharingError) => Err(SetReuseAddrError),
         }
     })
 }

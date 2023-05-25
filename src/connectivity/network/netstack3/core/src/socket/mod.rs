@@ -676,7 +676,7 @@ where
         self,
         old_sharing_state: &SocketType::SharingState,
         new_sharing_state: SocketType::SharingState,
-    ) -> Result<Self, (UpdateSharingError, Self)>
+    ) -> Result<(), UpdateSharingError>
     where
         SocketType::AddrState: SocketMapAddrStateUpdateSharingSpec,
         S: SocketMapUpdateSharingPolicy<SocketType::Addr, SocketType::SharingState, A>,
@@ -684,33 +684,29 @@ where
         let Self { id, mut addr_entry, _marker } = self;
         let addr = SocketType::from_addr_vec_ref(addr_entry.key());
 
-        match S::allows_sharing_update(
+        S::allows_sharing_update(
             addr_entry.get_map(),
             addr,
             old_sharing_state,
             &new_sharing_state,
-        ) {
-            Err(e) => return Err((e, Self { id, addr_entry, _marker })),
-            Ok(()) => (),
-        };
+        )?;
 
-        match addr_entry.map_mut(|value| {
-            let value = match SocketType::from_bound_mut(value) {
-                Some(value) => value,
-                // We shouldn't ever be storing listener state in a bound
-                // address, or bound state in a listener address. Doing so means
-                // we've got a serious bug.
-                None => unreachable!("found invalid state {:?}", value),
-            };
+        addr_entry
+            .map_mut(|value| {
+                let value = match SocketType::from_bound_mut(value) {
+                    Some(value) => value,
+                    // We shouldn't ever be storing listener state in a bound
+                    // address, or bound state in a listener address. Doing so means
+                    // we've got a serious bug.
+                    None => unreachable!("found invalid state {:?}", value),
+                };
 
-            value
-                .try_update_sharing(SocketType::from_socket_id_ref(&id).clone(), &new_sharing_state)
-        }) {
-            Err(IncompatibleError) => {
-                return Err((UpdateSharingError, Self { id, addr_entry, _marker }))
-            }
-            Ok(()) => Ok(Self { id, addr_entry, _marker }),
-        }
+                value.try_update_sharing(
+                    SocketType::from_socket_id_ref(&id).clone(),
+                    &new_sharing_state,
+                )
+            })
+            .map_err(|IncompatibleError| UpdateSharingError)
     }
 }
 
@@ -1504,13 +1500,13 @@ mod tests {
             .try_insert(addr.clone(), 'a', fake_id_gen.id_maker())
             .expect("failed to insert");
 
-        let _conn_id = entry.try_update_sharing(&'a', 'd').expect("worked").id();
+        entry.try_update_sharing(&'a', 'd').expect("worked");
         // Updating sharing is only allowed if there are no other occupants at
         // the address.
         let second_conn = map
             .conns_mut()
             .try_insert(addr.clone(), 'd', fake_id_gen.id_maker())
             .expect("can insert");
-        assert_matches!(second_conn.try_update_sharing(&'d', 'e'), Err((UpdateSharingError, _)));
+        assert_matches!(second_conn.try_update_sharing(&'d', 'e'), Err(UpdateSharingError));
     }
 }
