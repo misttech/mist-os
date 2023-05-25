@@ -66,7 +66,7 @@ VmMapping::~VmMapping() {
 }
 
 fbl::RefPtr<VmObject> VmMapping::vmo() const {
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   return vmo_locked();
 }
 
@@ -148,7 +148,7 @@ zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flag
 
   size = ROUNDUP(size, PAGE_SIZE);
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }
@@ -259,7 +259,7 @@ zx_status_t VmMapping::Unmap(vaddr_t base, size_t size) {
     return ZX_ERR_BAD_STATE;
   }
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }
@@ -635,7 +635,7 @@ zx_status_t VmMappingCoalescer::Flush() {
 }  // namespace
 
 zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ignore_existing) {
-  Guard<CriticalMutex> aspace_guard{aspace_->lock()};
+  Guard<CriticalMutex> aspace_guard{lock()};
   canary_.Assert();
 
   len = ROUNDUP(len, PAGE_SIZE);
@@ -680,7 +680,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   return EnumerateProtectionRangesLocked(
       base_ + offset, len,
       [this, commit, dirty_tracked, ignore_existing](vaddr_t base, size_t len, uint mmu_flags) {
-        AssertHeld(aspace_->lock_ref());
+        AssertHeld(lock_ref());
 
         // Remove the write permission if this maps a vmo that supports dirty tracking, in order to
         // trigger write permission faults when writes occur, enabling us to track when pages are
@@ -770,7 +770,7 @@ zx_status_t VmMapping::DecommitRange(size_t offset, size_t len) {
   canary_.Assert();
   LTRACEF("%p [%#zx+%#zx], offset %#zx, len %#zx\n", this, base_, size_, offset, len);
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }

@@ -78,7 +78,7 @@ zx_status_t VmAddressRegion::CreateSubVmarInternal(size_t offset, size_t size, u
                                                    fbl::RefPtr<VmAddressRegionOrMapping>* out) {
   DEBUG_ASSERT(out);
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }
@@ -376,7 +376,7 @@ zx_status_t VmAddressRegion::DestroyLocked() {
 }
 
 fbl::RefPtr<VmAddressRegionOrMapping> VmAddressRegion::FindRegion(vaddr_t addr) {
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   return FindRegionLocked(addr);
 }
 
@@ -540,7 +540,7 @@ zx_status_t VmAddressRegion::EnumerateChildrenLocked(VmEnumerator* ve) {
 }
 
 bool VmAddressRegion::has_parent() const {
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   return parent_ != nullptr;
 }
 
@@ -613,9 +613,9 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
     aspace_->MarkAsLatencySensitive();
   }
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   // Capture the validation that we need to do whenever the lock is acquired.
-  auto validate = [this, base, len]() TA_REQ(aspace_->lock()) -> zx_status_t {
+  auto validate = [this, base, len]() TA_REQ(lock()) -> zx_status_t {
     if (state_ != LifeCycleState::ALIVE) {
       return ZX_ERR_BAD_STATE;
     }
@@ -743,7 +743,7 @@ zx_status_t VmAddressRegion::Unmap(vaddr_t base, size_t size,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }
@@ -761,7 +761,7 @@ zx_status_t VmAddressRegion::UnmapAllowPartial(vaddr_t base, size_t size) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }
@@ -913,7 +913,7 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{aspace_->lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }

@@ -922,8 +922,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Accessors for VMO-mapping state
   // These can be read under either lock (both locks being held for writing), so we provide two
   // different accessors, one for each lock.
-  uint arch_mmu_flags_locked(vaddr_t offset) const
-      TA_REQ(aspace_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+  uint arch_mmu_flags_locked(vaddr_t offset) const TA_REQ(lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return protection_ranges_.MmuFlagsForRegion(offset);
   }
   uint arch_mmu_flags_locked_object(vaddr_t offset) const
@@ -1020,13 +1019,13 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   // Exposed for testing.
   CachedPageAttribution GetCachedPageAttribution() {
-    Guard<CriticalMutex> guard{aspace_->lock()};
+    Guard<CriticalMutex> guard{lock()};
     return cached_page_attribution_;
   }
 
   // Exposed for testing.
   uint64_t GetMappingGenerationCount() {
-    Guard<CriticalMutex> guard{aspace_->lock()};
+    Guard<CriticalMutex> guard{lock()};
     return GetMappingGenerationCountLocked();
   }
 
@@ -1038,7 +1037,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   zx_status_t EnumerateProtectionRangesLocked(
       vaddr_t base, size_t size,
       fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
-          func) const TA_REQ(aspace_->lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
+          func) const TA_REQ(lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
     DEBUG_ASSERT(is_in_range_locked(base, size));
     return ProtectRangesLocked().EnumerateProtectionRanges(base_, size_, base, size,
                                                            ktl::move(func));
@@ -1157,18 +1156,17 @@ class VmMapping final : public VmAddressRegionOrMapping,
   Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;
 
   // pointer and region of the object we are mapping
-  fbl::RefPtr<VmObject> object_ TA_GUARDED(aspace_->lock());
+  fbl::RefPtr<VmObject> object_ TA_GUARDED(lock());
   // This can be read with either lock hold, but requires both locks to write it.
-  uint64_t object_offset_ TA_GUARDED(object_->lock()) TA_GUARDED(aspace_->lock()) = 0;
+  uint64_t object_offset_ TA_GUARDED(object_->lock()) TA_GUARDED(lock()) = 0;
 
   // This can be read with either lock hold, but requires both locks to write it.
-  MappingProtectionRanges protection_ranges_ TA_GUARDED(object_->lock())
-      TA_GUARDED(aspace_->lock());
+  MappingProtectionRanges protection_ranges_ TA_GUARDED(object_->lock()) TA_GUARDED(lock());
 
   // Helpers for gaining read access to the protection information when only one of the locks is
   // held.
   const MappingProtectionRanges& ProtectRangesLocked() const
-      TA_REQ(aspace_->lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
+      TA_REQ(lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
     return protection_ranges_;
   }
   const MappingProtectionRanges& ProtectRangesLockedObject() const
@@ -1178,7 +1176,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   // Tracks the last cached page attribution count for the vmo range we are mapping.
   // Only used when |object_| is a VmObjectPaged.
-  mutable CachedPageAttribution cached_page_attribution_ TA_GUARDED(aspace_->lock()) = {};
+  mutable CachedPageAttribution cached_page_attribution_ TA_GUARDED(lock()) = {};
 
   // The mapping's generation count is incremented on any change to the vmo range that is mapped.
   //
@@ -1190,7 +1188,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   //
   // The generation count starts at 1 to ensure that there can be no cached values initially; the
   // cached generation count starts at 0.
-  uint64_t mapping_generation_count_ TA_GUARDED(aspace_->lock()) = 1;
+  uint64_t mapping_generation_count_ TA_GUARDED(lock()) = 1;
 };
 
 // Interface for walking a VmAspace-rooted VmAddressRegion/VmMapping tree.
