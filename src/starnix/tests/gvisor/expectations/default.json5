@@ -52,7 +52,7 @@
                 // Disable InterpreterScript because the script has the path /bin/bash which is not
                 // where bash is located on the Android system image.
                 "ExecTest.InterpreterScript",
-                "ProcSelfExe.ChangesAcrossExecve",
+                "ExecTest.SymlinkLimitRefreshedForInterpreter",
 
                 // This test attempts to successfully open a symlink in the test dir that points to
                 // `/bin/echo` using NOFOLLOW. The goal is to test that despite specifying NOFOLLOW,
@@ -333,6 +333,7 @@
                 "MountTest.TmpfsEmptySizeAllocCheck",
                 "MountTest.TmpfsSizePartialWriteSinglePage",
                 "MountTest.TmpfsSizePartialWriteMultiplePages",
+                "MountTest.MaxMounts",
                 "MountTest.ReuseGroupIDs",
                 "MountTest.PropagateUmountEvent",
 
@@ -405,6 +406,7 @@
                 "AllPacketSocketTests/PacketSocketCreationTest.Create/*",
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
                 "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
+                "AllPacketSocketTests/PacketSocketTest.ReceiveSentBoundToProtocolAll/*",
 
                 // pause_test
                 "PauseTest.OnlyReturnsWhenSignalHandled",
@@ -420,9 +422,6 @@
                 "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllNodes",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllRouters",
                 "PingSockets/Fixture.Bind/ICMP_socket_IPv6UnknownUnicast",
-
-                // pipe_test
-                "Pipes/PipeTest.OffsetCalls/*",
 
                 // pivot_root_test
                 "PivotRootTest.WithoutCapability",
@@ -473,18 +472,10 @@
                 // proc_test
                 "ProcCpuinfo.RequiredFieldsArePresent",
                 "ProcCpuinfo.Stable",
-                "ProcMeminfo.ContainsBasicFields",
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",
-                "ProcPidStatusTest.StateSleeping",
-                "ProcPidStatusTest.Threads",
-                "ProcPidCmdline.SubprocessSeekCmdline",
-                "ProcPidSymlink.SubprocessRunning",
                 "ProcPidSymlink.SubprocessZombied",
                 "ProcPidSymlink.SubprocessExited",
-                "ProcPidExe.Subprocess",
-                "ProcPidCwd.Subprocess",
-                "ProcPidRoot.Subprocess",
                 "ProcPidFile.SubprocessRunning",
                 "ProcPidFile.SubprocessZombie",
                 "ProcPidFile.SubprocessExited",
@@ -496,8 +487,6 @@
                 "ProcSysVmMmapMinAddr.HasNumericValue",
                 "ProcSysVmOvercommitMemory.HasNumericValue",
                 "ProcFilesystems.Bug65172365",
-                "ProcSelfMountinfo.RequiredFieldsArePresent",
-                "ProcSelfMounts.RequiredFieldsArePresent",
                 "Proc.GetdentsEnoent",
                 "Proc.PidTidIOAccounting",
                 "ProcPidMem.DifferentUserAttached",
@@ -684,6 +673,7 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V6EphemeralPortReservedReuseAddr/TCP",
@@ -895,6 +885,7 @@
                 "AllInetTests/TcpSocketTest.NoDelayDefault/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
+                "AllInetTests/SimpleTcpSocketTest.EpollListeningSocket/*",
                 "AllInetTests/SimpleTcpSocketTest.PollAroundAccept/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectSend/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectRecvShutdownRead/*",
@@ -1018,6 +1009,9 @@
                 "Inotify.BlockingReadOnInotifyFd",
                 "Inotify.EpollNoDeadlock",
 
+                // readv_test
+                "ReadvTestNoFixture.TruncatedAtMax",
+
                 // Breaks tests that run after it.
                 "MountTest.MaxMounts",
 
@@ -1086,6 +1080,7 @@
                 "AllInetTests/RawSocketTest.MultipleSocketReceive/*",
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
+                "MountTest.BindToSelf",
                 "UnameTest.Sanity",
                 "MountTest.BindToSelf",
 

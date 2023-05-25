@@ -12,12 +12,12 @@ group("tests") {
   testonly = true
   deps = []
 
-  #if (target_cpu == "x64" && !is_asan) {
-  #  deps = [ ":starnix_gvisor_tests" ]
-  #  if (data_filesystem_format == "fxfs") {
-  #    deps += [ ":starnix_gvisor_tests_on_fxfs" ]
-  #  }
-  #}
+  if (target_cpu == "x64" && !is_asan) {
+    deps += [ ":starnix_gvisor_tests" ]
+    if (data_filesystem_format == "fxfs") {
+      deps += [ ":starnix_gvisor_tests_on_fxfs" ]
+    }
+  }
 }
 
 gvisor_tests = [
@@ -281,17 +281,45 @@ expect_includes("gvisor_test_with_expectations") {
   ]
 }
 
-group("container_resources") {
-  deps = [ "//src/starnix/containers:default_init" ]
+test_runfiles = [
+  "exec_assert_closed_workload",
+  "exec_basic_workload",
+  "exec_proc_exe_workload",
+  "exec_state_workload",
+  "priority_execve",
+  "sigaltstack_check",
+]
 
-  if (target_cpu == "x64") {
-    deps += [
-      "//src/connectivity/network/netstack:component",
-      "//src/starnix/containers:data_tmp_target",
-      "//src/starnix/containers/bionic:system_image",
-      "//src/starnix/containers/bionic:testcases_image",
-    ]
+# These runfiles are binaries used by the test binaries. They need to be placed in the specific
+# location that the test binaries expect them.
+foreach(resource_name, test_runfiles) {
+  resource("${resource_name}") {
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${resource_name}" ]
+    outputs = [ "data/tests/runfiles/test/syscalls/linux/${resource_name}" ]
   }
+}
+
+# The exit script is a runfile that needs to be renamed explicitly.
+resource("exit_script") {
+  sources = [ "${gvisor_prebuilt_directory}/stripped/exit_script.sh" ]
+  outputs = [ "data/tests/runfiles/test/syscalls/linux/exit_script" ]
+}
+
+group("gvisor_runfiles") {
+  deps = [ ":exit_script" ]
+  foreach(runfile_name, test_runfiles) {
+    deps += [ ":${runfile_name}" ]
+  }
+}
+
+group("container_resources") {
+  deps = [
+    ":gvisor_runfiles",
+    "//src/connectivity/network/netstack:component",
+    "//src/starnix/containers:data_tmp_target",
+    "//src/starnix/containers:default_init",
+    "//src/starnix/containers/debian:system_image",
+  ]
 }
 
 # Creates a fuchsia_test_component for a gVisor binary.
@@ -477,9 +505,7 @@ template("gvisor_with_expectations_test_package") {
   fuchsia_test_with_expectations_package(target_name) {
     deps = [ ":container_resources" ]
 
-    if (target_cpu == "x64") {
-      subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
-    }
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 
     forward_variables_from(invoker, [ "test_components" ])
 
@@ -530,9 +556,7 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
     test_components += [ ":${benchmark_name}" ]
   }
 
-  if (target_cpu == "x64") {
-    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
-  }
+  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 
   # Set environments to none so infra doesn't run these benchmarks.
   # These benchmarks are run as a part of:

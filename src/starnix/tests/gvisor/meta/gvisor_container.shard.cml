@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // TODO: Move to the debian container.
-    include: [ "//src/starnix/containers/bionic/meta/bionic_container.shard.cml" ],
+    include: [ "//src/starnix/containers/debian/meta/debian_container.shard.cml" ],
+    program: {
+        kernel_cmdline: "test",
+    },
 }
