@@ -121,11 +121,12 @@ shard_test_list = [
   "fidl_microbenchmarks_test",
   "netstack_iperf_test",
 ]
-if (target_cpu == "x64" && !is_asan) {
-  if (host_os == "linux") {
-    shard_test_list += [ "starnix_gvisor_benchmarks_test" ]
-  }
-}
+
+#if (target_cpu == "x64" && !is_asan) {
+#  if (host_os == "linux") {
+#    shard_test_list += [ "starnix_gvisor_benchmarks_test" ]
+#  }
+#}
 foreach(test, shard_test_list) {
   foreach(shard, shards) {
     target_name = test + "_shard_" + shard

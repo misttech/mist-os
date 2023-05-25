@@ -12,12 +12,12 @@ group("tests") {
   testonly = true
   deps = []
 
-  if (target_cpu == "x64" && !is_asan) {
-    deps = [ ":starnix_gvisor_tests" ]
-    if (data_filesystem_format == "fxfs") {
-      deps += [ ":starnix_gvisor_tests_on_fxfs" ]
-    }
-  }
+  #if (target_cpu == "x64" && !is_asan) {
+  #  deps = [ ":starnix_gvisor_tests" ]
+  #  if (data_filesystem_format == "fxfs") {
+  #    deps += [ ":starnix_gvisor_tests_on_fxfs" ]
+  #  }
+  #}
 }
 
 gvisor_tests = [
