@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef STORAGE_METRICS_BLOCK_METRICS_H_
-#define STORAGE_METRICS_BLOCK_METRICS_H_
+#ifndef SRC_STORAGE_LIB_STORAGE_METRICS_BLOCK_METRICS_H_
+#define SRC_STORAGE_LIB_STORAGE_METRICS_BLOCK_METRICS_H_
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/zx/time.h>
@@ -97,4 +97,4 @@ class BlockDeviceMetrics : public storage_metrics::Metrics {
 };
 
 }  // namespace storage_metrics
-#endif  // STORAGE_METRICS_BLOCK_METRICS_H_
+#endif  // SRC_STORAGE_LIB_STORAGE_METRICS_BLOCK_METRICS_H_

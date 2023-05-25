@@ -40,7 +40,7 @@ static_library("cpp") {
     "//zircon/system/ulib/range",
 
     # fake_block_device.h has #include <storage-metrics/block-metrics.h>.
-    "//zircon/system/ulib/storage-metrics",
+    "//src/storage/lib/storage-metrics",
 
     # client.h has #include <storage/buffer/vmoid_registry.h>.
     "//zircon/system/ulib/storage/buffer",
@@ -83,9 +83,9 @@ static_library("fake_device") {
   sources = [ "fake_block_device.cc" ]
   public_deps = [
     ":cpp",
+    "//src/storage/lib/storage-metrics",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/range",
-    "//zircon/system/ulib/storage-metrics",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/zx",
   ]
@@ -96,7 +96,6 @@ static_library("fake_device") {
     "//sdk/lib/syslog/cpp",
     "//src/storage/fvm",
     "//zircon/system/ulib/range",
-    "//zircon/system/ulib/storage-metrics",
     "//zircon/system/ulib/storage/buffer",
   ]
 }
@@ -126,12 +125,12 @@ test("block_client_unit_test") {
     "//src/devices/lib/block",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fvm",
+    "//src/storage/lib/storage-metrics",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/range",
-    "//zircon/system/ulib/storage-metrics",
   ]
 }
 

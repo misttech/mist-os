@@ -108,7 +108,7 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
     "//src/devices/lib/dev-operation",
-    "//zircon/system/ulib/storage-metrics",
+    "//src/storage/lib/storage-metrics",
   ]
 }
 

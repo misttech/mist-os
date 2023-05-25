@@ -12,9 +12,8 @@
 #include <threads.h>
 #include <zircon/threads.h>
 
-#include <storage-metrics/block-metrics.h>
-
 #include "src/devices/block/drivers/core/server.h"
+#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   switch (proto_id) {

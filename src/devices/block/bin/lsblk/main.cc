@@ -33,7 +33,8 @@
 #include <gpt/c/gpt.h>
 #include <gpt/guid.h>
 #include <pretty/hexdump.h>
-#include <storage-metrics/block-metrics.h>
+
+#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 #define DEV_BLOCK "/dev/class/block"
 #define DEV_SKIP_BLOCK "/dev/class/skip-block"

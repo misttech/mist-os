@@ -16,9 +16,9 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 #include <range/range.h>
-#include <storage-metrics/block-metrics.h>
 
 #include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 namespace block_client {
 

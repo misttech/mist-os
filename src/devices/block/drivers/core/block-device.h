@@ -38,7 +38,8 @@
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <storage-metrics/block-metrics.h>
+
+#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 // To maintain stats related to time taken by a command or its success/failure, we need to
 // intercept command completion with a callback routine. This might introduce memory

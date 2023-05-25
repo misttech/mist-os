@@ -11,6 +11,7 @@ executable("storage-metrics") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/storage/fshost:admin-client",
+    "//src/storage/lib/storage-metrics",
     "//src/storage/minfs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",

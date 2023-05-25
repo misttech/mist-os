@@ -21,9 +21,9 @@
 #include <utility>
 
 #include <fbl/unique_fd.h>
-#include <storage-metrics/block-metrics.h>
 
 #include "src/storage/fshost/admin-client.h"
+#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 namespace {
 

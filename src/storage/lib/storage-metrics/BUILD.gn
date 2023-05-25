@@ -5,27 +5,34 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-group("test") {
-  testonly = true
-  deps = [ ":storage-metrics" ]
+source_set("storage-metrics") {
+  sources = [
+    "block-metrics.h",
+    "storage-metrics.cc",
+    "storage-metrics.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
+    "//sdk/fidl/fuchsia.storage.metrics:fuchsia.storage.metrics_cpp_wire",
+    "//zircon/system/ulib/fbl",
+  ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp" ]
 }
 
-test("storage-metrics") {
-  output_dir = "$root_out_dir/zircon-migrated"
+test("storage-metrics-test") {
   sources = [ "storage-metrics-test.cc" ]
   deps = [
+    ":storage-metrics",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/storage-metrics",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
 fuchsia_unittest_package("storage-metrics-test-pkg") {
-  package_name = "storage-metrics"
-  deps = [ ":storage-metrics" ]
+  deps = [ ":storage-metrics-test" ]
 }
 
 group("tests") {

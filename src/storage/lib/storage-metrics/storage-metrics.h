@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef STORAGE_METRICS_STORAGE_METRICS_H_
-#define STORAGE_METRICS_STORAGE_METRICS_H_
+#ifndef SRC_STORAGE_LIB_STORAGE_METRICS_STORAGE_METRICS_H_
+#define SRC_STORAGE_LIB_STORAGE_METRICS_STORAGE_METRICS_H_
 
 #include <fidl/fuchsia.storage.metrics/cpp/wire.h>
 #include <stdio.h>
@@ -133,4 +133,4 @@ class Metrics {
 };
 
 }  // namespace storage_metrics
-#endif  // STORAGE_METRICS_STORAGE_METRICS_H_
+#endif  // SRC_STORAGE_LIB_STORAGE_METRICS_STORAGE_METRICS_H_

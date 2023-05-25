@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/lib/storage-metrics/storage-metrics.h"
+
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 
 #include <algorithm>
 
-#include <storage-metrics/block-metrics.h>
-#include <storage-metrics/storage-metrics.h>
+#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 namespace storage_metrics {
 
