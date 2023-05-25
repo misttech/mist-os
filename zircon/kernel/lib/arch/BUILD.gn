@@ -44,14 +44,10 @@ library_headers("common-headers") {
     # <lib/arch/zbi.h> has #include <lib/zbi-format/kernel.h>.
     # <lib/arch/zbi.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
-  ]
 
-  # <lib/arch/x86/cpuid.h> has #include <hwreg/bitfields.h>.
-  if (is_kernel) {
-    public_deps += [ "//zircon/system/ulib/hwreg:headers" ]
-  } else {
-    public_deps += [ "//zircon/system/ulib/hwreg" ]
-  }
+    # <lib/arch/x86/cpuid.h> has #include <hwreg/bitfields.h>.
+    "//zircon/system/ulib/hwreg:headers",
+  ]
 }
 
 static_library("arch") {

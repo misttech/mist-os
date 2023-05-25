@@ -2,15 +2,20 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("mock-function") {
-  testonly = true
-  sdk = "source"
-  sdk_headers = [ "lib/mock-function/mock-function.h" ]
+library_headers("headers") {
+  headers = [ "lib/mock-function/mock-function.h" ]
 
-  sources = []
-  public_deps = [ "//zircon/system/ulib/zxtest:headers" ]
+  if (is_kernel) {
+    public_deps = [ "//zircon/system/ulib/zxtest:headers" ]
+  } else {
+    public_deps = [ "//zircon/system/ulib/zxtest" ]
+  }
+}
+
+source_set("mock-function") {
+  public_deps = [ ":headers" ]
 }
 
 group("tests") {

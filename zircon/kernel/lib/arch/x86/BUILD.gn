@@ -20,7 +20,7 @@ library_headers("headers") {
     "//zircon/kernel/lib/special-sections",
 
     # <lib/arch/x86/cpuid.h> has #include <hwreg/bitfields.h>.
-    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/hwreg:headers",
   ]
 
   public_deps += [ ":gen-cpuid-asm" ]

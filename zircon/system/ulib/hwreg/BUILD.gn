@@ -2,13 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/library_headers.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/toolchain/toolchain_environment.gni")
-import("//build/zircon/zx_library.gni")
 
-zx_library("hwreg") {
-  sdk = "source"
-  sdk_headers = [
+library_headers("headers") {
+  headers = [
     "hwreg/asm.h",
     "hwreg/bitfields.h",
     "hwreg/indirect.h",
@@ -22,41 +21,39 @@ zx_library("hwreg") {
     "//zircon/system/ulib/mmio-ptr",
   ]
 
-  sources = [ "printers.cc" ]
+  # TODO(mcgrathr): remove old multiboot environment
+  if (is_kernel && toolchain_environment != "multiboot") {
+    public_deps += [
+      "//zircon/kernel/lib/ktl:headers",
+      "//zircon/kernel/lib/libc:headers",
+    ]
+  }
+}
 
-  if (is_kernel) {
-    # TODO(mcgrathr): remove old multiboot environment
-    if (toolchain_environment != "multiboot") {
-      public_deps += [
-        "//zircon/kernel/lib/ktl:headers",
-        "//zircon/kernel/lib/libc:headers",
-      ]
-    }
-  } else {
+source_set("hwreg") {
+  public_deps = [ ":headers" ]
+
+  sources = [ "printers.cc" ]
+  if (!is_kernel) {
     sources += [ "asm.cc" ]
     deps = [ "//sdk/lib/fit" ]
   }
 }
 
-zx_library("hwreg-mock") {
-  testonly = true
-  sdk = "source"
-  sdk_headers = [
-    "hwreg/asm.h",
-    "hwreg/bitfields.h",
-    "hwreg/indirect.h",
-    "hwreg/internal.h",
-    "hwreg/mmio.h",
-    "hwreg/mock.h",
-    "hwreg/pio.h",
-  ]
-
-  sources = []
-  deps = [ "//zircon/system/ulib/mock-function" ]
+library_headers("hwreg-mock.headers") {
+  headers = [ "hwreg/mock.h" ]
   public_deps = [
+    ":headers",
+
     # <hwreg/mock.h> has #include <lib/mock-function/mock-function.h>.
     "//zircon/system/ulib/mock-function:headers",
   ]
+}
+
+source_set("hwreg-mock") {
+  testonly = true
+  public_deps = [ ":hwreg-mock.headers" ]
+  deps = [ "//zircon/system/ulib/mock-function" ]
 }
 
 # Subset of API exported via the SDK.
