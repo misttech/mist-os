@@ -24,7 +24,7 @@ use {
         path::Path,
     },
     thiserror::Error,
-    tracing::debug,
+    tracing::warn,
     version_history::AbiRevision,
 };
 
@@ -321,12 +321,12 @@ impl AbiRevisionPolicy {
             Some(abi) => {
                 let is_supported = version_history::is_supported_abi_revision(abi);
                 if !is_supported {
-                    debug!("Component {} targets an invalid ABI revision {}.", moniker, abi)
+                    warn!("Component {} targets an invalid ABI revision {}.", moniker, abi)
                 }
                 is_supported
             }
             None => {
-                debug!("Component {} does not have a target ABI revision.", moniker);
+                warn!("Component {} does not have a target ABI revision.", moniker);
                 false
             }
         }
