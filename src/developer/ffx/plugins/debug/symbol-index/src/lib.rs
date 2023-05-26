@@ -3,19 +3,33 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
+use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_core::ffx_plugin;
 use ffx_debug_symbol_index_args::*;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use std::path::Path;
 use symbol_index::*;
 
-#[ffx_plugin()]
-pub fn symbol_index(cmd: SymbolIndexCommand) -> Result<()> {
-    match cmd.sub_command {
-        SymbolIndexSubCommand::List(cmd) => list(cmd, &global_symbol_index_path()?),
-        SymbolIndexSubCommand::Add(cmd) => add(cmd, &global_symbol_index_path()?),
-        SymbolIndexSubCommand::Remove(cmd) => remove(cmd, &global_symbol_index_path()?),
-        SymbolIndexSubCommand::Clean(cmd) => clean(cmd, &global_symbol_index_path()?),
+#[derive(FfxTool)]
+pub struct SymbolIndexTool {
+    #[command]
+    cmd: SymbolIndexCommand,
+}
+
+fho::embedded_plugin!(SymbolIndexTool);
+
+#[async_trait(?Send)]
+impl FfxMain for SymbolIndexTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        match self.cmd.sub_command {
+            SymbolIndexSubCommand::List(cmd) => list(cmd, &global_symbol_index_path()?)?,
+            SymbolIndexSubCommand::Add(cmd) => add(cmd, &global_symbol_index_path()?)?,
+            SymbolIndexSubCommand::Remove(cmd) => remove(cmd, &global_symbol_index_path()?)?,
+            SymbolIndexSubCommand::Clean(cmd) => clean(cmd, &global_symbol_index_path()?)?,
+        }
+        Ok(())
     }
 }
 

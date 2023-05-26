@@ -11,7 +11,9 @@ ffx_plugin("ffx_debug_symbol_index") {
 
   deps = [
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/symbol-index",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde_json",
   ]
 

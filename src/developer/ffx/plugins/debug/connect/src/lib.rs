@@ -4,7 +4,11 @@
 
 use anyhow::{Context, Result};
 use async_io::Async;
+use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
+use ffx_debug_connect_args::ConnectCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_debugger::DebugAgentProxy;
 use fuchsia_async::unblock;
 use futures_util::{future::FutureExt, io::AsyncReadExt};
 use signal_hook::{
@@ -22,13 +26,27 @@ mod debug_agent;
 
 pub use debug_agent::DebugAgentSocket;
 
-#[ffx_core::ffx_plugin(
-    fidl_fuchsia_debugger::DebugAgentProxy = "core/debug_agent:expose:fuchsia.debugger.DebugAgent"
-)]
-pub async fn connect(
+#[derive(FfxTool)]
+pub struct ConnectTool {
+    #[command]
+    cmd: ConnectCommand,
+    #[with(moniker("/core/debug_agent"))]
     debugger_proxy: fidl_fuchsia_debugger::DebugAgentProxy,
-    cmd: ffx_debug_connect_args::ConnectCommand,
-) -> Result<()> {
+}
+
+fho::embedded_plugin!(ConnectTool);
+
+#[async_trait(?Send)]
+impl FfxMain for ConnectTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, mut _writer: Self::Writer) -> fho::Result<()> {
+        connect_tool_impl(self.cmd, self.debugger_proxy).await?;
+        Ok(())
+    }
+}
+
+async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy) -> Result<()> {
     let socket = DebugAgentSocket::create(debugger_proxy)?;
 
     if cmd.agent_only {
