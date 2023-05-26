@@ -65,11 +65,6 @@ type ClientCompositionOpcode = strict enum : uint8 {
     CLIENT_COLOR_CONVERSION = 6;
     // The client should apply the alpha itself.
     CLIENT_ALPHA = 7;
-    // The client cannot control the display gamma, and must accept
-    // the uncalibrated output. Clients are expected to produce linear
-    // buffers, and as such they cannot perform software gamma
-    // correction.
-    CLIENT_GAMMA = 8;
 };
 
 type ClientCompositionOp = struct {

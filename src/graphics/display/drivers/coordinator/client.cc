@@ -898,7 +898,13 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   }
   *res = fhd::wire::ConfigResult::kUnsupportedConfig;
 
-  constexpr uint32_t kAllErrors = (CLIENT_GAMMA << 1) - 1;
+  // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
+  // comments to make sure that any change of type Client in
+  // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
+  // will cause the definition of `kAllErrors` to change as well.
+  constexpr uint32_t kAllErrors = CLIENT_USE_PRIMARY | CLIENT_MERGE_BASE | CLIENT_MERGE_SRC |
+                                  CLIENT_FRAME_SCALE | CLIENT_SRC_FRAME | CLIENT_TRANSFORM |
+                                  CLIENT_COLOR_CONVERSION | CLIENT_ALPHA;
 
   layer_idx = 0;
   for (auto& display_config : configs_) {
@@ -1697,7 +1703,6 @@ constexpr auto banjo_CLIENT_SRC_FRAME = CLIENT_SRC_FRAME;
 constexpr auto banjo_CLIENT_TRANSFORM = CLIENT_TRANSFORM;
 constexpr auto banjo_CLIENT_COLOR_CONVERSION = CLIENT_COLOR_CONVERSION;
 constexpr auto banjo_CLIENT_ALPHA = CLIENT_ALPHA;
-constexpr auto banjo_CLIENT_GAMMA = CLIENT_GAMMA;
 #undef CLIENT_USE_PRIMARY
 #undef CLIENT_MERGE_BASE
 #undef CLIENT_MERGE_SRC
@@ -1706,7 +1711,6 @@ constexpr auto banjo_CLIENT_GAMMA = CLIENT_GAMMA;
 #undef CLIENT_TRANSFORM
 #undef CLIENT_COLOR_CONVERSION
 #undef CLIENT_ALPHA
-#undef CLIENT_GAMMA
 
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientUsePrimary)) ==
                   banjo_CLIENT_USE_PRIMARY,
@@ -1731,9 +1735,6 @@ static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClient
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientAlpha)) ==
                   banjo_CLIENT_ALPHA,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientGamma)) ==
-                  banjo_CLIENT_GAMMA,
               "Const mismatch");
 
 }  // namespace
