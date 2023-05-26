@@ -26,6 +26,7 @@ source_set("lib") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_hlcpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_hlcpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_hlcpp",
@@ -33,6 +34,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",

@@ -23,6 +23,7 @@
 #include <fbl/algorithm.h>
 #include <gtest/gtest.h>
 #include <ramdevice-client/ramdisk.h>
+#include <src/lib/uuid/uuid.h>
 
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/lib/storage/fs_management/cpp/format.h"
@@ -287,32 +288,20 @@ class FactoryResetTest : public gtest::RealLoopFixture {
     zx::result channel = WaitForDevice(fvm_path);
     ASSERT_EQ(channel.status_value(), ZX_OK);
 
-    // Allocate a FVM partition with the data guid but don't actually format the
-    // partition.
-    alloc_req_t req;
-    memset(&req, 0, sizeof(alloc_req_t));
-    req.slice_count = 1;
-    static const uint8_t data_guid[GPT_GUID_LEN] = GUID_DATA_VALUE;
-    memcpy(req.type, data_guid, BLOCK_GUID_LEN);
-
-    fuchsia_hardware_block_partition::wire::Guid type_guid;
-    memcpy(type_guid.value.data(), req.type, BLOCK_GUID_LEN);
-    fuchsia_hardware_block_partition::wire::Guid instance_guid;
-    memcpy(instance_guid.value.data(), req.guid, BLOCK_GUID_LEN);
-
+    // Allocate a FVM partition with the data guid but don't actually format the partition.
+    // FvmAllocatePartitionWithDevfs waits for the device to be enumerated.
+    zx::result devfs = devfs_root();
+    ASSERT_TRUE(devfs.is_ok()) << devfs.status_string();
     fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager> client_end(
         std::move(channel.value()));
-    auto response = fidl::WireCall(client_end)
-                        ->AllocatePartition(req.slice_count, type_guid, instance_guid,
-                                            fidl::StringView::FromExternal(kDataName), req.flags);
-    ASSERT_EQ(response.status(), ZX_OK);
-    ASSERT_EQ(response.value().status, ZX_OK);
+    zx::result device = fs_management::FvmAllocatePartitionWithDevfs(
+        devfs.value(), client_end, 1, GUID_DATA_VALUE, uuid::Uuid::Generate(), kDataName, 0);
+    ASSERT_TRUE(device.is_ok()) << device.status_string();
 
     fvm_block_path_ = fvm_path;
     fvm_block_path_.append("/");
     fvm_block_path_.append(kDataName);
     fvm_block_path_.append("-p-1/block");
-    ASSERT_EQ(WaitForDevice(fvm_block_path_).status_value(), ZX_OK);
   }
 
   zx::result<zx::channel> WaitForDevice(const std::string& path) const {

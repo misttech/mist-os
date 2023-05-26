@@ -18,19 +18,6 @@
 
 #include "src/lib/storage/fs_management/cpp/format.h"
 
-// TODO(https://fxbug.dev/124007): This is a copy of
-// fuchsia.hardware.block.volume/VolumeManager.AllocatePartition. Remove.
-using alloc_req_t = struct {
-  size_t slice_count;
-  uint8_t type[fuchsia_hardware_block_partition::wire::kGuidLength];
-  uint8_t guid[fuchsia_hardware_block_partition::wire::kGuidLength];
-  fidl::StringView name;
-  // Refer to //sdk/fidl/fuchsia.hardware.block.volume/volume.fidl for options
-  // here. (Currently only `ALLOCATE_PARTITION_FLAG_INACTIVE` is defined.)
-  // Default is 0.
-  uint32_t flags;
-};
-
 namespace fs_management {
 
 // Format a block device to be an empty FVM.
@@ -57,17 +44,14 @@ zx_status_t FvmOverwrite(std::string_view path, size_t slice_size);
 zx_status_t FvmOverwriteWithDevfs(int devfs_root_fd, std::string_view relative_path,
                                   size_t slice_size);
 
-// Allocates a new vpartition in the fvm, and waits for it to become
-// accessible (by watching for a corresponding block device).
-//
-// Returns an open fd to the new partition on success, -1 on error.
-//
-// TODO(https://fxbug.dev/124615): use channels rather than strings and file descriptors.
-zx::result<fbl::unique_fd> FvmAllocatePartition(int fvm_fd, const alloc_req_t& request,
-                                                std::string* out_path);
-zx::result<fbl::unique_fd> FvmAllocatePartitionWithDevfs(int devfs_root_fd, int fvm_fd,
-                                                         const alloc_req_t& request,
-                                                         std::string* out_path_relative);
+// Allocates a new vpartition in the fvm, and waits for it to become accessible.
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmAllocatePartition(
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm, uint64_t slice_count,
+    uuid::Uuid type_guid, uuid::Uuid instance_guid, std::string_view name, uint32_t flags);
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmAllocatePartitionWithDevfs(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root,
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm, uint64_t slice_count,
+    uuid::Uuid type_guid, uuid::Uuid instance_guid, std::string_view name, uint32_t flags);
 
 // Query the volume manager for info.
 zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(int fvm_fd);
@@ -101,6 +85,11 @@ zx::result<fbl::unique_fd> OpenPartition(const PartitionMatcher& matcher, bool w
 zx::result<fbl::unique_fd> OpenPartitionWithDevfs(int devfs_root_fd,
                                                   const PartitionMatcher& matcher, bool wait,
                                                   std::string* out_path_relative);
+
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartition(
+    const PartitionMatcher& matcher);
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionWithDevfs(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root, const PartitionMatcher& matcher);
 
 // Finds and destroys the first partition that matches |matcher|, if any.
 zx::result<> DestroyPartition(const PartitionMatcher& matcher, bool wait);

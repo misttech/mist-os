@@ -5,10 +5,12 @@
 #include "src/zircon/bin/hwstress/flash_stress.h"
 
 #include <fcntl.h>
+#include <fuchsia/device/cpp/fidl.h>
 #include <fuchsia/hardware/block/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/volume/cpp/fidl.h>
 #include <inttypes.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/fifo.h>
@@ -240,25 +242,36 @@ zx_status_t SetupBlockFifo(const std::string& path, BlockDevice* device) {
 
 std::unique_ptr<TemporaryFvmPartition> TemporaryFvmPartition::Create(int fvm_fd,
                                                                      uint64_t slices_requested) {
+  fdio_cpp::UnownedFdioCaller caller(fvm_fd);
+  fidl::UnownedClientEnd client_end =
+      caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>();
   uuid::Uuid unique_guid = uuid::Uuid::Generate();
 
-  alloc_req_t request{.slice_count = slices_requested,
-                      .name = "flash-test-fs",
-                      .flags = fuchsia::hardware::block::volume::ALLOCATE_PARTITION_FLAG_INACTIVE};
-  memcpy(request.guid, unique_guid.bytes(), sizeof(request.guid));
-  memcpy(request.type, kTestPartGUID.bytes(), sizeof(request.type));
-
   // Create a new partition.
-  std::string partition_path;
-  if (auto fd_or = fs_management::FvmAllocatePartition(fvm_fd, request, &partition_path);
-      fd_or.is_error()) {
+  zx::result partition = fs_management::FvmAllocatePartition(
+      client_end, slices_requested, kTestPartGUID, unique_guid, "flash-test-fs",
+      fuchsia_hardware_block_volume::wire::kAllocatePartitionFlagInactive);
+  if (partition.is_error()) {
     fprintf(stderr, "Error: Could not allocate and open FVM partition: %s\n",
-            fd_or.status_string());
+            partition.status_string());
+    return nullptr;
+  }
+  fuchsia::device::ControllerSyncPtr controller;
+  controller.Bind(partition->TakeChannel());
+  fuchsia::device::Controller_GetTopologicalPath_Result result;
+  if (zx_status_t status = controller->GetTopologicalPath(&result); status != ZX_OK) {
+    fprintf(stderr, "Could not get topological path of fvm partition (fidl error): %s\n",
+            zx_status_get_string(status));
+    return nullptr;
+  }
+  if (result.is_err()) {
+    fprintf(stderr, "Could not get topological path of fvm partition: %s\n",
+            zx_status_get_string(result.err()));
     return nullptr;
   }
 
-  return std::unique_ptr<TemporaryFvmPartition>(
-      new TemporaryFvmPartition(partition_path, unique_guid));
+  return std::unique_ptr<TemporaryFvmPartition>(new TemporaryFvmPartition(
+      std::string(result.response().path.data(), result.response().path.size()), unique_guid));
 }
 
 TemporaryFvmPartition::TemporaryFvmPartition(std::string partition_path, uuid::Uuid unique_guid)

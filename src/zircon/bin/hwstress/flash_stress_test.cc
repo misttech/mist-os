@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <fuchsia/hardware/block/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -277,15 +278,14 @@ TEST(Flash, DeletePartition) {
   ASSERT_TRUE(fvm_path.is_ok());
 
   // Access FVM.
-  fbl::unique_fd fvm_fd(open(fvm_path.value().c_str(), O_RDONLY));
-  ASSERT_TRUE(fvm_fd);
-
-  alloc_req_t request{.slice_count = 1, .name = "test-fs"};
-  memcpy(request.guid, uuid::Uuid::Generate().bytes(), sizeof(request.guid));
-  memcpy(request.type, kTestPartGUID.bytes(), sizeof(request.type));
+  zx::result fvm_client_end =
+      component::Connect<fuchsia_hardware_block_volume::VolumeManager>(*fvm_path);
+  ASSERT_EQ(fvm_client_end.status_value(), ZX_OK);
 
   // Create a partition.
-  ASSERT_EQ(fs_management::FvmAllocatePartition(fvm_fd.get(), request, nullptr).status_value(),
+  ASSERT_EQ(fs_management::FvmAllocatePartition(*fvm_client_end, 1, kTestPartGUID,
+                                                uuid::Uuid::Generate(), "test-fs", 0)
+                .status_value(),
             ZX_OK);
 
   StatusLine status;

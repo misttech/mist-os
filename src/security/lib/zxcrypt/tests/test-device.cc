@@ -322,22 +322,22 @@ void TestDevice::CreateFvmPart(size_t device_size, size_t block_size) {
   snprintf(path, sizeof(path), "%s/fvm", ramdisk_get_path(ramdisk_));
   zx::result fvm_channel = device_watcher::RecursiveWaitForFile(devfs_root().get(), path);
   ASSERT_OK(fvm_channel.status_value());
-  fbl::unique_fd fvm_fd;
-  ASSERT_OK(fdio_fd_create(fvm_channel.value().release(), fvm_fd.reset_and_get_address()));
+  fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm_manager(
+      std::move(*fvm_channel));
+
+  fdio_cpp::UnownedFdioCaller caller(devfs_root());
+  zx::result devfs = component::Clone(caller.directory());
+  ASSERT_OK(devfs.status_value());
 
   // Allocate a FVM partition with the last slice unallocated.
-  alloc_req_t req;
-  memset(&req, 0, sizeof(alloc_req_t));
-  req.slice_count = (kDeviceSize / fvm::kBlockSize) - 1;
-  memcpy(req.type, zxcrypt_magic, sizeof(zxcrypt_magic));
-  for (uint8_t i = 0; i < BLOCK_GUID_LEN; ++i) {
-    req.guid[i] = i;
-  }
-  req.name = "data";
-  auto fvm_part_or =
-      fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_fd.get(), req, nullptr);
-  ASSERT_EQ(fvm_part_or.status_value(), ZX_OK);
-  parent_ = *std::move(fvm_part_or);
+  uint64_t request_slice_count = (kDeviceSize / fvm::kBlockSize) - 1;
+  zx::result fvm_part = fs_management::FvmAllocatePartitionWithDevfs(
+      *devfs, fvm_manager, request_slice_count, uuid::Uuid(zxcrypt_magic), uuid::Uuid::Generate(),
+      "data", 0);
+  ASSERT_EQ(fvm_part.status_value(), ZX_OK);
+  fbl::unique_fd partition;
+  ASSERT_OK(fdio_fd_create(fvm_part->TakeChannel().release(), partition.reset_and_get_address()));
+  parent_ = std::move(partition);
 
   // Save the topological path for rebinding.  The topological path will be
   // consistent after rebinding the ramdisk, whereas the

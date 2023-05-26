@@ -105,6 +105,7 @@ test("factory_reset_unittests") {
     "//src/lib/storage/block_client/cpp",
     "//src/lib/storage/fs_management",
     "//src/lib/storage/ramdevice_client/cpp",
+    "//src/lib/uuid",
     "//src/security/lib/fcrypto",
     "//src/security/lib/zxcrypt:zxcrypt-client",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

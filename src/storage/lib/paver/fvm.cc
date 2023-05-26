@@ -518,31 +518,43 @@ struct BoundZxcryptDevice {
 zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(const fbl::unique_fd& devfs_root,
                                                                const fbl::unique_fd& fvm_fd,
                                                                fbl::Array<PartitionInfo>* parts) {
+  fdio_cpp::UnownedFdioCaller devfs_caller(devfs_root);
+  fdio_cpp::UnownedFdioCaller fvm_caller(fvm_fd);
+  fidl::UnownedClientEnd devfs_client_end = devfs_caller.directory();
+  fidl::UnownedClientEnd fvm_client_end =
+      fvm_caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>();
+
   std::vector<BoundZxcryptDevice> bound_devices;
   for (PartitionInfo& part_info : *parts) {
     fvm::ExtentDescriptor ext = GetExtent(part_info.pd, 0);
-    alloc_req_t alloc = {};
     // Allocate this partition as inactive so it gets deleted on the next
     // reboot if this stream fails.
-    alloc.flags = part_info.active ? 0 : volume::wire::kAllocatePartitionFlagInactive;
-    alloc.slice_count = ext.slice_count;
-    memcpy(&alloc.type, part_info.pd->type, sizeof(alloc.type));
-    memcpy(&alloc.guid, uuid::Uuid::Generate().bytes(), uuid::kUuidSize);
+    uint32_t flags = part_info.active ? 0 : volume::wire::kAllocatePartitionFlagInactive;
+    uint64_t slice_count = ext.slice_count;
+    uuid::Uuid type_guid(part_info.pd->type);
+    uuid::Uuid instance_guid = uuid::Uuid::Generate();
     const char* name = reinterpret_cast<const char*>(part_info.pd->name);
-    alloc.name = fidl::StringView::FromExternal(name, strnlen(name, sizeof(part_info.pd->name)));
+    std::string_view name_view(name, strnlen(name, sizeof(part_info.pd->name)));
     {
       char name[sizeof(part_info.pd->name) + 1];
       name[sizeof(part_info.pd->name)] = '\0';
       memcpy(name, part_info.pd->name, sizeof(part_info.pd->name));
-      LOG("Allocating partition %s consisting of %zu slices\n", name, alloc.slice_count);
+      LOG("Allocating partition %s consisting of %zu slices\n", name, slice_count);
     }
-    if (auto fd_or = fs_management::FvmAllocatePartitionWithDevfs(devfs_root.get(), fvm_fd.get(),
-                                                                  alloc, nullptr);
-        fd_or.is_error()) {
+    if (zx::result channel = fs_management::FvmAllocatePartitionWithDevfs(
+            devfs_client_end, fvm_client_end, slice_count, type_guid, instance_guid, name_view,
+            flags);
+        channel.is_error()) {
       ERROR("Couldn't allocate partition\n");
       return zx::error(ZX_ERR_NO_SPACE);
     } else {
-      part_info.new_part = *std::move(fd_or);
+      fbl::unique_fd partition;
+      if (zx_status_t status = fdio_fd_create(channel.value().TakeChannel().release(),
+                                              partition.reset_and_get_address());
+          status != ZX_OK) {
+        return zx::error(status);
+      }
+      part_info.new_part = std::move(partition);
     }
 
     // Add filter drivers.

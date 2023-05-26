@@ -241,23 +241,24 @@ zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(
     }
 
     if (options.dummy_fvm_partition_size > 0) {
-      auto fvm_fd = fbl::unique_fd(open((device_path + "/fvm").c_str(), O_RDONLY));
-      if (!fvm_fd) {
-        std::cout << "Could not open FVM driver: " << strerror(errno) << std::endl;
-        return zx::error(ZX_ERR_BAD_STATE);
+      zx::result fvm_device =
+          component::Connect<fuchsia_hardware_block_volume::VolumeManager>(device_path + "/fvm");
+      if (fvm_device.is_error()) {
+        std::cout << "Could not open FVM driver: " << fvm_device.status_string() << std::endl;
+        return fvm_device.take_error();
       }
 
-      alloc_req_t request = {
-          .slice_count = options.dummy_fvm_partition_size / options.fvm_slice_size,
-          .type = {0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01,
-                   0x02, 0x03, 0x04},
-          .guid = {0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01,
-                   0x02, 0x03, 0x04},
-          .name = "dummy",
-      };
-      if (fs_management::FvmAllocatePartition(fvm_fd.get(), request, nullptr).is_error()) {
-        std::cout << "Could not allocate dummy FVM partition" << std::endl;
-        return zx::error(ZX_ERR_BAD_STATE);
+      uint64_t slice_count = options.dummy_fvm_partition_size / options.fvm_slice_size;
+      uuid::Uuid type_guid({0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04,
+                            0x01, 0x02, 0x03, 0x04});
+      uuid::Uuid instance_guid({0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03,
+                                0x04, 0x01, 0x02, 0x03, 0x04});
+      std::string_view name = "extra";
+      if (zx::result res = fs_management::FvmAllocatePartition(*fvm_device, slice_count, type_guid,
+                                                               instance_guid, name, 0);
+          res.is_error()) {
+        std::cout << "Could not allocate extra FVM partition: " << res.status_string() << std::endl;
+        return res.take_error();
       }
     }
 
