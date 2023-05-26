@@ -106,35 +106,6 @@ protocol Coordinator {
         layer_id uint64;
     });
 
-    /// Import a gamma table for display calibration.
-    ///
-    /// Each array is a quantized representation of the gamma curve for a single
-    /// color channel. An input luminance in [0.0, 1.0] is mapped to an index
-    /// between 0-255, and the value in the array is used as the output
-    /// luminance. Rounding behavior is hardware-specific, and most often it
-    /// will floor(input * 255.0), requiring an input luminance of 1.0 to get
-    /// the max output luminance.
-    ///
-    /// It is an error to use output luminances outside of [0.0, 1.0]. Hardware
-    /// drivers may either clamp such values or disconnect a client that
-    /// provides invalid tables.
-    ImportGammaTable(struct {
-        gamma_table_id uint64;
-        r array<float32, 256>;
-        g array<float32, 256>;
-        b array<float32, 256>;
-    });
-
-    /// Release an imported gamma table.
-    ///
-    /// Subsequent calls to SetDisplayGammaTable cannot reference this
-    /// table. It is legal to re-use the gamma_table_id after making
-    /// this call. Releasing a table while it is set on a display is
-    /// safe, and will not modify the output of the display.
-    ReleaseGammaTable(struct {
-        gamma_table_id uint64;
-    });
-
     // Sets the display mode for the given display.
     //
     // It is illegal to pass a display mode which was not part of the display's Info.
@@ -174,16 +145,6 @@ protocol Coordinator {
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
         postoffsets array<float32, 3>;
-    });
-
-    /// Set the gamma correction table for a display.
-    ///
-    /// gamma_table_id must be a table registered with ImportGammaTable. It is
-    /// safe to release a gamma table after using it here, and will not modify
-    /// display output.
-    SetDisplayGammaTable(struct {
-        display_id DisplayId;
-        gamma_table_id uint64;
     });
 
     // Sets which layers are on a display. The list is in increasing z-order.

@@ -51,26 +51,6 @@
 
 namespace display {
 
-class GammaTables : public fbl::RefCounted<GammaTables> {
- public:
-  static constexpr uint32_t kTableSize = 256;
-  explicit GammaTables(const ::fidl::Array<float, kTableSize>& r,
-                       const ::fidl::Array<float, kTableSize>& g,
-                       const ::fidl::Array<float, kTableSize>& b);
-
-  // We are returning raw pointers here for display driver consumption. However,
-  // a ref-counted pointer is held by core display to guarantee validity of the
-  // pointers.
-  float* Red() { return red.data(); }
-  float* Green() { return green.data(); }
-  float* Blue() { return blue.data(); }
-
- private:
-  ::fidl::Array<float, kTableSize> red;
-  ::fidl::Array<float, kTableSize> green;
-  ::fidl::Array<float, kTableSize> blue;
-};
-
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
 class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
  public:
@@ -90,9 +70,6 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
  private:
   display_config_t current_;
   display_config_t pending_;
-
-  fbl::RefPtr<GammaTables> pending_gamma_table_;
-  fbl::RefPtr<GammaTables> current_gamma_table_;
 
   bool pending_layer_change_;
   bool pending_apply_layer_change_;
@@ -217,7 +194,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
   uint64_t LatestAckedCookie() const { return acked_cookie_; }
-  size_t GetGammaTableSize() const { return gamma_table_map_.size(); }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
@@ -229,16 +205,10 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   void CreateLayer(CreateLayerCompleter::Sync& _completer) override;
   void DestroyLayer(DestroyLayerRequestView request,
                     DestroyLayerCompleter::Sync& _completer) override;
-  void ImportGammaTable(ImportGammaTableRequestView request,
-                        ImportGammaTableCompleter::Sync& _completer) override;
-  void ReleaseGammaTable(ReleaseGammaTableRequestView request,
-                         ReleaseGammaTableCompleter::Sync& _completer) override;
   void SetDisplayMode(SetDisplayModeRequestView request,
                       SetDisplayModeCompleter::Sync& _completer) override;
   void SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
                                  SetDisplayColorConversionCompleter::Sync& _completer) override;
-  void SetDisplayGammaTable(SetDisplayGammaTableRequestView request,
-                            SetDisplayGammaTableCompleter::Sync& _completer) override;
   void SetDisplayLayers(SetDisplayLayersRequestView request,
                         SetDisplayLayersCompleter::Sync& _completer) override;
   void SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
@@ -363,8 +333,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   uint64_t pending_capture_release_image_ = INVALID_ID;
 
   uint64_t acked_cookie_ = 0;
-
-  std::map<uint64_t, fbl::RefPtr<GammaTables>> gamma_table_map_;
 };
 
 // ClientProxy manages interactions between its Client instance and the

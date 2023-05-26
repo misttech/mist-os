@@ -63,14 +63,6 @@ constexpr uint64_t kMaxLayers = 65536;
 
 namespace display {
 
-GammaTables::GammaTables(const ::fidl::Array<float, kTableSize>& r,
-                         const ::fidl::Array<float, kTableSize>& g,
-                         const ::fidl::Array<float, kTableSize>& b) {
-  std::copy(r.begin(), r.end(), red.begin());
-  std::copy(g.begin(), g.end(), green.begin());
-  std::copy(b.begin(), b.end(), blue.begin());
-}
-
 void DisplayConfig::InitializeInspect(inspect::Node* parent) {
   static std::atomic_uint64_t inspect_count;
   node_ = parent->CreateChild(fbl::StringPrintf("display-config-%ld", inspect_count++).c_str());
@@ -261,22 +253,6 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
   layers_.erase(request->layer_id);
 }
 
-void Client::ImportGammaTable(ImportGammaTableRequestView request,
-                              ImportGammaTableCompleter::Sync& /*_completer*/) {
-  fbl::AllocChecker ac;
-  auto gt = fbl::AdoptRef(new (&ac) GammaTables(request->r, request->g, request->b));
-  if (!ac.check()) {
-    zxlogf(ERROR, "%s failed!\n", __func__);
-    return;
-  }
-  gamma_table_map_[request->gamma_table_id] = std::move(gt);
-}
-
-void Client::ReleaseGammaTable(ReleaseGammaTableRequestView request,
-                               ReleaseGammaTableCompleter::Sync& /*_completer*/) {
-  gamma_table_map_.erase(request->gamma_table_id);
-}
-
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
                             SetDisplayModeCompleter::Sync& /*_completer*/) {
   auto config = configs_.find(request->display_id);
@@ -365,34 +341,6 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
     }
   }
   config->pending_.layer_count = static_cast<int32_t>(request->layer_ids.count());
-  pending_config_valid_ = false;
-}
-
-void Client::SetDisplayGammaTable(SetDisplayGammaTableRequestView request,
-                                  SetDisplayGammaTableCompleter::Sync& /*_completer*/) {
-  auto config = configs_.find(request->display_id);
-  if (!config.IsValid()) {
-    return;
-  }
-
-  auto gamma_table = gamma_table_map_.find(request->gamma_table_id);
-  if (gamma_table == gamma_table_map_.end()) {
-    zxlogf(ERROR, "Invalid Gamma Table\n");
-    TearDown();
-    return;
-  }
-
-  config->pending_.gamma_table_present = true;
-  config->pending_.gamma_red_list = gamma_table->second->Red();
-  config->pending_.gamma_red_count = GammaTables::kTableSize;
-  config->pending_.gamma_green_list = gamma_table->second->Green();
-  config->pending_.gamma_green_count = GammaTables::kTableSize;
-  config->pending_.gamma_blue_list = gamma_table->second->Blue();
-  config->pending_.gamma_blue_count = GammaTables::kTableSize;
-
-  // keep a reference of the table
-  config->pending_gamma_table_ = gamma_table->second;
-  config->display_config_change_ = true;
   pending_config_valid_ = false;
 }
 
@@ -555,8 +503,6 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
 
       config.pending_ = config.current_;
       config.display_config_change_ = false;
-
-      config.pending_gamma_table_ = config.current_gamma_table_;
     }
     pending_config_valid_ = true;
   }
@@ -647,16 +593,8 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
       layer_node.layer->ApplyChanges(display_config.current_.mode);
     }
 
-    // TODO(fxbug.dev/54374): Controller needs to keep track of client switching and their applied
-    // gamma table
-    if (display_config.pending_gamma_table_ != nullptr &&
-        (display_config.pending_gamma_table_ == display_config.current_gamma_table_)) {
-      // no need to make client re-apply gamma table if it has already been applied
-      display_config.current_.apply_gamma_table = false;
-    } else {
-      display_config.current_gamma_table_ = display_config.pending_gamma_table_;
-      display_config.current_.apply_gamma_table = true;
-    }
+    display_config.current_.gamma_table_present = false;
+    display_config.current_.apply_gamma_table = false;
   }
   // Overflow doesn't matter, since stamps only need to be unique until
   // the configuration is applied with vsync.

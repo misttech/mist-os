@@ -67,12 +67,6 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     return controller()->primary_client_->handler_.LatestAckedCookie() == cookie;
   }
 
-  size_t get_gamma_table_size() {
-    fbl::AutoLock l(controller()->mtx());
-    fbl::AutoLock cl(&controller()->primary_client_->mtx_);
-    return controller()->primary_client_->handler_.GetGammaTableSize();
-  }
-
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, uint64_t display_id) {
     fbl::AutoLock l(controller()->mtx());
     // Reseting client will *start* client tear down.
@@ -552,96 +546,6 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
             primary_client->vsync_count());
 }
 
-TEST_F(IntegrationTest, ImportGammaTable) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
-  EXPECT_TRUE(
-      RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(1)));
-
-  uint64_t gamma_table_id = 3;
-  ::fidl::Array<float, 256> gamma_red = {{0.1f}};
-  ::fidl::Array<float, 256> gamma_green = {{0.2f}};
-  ::fidl::Array<float, 256> gamma_blue = {{0.3f}};
-  {
-    fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->ImportGammaTable(gamma_table_id, gamma_red, gamma_green, gamma_blue);
-    EXPECT_TRUE(
-        RunLoopWithTimeoutOrUntil([this]() { return get_gamma_table_size() == 1; }, zx::sec(1)));
-  }
-}
-
-TEST_F(IntegrationTest, ReleaseGammaTable) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
-  EXPECT_TRUE(
-      RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(1)));
-
-  uint64_t gamma_table_id = 3;
-  ::fidl::Array<float, 256> gamma_red = {{0.1f}};
-  ::fidl::Array<float, 256> gamma_green = {{0.2f}};
-  ::fidl::Array<float, 256> gamma_blue = {{0.3f}};
-  {
-    fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->ImportGammaTable(gamma_table_id, gamma_red, gamma_green, gamma_blue);
-    EXPECT_TRUE(
-        RunLoopWithTimeoutOrUntil([this]() { return get_gamma_table_size() == 1; }, zx::sec(1)));
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->ReleaseGammaTable(gamma_table_id);
-    EXPECT_TRUE(
-        RunLoopWithTimeoutOrUntil([this]() { return get_gamma_table_size() == 0; }, zx::sec(1)));
-  }
-}
-
-TEST_F(IntegrationTest, ReleaseInvalidGammaTable) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
-  EXPECT_TRUE(
-      RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(1)));
-
-  uint64_t gamma_table_id = 3;
-  ::fidl::Array<float, 256> gamma_red = {{0.1f}};
-  ::fidl::Array<float, 256> gamma_green = {{0.2f}};
-  ::fidl::Array<float, 256> gamma_blue = {{0.3f}};
-  {
-    fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->ImportGammaTable(gamma_table_id, gamma_red, gamma_green, gamma_blue);
-    EXPECT_TRUE(
-        RunLoopWithTimeoutOrUntil([this]() { return get_gamma_table_size() == 1; }, zx::sec(1)));
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->ReleaseGammaTable(gamma_table_id + 5);
-    EXPECT_FALSE(
-        RunLoopWithTimeoutOrUntil([this]() { return get_gamma_table_size() == 0; }, zx::sec(1)));
-  }
-}
-
-TEST_F(IntegrationTest, SetGammaTable) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
-  EXPECT_TRUE(
-      RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(1)));
-
-  uint64_t gamma_table_id = 3;
-  ::fidl::Array<float, 256> gamma_red = {{0.1f}};
-  ::fidl::Array<float, 256> gamma_green = {{0.2f}};
-  ::fidl::Array<float, 256> gamma_blue = {{0.3f}};
-  {
-    fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->ImportGammaTable(gamma_table_id, gamma_red, gamma_green, gamma_blue);
-    EXPECT_TRUE(
-        RunLoopWithTimeoutOrUntil([this]() { return get_gamma_table_size() == 1; }, zx::sec(1)));
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)primary_client->dc_->SetDisplayGammaTable(primary_client->display_id(), gamma_table_id);
-  }
-}
-
 TEST_F(IntegrationTest, ImportImage_InvalidCollection) {
   TestFidlClient client(sysmem_);
   ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
@@ -711,9 +615,9 @@ TEST_F(IntegrationTest, EmptyConfigIsNotApplied) {
   ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    EXPECT_EQ(ZX_OK, vc_client.dc_
-                         ->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback)
-                         .status());
+    EXPECT_EQ(ZX_OK,
+              vc_client.dc_->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback)
+                  .status());
   }
   ASSERT_TRUE(vc_client.Bind(dispatcher()));
   {
