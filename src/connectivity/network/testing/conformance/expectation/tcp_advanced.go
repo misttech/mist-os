@@ -17,7 +17,7 @@ var tcpAdvancedExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{2, 23}: Fail,
 	{2, 24}: Fail,
 	{2, 25}: Fail,
-	{3, 17}: Pass,
+	{3, 17}: Flaky, // TODO(https://fxbug.dev/105170): Fix flake.
 	{4, 17}: Pass,
 	{6, 17}: Pass,
 }
