@@ -32,7 +32,3 @@ group("examples") {
     "//src/media/audio/examples/tones",
   ]
 }
-
-# Delete after multi-repo soft transition.
-group("virtual_audio_driver") {
-}
