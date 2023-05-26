@@ -12,7 +12,9 @@ use futures::{
     prelude::*,
     task::{Context, Poll},
 };
+use std::time::Duration;
 use std::{convert::TryInto, io::ErrorKind, net::SocketAddr, pin::Pin};
+use timeout::timeout;
 use tracing::debug;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";
@@ -143,8 +145,10 @@ impl TcpNetworkFactory {
         retry_count: u64,
         retry_wait_seconds: u64,
     ) -> Result<TcpNetworkInterface> {
+        let handshake_timeout_millis =
+            get(HANDSHAKE_TIMEOUT).await.unwrap_or(HANDSHAKE_TIMEOUT_MILLIS);
         for retry in 0..retry_count {
-            match open_once(target).await {
+            match open_once(target, Duration::from_millis(handshake_timeout_millis)).await {
                 Ok(res) => {
                     tracing::debug!("TCP connect attempt #{} succeeds", retry);
                     return Ok(res);
@@ -179,12 +183,15 @@ async fn handshake(stream: &mut TcpStream) -> Result<()> {
 const OPEN_RETRY_COUNT: &str = "fastboot.tcp.open.retry.count";
 /// Time to wait for a response when connecting to a target in fastboot over TCP
 const OPEN_RETRY_WAIT: &str = "fastboot.tcp.open.retry.wait";
+/// Timeout in seconds waiting for a valid fastboot TCP handshake.
+const HANDSHAKE_TIMEOUT: &str = "fastboot.tcp.handshake.timeout";
 
 const OPEN_RETRY: u64 = 10;
 const RETRY_WAIT_SECONDS: u64 = 5;
 const FASTBOOT_PORT: u16 = 5554;
+const HANDSHAKE_TIMEOUT_MILLIS: u64 = 1000;
 
-async fn open_once(target: &Target) -> Result<TcpNetworkInterface> {
+async fn open_once(target: &Target, handshake_timeout: Duration) -> Result<TcpNetworkInterface> {
     let mut addr: SocketAddr =
         target.fastboot_address().ok_or(anyhow!("No network address for fastboot"))?.0.into();
     if addr.port() == 0 {
@@ -193,11 +200,19 @@ async fn open_once(target: &Target) -> Result<TcpNetworkInterface> {
         );
         addr.set_port(FASTBOOT_PORT);
     }
-    tracing::debug!("Trying to establish TCP Conneciton to address: {addr:?}");
-    let mut stream = TcpStream::connect(addr).await.context("Establishing TCP connection")?;
-    handshake(&mut stream).await?;
 
-    Ok(TcpNetworkInterface { stream, read_avail_bytes: None, read_task: None, write_task: None })
+    tracing::debug!("Trying to establish TCP Connection to address: {addr:?}");
+    timeout(handshake_timeout, async {
+        let mut stream = TcpStream::connect(addr).await.context("Establishing TCP connection")?;
+        handshake(&mut stream).await?;
+        Ok(TcpNetworkInterface {
+            stream,
+            read_avail_bytes: None,
+            read_task: None,
+            write_task: None,
+        })
+    })
+    .await?
 }
 
 #[async_trait(?Send)]
