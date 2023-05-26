@@ -75,10 +75,11 @@ pub enum CopyError {
 /// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
 /// * `paths`: The host and remote paths used for file copying.
 /// * `verbose`: Flag used to indicate whether or not to print output to console.
-pub async fn copy_cmd(
+pub async fn copy_cmd<W: std::io::Write>(
     realm_query: &fsys::RealmQueryProxy,
     mut paths: Vec<String>,
     verbose: bool,
+    mut writer: W,
 ) -> Result<()> {
     validate_paths(&paths)?;
 
@@ -111,17 +112,19 @@ pub async fn copy_cmd(
                         .await?;
 
                         if verbose {
-                            println!(
+                            writeln!(
+                                writer,
                                 "Successfully copied {} to {}",
                                 &source_path, &destination_path
-                            );
+                            )?;
                         }
                     } else if verbose {
                         // TODO(https://fxbug.dev/116065): add recursive flag for wildcards.
-                        println!(
+                        writeln!(
+                            writer,
                             "Subdirectory \"{}\" ignored as recursive copying is currently not supported.",
                             remote_path.to_string()
-                        );
+                        )?;
                     }
                 }
                 Ok(())
@@ -157,17 +160,19 @@ pub async fn copy_cmd(
                         .await?;
 
                         if verbose {
-                            println!(
+                            writeln!(
+                                writer,
                                 "Successfully copied {} to {}",
                                 &source_path, &destination_path
-                            );
+                            )?;
                         }
                     } else if verbose {
                         //TODO(https://fxrev.dev/116065): add recursive flag for wildcards.
-                        println!(
+                        writeln!(
+                            writer,
                             "Subdirectory \"{}\" ignored as recursive copying is currently not supported.",
                             remote_path.to_string()
-                        );
+                        )?;
                     }
                 }
 
@@ -189,7 +194,11 @@ pub async fn copy_cmd(
                 .await?;
 
                 if verbose {
-                    println!("Successfully copied {} to {}", &source_path, &destination_path);
+                    writeln!(
+                        writer,
+                        "Successfully copied {} to {}",
+                        &source_path, &destination_path
+                    )?;
                 }
 
                 Ok(())
@@ -573,6 +582,7 @@ mod tests {
             &realm_query,
             vec![input.source.to_string(), destination_path],
             /*verbose=*/ false,
+            std::io::stdout(),
         )
         .await
         .unwrap();
@@ -627,6 +637,7 @@ mod tests {
             &realm_query,
             vec![input.source.to_string(), destination_path.display().to_string()],
             /*verbose=*/ true,
+            std::io::stdout(),
         )
         .await
         .unwrap();
@@ -659,6 +670,7 @@ mod tests {
             &realm_query,
             vec![input.source.to_string(), destination_path],
             /*verbose=*/ true,
+            std::io::stdout(),
         )
         .await;
 
@@ -705,6 +717,7 @@ mod tests {
             &realm_query,
             vec![source_path.display().to_string(), input.destination.to_string()],
             /*verbose=*/ false,
+            std::io::stdout(),
         )
         .await
         .unwrap();
@@ -756,6 +769,7 @@ mod tests {
             &realm_query,
             vec![input.source.to_string(), input.destination.to_string()],
             /*verbose=*/ false,
+            std::io::stdout(),
         )
         .await
         .unwrap();
@@ -788,6 +802,7 @@ mod tests {
             &realm_query,
             vec![input.source.to_string(), input.destination.to_string()],
             /*verbose=*/ false,
+            std::io::stdout(),
         )
         .await;
 
@@ -828,7 +843,7 @@ mod tests {
             .collect();
         paths.push(input.destination.to_string());
 
-        copy_cmd(&realm_query, paths, /*verbose=*/ false).await.unwrap();
+        copy_cmd(&realm_query, paths, /*verbose=*/ false, std::io::stdout()).await.unwrap();
 
         for expected in expectation {
             let actual_path = foo_path.join(expected.path);
@@ -858,6 +873,7 @@ mod tests {
             &realm_query,
             vec![source_path.display().to_string(), input.destination.to_string()],
             /*verbose=*/ false,
+            std::io::stdout(),
         )
         .await;
 
@@ -876,7 +892,7 @@ mod tests {
             vec![],
         );
         let paths = paths.into_iter().map(|s| s.to_string()).collect();
-        let result = copy_cmd(&realm_query, paths, /*verbose=*/ false).await;
+        let result = copy_cmd(&realm_query, paths, /*verbose=*/ false, std::io::stdout()).await;
 
         assert!(result.is_err());
     }
@@ -919,7 +935,7 @@ mod tests {
             .collect();
         paths.push(input.destination.to_owned());
 
-        copy_cmd(&realm_query, paths, /*verbose=*/ false).await.unwrap();
+        copy_cmd(&realm_query, paths, /*verbose=*/ false, std::io::stdout()).await.unwrap();
 
         for expected in expectation {
             let actual_path = bar_path.join(expected.path);

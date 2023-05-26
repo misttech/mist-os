@@ -2,22 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+// TODO(fxbug.dev/120283): Remove. This is force-included as part of ffx_plugin.
+use anyhow as _;
+use async_trait::async_trait;
 use component_debug::cli::stop_cmd;
 use errors::FfxError;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_stop_args::ComponentStopCommand;
-use ffx_core::ffx_plugin;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
-#[ffx_plugin]
-pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: ComponentStopCommand) -> Result<()> {
-    let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
-    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
+#[derive(FfxTool)]
+pub struct StopTool {
+    #[command]
+    cmd: ComponentStopCommand,
+    rcs: rc::RemoteControlProxy,
+}
 
-    // All errors from component_debug library are user-visible.
-    stop_cmd(args.query, lifecycle_controller, realm_query, std::io::stdout())
-        .await
-        .map_err(|e| FfxError::Error(e, 1))?;
-    Ok(())
+fho::embedded_plugin!(StopTool);
+
+#[async_trait(?Send)]
+impl FfxMain for StopTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        let lifecycle_controller = connect_to_lifecycle_controller(&self.rcs).await?;
+        let realm_query = connect_to_realm_query(&self.rcs).await?;
+
+        // All errors from component_debug library are user-visible.
+        stop_cmd(self.cmd.query, lifecycle_controller, realm_query, writer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
+        Ok(())
+    }
 }

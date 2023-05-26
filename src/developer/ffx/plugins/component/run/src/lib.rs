@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _, Result};
+use async_trait::async_trait;
 use component_debug::{cli::run_cmd, config::resolve_raw_config_overrides};
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_run_args::RunComponentCommand;
-use ffx_core::{ffx_plugin, macro_deps::errors::FfxError};
+use ffx_core::macro_deps::errors::FfxError;
 use ffx_log::{error::LogError, log_impl, LogOpts};
 use ffx_log_args::LogCommand;
 use ffx_log_frontend::RemoteDiagnosticsBridgeProxyWrapper;
+use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use std::sync::Arc;
@@ -18,6 +20,7 @@ async fn cmd_impl(
     target_collection_proxy: TargetCollectionProxy,
     rcs_proxy: rc::RemoteControlProxy,
     args: RunComponentCommand,
+    mut writer: SimpleWriter,
 ) -> Result<(), anyhow::Error> {
     let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
     let host = rcs_proxy
@@ -43,7 +46,7 @@ async fn cmd_impl(
         args.connect_stdio,
         config_overrides,
         lifecycle_controller,
-        std::io::stdout(),
+        &mut writer,
     )
     .await
     .map_err(|e| FfxError::Error(e, 1))?;
@@ -60,7 +63,7 @@ async fn cmd_impl(
             Some(rcs_proxy),
             &None,
             log_cmd,
-            &mut std::io::stdout(),
+            &mut writer,
             LogOpts::default(),
         )
         .await?;
@@ -68,12 +71,23 @@ async fn cmd_impl(
     Ok(())
 }
 
-#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn cmd(
-    target_collection_proxy: TargetCollectionProxy,
-    rcs_proxy: rc::RemoteControlProxy,
-    args: RunComponentCommand,
-) -> Result<()> {
-    cmd_impl(target_collection_proxy, rcs_proxy, args).await?;
-    Ok(())
+#[derive(FfxTool)]
+pub struct RunTool {
+    #[command]
+    cmd: RunComponentCommand,
+    rcs: rc::RemoteControlProxy,
+    #[with(daemon_protocol())]
+    target_collection: TargetCollectionProxy,
+}
+
+fho::embedded_plugin!(RunTool);
+
+#[async_trait(?Send)]
+impl FfxMain for RunTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        cmd_impl(self.target_collection, self.rcs, self.cmd, writer).await?;
+        Ok(())
+    }
 }

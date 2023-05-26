@@ -2,26 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+// TODO(fxbug.dev/120283): Remove. This is force-included as part of ffx_plugin.
+use anyhow as _;
+use async_trait::async_trait;
 use component_debug::cli::{collection_list_cmd, collection_show_cmd};
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_collection_args::{CollectionCommand, ShowArgs, SubCommandEnum};
-use ffx_core::ffx_plugin;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
-#[ffx_plugin()]
-pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: CollectionCommand) -> Result<()> {
-    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
+#[derive(FfxTool)]
+pub struct CollectionTool {
+    #[command]
+    cmd: CollectionCommand,
+    rcs: rc::RemoteControlProxy,
+}
 
-    // All errors from component_debug library are user-visible.
-    match args.subcommand {
-        SubCommandEnum::List(_) => collection_list_cmd(realm_query, std::io::stdout()).await,
-        SubCommandEnum::Show(ShowArgs { query }) => {
-            collection_show_cmd(query, realm_query, std::io::stdout()).await
+fho::embedded_plugin!(CollectionTool);
+
+#[async_trait(?Send)]
+impl FfxMain for CollectionTool {
+    type Writer = SimpleWriter;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        let realm_query = connect_to_realm_query(&self.rcs).await?;
+
+        // All errors from component_debug library are user-visible.
+        match self.cmd.subcommand {
+            SubCommandEnum::List(_) => collection_list_cmd(realm_query, writer).await,
+            SubCommandEnum::Show(ShowArgs { query }) => {
+                collection_show_cmd(query, realm_query, writer).await
+            }
         }
-    }
-    .map_err(|e| FfxError::Error(e, 1))?;
+        .map_err(|e| FfxError::Error(e, 1))?;
 
-    Ok(())
+        Ok(())
+    }
 }

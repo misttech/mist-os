@@ -2,30 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+// TODO(fxbug.dev/120283): Remove. This is force-included as part of ffx_plugin.
+use anyhow as _;
+use async_trait::async_trait;
 use component_debug::{cli::create_cmd, config::resolve_raw_config_overrides};
-use errors::FfxError;
+use errors::{ffx_error, FfxError};
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_create_args::CreateComponentCommand;
-use ffx_core::ffx_plugin;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
-#[ffx_plugin]
-pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: CreateComponentCommand) -> Result<()> {
-    let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
-    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
+#[derive(FfxTool)]
+pub struct CreateTool {
+    #[command]
+    cmd: CreateComponentCommand,
+    rcs: rc::RemoteControlProxy,
+}
 
-    let config_overrides = resolve_raw_config_overrides(
-        &realm_query,
-        &args.moniker,
-        &args.url.to_string(),
-        &args.config,
-    )
-    .await?;
+fho::embedded_plugin!(CreateTool);
 
-    // All errors from component_debug library are user-visible.
-    create_cmd(args.url, args.moniker, config_overrides, lifecycle_controller, std::io::stdout())
+#[async_trait(?Send)]
+impl FfxMain for CreateTool {
+    type Writer = SimpleWriter;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        let lifecycle_controller = connect_to_lifecycle_controller(&self.rcs).await?;
+        let realm_query = connect_to_realm_query(&self.rcs).await?;
+
+        let config_overrides = resolve_raw_config_overrides(
+            &realm_query,
+            &self.cmd.moniker,
+            &self.cmd.url.to_string(),
+            &self.cmd.config,
+        )
         .await
-        .map_err(|e| FfxError::Error(e, 1))?;
-    Ok(())
+        .map_err(|e| ffx_error!("{e}"))?;
+
+        // All errors from component_debug library are user-visible.
+        create_cmd(self.cmd.url, self.cmd.moniker, config_overrides, lifecycle_controller, writer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
+        Ok(())
+    }
 }

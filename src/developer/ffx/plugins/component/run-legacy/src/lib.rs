@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use blocking::Unblock;
+use errors::ffx_bail;
 use ffx_component_run_legacy_args::RunComponentCommand;
-use ffx_core::ffx_plugin;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_sys::{
     ComponentControllerEvent, ComponentControllerMarker, FileDescriptor, LaunchInfo, LauncherProxy,
@@ -18,14 +20,29 @@ use signal_hook::{consts::signal::SIGINT, iterator::Signals};
 // rather than redefining it here.
 const HANDLE_TYPE_FILE_DESCRIPTOR: i32 = 0x30;
 
-#[ffx_plugin(LauncherProxy = "core/appmgr:expose:fuchsia.sys.Launcher")]
-pub async fn run_component(launcher_proxy: LauncherProxy, run: RunComponentCommand) -> Result<()> {
-    if !run.url.ends_with("cmx") {
-        return Err(anyhow!(
-            "Invalid component URL! For CML components, use `ffx component run` instead."
-        ));
+#[derive(FfxTool)]
+pub struct RunLegacyTool {
+    #[command]
+    cmd: RunComponentCommand,
+    #[with(moniker("/core/appmgr"))]
+    launcher: LauncherProxy,
+}
+
+fho::embedded_plugin!(RunLegacyTool);
+
+#[async_trait(?Send)]
+impl FfxMain for RunLegacyTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        if !self.cmd.url.ends_with("cmx") {
+            ffx_bail!(
+                "Invalid component URL! For CML components, use `ffx component run` instead."
+            );
+        }
+        run_component_cmd(self.launcher, self.cmd, &mut writer).await?;
+        Ok(())
     }
-    run_component_cmd(launcher_proxy, run, &mut std::io::stdout()).await
 }
 
 async fn run_component_cmd<W: std::io::Write>(
@@ -158,31 +175,29 @@ async fn run_component_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_sys::LauncherRequest;
+    use fidl_fuchsia_sys::{LauncherMarker, LauncherRequest};
+    use fuchsia_async as fasync;
+    use futures::TryStreamExt;
 
-    fn setup_fake_launcher_service() -> LauncherProxy {
-        setup_oneshot_fake_launcher_proxy(|req| {
+    fn setup_oneshot_fake_launcher_proxy() -> (fasync::Task<()>, LauncherProxy) {
+        let (proxy, mut stream) =
+            fidl::endpoints::create_proxy_and_stream::<LauncherMarker>().unwrap();
+        let server_task = fasync::Task::local(async move {
+            let req = stream.try_next().await;
             match req {
-                LauncherRequest::CreateComponent {
-                    launch_info:
-                        LaunchInfo {
-                            url: _,
-                            arguments: _,
-                            out: _,
-                            err: _,
-                            additional_services: _,
-                            directory_request: _,
-                            flat_namespace: _,
-                        },
+                Ok(Some(LauncherRequest::CreateComponent {
                     controller,
                     control_handle: _,
-                } => {
+                    ..
+                })) => {
                     let (_, handle) = controller.unwrap().into_stream_and_control_handle().unwrap();
                     handle.send_on_terminated(0, Exited).unwrap();
                     // TODO: Add test coverage for FE behavior once fxbug.dev/49063 is resolved.
                 }
+                _ => {}
             }
-        })
+        });
+        (server_task, proxy)
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -191,7 +206,7 @@ mod test {
         let args = vec!["test1".to_string(), "test2".to_string()];
         let background = true;
         let run_cmd = RunComponentCommand { url, args, background };
-        let launcher_proxy = setup_fake_launcher_service();
+        let (_server_task, launcher_proxy) = setup_oneshot_fake_launcher_proxy();
         let mut writer = Vec::new();
         let _response = run_component_cmd(launcher_proxy, run_cmd, &mut writer)
             .await

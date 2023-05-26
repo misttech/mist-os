@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("../../../build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_plugin.gni")
 
 if (is_host) {
   ffx_plugin("ffx_component_run") {
@@ -12,11 +12,14 @@ if (is_host) {
     deps = [
       "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+      "//src/developer/ffx/lib/fho:lib",
       "//src/developer/ffx/logger/frontend:lib",
       "//src/developer/ffx/plugins/component/common:ffx_component",
       "//src/developer/ffx/plugins/log:ffx_log",
       "//src/developer/ffx/plugins/log:ffx_log_args",
       "//src/sys/lib/component_debug",
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:async-trait",
     ]
 
     args_sources = [ "src/args.rs" ]

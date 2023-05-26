@@ -10,8 +10,10 @@ ffx_plugin("ffx_component_destroy") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/sys/lib/component_debug",
+    "//third_party/rust_crates:async-trait",
   ]
 
   args_sources = [ "src/args.rs" ]

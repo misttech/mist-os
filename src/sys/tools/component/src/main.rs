@@ -103,7 +103,9 @@ pub async fn exec() -> Result<()> {
             )
             .await
         }
-        ComponentSubcommand::Copy(args) => copy_cmd(&realm_query, args.paths, args.verbose).await,
+        ComponentSubcommand::Copy(args) => {
+            copy_cmd(&realm_query, args.paths, args.verbose, writer).await
+        }
         ComponentSubcommand::Storage(args) => match args.subcommand {
             StorageSubcommand::Copy(copy_args) => {
                 storage_copy_cmd(
