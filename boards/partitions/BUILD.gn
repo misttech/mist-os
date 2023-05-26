@@ -29,7 +29,7 @@ _gigaboot = {
   bootloader_partitions = [
     {
       image = "$root_build_dir/fuchsia.esp.blk"
-      type = "esp"
+      type = ""
       name = "fuchsia-esp"
     },
   ]

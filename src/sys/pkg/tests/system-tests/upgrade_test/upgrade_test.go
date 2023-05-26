@@ -271,7 +271,7 @@ func doTestOTAs(
 		for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
 			logger.Infof(ctx, "starting OTA from N-1 -> N test, attempt %d of %d", attempt, c.downgradeOTAAttempts)
 			otaTime := time.Now()
-			if lastError = systemOTA(ctx, device, rpcClient, repo, true); lastError == nil {
+			if lastError = systemOTA(ctx, device, rpcClient, repo, true, !c.buildExpectUnknownFirmware); lastError == nil {
 				logger.Infof(ctx, "OTA from N-1 -> N successful in %s", time.Now().Sub(otaTime))
 				break
 			}
@@ -323,7 +323,15 @@ func doTestOTAs(
 
 	logger.Infof(ctx, "starting OTA N' -> N test")
 	otaTime = time.Now()
-	if err := systemOTA(ctx, device, rpcClient, repo, false); err != nil {
+
+	if err := systemOTA(
+		ctx,
+		device,
+		rpcClient,
+		repo,
+		false,
+		true,
+	); err != nil {
 		return fmt.Errorf("OTA from N' -> N failed: %w", err)
 	}
 	logger.Infof(ctx, "OTA from N' -> N successful in %s", time.Now().Sub(otaTime))
@@ -437,6 +445,7 @@ func systemOTA(
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
 	checkABR bool,
+	checkForUnknownFirmware bool,
 ) error {
 	expectedSystemImageMerkle, err := repo.LookupUpdateSystemImageMerkle(ctx)
 	if err != nil {
@@ -451,6 +460,7 @@ func systemOTA(
 		expectedSystemImageMerkle,
 		"fuchsia-pkg://fuchsia.com/update/0",
 		checkABR,
+		checkForUnknownFirmware,
 	)
 }
 
@@ -540,6 +550,7 @@ func buildAndOtaToPackage(
 		systemImagePrimeMerkle,
 		"fuchsia-pkg://fuchsia.com/update_prime2/0",
 		checkABR,
+		true,
 	)
 }
 
@@ -551,6 +562,7 @@ func otaToPackage(
 	expectedSystemImageMerkle string,
 	updatePackageURL string,
 	checkABR bool,
+	checkForUnknownFirmware bool,
 ) error {
 	expectedConfig, err := check.DetermineTargetABRConfig(ctx, *rpcClient)
 	if err != nil {
@@ -565,7 +577,7 @@ func otaToPackage(
 		return fmt.Errorf("device already updated to the expected version %q", expectedSystemImageMerkle)
 	}
 
-	u, err := c.installerConfig.Updater(repo, updatePackageURL)
+	u, err := c.installerConfig.Updater(repo, updatePackageURL, checkForUnknownFirmware)
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
 	}
