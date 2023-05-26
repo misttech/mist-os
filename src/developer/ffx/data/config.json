@@ -5,7 +5,6 @@
     "log": {
         "dir": [
             "$FFX_LOG_DIR",
-            "$FUCHSIA_TEST_OUTDIR/ffx_logs",
             "$CACHE/logs"
         ],
         "enabled": [
