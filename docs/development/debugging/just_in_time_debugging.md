@@ -73,54 +73,65 @@ early drivers.
 ### zxdb
 
 The main user of JITD is zxdb, which is able to attach to a process waiting in the limbo. When
-starting zxdb, it will display the processes that are waiting in it:
+starting zxdb, it will automatically attach to processes waiting in limbo:
 
 ```
 $ ffx debug connect
 Connecting (use "disconnect" to cancel)...
 Connected successfully.
-
 👉 To get started, try "status" or "help".
+Processes attached from limbo:
+  48487: crasher
+Type "detach <pid>" to send back to Process Limbo if attached,
+type "detach <pid>" again to terminate the process if not attached, or
+type "process <process context #> kill" to terminate the process if attached.
+See "help jitd" for more information on Just-In-Time-Debugging.
+Process "crasher" (48487) crashed and has been automatically attached.
+Type "status" for more information.
+Attached Process 1 state=Running koid=48487 name=crasher component=sshd-host.cm
+Loading 9 modules for crasher Done.
+   23
+   24 int blind_write(volatile unsigned int* addr) {
+ ▶ 25   *addr = 0xBAD1DEA;
+   26   return 0;
+   27 }
+════════════════════════════════════════════════════════════════════════════
+ Data fault writing address 0x0 (translation fault level 2) (second chance)
+════════════════════════════════════════════════════════════════════════════
+ Process 1 (koid=48487) thread 1 (koid=48489)
+ Faulting instruction: 0x642ff060
 
-Processes waiting on exception:
-272401: crasher
-Type "attach <pid>" to reconnect.
-
-[zxdb] attach 272401
-Process 1 [Running] koid=272401 crashed
-Attached Process 1 [Running] koid=272401 crasher
-[Warning] Received thread exception for an unknown thread.
+🛑 blind_write(volatile unsigned int*) • crasher.c:25
 
 [zxdb] thread
-  # State                 Koid Name
-▶ 1 Blocked (Exception) 272403 initial-thread
+  # state                koid name
+▶ 1 Blocked (Exception) 58692 initial-thread
 
 [zxdb] frame
-▶ 0 blind_write(volatile unsigned int*) • crasher.c:22 (inline)
-  1 main(int, char**) • crasher.c:201
-  2 start_main(const start_params*) • __libc_start_main.c:93
-  3 __libc_start_main(zx_handle_t, int (*)(int, char**, char**)) • __libc_start_main.c:165
-  4 _start + 0x14
+▶ 0 blind_write(…) • crasher.c:25
+  1 main(…) • crasher.c:356
+  2…4 «libc startup» (-r expands)
 
 [zxdb] list
-   17   int (*func)(volatile unsigned int*);
-   18   const char* desc;
-   19 } command_t;
-   20
-   21 int blind_write(volatile unsigned int* addr) {
- ▶ 22   *addr = 0xBAD1DEA;
-   23   return 0;
-   24 }
-   25
-   26 int blind_read(volatile unsigned int* addr) { return (int)(*addr); }
-   27
-   28 int blind_execute(volatile unsigned int* addr) {
-   29   void (*func)(void) = (void*)addr;
-   30   func();
-   31   return 0;
+   20   int (*func)(volatile unsigned int*);
+   21   const char* desc;
+   22 } command_t;
+   23
+   24 int blind_write(volatile unsigned int* addr) {
+ ▶ 25   *addr = 0xBAD1DEA;
+   26   return 0;
+   27 }
+   28
+   29 int blind_read(volatile unsigned int* addr) { return (int)(*addr); }
+   30
+   31 int blind_execute(volatile unsigned int* addr) {
+   32   void (*func)(void) = (void*)addr;
+   33   func();
+   34   return 0;
+   35 }
 ```
 
-Within zxdb you can also do `help process-limbo` to get more information about how to use it.
+Within zxdb you can also do `help jitd` to get more information about how to use it.
 
 ### Process Limbo FIDL Service
 
