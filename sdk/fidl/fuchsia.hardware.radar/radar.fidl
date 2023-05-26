@@ -55,7 +55,7 @@ type StatusCode = strict enum {
     SENSOR_ERROR = 12;
 
     /// The radar driver or proxy was not in the correct state for this call.
-    @available(added=HEAD)
+    @available(added=12)
     BAD_STATE = 13;
 };
 

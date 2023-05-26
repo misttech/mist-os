@@ -335,6 +335,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.hardware.radar/StatusCode.BAD_STATE",
+        "value": "13"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.hardware.radar/StatusCode.BIND_ERROR",
         "value": "3"
     },
