@@ -23,7 +23,7 @@ fuchsia_product_configuration(
     name = "default",
     json_config = {
         "platform": {
-            "build_type": BUILD_TYPES.USER,
+            "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
         },
     },
