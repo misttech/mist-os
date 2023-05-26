@@ -1015,22 +1015,14 @@
                 // Breaks tests that run after it.
                 "MountTest.MaxMounts",
 
-                // Passes in debian image, remove.
-                "ExecveTest.SymlinkLoop",
-
-                // Passes in debian image, remove.
-                "ExecveTest.Directory",
-                "InterpreterScriptTest.Execute",
-
-                // Passes in debian image, remove.
-                "InterpreterScriptTest.InterpreterScriptNoExecute",
+                // Crashes during ELF parsing.
                 "InterpreterScriptTest.BinaryNoExecute",
+                "InterpreterScriptTest.Execute",
                 "InterpreterScriptTest.RelativePath",
                 "InterpreterScriptTest.Symlink",
+                "InterpreterScriptTest.UncleanPath",
 
                 // Passes in debian image, remove.
-                "InterpreterScriptTest.SymlinkLoop",
-                "InterpreterScriptTest.UncleanPath",
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
 
                 // Passes in debian image, remove.
