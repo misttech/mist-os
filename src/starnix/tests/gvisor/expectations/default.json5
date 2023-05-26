@@ -1022,11 +1022,10 @@
                 "InterpreterScriptTest.Symlink",
                 "InterpreterScriptTest.UncleanPath",
 
-                // Passes in debian image, remove.
+                // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
 
                 // Passes in debian image, remove.
-                "MMapTest.MapDevZeroSegfaultAfterUnmap",
                 "PingSocket.ICMPPortExhaustion",
                 "Pipes/PipeTest.ZeroSize/*",
                 "PollTest.BlockingEventPOLLRDNORM",
