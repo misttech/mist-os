@@ -1,0 +1,8 @@
+{
+  "pkg/fidl_driver_natural/include/lib/fidl_driver/cpp/internal/endpoint_conversions.h": "081a344562326e268cecf514f707d54f",
+  "pkg/fidl_driver_natural/include/lib/fidl_driver/cpp/internal/natural_client_details.h": "42df7763b2d296990fc1f5eddd06a462",
+  "pkg/fidl_driver_natural/include/lib/fidl_driver/cpp/natural_client.h": "2164c047b98feb599aea3644f910e2aa",
+  "pkg/fidl_driver_natural/include/lib/fidl_driver/cpp/natural_messaging.h": "999631bf78bac0241a45ba0c7188a6c3",
+  "pkg/fidl_driver_natural/include/lib/fidl_driver/cpp/natural_types.h": "cae0a38844add89d42a127207809ee8d",
+  "pkg/fidl_driver_natural/include/lib/fidl_driver/cpp/unified_messaging_declarations.h": "54d9cfb48a9628b511ae61c1107132d6"
+}

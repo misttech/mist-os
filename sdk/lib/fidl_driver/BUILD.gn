@@ -9,7 +9,7 @@ config("include") {
 }
 
 sdk_source_set("fidl_driver_transport") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "fidl_driver_transport"
   public = [ "include/lib/fidl_driver/cpp/transport.h" ]
   sources = [ "transport.cc" ]
@@ -22,7 +22,7 @@ sdk_source_set("fidl_driver_transport") {
 }
 
 sdk_source_set("fidl_driver") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "fidl_driver"
   public = [
     "include/lib/fidl_driver/cpp/internal/server_details.h",
@@ -46,7 +46,7 @@ sdk_source_set("fidl_driver") {
 }
 
 sdk_source_set("fidl_driver_natural") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "fidl_driver_natural"
   public = [
     "include/lib/fidl_driver/cpp/internal/endpoint_conversions.h",
