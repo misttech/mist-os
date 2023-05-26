@@ -88,7 +88,7 @@ impl FileOps for SignalFd {
                 }
                 buf.extend_from_slice(siginfo.as_bytes());
             }
-            data.write_all(&buf).map(BlockableOpsResult::Done)
+            data.write_all(&buf)
         })
     }
 

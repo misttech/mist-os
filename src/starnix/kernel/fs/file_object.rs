@@ -37,26 +37,6 @@ impl SeekOrigin {
     }
 }
 
-pub enum BlockableOpsResult<T> {
-    Done(T),
-    Partial(T),
-}
-
-impl<T> BlockableOpsResult<T> {
-    pub fn value(self) -> T {
-        match self {
-            Self::Done(v) | Self::Partial(v) => v,
-        }
-    }
-
-    pub fn is_partial(&self) -> bool {
-        match self {
-            Self::Done(_) => false,
-            Self::Partial(_) => true,
-        }
-    }
-}
-
 /// This function adds `POLLRDNORM` and `POLLWRNORM` to the FdEvents
 /// return from the FileOps because these FdEvents are equivalent to
 /// `POLLIN` and `POLLOUT`, respectively, in the Linux UAPI.
@@ -683,44 +663,25 @@ impl FileObject {
         mut op: Op,
     ) -> Result<T, Errno>
     where
-        Op: FnMut() -> Result<BlockableOpsResult<T>, Errno>,
+        Op: FnMut() -> Result<T, Errno>,
     {
-        let is_partial = |result: &Result<BlockableOpsResult<T>, Errno>| match result {
-            Err(e) if e.code == EAGAIN => true,
-            Ok(v) => v.is_partial(),
-            _ => false,
-        };
-
         // Run the operation a first time without registering a waiter in case no wait is needed.
-        {
-            // result must be destroyed before entering the wait loop, in case it owns some
-            // resources
-            let result = op();
-            if self.is_non_blocking() || !is_partial(&result) {
-                return result.map(BlockableOpsResult::value);
-            }
+        match op() {
+            Err(errno) if errno == EAGAIN && !self.flags().contains(OpenFlags::NONBLOCK) => {}
+            result => return result,
         }
 
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
             self.wait_async(current_task, &waiter, events, WaitCallback::none());
-            {
-                // result must be destroyed before waiting, in case it owns some resources
-                let result = op();
-                if !is_partial(&result) {
-                    return result.map(BlockableOpsResult::value);
-                }
+            match op() {
+                Err(e) if e == EAGAIN => {}
+                result => return result,
             }
-            waiter.wait_until(current_task, deadline.unwrap_or(zx::Time::INFINITE)).map_err(
-                |e| {
-                    if e == ETIMEDOUT {
-                        errno!(EAGAIN)
-                    } else {
-                        e
-                    }
-                },
-            )?;
+            waiter
+                .wait_until(current_task, deadline.unwrap_or(zx::Time::INFINITE))
+                .map_err(|e| if e == ETIMEDOUT { errno!(EAGAIN) } else { e })?;
         }
     }
 
