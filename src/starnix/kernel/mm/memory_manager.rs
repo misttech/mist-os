@@ -734,6 +734,7 @@ impl MemoryManagerState {
                 }
                 MADV_DONTNEED => zx::VmoOp::ZERO,
                 MADV_WILLNEED => zx::VmoOp::COMMIT,
+                MADV_NOHUGEPAGE => return Ok(()),
                 advice => {
                     not_implemented!("madvise advice {} not implemented", advice);
                     return error!(EINVAL);
