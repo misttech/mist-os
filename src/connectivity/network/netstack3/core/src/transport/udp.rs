@@ -4,13 +4,12 @@
 
 //! The User Datagram Protocol (UDP).
 
-use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
+use alloc::collections::hash_map::DefaultHasher;
 use core::{
     convert::Infallible as Never,
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    mem,
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
@@ -20,7 +19,7 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv6},
-    MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use nonzero_ext::nonzero;
 use packet::{BufferMut, Nested, ParsablePacket, ParseBuffer, Serializer};
@@ -51,19 +50,16 @@ use crate::{
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         datagram::{
-            self, ConnState, ConnectListenerError, DatagramBoundId, DatagramFlowId,
+            self, AddrEntry, ConnState, ConnectListenerError, DatagramBoundId, DatagramFlowId,
             DatagramSocketId, DatagramSocketSpec, DatagramSocketStateSpec, DatagramSockets,
-            DatagramStateContext, DatagramStateNonSyncContext, InUseError, ListenerState,
-            LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
+            DatagramStateContext, DatagramStateNonSyncContext, FoundSockets, InUseError,
+            ListenerState, LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
             SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
             SockCreationError, SocketHopLimits, UnboundSocketState,
         },
-        posix::{
-            PosixAddrState, PosixAddrVecIter, PosixAddrVecTag, PosixSharingOptions,
-            ToPosixSharingOptions,
-        },
+        posix::{PosixAddrState, PosixAddrVecTag, PosixSharingOptions, ToPosixSharingOptions},
         AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, InsertError, Listener,
-        SocketAddrType, SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketAddrType, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -139,11 +135,12 @@ impl<I: IpExt, D: WeakId> Default for UdpState<I, D> {
 struct Udp<I, D>(PhantomData<(I, D)>, Never);
 
 /// Produces an iterator over eligible receiving socket addresses.
+#[cfg(test)]
 fn iter_receiving_addrs<I: Ip + IpExt, D: WeakId>(
     addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     device: D,
 ) -> impl Iterator<Item = AddrVec<IpPortSpec<I, D>>> {
-    PosixAddrVecIter::with_device(addr, device)
+    crate::socket::posix::PosixAddrVecIter::with_device(addr, device)
 }
 
 fn check_posix_sharing<I: IpExt, D: WeakId>(
@@ -429,18 +426,7 @@ impl<T> PosixAddrState<T> {
     }
 }
 
-enum AddrEntry<'a, A: SocketMapAddrSpec> {
-    Listen(
-        &'a PosixAddrState<ListenerId<<A::IpAddr as IpAddress>::Version>>,
-        ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
-    ),
-    Conn(
-        &'a PosixAddrState<ConnId<<A::IpAddr as IpAddress>::Version>>,
-        ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
-    ),
-}
-
-impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, IpPortSpec<I, D>> {
+impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, IpPortSpec<I, D>, Udp<I, D>> {
     /// Returns an iterator that yields a `LookupResult` for each contained ID.
     fn collect_all_ids(self) -> impl Iterator<Item = LookupResult<I, D>> + 'a {
         match self {
@@ -465,7 +451,7 @@ impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, IpPortSpec<I, D>> {
     }
 }
 
-impl<I: Ip + IpExt, D: WeakId> UdpBoundSocketMap<I, D> {
+impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
     /// Finds the socket(s) that should receive an incoming packet.
     ///
     /// Uses the provided addresses and receiving device to look up sockets that
@@ -473,39 +459,30 @@ impl<I: Ip + IpExt, D: WeakId> UdpBoundSocketMap<I, D> {
     /// yield 0, 1, or multiple sockets.
     fn lookup(
         &self,
-        dst_ip: SpecifiedAddr<I::Addr>,
-        src_ip: SpecifiedAddr<I::Addr>,
-        dst_port: NonZeroU16,
-        src_port: NonZeroU16,
+        (src_ip, src_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
+        (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
         device: D,
     ) -> impl Iterator<Item = LookupResult<I, D>> + '_ {
-        let mut matching_entries = iter_receiving_addrs(
-            ConnIpAddr { local: (dst_ip, dst_port), remote: (src_ip, src_port) },
-            device,
-        )
-        .filter_map(move |addr: AddrVec<IpPortSpec<I, D>>| match addr {
-            AddrVec::Listen(l) => {
-                self.listeners().get_by_addr(&l).map(|state| AddrEntry::Listen(state, l))
+        let matching_entries = self.iter_receivers((src_ip, src_port), (dst_ip, dst_port), device);
+
+        match matching_entries {
+            None => Either::Left(None),
+            Some(FoundSockets::Single(entry)) => {
+                let selector = SocketSelectorParams {
+                    src_ip,
+                    dst_ip,
+                    src_port: src_port.get(),
+                    dst_port: dst_port.get(),
+                    _ip: IpVersionMarker::default(),
+                };
+                Either::Left(Some(entry.select_receiver(selector)))
             }
-            AddrVec::Conn(c) => self.conns().get_by_addr(&c).map(|state| AddrEntry::Conn(state, c)),
-        });
 
-        if dst_ip.is_multicast() {
-            let all_ids = matching_entries.flat_map(AddrEntry::collect_all_ids);
-            Either::Left(all_ids)
-        } else {
-            let selector = SocketSelectorParams::<I, _> {
-                src_ip,
-                dst_ip,
-                src_port: src_port.get(),
-                dst_port: dst_port.get(),
-                _ip: IpVersionMarker::default(),
-            };
-
-            let single_id: Option<_> =
-                matching_entries.next().map(move |entry| entry.select_receiver(selector));
-            Either::Right(single_id.into_iter())
+            Some(FoundSockets::Multicast(entries)) => {
+                Either::Right(entries.into_iter().flat_map(AddrEntry::collect_all_ids))
+            }
         }
+        .into_iter()
     }
 }
 
@@ -971,9 +948,10 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
             sync_ctx.with_sockets(|sync_ctx, state| {
-                let Sockets {sockets: DatagramSockets{bound, unbound: _, bound_state: _ }, lazy_port_alloc: _} = state;
-                let receiver = bound
-                    .lookup(src_ip, dst_ip, src_port, dst_port, sync_ctx.downgrade_device_id(device))
+                let Sockets {sockets, lazy_port_alloc: _} = state;
+
+                let receiver = sockets
+                    .lookup((dst_ip, dst_port), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
                     .next();
 
             if let Some(id) = receiver {
@@ -1022,32 +1000,27 @@ impl<
                 // TODO(joshlf): Do something with ICMP here?
                 return Ok(());
             };
-            let Sockets {
-                sockets: DatagramSockets { bound, unbound: _, bound_state: _ },
-                lazy_port_alloc: _,
-            } = state;
+            let Sockets { sockets, lazy_port_alloc: _ } = state;
 
             let device_weak = sync_ctx.downgrade_device_id(device);
 
-            let recipients: Vec<LookupResult<_, _>> = SpecifiedAddr::new(src_ip)
+            let mut recipients = SpecifiedAddr::new(src_ip)
                 .and_then(|src_ip| {
                     packet.src_port().map(|src_port| {
-                        bound.lookup(
-                            dst_ip,
-                            src_ip,
-                            packet.dst_port(),
-                            src_port,
+                        sockets.lookup(
+                            (src_ip, src_port),
+                            (dst_ip, packet.dst_port()),
                             device_weak.clone(),
                         )
                     })
                 })
                 .into_iter()
                 .flatten()
-                .collect();
+                .peekable();
 
-            if !recipients.is_empty() {
+            if recipients.peek().is_some() {
                 let src_port = packet.src_port();
-                mem::drop(packet);
+                drop(packet);
                 for lookup_result in recipients {
                     match lookup_result {
                         LookupResult::Conn(
@@ -1070,7 +1043,7 @@ impl<
                     ParsablePacket::<_, packet_formats::udp::UdpParseArgs<I::Addr>>::parse_metadata(
                         &packet,
                     );
-                core::mem::drop(packet);
+                drop(packet);
                 buffer.undo_parse(meta);
                 Err((buffer, TransportReceiveError::new_port_unreachable()))
             } else {

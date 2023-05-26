@@ -39,7 +39,7 @@ use crate::{
     },
     socket::{
         self,
-        address::{ConnAddr, ConnIpAddr, ListenerIpAddr},
+        address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerIpAddr},
         AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, ExistsError,
         InsertError, Listener, ListenerAddr, SocketId, SocketMapAddrSpec, SocketMapAddrStateSpec,
         SocketMapConflictPolicy, SocketMapStateSpec, SocketState,
@@ -57,6 +57,92 @@ where
     pub(crate) unbound:
         IdMap<UnboundSocketState<A::IpAddr, A::WeakDeviceId, S::UnboundSharingState>>,
     pub(crate) bound_state: IdMapCollection<SocketId<S>, SocketState<A, S>>,
+}
+
+impl<A: SocketMapAddrSpec, S: DatagramSocketStateSpec> DatagramSockets<A, S>
+where
+    Bound<S>: Tagged<AddrVec<A>>,
+    S: SocketMapConflictPolicy<
+            ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
+            <S as SocketMapStateSpec>::ListenerSharingState,
+            A,
+        > + SocketMapConflictPolicy<
+            ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+            <S as SocketMapStateSpec>::ConnSharingState,
+            A,
+        >,
+{
+    pub(crate) fn iter_receivers(
+        &self,
+        (src_ip, src_port): (SpecifiedAddr<A::IpAddr>, A::RemoteIdentifier),
+        (dst_ip, dst_port): (SpecifiedAddr<A::IpAddr>, A::LocalIdentifier),
+        device: A::WeakDeviceId,
+    ) -> Option<FoundSockets<AddrEntry<'_, A, S>, impl Iterator<Item = AddrEntry<'_, A, S>> + '_>>
+    {
+        let Self { bound, unbound: _, bound_state: _ } = self;
+        bound.lookup((src_ip, src_port), (dst_ip, dst_port), device)
+    }
+}
+
+pub(crate) enum FoundSockets<A, It> {
+    /// A single recipient was found for the address.
+    Single(A),
+    /// Indicates the looked-up address was multicast, and holds an iterator of
+    /// the found receivers.
+    Multicast(It),
+}
+
+impl<A: SocketMapAddrSpec, S: DatagramSocketStateSpec> BoundSocketMap<A, S>
+where
+    Bound<S>: Tagged<AddrVec<A>>,
+    S: SocketMapConflictPolicy<
+            ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
+            <S as SocketMapStateSpec>::ListenerSharingState,
+            A,
+        > + SocketMapConflictPolicy<
+            ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+            <S as SocketMapStateSpec>::ConnSharingState,
+            A,
+        >,
+{
+    /// Finds the socket(s) that should receive an incoming packet.
+    ///
+    /// Uses the provided addresses and receiving device to look up sockets that
+    /// should receive a matching incoming packet. Returns `None` if no sockets
+    /// were found, or the results of the lookup.
+    fn lookup(
+        &self,
+        (src_ip, src_port): (SpecifiedAddr<A::IpAddr>, A::RemoteIdentifier),
+        (dst_ip, dst_port): (SpecifiedAddr<A::IpAddr>, A::LocalIdentifier),
+        device: A::WeakDeviceId,
+    ) -> Option<FoundSockets<AddrEntry<'_, A, S>, impl Iterator<Item = AddrEntry<'_, A, S>> + '_>>
+    {
+        let mut matching_entries = AddrVecIter::with_device(
+            ConnIpAddr { local: (dst_ip, dst_port), remote: (src_ip, src_port) }.into(),
+            device,
+        )
+        .filter_map(move |addr: AddrVec<A>| match addr {
+            AddrVec::Listen(l) => {
+                self.listeners().get_by_addr(&l).map(|state| AddrEntry::Listen(state, l))
+            }
+            AddrVec::Conn(c) => self.conns().get_by_addr(&c).map(|state| AddrEntry::Conn(state, c)),
+        });
+
+        if dst_ip.is_multicast() {
+            Some(FoundSockets::Multicast(matching_entries))
+        } else {
+            let single_entry: Option<_> = matching_entries.next();
+            single_entry.map(FoundSockets::Single)
+        }
+    }
+}
+
+pub(crate) enum AddrEntry<'a, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> {
+    Listen(&'a S::ListenerAddrState, ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>),
+    Conn(
+        &'a S::ConnAddrState,
+        ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+    ),
 }
 
 #[derive(Debug, Derivative)]

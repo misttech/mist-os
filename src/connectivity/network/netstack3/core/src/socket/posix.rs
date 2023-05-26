@@ -64,6 +64,7 @@ impl<A: SocketMapAddrSpec> Iterator for PosixAddrVecIter<A> {
 }
 
 impl<A: SocketMapAddrSpec> PosixAddrVecIter<A> {
+    #[cfg(test)]
     pub(crate) fn with_device(addr: impl Into<IpAddrVec<A>>, device: A::WeakDeviceId) -> Self {
         Self(AddrVecIter::with_device(addr.into(), device))
     }
