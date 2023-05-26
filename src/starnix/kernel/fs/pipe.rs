@@ -501,7 +501,7 @@ impl PipeFileObject {
             if condition(&pipe) {
                 Ok(BlockableOpsResult::Done((other, pipe)))
             } else {
-                Ok(BlockableOpsResult::Partial((other, pipe)))
+                error!(EAGAIN)
             }
         })
     }
