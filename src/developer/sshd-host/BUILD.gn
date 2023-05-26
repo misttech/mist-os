@@ -81,6 +81,7 @@ if (authorized_ssh_keys != []) {
   config_data("authorized_ssh_keys_config_data") {
     for_pkg = "sshd-host"
     sources = authorized_ssh_keys
+    outputs = [ "authorized_keys" ]  # /config/data/authorized_keys
     deps = [ "//build/validate:non_production_tag" ]
   }
 }
