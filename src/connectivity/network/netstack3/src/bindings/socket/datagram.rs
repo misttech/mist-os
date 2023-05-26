@@ -266,7 +266,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: Self::ListenerId,
         remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, (Self::ConnectListenerError, Self::ListenerId)>;
+    ) -> Result<Self::ConnId, Self::ConnectListenerError>;
 
     fn disconnect_connected<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -280,7 +280,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: Self::ConnId,
         remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, (Self::ReconnectConnError, Self::ConnId)>;
+    ) -> Result<(), Self::ReconnectConnError>;
 
     fn shutdown<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -492,7 +492,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         id: Self::ListenerId,
         remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, (Self::ConnectListenerError, Self::ListenerId)> {
+    ) -> Result<Self::ConnId, Self::ConnectListenerError> {
         udp::connect_udp_listener(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
@@ -510,7 +510,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         id: Self::ConnId,
         remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, (Self::ReconnectConnError, Self::ConnId)> {
+    ) -> Result<(), Self::ReconnectConnError> {
         udp::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
@@ -1027,7 +1027,7 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _id: Self::ListenerId,
         _remote_ip: ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>,
         _remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, (Self::ConnectListenerError, Self::ListenerId)> {
+    ) -> Result<Self::ConnId, Self::ConnectListenerError> {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
@@ -1054,7 +1054,7 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _id: Self::ConnId,
         _remote_ip: ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>,
         _remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, (Self::ConnectListenerError, Self::ConnId)> {
+    ) -> Result<(), Self::ConnectListenerError> {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
@@ -2026,15 +2026,6 @@ where
                 (conn_id, self.data.messages.clone())
             }
             SocketState::BoundListen { listener_id } => {
-                // Whether connect_listener succeeds or fails, it will consume
-                // the existing listener.
-                // TODO(https://fxbug.dev/103049): Make T::connect_listener not
-                // remove the existing listener on failure.
-                let messages = assert_matches!(
-                    I::with_collection_mut(non_sync_ctx, |c| c.listeners.remove(&listener_id)),
-                    Some(t) => t
-                );
-
                 match T::connect_listener(
                     sync_ctx,
                     non_sync_ctx,
@@ -2042,43 +2033,27 @@ where
                     remote_addr,
                     remote_port,
                 ) {
-                    Ok(conn_id) => (conn_id, messages),
-                    Err((e, listener_id)) => {
-                        // Replace the consumed listener with the new one.
+                    Ok(conn_id) => (
+                        conn_id,
                         assert_matches!(
-                            I::with_collection_mut(non_sync_ctx, |c| c
-                                .listeners
-                                .insert(&listener_id, messages)),
-                            None
-                        );
-                        self.data.info.state = SocketState::BoundListen { listener_id };
+                            I::with_collection_mut(non_sync_ctx, |c| c.listeners.remove(&listener_id)),
+                            Some(t) => t
+                        ),
+                    ),
+                    Err(e) => {
                         return Err(e.into_errno());
                     }
                 }
             }
-            SocketState::BoundConnect { conn_id, shutdown_read } => {
-                // if we're bound to a connect mode, we need to remove the
-                // connection, and retrieve the bound local addr and port.
-
-                // Whether reconnect_conn succeeds or fails, it will consume
-                // the existing socket.
-                let messages = assert_matches!(
-                    I::with_collection_mut(non_sync_ctx, |c| c.conns.remove(&conn_id)),
-                    Some(t) => t);
-
-                match T::reconnect_conn(sync_ctx, non_sync_ctx, conn_id, remote_addr, remote_port) {
-                    Ok(conn_id) => (conn_id, messages),
-                    Err((e, conn_id)) => {
-                        assert_matches!(
-                            I::with_collection_mut(non_sync_ctx, |c| c
-                                .conns
-                                .insert(&conn_id, messages)),
-                            None
-                        );
-                        self.data.info.state = SocketState::BoundConnect { conn_id, shutdown_read };
-                        return Err(e.into_errno());
-                    }
-                }
+            SocketState::BoundConnect { conn_id, shutdown_read: _ } => {
+                return T::reconnect_conn(
+                    sync_ctx,
+                    non_sync_ctx,
+                    conn_id,
+                    remote_addr,
+                    remote_port,
+                )
+                .map_err(IntoErrno::into_errno);
             }
         };
 

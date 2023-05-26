@@ -1171,7 +1171,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         id: ListenerId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
-    ) -> Result<ConnId<I>, (ConnectListenerError, ListenerId<I>)>;
+    ) -> Result<ConnId<I>, ConnectListenerError>;
 
     fn disconnect_udp_connected(&mut self, ctx: &mut C, id: ConnId<I>) -> ListenerId<I>;
 
@@ -1183,7 +1183,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         id: ConnId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
-    ) -> Result<ConnId<I>, (ConnectListenerError, ConnId<I>)>;
+    ) -> Result<(), ConnectListenerError>;
 
     fn remove_udp_conn(
         &mut self,
@@ -1387,7 +1387,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         id: ListenerId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
-    ) -> Result<ConnId<I>, (ConnectListenerError, ListenerId<I>)> {
+    ) -> Result<ConnId<I>, ConnectListenerError> {
         crate::socket::datagram::connect_listener(
             self,
             ctx,
@@ -1412,7 +1412,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         id: ConnId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
-    ) -> Result<ConnId<I>, (ConnectListenerError, ConnId<I>)> {
+    ) -> Result<(), ConnectListenerError> {
         crate::socket::datagram::reconnect(self, ctx, id, remote_ip, remote_port)
     }
 
@@ -2163,7 +2163,7 @@ pub fn connect_udp_listener<I: IpExt, C: crate::NonSyncContext>(
     id: ListenerId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
-) -> Result<ConnId<I>, (ConnectListenerError, ListenerId<I>)> {
+) -> Result<ConnId<I>, ConnectListenerError> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
@@ -2175,7 +2175,7 @@ pub fn connect_udp_listener<I: IpExt, C: crate::NonSyncContext>(
                 remote_ip,
                 remote_port,
             )
-            .map_err(|(a, b)| (IpInvariant(a), b))
+            .map_err(IpInvariant)
         },
         |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
             SocketHandler::<Ipv6, _>::connect_udp_listener(
@@ -2185,10 +2185,10 @@ pub fn connect_udp_listener<I: IpExt, C: crate::NonSyncContext>(
                 remote_ip,
                 remote_port,
             )
-            .map_err(|(a, b)| (IpInvariant(a), b))
+            .map_err(IpInvariant)
         },
     )
-    .map_err(|(IpInvariant(a), b)| (a, b))
+    .map_err(|IpInvariant(e)| e)
 }
 
 /// Disconnects a connected UDP socket.
@@ -2228,20 +2228,20 @@ pub fn reconnect_udp<I: IpExt, C: crate::NonSyncContext>(
     id: ConnId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
-) -> Result<ConnId<I>, (ConnectListenerError, ConnId<I>)> {
+) -> Result<(), ConnectListenerError> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
             SocketHandler::<Ipv4, _>::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
-                .map_err(|(a, b)| (IpInvariant(a), b))
+                .map_err(IpInvariant)
         },
         |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
             SocketHandler::<Ipv6, _>::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
-                .map_err(|(a, b)| (IpInvariant(a), b))
+                .map_err(IpInvariant)
         },
     )
-    .map_err(|(IpInvariant(a), b)| (a, b))
+    .map_err(IpInvariant::into_inner)
 }
 /// Shuts down a socket for reading and/or writing.
 ///
@@ -3236,7 +3236,7 @@ mod tests {
         )
         .expect("Initial call to listen_udp was expected to succeed");
 
-        let listener = assert_matches!(
+        assert_matches!(
             SocketHandler::connect_udp_listener(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
@@ -3244,17 +3244,12 @@ mod tests {
                 ZonedAddr::Unzoned(remote_ip),
                 nonzero!(1234u16)
             ),
-            Err((
-                ConnectListenerError::Ip(
-                IpSockCreationError::Route(ResolveRouteError::Unreachable)
-                ),
-                listener
-            )) => listener
+            Err(ConnectListenerError::Ip(IpSockCreationError::Route(
+                ResolveRouteError::Unreachable
+            )))
         );
 
-        // The listener that was returned is not necessarily the same one that
-        // was passed in to `connect_udp_listener`. Check that socket options
-        // that were set on it before attempting to connect were preserved.
+        // Check that the listener was unchanged by the failed connection.
         assert!(SocketHandler::get_udp_posix_reuse_port(
             &mut sync_ctx,
             &non_sync_ctx,
@@ -3316,7 +3311,7 @@ mod tests {
         )
         .expect("connect was expected to succeed");
         let other_remote_port = NonZeroU16::new(300).unwrap();
-        let socket = SocketHandler::reconnect_udp(
+        SocketHandler::reconnect_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
@@ -3363,7 +3358,7 @@ mod tests {
         )
         .expect("connect was expected to succeed");
         let other_remote_port = NonZeroU16::new(300).unwrap();
-        let (error, socket) = SocketHandler::reconnect_udp(
+        let error = SocketHandler::reconnect_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
@@ -5692,8 +5687,7 @@ where {
         )
         .map(|id: ConnId<_>| {
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, id.into()).unwrap()
-        })
-        .map_err(|(e, _id): (_, ListenerId<_>)| e);
+        });
         assert_eq!(result, expected);
     }
 
