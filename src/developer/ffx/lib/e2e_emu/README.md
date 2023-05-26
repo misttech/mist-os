@@ -19,12 +19,6 @@ for examples.
 
 [existing users]: https://cs.opensource.google/search?q=%2F%2Fsrc%2Fdeveloper%2Fffx%2Flib%2Fe2e_emu&ss=fuchsia
 
-## Packages
-
-The emulator instance has access to any packages in the base or cache sets.
-Infra ~always puts packages in the base or cache sets today, and you can do so
-locally using `fx set ... --with-base/--with-cache //path/to:package`.
-
 ## Isolated emulator tests are slow
 
 You should be sparing in the number of tests you write using this library for

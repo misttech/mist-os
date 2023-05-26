@@ -2,65 +2,144 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/sys/pkg/repositories/devhost/devhost.gni")
 
-assert(is_host)
+if (is_host) {
+  group("lib") {
+    testonly = true
+    deps = [ ":ffx_e2e_emu" ]
+  }
 
-group("lib") {
-  testonly = true
-  deps = [ ":ffx_e2e_emu" ]
+  group("host_tests") {
+    testonly = true
+    deps = [ ":ffx_e2e_emu_test" ]
+  }
+
+  rustc_library("ffx_e2e_emu") {
+    testonly = true
+    edition = "2021"
+    with_unit_tests = true
+    sources = [ "src/lib.rs" ]
+    deps = [
+      "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/lib/isolate:lib",
+      "//src/lib/diagnostics/data/rust",
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:serde",
+      "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tempfile",
+      "//third_party/rust_crates:tracing",
+    ]
+    test_deps = [ "//src/lib/fuchsia" ]
+    data_deps = [
+      ":isolated_emulator_data",
+
+      # Put this in the main data_deps since rustc_library doesn't have test_data_deps
+      ":test_package_repo_data",
+      "//src/developer/ffx:suite_test_data",
+    ]
+    configs += [
+      ":isolated_emulator_path_config",
+
+      # Put this in the main config since rustc_library doesn't have test_data_deps
+      ":test_data_path_config",
+    ]
+  }
+
+  # Exported SDK with ffx binary.
+  _sdk_label = "//sdk:core($default_toolchain)"
+  _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
+  _sdk_path = _sdk_outdir + "/sdk/exported/core"
+
+  # Product bundle containing emulator image.
+  _pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
+  _pb_outdir = get_label_info(_pb_label, "target_out_dir")
+  _product_bundle = "$_pb_outdir/product_bundle"
+
+  # Package repository inputs from the main build, so that `fx set ... --with //foo` will work.
+  _amber_files_label =
+      "//build/images/updates:prepare_publish($default_toolchain)"
+  _amber_files_path = "$root_build_dir/amber-files"
+
+  host_test_data("isolated_emulator_data") {
+    sources = [
+      _amber_files_path,
+      _product_bundle,
+      _sdk_path,
+    ]
+    deps = [
+      _amber_files_label,
+      _pb_label,
+      _sdk_label,
+    ]
+  }
+
+  config("isolated_emulator_path_config") {
+    rustenv = [
+      "PACKAGE_REPOSITORY_PATH=" +
+          rebase_path(_amber_files_path, root_build_dir),
+      "PRODUCT_BUNDLE_PATH=" + rebase_path(_product_bundle, root_build_dir),
+      "SDK_ROOT_DIR=" + rebase_path(_sdk_path, root_build_dir),
+    ]
+  }
 }
 
-group("host_tests") {
-  testonly = true
-  deps = [ ":ffx_e2e_emu_test" ]
+# For this library's own tests we need to make something available in the universe package
+# set without relying on the overall build system to do so via dependencies. Most test packages
+# are put in the base package set on infra builders so if we want continuous validation of
+# universe package resolution (which is how most developers work locally) then we need to make
+# our own isolated package repository for a package that's not in the base/cache set of the
+# overall build graph.
+_package_for_test_name = "ffx_e2e_emu_resolve_from_universe_for_own_tests"
+
+if (is_host) {
+  _package_for_test_label = ":${_package_for_test_name}($default_toolchain)"
+  _package_for_test_outdir =
+      get_label_info(_package_for_test_label, "target_out_dir")
+  _package_for_test_manifest_path = "${_package_for_test_outdir}/${_package_for_test_name}/package_manifest.json"
+
+  _package_manifests_list = "$target_out_dir/package_manifests.list"
+  generated_file("package_manifests.list") {
+    testonly = true
+    outputs = [ _package_manifests_list ]
+    contents = rebase_path(_package_for_test_manifest_path, root_build_dir)
+
+    # Prevent packages in this list from making it into the overall system image via our deps.
+    metadata = {
+      package_barrier = []
+    }
+    deps = [ _package_for_test_label ]
+  }
+
+  _test_amber_files_path = "$target_out_dir/amber-files"
+  devhost_repository_publish("test_repo_publish") {
+    testonly = true
+
+    output_repository_dir = _test_amber_files_path
+
+    deps = [ ":package_manifests.list" ]
+    package_list_manifests = [ _package_manifests_list ]
+  }
+
+  host_test_data("test_package_repo_data") {
+    sources = [ _test_amber_files_path ]
+    deps = [ ":test_repo_publish" ]
+  }
+
+  config("test_data_path_config") {
+    rustenv = [
+      "TEST_PACKAGE_NAME=${_package_for_test_name}",
+      "TEST_PACKAGE_REPOSITORY_PATH=" +
+          rebase_path(_test_amber_files_path, root_build_dir),
+    ]
+  }
 }
 
-rustc_library("ffx_e2e_emu") {
-  testonly = true
-  edition = "2021"
-  with_unit_tests = true
-  sources = [ "src/lib.rs" ]
-  deps = [
-    "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/lib/isolate:lib",
-    "//src/lib/diagnostics/data/rust",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:tracing",
-  ]
-  test_deps = [ "//src/lib/fuchsia" ]
-  data_deps = [
-    ":test_data",
-    "//src/developer/ffx:suite_test_data",
-  ]
-  configs += [ ":test_data_path_config" ]
-}
-
-# Exported SDK with ffx binary.
-_sdk_label = "//sdk:core($default_toolchain)"
-_sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
-_sdk_path = _sdk_outdir + "/sdk/exported/core"
-
-# Product bundle containing emulator image.
-_pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
-_pb_outdir = get_label_info(_pb_label, "target_out_dir")
-_product_bundle = "$_pb_outdir/product_bundle"
-
-host_test_data("test_data") {
-  sources = [
-    _product_bundle,
-    _sdk_path,
-  ]
-  deps = [
-    _pb_label,
-    _sdk_label,
-  ]
-}
-
-config("test_data_path_config") {
-  rustenv =
-      [ "PRODUCT_BUNDLE_PATH=" + rebase_path(_product_bundle, root_build_dir) ]
+if (is_fuchsia) {
+  fuchsia_package(_package_for_test_name) {
+    testonly = true
+    visibility = [ ":*" ]
+  }
 }

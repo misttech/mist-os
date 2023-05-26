@@ -10,6 +10,7 @@ use serde::Deserialize;
 use tempfile::TempDir;
 use tracing::info;
 
+const AMBER_FILES_PATH: &str = env!("PACKAGE_REPOSITORY_PATH");
 const PRODUCT_BUNDLE_PATH: &str = env!("PRODUCT_BUNDLE_PATH");
 
 /// An isolated environment for testing ffx against a running emulator.
@@ -25,8 +26,16 @@ pub struct IsolatedEmulator {
 
 impl IsolatedEmulator {
     /// Create an isolated ffx environment and start an emulator in it using the default product
-    /// bundle and package repository from the Fuchsia build directory.
+    /// bundle and package repository from the Fuchsia build directory. Streams logs in the
+    /// background and allows resolving packages from universe.
     pub async fn start(name: &str) -> anyhow::Result<Self> {
+        Self::start_internal(name, Some(AMBER_FILES_PATH)).await
+    }
+
+    // This is private to be used for testing with a path to a different package repo. Path
+    // to amber-files is optional for testing to ensure that other successful tests are actually
+    // matching a developer workflow.
+    async fn start_internal(name: &str, amber_files_path: Option<&str>) -> anyhow::Result<Self> {
         let emu_name = format!("{name}-emu");
 
         info!(%name, "making ffx isolate");
@@ -98,6 +107,27 @@ impl IsolatedEmulator {
 
         this.system_logs_child =
             Some(system_logs_command.spawn().context("spawning log streaming command")?);
+
+        // serve packages by creating a repository and a server, then registering the server
+        if let Some(amber_files_path) = amber_files_path {
+            this.ffx(&["repository", "add-from-pm", &amber_files_path])
+                .await
+                .context("adding repository from build dir")?;
+            this.ffx(&[
+                "repository",
+                "server",
+                "start",
+                // ask the kernel to give us a random unused port
+                "--address",
+                "[::]:0",
+            ])
+            .await
+            .context("starting repository server")?;
+
+            this.ffx(&["target", "repository", "register", "--alias", "fuchsia.com"])
+                .await
+                .context("registering repository")?;
+        }
 
         Ok(this)
     }
@@ -230,5 +260,26 @@ mod tests {
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
+    }
+
+    const TEST_PACKAGE_URL: &str = concat!("fuchsia-pkg://fuchsia.com/", env!("TEST_PACKAGE_NAME"));
+
+    #[fuchsia::test]
+    async fn resolve_package_from_server() {
+        let emu = IsolatedEmulator::start_internal(
+            "pkg_resolve",
+            Some(env!("TEST_PACKAGE_REPOSITORY_PATH")),
+        )
+        .await
+        .unwrap();
+        emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap();
+    }
+
+    /// This ensures the above test is actually resolving the package from the package server by
+    /// demonstrating that the same package is unavailable when there's no server running.
+    #[fuchsia::test]
+    async fn fail_to_resolve_package_when_no_package_server_running() {
+        let emu = IsolatedEmulator::start_internal("pkg_resolve_fail", None).await.unwrap();
+        emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap_err();
     }
 }
