@@ -70,6 +70,15 @@ class SpinelFidlInterface {
    */
   otError ResetConnection(void);
 
+  /**
+   * This method hardware resets the RCP.
+   *
+   * @retval OT_ERROR_NONE            Successfully reset the RCP.
+   * @retval OT_ERROR_NOT_IMPLEMENT   The hardware reset is not implemented.
+   *
+   */
+  otError HardwareReset(void) { return OT_ERROR_NOT_IMPLEMENTED; }
+
  private:
   /**
    * Write received inbound frame to the buffer where can be processed by ot-lib
