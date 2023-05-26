@@ -254,6 +254,7 @@ impl QueuedResolver {
         }
 
         // Fetch from TUF.
+        info!("attempting to resolve {} as {} with TUF", pkg_url, rewritten_url);
         let queued_fetch =
             self.queue.push(rewritten_url.clone(), ResolveQueueContext::new(trace_id));
         match queued_fetch.await.expect("expected queue to be open") {
