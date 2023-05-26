@@ -6,7 +6,6 @@ package updater
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
@@ -48,56 +46,20 @@ type Updater interface {
 	Update(ctx context.Context, c client) error
 }
 
-func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
-	logger.Infof(ctx, "Checking system log for errors")
-	cmd := []string{"log_listener", "--tag", "system-updater", "--dump_logs", "yes"}
-
-	var stdout bytes.Buffer
-
-	if err := c.Run(ctx, cmd, &stdout, os.Stderr); err != nil {
-		return err
-	}
-
-	re := regexp.MustCompile("skipping unsupported .* type:")
-
-	scanner := bufio.NewScanner(&stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if re.MatchString(line) {
-			return fmt.Errorf("System Updater should not have skipped installing firmware: %s", line)
-		}
-	}
-
-	return nil
-}
-
-func SyslogForUnknownFirmwareIgnoreDisconnect(ctx context.Context, c client) error {
-	if err := checkSyslogForUnknownFirmware(ctx, c); err != nil {
-		var errExitMissing *ssh.ExitMissingError
-		if errors.As(err, &errExitMissing) {
-			logger.Warningf(ctx, "disconnected, assuming did not install unknown firmware")
-			return nil
-		}
-		return err
-	}
-	return nil
-}
-
 // SystemUpdateChecker uses `update check-now` to install a package.
 type SystemUpdateChecker struct {
-	repo                   *packages.Repository
-	checkForUnkownFirmware bool
+	repo *packages.Repository
 }
 
-func NewSystemUpdateChecker(repo *packages.Repository, checkForUnkownFirmware bool) *SystemUpdateChecker {
-	return &SystemUpdateChecker{repo: repo, checkForUnkownFirmware: checkForUnkownFirmware}
+func NewSystemUpdateChecker(repo *packages.Repository) *SystemUpdateChecker {
+	return &SystemUpdateChecker{repo: repo}
 }
 
 func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
-	return updateCheckNow(ctx, c, u.repo, true, u.checkForUnkownFirmware)
+	return updateCheckNow(ctx, c, u.repo, true)
 }
 
-func updateCheckNow(ctx context.Context, c client, repo *packages.Repository, createRewriteRule bool, checkForUnkownFirmware bool) error {
+func updateCheckNow(ctx context.Context, c client, repo *packages.Repository, createRewriteRule bool) error {
 	logger.Infof(ctx, "Triggering OTA")
 
 	startTime := time.Now()
@@ -145,14 +107,7 @@ func updateCheckNow(ctx context.Context, c client, repo *packages.Repository, cr
 			"check-now",
 			"--monitor",
 		}
-		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err == nil {
-			if checkForUnkownFirmware {
-				// FIXME(fxbug.dev/126805): We wouldn't have to ignore disconnects if we could trigger an update without it automatically rebooting.
-				if err := SyslogForUnknownFirmwareIgnoreDisconnect(ctx, c); err != nil {
-					return err
-				}
-			}
-		} else {
+		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 			// If the device rebooted before ssh was able to tell
 			// us the command ran, it will tell us the session
 			// exited without passing along an exit code. So,
@@ -194,13 +149,12 @@ func updateCheckNow(ctx context.Context, c client, repo *packages.Repository, cr
 
 // SystemUpdater uses the `system-updater` to install a package.
 type SystemUpdater struct {
-	repo                   *packages.Repository
-	updatePackageUrl       string
-	checkForUnkownFirmware bool
+	repo             *packages.Repository
+	updatePackageUrl string
 }
 
-func NewSystemUpdater(repo *packages.Repository, updatePackageUrl string, checkForUnkownFirmware bool) *SystemUpdater {
-	return &SystemUpdater{repo: repo, updatePackageUrl: updatePackageUrl, checkForUnkownFirmware: checkForUnkownFirmware}
+func NewSystemUpdater(repo *packages.Repository, updatePackageUrl string) *SystemUpdater {
+	return &SystemUpdater{repo: repo, updatePackageUrl: updatePackageUrl}
 }
 
 func (u *SystemUpdater) Update(ctx context.Context, c client) error {
@@ -255,10 +209,6 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 
 	logger.Infof(ctx, "OTA successfully downloaded in %s", time.Now().Sub(startTime))
 
-	if err := checkSyslogForUnknownFirmware(ctx, c); err != nil {
-		return err
-	}
-
 	logger.Infof(ctx, "Rebooting device")
 	startTime = time.Now()
 
@@ -283,7 +233,6 @@ type OmahaUpdater struct {
 	avbTool                     *avb.AVBTool
 	zbiTool                     *zbi.ZBITool
 	workaroundOtaNoRewriteRules bool
-	checkForUnkownFirmware      bool
 }
 
 func NewOmahaUpdater(
@@ -293,7 +242,6 @@ func NewOmahaUpdater(
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
 	workaroundOtaNoRewriteRules bool,
-	checkForUnkownFirmware bool,
 ) (*OmahaUpdater, error) {
 	u, err := url.Parse(updatePackageURL)
 	if err != nil {
@@ -315,7 +263,6 @@ func NewOmahaUpdater(
 		avbTool:                     avbTool,
 		zbiTool:                     zbiTool,
 		workaroundOtaNoRewriteRules: workaroundOtaNoRewriteRules,
-		checkForUnkownFirmware:      checkForUnkownFirmware,
 	}, nil
 }
 
@@ -401,7 +348,7 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	}
 
 	// Trigger an update
-	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware)
+	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules)
 }
 
 func rehostPackageRepository(ctx context.Context, repo *packages.Repository, updatePackageUrl *url.URL, repoName string, tempDir string) error {
