@@ -230,16 +230,14 @@ mod tests {
     use super::*;
 
     #[fuchsia::test]
-    async fn get_monotonic_clock() {
-        let emu = IsolatedEmulator::start("get_clock").await.unwrap();
+    async fn public_apis_succeed() {
+        let emu = IsolatedEmulator::start("e2e_emu_public_apis").await.unwrap();
+
+        info!("Checking target monotonic time to ensure we can connect and get stdout");
         let time = emu.ffx_output(&["target", "get-time"]).await.unwrap();
         time.trim().parse::<u64>().expect("should have gotten a timestamp back");
-    }
 
-    #[fuchsia::test]
-    async fn system_logs_are_streamed() {
-        let emu = IsolatedEmulator::start("system_logs").await.unwrap();
-
+        info!("Checking that the emulator instance writes a system log.");
         let system_log_path = emu.ffx_isolate.log_dir().join("system.log");
         loop {
             let contents = std::fs::read_to_string(&system_log_path).unwrap();
@@ -248,11 +246,8 @@ mod tests {
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
-    }
 
-    #[fuchsia::test]
-    async fn get_remote_control_logs() {
-        let emu = IsolatedEmulator::start("rcs_logs").await.unwrap();
+        info!("Checking that we can read RCS' logs.");
         loop {
             let remote_control_logs = emu.logs_for_moniker("/core/remote-control").await.unwrap();
             if !remote_control_logs.is_empty() {

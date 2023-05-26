@@ -7,17 +7,15 @@ use ffx_e2e_emu::IsolatedEmulator;
 use pretty_assertions::assert_eq;
 
 #[fuchsia::test]
-async fn echo_hello_world() -> Result<()> {
-    let emu = IsolatedEmulator::start("echo-ssh").await?;
+async fn ssh_works_and_reports_failures() -> Result<()> {
+    let emu = IsolatedEmulator::start("target-ssh").await?;
+
     let expected_message = "hello, world!";
     let message = emu.ssh_output(&["echo", expected_message]).await?;
     assert_eq!(message.trim(), expected_message);
-    Ok(())
-}
 
-#[fuchsia::test]
-async fn failing_command_fails() -> Result<()> {
-    let emu = IsolatedEmulator::start("failing-command").await?;
-    emu.ssh(&["false"]).await.unwrap_err();
+    emu.ssh(&["false"])
+        .await
+        .expect_err("the false command should fail and the failure should be reported to caller");
     Ok(())
 }
