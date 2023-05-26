@@ -9,7 +9,6 @@
 #include <lib/arch/asm.h>
 #include <lib/arch/zbi.h>
 #include <arch/x86/asm.h>
-#include <lib/zbi-format/zbi.h>
 
 
 // This file lays out the final kernel image seen by the boot loader.

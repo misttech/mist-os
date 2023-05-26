@@ -1,4 +1,4 @@
-# `zbi-format` Library
+# zbi
 
 This library contains the definitions for the Zircon Boot Image (ZBI) format.
 

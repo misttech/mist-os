@@ -5,6 +5,8 @@
 #ifndef LIB_ZBI_FORMAT_INTERNAL_STORAGE_H_
 #define LIB_ZBI_FORMAT_INTERNAL_STORAGE_H_
 
+#include <lib/zbi-format/zbi.h>
+
 // The zbi_header_t.extra field always gives the exact size of the
 // original, uncompressed payload.  That equals zbi_header_t.length when
 // the payload is not compressed.  If ZBI_FLAGS_STORAGE_COMPRESSED is set in
@@ -18,6 +20,6 @@
 //    only support one particular compression format.
 //  - The `zbi` tool will usually retain the ability to compress and
 //    decompress for old formats, and can be used to convert between formats.
-#define ZBI_FLAGS_STORAGE_COMPRESSED (0x00000001)
+#define ZBI_FLAGS_STORAGE_COMPRESSED ((zbi_flags_t)(1u << 0))
 
 #endif  // LIB_ZBI_FORMAT_INTERNAL_STORAGE_H_

@@ -6,11 +6,17 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ZBI_H_
 
 #include <lib/arch/internal/zbi-constants.h>
+
+#ifdef __ASSEMBLER__
+
+#include <fidl/zbi/data/asm/zbi.h>
+
+#else
+
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 
-#ifndef __ASSEMBLER__
-#include <lib/zbi-format/kernel.h>
-#endif
+#endif  // #ifdef __ASSEMBLER__
 
 #ifdef __ASSEMBLER__  // clang-format off
 
@@ -98,4 +104,5 @@ struct ZbiKernelImage {
 }  // namespace arch
 
 #endif  // ifdef __ASSEMBLER__
+
 #endif  // ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ZBI_H_

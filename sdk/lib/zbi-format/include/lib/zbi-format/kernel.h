@@ -1,13 +1,19 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// DO NOT EDIT. Generated from FIDL library
+//   zbi (//sdk/fidl/zbi/kernel.fidl)
+// by zither, a Fuchsia platform tool.
 
 #ifndef LIB_ZBI_FORMAT_KERNEL_H_
 #define LIB_ZBI_FORMAT_KERNEL_H_
 
 #include <stdint.h>
 
-#include "zbi.h"
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 // The kernel image.  In a bootable ZBI this item must always be first,
 // immediately after the ZBI_TYPE_CONTAINER header.  The contiguous memory
@@ -67,7 +73,6 @@
 //     physical memory, aligned to 4KiB.  The a0 register holds the HART ID,
 //     and the a1 register holds the 4KiB-aligned physical address of the
 //     bootloader-constructed ZBI.  All other registers are unspecified.
-//
 typedef struct {
   // Entry-point address.  The interpretation of this differs by machine.
   uint64_t entry;
@@ -76,5 +81,9 @@ typedef struct {
   // immediately after its load image.
   uint64_t reserve_memory_size;
 } zbi_kernel_t;
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif  // LIB_ZBI_FORMAT_KERNEL_H_

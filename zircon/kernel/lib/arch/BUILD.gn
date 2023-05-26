@@ -41,9 +41,12 @@ library_headers("common-headers") {
   public_deps = [
     "//sdk/lib/stdcompat",
 
-    # <lib/arch/zbi.h> has #include <lib/zbi-format/kernel.h>.
-    # <lib/arch/zbi.h> has #include <lib/zbi-format/zbi.h>.
+    # <lib/arch/zbi.h> has #include <lib/zbi-format/kernel.h>
+    # <lib/arch/zbi.h> has #include <lib/zbi-format/zbi.h>
     "//sdk/lib/zbi-format",
+
+    # <lib/arch/zbi.h> has #include <fidl/zbi/data/asm/zbi.h>
+    "//sdk/fidl/zbi:zbi_zither.asm",
 
     # <lib/arch/x86/cpuid.h> has #include <hwreg/bitfields.h>.
     "//zircon/system/ulib/hwreg:headers",

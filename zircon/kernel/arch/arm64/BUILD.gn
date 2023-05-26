@@ -164,6 +164,7 @@ if (toolchain_environment == "physmem" ||
   # This is linked into the ZBI kernel, but not the PIE (ELF) kernel.
   source_set("zbi-kernel-image") {
     sources = [ "zbi-start.S" ]
+    deps = [ "//zircon/kernel/lib/arch" ]
   }
 
   source_set("boot-mmu") {

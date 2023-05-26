@@ -5,11 +5,26 @@
 import("//build/fidl/fidl.gni")
 import("//zircon/tools/zither/zither_golden_files.gni")
 
+zbi_sources = [
+  "board.fidl",
+  "driver-config.fidl",
+  "graphics.fidl",
+  "kernel.fidl",
+  "memory.fidl",
+  "overview.fidl",
+  "partition.fidl",
+  "reboot.fidl",
+  "zbi.fidl",
+]
+
 # TODO(fxbug.dev/111453): This is not yet exported in the SDK - and rather is
 # used to generate checked-in headers which are - but it will be eventually.
 fidl("zbi") {
-  sources = [ "driver-config.fidl" ]
+  sources = zbi_sources
   enable_zither = true
+
+  # TODO(fxbug.dev/110021): For string_array<N>.
+  experimental_flags = [ "zx_c_types" ]
 
   zither = {
     c = {
@@ -23,5 +38,9 @@ fidl("zbi") {
 zither_golden_files("zbi.c.checked-in") {
   fidl = ":zbi"
   backend = "c"
-  sources = [ "//sdk/lib/zbi-format/include/lib/zbi-format/driver-config.h" ]
+  sources = [ "//sdk/lib/zbi-format/README.md" ]
+  foreach(source, zbi_sources - [ "overview.fidl" ]) {
+    name = get_path_info(source, "name")
+    sources += [ "//sdk/lib/zbi-format/include/lib/zbi-format/${name}.h" ]
+  }
 }

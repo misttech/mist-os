@@ -7,7 +7,11 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_INTERNAL_ZBI_CONSTANTS_H_
 #define ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_INTERNAL_ZBI_CONSTANTS_H_
 
+#ifdef __ASSEMBLER__
+#include <fidl/zbi/data/asm/zbi.h>
+#else
 #include <lib/zbi-format/zbi.h>
+#endif
 
 #define ARCH_ZBI_KERNEL_TYPE (ZBI_TYPE_KERNEL_X64)
 

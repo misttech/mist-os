@@ -16,8 +16,11 @@ library_headers("headers") {
     ":gen-arm64-system-asm",
     "//zircon/system/ulib/hwreg:headers",
 
+    # <lib/arch/internal/zbi-constants.h> has #include <fidl/zbi/data/asm/zbi.h>
+    "//sdk/fidl/zbi:zbi_zither.asm",
+
     # <lib/arch/zbi-boot.h> has #include <lib/zbi-format/zbi.h>.
-    # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>
+    # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
   ]
 }

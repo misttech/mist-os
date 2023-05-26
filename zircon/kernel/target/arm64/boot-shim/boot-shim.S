@@ -6,7 +6,6 @@
 
 #include <asm.h>
 #include <arch/asm_macros.h>
-#include <lib/zbi-format/zbi.h>
 
 #define SCTLR_I     (1 << 12)   // Instruction cache enable
 #define SCTLR_C     (1 << 2)    // Cache enable

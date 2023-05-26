@@ -13,8 +13,11 @@ library_headers("headers") {
 
   headers = []
   public_deps = [
+    # <lib/arch/internal/zbi-constants.h> has #include <fidl/zbi/data/asm/zbi.h>
+    "//sdk/fidl/zbi:zbi_zither.asm",
+
     # <lib/arch/zbi-boot.h> has #include <lib/zbi-format/zbi.h>.
-    # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>
+    # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
 
     # <lib/arch/x86/boot-cpuid.h> has #include <lib/special-sections/special-sections.h>.
