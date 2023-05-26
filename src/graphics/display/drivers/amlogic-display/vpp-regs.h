@@ -129,34 +129,6 @@
 
 namespace amlogic_display {
 
-class VppGammaCntlPortReg : public hwreg::RegisterBase<VppGammaCntlPortReg, uint32_t> {
- public:
-  DEF_BIT(7, vcom_pol);
-  DEF_BIT(6, rvs_out);
-  DEF_BIT(5, adr_rdy);
-  DEF_BIT(4, wr_rdy);
-  DEF_BIT(3, rd_rdy);
-  DEF_BIT(2, tr);
-  DEF_BIT(1, set);
-  DEF_BIT(0, en);
-  static auto Get() { return hwreg::RegisterAddr<VppGammaCntlPortReg>(VPP_GAMMA_CNTL_PORT); }
-};
-class VppGammaDataPortReg : public hwreg::RegisterBase<VppGammaDataPortReg, uint32_t> {
- public:
-  DEF_FIELD(31, 0, data);
-  static auto Get() { return hwreg::RegisterAddr<VppGammaDataPortReg>(VPP_GAMMA_DATA_PORT); }
-};
-class VppGammaAddrPortReg : public hwreg::RegisterBase<VppGammaAddrPortReg, uint32_t> {
- public:
-  DEF_BIT(12, rd);
-  DEF_BIT(11, auto_inc);
-  DEF_BIT(10, sel_r);
-  DEF_BIT(9, sel_g);
-  DEF_BIT(8, sel_b);
-  DEF_FIELD(7, 0, adr);
-  static auto Get() { return hwreg::RegisterAddr<VppGammaAddrPortReg>(VPP_GAMMA_ADDR_PORT); }
-};
-
 class VppClipMisc1Reg : public hwreg::RegisterBase<VppClipMisc1Reg, uint32_t> {
  public:
   DEF_FIELD(29, 20, r_clamp);

@@ -30,12 +30,6 @@
 
 namespace amlogic_display {
 
-enum class GammaChannel {
-  kRed,
-  kGreen,
-  kBlue,
-};
-
 class Osd {
  public:
   static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev, uint32_t fb_width,
@@ -76,7 +70,6 @@ class Osd {
   // This function converts a float into Signed fixed point 2.10 format
   // [11][10][9:0] = [sign][integer][fraction]
   static uint32_t FloatToFixed2_10(float f);
-  static constexpr size_t kGammaTableSize = 256;
 
   void SetMinimumRgb(uint8_t minimum_rgb);
 
@@ -89,13 +82,8 @@ class Osd {
   // dimensions. The scaling IP and registers and undocumented.
   void EnableScaling(bool enable);
 
-  void EnableGamma();
-  void DisableGamma();
   zx_status_t ConfigAfbc();
-  zx_status_t SetGamma(GammaChannel channel, const float* data);
   void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config);
-  zx_status_t WaitForGammaAddressReady();
-  zx_status_t WaitForGammaWriteReady();
 
   void DumpNonRdmaRegisters();
 
@@ -112,11 +100,6 @@ class Osd {
   // inspect::Node* inspect_node_;
   std::unique_ptr<RdmaEngine> rdma_;
   thrd_t rdma_irq_thread_;
-
-  // This flag is set when the driver enables gamma correction.
-  // If this flag is not set, we should not disable gamma in the absence
-  // of a gamma table since that might have been provided by earlier boot stages.
-  bool osd_enabled_gamma_ = false;
 };
 
 }  // namespace amlogic_display

@@ -393,15 +393,6 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     }
   }
 
-  if (success && display_configs[0]->gamma_table_present) {
-    // Make sure all channels have the same size and equal to the expected table size of hardware
-    if (display_configs[0]->gamma_red_count != Osd::kGammaTableSize ||
-        display_configs[0]->gamma_red_count != display_configs[0]->gamma_green_count ||
-        display_configs[0]->gamma_red_count != display_configs[0]->gamma_blue_count) {
-      layer_cfg_results[0][0] |= CLIENT_GAMMA;
-    }
-  }
-
   if (success) {
     const uint32_t width = display_configs[0]->mode.h_addressable;
     const uint32_t height = display_configs[0]->mode.v_addressable;
