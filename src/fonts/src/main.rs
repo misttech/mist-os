@@ -10,8 +10,9 @@ mod font_service;
 
 use {
     self::font_service::{FontServiceBuilder, ProviderRequestStream},
-    anyhow::{format_err, Context, Error},
+    anyhow::{format_err, Context, Result},
     argh::FromArgs,
+    config::Config,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::component::inspector,
     fuchsia_trace as trace, fuchsia_trace_provider as trace_provider,
@@ -43,7 +44,7 @@ struct Args {
 }
 
 #[fuchsia::main(logging_tags = ["fonts"])]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     trace_provider::trace_provider_create_with_fdio();
     trace::instant!("fonts", "startup", trace::Scope::Process);
 
@@ -63,8 +64,9 @@ async fn main() -> Result<(), Error> {
         warn!("--no-default-fonts is deprecated and is treated as a no-op")
     }
 
-    let font_manifest_paths =
-        select_manifests(&args).context("no usable font manifests, this is a fatal error")?;
+    let structured_config = font_service::config::as_ref();
+    let font_manifest_paths = select_manifests(&args, structured_config)
+        .context("no usable font manifests, this is a fatal error")?;
 
     let mut service_builder = FontServiceBuilder::with_default_asset_loader(
         DEFAULT_CACHE_CAPACITY_BYTES,
@@ -99,13 +101,34 @@ async fn main() -> Result<(), Error> {
 
 /// Negotiate which manifest(s) to load.
 /// TODO(fxbug.dev/43936): Remove compatibility manifest after Chromium tests are made hermetic.
-fn select_manifests(args: &Args) -> Result<Vec<PathBuf>, Error> {
+fn select_manifests(args: &Args, config: &Config) -> Result<Vec<PathBuf>> {
+    select_manifests_for_test(args, config, /*check_files=*/ true)
+}
+
+// If `check_files` == false, the code will not go out to the filesystem to verify
+// that a file exists; useful for lightweight testing.
+fn select_manifests_for_test(
+    args: &Args,
+    config: &Config,
+    check_files: bool,
+) -> Result<Vec<PathBuf>> {
     let mut manifest_paths: Vec<PathBuf> = vec![];
+
+    // Load a font manifest from structured config.
+    let manifest_from_config = PathBuf::from(&config.font_manifest);
+    if manifest_from_config.as_os_str().len() != 0
+        && (!check_files || manifest_from_config.is_file())
+    {
+        manifest_paths.push(manifest_from_config);
+    }
+
+    // Also try loading a font manifest from the command line args.
     let main_manifest_path = match &args.font_manifest {
         Some(path) => PathBuf::from(path),
         None => PathBuf::from(FONT_MANIFEST_PATH),
     };
-    if main_manifest_path.is_file() {
+    if (main_manifest_path.is_file() || !check_files) && !main_manifest_path.as_os_str().is_empty()
+    {
         manifest_paths.push(main_manifest_path);
     } else {
         warn!(
@@ -116,18 +139,51 @@ fn select_manifests(args: &Args) -> Result<Vec<PathBuf>, Error> {
             main_manifest_path
         );
     }
+
     // Support legacy non-hermetic tests (e.g. Chromium) that expect some minimum set of fonts but
-    // don't specify what it should be.
-    if args.font_manifest.is_none() {
+    // don't specify what it should be.  This happens when a font manifest is specified but is not
+    // found under the specified path.
+    if manifest_paths.is_empty() {
         let compatibility_manifest_path = PathBuf::from(TEST_COMPATIBILITY_FONT_MANIFEST_PATH);
-        if compatibility_manifest_path.is_file() {
+        if compatibility_manifest_path.is_file() || !check_files {
             manifest_paths.push(compatibility_manifest_path);
         }
     }
+
+    // The ordering of manifests should not matter.
+    manifest_paths.sort();
 
     if manifest_paths.is_empty() {
         Err(format_err!("Either no font manifests were specified, or they do not exist"))
     } else {
         Ok(manifest_paths)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case(
+        Args { font_manifest: Some("".into()), no_default_fonts: false },
+        Config { font_manifest: "".into(), verbose_logging: true },
+        vec![TEST_COMPATIBILITY_FONT_MANIFEST_PATH]; "empty means default manifest is used")]
+    #[test_case(
+        Args { font_manifest: Some("/test/foo.txt".into()), no_default_fonts: false },
+        Config { font_manifest: "".into(), verbose_logging: true },
+        vec!["/test/foo.txt"]; "from args only")]
+    #[test_case(
+        Args { font_manifest: None, no_default_fonts: false },
+        Config { font_manifest: "/test/foo.txt".into(), verbose_logging: true },
+        vec![FONT_MANIFEST_PATH, "/test/foo.txt" ]; "from config only")]
+    #[test_case(
+        Args { font_manifest: Some("/test/foo.txt".into()), no_default_fonts: false },
+        Config { font_manifest: "/test/foo2.txt".into(), verbose_logging: true },
+        vec!["/test/foo.txt", "/test/foo2.txt"]; "from both")]
+    fn test_manifest_selection(args: Args, config: Config, expected: Vec<&str>) {
+        let result = select_manifests_for_test(&args, &config, /*check_files=*/ false).unwrap();
+        let actual: Vec<&str> = result.iter().map(|p| p.as_os_str().to_str().unwrap()).collect();
+        assert_eq!(expected, actual);
     }
 }

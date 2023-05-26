@@ -38,5 +38,9 @@
     ],
     config: {
         verbose_logging: { type: "bool" },
+        font_manifest: {
+            type: "string",
+            max_size: 1024,
+        },
     },
 }

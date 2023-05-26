@@ -6,6 +6,7 @@
 
 mod asset;
 mod builder;
+pub(crate) mod config;
 mod debug;
 mod family;
 mod inspect;

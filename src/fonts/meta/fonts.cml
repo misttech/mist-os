@@ -47,5 +47,18 @@
         // We expect that `eng` and `userdebug` builds would have this
         // config option set to "true".
         verbose_logging: { type: "bool" },
+
+        // If set to a nonempty string, the name of the font manifest
+        // specified is used as the base name of the font manifest file that
+        // the font server looks for at startup.  This file will be added
+        // to the list of font manifests being read.
+        //
+        // The font manifest file, and all the files it mentions must be
+        // readable to the font server, and hence should be routed
+        // appropriately.
+        font_manifest: {
+            type: "string",
+            max_size: 1024,
+        },
     },
 }

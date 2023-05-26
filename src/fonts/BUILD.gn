@@ -93,6 +93,7 @@ rustc_binary("font_provider") {
     "//third_party/rust_crates:heck",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:unicase",
@@ -105,6 +106,7 @@ rustc_binary("font_provider") {
     "//src/lib/intl/unicode_utils/char_collection",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:test-case",
   ]
 
   non_rust_deps = [ "//third_party/freetype2" ]
@@ -116,6 +118,7 @@ rustc_binary("font_provider") {
     "src/font_service/asset/loader.rs",
     "src/font_service/asset/mod.rs",
     "src/font_service/builder.rs",
+    "src/font_service/config.rs",
     "src/font_service/debug.rs",
     "src/font_service/family.rs",
     "src/font_service/inspect.rs",
@@ -145,6 +148,7 @@ fuchsia_structured_config_values("config_values") {
     # Use `--args=src_fonts_verbose_logging=true` to change this value from
     # the `fx` command line.
     verbose_logging = src_fonts_verbose_logging
+    font_manifest = ""
   }
 }
 
@@ -185,6 +189,7 @@ fuchsia_structured_config_values(
   cm_label = ":font_provider_hermetic_for_test_manifest"
   values = {
     verbose_logging = true
+    font_manifest = ""
   }
 }
 

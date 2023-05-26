@@ -2,23 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use config::Config;
 use {
     anyhow::{Error, Result},
     fidl_fuchsia_fonts as fonts,
     std::stringify,
     tracing::debug,
 };
-
-// Once-only initialized structured configuration.
-//
-// In tests, we only need the config to be present, and initialized to true.
-static mut CONFIG: Option<Config> =
-    if cfg!(test) { Some(Config { verbose_logging: true }) } else { None };
-
-// For CONFIG above.
-#[cfg(not(test))]
-static INIT: std::sync::Once = std::sync::Once::new();
 
 macro_rules! format_field {
     ($debug_struct:expr, $parent:expr, $field:ident, $wrapper:path) => {
@@ -53,16 +42,7 @@ struct Verbosity {
 impl Verbosity {
     // Loads the verbosity configuration. It may be called only once.
     fn load_from_config_data() -> Verbosity {
-        // Safety: this should be the only function that ever gets called
-        // to modify the value of `CONFIG`.
-        let verbose_logging = unsafe {
-            #[cfg(not(test))]
-            INIT.call_once(|| {
-                // The "take" call may only be made once.
-                CONFIG = Some(Config::take_from_startup_handle());
-            });
-            CONFIG.as_ref().expect("config is loaded").verbose_logging
-        };
+        let verbose_logging = crate::font_service::config::as_ref().verbose_logging;
         Verbosity { verbose_logging }
     }
 

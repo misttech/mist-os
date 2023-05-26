@@ -126,6 +126,7 @@ foreach(comp, ALL_COMPONENTS) {
     component_name = comp
     values = {
       verbose_logging = integration_tests_verbose_logging
+      font_manifest = ""
     }
   }
 
