@@ -271,6 +271,10 @@ impl RequestPacket {
         Self::new(OpCode::Connect, data, headers)
     }
 
+    pub fn new_disconnect(headers: HeaderSet) -> Self {
+        Self::new(OpCode::Disconnect, vec![], headers)
+    }
+
     pub fn new_get(headers: HeaderSet) -> Result<Self, PacketError> {
         Ok(Self::new(OpCode::Get, vec![], headers))
     }
@@ -593,7 +597,7 @@ impl<'a> PutOperation<'a> {
     }
 
     /// Attempts to write the final `data` object to the remote OBEX server.
-    /// This _must_ be called before the PutOperation object is dropped.
+    /// This must be called before the PutOperation object is dropped.
     /// Returns the informational headers from the peer response on success, Error otherwise.
     ///
     /// The PUT operation is considered complete after this.

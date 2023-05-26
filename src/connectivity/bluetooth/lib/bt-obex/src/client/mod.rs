@@ -87,6 +87,28 @@ impl ObexClient {
         Ok(response_headers)
     }
 
+    /// Initiates a DISCONNECT request to the remote peer.
+    /// Returns the Headers associated with the response on success.
+    /// Returns Error if the DISCONNECT operation couldn't be completed or was rejected by the peer.
+    /// The OBEX Session with the peer is considered terminated, regardless.
+    pub async fn disconnect(self, headers: HeaderSet) -> Result<HeaderSet, Error> {
+        let opcode = OpCode::Disconnect;
+        if !self.connected {
+            return Err(Error::operation(opcode, "session not connected"));
+        }
+
+        let response = {
+            let request = RequestPacket::new_disconnect(headers);
+            let mut transport = self.transport.try_new_operation()?;
+            trace!("Making outgoing DISCONNECT request: {request:?}");
+            transport.send(request)?;
+            trace!("Successfully made DISCONNECT request");
+            transport.receive_response(opcode).await?
+        };
+
+        response.expect_code(opcode, ResponseCode::Ok).map(Into::into)
+    }
+
     /// Initializes a GET Operation to retrieve data from the remote OBEX Server.
     /// Returns a `GetOperation` on success, Error if the new operation couldn't be started.
     pub fn get(&mut self, headers: HeaderSet) -> Result<GetOperation<'_>, Error> {
@@ -220,5 +242,62 @@ mod tests {
         // After the first one "completes" (e.g. no longer held), it's okay to initiate a GET.
         drop(_get_operation1);
         let _get_operation2 = client.get(headers).expect("can initialize second get");
+    }
+
+    #[fuchsia::test]
+    fn obex_disconnect_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (client, mut remote) = new_obex_client(true);
+
+        let headers = HeaderSet::from_header(Header::Description("finished".into())).unwrap();
+        let disconnect_fut = client.disconnect(headers);
+        pin_mut!(disconnect_fut);
+        exec.run_until_stalled(&mut disconnect_fut).expect_pending("waiting for response");
+
+        // Expect the Disconnect request on the remote. The typical response is a positive `Ok`.
+        let response_headers =
+            HeaderSet::from_header(Header::Description("accepted".into())).unwrap();
+        let response = ResponsePacket::new(ResponseCode::Ok, vec![], response_headers.clone());
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Disconnect), response);
+
+        let disconnect_result = exec
+            .run_until_stalled(&mut disconnect_fut)
+            .expect("received response")
+            .expect("response is ok");
+        assert_eq!(disconnect_result, response_headers);
+    }
+
+    #[fuchsia::test]
+    async fn obex_disconnect_before_connect_error() {
+        let (client, _remote) = new_obex_client(false);
+
+        let headers = HeaderSet::from_header(Header::Description("finished".into())).unwrap();
+        let disconnect_result = client.disconnect(headers).await;
+        assert_matches!(disconnect_result, Err(Error::OperationError { .. }))
+    }
+
+    #[fuchsia::test]
+    fn obex_disconnect_error_response_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (client, mut remote) = new_obex_client(true);
+
+        let disconnect_fut = client.disconnect(HeaderSet::new());
+        pin_mut!(disconnect_fut);
+        exec.run_until_stalled(&mut disconnect_fut).expect_pending("waiting for response");
+
+        // Expect the Disconnect request on the remote. An Error response still results in
+        // disconnection.
+        let response_headers =
+            HeaderSet::from_header(Header::Description("accepted".into())).unwrap();
+        let response = ResponsePacket::new(
+            ResponseCode::InternalServerError,
+            vec![],
+            response_headers.clone(),
+        );
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Disconnect), response);
+
+        let disconnect_result =
+            exec.run_until_stalled(&mut disconnect_fut).expect("received response");
+        assert_matches!(disconnect_result, Err(Error::PeerRejected { .. }));
     }
 }
