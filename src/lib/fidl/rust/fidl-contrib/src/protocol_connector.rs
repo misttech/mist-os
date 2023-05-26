@@ -231,7 +231,8 @@ impl<CP: ConnectedProtocol> ProtocolConnector<CP> {
     /// be used to send messages to the underlying protocol. All errors from the
     /// underlying protocol will be logged.
     pub fn serve_and_log_errors(self) -> (ProtocolSender<CP::Message>, impl Future<Output = ()>) {
-        let mut log_error = log_first_n_factory(30, |e| error!("{}", e));
+        let protocol = <<<CP as ConnectedProtocol>::Protocol as fidl::endpoints::Proxy>::Protocol as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        let mut log_error = log_first_n_factory(30, move |e| error!(%protocol, "{}", e));
         self.serve(move |e| match e {
             ProtocolConnectorError::ConnectFailed(e) => {
                 log_error(format!("Error obtaining a connection to the protocol: {}", e))
