@@ -316,6 +316,19 @@ impl<T, L> Locked<&T, L> {
         (data, Locked(t, PhantomData))
     }
 
+    /// Returns an owned `Locked` from a current `Locked`.
+    ///
+    /// Useful when callers need to have access to an owned `Locked` but only
+    /// have access to a reference.
+    ///
+    /// This method is a shorthand for `self.cast_with(|s| s)`. This is safe
+    /// because the returned `Locked` instance borrows `self` mutably so it
+    /// can't be used until the new instance is dropped.
+    pub fn as_owned(&mut self) -> Locked<&T, L> {
+        let Self(t, PhantomData) = self;
+        Locked(t, PhantomData)
+    }
+
     /// Narrow the type on which locks can be acquired.
     ///
     /// This allows scoping down the state on which locks are acquired. This is

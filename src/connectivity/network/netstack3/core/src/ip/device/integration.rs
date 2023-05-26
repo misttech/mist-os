@@ -587,7 +587,7 @@ where
     ) -> (&I::Configuration, Self::IpDeviceStateCtx<'_>) {
         let Self { config, sync_ctx } = self;
         let config = &**config;
-        (config, SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|r| r) })
+        (config, SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.as_owned() })
     }
 
     fn with_configuration_and_flags_mut<
@@ -632,7 +632,7 @@ where
     ) -> (&Ipv6DeviceConfiguration, Self::Ipv6DeviceStateCtx<'_>) {
         let Self { config, sync_ctx } = self;
         let config = &**config;
-        (config, SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|r| r) })
+        (config, SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.as_owned() })
     }
 }
 
@@ -702,8 +702,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContex
             ip_config: _,
         } = *config;
 
-        let sync_ctx =
-            SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|d| d) };
+        let sync_ctx = SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.as_owned() };
 
         let mut addrs =
             SlaacAddrs { sync_ctx, device_id: device_id.clone(), config, _marker: PhantomData };
@@ -745,7 +744,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> DadA
         let Self { config, sync_ctx } = self;
         let config = Borrow::borrow(&*config);
         join_ip_multicast_with_config(
-            &mut SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|s| s) },
+            &mut SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.as_owned() },
             ctx,
             device_id,
             multicast_addr,
@@ -762,7 +761,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> DadA
         let Self { config, sync_ctx } = self;
         let config = Borrow::borrow(&*config);
         leave_ip_multicast_with_config(
-            &mut SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.cast_with(|s| s) },
+            &mut SyncCtxWithIpDeviceConfiguration { config, sync_ctx: sync_ctx.as_owned() },
             ctx,
             device_id,
             multicast_addr,
