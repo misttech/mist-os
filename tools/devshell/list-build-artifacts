@@ -12,6 +12,7 @@
 ## the GN graph relative to the build directory.
 ##
 ##  --build       build the artifacts as well as returning a list of them
+##  --show-label  show the GN label rather than the path
 ##  --allow-empty do not fail if no such artifacts are found
 ##  --expect-one  fail if zero or more than one artifacts are found. This
 ##                option is mutually exclusive from `--allow-empty`.
@@ -50,8 +51,10 @@ readonly TOOL_PATHS_JSON="tool_paths.json"
 readonly BOOT_TESTS_JSON="boot_tests.json"
 readonly GENERATED_SOURCES_JSON="generated_sources.json"
 readonly PRODUCT_BUNDLE_JSON="product_bundles.json"
+readonly BINARIES_JSON="binaries.json"
 
 build=false
+show_label=false
 allow_empty=false
 expect_one=false
 mode=""
@@ -73,6 +76,9 @@ while [[ $# -ne 0 ]]; do
     ;;
   --expect-one)
     expect_one=true
+    ;;
+  --show-label)
+    show_label=true
     ;;
   --name)
     shift
@@ -125,6 +131,9 @@ is_list_like=false
 manifest=""
 jq_filter=".[]"
 paths=()
+name_key="name"
+name_regex=false
+path_key="path"
 if [[ "${mode}" == images ]]; then
   manifest="${IMAGES_JSON}"
 elif [[ "${mode}" == pave ]]; then
@@ -158,14 +167,27 @@ elif [[ "${mode}" == generated-sources ]]; then
 elif [[ "${mode}" == product-bundle ]]; then
   manifest="${PRODUCT_BUNDLE_JSON}"
   jq_filter+=" |  select(.path != null)"
+elif [[ "${mode}" == binaries ]]; then
+  manifest="${BINARIES_JSON}"
+  name_key="dist"
+  name_regex=true
+  path_key="debug"
 else
   fx-error "unknown MODE: ${mode}"
   fx-command-help
   exit 1
 fi
 
+if $show_label; then
+  path_key="label"
+fi
+
 if [[ ! -z "${name}" ]]; then
-  jq_filter+=" | select(.name == \"${name}\")"
+  if $name_regex; then
+    jq_filter+=" | select(.$name_key | test(\"${name}\"))"
+  else
+    jq_filter+=" | select(.$name_key == \"${name}\")"
+  fi
   # Filter existing paths by the name as well.
   if [[ "${paths[@]}" =~ "${name}" ]]; then
     paths=("${name}")
@@ -184,7 +206,7 @@ if ! $is_list_like ; then
   if [[ ! -z "${type}" ]]; then
     jq_filter+=" | select(.type == \"${type}\")"
   fi
-  jq_filter+=" | .path"
+  jq_filter+=" | .$path_key"
 fi
 
 paths+=($(fx-command-run jq --raw-output "${jq_filter}" "${FUCHSIA_BUILD_DIR}/${manifest}"))
@@ -193,7 +215,7 @@ if $build && [[ ${#paths[@]} -ne 0 ]] ; then
 fi
 
 if [[ ${#paths[@]} -eq 0 ]] && (! $allow_empty || $expect_one) ; then
-  fx-error "found no artifacts in the GN graph of type \"${mode}\" with (name, os, cpu, type) == (\"${name:-*}\", \"${os:-*}\", \"${cpu:-*}\", \"${type:-*}\")"
+  fx-error "found no artifacts in the GN graph of type \"${mode}\" with ($name_key, os, cpu, type) == (\"${name:-*}\", \"${os:-*}\", \"${cpu:-*}\", \"${type:-*}\")"
   exit 1
 fi
 
