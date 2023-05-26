@@ -259,7 +259,6 @@ _SYSROOT_LIB_FILES = (
     'libc.so.6',
     'libpthread.so.0',
     'libm.so.6',
-    'libmvec.so.1',
     'librt.so.1',
     'libutil.so.1',
 )
@@ -273,9 +272,6 @@ _SYSROOT_USR_LIB_FILES = (
     'libpthread_nonshared.a',
     'libm.so',
     'libm.a',
-    'libmvec.so',
-    'libmvec.a',
-    'libmvec_nonshared.a',
     'librt.so',
     'librt.a',
     'libdl.so',
