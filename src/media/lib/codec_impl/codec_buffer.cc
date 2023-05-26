@@ -10,7 +10,7 @@
 #include <zircon/types.h>
 
 #include <fbl/algorithm.h>
-#include <src/media/lib/memory_barriers/memory_barriers.h>
+#include <src/lib/memory_barriers/memory_barriers.h>
 
 CodecBuffer::CodecBuffer(CodecImpl* parent, Info buffer_info, CodecVmoRange vmo_range)
     : parent_(parent), buffer_info_(std::move(buffer_info)), vmo_range_(std::move(vmo_range)) {

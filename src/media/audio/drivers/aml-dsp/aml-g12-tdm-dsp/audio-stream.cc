@@ -20,7 +20,7 @@
 
 #include <pretty/hexdump.h>
 
-#include "src/media/lib/memory_barriers/memory_barriers.h"
+#include "src/lib/memory_barriers/memory_barriers.h"
 
 namespace {
 

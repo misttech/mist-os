@@ -18,7 +18,7 @@
 #include <optional>
 
 #include <fbl/algorithm.h>
-#include <src/media/lib/memory_barriers/memory_barriers.h>
+#include <src/lib/memory_barriers/memory_barriers.h>
 
 #include "device_ctx.h"
 #include "h264_multi_decoder.h"

@@ -16,7 +16,7 @@
 #include "device_ctx.h"
 #include "hevcdec.h"
 #include "pts_manager.h"
-#include "src/media/lib/memory_barriers/memory_barriers.h"
+#include "src/lib/memory_barriers/memory_barriers.h"
 #include "thread_role.h"
 #include "vp9_configuration.h"
 #include "vp9_decoder.h"

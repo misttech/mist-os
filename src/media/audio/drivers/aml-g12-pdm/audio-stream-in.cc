@@ -18,7 +18,7 @@
 #include <optional>
 #include <utility>
 
-#include "src/media/lib/memory_barriers/memory_barriers.h"
+#include "src/lib/memory_barriers/memory_barriers.h"
 
 namespace audio::aml_g12 {
 

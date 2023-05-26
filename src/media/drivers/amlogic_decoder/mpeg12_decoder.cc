@@ -6,7 +6,7 @@
 
 #include "firmware_blob.h"
 #include "macros.h"
-#include "src/media/lib/memory_barriers/memory_barriers.h"
+#include "src/lib/memory_barriers/memory_barriers.h"
 
 namespace amlogic_decoder {
 

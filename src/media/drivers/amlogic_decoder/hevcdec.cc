@@ -11,7 +11,7 @@
 #include <algorithm>
 
 #include "macros.h"
-#include "src/media/lib/memory_barriers/memory_barriers.h"
+#include "src/lib/memory_barriers/memory_barriers.h"
 #include "util.h"
 #include "video_decoder.h"
 

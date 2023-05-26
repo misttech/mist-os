@@ -13,8 +13,8 @@
 
 #include "macros.h"
 #include "registers.h"
+#include "src/lib/memory_barriers/memory_barriers.h"
 #include "src/media/lib/internal_buffer/internal_buffer.h"
-#include "src/media/lib/memory_barriers/memory_barriers.h"
 
 namespace amlogic_decoder {
 
