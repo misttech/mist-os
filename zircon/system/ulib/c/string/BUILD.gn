@@ -204,22 +204,18 @@ libc_source_set("StringUtil") {
     "error_to_string.cpp",
     "message_mapper.h",
     "signal_to_string.cpp",
+    "tables/linux_extension_errors.h",
+    "tables/linux_extension_signals.h",
+    "tables/linux_platform_errors.h",
+    "tables/linux_platform_signals.h",
+    "tables/minimal_platform_errors.h",
+    "tables/minimal_platform_signals.h",
+    "tables/posix_errors.h",
+    "tables/posix_signals.h",
+    "tables/signal_table.h",
+    "tables/stdc_errors.h",
+    "tables/stdc_signals.h",
   ]
-  if (false) {  # TODO(mcgrathr): temporary until next roll
-    sources += [
-      "tables/linux_extension_errors.h",
-      "tables/linux_extension_signals.h",
-      "tables/linux_platform_errors.h",
-      "tables/linux_platform_signals.h",
-      "tables/minimal_platform_errors.h",
-      "tables/minimal_platform_signals.h",
-      "tables/posix_errors.h",
-      "tables/posix_signals.h",
-      "tables/signal_table.h",
-      "tables/stdc_errors.h",
-      "tables/stdc_signals.h",
-    ]
-  }
 }
 
 # llvm_libc_source_set() deps wants this too.
