@@ -49,14 +49,11 @@ platform_aibs(
 )
 
 platform_aibs(
-    name = "platform",
+    name = "platform_bringup",
     aib_dirs = [
         "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in USER_PLATFORM_AIB_NAMES
+        for aib in BRINGUP_PLATFORM_AIB_NAMES
     ],
-    # NOTE: Including `bazel_migration` has no real effect because it's not
-    # recognized by `ffx assembly`. It's here to help development and debugging.
-    aibs = [":bazel_migration"],
 )
 
 platform_aibs(
