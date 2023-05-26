@@ -5,7 +5,7 @@
     children: [
         {
             name: "radar-proxy",
-            url: "fuchsia-pkg://fuchsia.com/radar-proxy#meta/radar-proxy.cm",
+            url: "fuchsia-pkg://fuchsia.com/radar-proxy-with-injector#meta/radar-proxy.cm",
         },
     ],
     use: [

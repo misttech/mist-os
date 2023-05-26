@@ -54,7 +54,6 @@ fuchsia_component("radar-proxy-component-with-injector") {
 }
 
 fuchsia_package("radar-proxy-with-injector") {
-  package_name = "radar-proxy"
   deps = [ ":radar-proxy-component-with-injector" ]
 }
 
@@ -65,7 +64,6 @@ fuchsia_component("radar-proxy-component-without-injector") {
 }
 
 fuchsia_package("radar-proxy-without-injector") {
-  package_name = "radar-proxy"
   deps = [ ":radar-proxy-component-without-injector" ]
 }
 
@@ -77,7 +75,7 @@ _test_deps = [
   "//zircon/system/ulib/zxtest",
 ]
 
-test("radar-proxy-test-bin-with-injection") {
+test("radar-proxy-test-bin-with-injector") {
   sources = [
     "burst-injector.cc",
     "radar-reader-proxy.cc",
@@ -87,11 +85,11 @@ test("radar-proxy-test-bin-with-injection") {
   deps = _common_deps + _test_deps
 }
 
-fuchsia_unittest_component("radar-proxy-test-component-with-injection") {
-  deps = [ ":radar-proxy-test-bin-with-injection" ]
+fuchsia_unittest_component("radar-proxy-test-component-with-injector") {
+  deps = [ ":radar-proxy-test-bin-with-injector" ]
 }
 
-test("radar-proxy-test-bin-without-injection") {
+test("radar-proxy-test-bin-without-injector") {
   sources = [
     "radar-provider-proxy.cc",
     "test/radar-provider-proxy-test.cc",
@@ -99,8 +97,8 @@ test("radar-proxy-test-bin-without-injection") {
   deps = _common_deps + _test_deps
 }
 
-fuchsia_unittest_component("radar-proxy-test-component-without-injection") {
-  deps = [ ":radar-proxy-test-bin-without-injection" ]
+fuchsia_unittest_component("radar-proxy-test-component-without-injector") {
+  deps = [ ":radar-proxy-test-bin-without-injector" ]
 }
 
 fuchsia_test_package("radar-proxy-test") {
@@ -110,8 +108,8 @@ fuchsia_test_package("radar-proxy-test") {
     }
   }
   test_components = [
-    ":radar-proxy-test-component-with-injection",
-    ":radar-proxy-test-component-without-injection",
+    ":radar-proxy-test-component-with-injector",
+    ":radar-proxy-test-component-without-injector",
   ]
 }
 
