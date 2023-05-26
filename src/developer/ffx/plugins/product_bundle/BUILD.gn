@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_product_bundle") {
   version = "0.1.0"
@@ -18,13 +19,14 @@ ffx_plugin("ffx_product_bundle") {
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pbms:lib",
-    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:fs_extra",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
@@ -55,4 +57,15 @@ group("tests") {
 
   # The unit tests are also built by the ffx_plugin target.
   deps = [ ":ffx_product_bundle" ]
+}
+
+ffx_tool("ffx_product_bundle_tool") {
+  edition = "2021"
+  output_name = "ffx-product-bundle"
+  deps = [
+    ":ffx_product_bundle",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

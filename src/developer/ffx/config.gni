@@ -40,7 +40,6 @@ included_ffx_plugins = [
   "//src/developer/ffx/plugins/cts:ffx_cts",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
   "//src/developer/ffx/plugins/doctor:ffx_doctor",
-  "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
   "//src/developer/ffx/plugins/test:ffx_test",
 ]
 
@@ -69,6 +68,7 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/power:ffx_power",
   "//src/developer/ffx/plugins/process_explorer:ffx_process_explorer",
   "//src/developer/ffx/plugins/product:ffx_product",
+  "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
   "//src/developer/ffx/plugins/profile:ffx_profile",
   "//src/developer/ffx/plugins/repository:ffx_repository",
   "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny",

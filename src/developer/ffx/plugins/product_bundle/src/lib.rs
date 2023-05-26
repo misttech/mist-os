@@ -8,13 +8,13 @@
 
 use ::gcs::client::Client;
 use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_config::ConfigLevel;
-use ffx_core::ffx_plugin;
 use ffx_product_bundle_args::{
     CreateCommand, GetCommand, ListCommand, ProductBundleCommand, RemoveCommand, SubCommand,
 };
-use ffx_writer::Writer;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl;
 use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositoryError, RepositorySpec};
@@ -27,7 +27,7 @@ use std::{
     collections::BTreeSet,
     convert::TryInto,
     fs::{read_dir, remove_dir_all},
-    io::{stderr, stdin},
+    io::{stderr, stdin, stdout},
     path::{Component, Path},
 };
 use structured_ui::{self, Presentation, Response, SimplePresentation, TableRows, TextUi};
@@ -37,19 +37,31 @@ mod create;
 
 const CONFIG_METADATA: &str = "pbms.metadata";
 
+#[derive(FfxTool)]
+pub struct ProductBundleTool {
+    #[command]
+    cmd: ProductBundleCommand,
+    #[with(fho::daemon_protocol())]
+    repos: RepositoryRegistryProxy,
+}
+
+fho::embedded_plugin!(ProductBundleTool);
+
 /// Provide functionality to list product-bundle metadata, fetch metadata, and
 /// pull images and related data.
-#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
-pub async fn product_bundle(
-    cmd: ProductBundleCommand,
-    writer: Writer,
-    repos: RepositoryRegistryProxy,
-) -> Result<()> {
-    let mut input = stdin();
-    let mut output = writer;
-    let mut err_out = stderr();
-    let mut ui = TextUi::new(&mut input, &mut output, &mut err_out);
-    product_bundle_plugin_impl(cmd, &mut ui, repos).await
+#[async_trait(?Send)]
+impl FfxMain for ProductBundleTool {
+    type Writer = SimpleWriter;
+
+    // TODO(fxbug.dev/127955) use the writer when possible.
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let mut input = stdin();
+        let mut output = stdout();
+        let mut err_out = stderr();
+        let mut ui = TextUi::new(&mut input, &mut output, &mut err_out);
+        product_bundle_plugin_impl(self.cmd, &mut ui, self.repos).await?;
+        Ok(())
+    }
 }
 
 /// Dispatch to a sub-command.
