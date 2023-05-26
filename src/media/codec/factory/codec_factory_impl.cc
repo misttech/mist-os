@@ -34,6 +34,7 @@ const std::string kIsolateRelativeUrlSbc = "#meta/codec_runner_sw_sbc.cm";
 const std::string kIsolateRelativeUrlAac = "#meta/codec_runner_sw_aac.cm";
 const std::string kIsolateRelativeUrlCvsd = "#meta/codec_runner_sw_cvsd.cm";
 const std::string kIsolateRelativeUrlFfmpeg = "#meta/codec_runner_sw_ffmpeg.cm";
+const std::string kIsolateRelativeUrlLc3 = "#meta/codec_runner_sw_lc3.cm";
 
 struct EncoderSupportSpec {
   std::string isolate_url;
@@ -69,10 +70,17 @@ const EncoderSupportSpec kCvsdEncoderSupportSpec = {
     .mime_types = {"audio/pcm"},
     .supports_settings =
         [](const fuchsia::media::EncoderSettings& settings) { return settings.is_cvsd(); },
-};  // namespace
+};
+
+const EncoderSupportSpec kLc3EncoderSupportSpec = {
+    .isolate_url = kIsolateRelativeUrlLc3,
+    .mime_types = {"audio/pcm"},
+    .supports_settings =
+        [](const fuchsia::media::EncoderSettings& settings) { return settings.is_lc3(); },
+};
 
 const EncoderSupportSpec supported_encoders[] = {kSbcEncoderSupportSpec, kAacEncoderSupportSpec,
-                                                 kCvsdEncoderSupportSpec};
+                                                 kCvsdEncoderSupportSpec, kLc3EncoderSupportSpec};
 
 struct DecoderSupportSpec {
   std::string isolate_url;
@@ -92,13 +100,18 @@ const DecoderSupportSpec kSbcDecoderSuportSpec = {
     .mime_types = {"audio/sbc", "audio/msbc"},
 };
 
-const DecoderSupportSpec kCvsdDecoderSuportSpec = {
+const DecoderSupportSpec kCvsdDecoderSupportSpec = {
     .isolate_url = kIsolateRelativeUrlCvsd,
     .mime_types = {"audio/cvsd"},
 };
 
+const DecoderSupportSpec kLc3DecoderSupportSpec = {
+    .isolate_url = kIsolateRelativeUrlLc3,
+    .mime_types = {"audio/lc3"},
+};
+
 const DecoderSupportSpec supported_decoders[] = {kFfmpegSupportSpec, kSbcDecoderSuportSpec,
-                                                 kCvsdDecoderSuportSpec};
+                                                 kCvsdDecoderSupportSpec, kLc3DecoderSupportSpec};
 
 std::optional<std::string> FindEncoder(const std::string& mime_type,
                                        const fuchsia::media::EncoderSettings& settings) {

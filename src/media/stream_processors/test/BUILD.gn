@@ -104,6 +104,18 @@ rustc_library("stream_processor_encoder_factory_lib") {
   sources = [ "stream_processor_factories/encoders.rs" ]
 }
 
+rustc_library("decoder_test_data") {
+  name = "decoder_test_data"
+  edition = "2021"
+  source_root = "audio_decoder_test/test_data/lib.rs"
+  testonly = true
+
+  sources = [
+    "audio_decoder_test/test_data/encoded.rs",
+    "audio_decoder_test/test_data/lib.rs",
+  ]
+}
+
 rustc_library("audio_decoder_test_lib") {
   name = "audio_decoder_test_lib"
   edition = "2021"
@@ -124,6 +136,7 @@ rustc_library("audio_decoder_test_lib") {
 
   sources = [
     "audio_decoder_test/cvsd.rs",
+    "audio_decoder_test/lc3.rs",
     "audio_decoder_test/lib.rs",
     "audio_decoder_test/sbc.rs",
     "audio_decoder_test/test_suite.rs",
@@ -137,6 +150,7 @@ rustc_test("audio_decoder_test_bin") {
   sources = [ "audio_decoder_test/tests/tests.rs" ]
   deps = [
     ":audio_decoder_test_lib",
+    ":decoder_test_data",
     ":stream_processor_test_lib",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/lib/fuchsia",
@@ -162,6 +176,18 @@ fuchsia_test_package("audio_decoder_test") {
   test_components = [ ":audio_decoder_test_comp" ]
   subpackages = [ "//src/media/codec:codec_factory_test" ]
   deps = [ ":sbc_file" ]
+}
+
+rustc_library("encoder_test_data") {
+  name = "encoder_test_data"
+  edition = "2021"
+  source_root = "audio_encoder_test/test_data/lib.rs"
+  testonly = true
+
+  sources = [
+    "audio_encoder_test/test_data/input_pcm.rs",
+    "audio_encoder_test/test_data/lib.rs",
+  ]
 }
 
 rustc_library("audio_encoder_test_lib") {
@@ -208,6 +234,7 @@ rustc_test("audio_encoder_test_bin") {
   sources = [ "audio_encoder_test/tests/tests.rs" ]
   deps = [
     ":audio_encoder_test_lib",
+    ":encoder_test_data",
     ":stream_processor_test_lib",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/lib/fuchsia",

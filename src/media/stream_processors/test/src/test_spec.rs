@@ -10,6 +10,13 @@ use fidl_fuchsia_media::StreamProcessorProxy;
 use futures::{future::BoxFuture, stream::FuturesUnordered, TryStreamExt};
 use std::rc::Rc;
 
+pub enum OutputSize {
+    // Size of output in terms of packets.
+    PacketCount(usize),
+    // Size of output in terms of number of raw bytes.
+    RawBytesCount(usize),
+}
+
 const FIRST_FORMAT_DETAILS_VERSION_ORDINAL: u64 = 1;
 
 pub type TestCaseOutputs = Vec<Output>;

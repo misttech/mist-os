@@ -6,6 +6,7 @@
 
 use audio_encoder_test_lib::{pcm_audio::*, test_suite::*};
 
+use encoder_test_data::*;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
 use stream_processor_test::*;
@@ -39,6 +40,7 @@ fn sbc_test_suite() -> Result<()> {
 
         let sbc_tests = AudioEncoderTestCase {
             input_framelength: (sub_bands.into_primitive() * block_count.into_primitive()) as usize,
+            input_frames_per_second: 44100,
             settings: EncoderSettings::Sbc(SbcEncoderSettings {
                 allocation: SbcAllocation::AllocLoudness,
                 sub_bands,
@@ -48,10 +50,9 @@ fn sbc_test_suite() -> Result<()> {
                 bit_pool: 59,
             }),
             channel_count: 1,
-            frames_per_second: 44100,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                94,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 44100,
+                OutputSize::PacketCount(94),
                 vec![ExpectedDigest::new(
                     "Sbc: 44.1kHz/Loudness/Mono/bitpool 56/blocks 8/subbands 4",
                     "5c65a88bda3f132538966d87df34aa8675f85c9892b7f9f5571f76f3c7813562",
@@ -71,12 +72,12 @@ fn msbc_test_suite() -> Result<()> {
 
         let msbc_tests = AudioEncoderTestCase {
             input_framelength: (sub_bands * block_count) as usize,
+            input_frames_per_second: 16000,
             settings: EncoderSettings::Msbc(MSbcEncoderSettings::default()),
             channel_count: 1,
-            frames_per_second: 16000,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                25,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 16000,
+                OutputSize::PacketCount(25),
                 vec![ExpectedDigest::new(
                     "Sbc: 16kHz/Loudness/Mono/bitpool 26/blocks 15/subbands 8",
                     "bf96bd3b827a1317d8e707d3791d1a7d4b7f6a0d7f63f89831c5de1f1828b5ab",
@@ -93,6 +94,7 @@ fn aac_test_suite() -> Result<()> {
     with_large_stack(|| {
         let aac_raw_tests = AudioEncoderTestCase {
             input_framelength: 1024,
+            input_frames_per_second: 44100,
             settings: EncoderSettings::Aac(AacEncoderSettings {
                 transport: AacTransport::Raw(AacTransportRaw {}),
                 channel_mode: AacChannelMode::Mono,
@@ -100,10 +102,9 @@ fn aac_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
-            frames_per_second: 44100,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                5,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 44100,
+                OutputSize::PacketCount(5),
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Raw Arm",
@@ -123,6 +124,7 @@ fn aac_test_suite() -> Result<()> {
         // resulting bit streams are identical.
         let aac_raw_tests = AudioEncoderTestCase {
             input_framelength: 1024,
+            input_frames_per_second: 44100,
             settings: EncoderSettings::Aac(AacEncoderSettings {
                 transport: AacTransport::Raw(AacTransportRaw {}),
                 channel_mode: AacChannelMode::Mono,
@@ -130,10 +132,9 @@ fn aac_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg4AacLc,
             }),
             channel_count: 1,
-            frames_per_second: 44100,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                5,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 44100,
+                OutputSize::PacketCount(5),
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Raw Arm",
@@ -156,6 +157,7 @@ fn aac_adts_test_suite() -> Result<()> {
     with_large_stack(|| {
         let aac_adts_tests = AudioEncoderTestCase {
             input_framelength: 1024,
+            input_frames_per_second: 44100,
             settings: EncoderSettings::Aac(AacEncoderSettings {
                 transport: AacTransport::Adts(AacTransportAdts {}),
                 channel_mode: AacChannelMode::Mono,
@@ -163,10 +165,9 @@ fn aac_adts_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
-            frames_per_second: 44100,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                5,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 44100,
+                OutputSize::PacketCount(5),
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Adts Arm",
@@ -189,6 +190,7 @@ fn aac_latm_test_suite() -> Result<()> {
     with_large_stack(|| {
         let aac_latm_with_mux_config_test = AudioEncoderTestCase {
             input_framelength: 1024,
+            input_frames_per_second: 44100,
             settings: EncoderSettings::Aac(AacEncoderSettings {
                 transport: AacTransport::Latm(AacTransportLatm { mux_config_present: true }),
                 channel_mode: AacChannelMode::Mono,
@@ -196,10 +198,9 @@ fn aac_latm_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
-            frames_per_second: 44100,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                5,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 44100,
+                OutputSize::PacketCount(5),
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Latm/MuxConfig Arm",
@@ -217,6 +218,7 @@ fn aac_latm_test_suite() -> Result<()> {
 
         let aac_latm_without_mux_config_test = AudioEncoderTestCase {
             input_framelength: 1024,
+            input_frames_per_second: 44100,
             settings: EncoderSettings::Aac(AacEncoderSettings {
                 transport: AacTransport::Latm(AacTransportLatm { mux_config_present: false }),
                 channel_mode: AacChannelMode::Mono,
@@ -224,10 +226,9 @@ fn aac_latm_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
-            frames_per_second: 44100,
-            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
-                5,
+            output_tests: vec![AudioEncoderOutputTest::saw_wave_test(
                 44100,
+                OutputSize::PacketCount(5),
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Latm/NoMuxConfig Arm",
@@ -250,10 +251,10 @@ fn cvsd_simple_test_suite() -> Result<()> {
     with_large_stack(|| {
         let cvsd_tests = AudioEncoderTestCase {
             input_framelength: 8,
+            input_frames_per_second: 64000,
             settings: EncoderSettings::Cvsd(CvsdEncoderSettings::default()),
             channel_count: 1,
-            frames_per_second: 64000,
-            hash_tests: vec![AudioEncoderHashTest {
+            output_tests: vec![AudioEncoderOutputTest {
                 output_file: None,
                 input_audio: PcmAudio::create_from_data(
                     PcmFormat {
@@ -264,16 +265,60 @@ fn cvsd_simple_test_suite() -> Result<()> {
                     },
                     vec![1, 2, 3, 4, 5, 6, 7, 8].as_slice(),
                 ),
-                // Total number of expected encoded output bytes is 1.
-                // Since the minimum output buffer size is 1 byte, test should
-                // have outputted 1 packet.
-                output_packet_count: 1,
-                expected_digests: vec![ExpectedDigest::new_from_raw(
+                // 16-1 compression means 8 samples of 2-byte PCM input will be converted to 1 byte of output.
+                expected_output_size: OutputSize::RawBytesCount(1),
+                expected_digests: Some(vec![ExpectedDigest::new_from_raw(
                     "Simple test case",
                     vec![0b01010101],
-                )],
+                )]),
             }],
         };
         fasync::TestExecutor::new().run_singlethreaded(cvsd_tests.run())
+    })
+}
+
+#[test]
+fn lc3_simple_test_suite() -> Result<()> {
+    const BITS_PER_SAMPLE: u32 = 16;
+    const FRAMES_PER_SECOND: u32 = 32000;
+    const FRAME_DURATION: Lc3FrameDuration = Lc3FrameDuration::D7P5Ms;
+    const FRAME_SIZE: u32 = 240;
+    const NBYTES: u16 = 58;
+    with_large_stack(|| {
+        let lc3_tests = AudioEncoderTestCase {
+            input_framelength: (FRAME_SIZE).try_into().unwrap(),
+            // We use 32kHz for timestamp testing instead of 44.1kHz that's used
+            // for other codecs.
+            // For LC3, When the sampling frequency of the input signal is 44.1 kHz, the
+            // same frame length is used as for 48 kHz, resulting in the slightly longer
+            // actual frame duration of 10.884 ms for the 10 ms frame interval and of 8.16 ms
+            // for the 7.5 ms frame interval, which makes it hard to test for timestamp
+            // validations.
+            // See LC3 specification v1.0 section 2.1 for more details.
+            input_frames_per_second: 32000,
+            settings: EncoderSettings::Lc3(Lc3EncoderSettings {
+                nbytes: Some(NBYTES),
+                frame_duration: Some(FRAME_DURATION),
+                ..Lc3EncoderSettings::default()
+            }),
+            channel_count: 1,
+            output_tests: vec![AudioEncoderOutputTest {
+                output_file: None,
+                input_audio: PcmAudio::create_from_data(
+                    PcmFormat {
+                        pcm_mode: AudioPcmMode::Linear,
+                        bits_per_sample: BITS_PER_SAMPLE,
+                        frames_per_second: FRAMES_PER_SECOND,
+                        channel_map: vec![AudioChannelId::Lf],
+                    },
+                    &INPUT_TEST_S16LE32000MONO,
+                ),
+                // Each frame of input is to be converted to 58 bytes of output.
+                // There are 48 frames worth of input data in total.
+                expected_output_size: OutputSize::RawBytesCount((NBYTES * 48) as usize),
+                expected_digests: None,
+            }],
+        };
+        fasync::TestExecutor::new().run_singlethreaded(lc3_tests.run())
     })
 }

@@ -3,5 +3,6 @@
 // found in the LICENSE file.
 
 pub mod cvsd;
+pub mod lc3;
 pub mod sbc;
 pub mod test_suite;

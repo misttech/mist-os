@@ -75,8 +75,10 @@ fuchsia_package("codec_factory") {
 fuchsia_package("codec_factory_test") {
   testonly = true
   deps = [
-    ":codec_runner_sw_cvsd_comp",  # TODO(fxbug.dev/127023): make available
-                                   # based on product requirements
+    # TODO(fxbug.dev/127023): move to `sw_codecs` when ready for prod
+    # and make available based on product requirements.
+    ":codec_runner_sw_cvsd_comp",
+    ":codec_runner_sw_lc3_comp",
     ":sw_codecs",
     "//src/media/codec/factory:component",
   ]

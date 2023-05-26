@@ -4,8 +4,9 @@
 
 #![cfg(test)]
 
-use audio_decoder_test_lib::{cvsd::*, sbc::*, test_suite::*};
+use audio_decoder_test_lib::{cvsd::*, lc3::*, sbc::*, test_suite::*};
 
+use decoder_test_data::*;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
 use std::rc::Rc;
@@ -61,14 +62,14 @@ fn sbc_decode() -> Result<()> {
     // One output packet per input packet, the decoder queues an output packet whenever an input packet is
     // exhausted.
     let sbc_tests = AudioDecoderTestCase {
-        hash_tests: vec![AudioDecoderHashTest {
+        output_tests: vec![AudioDecoderOutputTest {
             output_file: None,
             stream: stream,
-            output_packet_count: 23,
-            expected_digests: vec![ExpectedDigest::new(
+            expected_output_size: OutputSize::PacketCount(23),
+            expected_digests: Some(vec![ExpectedDigest::new(
                 "Pcm: 44.1kHz/16bit/Mono",
                 "ff2e7afea51217886d3df15b9a623b4e49c9bd9bd79c58ac01bc94c5511e08d6",
-            )],
+            )]),
             expected_output_format: output_format,
         }],
     };
@@ -104,14 +105,14 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
     // Output space is large (min 10k) so only 2 output frames are needed (this is good) -
     // decoder will continue filling an output frame as long as there is space
     let sbc_tests = AudioDecoderTestCase {
-        hash_tests: vec![AudioDecoderHashTest {
+        output_tests: vec![AudioDecoderOutputTest {
             output_file: None,
             stream: large_input_chunk_stream,
-            output_packet_count: 1,
-            expected_digests: vec![ExpectedDigest::new(
+            expected_output_size: OutputSize::PacketCount(1),
+            expected_digests: Some(vec![ExpectedDigest::new(
                 "Large chunk Pcm: 44.1kHz/16bit/Mono",
                 "ff2e7afea51217886d3df15b9a623b4e49c9bd9bd79c58ac01bc94c5511e08d6",
-            )],
+            )]),
             expected_output_format: output_format2,
         }],
     };
@@ -136,7 +137,7 @@ fn cvsd_simple_decode() -> Result<()> {
     };
 
     let cvsd_tests = AudioDecoderTestCase {
-        hash_tests: vec![AudioDecoderHashTest {
+        output_tests: vec![AudioDecoderOutputTest {
             output_file: None,
             stream: Rc::new(TimestampedStream {
                 source: CvsdStream::from_data(vec![0b01010101], 1),
@@ -145,15 +146,65 @@ fn cvsd_simple_decode() -> Result<()> {
             // Total number of expected decoded output bytes is 16.
             // Since the minimum output buffer size is 16 bytes, all the input
             // should have been decoded in 1 output packet.
-            output_packet_count: 1,
-            expected_digests: vec![ExpectedDigest::new_from_raw(
+            expected_output_size: OutputSize::PacketCount(1),
+            expected_digests: Some(vec![ExpectedDigest::new_from_raw(
                 "Simple test case",
                 // Equivalent to eight int16 elements [10, 0, 9, -1, 9, -1, 9, -1].
                 vec![10, 0, 0, 0, 9, 0, 255, 255, 9, 0, 255, 255, 9, 0, 255, 255],
-            )],
+            )]),
             expected_output_format: output_format,
         }],
     };
 
     fasync::TestExecutor::new().run_singlethreaded(cvsd_tests.run())
+}
+
+#[test]
+fn lc3_simple_decode() -> Result<()> {
+    const BITS_PER_SAMPLE: u32 = 16;
+    const FRAMES_PER_SECOND: u32 = 32000;
+    const FRAME_SIZE: u32 = 240;
+    const NBYTES: usize = 58;
+
+    let oob_bytes = vec![
+        0x02, 0x01, 0x06, // 32kHz sampling freq.
+        0x02, 0x02, 0x00, // 7.5ms frame duration.
+        0x05, 0x03, 0x00, 0x00, 0x00, 0x01, // LF.
+        0x03, 0x04, 0x00, 58, // 58 octets per codec frame.
+    ];
+
+    let output_format = FormatDetails {
+        format_details_version_ordinal: Some(1),
+        mime_type: Some("audio/pcm".to_string()),
+        domain: Some(DomainFormat::Audio(AudioFormat::Uncompressed(AudioUncompressedFormat::Pcm(
+            PcmFormat {
+                pcm_mode: AudioPcmMode::Linear,
+                bits_per_sample: BITS_PER_SAMPLE,
+                frames_per_second: FRAMES_PER_SECOND,
+                channel_map: vec![AudioChannelId::Lf],
+            },
+        )))),
+        ..FormatDetails::default()
+    };
+
+    let lc3_data: Vec<u8> = LC3_TEST_S16LE32000MONO.to_vec();
+
+    let lc3_tests = AudioDecoderTestCase {
+        output_tests: vec![AudioDecoderOutputTest {
+            output_file: None,
+            stream: Rc::new(TimestampedStream {
+                source: Lc3Stream::from_data(lc3_data, oob_bytes, NBYTES),
+                timestamps: 0..,
+            }),
+            // Frame size for output PCM is 240 samples. There are 48 output frames
+            // worth of input and each sample is 2 bytes long.
+            expected_output_size: OutputSize::RawBytesCount(
+                (FRAME_SIZE * 48 * 2).try_into().unwrap(),
+            ),
+            expected_digests: None,
+            expected_output_format: output_format,
+        }],
+    };
+
+    fasync::TestExecutor::new().run_singlethreaded(lc3_tests.run())
 }

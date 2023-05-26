@@ -9,18 +9,18 @@ use stream_processor_decoder_factory::*;
 use stream_processor_test::*;
 
 pub struct AudioDecoderTestCase {
-    pub hash_tests: Vec<AudioDecoderHashTest>,
+    pub output_tests: Vec<AudioDecoderOutputTest>,
 }
 
 /// A hash test runs audio through the encoder and checks that all that data emitted when hashed
 /// sequentially results in the expected digest. Oob bytes are hashed first.
-pub struct AudioDecoderHashTest {
+pub struct AudioDecoderOutputTest {
     /// If provided, the output will also be written to this file. Use this to verify new files
     /// with a decoder before using their digest in tests.
     pub output_file: Option<&'static str>,
     pub stream: Rc<dyn ElementaryStream>,
-    pub output_packet_count: usize,
-    pub expected_digests: Vec<ExpectedDigest>,
+    pub expected_output_size: OutputSize,
+    pub expected_digests: Option<Vec<ExpectedDigest>>,
     pub expected_output_format: FormatDetails,
 }
 
@@ -43,25 +43,37 @@ impl AudioDecoderTestCase {
 
     async fn test_hashes(self) -> Result<()> {
         let mut cases = vec![];
-        for (hash_test, stream_lifetime_ordinal) in
-            self.hash_tests.into_iter().zip(OrdinalPattern::Odd.into_iter())
+        for (output_test, stream_lifetime_ordinal) in
+            self.output_tests.into_iter().zip(OrdinalPattern::Odd.into_iter())
         {
+            let mut validators: Vec<Rc<dyn OutputValidator>> =
+                vec![Rc::new(TerminatesWithValidator {
+                    expected_terminal_output: Output::Eos { stream_lifetime_ordinal },
+                })];
+            match output_test.expected_output_size {
+                OutputSize::PacketCount(v) => {
+                    validators.push(Rc::new(OutputPacketCountValidator {
+                        expected_output_packet_count: v,
+                    }));
+                }
+                OutputSize::RawBytesCount(v) => {
+                    validators
+                        .push(Rc::new(OutputDataSizeValidator { expected_output_data_size: v }));
+                }
+            };
+            validators.push(Rc::new(FormatValidator {
+                expected_format: output_test.expected_output_format,
+            }));
+            if let Some(digests) = output_test.expected_digests {
+                validators.push(Rc::new(BytesValidator {
+                    output_file: output_test.output_file,
+                    expected_digests: digests,
+                }));
+            }
             cases.push(TestCase {
-                name: "Audio decoder hash test",
-                stream: hash_test.stream,
-                validators: vec![
-                    Rc::new(TerminatesWithValidator {
-                        expected_terminal_output: Output::Eos { stream_lifetime_ordinal },
-                    }),
-                    Rc::new(OutputPacketCountValidator {
-                        expected_output_packet_count: hash_test.output_packet_count,
-                    }),
-                    Rc::new(FormatValidator { expected_format: hash_test.expected_output_format }),
-                    Rc::new(BytesValidator {
-                        output_file: hash_test.output_file,
-                        expected_digests: hash_test.expected_digests,
-                    }),
-                ],
+                name: "Audio decoder output test",
+                stream: output_test.stream,
+                validators,
                 stream_options: Some(StreamOptions {
                     queue_format_details: false,
                     // Set the buffer constraints slightly off-kilter to test fenceposting

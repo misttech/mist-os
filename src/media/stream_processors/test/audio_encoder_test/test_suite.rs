@@ -15,32 +15,32 @@ use stream_processor_test::*;
 pub const TEST_PCM_FRAME_COUNT: usize = 3000;
 
 pub struct AudioEncoderTestCase {
-    /// Encoder settings.
-    // This is a function because FIDL unions are not Copy or Clone.
+    // Encoder settings. This is a function because FIDL unions are not Copy or Clone.
     pub settings: EncoderSettings,
     /// The number of PCM input frames per encoded frame.
     pub input_framelength: usize,
-    /// The frames per second of the input frames.
-    pub frames_per_second: u32,
+    /// Sampling frequency to use for generating input for timestamp-related tests.
+    pub input_frames_per_second: u32,
     pub channel_count: usize,
-    pub hash_tests: Vec<AudioEncoderHashTest>,
+    pub output_tests: Vec<AudioEncoderOutputTest>,
 }
 
-/// A hash test runs audio through the encoder and checks that all that data emitted when hashed
-/// sequentially results in the expected digest. Oob bytes are hashed first.
-pub struct AudioEncoderHashTest {
+/// An output test runs audio through the encoder and checks that the output is expected.
+/// It checks the output size and if the hash was passed in, it checks that all that data
+/// emitted when hashed sequentially results in the expected digest. Oob bytes are hashed first.
+pub struct AudioEncoderOutputTest {
     /// If provided, the output will also be written to this file. Use this to verify new files
     /// with a decoder before using their digest in tests.
     pub output_file: Option<&'static str>,
     pub input_audio: PcmAudio,
-    pub output_packet_count: usize,
-    pub expected_digests: Vec<ExpectedDigest>,
+    pub expected_output_size: OutputSize,
+    pub expected_digests: Option<Vec<ExpectedDigest>>,
 }
 
-impl AudioEncoderHashTest {
+impl AudioEncoderOutputTest {
     pub fn saw_wave_test(
-        output_packet_count: usize,
         frames_per_second: u32,
+        expected_output_size: OutputSize,
         expected_digests: Vec<ExpectedDigest>,
     ) -> Self {
         Self {
@@ -54,50 +54,60 @@ impl AudioEncoderHashTest {
                 },
                 TEST_PCM_FRAME_COUNT,
             ),
-            output_packet_count,
-            expected_digests,
+            expected_output_size,
+            expected_digests: Some(expected_digests),
         }
     }
 }
 
 impl AudioEncoderTestCase {
     pub async fn run(self) -> Result<()> {
-        self.test_termination().await.expect("termination test");
-        self.test_early_termination().await.expect("early termination test");
-        self.test_timestamps().await.expect("timestamps test");
-        self.test_hashes().await.expect("hashes test");
-        Ok(())
+        self.test_termination().await?;
+        self.test_early_termination().await?;
+        self.test_timestamps().await?;
+        self.test_outputs().await
     }
 
-    async fn test_hashes(self) -> Result<()> {
+    async fn test_outputs(self) -> Result<()> {
         let mut cases = vec![];
         let easy_framelength = self.input_framelength;
-        for (hash_test, stream_lifetime_ordinal) in
-            self.hash_tests.into_iter().zip(OrdinalPattern::Odd.into_iter())
+        for (output_test, stream_lifetime_ordinal) in
+            self.output_tests.into_iter().zip(OrdinalPattern::Odd.into_iter())
         {
             let settings = self.settings.clone();
-            let pcm_audio = hash_test.input_audio;
+            let pcm_audio = output_test.input_audio;
             let stream = Rc::new(PcmAudioStream {
                 pcm_audio,
                 encoder_settings: settings.clone(),
                 frames_per_packet: (0..).map(move |_| easy_framelength),
                 timebase: None,
             });
+            let mut validators: Vec<Rc<dyn OutputValidator>> =
+                vec![Rc::new(TerminatesWithValidator {
+                    expected_terminal_output: Output::Eos { stream_lifetime_ordinal },
+                })];
+            match output_test.expected_output_size {
+                OutputSize::PacketCount(v) => {
+                    validators.push(Rc::new(OutputPacketCountValidator {
+                        expected_output_packet_count: v,
+                    }));
+                }
+                OutputSize::RawBytesCount(v) => {
+                    validators
+                        .push(Rc::new(OutputDataSizeValidator { expected_output_data_size: v }));
+                }
+            }
+
+            if let Some(expected_digests) = output_test.expected_digests {
+                validators.push(Rc::new(BytesValidator {
+                    output_file: output_test.output_file,
+                    expected_digests,
+                }));
+            }
             cases.push(TestCase {
-                name: "Audio encoder hash test",
+                name: "Audio encoder output test",
                 stream,
-                validators: vec![
-                    Rc::new(TerminatesWithValidator {
-                        expected_terminal_output: Output::Eos { stream_lifetime_ordinal },
-                    }),
-                    Rc::new(OutputPacketCountValidator {
-                        expected_output_packet_count: hash_test.output_packet_count,
-                    }),
-                    Rc::new(BytesValidator {
-                        output_file: hash_test.output_file,
-                        expected_digests: hash_test.expected_digests,
-                    }),
-                ],
+                validators,
                 stream_options: Some(StreamOptions {
                     queue_format_details: false,
                     ..StreamOptions::default()
@@ -240,7 +250,7 @@ impl AudioEncoderTestCase {
         let pcm_format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
             bits_per_sample: 16,
-            frames_per_second: self.frames_per_second,
+            frames_per_second: self.input_frames_per_second,
             channel_map: match self.channel_count {
                 1 => vec![AudioChannelId::Cf],
                 2 => vec![AudioChannelId::Lf, AudioChannelId::Rf],
