@@ -1638,7 +1638,7 @@ TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFile) {
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
-  struct [[gnu::packed]] {
+  struct {
     Ehdr ehdr{.phoff = sizeof(Ehdr), .phentsize = sizeof(Phdr), .phnum = 1};
     Phdr phdrs[1]{};
   } elfbytes;
@@ -1663,7 +1663,7 @@ TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNum) {
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
-  struct [[gnu::packed]] {
+  struct {
     Ehdr ehdr{.phoff = sizeof(Ehdr) + sizeof(Shdr),
               .shoff = sizeof(Ehdr),
               .phentsize = sizeof(Phdr),
