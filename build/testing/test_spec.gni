@@ -489,6 +489,13 @@ template("test_spec") {
       tests = [ test_spec ]
     }
     deps = target_name_deps
+    if (defined(invoker.isolated) && invoker.isolated &&
+        # Tests that use image overrides, primarily boot tests, must necessarily
+        # run in isolated mode, so they need not be explicitly included in the
+        # isolated allowlist.
+        !defined(invoker.image_overrides)) {
+      deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
+    }
   }
 
   # When an unreferenced board_name is used, the allowed_device_types
