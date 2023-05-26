@@ -5,6 +5,6 @@
     include: [ "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml" ],
     program: {
         binary: "data/tests/exec_test",
-        args: [ "--runfile_workspace_root=exec_test.runfiles" ],
+        args: [ "--runfile_workspace_root=runfiles" ],
     },
 }
