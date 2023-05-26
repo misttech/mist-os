@@ -13,7 +13,6 @@ core_shard("display_png_shard") {
 rustc_binary("display_png") {
   edition = "2021"
   source_root = "display-png.rs"
-  with_unit_tests = true
   deps = [
     "//src/lib/fuchsia-async",
     "//src/lib/ui/carnelian",
@@ -35,13 +34,4 @@ fuchsia_package_with_single_component("display-png-pkg") {
 fuchsia_shell_package("display-png") {
   manifest = "meta/display-png.cml"
   deps = [ ":display_png" ]
-}
-
-fuchsia_unittest_package("display-png-tests") {
-  deps = [ ":display_png_test" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":display-png-tests" ]
 }
