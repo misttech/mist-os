@@ -53,6 +53,16 @@ pub struct Loader {
     device: vk::Device,
 }
 
+impl Drop for Loader {
+    fn drop(&mut self) {
+        let vk_d = device_pointers(&self.instance_pointers, self.device);
+        unsafe {
+            vk_d.DestroyDevice(self.device, std::ptr::null());
+            self.instance_pointers.DestroyInstance(self._instance, std::ptr::null());
+        }
+    }
+}
+
 impl Loader {
     /// Creates a new `Loader` by creating a Vulkan instance and device, with the provided physical
     /// device index.
@@ -245,7 +255,7 @@ impl Loader {
             self.instance_pointers.GetDeviceProcAddr(self.device, name.as_ptr()) as *const _
         });
 
-        let mut collection: BufferCollectionFUCHSIA = 0;
+        let mut vk_collection: BufferCollectionFUCHSIA = 0;
         let result = unsafe {
             vk_ext.CreateBufferCollectionFUCHSIA(
                 self.device,
@@ -255,21 +265,26 @@ impl Loader {
                     collectionToken: tokens.vulkan_token.as_handle_ref().raw_handle(),
                 },
                 std::ptr::null(),
-                &mut collection as *mut BufferCollectionFUCHSIA,
+                &mut vk_collection as *mut BufferCollectionFUCHSIA,
             )
         };
         if result != vk::SUCCESS {
             return Err(result);
         }
-        assert!(collection != 0);
+        assert!(vk_collection != 0);
 
         let result = unsafe {
             vk_ext.SetBufferCollectionImageConstraintsFUCHSIA(
                 self.device,
-                collection,
+                vk_collection,
                 image_constraints_info as *const ImageConstraintsInfoFUCHSIA,
             )
         };
+
+        unsafe {
+            vk_ext.DestroyBufferCollectionFUCHSIA(self.device, vk_collection, std::ptr::null());
+        }
+
         if result != vk::SUCCESS {
             return Err(result);
         }
