@@ -29,10 +29,23 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    When set, two extra sub_targets are provided to access outputs from Bazel
 #    product image build steps:
 #
-#      * ${target_name}_product_assembly: for images.json
-#      * ${target_name}_create_system: for image_assembly.json
+#      * ${target_name}_product_assembly: for image_assembly.json
+#      * ${target_name}_create_system: for images.json
 #
 #    NOTE: This template does not check this is the actual product image target
+#    used in `bazel_product_bundle_target`.
+#
+#    Type: label (from BUIDL.bazel)
+#
+#  bazel_recovery_image_target (optional)
+#    The Bazel recovery image target for this product bundle.
+#
+#    When set, one extra sub_target is provided to access outputs from Bazel
+#    recovery image build steps:
+#
+#      * ${target_name}_create_recovery_system: for images.json
+#
+#    NOTE: This template does not check this is the actual recovery image target
 #    used in `bazel_product_bundle_target`.
 #
 #    Type: label (from BUIDL.bazel)
@@ -158,6 +171,31 @@ template("bazel_product_bundle") {
       },
     ]
     directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
+  }
+
+  if (defined(invoker.bazel_recovery_image_target)) {
+    _create_recovery_system_target = "${target_name}_create_recovery_system"
+    bazel_action(_create_recovery_system_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "deps",
+                             ])
+
+      command = "build"
+      bazel_targets = [ invoker.bazel_recovery_image_target ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      allow_directory_in_outputs = true
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+          ninja = _create_recovery_system_target
+        },
+      ]
+      directory_timestamp_outputs =
+          [ "${_create_recovery_system_target}/images.json" ]
+    }
   }
 
   bazel_action(labels.bazel_product_bundle) {

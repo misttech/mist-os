@@ -226,7 +226,10 @@ def main():
     bazel_images_manifest_dir = ""
     for line in args.path_mapping:
         gn_path, bazel_path = line.split(":")
-        if gn_path.endswith("_create_system"):
+        # Keep these suffixes in sync with subtarget suffixes in
+        # bazel_product_bundle.gni.
+        if gn_path.endswith("_create_system") or gn_path.endswith(
+                "_create_recovery_system"):
             bazel_images_manifest_dir = bazel_path
             break
 
