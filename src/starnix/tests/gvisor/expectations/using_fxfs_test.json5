@@ -173,7 +173,6 @@
                 "MountTest.BindPeerGroupsWithChildren",
                 "MountTest.BindSharedOnPrivate",
                 "MountTest.BindSharedOnShared",
-                "MountTest.DeadMountsAreDecRefd",
                 "MountTest.InerheritPropagation",
                 "MountTest.MakeMultipleShared",
                 "MountTest.MakePeer",
@@ -314,6 +313,141 @@
                 "RenameTest.TargetIsAncestorOfSource",
                 "Renameat2Test.NoReplaceDot",
 
+                // sendfile_socket_test
+                "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/0",
+
+                // socket_filesystem_non_blocking_test
+                "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.ReadNothingAvailable/*",
+                "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.RecvMsgNothingAvailable/*",
+                "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.RecvNothingAvailable/*",
+
+                // socket_filesystem_test
+                //
+                // Note, since expectations are processed from top to bottom,
+                // we have to be careful of collisions where tests are defined
+                // with a different expectation in the imported file.
+                //
+                // For example,
+                // "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
+                // is defined as type: "skip" in the default.json5 file.
+                // So if we defined "FilesystemUnixSockets/AllSocketPairTest.*/*"
+                // here as type: "expect_failure", the initial tests will the
+                // latter type. To avoid this, we can be more explicit with
+                // the file names.
+                "FilesystemUnixSockets/AllSocketPairTest.BasicReadWrite/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicReadWriteBadBuffer/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicRecvmmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicSendmmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicSendRecv/*",
+                "FilesystemUnixSockets/AllSocketPairTest.LingerSocketOption/*",
+                "FilesystemUnixSockets/AllSocketPairTest.KeepAliveSocketOption/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSndBufSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSocketRcvbufOption/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSockoptDomain/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSockoptType/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSockoptProtocol/*",
+                "FilesystemUnixSockets/AllSocketPairTest.MsgPeek/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RcvBufSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RcvufSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetSendDefault/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetSendTimeout/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetSendTimeoutLargerArg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetRecvTimeout/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetRecvTimeoutLargerArg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutDefault/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgMsghdrFlagsNotClearedOnFailure/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgIovNotUpdated/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutReadSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvOneSecondSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvmsgSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutDefault/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutAllowsWrite/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutAllowsSend/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutAllowsSendmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutUsecTooLarge/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutUsecNeg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutNegSecRead/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutNegSecRecv/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutNegSecRecvmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutWaitAll/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvWaitAll/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvWaitAllDontWait/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BadFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicCredPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassNoSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassNoSpaceMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassNotEnoughSpaceMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassUnalignedRecv/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassUnalignedRecvNoMsgTrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicThreeFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicThreeFDPassTruncationMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicTwoFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicTwoFDPassUnalignedRecvTruncationMsgTrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CloexecRecvFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CloexecDroppedWhenFDPassed/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredAndFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassNoMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassNoSpaceMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassTruncated/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassTruncatedMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.ConcurrentBasicFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCredWithoutCredHeaderSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCredWithoutCredSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassBeforeSoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassInterspersed1/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassInterspersed2/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassNoRecv/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassNotCoalesced/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassPeek/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCredWithoutCredHeaderSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.MsgCtruncInputIsNoop/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.NoDataCredPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.NoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsAfterSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsAfterSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.ShortCmsg/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteAfterSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteAfterSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsAfterSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsAfterSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsBeforeSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsBeforeSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.InvalidGetSockOpt/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.RecvmmsgTimeoutAfterRecv/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.TIOCINQSucceeds/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.TIOCOUTQSucceeds/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.Shutdown/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.ShutdownRead/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.ShutdownWrite/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.SocketReopenFromProcfs/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
+
+                // socket_test
+                "SocketTest.UnixSocketStat",
+                "OpenModes/SocketOpenTest.Unix/*",
+
+                // socket_unix_unbound_filesystem_test
+                "AllUnixDomainSockets/UnboundFilesystemUnixSocketPairTest.*/*",
+
                 // stat_test
                 "StatTest.BlocksIncreaseOnWrite",
                 "StatTest.ChildOfNonDir",
@@ -440,9 +574,6 @@
                 "AllUnixDomainSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
                 "Renameat2Test.NoReplaceSuccess",
 
-                // readv_test
-                "ReadvTestNoFixture.TruncatedAtMax",
-
                 // accept_bind_test
                 // Tests [0-3] fail.
                 // Skip all until we fix the issue causing the tests to fail
@@ -490,8 +621,6 @@
                 "AllUnixDomainSockets/AllSocketPairTest.Unbind/*",
 
                 // chroot_test - panicked
-                "ChrootTest.ProcMemSelfFdsYesEscapeProcOpen",
-                "ChrootTest.ProcMountsMountinfoNoEscape",
                 "ChrootTest.Success",
 
                 // epoll_test - these tests hang
