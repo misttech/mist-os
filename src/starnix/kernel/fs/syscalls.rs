@@ -1322,7 +1322,7 @@ fn do_mount_create(
         String::from_utf8_lossy(data)
     );
 
-    target.mount(create_filesystem(current_task, source, fs_type, data)?, flags)
+    target.mount(create_filesystem(current_task, fs_type, source, flags, data)?, flags)
 }
 
 pub fn sys_umount2(

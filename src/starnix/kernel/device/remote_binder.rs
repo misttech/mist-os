@@ -755,7 +755,7 @@ mod tests {
     use super::*;
     use crate::device::binder::tests::run_process_accessor;
     use crate::device::BinderFs;
-    use crate::fs::WhatToMount;
+    use crate::fs::{FileSystemOptions, WhatToMount};
     use crate::mm::MemoryAccessor;
     use crate::task::Task;
     use crate::testing::*;
@@ -805,7 +805,9 @@ mod tests {
                 .expect("mkdir dev");
             let dev = init_task.lookup_path_from_root(b"/dev").expect("lookup_path_from_root");
             dev.mount(
-                WhatToMount::Fs(BinderFs::new_fs(&init_task).expect("new_fs")),
+                WhatToMount::Fs(
+                    BinderFs::new_fs(&init_task, FileSystemOptions::default()).expect("new_fs"),
+                ),
                 MountFlags::empty(),
             )
             .expect("mount");

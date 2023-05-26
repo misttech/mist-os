@@ -198,7 +198,13 @@ pub fn create_filesystem_from_spec<'a>(
         "bind" => Bind(task.lookup_path_from_root(fs_src.as_bytes())?),
         "remote_bundle" => Fs(RemoteBundle::new_fs(task.kernel(), pkg, rights, fs_src)?),
         "remotefs" => Fs(create_remotefs_filesystem(task.kernel(), pkg, rights, fs_src)?),
-        _ => create_filesystem(task, fs_src.as_bytes(), fs_type.as_bytes(), b"")?,
+        _ => create_filesystem(
+            task,
+            fs_type.as_bytes(),
+            fs_src.as_bytes(),
+            MountFlags::empty(),
+            b"",
+        )?,
     };
     Ok((mount_point.as_bytes(), fs))
 }

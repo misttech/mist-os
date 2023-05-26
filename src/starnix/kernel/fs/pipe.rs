@@ -258,15 +258,13 @@ impl FileSystemOps for PipeFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(PIPEFS_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"pipe"
+    }
 }
 fn pipe_fs(kernel: &Kernel) -> &FileSystemHandle {
     kernel.pipe_fs.get_or_init(|| {
-        FileSystem::new(
-            kernel,
-            CacheMode::Uncached,
-            PipeFs,
-            FileSystemLabel::without_source("pipe"),
-        )
+        FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
     })
 }
 

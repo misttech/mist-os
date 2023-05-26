@@ -28,6 +28,9 @@ impl FileSystemOps for RemoteFs {
         const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
         Ok(statfs::default(REMOTE_FS_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"remote"
+    }
 
     fn generate_node_ids(&self) -> bool {
         true
@@ -49,11 +52,15 @@ impl RemoteFs {
             kernel,
             CacheMode::Cached,
             RemoteFs,
-            FileSystemLabel::new(
-                "remotefs",
-                source.as_bytes(),
-                rights.contains(fio::OpenFlags::RIGHT_WRITABLE),
-            ),
+            FileSystemOptions {
+                source: source.as_bytes().to_vec(),
+                flags: if rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+                    MountFlags::empty()
+                } else {
+                    MountFlags::RDONLY
+                },
+                params: b"".to_vec(),
+            },
         );
         fs.set_root_node(root_node);
         Ok(fs)

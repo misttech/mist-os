@@ -7,7 +7,7 @@ use {
         fs::{
             buffers::{InputBuffer, OutputBuffer},
             fileops_impl_nonseekable, fs_args, CacheMode, FdNumber, FileObject, FileOps,
-            FileSystem, FileSystemHandle, FileSystemLabel, FileSystemOps, FsNode, FsNodeHandle,
+            FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
             FsNodeOps, FsStr,
         },
         task::CurrentTask,
@@ -50,20 +50,18 @@ impl FileOps for DevFuse {
     }
 }
 
-pub fn new_fuse_fs(task: &CurrentTask, data: &FsStr) -> Result<FileSystemHandle, Errno> {
-    let mut mount_options = fs_args::generic_parse_mount_options(data);
+pub fn new_fuse_fs(
+    task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    let mut mount_options = fs_args::generic_parse_mount_options(&options.params);
     let fd = fs_args::parse::<FdNumber>(
         mount_options.remove(b"fd" as &FsStr).ok_or_else(|| errno!(EINVAL))?,
     )?;
     let state =
         task.files.get(fd)?.downcast_file::<DevFuse>().ok_or_else(|| errno!(EINVAL))?.state.clone();
 
-    let fs = FileSystem::new(
-        task.kernel(),
-        CacheMode::Uncached,
-        FuseFs::new(state),
-        FileSystemLabel::without_source("fuse"),
-    );
+    let fs = FileSystem::new(task.kernel(), CacheMode::Uncached, FuseFs::new(state), options);
     fs.set_root_node(FsNode::new_root(FuseNode {}));
     Ok(fs)
 }
@@ -95,6 +93,9 @@ impl FileSystemOps for FuseFs {
 
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         error!(ENOTSUP)
+    }
+    fn name(&self) -> &'static FsStr {
+        b"fuse"
     }
 }
 

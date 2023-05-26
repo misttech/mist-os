@@ -13,16 +13,14 @@ impl FileSystemOps for SocketFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(SOCKFS_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"socket"
+    }
 }
 
 /// Returns a handle to the `SocketFs` instance in `kernel`, initializing it if needed.
 pub fn socket_fs(kernel: &Kernel) -> &FileSystemHandle {
     kernel.socket_fs.get_or_init(|| {
-        FileSystem::new(
-            kernel,
-            CacheMode::Uncached,
-            SocketFs,
-            FileSystemLabel::without_source("socket"),
-        )
+        FileSystem::new(kernel, CacheMode::Uncached, SocketFs, FileSystemOptions::default())
     })
 }

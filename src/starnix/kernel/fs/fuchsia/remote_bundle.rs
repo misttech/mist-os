@@ -68,11 +68,15 @@ impl RemoteBundle {
             kernel,
             CacheMode::Cached,
             RemoteBundle { metadata, root, rights },
-            FileSystemLabel::new(
-                "remote_bundle",
-                path.as_bytes(),
-                rights.contains(fio::OpenFlags::RIGHT_WRITABLE),
-            ),
+            FileSystemOptions {
+                source: path.as_bytes().to_vec(),
+                flags: if rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+                    MountFlags::empty()
+                } else {
+                    MountFlags::RDONLY
+                },
+                params: b"".to_vec(),
+            },
         );
         fs.set_root_node(root_node);
         Ok(fs)
@@ -96,6 +100,9 @@ impl FileSystemOps for RemoteBundle {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         const REMOTE_BUNDLE_FS_MAGIC: u32 = u32::from_be_bytes(*b"bndl");
         Ok(statfs::default(REMOTE_BUNDLE_FS_MAGIC))
+    }
+    fn name(&self) -> &'static FsStr {
+        b"remote_bundle"
     }
 }
 

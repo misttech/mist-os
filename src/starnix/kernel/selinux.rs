@@ -24,16 +24,14 @@ impl FileSystemOps for SeLinuxFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(SELINUX_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"selinuxfs"
+    }
 }
 
 impl SeLinuxFs {
-    fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(
-            kernel,
-            CacheMode::Permanent,
-            SeLinuxFs,
-            FileSystemLabel::without_source("selinux"),
-        );
+    fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
         dir.entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644));
@@ -327,6 +325,7 @@ fn parse_int(buf: &[u8]) -> Result<u32, Errno> {
     std::str::from_utf8(&buf[..i]).unwrap().parse::<u32>().map_err(|_| errno!(EINVAL))
 }
 
-pub fn selinux_fs(kern: &Kernel) -> &FileSystemHandle {
-    kern.selinux_fs.get_or_init(|| SeLinuxFs::new_fs(kern).expect("failed to construct selinuxfs"))
+pub fn selinux_fs(kern: &Kernel, options: FileSystemOptions) -> &FileSystemHandle {
+    kern.selinux_fs
+        .get_or_init(|| SeLinuxFs::new_fs(kern, options).expect("failed to construct selinuxfs"))
 }

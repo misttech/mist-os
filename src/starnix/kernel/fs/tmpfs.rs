@@ -17,6 +17,19 @@ use crate::types::*;
 pub struct TmpFs(());
 
 impl FileSystemOps for Arc<TmpFs> {
+    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+        Ok(statfs {
+            // Pretend we have a ton of free space.
+            f_blocks: 0x100000000,
+            f_bavail: 0x100000000,
+            f_bfree: 0x100000000,
+            ..statfs::default(TMPFS_MAGIC)
+        })
+    }
+    fn name(&self) -> &'static FsStr {
+        b"tmpfs"
+    }
+
     fn rename(
         &self,
         _fs: &FileSystem,
@@ -61,33 +74,21 @@ impl FileSystemOps for Arc<TmpFs> {
         }
         Ok(())
     }
-
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
-        Ok(statfs {
-            // Pretend we have a ton of free space.
-            f_blocks: 0x100000000,
-            f_bavail: 0x100000000,
-            f_bfree: 0x100000000,
-            ..statfs::default(TMPFS_MAGIC)
-        })
-    }
 }
 
 impl TmpFs {
     pub fn new_fs(kernel: &Kernel) -> FileSystemHandle {
-        Self::new_fs_with_data(kernel, b"").expect("empty options cannot fail")
+        Self::new_fs_with_options(kernel, Default::default()).expect("empty options cannot fail")
     }
 
-    pub fn new_fs_with_data(kernel: &Kernel, data: &FsStr) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(
-            kernel,
-            CacheMode::Permanent,
-            Arc::new(TmpFs(())),
-            FileSystemLabel::without_source("tmpfs"),
-        );
+    pub fn new_fs_with_options(
+        kernel: &Kernel,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options);
         fs.set_root(TmpfsDirectory::new());
         let root_node = &fs.root().node;
-        let mut mount_options = fs_args::generic_parse_mount_options(data);
+        let mut mount_options = fs_args::generic_parse_mount_options(&fs.options.params);
         if let Some(mode) = mount_options.remove(b"mode" as &FsStr) {
             let mode = FileMode::from_string(mode)?;
             root_node.info_write().chmod(mode);
@@ -420,7 +421,15 @@ mod test {
     #[::fuchsia::test]
     async fn test_data() {
         let (kernel, _current_task) = create_kernel_and_task();
-        let fs = TmpFs::new_fs_with_data(&kernel, b"mode=0123,uid=42,gid=84").expect("new_fs");
+        let fs = TmpFs::new_fs_with_options(
+            &kernel,
+            FileSystemOptions {
+                source: b"".to_vec(),
+                flags: MountFlags::empty(),
+                params: b"mode=0123,uid=42,gid=84".to_vec(),
+            },
+        )
+        .expect("new_fs");
         let info = fs.root().node.info();
         assert_eq!(info.mode, mode!(IFDIR, 0o123));
         assert_eq!(info.uid, 42);

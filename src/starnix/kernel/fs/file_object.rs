@@ -330,7 +330,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             file: &FileObject,
             current_task: &crate::task::CurrentTask,
             current_offset: crate::types::off_t,
-            new_offset: off_t,
+            new_offset: crate::types::off_t,
             whence: crate::fs::SeekOrigin,
         ) -> Result<off_t, crate::types::Errno> {
             $delegate.seek(file, current_task, current_offset, new_offset, whence)

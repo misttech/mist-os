@@ -16,6 +16,9 @@ impl FileSystemOps for SysFsOps {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(SYSFS_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"sysfs"
+    }
 }
 
 pub struct SysFs {
@@ -25,13 +28,8 @@ pub struct SysFs {
 }
 
 impl SysFs {
-    pub fn new(kernel: &Arc<Kernel>) -> Self {
-        let fs = FileSystem::new(
-            kernel,
-            CacheMode::Permanent,
-            SysFsOps,
-            FileSystemLabel::without_source("sysfs"),
-        );
+    pub fn new(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Self {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFsOps, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.subdir(b"fs", 0o755, |dir| {
             dir.subdir(b"selinux", 0o755, |_| ());
@@ -117,8 +115,8 @@ impl SysFs {
     }
 }
 
-pub fn sys_fs(kern: &Arc<Kernel>) -> &SysFs {
-    kern.sys_fs.get_or_init(|| SysFs::new(kern))
+pub fn sys_fs(kern: &Arc<Kernel>, options: FileSystemOptions) -> &SysFs {
+    kern.sys_fs.get_or_init(|| SysFs::new(kern, options))
 }
 
 struct SysFsDirectory {

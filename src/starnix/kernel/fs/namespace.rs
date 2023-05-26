@@ -155,7 +155,7 @@ impl Mount {
     }
 
     fn new_with_root(root: DirEntryHandle, flags: MountFlags) -> MountHandle {
-        let known_flags = MountFlags::STORED_FLAGS | MountFlags::SILENT;
+        let known_flags = MountFlags::STORED_ON_MOUNT;
         assert!(
             !flags.intersects(!known_flags),
             "mount created with extra flags {:?}",
@@ -472,21 +472,27 @@ impl fmt::Debug for Mount {
 
 pub fn create_filesystem(
     task: &CurrentTask,
-    _source: &FsStr,
     fs_type: &FsStr,
+    source: &FsStr,
+    flags: MountFlags,
     data: &FsStr,
 ) -> Result<WhatToMount, Errno> {
     let kernel = task.kernel();
+    let options = FileSystemOptions {
+        source: source.to_vec(),
+        flags: flags & MountFlags::STORED_ON_FILESYSTEM,
+        params: data.to_vec(),
+    };
     let fs = match fs_type {
-        b"binder" => BinderFs::new_fs(task)?,
-        b"bpf" => BpfFs::new_fs(kernel)?,
-        b"devpts" => dev_pts_fs(kernel).clone(),
+        b"binder" => BinderFs::new_fs(task, options)?,
+        b"bpf" => BpfFs::new_fs(kernel, options)?,
+        b"devpts" => dev_pts_fs(kernel, options).clone(),
         b"devtmpfs" => dev_tmp_fs(task).clone(),
-        b"fuse" => new_fuse_fs(task, data)?,
-        b"proc" => proc_fs(kernel.clone()),
-        b"selinuxfs" => selinux_fs(kernel).clone(),
-        b"sysfs" => sys_fs(kernel).fs(),
-        b"tmpfs" => TmpFs::new_fs_with_data(kernel, data)?,
+        b"fuse" => new_fuse_fs(task, options)?,
+        b"proc" => proc_fs(kernel.clone(), options),
+        b"selinuxfs" => selinux_fs(kernel, options).clone(),
+        b"sysfs" => sys_fs(kernel, options).fs(),
+        b"tmpfs" => TmpFs::new_fs_with_options(kernel, options)?,
         _ => return error!(ENODEV, String::from_utf8_lossy(fs_type)),
     };
 
@@ -519,9 +525,9 @@ impl DynamicFileSource for ProcMountsFileSource {
             if !mountpoint.is_descendant_of(&root) {
                 return Ok(());
             }
-            let fs_spec = String::from_utf8_lossy(mount.fs.label.source_string());
+            let fs_spec = String::from_utf8_lossy(mount.fs.options.source_for_display());
             let fs_file = String::from_utf8_lossy(&mountpoint.path(&task)).into_owned();
-            let fs_vfstype = mount.fs.label.name();
+            let fs_vfstype = String::from_utf8_lossy(mount.fs.name());
             let fs_mntopts = mount.flags.to_string();
             writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
             Ok(())
@@ -631,9 +637,9 @@ impl DynamicFileSource for ProcMountinfoFile {
             writeln!(
                 sink,
                 " - {} {} {}",
-                mount.fs.label.name(),
-                String::from_utf8_lossy(mount.fs.label.source_string()),
-                mount.fs.label.opts_string()
+                String::from_utf8_lossy(mount.fs.name()),
+                String::from_utf8_lossy(mount.fs.options.source_for_display()),
+                mount.fs.options.flags.to_string()
             )?;
             Ok(())
         })?;
@@ -1030,6 +1036,7 @@ impl NamespaceNode {
     }
 
     pub fn mount(&self, what: WhatToMount, flags: MountFlags) -> Result<(), Errno> {
+        let flags = flags & (MountFlags::STORED_ON_MOUNT | MountFlags::REC);
         let mountpoint = self.enter_mount();
         let mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
         mount.create_submount(&mountpoint.entry, what, flags);

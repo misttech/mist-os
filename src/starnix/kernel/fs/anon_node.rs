@@ -51,14 +51,12 @@ impl FileSystemOps for AnonFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(ANON_INODE_FS_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"anon"
+    }
 }
 pub fn anon_fs(kernel: &Kernel) -> &FileSystemHandle {
     kernel.anon_fs.get_or_init(|| {
-        FileSystem::new(
-            kernel,
-            CacheMode::Uncached,
-            AnonFs,
-            FileSystemLabel::without_source("anon"),
-        )
+        FileSystem::new(kernel, CacheMode::Uncached, AnonFs, FileSystemOptions::default())
     })
 }

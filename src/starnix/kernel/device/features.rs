@@ -7,7 +7,7 @@ use crate::fs::sysfs::sys_fs;
 use crate::fs::{
     devtmpfs::dev_tmp_fs,
     kobject::{KObjectDeviceAttribute, KType},
-    SpecialNode,
+    FileSystemOptions, SpecialNode,
 };
 use crate::logging::log_warn;
 use crate::task::CurrentTask;
@@ -31,7 +31,7 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 let kernel = current_task.kernel();
 
                 // Add framebuffer and input devices in sysfs.
-                let sysfs = sys_fs(kernel);
+                let sysfs = sys_fs(kernel, FileSystemOptions::default());
                 sysfs.add_device(
                     sysfs.virtual_bus().get_or_create_child(b"graphics", KType::Class),
                     KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0),
@@ -61,7 +61,7 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 device_registry.register_chrdev_major(kernel.input_file.clone(), INPUT_MAJOR)?;
             }
             "magma" => {
-                let sysfs = sys_fs(current_task.kernel());
+                let sysfs = sys_fs(current_task.kernel(), FileSystemOptions::default());
                 let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
                 sysfs.add_device(
                     sysfs.virtual_bus().get_or_create_child(b"starnix", KType::Class),

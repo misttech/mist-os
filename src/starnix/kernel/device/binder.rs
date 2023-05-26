@@ -13,7 +13,7 @@ use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
     fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle, FdEvents,
     FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemLabel, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
     NamespaceNode, SpecialNode,
 };
 use crate::lock::{Mutex, MutexGuard, RwLock};
@@ -3775,6 +3775,9 @@ impl FileSystemOps for BinderFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(BINDERFS_SUPER_MAGIC))
     }
+    fn name(&self) -> &'static FsStr {
+        b"binder"
+    }
 }
 
 struct BinderFsDir;
@@ -3807,13 +3810,11 @@ fn make_binder_nodes(current_task: &CurrentTask, dir: &DirEntryHandle) -> Result
 }
 
 impl BinderFs {
-    pub fn new_fs(current_task: &CurrentTask) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Permanent,
-            BinderFs,
-            FileSystemLabel::without_source("binder"),
-        );
+    pub fn new_fs(
+        current_task: &CurrentTask,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new(current_task.kernel(), CacheMode::Permanent, BinderFs, options);
         fs.set_root(BinderFsDir);
         make_binder_nodes(current_task, fs.root())?;
         Ok(fs)

@@ -25,9 +25,9 @@ pub struct FileSystem {
     next_inode: AtomicU64,
     ops: Box<dyn FileSystemOps>,
 
-    /// Label contains info that can be used to distinguish this file system from others,
-    /// particularly in `/proc/mounts`.
-    pub label: FileSystemLabel,
+    /// The options specified when mounting the filesystem. Saved here for display in
+    /// /proc/[pid]/mountinfo.
+    pub options: FileSystemOptions,
 
     /// The device ID of this filesystem. Returned in the st_dev field when stating an inode in
     /// this filesystem.
@@ -65,6 +65,25 @@ pub struct FileSystem {
     pub selinux_context: OnceCell<FsString>,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct FileSystemOptions {
+    /// The source string passed as the first argument to mount(), e.g. a block device.
+    pub source: FsString,
+    /// Flags kept per-superblock, i.e. included in MountFlags::STORED_ON_FILESYSTEM.
+    pub flags: MountFlags,
+    /// Filesystem options passed as the last argument to mount().
+    pub params: FsString,
+}
+
+impl FileSystemOptions {
+    pub fn source_for_display(&self) -> &FsStr {
+        if self.source.is_empty() {
+            return b"none";
+        }
+        &self.source
+    }
+}
+
 enum Entries {
     Permanent(Mutex<HashSet<ArcKey<DirEntry>>>),
     Lru(Mutex<LinkedHashMap<ArcKey<DirEntry>, ()>>),
@@ -89,13 +108,13 @@ impl FileSystem {
         kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
-        label: FileSystemLabel,
+        options: FileSystemOptions,
     ) -> FileSystemHandle {
         Arc::new(FileSystem {
             root: OnceCell::new(),
             next_inode: AtomicU64::new(1),
             ops: Box::new(ops),
-            label,
+            options,
             dev_id: kernel.device_registry.write().next_anonymous_dev_id(),
             rename_mutex: Mutex::new(()),
             nodes: Mutex::new(HashMap::new()),
@@ -311,6 +330,10 @@ impl FileSystem {
     pub fn downcast_ops<T: 'static>(&self) -> Option<&T> {
         self.ops.as_ref().as_any().downcast_ref()
     }
+
+    pub fn name(&self) -> &'static FsStr {
+        self.ops.name()
+    }
 }
 
 /// The filesystem-implementation-specific data for FileSystem.
@@ -329,6 +352,8 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// })
     /// ```
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno>;
+
+    fn name(&self) -> &'static FsStr;
 
     /// Whether this file system generates its own node IDs.
     fn generate_node_ids(&self) -> bool {
@@ -364,37 +389,3 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
 }
 
 pub type FileSystemHandle = Arc<FileSystem>;
-
-#[derive(Clone)]
-pub struct FileSystemLabel {
-    name: &'static str,
-    source: Option<FsString>,
-    writable: bool,
-}
-
-impl FileSystemLabel {
-    pub fn new(name: &'static str, source: &FsStr, writable: bool) -> Self {
-        Self { name, source: Some(source.to_vec()), writable }
-    }
-
-    pub fn without_source(name: &'static str) -> Self {
-        Self { name, source: None, writable: true }
-    }
-
-    pub fn name(&self) -> &'static str {
-        self.name
-    }
-
-    pub fn source_string(&self) -> &FsStr {
-        match &self.source {
-            Some(s) => s,
-
-            // Use file system name for file systems without source.
-            None => self.name.as_bytes(),
-        }
-    }
-
-    pub fn opts_string(&self) -> String {
-        (if self.writable { "rw" } else { "ro" }).to_string()
-    }
-}
