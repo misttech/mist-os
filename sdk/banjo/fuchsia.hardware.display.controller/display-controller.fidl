@@ -328,18 +328,6 @@ type DisplayConfig = struct {
     @mutable
     @out_of_line_contents
     layer vector<Layer>:MAX;
-
-    /// Flag to indicate valid gamma table
-    gamma_table_present bool;
-    /// Flag to indicate whether display driver should re-apply gamma correction table to hardware
-    apply_gamma_table bool;
-    /// Gamma Table (Red, Green and Blue)
-    @mutable
-    gamma_red vector<float32>:MAX;
-    @mutable
-    gamma_green vector<float32>:MAX;
-    @mutable
-    gamma_blue vector<float32>:MAX;
 };
 
 type ConfigCheckResult = strict enum : uint32 {

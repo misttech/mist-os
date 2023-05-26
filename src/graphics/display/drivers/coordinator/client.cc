@@ -592,9 +592,6 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
     for (auto& layer_node : display_config.current_layers_) {
       layer_node.layer->ApplyChanges(display_config.current_.mode);
     }
-
-    display_config.current_.gamma_table_present = false;
-    display_config.current_.apply_gamma_table = false;
   }
   // Overflow doesn't matter, since stamps only need to be unique until
   // the configuration is applied with vsync.

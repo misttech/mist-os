@@ -120,8 +120,6 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .cc_flags = 0u,
       .layer_list = test_layers_1,
       .layer_count = 1,
-      .gamma_table_present = false,
-      .apply_gamma_table = false,
   };
   config_stamp_t stamp_1 = {.value = 1u};
   pipe.ApplyConfiguration(&config, &stamp_1, GetGttImageHandle, GetPixelFormat);
@@ -146,8 +144,6 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .cc_flags = 0u,
       .layer_list = test_layers_2,
       .layer_count = 1,
-      .gamma_table_present = false,
-      .apply_gamma_table = false,
   };
   config_stamp_t stamp_2 = {.value = 2u};
   pipe.ApplyConfiguration(&config_2, &stamp_2, GetGttImageHandle, GetPixelFormat);
