@@ -293,26 +293,6 @@ impl AppSender {
         sender
     }
 
-    /// Set the display's gamma table. Used only for factory diagnostics.
-    pub fn import_and_set_gamma_table(
-        &self,
-        display_id: u64,
-        gamma_table_id: u64,
-        r: GammaValues,
-        g: GammaValues,
-        b: GammaValues,
-    ) {
-        self.sender
-            .unbounded_send(MessageInternal::ImportAndSetGamaTable(
-                display_id,
-                gamma_table_id,
-                Box::new(r),
-                Box::new(g),
-                Box::new(b),
-            ))
-            .expect("AppSender::import_gamma_table - unbounded_send");
-    }
-
     /// Create an context for testing things that need an app context.
     pub fn new_for_testing_purposes_only() -> AppSender {
         let (internal_sender, _) = unbounded::<MessageInternal>();
@@ -421,10 +401,6 @@ pub struct App {
     sender: InternalSender,
 }
 
-#[allow(missing_docs)]
-pub type GammaValues = [f32; 256];
-type BoxedGammaValues = Box<[f32; 256]>;
-
 #[derive(Debug)]
 pub(crate) enum MessageInternal {
     ServiceConnection(zx::Channel, &'static str),
@@ -452,7 +428,6 @@ pub(crate) enum MessageInternal {
     NewDisplayCoordinator(PathBuf),
     DisplayCoordinatorEvent(CoordinatorEvent),
     SetVirtconMode(VirtconMode),
-    ImportAndSetGamaTable(u64, u64, BoxedGammaValues, BoxedGammaValues, BoxedGammaValues),
     UserInputMessage(ViewKey, UserInputMessage),
 }
 
@@ -644,9 +619,6 @@ impl App {
             },
             MessageInternal::SetVirtconMode(virtcon_mode) => {
                 self.strategy.set_virtcon_mode(virtcon_mode);
-            }
-            MessageInternal::ImportAndSetGamaTable(display_id, gamma_table_id, r, g, b) => {
-                self.strategy.import_and_set_gamma_table(display_id, gamma_table_id, r, g, b);
             }
         }
         Ok(())

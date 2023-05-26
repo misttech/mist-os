@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    app::{
-        strategies::base::AppStrategy, BoxedGammaValues, Config, InternalSender, MessageInternal,
-    },
+    app::{strategies::base::AppStrategy, Config, InternalSender, MessageInternal},
     drawing::DisplayRotation,
     geometry::IntSize,
     input::{self, listen_for_user_input, report::InputReportHandler, DeviceId},
@@ -410,25 +408,6 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
             .coordinator
             .set_virtcon_mode(virtcon_mode)
             .expect("set_virtcon_mode");
-    }
-
-    fn import_and_set_gamma_table(
-        &mut self,
-        display_id: u64,
-        gamma_table_id: u64,
-        r: BoxedGammaValues,
-        g: BoxedGammaValues,
-        b: BoxedGammaValues,
-    ) {
-        let display_coordinator = self.display_coordinator.as_ref().expect("display_coordinator");
-        display_coordinator
-            .coordinator
-            .import_gamma_table(gamma_table_id, &r, &g, &b)
-            .expect("import_gamma_table");
-        display_coordinator
-            .coordinator
-            .set_display_gamma_table(display_id, gamma_table_id)
-            .expect("set_display_gamma_table");
     }
 
     fn get_focused_view_key(&self) -> Option<ViewKey> {

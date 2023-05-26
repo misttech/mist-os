@@ -10,7 +10,7 @@ use crate::{
             },
             scenic::ScenicAppStrategy,
         },
-        BoxedGammaValues, Config, InternalSender, MessageInternal, ViewMode,
+        Config, InternalSender, MessageInternal, ViewMode,
     },
     input::{self},
     view::{
@@ -84,15 +84,6 @@ pub(crate) trait AppStrategy {
     ) {
     }
     fn set_virtcon_mode(&mut self, _virtcon_mode: VirtconMode) {}
-    fn import_and_set_gamma_table(
-        &mut self,
-        _display_id: u64,
-        _gamma_table_id: u64,
-        mut _r: BoxedGammaValues,
-        mut _g: BoxedGammaValues,
-        mut _b: BoxedGammaValues,
-    ) {
-    }
     fn handle_view_closed(&mut self, _view_key: ViewKey) {}
     fn get_focused_view_key(&self) -> Option<ViewKey> {
         panic!("get_focused_view_key not implemented");
