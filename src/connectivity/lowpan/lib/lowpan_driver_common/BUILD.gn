@@ -9,6 +9,7 @@ rustc_library("lowpan_driver_common") {
   edition = "2021"
   with_unit_tests = true
   features = [ "poll_debugger" ]
+  disable_rustdoc = true  # https://issuetracker.google.com/issues/284368914
   deps = [
     "//sdk/fidl/fuchsia.factory.lowpan:fuchsia.factory.lowpan_rust",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
