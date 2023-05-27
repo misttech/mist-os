@@ -180,7 +180,9 @@ gvisor_tests = [
   "sysinfo_test",
   "syslog_test",
   "sysret_test",
-  "tcp_socket_test",
+
+  # TODO(https://fxbug.dev/127944): Disabled due to high flake rate.
+  # "tcp_socket_test",
   "tgkill_test",
   "timerfd_test",
   "timers_test",
