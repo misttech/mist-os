@@ -390,34 +390,23 @@ WEAVE_ERROR PlatformAuthDelegate::BeginCertValidation(ValidationContext& valid_c
 
   memset(&valid_ctx, 0, sizeof(valid_ctx));
 
-  uint64_t cert_validation_ts = 0;
-  zx_status_t status =
-      ConfigurationMgrImpl().GetCertValidationEffectiveTimestamp(&cert_validation_ts);
-  if (status != ZX_OK) {
-    // Set the effective time for certificate validation. Use the current time if
-    // the system's real time clock is synchronized, but otherwise use the
-    // firmware build time and arrange to ignore the 'not before' date in the
-    // peer's certificate.
-    err = System::Layer::GetClock_RealTimeMS(now_ms);
-    if (err == WEAVE_NO_ERROR) {
-      // TODO(fxbug.dev/51890): The default implementation of GetClock_RealTimeMS only returns
-      // not-synced if the value is before Jan 1, 2000. Use the UTC fidl instead
-      // to confirm whether the clock source is from some external source.
-      valid_ctx.EffectiveTime =
-          Security::SecondsSinceEpochToPackedCertTime(static_cast<uint32_t>(now_ms / 1000));
-    } else if (err == WEAVE_SYSTEM_ERROR_REAL_TIME_NOT_SYNCED) {
-      // TODO(fxbug.dev/51890): Acquire the firmware build time, for now we set it to Jan 1, 2020
-      // as reasonable default time.
-      valid_ctx.EffectiveTime = Security::SecondsSinceEpochToPackedCertTime(1577836800U);
-      valid_ctx.ValidateFlags |= Security::kValidateFlag_IgnoreNotBefore;
-      FX_LOGS(WARNING)
-          << "Real time clock not synchronized, using default time for cert validation.";
-    }
-  } else {
-    // Use cert-validation-effective-timestamp for cert validation.
-    valid_ctx.EffectiveTime = Security::SecondsSinceEpochToPackedCertTime(cert_validation_ts);
+  // Set the effective time for certificate validation. Use the current time if
+  // the system's real time clock is synchronized, but otherwise use the
+  // firmware build time and arrange to ignore the 'not before' date in the
+  // peer's certificate.
+  err = System::Layer::GetClock_RealTimeMS(now_ms);
+  if (err == WEAVE_NO_ERROR) {
+    // TODO(fxbug.dev/51890): The default implementation of GetClock_RealTimeMS only returns
+    // not-synced if the value is before Jan 1, 2000. Use the UTC fidl instead
+    // to confirm whether the clock source is from some external source.
+    valid_ctx.EffectiveTime =
+        Security::SecondsSinceEpochToPackedCertTime(static_cast<uint32_t>(now_ms / 1000));
+  } else if (err == WEAVE_SYSTEM_ERROR_REAL_TIME_NOT_SYNCED) {
+    // TODO(fxbug.dev/51890): Acquire the firmware build time, for now we set it to Jan 1, 2020
+    // as reasonable default time.
+    valid_ctx.EffectiveTime = Security::SecondsSinceEpochToPackedCertTime(1577836800U);
     valid_ctx.ValidateFlags |= Security::kValidateFlag_IgnoreNotBefore;
-    FX_LOGS(WARNING) << "Using cert-validation-effective-timestamp";
+    FX_LOGS(WARNING) << "Real time clock not synchronized, using default time for cert validation.";
   }
 
   valid_ctx.RequiredKeyUsages = Security::kKeyUsageFlag_DigitalSignature;

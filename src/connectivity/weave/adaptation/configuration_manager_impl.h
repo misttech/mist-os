@@ -190,9 +190,6 @@ class NL_DLL_EXPORT ConfigurationManagerImpl final
     // Store paired account ID.
     virtual WEAVE_ERROR StorePairedAccountId(const char* accountId, size_t accountIdLen) = 0;
 
-    // Returns the cert validation effective timestamp.
-    virtual zx_status_t GetCertValidationEffectiveTimestamp(uint64_t* out) = 0;
-
    protected:
     ConfigurationManagerImpl* impl_;
   };
@@ -235,9 +232,6 @@ class NL_DLL_EXPORT ConfigurationManagerImpl final
 
   // Returns the fail safe armed state of the device.
   WEAVE_ERROR GetFailSafeArmed(bool& fail_safe_armed);
-
-  // Returns the cert validation effective timestamp.
-  zx_status_t GetCertValidationEffectiveTimestamp(uint64_t* out);
 
  private:
   using GroupKeyStoreBase = ::nl::Weave::Profiles::Security::AppKeys::GroupKeyStoreBase;
