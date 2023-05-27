@@ -62,6 +62,7 @@ if (current_toolchain == default_toolchain) {
 
     # Don't set MSVC predefines.
     cflags = [
+      "-Wno-builtin-macro-redefined",
       "-U_MSC_VER",
       "-U_MSC_FULL_VER",
     ]
