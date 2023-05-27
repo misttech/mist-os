@@ -7,13 +7,13 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use super::UserBuffer;
 use crate::mm::vmo::round_up_to_increment;
 use crate::types::{error, Errno};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeroes, FromBytes)]
 #[repr(transparent)]
 pub struct UserAddress(u64);
 
@@ -206,7 +206,20 @@ impl<T> fmt::Display for UserRef<T> {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Hash,
+    Ord,
+    PartialOrd,
+    AsBytes,
+    FromZeroes,
+    FromBytes,
+)]
 #[repr(transparent)]
 pub struct UserCString(UserAddress);
 

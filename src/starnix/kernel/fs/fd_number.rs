@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::fs::FsStr;
 use crate::types::*;
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(
+    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes,
+)]
 #[repr(transparent)]
 pub struct FdNumber(i32);
 

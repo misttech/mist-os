@@ -2011,6 +2011,7 @@ mod tests {
     use assert_matches::assert_matches;
     use itertools::assert_equal;
     use std::ffi::CString;
+    use zerocopy::FromZeroes;
 
     #[::fuchsia::test]
     async fn test_brk() {
@@ -2473,7 +2474,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_object_partial() {
-        #[derive(Debug, Default, Copy, Clone, FromBytes, PartialEq)]
+        #[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, PartialEq)]
         struct Items {
             val: [i32; 4],
         }

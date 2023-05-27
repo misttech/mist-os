@@ -12,7 +12,7 @@ use {
     std::fmt,
     std::mem,
     thiserror::Error,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 /// Possible errors that can occur during ELF parsing.
@@ -50,7 +50,7 @@ trait Validate {
 }
 
 /// ELF identity header.
-#[derive(FromBytes, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
+#[derive(FromZeroes, FromBytes, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct ElfIdent {
     /// e_ident[EI_MAG0:EI_MAG3]
@@ -121,7 +121,7 @@ impl ElfIdent {
     }
 }
 
-#[derive(FromBytes, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
+#[derive(FromZeroes, FromBytes, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct Elf64FileHeader {
     pub ident: ElfIdent,
@@ -232,7 +232,7 @@ impl Validate for Elf64FileHeader {
     }
 }
 
-#[derive(FromBytes, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
+#[derive(FromZeroes, FromBytes, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct Elf64ProgramHeader {
     pub segment_type: u32,
@@ -287,7 +287,7 @@ pub enum Elf64DynTag {
     Hiproc = 0x7fffffff,
 }
 
-#[derive(AsBytes, Copy, Clone, FromBytes, Default, Debug, Eq, PartialEq)]
+#[derive(AsBytes, Copy, Clone, FromBytes, FromZeroes, Default, Debug, Eq, PartialEq)]
 #[repr(C)]
 pub struct Elf64Dyn {
     pub tag: u64,
@@ -306,7 +306,7 @@ pub type Elf64Word = u32;
 pub type Elf64Xword = u64;
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct elf64_sym {
     pub st_name: Elf64Word,
     pub st_info: u8,

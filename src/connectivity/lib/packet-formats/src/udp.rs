@@ -22,7 +22,8 @@ use packet::{
     Serializer,
 };
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
+    Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -33,7 +34,7 @@ pub(crate) const HEADER_BYTES: usize = 8;
 const CHECKSUM_OFFSET: usize = 6;
 const CHECKSUM_RANGE: Range<usize> = CHECKSUM_OFFSET..CHECKSUM_OFFSET + 2;
 
-#[derive(Debug, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 struct Header {
     src_port: U16,
@@ -214,7 +215,7 @@ impl<B: ByteSlice> UdpPacket<B> {
 ///
 /// A `UdpPacketHeader` may be the result of a partially parsed UDP packet in
 /// [`UdpPacketRaw`].
-#[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
 #[repr(C)]
 struct UdpFlowHeader {
     src_port: U16,

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::mem;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::fs::*;
 use crate::mm::vmo::round_up_to_increment;
@@ -46,7 +46,7 @@ impl DirectoryEntryType {
 const DIRENT64_PADDING_SIZE: usize = 5;
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 struct DirentHeader64 {
     d_ino: u64,
     d_off: i64,
@@ -58,7 +58,7 @@ struct DirentHeader64 {
 const DIRENT32_PADDING_SIZE: usize = 6;
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 struct DirentHeader32 {
     d_ino: u64,
     d_off: i64,

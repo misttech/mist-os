@@ -9,7 +9,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use zerocopy::{AsBytes, FromBytes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = "macos")]
@@ -489,7 +489,7 @@ fn bindgen_test_layout_usb_ctrlrequest() {
     );
 }
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
 pub struct usb_descriptor_header {
     pub bLength: __u8,
     pub bDescriptorType: __u8,
@@ -526,7 +526,7 @@ fn bindgen_test_layout_usb_descriptor_header() {
     );
 }
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
 pub struct usb_device_descriptor {
     pub bLength: __u8,
     pub bDescriptorType: __u8,
@@ -826,7 +826,7 @@ fn bindgen_test_layout_usb_string_descriptor() {
     );
 }
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
 pub struct usb_interface_descriptor {
     pub bLength: __u8,
     pub bDescriptorType: __u8,
@@ -945,7 +945,7 @@ fn bindgen_test_layout_usb_interface_descriptor() {
     );
 }
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
 pub struct usb_endpoint_descriptor {
     pub bLength: __u8,
     pub bDescriptorType: __u8,

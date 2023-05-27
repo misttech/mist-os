@@ -7,7 +7,7 @@
 
 #![allow(unused_imports)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 /// 'a'
 pub const CHAR_CONST: u8 = 97;
@@ -38,7 +38,7 @@ pub struct StructWithPointers {
 }
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct StructWithStringArrays {
     pub str: [u8; 10],
     pub strs: [[u8; 6]; 4],

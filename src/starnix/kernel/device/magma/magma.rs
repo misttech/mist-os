@@ -12,7 +12,7 @@ use fuchsia_vulkan::*;
 use fuchsia_zircon as zx;
 use magma::*;
 use vk_sys as vk;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::device::wayland::vulkan::*;
 use crate::logging::log_warn;
@@ -336,7 +336,7 @@ pub fn get_image_info(
 }
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Copy, Clone, Default, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Copy, Clone, Default, Debug)]
 /// `StarnixPollItem` exists to be able to `AsBytes` and `FromBytes` the union that exists in
 /// `magma_poll_item_t`.
 pub struct StarnixPollItem {

@@ -4,11 +4,11 @@
 
 use {
     ieee80211::{Bssid, MacAddr},
-    zerocopy::{AsBytes, FromBytes, Unaligned},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned},
 };
 
 // IEEE Std 802.11-2016, 9.3.1.5
-#[derive(FromBytes, AsBytes, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct PsPoll {
     pub masked_aid: u16,

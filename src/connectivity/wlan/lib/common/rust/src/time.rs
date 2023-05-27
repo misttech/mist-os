@@ -4,7 +4,7 @@
 
 use {
     std::ops,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 /// Representation of N IEEE 802.11 TimeUnits.
@@ -12,7 +12,20 @@ use {
 /// Note: Be careful with arithmetic operations on a TimeUnit. A TimeUnit is limited to 2 octets
 /// and can easily overflow. However, there is usually no need to ever work with TUs > 0xFFFF.
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    AsBytes,
+    FromZeroes,
+    FromBytes,
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
 pub struct TimeUnit(pub u16);
 
 #[cfg(target_os = "fuchsia")]

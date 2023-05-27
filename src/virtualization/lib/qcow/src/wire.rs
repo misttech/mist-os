@@ -5,11 +5,11 @@
 // Allow dead code here so we can retain some definitions from the spec that are not yet used.
 #![allow(dead_code)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub use zerocopy::byteorder::big_endian::{U32 as BE32, U64 as BE64};
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct Header {
     pub magic: BE32,
@@ -40,14 +40,14 @@ pub const QCOW_EXT_BITMAPS: u32 = 0x23852875;
 pub const QCOW_CRYPT_NONE: u32 = 0;
 pub const QCOW_CRYPT_AES: u32 = 1;
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct ExtensionHeader {
     pub extension_type: BE32,
     pub extension_size: BE32,
 }
 
-#[derive(Default, Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Default, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct L1Entry(pub BE64);
 
@@ -66,7 +66,7 @@ impl L1Entry {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Default, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct L2Entry(pub BE64);
 

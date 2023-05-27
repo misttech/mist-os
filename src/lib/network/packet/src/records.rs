@@ -900,7 +900,7 @@ impl<'a> BufferView<&'a [u8]> for LongLivedBuff<'a> {
 #[cfg(test)]
 mod tests {
     use test_case::test_case;
-    use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
 
     use super::*;
 
@@ -915,7 +915,7 @@ mod tests {
         zerocopy::LayoutVerified::<_, ()>::new_unaligned(bytes).unwrap().into_mut()
     }
 
-    #[derive(Debug, AsBytes, FromBytes, Unaligned)]
+    #[derive(Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
     #[repr(C)]
     struct DummyRecord {
         a: [u8; 2],

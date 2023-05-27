@@ -503,6 +503,7 @@ mod types {
     use std::convert::{TryFrom, TryInto as _};
     use std::fmt::Debug;
     use std::num::TryFromIntError;
+    use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
     /// The identifier of a descriptor.
     ///
@@ -515,7 +516,7 @@ mod types {
     ///
     /// Also since DESCID_NO_NEXT(u16::MAX) is used to signal the end of a free
     /// list, there should be no [`DescId`] holding that value.
-    #[derive(PartialEq, Eq, zerocopy::FromBytes, zerocopy::AsBytes)]
+    #[derive(PartialEq, Eq, FromZeroes, FromBytes, AsBytes)]
     #[repr(transparent)]
     pub(in crate::session) struct DescId<K: AllocKind>(u16, std::marker::PhantomData<K>);
 

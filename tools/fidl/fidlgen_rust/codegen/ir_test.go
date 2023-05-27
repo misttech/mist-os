@@ -51,7 +51,7 @@ func TestDerivesCalculation(t *testing.T) {
 		{
 			fidl: `type MyStruct = resource struct { field uint64; };`,
 			// TODO(fxbug.dev/124207): Remove zerocopy traits in expected result.
-			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes)]",
+			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes, zerocopy::FromZeroes)]",
 		},
 		{
 			fidl:     `type MyStruct = resource struct {};`,

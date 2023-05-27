@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::mm::PAGE_SIZE;
 use crate::types::*;
 use once_cell::sync::Lazy;
 
 /// Matches iovec_t.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromBytes)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct UserBuffer {
     pub address: UserAddress,

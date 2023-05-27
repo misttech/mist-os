@@ -4,14 +4,14 @@
 
 #![allow(non_camel_case_types)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::types::{dev_t, gid_t, ino_t, mode_t, off_t, timespec, uid_t};
 
 pub type blksize_t = i32;
 pub type nlink_t = u32;
 
-#[derive(Debug, Default, Clone, Copy, AsBytes, FromBytes)]
+#[derive(Debug, Default, Clone, Copy, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct stat_t {
     pub st_dev: dev_t,
@@ -32,7 +32,7 @@ pub struct stat_t {
     pub _pad3: [u32; 2],
 }
 
-#[derive(Default, Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Default, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(packed)]
 #[non_exhaustive]
 pub struct epoll_event {

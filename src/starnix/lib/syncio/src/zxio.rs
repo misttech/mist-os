@@ -9,7 +9,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub const EPERM: u32 = 1;
 pub const ENOENT: u32 = 2;
@@ -645,8 +645,8 @@ extern "C" {
 }
 extern "C" {
     pub fn zxio_create_with_on_representation(
-        raw_handle: zx_handle_t,
-        attr: *mut zxio_node_attributes_t,
+        handle: zx_handle_t,
+        inout_attr: *mut zxio_node_attributes_t,
         storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }
@@ -1022,7 +1022,7 @@ impl Default for msghdr {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct cmsghdr {
     pub cmsg_len: socklen_t,
     pub cmsg_level: ::std::os::raw::c_int,
@@ -1175,12 +1175,12 @@ pub struct sockaddr_in {
     pub sin_zero: [u8; 8usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes)]
+#[derive(Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct in6_addr {
     pub __in6_union: in6_addr__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes)]
+#[derive(Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub union in6_addr__bindgen_ty_1 {
     pub __s6_addr: [u8; 16usize],
     pub __s6_addr16: [u16; 8usize],
@@ -1223,7 +1223,7 @@ impl Default for sockaddr_in6 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes)]
+#[derive(Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct in6_pktinfo {
     pub ipi6_addr: in6_addr,
     pub ipi6_ifindex: ::std::os::raw::c_uint,

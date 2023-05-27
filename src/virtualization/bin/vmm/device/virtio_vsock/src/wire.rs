@@ -7,7 +7,7 @@ use {
     bitflags::bitflags,
     num_derive::FromPrimitive,
     std::convert::TryFrom,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 pub use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32, U64 as LE64};
@@ -47,7 +47,7 @@ impl VirtioVsockConfig {
 
 // 5.10.6 Device Operation
 #[repr(C, packed)]
-#[derive(Default, Debug, AsBytes, FromBytes, PartialEq)]
+#[derive(Default, Debug, AsBytes, FromZeroes, FromBytes, PartialEq)]
 pub struct VirtioVsockHeader {
     pub src_cid: LE64,
     pub dst_cid: LE64,

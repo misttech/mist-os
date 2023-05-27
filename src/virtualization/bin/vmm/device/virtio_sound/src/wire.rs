@@ -7,7 +7,7 @@
 
 use {
     iota::iota,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 pub use zerocopy::byteorder::little_endian::{U32 as LE32, U64 as LE64};
@@ -27,7 +27,7 @@ pub use zerocopy::byteorder::little_endian::{U32 as LE32, U64 as LE64};
 //   named request and response type. For example: JackInfo{Request,Response}.
 //
 // All struct fields use integers, even fields that are logically enums, so
-// that each struct can derive AsBytes, FromBytes (we can't derive AsBytes, FromBytes from an enum
+// that each struct can derive AsBytes, FromBytes (we can't derive AsBytes, FromZeroes, FromBytes from an enum
 // field unless the enum covers all possible bit patterns, which isn't true
 // of any the enums below).
 
@@ -44,7 +44,7 @@ pub const RXQ: u16 = 3;
 // 5.14.4 Device Configuration Layout
 //
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndConfig {
     pub jacks: LE32,
@@ -104,14 +104,14 @@ iota! {
 }
 
 // A common header
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndHdr {
     pub code: LE32,
 }
 
 // An event notification
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndEvent {
     pub hdr: VirtioSndHdr, // .code = VIRTIO_SND_EVT_*
@@ -125,7 +125,7 @@ pub type GenericResponse = VirtioSndHdr; // .code = VIRTIO_SND_S_*
 // 5.14.6.1 Item Information Request
 //
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndQueryInfo {
     pub hdr: VirtioSndHdr, // .code = VIRTIO_SND_R_*_INFO
@@ -134,7 +134,7 @@ pub struct VirtioSndQueryInfo {
     pub size: LE32,
 }
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndInfo {
     pub hda_fn_nid: LE32,
@@ -147,7 +147,7 @@ pub type GenericInfoResponse = VirtioSndInfo;
 // 5.14.6.4 Jack Control Messages
 //
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndJackHdr {
     pub hdr: VirtioSndHdr,
@@ -163,7 +163,7 @@ iota! {
     pub const VIRTIO_SND_JACK_F_REMAP: u32 = iota;
 }
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndJackInfo {
     pub hdr: VirtioSndInfo,
@@ -182,7 +182,7 @@ pub type JackInfoResponse = VirtioSndJackInfo;
 // 5.14.6.4.2 VIRTIO_SND_R_JACK_REMAP
 //
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndJackRemap {
     pub hdr: VirtioSndJackHdr, // .code = VIRTIO_SND_R_JACK_REMAP
@@ -197,7 +197,7 @@ pub type JackRemapResponse = GenericResponse;
 // 5.14.6.6 PCM Control Messages
 //
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndPcmHdr {
     pub hdr: VirtioSndHdr,
@@ -267,7 +267,7 @@ iota! {
         , VIRTIO_SND_PCM_RATE_384000
 }
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndPcmInfo {
     pub hdr: VirtioSndInfo,
@@ -288,7 +288,7 @@ pub type PcmInfoResponse = VirtioSndPcmInfo;
 // 5.14.6.6.3 VIRTIO_SND_R_PCM_SET_PARAMS
 //
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndPcmSetParams {
     pub hdr: VirtioSndPcmHdr, // .hdr.code = VIRTIO_SND_R_PCM_SET_PARAMS
@@ -329,14 +329,14 @@ pub type PcmStopResponse = GenericResponse;
 //
 
 // Header for an I/O message.
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndPcmXfer {
     pub stream_id: LE32,
 }
 
 // Status of an I/O message.
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndPcmStatus {
     pub status: LE32,
@@ -391,7 +391,7 @@ iota! {
 // Maximum possible number of channels
 pub const VIRTIO_SND_CHMAP_MAX_SIZE: usize = 18;
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioSndChmapInfo {
     pub hdr: VirtioSndInfo,

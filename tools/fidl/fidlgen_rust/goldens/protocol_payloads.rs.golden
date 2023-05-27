@@ -32,7 +32,17 @@ use {
 const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct LocalStructPayload {
@@ -71,7 +81,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolOnAnonRequest {
@@ -110,7 +130,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolOneWayAnonRequest {
@@ -149,7 +179,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolTwoWayAnonRequest {
@@ -188,7 +228,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolTwoWayAnonResponse {
@@ -227,7 +277,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolTwoWayAnonWithErrorRequest {
@@ -266,7 +326,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolOnAnonWithErrorResponse {
@@ -305,7 +375,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct MainProtocolTwoWayAnonWithErrorResponse {

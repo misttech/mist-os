@@ -5,7 +5,7 @@
 use {
     crate::mac::{FrameControl, HtControl, MacAddr, OptionalField, Presence, SequenceControl},
     wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, FromBytes, Unaligned},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned},
 };
 
 // IEEE Std 802.11-2016, 9.2.4.5.1, Table 9-6
@@ -17,13 +17,13 @@ use {
     8..=15  high_byte, // interpretation varies
 )]
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Copy, Clone, PartialEq, Eq)]
+#[derive(AsBytes, FromZeroes, FromBytes, Copy, Clone, PartialEq, Eq)]
 pub struct QosControl(pub u16);
 
 pub type Addr4 = MacAddr;
 
 // IEEE Std 802.11-2016, 9.3.2.1
-#[derive(FromBytes, AsBytes, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct FixedDataHdrFields {
     pub frame_ctrl: FrameControl,

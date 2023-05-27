@@ -169,10 +169,13 @@ impl<B: ByteSliceMut> BufferReader<B> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, zerocopy::AsBytes};
+    use {
+        super::*,
+        zerocopy::{AsBytes, FromZeroes},
+    };
 
     #[repr(C, packed)]
-    #[derive(AsBytes, FromBytes, Unaligned)]
+    #[derive(AsBytes, FromZeroes, FromBytes, Unaligned)]
     struct Foo {
         x: u8,
         y: u16,

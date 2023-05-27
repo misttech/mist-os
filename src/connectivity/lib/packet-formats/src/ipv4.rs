@@ -25,8 +25,8 @@ use packet::{
 };
 use tracing::debug;
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, LayoutVerified,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes,
+    LayoutVerified, Unaligned,
 };
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
@@ -62,7 +62,7 @@ pub enum Ipv4FragmentType {
 
 /// The prefix of the IPv4 header which precedes any header options and the
 /// body.
-#[derive(FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 pub struct HeaderPrefix {
     version_ihl: u8,

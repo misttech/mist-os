@@ -72,7 +72,7 @@ func (t traits) supported() []string {
 		supported = append(supported, "AsBytes")
 	}
 	if t.fromBytes {
-		supported = append(supported, "FromBytes")
+		supported = append(supported, "FromZeroes", "FromBytes")
 	}
 	return supported
 }
@@ -229,7 +229,7 @@ func Imports(summary zither.FileSummary) []string {
 			zerocopyImports = append(zerocopyImports, "AsBytes")
 		}
 		if fromBytes {
-			zerocopyImports = append(zerocopyImports, "FromBytes")
+			zerocopyImports = append(zerocopyImports, "FromZeroes", "FromBytes")
 		}
 		imports = append(imports, fmt.Sprintf("zerocopy::{%s}", strings.Join(zerocopyImports, ", ")))
 	}
@@ -296,7 +296,7 @@ func BitsAttributes() []string {
 	// macro.
 	return []string{
 		"#[repr(C)]",
-		"#[derive(AsBytes, FromBytes)]",
+		"#[derive(AsBytes, FromZeroes, FromBytes)]",
 	}
 }
 

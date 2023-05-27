@@ -6,7 +6,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::mm::PAGE_SIZE;
 use crate::types::{SigSet, UserAddress};
@@ -25,7 +25,7 @@ pub type uid_t = uapi::__kernel_uid_t;
 
 pub const ENOTSUP: u32 = uapi::EOPNOTSUPP;
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct utsname_t {
     pub sysname: [u8; 65],
@@ -36,7 +36,7 @@ pub struct utsname_t {
     pub domainname: [u8; 65],
 }
 
-#[derive(Debug, Clone, Copy, AsBytes, FromBytes, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, AsBytes, FromZeroes, FromBytes, Eq, PartialEq)]
 #[repr(C)]
 pub struct statfs {
     pub f_type: i64,
@@ -72,7 +72,7 @@ impl statfs {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromBytes)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct sigaltstack_t {
     pub ss_sp: UserAddress,
@@ -90,7 +90,7 @@ impl sigaltstack_t {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromBytes)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct sigaction_t {
     pub sa_handler: UserAddress,
@@ -170,10 +170,9 @@ pub const MNT_DETACH: u32 = 2;
 pub const MNT_EXPIRE: u32 = 4;
 pub const UMOUNT_NOFOLLOW: u32 = 8;
 
-
 pub type socklen_t = u32;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromBytes)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct ucred {
     pub pid: pid_t,
@@ -181,7 +180,7 @@ pub struct ucred {
     pub gid: gid_t,
 }
 
-#[derive(Debug, Default, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct msghdr {
     pub msg_name: UserAddress,
@@ -193,7 +192,7 @@ pub struct msghdr {
     pub msg_flags: u64,
 }
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeroes, FromBytes, Eq, PartialEq)]
 #[repr(packed)]
 pub struct cmsghdr {
     pub cmsg_len: usize,
@@ -201,7 +200,7 @@ pub struct cmsghdr {
     pub cmsg_type: u32,
 }
 
-#[derive(Debug, Default, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct mmsghdr {
     pub msg_hdr: msghdr,
@@ -209,7 +208,7 @@ pub struct mmsghdr {
     pub __reserved: [u8; 4usize],
 }
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct linger {
     pub l_onoff: i32,
@@ -220,7 +219,7 @@ pub const EFD_CLOEXEC: u32 = O_CLOEXEC;
 pub const EFD_NONBLOCK: u32 = O_NONBLOCK;
 pub const EFD_SEMAPHORE: u32 = 1;
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct pselect6_sigmask {
     pub ss: UserAddress,

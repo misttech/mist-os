@@ -20,7 +20,7 @@ use {
         collections::{BTreeMap, HashMap},
         mem::size_of_val,
     },
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 const METADATA_PATH: &str = "metadata.v1";
@@ -121,7 +121,7 @@ struct AndroidSparseReader<R: ext4_readers::Reader> {
 }
 
 /// Copied from system/core/libsparse/sparse_format.h
-#[derive(AsBytes, FromBytes, Default, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Default, Debug)]
 #[repr(C)]
 struct SparseHeader {
     /// 0xed26ff3a
@@ -149,7 +149,7 @@ struct SparseHeader {
 const SPARSE_HEADER_MAGIC: u32 = 0xed26ff3a;
 
 /// Copied from system/core/libsparse/sparse_format.h
-#[derive(AsBytes, FromBytes, Default)]
+#[derive(AsBytes, FromZeroes, FromBytes, Default)]
 #[repr(C)]
 struct RawChunkHeader {
     /// 0xCAC1 -> raw; 0xCAC2 -> fill; 0xCAC3 -> don't care

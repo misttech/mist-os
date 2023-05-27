@@ -8,20 +8,20 @@
 #![allow(unused_imports)]
 
 use bitflags::bitflags;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct Empty {}
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct Singleton {
     pub value: u8,
 }
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct Doubtleton {
     pub first: Singleton,
     pub second: Singleton,
@@ -42,7 +42,7 @@ pub struct PrimitiveMembers {
 }
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct ArrayMembers {
     pub u8s: [u8; 10],
     pub singletons: [Singleton; 6],
@@ -59,7 +59,7 @@ pub enum Enum {
 
 bitflags! {
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct Bits : u16 {
         const ONE = 1 << 0;
         const TWO = 1 << 1;
@@ -93,7 +93,7 @@ pub struct StructWithOneLineComment {
 ///         many-line
 ///           comment.
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct StructWithManyLineComment {
     pub member: u16,
 }

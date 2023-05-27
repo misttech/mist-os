@@ -65,7 +65,7 @@ use core::ops::Deref;
 use std::net;
 
 pub use net_types_macros::GenericOverIp;
-use zerocopy::{AsBytes, FromBytes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
 use crate::{
     sealed, LinkLocalAddr, LinkLocalAddress, LinkLocalMulticastAddr, LinkLocalUnicastAddr,
@@ -1306,7 +1306,7 @@ impl_from_witness!(LinkLocalUnicastAddr, Ipv6Addr, |addr| LinkLocalAddr(UnicastA
 ///     gateway: Ipv4Addr,
 /// }
 /// ```
-#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(transparent)]
 pub struct Ipv4Addr([u8; 4]);
 
@@ -1533,7 +1533,7 @@ impl Debug for Ipv4Addr {
 /// the same by `Ipv6Addr` as by `<std::net::Ipv6Addr as Display>::fmt`.
 ///
 /// [RFC 5952]: https://datatracker.ietf.org/doc/html/rfc5952
-#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(transparent)]
 pub struct Ipv6Addr([u8; 16]);
 

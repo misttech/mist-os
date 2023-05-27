@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, LayoutVerified, Unaligned};
+use zerocopy::{
+    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+};
 
 // A helper for unaligned reads of types that require alignment
 #[repr(C, packed)]
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 struct UnalignedWrapper<T> {
     value: T,
 }

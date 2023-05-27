@@ -478,15 +478,16 @@ mod tests {
     use fuchsia_zircon::prelude::*;
     use futures::future::try_join;
     use futures::prelude::*;
+    use zerocopy::FromZeroes;
 
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, AsBytes, FromBytes)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeroes, FromBytes)]
     #[repr(C)]
     struct entry {
         a: u32,
         b: u32,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Default, AsBytes, FromBytes)]
+    #[derive(Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeroes, FromBytes)]
     #[repr(C)]
     struct wrong_entry {
         a: u16,

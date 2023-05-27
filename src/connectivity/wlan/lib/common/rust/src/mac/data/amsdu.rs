@@ -8,11 +8,11 @@ use {
         buffer_reader::BufferReader,
         mac::{round_up, MacAddr},
     },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
 };
 
 // IEEE Std 802.11-2016, 9.3.2.2.2
-#[derive(FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C, packed)]
 pub struct AmsduSubframeHdr {
     // Note this is the same as the IEEE 802.3 frame format.

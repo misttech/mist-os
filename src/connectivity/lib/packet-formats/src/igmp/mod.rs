@@ -32,7 +32,7 @@ use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, InnerPacketBuilder, PacketBuilder,
     PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
 };
-use zerocopy::{AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned};
 
 use self::messages::IgmpMessageType;
 use crate::error::ParseError;
@@ -218,7 +218,7 @@ where
 ///
 /// Note that even though `max_rsp_time` is part of `HeaderPrefix`, it is not
 /// meaningful or used in every message.
-#[derive(Default, Debug, AsBytes, FromBytes, Unaligned)]
+#[derive(Default, Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct HeaderPrefix {
     msg_type: u8,

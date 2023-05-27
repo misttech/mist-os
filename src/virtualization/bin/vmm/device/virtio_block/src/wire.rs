@@ -4,7 +4,7 @@
 
 #![allow(dead_code)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub const VIRTIO_BLOCK_REQUEST_QUEUE: u16 = 0;
 pub const VIRTIO_BLOCK_SECTOR_SIZE: u64 = 512;
@@ -43,7 +43,7 @@ impl VirtioBlockStatus {
 
 pub use zerocopy::byteorder::little_endian::{U32 as LE32, U64 as LE64};
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioBlockHeader {
     pub request_type: LE32,
@@ -51,7 +51,7 @@ pub struct VirtioBlockHeader {
     pub sector: LE64,
 }
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioBlockFooter {
     pub status: u8,

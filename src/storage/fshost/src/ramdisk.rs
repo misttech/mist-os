@@ -11,7 +11,7 @@ use {
     anyhow::{ensure, Context, Error},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
-    zerocopy::FromBytes,
+    zerocopy::{FromBytes, FromZeroes},
 };
 
 /// The following types and constants are defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
@@ -21,7 +21,7 @@ const ZBI_ITEM_MAGIC: u32 = 0xb5781729;
 const ZBI_FLAGS_STORAGE_COMPRESSED: u32 = 0x00000001;
 
 #[repr(C)]
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 struct ZbiHeader {
     type_: u32,
     length: u32,

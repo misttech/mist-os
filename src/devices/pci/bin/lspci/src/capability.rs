@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_hardware_pci::Capability as FidlCapability,
     std::convert::From,
     std::fmt,
-    zerocopy::{AsBytes, FromBytes, LayoutVerified},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified},
 };
 
 // Capability types are documented in PCI Local Bus Specification v3.0 Appendix H
@@ -223,7 +223,7 @@ bitfield! {
     _reserved, _: 15, 9;
 }
 
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 struct Msi32Capability {
     id: u8,
@@ -233,7 +233,7 @@ struct Msi32Capability {
     data: u16,
 }
 
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 struct Msi64Capability {
     id: u8,
@@ -244,7 +244,7 @@ struct Msi64Capability {
     data: u16,
 }
 
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 struct MsixCapability {
     id: u8,
@@ -329,7 +329,7 @@ impl fmt::Display for PcieDevicePortType {
     }
 }
 
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 struct PciExpressCapability {
     id: u8,

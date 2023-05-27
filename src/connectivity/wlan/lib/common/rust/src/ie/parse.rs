@@ -344,11 +344,11 @@ mod tests {
         super::*,
         crate::assert_variant,
         std::convert::TryInto,
-        zerocopy::{AsBytes, FromBytes},
+        zerocopy::{AsBytes, FromBytes, FromZeroes},
     };
 
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct SomeIe {
         some_field: u16,
     }

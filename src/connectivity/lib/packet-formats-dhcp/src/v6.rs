@@ -25,7 +25,7 @@ use {
     uuid::Uuid,
     zerocopy::{
         byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
+        AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
     },
 };
 
@@ -397,7 +397,7 @@ impl<'a, B: ByteSlice> IanaData<B> {
 }
 
 /// An overlay for the fixed fields of an IA_NA option.
-#[derive(FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IanaHeader {
     iaid: U32,
@@ -454,7 +454,7 @@ impl<'a, B: ByteSlice> IaAddrData<B> {
 }
 
 /// An overlay for the fixed fields of an IA Address option.
-#[derive(FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IaAddrHeader {
     addr: Ipv6Addr,
@@ -463,7 +463,7 @@ struct IaAddrHeader {
 }
 
 /// An overlay for the fixed fields of an IA_PD option.
-#[derive(FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IaPdHeader {
     iaid: U32,
@@ -522,7 +522,7 @@ impl<'a, B: ByteSlice> IaPdData<B> {
 }
 
 /// An overlay for the fixed fields of an IA Prefix option.
-#[derive(FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Debug, PartialEq, Copy, Clone)]
 #[repr(C)]
 struct IaPrefixHeader {
     preferred_lifetime_secs: U32,

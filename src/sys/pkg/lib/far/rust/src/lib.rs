@@ -79,7 +79,17 @@ pub type ChunkType = [u8; 8];
 pub const DIR_CHUNK_TYPE: ChunkType = *b"DIR-----";
 pub const DIR_NAMES_CHUNK_TYPE: ChunkType = *b"DIRNAMES";
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Default, zerocopy::AsBytes, zerocopy::FromBytes)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::AsBytes,
+    zerocopy::FromZeroes,
+    zerocopy::FromBytes,
+)]
 #[repr(C)]
 struct Index {
     magic: [u8; 8],
@@ -88,7 +98,17 @@ struct Index {
 
 const INDEX_LEN: u64 = std::mem::size_of::<Index>() as u64;
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Default, zerocopy::AsBytes, zerocopy::FromBytes)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::AsBytes,
+    zerocopy::FromZeroes,
+    zerocopy::FromBytes,
+)]
 #[repr(C)]
 struct IndexEntry {
     chunk_type: ChunkType,
@@ -98,7 +118,17 @@ struct IndexEntry {
 
 const INDEX_ENTRY_LEN: u64 = std::mem::size_of::<IndexEntry>() as u64;
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Default, zerocopy::AsBytes, zerocopy::FromBytes)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::AsBytes,
+    zerocopy::FromZeroes,
+    zerocopy::FromBytes,
+)]
 #[repr(C)]
 struct DirectoryEntry {
     name_offset: U32,

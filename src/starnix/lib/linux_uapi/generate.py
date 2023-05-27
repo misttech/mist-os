@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 from bindgen import Bindgen
 
 RAW_LINES = """
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 unsafe impl<Storage> AsBytes for __BindgenBitfieldUnit<Storage>
 where
@@ -20,6 +20,13 @@ where
 unsafe impl<Storage> FromBytes for __BindgenBitfieldUnit<Storage>
 where
     Storage: FromBytes,
+{
+    fn only_derive_is_allowed_to_implement_this_trait() {}
+}
+
+unsafe impl<Storage> FromZeroes for __BindgenBitfieldUnit<Storage>
+where
+    Storage: FromZeroes,
 {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
@@ -43,22 +50,28 @@ INCLUDE_DIRS = [
 
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
-    (r'__IncompleteArrayField', ['AsBytes, FromBytes']),
-    (r'__sifields__bindgen_ty_7', ['AsBytes, FromBytes']),
-    (r'binder_transaction_data.*', ['FromBytes']),
-    (r'bpf_attr.*', ['FromBytes']),
-    (r'flat_binder_object.*', ['FromBytes']),
-    (r'ip6?t_entry', ['FromBytes']),
-    (r'ip6?t_get_entries', ['FromBytes']),
-    (r'ip6?t_replace', ['FromBytes']),
-    (r'in6_addr', ['AsBytes', 'FromBytes']),
-    (r'in6_pktinfo', ['AsBytes', 'FromBytes']),
+    (r'__IncompleteArrayField', ['AsBytes, FromBytes', 'FromZeroes']),
+    (r'__sifields__bindgen_ty_7', ['AsBytes, FromBytes', 'FromZeroes']),
+    (
+        r'binder_transaction_data__bindgen_ty_2__bindgen_ty_1',
+        ['AsBytes', 'FromBytes', 'FromZeroes']),
+    (r'binder_transaction_data.*', ['FromBytes', 'FromZeroes']),
+    (
+        r'bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|15|16|17|18|19)$',
+        ['AsBytes', 'FromBytes', 'FromZeroes']),
+    (r'bpf_attr.*', ['FromBytes', 'FromZeroes']),
+    (r'flat_binder_object.*', ['FromBytes', 'FromZeroes']),
+    (r'ip6?t_entry', ['FromBytes', 'FromZeroes']),
+    (r'ip6?t_get_entries', ['FromBytes', 'FromZeroes']),
+    (r'ip6?t_replace', ['FromBytes', 'FromZeroes']),
+    (r'in6_addr', ['AsBytes', 'FromBytes', 'FromZeroes']),
+    (r'in6_pktinfo', ['AsBytes', 'FromBytes', 'FromZeroes']),
     (r'inotify_event', ['AsBytes']),
-    (r'ip6t_ip6', ['FromBytes']),
-    (r'sockaddr_in*', ['AsBytes', 'FromBytes']),
-    (r'sock_fprog', ['FromBytes']),
+    (r'ip6t_ip6', ['FromBytes', 'FromZeroes']),
+    (r'sockaddr_in*', ['AsBytes', 'FromBytes', 'FromZeroes']),
+    (r'sock_fprog', ['FromBytes', 'FromZeroes']),
     (r'sysinfo', ['AsBytes']),
-    (r'xt_counters_info', ['FromBytes']),
+    (r'xt_counters_info', ['FromBytes', 'FromZeroes']),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
@@ -85,15 +98,18 @@ REPLACEMENTS = [
         '#[derive(\\1)]\n'
         'pub struct __IncompleteArrayField'),
 
-    # Add AsBytes/FromBytes to every copyable struct regardless of name.
+    # Add AsBytes/FromBytes/FromZeroes to every copyable struct regardless of
+    # name.
     # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
     # Remove in favor of bindgen support for custom derives.
     (
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"),
+        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n"
+    ),
 
-    # Use usize in place of pointers for compat with FromBytes. Because the target of the
-    # pointer is in userspace anyway, treating it as an opaque pointer is harmless.
+    # Use usize in place of pointers for compat with zerocopy traits. Because
+    # the target of the pointer is in userspace anyway, treating it as an opaque
+    # pointer is harmless.
     (r'\*mut crate::types::c_void', 'usize'),
     (r'\*mut sock_filter', 'usize')
 ]

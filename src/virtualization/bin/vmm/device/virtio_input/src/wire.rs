@@ -7,7 +7,7 @@
 
 use {
     lazy_static::lazy_static,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 pub use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32};
@@ -63,7 +63,7 @@ pub const VIRTIO_INPUT_EV_MT_TRACKING_ID: u16 = 0x39;
 //
 // 5.8.6: Device Operation.
 //
-#[derive(Debug, Default, Copy, Clone, PartialEq, AsBytes, FromBytes)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioInputEvent {
     pub type_: LE16,

@@ -25,8 +25,8 @@ use packet::{
 };
 use tracing::debug;
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, LayoutVerified,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes,
+    LayoutVerified, Unaligned,
 };
 
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
@@ -175,7 +175,7 @@ fn ext_hdr_err_fn(hdr: &FixedHeader, err: Ipv6ExtensionHeaderParsingError) -> Ip
 }
 
 /// The IPv6 fixed header which precedes any extension headers and the body.
-#[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
 #[repr(C)]
 pub struct FixedHeader {
     version_tc_flowlabel: [u8; 4],

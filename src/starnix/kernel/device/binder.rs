@@ -3839,6 +3839,7 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
+    use zerocopy::FromZeroes;
 
     const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
@@ -5482,7 +5483,7 @@ pub mod tests {
 
         // Serialize a C struct with an fd array.
         #[repr(C)]
-        #[derive(AsBytes, FromBytes)]
+        #[derive(AsBytes, FromZeroes, FromBytes)]
         struct Bar {
             len: u32,
             fds: [u32; 2],

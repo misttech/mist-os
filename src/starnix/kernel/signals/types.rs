@@ -9,7 +9,7 @@ use crate::task::{WaitQueue, WaiterRef};
 use crate::types::*;
 use std::collections::VecDeque;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 /// `SignalActions` contains a `sigaction_t` for each valid signal.
 #[derive(Debug)]
@@ -159,7 +159,7 @@ impl SignalState {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromBytes)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct SignalInfoHeader {
     pub signo: u32,

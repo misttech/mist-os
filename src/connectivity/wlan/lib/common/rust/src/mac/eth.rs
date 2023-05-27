@@ -4,7 +4,7 @@
 
 use {
     crate::{big_endian::BigEndianU16, mac::MacAddr},
-    zerocopy::{AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
 };
 
 // RFC 704, Appendix B.2
@@ -16,7 +16,7 @@ pub const ETHER_TYPE_IPV6: u16 = 0x86DD;
 pub const MAX_ETH_FRAME_LEN: usize = 2048;
 
 // IEEE Std 802.3-2015, 3.1.1
-#[derive(FromBytes, AsBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct EthernetIIHdr {
     pub da: MacAddr,

@@ -228,7 +228,7 @@ unicode-xid = "0.2.0"
 utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
-zerocopy = "0.7.0-alpha.2"
+zerocopy = "0.7.0-alpha.4"
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
@@ -282,7 +282,7 @@ indoc = "1.0.3"
 mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 petgraph = { version = "0.6.2" }
-proc-macro2 = { version = "1.0.39", features = ["span-locations"] }
+proc-macro2 = { version = "1.0.58", features = ["span-locations"] }
 pulldown-cmark = "0.6.0"
 quote = "1.0.10"
 rustfix = "0.6.1"
@@ -554,8 +554,14 @@ rustflags = []
 rustflags = ["--cfg=u128", "--cfg=use_proc_macro", "--cfg=wrap_proc_macro"]
 
 # cargo-gnaw suggested "--cfg=proc_macro_span" as well but proc_macro_span is still an unstable feature.
-[gn.package.proc-macro2."1.0.39"]
+[gn.package.proc-macro2."1.0.58"]
 rustflags = ["--cfg=span_locations", "--cfg=use_proc_macro", "--cfg=wrap_proc_macro"]
+
+# The `build.rs` file in this version of quote checks for rustc versions less
+# than 53; for later rustc versions (including the one that we vendor with
+# Fuchsia), the logic in `build.rs` is a no-op.
+[gn.package.quote."1.0.27"]
+rustflags = []
 
 [gn.package.rand."0.6.5"]
 rustflags = ["--cfg=rustc_1_25","--cfg=rustc_1_26",  "--cfg=rustc_1_27",]
@@ -759,4 +765,3 @@ rustflags = ["--cfg=limb_width_64"]
 [gn.package.syn."1.0.98"]
 [gn.package.test-case."1.1.0"]
 [gn.package.wasm-bindgen."0.2.63"]
-

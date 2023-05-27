@@ -43,14 +43,14 @@ use packet::{
     PacketConstraints, ParsablePacket, ParseMetadata, SerializeBuffer,
 };
 use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
 use crate::ipv4::{self, Ipv4PacketRaw};
 use crate::ipv6::Ipv6PacketRaw;
 
-#[derive(Copy, Clone, Default, Debug, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Default, Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 struct HeaderPrefix {
     msg_type: u8,
@@ -343,7 +343,7 @@ pub trait IcmpMessageType: TryFrom<u8> + Into<u8> + Copy {
     fn is_err(self) -> bool;
 }
 
-#[derive(Copy, Clone, Debug, FromBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 struct Header<M> {
     prefix: HeaderPrefix,
@@ -693,7 +693,7 @@ impl From<IcmpUnusedCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 struct IdAndSeq {
     id: U16,

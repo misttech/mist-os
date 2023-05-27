@@ -7,7 +7,7 @@
 
 #![allow(unused_imports)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 #[repr(u32)]
 #[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]

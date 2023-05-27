@@ -9,7 +9,9 @@ use core::fmt;
 
 use net_types::ip::{Ipv4, Ipv4Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
-use zerocopy::{byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, Unaligned};
+use zerocopy::{
+    byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, Unaligned,
+};
 
 use crate::error::{ParseError, ParseResult};
 
@@ -165,7 +167,7 @@ create_protocol_enum!(
 );
 
 /// An ICMPv4 Redirect Message.
-#[derive(Copy, Clone, Debug, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 pub struct Icmpv4Redirect {
     gateway: Ipv4Addr,
@@ -184,7 +186,7 @@ create_protocol_enum!(
 
 impl_icmp_message!(Ipv4, IcmpTimeExceeded, TimeExceeded, Icmpv4TimeExceededCode, OriginalPacket<B>);
 
-#[derive(Copy, Clone, Debug, FromBytes, AsBytes, Unaligned, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, Eq, PartialEq)]
 #[repr(C)]
 struct IcmpTimestampData {
     origin_timestamp: U32,
@@ -192,7 +194,7 @@ struct IcmpTimestampData {
     tx_timestamp: U32,
 }
 
-#[derive(Copy, Clone, Debug, FromBytes, AsBytes, Unaligned, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, Eq, PartialEq)]
 #[repr(C)]
 struct Timestamp {
     id_seq: IdAndSeq,
@@ -200,7 +202,7 @@ struct Timestamp {
 }
 
 /// An ICMPv4 Timestamp Request message.
-#[derive(Copy, Clone, Debug, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(transparent)]
 pub struct Icmpv4TimestampRequest(Timestamp);
 
@@ -242,7 +244,7 @@ impl Icmpv4TimestampRequest {
 }
 
 /// An ICMPv4 Timestamp Reply message.
-#[derive(Copy, Clone, Debug, FromBytes, AsBytes, Unaligned, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned, Eq, PartialEq)]
 #[repr(transparent)]
 pub struct Icmpv4TimestampReply(Timestamp);
 
@@ -260,7 +262,7 @@ create_protocol_enum! (
 );
 
 /// An ICMPv4 Parameter Problem message.
-#[derive(Copy, Clone, Debug, FromBytes, AsBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 pub struct Icmpv4ParameterProblem {
     pointer: u8,

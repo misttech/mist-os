@@ -69,7 +69,7 @@ pub(crate) mod testutil {
         fmt::{self, Display, Formatter},
     };
 
-    use zerocopy::{AsBytes, FromBytes, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
     use super::*;
     use crate::{
@@ -86,7 +86,9 @@ pub(crate) mod testutil {
     /// A fake [`LinkAddress`].
     ///
     /// The value 0xFF is the broadcast address.
-    #[derive(FromBytes, AsBytes, Unaligned, Copy, Clone, Debug, Hash, PartialEq, Eq)]
+    #[derive(
+        FromZeroes, FromBytes, AsBytes, Unaligned, Copy, Clone, Debug, Hash, PartialEq, Eq,
+    )]
     #[repr(transparent)]
     pub(crate) struct FakeLinkAddress(pub(crate) [u8; FAKE_LINK_ADDRESS_LEN]);
 

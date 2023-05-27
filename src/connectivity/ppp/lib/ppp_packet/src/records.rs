@@ -540,14 +540,14 @@ impl<'a> packet::BufferView<&'a [u8]> for LongLivedBuff<'a> {
 mod test {
     use super::*;
     use packet::BufferView;
-    use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
 
     const DUMMY_BYTES: [u8; 16] = [
         0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03,
         0x04,
     ];
 
-    #[derive(Debug, AsBytes, FromBytes, Unaligned)]
+    #[derive(Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
     #[repr(C)]
     struct DummyRecord {
         a: [u8; 2],

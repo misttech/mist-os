@@ -2,13 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
 // IEEE Std 802.11-2016, 9.4.1.32
 // 24-bit organization unique identifier
 #[repr(C, packed)]
 #[derive(
-    Eq, PartialEq, Hash, AsBytes, FromBytes, Unaligned, Copy, Clone, Debug, PartialOrd, Default,
+    Eq,
+    PartialEq,
+    Hash,
+    AsBytes,
+    FromZeroes,
+    FromBytes,
+    Unaligned,
+    Copy,
+    Clone,
+    Debug,
+    PartialOrd,
+    Default,
 )]
 pub struct Oui([u8; 3]);
 

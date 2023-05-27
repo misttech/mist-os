@@ -7,7 +7,7 @@ use std::sync::Arc;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use magma::*;
 use std::mem::ManuallyDrop;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::device::{
     magma::{
@@ -213,7 +213,7 @@ pub fn device_release(
 /// `WireDescriptor` matches the struct used by libmagma_virt to encode some fields of the magma
 /// command descriptor.
 #[repr(C)]
-#[derive(FromBytes, AsBytes, Default, Debug)]
+#[derive(FromZeroes, FromBytes, AsBytes, Default, Debug)]
 struct WireDescriptor {
     resource_count: u32,
     command_buffer_count: u32,

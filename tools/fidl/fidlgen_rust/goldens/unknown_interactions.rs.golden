@@ -1203,7 +1203,17 @@ fidl_union! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
@@ -1234,7 +1244,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
@@ -1265,7 +1285,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
@@ -1296,7 +1326,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
@@ -1327,7 +1367,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
@@ -1358,7 +1408,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
@@ -1389,7 +1449,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
@@ -1420,7 +1490,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
@@ -1451,7 +1531,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
@@ -1482,7 +1572,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
@@ -1513,7 +1613,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
@@ -1544,7 +1654,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictEventFieldsRequest {
@@ -1575,7 +1695,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
@@ -1606,7 +1736,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
@@ -1637,7 +1777,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
@@ -1668,7 +1818,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
@@ -1699,7 +1859,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
@@ -1730,7 +1900,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {

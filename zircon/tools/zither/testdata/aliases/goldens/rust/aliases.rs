@@ -7,7 +7,7 @@
 
 #![allow(unused_imports)]
 
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub type BoolAlias = bool;
 

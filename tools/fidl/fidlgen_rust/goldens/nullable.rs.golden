@@ -68,7 +68,17 @@ fidl_union! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct Int32Wrapper {
@@ -99,7 +109,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct SimpleProtocolAddRequest {
@@ -138,7 +158,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct SimpleProtocolAddResponse {

@@ -38,7 +38,7 @@ use {
     thiserror::Error,
     zerocopy::{
         byteorder::little_endian::{U16 as LEU16, U32 as LEU32, U64 as LEU64},
-        ByteSlice, FromBytes, LayoutVerified, Unaligned,
+        ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
     },
 };
 
@@ -55,7 +55,7 @@ pub const MIN_EXT4_SIZE: u64 = FIRST_BG_PADDING + size_of::<SuperBlock>() as u64
 /// The smallest supported INode size.
 pub const MINIMUM_INODE_SIZE: u64 = 128;
 
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct ExtentHeader {
     /// Magic number: 0xF30A
@@ -74,7 +74,7 @@ pub struct ExtentHeader {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(ExtentHeader, [u8; 12]);
 
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct ExtentIndex {
     /// Indexes logical blocks.
@@ -89,7 +89,7 @@ pub struct ExtentIndex {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(ExtentIndex, [u8; 12]);
 
-#[derive(Clone, FromBytes, Unaligned)]
+#[derive(Clone, FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct Extent {
     /// First logical block.
@@ -120,7 +120,7 @@ pub struct DirEntry2 {
     pub e2d_name: [u8; 255],
 }
 
-#[derive(FromBytes, Unaligned, std::fmt::Debug)]
+#[derive(FromZeroes, FromBytes, Unaligned, std::fmt::Debug)]
 #[repr(C)]
 pub struct DirEntryHeader {
     /// INode number of entry
@@ -136,7 +136,7 @@ pub struct DirEntryHeader {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(DirEntryHeader, [u8; 8]);
 
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct SuperBlock {
     /// INode count.
@@ -327,7 +327,7 @@ pub struct SuperBlock {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(SuperBlock, [u8; 1024]);
 
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct BlockGroupDesc32 {
     /// Blocks bitmap block.
@@ -361,7 +361,7 @@ assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 
 // TODO(fxbug.dev/122152): There are more fields in BlockGroupDesc if the filesystem is 64bit.
 // Uncomment this when we add support.
-// #[derive(FromBytes, Unaligned)]
+// #[derive(FromZeroes, FromBytes, Unaligned)]
 // #[repr(C)]
 // pub struct BlockGroupDesc64 {
 //     pub base: BlockGroupDesc32,
@@ -381,14 +381,14 @@ assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 // assert_eq_size!(BlockGroupDesc64, [u8; 64]);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct ExtentTreeNode<B: ByteSlice> {
     pub header: LayoutVerified<B, ExtentHeader>,
     pub entries: B,
 }
 
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct INode {
     /// Access permission flags.
@@ -453,7 +453,7 @@ pub struct INode {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(INode, [u8; 160]);
 
-#[derive(FromBytes, Unaligned, Debug)]
+#[derive(FromZeroes, FromBytes, Unaligned, Debug)]
 #[repr(C)]
 pub struct XattrHeader {
     pub e_magic: LEU32,
@@ -464,7 +464,7 @@ pub struct XattrHeader {
     e_reserved: [u8; 8],
 }
 
-#[derive(FromBytes, Unaligned, Debug)]
+#[derive(FromZeroes, FromBytes, Unaligned, Debug)]
 #[repr(C)]
 pub struct XattrEntryHeader {
     pub e_name_len: u8,

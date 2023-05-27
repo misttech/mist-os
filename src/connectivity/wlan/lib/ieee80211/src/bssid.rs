@@ -4,7 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    zerocopy::{AsBytes, FromBytes, Unaligned},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned},
 };
 
 // Strictly speaking, the MAC address is not defined in 802.11, but it's defined
@@ -16,7 +16,18 @@ pub const NULL_MAC_ADDR: MacAddr = [0x00; fidl_ieee80211::MAC_ADDR_LEN as usize]
 // Bssid is a newtype to wrap MacAddr where a BSSID is explicitly required.
 #[repr(transparent)]
 #[derive(
-    FromBytes, AsBytes, Unaligned, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
+    FromZeroes,
+    FromBytes,
+    AsBytes,
+    Unaligned,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 pub struct Bssid(pub MacAddr);
 

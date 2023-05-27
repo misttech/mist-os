@@ -5,12 +5,12 @@ use {
     crate::util::is_set,
     bitfield::bitfield,
     std::fmt,
-    zerocopy::{AsBytes, FromBytes, LayoutVerified},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified},
 };
 
 // PCI Local Bus Specification v3.0 section 6.1
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct Type00Config {
     pub vendor_id: u16,
     pub device_id: u16,
@@ -46,7 +46,7 @@ impl Type00Config {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct Type01Config {
     pub vendor_id: u16,
     pub device_id: u16,

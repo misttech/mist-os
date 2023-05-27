@@ -30,7 +30,17 @@ use {
 };
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct Payload {

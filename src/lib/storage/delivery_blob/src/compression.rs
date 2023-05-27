@@ -9,11 +9,11 @@ use {
     rayon::prelude::*,
     zerocopy::{
         byteorder::{LE, U16, U32, U64},
-        AsBytes, FromBytes, Unaligned,
+        AsBytes, FromBytes, FromZeroes, Unaligned,
     },
 };
 
-#[derive(AsBytes, FromBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct ChunkedArchiveHeader {
     magic: [u8; 8],
@@ -25,7 +25,7 @@ struct ChunkedArchiveHeader {
     reserved_2: U64<LE>,
 }
 
-#[derive(AsBytes, FromBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct SeekTableEntry {
     decompressed_offset: U64<LE>,

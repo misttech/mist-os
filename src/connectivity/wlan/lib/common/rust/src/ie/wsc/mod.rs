@@ -12,11 +12,11 @@ pub use {constants::*, fields::*, id::*, parse::*, reader::*};
 
 use {
     crate::big_endian::BigEndianU16,
-    zerocopy::{AsBytes, FromBytes, Unaligned},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned},
 };
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes, Unaligned)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned)]
 pub struct AttributeHeader {
     id: Id,
     body_len: BigEndianU16,

@@ -7,7 +7,7 @@ use std::convert::{From, TryFrom};
 use std::fmt;
 
 use crate::types::*;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub const UNBLOCKABLE_SIGNALS: SigSet = SigSet(SIGKILL.mask() | SIGSTOP.mask());
 
@@ -178,7 +178,7 @@ impl fmt::Display for Signal {
 /// The layout of this object is designed to be identical to the layout of the current
 /// architecture's sigset_t type so UserRef<SigSet> can be used for system calls.
 #[repr(transparent)]
-#[derive(Debug, Copy, Clone, Default, AsBytes, Eq, FromBytes, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, AsBytes, Eq, FromZeroes, FromBytes, PartialEq)]
 pub struct SigSet(pub std::os::raw::c_ulong);
 assert_eq_size!(SigSet, sigset_t);
 

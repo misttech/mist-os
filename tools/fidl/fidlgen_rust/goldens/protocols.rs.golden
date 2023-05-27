@@ -133,7 +133,17 @@ fidl_union! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct ChannelProtocolEventARequest {
@@ -172,7 +182,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct ChannelProtocolMethodARequest {
@@ -211,7 +231,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct ChannelProtocolMethodBRequest {
@@ -250,7 +280,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct ChannelProtocolMethodBResponse {
@@ -733,7 +773,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct TransitionalEventRequest {
@@ -764,7 +814,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct TransitionalOneWayRequest {
@@ -795,7 +855,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct TransitionalRequestRequest {
@@ -826,7 +896,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct TransitionalRequestResponse {
@@ -1048,7 +1128,17 @@ fidl_struct! {
 }
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::AsBytes,
+    zerocopy::FromBytes,
+    zerocopy::FromZeroes,
 )]
 #[repr(C)]
 pub struct WithErrorSyntaxResponseAsStructResponse {

@@ -8,11 +8,11 @@
 #![allow(unused_imports)]
 
 use bitflags::bitflags;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 bitflags! {
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct Uint8Bits : u8 {
         const ONE = 1 << 0;
         const TWO = 1 << 1;
@@ -27,7 +27,7 @@ bitflags! {
 
 bitflags! {
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct Uint16Bits : u16 {
         const ZEROTH = 1 << 0;
         const FIRST = 1 << 1;
@@ -50,7 +50,7 @@ bitflags! {
 
 bitflags! {
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct Uint32Bits : u32 {
         const POW_0 = 1 << 0;
         const POW_31 = 1 << 31;
@@ -59,7 +59,7 @@ bitflags! {
 
 bitflags! {
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct Uint64Bits : u64 {
         const POW_0 = 1 << 0;
         const POW_63 = 1 << 63;
@@ -69,7 +69,7 @@ bitflags! {
 bitflags! {
     /// Bits with a one-line comment.
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct BitsWithOneLineComment : u8 {
 
         /// Bits member with one-line comment.
@@ -90,7 +90,7 @@ bitflags! {
     ///         many-line
     ///           comment.
     #[repr(C)]
-    #[derive(AsBytes, FromBytes)]
+    #[derive(AsBytes, FromZeroes, FromBytes)]
     pub struct BitsWithManyLineComment : u16 {
         const MEMBER = 1 << 0;
   }

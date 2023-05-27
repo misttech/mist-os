@@ -12,7 +12,7 @@ use packet::{
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
+    AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -46,7 +46,7 @@ impl EthernetIpExt for Ipv6 {
     const ETHER_TYPE: EtherType = EtherType::Ipv6;
 }
 
-#[derive(FromBytes, AsBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 struct HeaderPrefix {
     dst_mac: Mac,

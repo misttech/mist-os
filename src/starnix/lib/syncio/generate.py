@@ -10,7 +10,7 @@ from bindgen import Bindgen
 bindgen = Bindgen()
 
 bindgen.raw_lines = """
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 """
 
 bindgen.include_dirs = [
@@ -19,23 +19,19 @@ bindgen.include_dirs = [
     'zircon/system/public',
 ]
 
-
 bindgen.function_allowlist = ['zxio_.*']
-bindgen.var_allowlist = ['ZXIO_SHUTDOWN.*',
-                         'ZXIO_NODE_PROTOCOL.*',
-                         'ZXIO_SEEK_ORIGIN.*',
-                         'E[A-Z]*',
-                         'AF_.*',
-                         'SO.*',
-                         'IP.*',
-                         'MSG_.*']
+bindgen.var_allowlist = [
+    'ZXIO_SHUTDOWN.*', 'ZXIO_NODE_PROTOCOL.*', 'ZXIO_SEEK_ORIGIN.*', 'E[A-Z]*',
+    'AF_.*', 'SO.*', 'IP.*', 'MSG_.*'
+]
 bindgen.type_allowlist = ['cmsghdr.*', 'in6_.*', 'sockaddr.*']
 
-bindgen.set_auto_derive_traits([
-    (r'cmsghdr', ['AsBytes, FromBytes']),
-    (r'in6_pktinfo', ['AsBytes, FromBytes']),
-    (r'in6_addr*', ['AsBytes, FromBytes']),
-])
+bindgen.set_auto_derive_traits(
+    [
+        (r'cmsghdr', ['AsBytes, FromBytes', 'FromZeroes']),
+        (r'in6_pktinfo', ['AsBytes, FromBytes', 'FromZeroes']),
+        (r'in6_addr*', ['AsBytes, FromBytes', 'FromZeroes']),
+    ])
 
-
-bindgen.run('src/starnix/lib/syncio/wrapper.h', 'src/starnix/lib/syncio/src/zxio.rs')
+bindgen.run(
+    'src/starnix/lib/syncio/wrapper.h', 'src/starnix/lib/syncio/src/zxio.rs')

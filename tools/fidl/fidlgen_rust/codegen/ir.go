@@ -1624,10 +1624,12 @@ const (
 	derivesAsBytes
 	// TODO(fxbug.dev/124207): Remove derivesFromBytes.
 	derivesFromBytes
+	// TODO(fxbug.dev/124207): Remove derivesFromZeroes.
+	derivesFromZeroes
 	derivesAll derives = (1 << iota) - 1
 
 	// TODO(fxbug.dev/124207): Remove derivesZerocopy.
-	derivesZerocopy derives = derivesAsBytes | derivesFromBytes
+	derivesZerocopy derives = derivesAsBytes | derivesFromBytes | derivesFromZeroes
 )
 
 // note: keep this list in the same order as the derives definitions
@@ -1647,6 +1649,7 @@ var derivesNames = []string{
 	// TODO(fxbug.dev/124207): Remove.
 	"zerocopy::AsBytes",
 	"zerocopy::FromBytes",
+	"zerocopy::FromZeroes",
 }
 
 // Returns the derives that are allowed for a type based on resourceness

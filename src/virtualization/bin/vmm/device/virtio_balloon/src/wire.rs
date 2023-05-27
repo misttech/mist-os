@@ -6,7 +6,7 @@
 
 use {
     bitflags::bitflags,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 pub use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32, U64 as LE64};
@@ -64,7 +64,7 @@ pub const REPORTINGVQ: u16 = 3;
 // 4096 is historical, and independent of the guest page size.
 pub const PAGE_SIZE: usize = 4096;
 
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C, packed)]
 pub struct VirtioBalloonMemStat {
     pub tag: LE16,

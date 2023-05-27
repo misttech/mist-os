@@ -14,7 +14,7 @@ use {
     static_assertions::const_assert_eq,
     zerocopy::{
         byteorder::{LE, U32, U64},
-        AsBytes, FromBytes, Unaligned,
+        AsBytes, FromBytes, FromZeroes, Unaligned,
     },
 };
 
@@ -49,7 +49,7 @@ impl From<&Type1Blob> for SerializedType1Flags {
 }
 
 /// Serialized header of an RFC 0207 compliant delivery blob.
-#[derive(AsBytes, FromBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct SerializedHeader {
     magic: [u8; 4],
@@ -85,7 +85,7 @@ impl From<&DeliveryBlobHeader> for SerializedHeader {
 /// **WARNING**: Changes to this format must be done in a backwards compatible manner, or a new
 /// delivery blob type should be created. This format should be considered an implementation detail,
 /// and not relied on outside of storage-owned components.
-#[derive(AsBytes, FromBytes, Unaligned, Clone, Copy, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 pub(crate) struct SerializedType1Blob {
     // Header:

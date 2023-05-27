@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(
+    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes,
+)]
 #[repr(transparent)]
 pub struct WdNumber(i32);
 

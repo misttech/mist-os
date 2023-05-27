@@ -27,7 +27,7 @@ use packet::{
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
+    AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -49,7 +49,7 @@ pub const MAX_OPTIONS_LEN: usize = MAX_HDR_LEN - HDR_PREFIX_LEN;
 const CHECKSUM_OFFSET: usize = 16;
 const CHECKSUM_RANGE: Range<usize> = CHECKSUM_OFFSET..CHECKSUM_OFFSET + 2;
 
-#[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
 #[repr(C)]
 struct HeaderPrefix {
     src_port: U16,
@@ -113,7 +113,9 @@ mod data_offset_reserved_flags {
     /// into new segments - in these cases, if we were to unconditionally set
     /// the reserved bits to zero, we could be changing the semantics of a TCP
     /// segment.
-    #[derive(FromBytes, AsBytes, Unaligned, Copy, Clone, Debug, Default, Eq, PartialEq)]
+    #[derive(
+        FromZeroes, FromBytes, AsBytes, Unaligned, Copy, Clone, Debug, Default, Eq, PartialEq,
+    )]
     #[repr(transparent)]
     pub(super) struct DataOffsetReservedFlags(U16);
 
@@ -446,7 +448,7 @@ impl<B: ByteSlice> TcpSegment<B> {
 ///
 /// A `TcpFlowHeader` may be the result of a partially parsed TCP segment in
 /// [`TcpSegmentRaw`].
-#[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
 #[repr(C)]
 pub struct TcpFlowHeader {
     /// Source port.
@@ -467,7 +469,7 @@ struct PartialHeaderPrefix<B: ByteSlice> {
 /// can deliver the ICMP message to the right socket and also perform checks
 /// against the sequence number to make sure it corresponds to an in-flight
 /// segment.
-#[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
 #[repr(C)]
 pub struct TcpFlowAndSeqNum {
     /// The flow header.
@@ -864,7 +866,7 @@ pub mod options {
     };
     use packet::BufferViewMut as _;
     use zerocopy::byteorder::{network_endian::U32, ByteOrder, NetworkEndian};
-    use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
 
     use super::*;
 
@@ -911,7 +913,7 @@ pub mod options {
     /// See [RFC 2018] for more details.
     ///
     /// [RFC 2018]: https://tools.ietf.org/html/rfc2018
-    #[derive(Copy, Clone, Eq, PartialEq, Debug, FromBytes, AsBytes, Unaligned)]
+    #[derive(Copy, Clone, Eq, PartialEq, Debug, FromZeroes, FromBytes, AsBytes, Unaligned)]
     #[repr(C)]
     pub struct TcpSackBlock {
         left_edge: U32,

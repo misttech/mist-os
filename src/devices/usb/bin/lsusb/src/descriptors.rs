@@ -4,7 +4,7 @@
 
 use {
     num_traits::FromPrimitive,
-    zerocopy::{AsBytes, FromBytes, LayoutVerified},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified},
 };
 
 #[repr(u8)]
@@ -29,7 +29,7 @@ pub enum DescriptorType {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct DeviceDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -48,7 +48,7 @@ pub struct DeviceDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct ConfigurationDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -61,7 +61,7 @@ pub struct ConfigurationDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct InterfaceInfoDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -75,7 +75,7 @@ pub struct InterfaceInfoDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct EndpointInfoDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -86,7 +86,7 @@ pub struct EndpointInfoDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct HidDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -96,7 +96,7 @@ pub struct HidDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct SsEpCompDescriptorInfo {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -106,7 +106,7 @@ pub struct SsEpCompDescriptorInfo {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct SsIsochEpCompDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -115,7 +115,7 @@ pub struct SsIsochEpCompDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct InterfaceAssocDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -128,7 +128,7 @@ pub struct InterfaceAssocDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromBytes)]
+#[derive(AsBytes, FromZeroes, FromBytes)]
 pub struct HidDescriptorEntry {
     pub b_descriptor_type: u8,
     pub w_descriptor_length: u16,

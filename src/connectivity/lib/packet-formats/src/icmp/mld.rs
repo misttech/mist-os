@@ -21,7 +21,8 @@ use packet::{
     BufferView,
 };
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
+    Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
@@ -57,7 +58,7 @@ create_protocol_enum!(
 /// [RFC 3810 section 5.2].
 ///
 /// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
-#[derive(Copy, Clone, Debug, AsBytes, FromBytes, Unaligned)]
+#[derive(Copy, Clone, Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 pub struct MulticastRecordHeader {
     record_type: u8,
@@ -140,7 +141,7 @@ impl<'a> RecordsImpl<'a> for Mldv2ReportRecords {
 ///
 /// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
 pub struct Mldv2ReportMessageHeader {
     /// Initialized to zero by the sender; ignored by receivers.
     _reserved: [u8; 2],
@@ -196,7 +197,7 @@ impl<B: ByteSlice> MessageBody<B> for Mldv2ReportBody<B> {
 
 /// Multicast Listener Report V2 Message.
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
 pub struct MulticastListenerReportV2;
 
 impl_icmp_message!(
@@ -209,17 +210,17 @@ impl_icmp_message!(
 
 /// Multicast Listener Query V1 Message.
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
 pub struct MulticastListenerQuery;
 
 /// Multicast Listener Report V1 Message.
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
 pub struct MulticastListenerReport;
 
 /// Multicast Listener Done V1 Message.
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
 pub struct MulticastListenerDone;
 
 /// MLD Errors.
@@ -303,7 +304,7 @@ impl TryFrom<Duration> for Mldv1ResponseDelay {
 
 /// The layout for an MLDv1 message body.
 #[repr(C)]
-#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+#[derive(AsBytes, FromZeroes, FromBytes, Unaligned, Copy, Clone, Debug)]
 pub struct Mldv1Message {
     /// Max Response Delay, in units of milliseconds.
     pub max_response_delay: U16,

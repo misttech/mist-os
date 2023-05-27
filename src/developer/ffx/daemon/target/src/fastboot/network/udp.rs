@@ -15,7 +15,9 @@ use futures::{
 };
 use std::{io::ErrorKind, net::SocketAddr, num::Wrapping, pin::Pin, time::Duration};
 use timeout::timeout;
-use zerocopy::{byteorder::big_endian::U16, ByteSlice, FromBytes, LayoutVerified, Unaligned};
+use zerocopy::{
+    byteorder::big_endian::U16, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+};
 
 const HOST_PORT: u16 = 5554;
 const REPLY_TIMEOUT: Duration = Duration::from_millis(500);
@@ -28,7 +30,7 @@ enum PacketType {
     Fastboot,
 }
 
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 struct Header {
     id: u8,

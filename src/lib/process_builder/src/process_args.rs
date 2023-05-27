@@ -13,7 +13,7 @@ use {
     std::mem,
     std::num,
     thiserror::Error,
-    zerocopy::{AsBytes, FromBytes},
+    zerocopy::{AsBytes, FromBytes, FromZeroes},
 };
 
 /// Possible errors that can occur during processargs startup message construction
@@ -62,7 +62,7 @@ const ZX_PROCARGS_PROTOCOL: u32 = 0x4150585d;
 const ZX_PROCARGS_VERSION: u32 = 0x00001000;
 
 /// Header for bootstrap message following the processargs protocol.
-#[derive(FromBytes, AsBytes, Default)]
+#[derive(FromZeroes, FromBytes, AsBytes, Default)]
 #[repr(C)]
 pub(crate) struct MessageHeader {
     // Protocol and version identifiers to allow for different process start message protocols and

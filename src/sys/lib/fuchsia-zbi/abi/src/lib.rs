@@ -4,7 +4,7 @@
 
 use {
     num_derive::{FromPrimitive, ToPrimitive},
-    zerocopy::{byteorder::little_endian::U32, AsBytes, FromBytes, Unaligned},
+    zerocopy::{byteorder::little_endian::U32, AsBytes, FromBytes, FromZeroes, Unaligned},
 };
 
 const ZBI_MAX_SMT: usize = 4;
@@ -82,7 +82,7 @@ impl ZbiType {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, Unaligned)]
+#[derive(Debug, Default, Copy, Clone, FromZeroes, FromBytes, AsBytes, Unaligned)]
 pub struct zbi_header_t {
     pub zbi_type: U32,
     pub length: U32,
@@ -109,7 +109,7 @@ pub fn zbi_container_header(length: u32) -> zbi_header_t {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 /// Defines the Rust version of `zbi_topology_node_t` in
 /// sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 pub struct ZbiTopologyNode {
@@ -141,7 +141,7 @@ pub enum ZbiTopologyArchitecture {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub union Entity {
     pub processor: ZbiTopologyProcessor,
     pub cluster: ZbiTopologyCluster,
@@ -150,7 +150,7 @@ pub union Entity {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub struct ZbiTopologyProcessor {
     pub logical_ids: [u16; ZBI_MAX_SMT],
     pub logical_id_count: u8,
@@ -163,14 +163,14 @@ pub struct ZbiTopologyProcessor {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub union ArchitectureInfo {
     pub arm: ZbiTopologyArmInfo,
     pub x86: ZbiTopologyX86Info,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub struct ZbiTopologyCluster {
     // Relative performance level of this processor in the system.
     // Refer to sdk/lib/zbi-format/include/lib/zbi-format/zbi.h for more details.
@@ -178,7 +178,7 @@ pub struct ZbiTopologyCluster {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub struct ZbiTopologyNumaRegion {
     // Starting and ending memory addresses of this numa region.
     pub start_address: u64,
@@ -186,14 +186,14 @@ pub struct ZbiTopologyNumaRegion {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub struct ZbiTopologyCache {
     // Unique id of this cache node. No other semantics are assumed.
     pub cache_id: u32,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub struct ZbiTopologyArmInfo {
     // Cluster ids for each level, one being closest to the cpu.
     // These map to aff1, aff2, and aff3 values in the ARM registers.
@@ -211,7 +211,7 @@ pub struct ZbiTopologyArmInfo {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
+#[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub struct ZbiTopologyX86Info {
     // Indexes here correspond to the logical_ids index for the thread.
     pub apic_ids: [u32; ZBI_MAX_SMT],

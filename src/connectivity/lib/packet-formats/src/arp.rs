@@ -16,7 +16,8 @@ use net_types::ethernet::Mac;
 use net_types::ip::{IpAddress, Ipv4Addr};
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
+    Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -84,7 +85,7 @@ create_protocol_enum!(
     }
 );
 
-#[derive(Default, FromBytes, AsBytes, Unaligned)]
+#[derive(Default, FromZeroes, FromBytes, AsBytes, Unaligned)]
 #[repr(C)]
 struct Header {
     htype: U16, // Hardware (e.g. Ethernet)
@@ -160,7 +161,7 @@ pub fn peek_arp_types<B: ByteSlice>(bytes: B) -> ParseResult<(ArpHardwareType, A
 //   padding so long as each field also has no alignment requirement that would
 //   cause the layout algorithm to produce padding. Thus, we use an AsBytes +
 //   Unaligned bound for our type parameters.
-#[derive(FromBytes, Unaligned)]
+#[derive(FromZeroes, FromBytes, Unaligned)]
 #[repr(C)]
 struct Body<HwAddr, ProtoAddr> {
     sha: HwAddr,

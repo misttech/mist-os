@@ -11,6 +11,7 @@
 # rust wg
 'third_party/rust_crates/vendor/anyhow' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/argh' = ["third_party/rust_crates/OWNERS"]
+'third_party/rust_crates/vendor/async-stream' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/async-trait' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/backtrace' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/bitflags' = ["third_party/rust_crates/OWNERS"]
@@ -27,12 +28,16 @@
 'third_party/rust_crates/vendor/pin-project' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/pin-project-lite' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/pin-utils' = ["third_party/rust_crates/OWNERS"]
+'third_party/rust_crates/vendor/proc-macro2' = ["third_party/rust_crates/OWNERS"]
+'third_party/rust_crates/vendor/quote' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/regex' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/serde' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/serde_json' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/static_assertions' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/syn' = ["third_party/rust_crates/OWNERS"]
 'third_party/rust_crates/vendor/thiserror' = ["third_party/rust_crates/OWNERS"]
+'third_party/rust_crates/vendor/zerocopy' = ["third_party/rust_crates/OWNERS"]
+'third_party/rust_crates/vendor/zerocopy-derive' = ["third_party/rust_crates/OWNERS"]
 
 # diagnostics team
 'third_party/rust_crates/vendor/log' = ["src/diagnostics/OWNERS"]
@@ -73,5 +78,6 @@
 
 # storage team
 'third_party/rust_crates/forks/fatfs' = ["src/storage/OWNERS"]
+'third_party/rust_crates/forks/fuse3' = ["src/storage/OWNERS"]
 
 'third_party/wayland' = ["src/graphics/OWNERS", "src/virtualization/OWNERS"]
