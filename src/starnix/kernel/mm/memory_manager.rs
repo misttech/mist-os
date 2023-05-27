@@ -51,7 +51,7 @@ impl ProtectionFlags {
             vmar_flags |= zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
         }
         if self.contains(ProtectionFlags::EXEC) {
-            vmar_flags |= zx::VmarFlags::PERM_EXECUTE;
+            vmar_flags |= zx::VmarFlags::PERM_EXECUTE | zx::VmarFlags::PERM_READ_IF_XOM_UNSUPPORTED;
         }
         vmar_flags
     }
@@ -243,22 +243,66 @@ pub struct MemoryManagerState {
 }
 
 impl MemoryManagerState {
+    // Map the memory without updating `self.mappings`.
+    fn map_internal(
+        &mut self,
+        addr: DesiredAddress,
+        vmo: &zx::Vmo,
+        vmo_offset: u64,
+        length: usize,
+        prot_flags: ProtectionFlags,
+        options: MappingOptions,
+    ) -> Result<UserAddress, Errno> {
+        let base_addr = UserAddress::from_ptr(self.user_vmar_info.base);
+        let (vmar_offset, vmar_extra_flags) = match addr {
+            DesiredAddress::Any if options.contains(MappingOptions::LOWER_32BIT) => {
+                // MAP_32BIT specifies that the memory allocated will
+                // be within the first 2 GB of the process address space.
+                (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
+            }
+            DesiredAddress::Any => (0, zx::VmarFlags::empty()),
+            DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
+                (addr - base_addr, zx::VmarFlags::SPECIFIC)
+            }
+            DesiredAddress::FixedOverwrite(addr) => {
+                let specific_overwrite = unsafe {
+                    zx::VmarFlags::from_bits_unchecked(
+                        zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits(),
+                    )
+                };
+                (addr - base_addr, specific_overwrite)
+            }
+        };
+
+        let vmar_flags =
+            prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
+
+        let mut map_result = self.user_vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
+
+        // Retry mapping if the target address was a Hint.
+        if map_result.is_err() {
+            if let DesiredAddress::Hint(_) = addr {
+                let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
+                map_result = self.user_vmar.map(0, vmo, vmo_offset, length, vmar_flags);
+            }
+        }
+
+        let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
+        Ok(UserAddress::from_ptr(mapped_addr))
+    }
+
     fn map(
         &mut self,
-        vmar_offset: usize,
+        addr: DesiredAddress,
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
-        vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         name: MappingName,
+        released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
-        let addr = UserAddress::from_ptr(
-            self.user_vmar
-                .map(vmar_offset, &vmo, vmo_offset, length, vmar_flags)
-                .map_err(MemoryManager::get_errno_for_map_err)?,
-        );
+        let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, prot_flags, options)?;
 
         #[cfg(any(test, debug_assertions))]
         {
@@ -269,15 +313,21 @@ impl MemoryManagerState {
             }
         }
 
-        let mut mapping = Mapping::new(addr, vmo, vmo_offset, prot_flags, options);
+        let end = (mapped_addr + length).round_up(*PAGE_SIZE)?;
+
+        if let DesiredAddress::FixedOverwrite(addr) = addr {
+            assert_eq!(addr, mapped_addr);
+            self.update_after_unmap(addr, end - addr, released_mappings)?;
+        }
+
+        let mut mapping = Mapping::new(mapped_addr, vmo, vmo_offset, prot_flags, options);
         mapping.name = name;
-        let end = (addr + length).round_up(*PAGE_SIZE)?;
-        self.mappings.insert(addr..end, mapping);
+        self.mappings.insert(mapped_addr..end, mapping);
 
         // TODO(https://fxbug.dev/97514): Create a guard region below this mapping if GROWSDOWN is
         // in |options|.
 
-        Ok(addr)
+        Ok(mapped_addr)
     }
 
     fn remap(
@@ -288,6 +338,7 @@ impl MemoryManagerState {
         new_length: usize,
         flags: MremapFlags,
         new_address: UserAddress,
+        released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
         // MREMAP_FIXED moves a mapping, which requires MREMAP_MAYMOVE.
         if flags.contains(MremapFlags::FIXED) && !flags.contains(MremapFlags::MAYMOVE) {
@@ -328,7 +379,9 @@ impl MemoryManagerState {
         if !flags.contains(MremapFlags::FIXED) && old_length != 0 {
             // We are not requested to remap to a specific address, so first we see if we can remap
             // in-place. In-place copies (old_length == 0) are not allowed.
-            if let Some(new_address) = self.try_remap_in_place(old_addr, old_length, new_length)? {
+            if let Some(new_address) =
+                self.try_remap_in_place(old_addr, old_length, new_length, released_mappings)?
+            {
                 return Ok(new_address);
             }
         }
@@ -337,7 +390,7 @@ impl MemoryManagerState {
         if flags.contains(MremapFlags::MAYMOVE) {
             let dst_address =
                 if flags.contains(MremapFlags::FIXED) { Some(new_address) } else { None };
-            self.remap_move(old_addr, old_length, dst_address, new_length)
+            self.remap_move(old_addr, old_length, dst_address, new_length, released_mappings)
         } else {
             error!(ENOMEM)
         }
@@ -350,6 +403,7 @@ impl MemoryManagerState {
         old_addr: UserAddress,
         old_length: usize,
         new_length: usize,
+        released_mappings: &mut Vec<Mapping>,
     ) -> Result<Option<UserAddress>, Errno> {
         let old_range = old_addr..old_addr.checked_add(old_length).ok_or_else(|| errno!(EINVAL))?;
         let new_range_in_place =
@@ -359,7 +413,7 @@ impl MemoryManagerState {
             // Shrink the mapping in-place, which should always succeed.
             // This is done by unmapping the extraneous region.
             if new_length != old_length {
-                self.unmap(new_range_in_place.end, old_length - new_length)?;
+                self.unmap(new_range_in_place.end, old_length - new_length, released_mappings)?;
             }
             return Ok(Some(old_addr));
         }
@@ -406,36 +460,27 @@ impl MemoryManagerState {
 
         let prot_flags = original_mapping.prot_flags;
 
-        // Since the mapping is growing in-place, it must be mapped at the original address.
-        let vmar_flags = prot_flags.to_vmar_flags()
-            | unsafe {
-                zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
-            };
-
-        let vmar_offset =
-            self.user_address_to_vmar_offset(original_range.start).map_err(|_| errno!(EINVAL))?;
-
         // Re-map the original range, which may include pages before the requested range.
         Ok(Some(self.map(
-            vmar_offset,
+            DesiredAddress::FixedOverwrite(original_range.start),
             original_mapping.vmo,
             original_mapping.vmo_offset,
             final_length,
             prot_flags,
-            vmar_flags,
             original_mapping.options,
             original_mapping.name,
+            released_mappings,
         )?))
     }
 
-    /// Grows or shrinks the mapping while moving it to a new destination. If `dst_addr` is `None`,
-    /// the kernel decides where to move the mapping.
+    /// Grows or shrinks the mapping while moving it to a new destination.
     fn remap_move(
         &mut self,
         src_addr: UserAddress,
         src_length: usize,
         dst_addr: Option<UserAddress>,
         dst_length: usize,
+        released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
         let src_range = src_addr..src_addr.checked_add(src_length).ok_or_else(|| errno!(EINVAL))?;
         let (original_range, src_mapping) =
@@ -449,28 +494,30 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        let offset_into_original_range = (src_addr - original_range.start) as u64;
-        let dst_vmo_offset = src_mapping.vmo_offset + offset_into_original_range;
-
-        if let Some(dst_addr) = &dst_addr {
-            // The mapping is being moved to a specific address.
-            let dst_range =
-                *dst_addr..(dst_addr.checked_add(dst_length).ok_or_else(|| errno!(EINVAL))?);
-            if !src_range.intersect(&dst_range).is_empty() {
-                return error!(EINVAL);
-            }
-
-            // If the destination range is smaller than the source range, we must first shrink
-            // the source range in place. This must be done now and visible to processes, even if
-            // a later failure causes the remap operation to fail.
-            if src_length != 0 && src_length > dst_length {
-                self.unmap(src_addr + dst_length, src_length - dst_length)?;
-            }
-
-            // The destination range must be unmapped. This must be done now and visible to
-            // processes, even if a later failure causes the remap operation to fail.
-            self.unmap(*dst_addr, dst_length)?;
+        // If the destination range is smaller than the source range, we must first shrink
+        // the source range in place. This must be done now and visible to processes, even if
+        // a later failure causes the remap operation to fail.
+        if src_length != 0 && src_length > dst_length {
+            self.unmap(src_addr + dst_length, src_length - dst_length, released_mappings)?;
         }
+
+        let dst_addr_for_map = match dst_addr {
+            None => DesiredAddress::Any,
+            Some(dst_addr) => {
+                // The mapping is being moved to a specific address.
+                let dst_range =
+                    dst_addr..(dst_addr.checked_add(dst_length).ok_or_else(|| errno!(EINVAL))?);
+                if !src_range.intersect(&dst_range).is_empty() {
+                    return error!(EINVAL);
+                }
+
+                // The destination range must be unmapped. This must be done now and visible to
+                // processes, even if a later failure causes the remap operation to fail.
+                self.unmap(dst_addr, dst_length, released_mappings)?;
+
+                DesiredAddress::Fixed(dst_addr)
+            }
+        };
 
         if src_range.end > original_range.end {
             // The source range is not one contiguous mapping. This check must be done only after
@@ -478,17 +525,10 @@ impl MemoryManagerState {
             return error!(EFAULT);
         }
 
-        // Get the destination address, which may be 0 if we are letting the kernel choose for us.
-        let (vmar_offset, vmar_flags) = if let Some(dst_addr) = &dst_addr {
-            (
-                self.user_address_to_vmar_offset(*dst_addr).map_err(|_| errno!(EINVAL))?,
-                src_mapping.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC,
-            )
-        } else {
-            (0, src_mapping.prot_flags.to_vmar_flags())
-        };
+        let offset_into_original_range = (src_addr - original_range.start) as u64;
+        let mut dst_vmo_offset = src_mapping.vmo_offset + offset_into_original_range;
 
-        let new_address = if src_mapping.options.contains(MappingOptions::ANONYMOUS)
+        let vmo = if src_mapping.options.contains(MappingOptions::ANONYMOUS)
             && !src_mapping.options.contains(MappingOptions::SHARED)
         {
             // This mapping is a private, anonymous mapping. Create a COW child VMO that covers
@@ -514,40 +554,67 @@ impl MemoryManagerState {
                     (dst_length - src_length) as u64,
                 );
             }
-            self.map(
-                vmar_offset,
-                Arc::new(child_vmo),
-                0,
-                dst_length,
-                src_mapping.prot_flags,
-                vmar_flags,
-                src_mapping.options,
-                src_mapping.name,
-            )?
+            dst_vmo_offset = 0;
+            Arc::new(child_vmo)
         } else {
             // This mapping is backed by an FD, just map the range of the VMO covering the moved
             // pages. If the VMO already had COW semantics, this preserves them.
-            self.map(
-                vmar_offset,
-                src_mapping.vmo,
-                dst_vmo_offset,
-                dst_length,
-                src_mapping.prot_flags,
-                vmar_flags,
-                src_mapping.options,
-                src_mapping.name,
-            )?
+            src_mapping.vmo
         };
+
+        let new_address = self.map(
+            dst_addr_for_map,
+            vmo,
+            dst_vmo_offset,
+            dst_length,
+            src_mapping.prot_flags,
+            src_mapping.options,
+            src_mapping.name,
+            released_mappings,
+        )?;
 
         if src_length != 0 {
             // Only unmap the source range if this is not a copy. It was checked earlier that
             // this mapping is MAP_SHARED.
-            self.unmap(src_addr, src_length)?;
+            self.unmap(src_addr, src_length, released_mappings)?;
         }
 
         Ok(new_address)
     }
 
+    /// Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.
+    fn unmap(
+        &mut self,
+        addr: UserAddress,
+        length: usize,
+        released_mappings: &mut Vec<Mapping>,
+    ) -> Result<(), Errno> {
+        if !addr.is_aligned(*PAGE_SIZE) {
+            return error!(EINVAL);
+        }
+        let length = round_up_to_system_page_size(length)?;
+        if length == 0 {
+            return error!(EINVAL);
+        }
+
+        // Unmap the range, including the the tail of any range that would have been split. This
+        // operation is safe because we're operating on another process.
+        match unsafe { self.user_vmar.unmap(addr.ptr(), length) } {
+            Ok(_) => (),
+            Err(zx::Status::NOT_FOUND) => (),
+            Err(zx::Status::INVALID_ARGS) => return error!(EINVAL),
+            Err(status) => {
+                impossible_error(status);
+            }
+        };
+
+        self.update_after_unmap(addr, length, released_mappings)?;
+
+        Ok(())
+    }
+
+    // Updates `self.mappings` after the specified range was unmaped.
+    //
     // The range to unmap can span multiple mappings, and can split mappings if
     // the range start or end falls in the middle of a mapping.
     //
@@ -563,17 +630,14 @@ impl MemoryManagerState {
     //
     // File-backed mappings don't need to have their VMOs modified.
     //
-    // Returns any unmapped mappings.
-    fn unmap(&mut self, addr: UserAddress, length: usize) -> Result<Vec<Mapping>, Errno> {
-        if !addr.is_aligned(*PAGE_SIZE) {
-            return error!(EINVAL);
-        }
-        let length = round_up_to_system_page_size(length)?;
-        if length == 0 {
-            return error!(EINVAL);
-        }
+    // Unmapped mappings are placed in `released_mappings`.
+    fn update_after_unmap(
+        &mut self,
+        addr: UserAddress,
+        length: usize,
+        released_mappings: &mut Vec<Mapping>,
+    ) -> Result<(), Errno> {
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
-        let mut unmap_length = length;
 
         // Find the private, anonymous mapping that will get its tail cut off by this unmap call.
         let truncated_head = match self.mappings.get(&addr) {
@@ -594,27 +658,15 @@ impl MemoryManagerState {
                     && mapping.options.contains(MappingOptions::ANONYMOUS)
                     && !mapping.options.contains(MappingOptions::SHARED) =>
             {
-                // We are going to make a child VMO of the remaining mapping and remap
-                // it, so we increase the range of the unmap call to include the tail.
-                unmap_length = range.end - addr;
                 Some((end_addr..range.end, mapping.clone()))
             }
             _ => None,
         };
 
-        // Actually unmap the range, including the the tail of any range that would have been split.
-        // This operation is safe because we're operating on another process.
-        match unsafe { self.user_vmar.unmap(addr.ptr(), unmap_length) } {
-            Ok(_) => Ok(()),
-            Err(zx::Status::NOT_FOUND) => Ok(()),
-            Err(zx::Status::INVALID_ARGS) => error!(EINVAL),
-            Err(status) => Err(impossible_error(status)),
-        }?;
-
         // Remove the original range of mappings from our map.
-        let mappings = self.mappings.remove(&(addr..end_addr));
+        released_mappings.extend(self.mappings.remove(&(addr..end_addr)));
 
-        if let Some((range, mapping)) = truncated_tail {
+        if let Some((range, mut mapping)) = truncated_tail {
             // Create and map a child COW VMO mapping that represents the truncated tail.
             let vmo_info = mapping.vmo.basic_info().map_err(impossible_error)?;
             let child_vmo_offset = (range.start - mapping.base) as u64 + mapping.vmo_offset;
@@ -631,18 +683,23 @@ impl MemoryManagerState {
                 child_vmo =
                     child_vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
             }
-            let vmar_offset =
-                self.user_address_to_vmar_offset(range.start).map_err(|_| errno!(EINVAL))?;
-            self.map(
-                vmar_offset,
-                Arc::new(child_vmo),
+
+            // Update the mapping.
+            mapping.vmo = Arc::new(child_vmo);
+            mapping.base = range.start;
+            mapping.vmo_offset = 0;
+
+            self.map_internal(
+                DesiredAddress::FixedOverwrite(range.start),
+                &mapping.vmo,
                 0,
                 child_length,
                 mapping.prot_flags,
-                mapping.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC,
                 mapping.options,
-                mapping.name,
             )?;
+
+            // Replace the mapping with a new one that contains updated VMO handle.
+            self.mappings.insert(range, mapping);
         }
 
         if let Some((range, mapping)) = truncated_head {
@@ -652,7 +709,7 @@ impl MemoryManagerState {
             mapping.vmo.set_size(new_vmo_size).map_err(MemoryManager::get_errno_for_map_err)?;
         }
 
-        Ok(mappings)
+        Ok(())
     }
 
     fn protect(
@@ -1225,6 +1282,7 @@ impl MemoryManager {
             current_task.thread_group.get_rlimit(Resource::DATA),
         );
 
+        let mut released_mappings = vec![];
         let mut state = self.state.write();
 
         // Ensure that a program break exists by mapping at least one page.
@@ -1235,14 +1293,14 @@ impl MemoryManager {
                 let length = *PAGE_SIZE as usize;
                 let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
                 let addr = state.map(
-                    0,
+                    DesiredAddress::Any,
                     Arc::new(vmo),
                     0,
                     length,
                     prot_flags,
-                    prot_flags.to_vmar_flags(),
                     MappingOptions::empty(),
                     MappingName::Heap,
+                    &mut released_mappings,
                 )?;
                 let brk = ProgramBreak { base: addr, current: addr };
                 state.brk = Some(brk);
@@ -1269,7 +1327,7 @@ impl MemoryManager {
                 // We've been asked to free memory.
                 let delta = old_end - new_end;
                 let vmo = mapping.vmo.clone();
-                state.unmap(new_end, delta)?;
+                state.unmap(new_end, delta, &mut released_mappings)?;
                 let vmo_offset = new_end - brk.base;
                 vmo.op_range(zx::VmoOp::ZERO, vmo_offset as u64, delta as u64)
                     .map_err(impossible_error)?;
@@ -1281,7 +1339,7 @@ impl MemoryManager {
                 let range = range.clone();
                 let mapping = mapping.clone();
 
-                state.mappings.remove(&range);
+                released_mappings.extend(state.mappings.remove(&range));
                 match state.user_vmar.map(
                     old_end - self.base_addr,
                     &mapping.vmo,
@@ -1374,16 +1432,18 @@ impl MemoryManager {
                 vmo
             };
 
+            let mut released_mappings = vec![];
             target_state.map(
-                range.start - target.base_addr,
+                DesiredAddress::Fixed(range.start),
                 target_vmo.clone(),
                 vmo_offset,
                 length,
                 mapping.prot_flags,
-                mapping.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC,
                 mapping.options,
                 mapping.name.clone(),
+                &mut released_mappings,
             )?;
+            assert!(released_mappings.is_empty());
         }
 
         target_state.brk = state.brk;
@@ -1436,45 +1496,29 @@ impl MemoryManager {
         vmo_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
-        mut vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         name: MappingName,
     ) -> Result<UserAddress, Errno> {
-        let vmar_offset = match addr.address() {
-            a if a.is_null() => {
-                // MAP_32BIT specifies that the memory allocated will
-                // be within the first 2 GB of the process address space.
-                if options.contains(MappingOptions::LOWER_32BIT) {
-                    vmar_flags |= zx::VmarFlags::OFFSET_IS_UPPER_LIMIT;
-                    0x80000000 - self.base_addr.ptr()
-                } else {
-                    0
-                }
-            }
-            a => a - self.base_addr,
-        };
-
+        // Unmapped mappings must be released after the state is unlocked.
+        let mut released_mappings = vec![];
         let mut state = self.state.write();
-        let mut try_map = |vmar_offset, vmar_flags| {
-            state.map(
-                vmar_offset,
-                Arc::clone(&vmo),
-                vmo_offset,
-                length,
-                prot_flags,
-                vmar_flags,
-                options,
-                name.clone(),
-            )
-        };
-        let addr = match try_map(vmar_offset, vmar_flags) {
-            Err(errno) if vmar_flags.contains(zx::VmarFlags::SPECIFIC) => match addr {
-                DesiredAddress::Fixed(_) => return Err(errno),
-                DesiredAddress::Hint(_) => try_map(0, vmar_flags - zx::VmarFlags::SPECIFIC),
-            },
-            result => result,
-        }?;
-        Ok(addr)
+        let result = state.map(
+            addr,
+            vmo,
+            vmo_offset,
+            length,
+            prot_flags,
+            options,
+            name,
+            &mut released_mappings,
+        );
+
+        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+        // in `DirEntry`'s `drop`.
+        std::mem::drop(state);
+        std::mem::drop(released_mappings);
+
+        result
     }
 
     pub fn remap(
@@ -1486,20 +1530,37 @@ impl MemoryManager {
         flags: MremapFlags,
         new_addr: UserAddress,
     ) -> Result<UserAddress, Errno> {
+        let mut released_mappings = vec![];
         let mut state = self.state.write();
-        state.remap(current_task, addr, old_length, new_length, flags, new_addr)
-    }
-
-    pub fn unmap(&self, addr: UserAddress, length: usize) -> Result<(), Errno> {
-        let mut state = self.state.write();
-        let mappings = state.unmap(addr, length)?;
+        let result = state.remap(
+            current_task,
+            addr,
+            old_length,
+            new_length,
+            flags,
+            new_addr,
+            &mut released_mappings,
+        );
 
         // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
         // in `DirEntry`'s `drop`.
         std::mem::drop(state);
-        std::mem::drop(mappings);
+        std::mem::drop(released_mappings);
 
-        Ok(())
+        result
+    }
+
+    pub fn unmap(&self, addr: UserAddress, length: usize) -> Result<(), Errno> {
+        let mut released_mappings = vec![];
+        let mut state = self.state.write();
+        let result = state.unmap(addr, length, &mut released_mappings);
+
+        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+        // in `DirEntry`'s `drop`.
+        std::mem::drop(state);
+        std::mem::drop(released_mappings);
+
+        result
     }
 
     pub fn protect(
@@ -1660,11 +1721,11 @@ impl MemoryManager {
     pub fn get_mapping_vmo(
         &self,
         addr: UserAddress,
-        perms: zx::VmarFlags,
+        perms: ProtectionFlags,
     ) -> Result<(Arc<zx::Vmo>, u64), Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        if !mapping.prot_flags.to_vmar_flags().contains(perms) {
+        if !mapping.prot_flags.contains(perms) {
             return error!(EACCES);
         }
         Ok((Arc::clone(&mapping.vmo), mapping.address_to_offset(addr)))
@@ -1789,20 +1850,17 @@ impl MappedVmo {
 /// The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
 #[derive(Debug, Clone, Copy)]
 pub enum DesiredAddress {
-    /// The address is a hint. If the address is 0 or overlaps an existing mapping, it may be mapped
-    /// to a location chosen by the kernel.
+    /// Map at any address chosen by the kernel.
+    Any,
+    /// The address is a hint. If the address overlaps an existing mapping a different address may
+    /// be chosen.
     Hint(UserAddress),
     /// The address is a requirement. If the address overlaps an existing mapping (and cannot
     /// overwrite it), mapping fails.
     Fixed(UserAddress),
-}
-
-impl DesiredAddress {
-    pub fn address(&self) -> UserAddress {
-        match self {
-            DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => *addr,
-        }
-    }
+    /// The address is a requirement. If the address overlaps an existing mapping (and cannot
+    /// overwrite it), they should be unmapped.
+    FixedOverwrite(UserAddress),
 }
 
 fn write_map(
@@ -2296,9 +2354,11 @@ mod tests {
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
-        let unmap_result = mm.state.write().unmap(addr, *PAGE_SIZE as usize);
+        let mut released_mappings = vec![];
+        let unmap_result =
+            mm.state.write().unmap(addr, *PAGE_SIZE as usize, &mut released_mappings);
         assert!(unmap_result.is_ok());
-        assert_eq!(unmap_result.unwrap().len(), 1);
+        assert_eq!(released_mappings.len(), 1);
     }
 
     #[::fuchsia::test]
@@ -2309,9 +2369,11 @@ mod tests {
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let _ = map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
 
-        let unmap_result = mm.state.write().unmap(addr, (*PAGE_SIZE * 3) as usize);
+        let mut released_mappings = vec![];
+        let unmap_result =
+            mm.state.write().unmap(addr, (*PAGE_SIZE * 3) as usize, &mut released_mappings);
         assert!(unmap_result.is_ok());
-        assert_eq!(unmap_result.unwrap().len(), 2);
+        assert_eq!(released_mappings.len(), 2);
     }
 
     /// Maps two pages, then unmaps the first page.
@@ -2687,15 +2749,13 @@ mod tests {
         );
 
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
-        let vmar_flags = prot_flags.to_vmar_flags();
         let addr = mm
             .map(
-                DesiredAddress::Hint(UserAddress::default()),
+                DesiredAddress::Any,
                 child_vmo,
                 0,
                 VMO_SIZE as usize,
                 prot_flags,
-                vmar_flags,
                 MappingOptions::empty(),
                 MappingName::None,
             )
@@ -2709,7 +2769,7 @@ mod tests {
 
         // Find the mapping in the target.
         let (target_vmo, offset) =
-            target.mm.get_mapping_vmo(addr, vmar_flags).expect("get_mapping_vmo failed");
+            target.mm.get_mapping_vmo(addr, prot_flags).expect("get_mapping_vmo failed");
         assert_eq!(offset, 0);
 
         // Make sure it has what we wrote.

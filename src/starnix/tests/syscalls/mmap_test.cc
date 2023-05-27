@@ -385,6 +385,37 @@ TEST_P(MMapProcStatmTest, RssAfterUnmap) {
   EXPECT_LT(rss_unmapped_all, rss_unmapped_half);
 }
 
+TEST_P(MMapProcStatmTest, RssAfterMapOverride) {
+  const size_t kSize = 4 * 1024 * 1024;
+
+  size_t vm_size_base;
+  size_t rss_base;
+  ASSERT_NO_FATAL_FAILURE(ReadStatm(&vm_size_base, &rss_base));
+
+  int flags = MAP_ANON | MAP_POPULATE | GetParam();
+  void* mapped = mmap(nullptr, kSize, PROT_READ | PROT_WRITE, flags, -1, 0);
+  ASSERT_NE(mapped, nullptr) << "errno=" << errno << ", " << strerror(errno);
+
+  size_t vm_size_mapped;
+  size_t rss_mapped;
+  ReadStatm(&vm_size_mapped, &rss_mapped);
+  EXPECT_GT(vm_size_mapped, vm_size_base);
+  EXPECT_GT(rss_mapped, rss_base);
+
+  // Map middle the region again without MAP_POPULATE. This should release memory.
+  flags = MAP_ANON | MAP_FIXED | GetParam();
+  void* remap_addr = reinterpret_cast<char*>(mapped) + kSize / 4;
+  void* mapped2 = mmap(remap_addr, kSize / 2, PROT_READ | PROT_WRITE, flags, -1, 0);
+  EXPECT_EQ(mapped2, remap_addr);
+
+  size_t vm_size_remapped;
+  size_t rss_remapped;
+  ReadStatm(&vm_size_remapped, &rss_remapped);
+  EXPECT_LT(rss_remapped, rss_mapped);
+
+  munmap(mapped, kSize);
+}
+
 INSTANTIATE_TEST_SUITE_P(Private, MMapProcStatmTest, testing::Values(MAP_PRIVATE));
 INSTANTIATE_TEST_SUITE_P(Shared, MMapProcStatmTest, testing::Values(MAP_SHARED));
 

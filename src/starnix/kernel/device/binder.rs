@@ -209,7 +209,6 @@ impl FileOps for BinderConnection {
         _vmo_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
-        vmar_flags: zx::VmarFlags,
         mapping_options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
@@ -219,7 +218,6 @@ impl FileOps for BinderConnection {
             addr,
             length,
             prot_flags,
-            vmar_flags,
             mapping_options,
             filename,
         )
@@ -3436,7 +3434,6 @@ impl BinderDriver {
         addr: DesiredAddress,
         length: usize,
         prot_flags: ProtectionFlags,
-        vmar_flags: zx::VmarFlags,
         mapping_options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
@@ -3456,7 +3453,6 @@ impl BinderDriver {
             0,
             length,
             prot_flags,
-            vmar_flags,
             mapping_options,
             MappingName::File(filename),
         )?;
@@ -3909,10 +3905,9 @@ pub mod tests {
             .mmap(
                 task,
                 proc,
-                DesiredAddress::Hint(UserAddress::default()),
+                DesiredAddress::Any,
                 VMO_LENGTH,
                 prot_flags,
-                prot_flags.to_vmar_flags(),
                 MappingOptions::empty(),
                 NamespaceNode::new_anonymous(DirEntry::new_unrooted(Arc::new(FsNode::new_root(
                     PanickingFsNode,

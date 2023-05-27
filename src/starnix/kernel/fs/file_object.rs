@@ -150,7 +150,6 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         vmo_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
-        vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
@@ -179,7 +178,6 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             vmo_offset,
             length,
             prot_flags,
-            vmar_flags,
             options,
             MappingName::File(filename),
         )?;
@@ -894,31 +892,21 @@ impl FileObject {
         vmo_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
-        vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
-        if vmar_flags.contains(zx::VmarFlags::PERM_READ) && !self.can_read() {
+        if prot_flags.intersects(ProtectionFlags::READ | ProtectionFlags::WRITE) && !self.can_read()
+        {
             return error!(EACCES);
         }
-        if vmar_flags.contains(zx::VmarFlags::PERM_WRITE)
+        if prot_flags.contains(ProtectionFlags::WRITE)
             && !self.can_write()
             && options.contains(MappingOptions::SHARED)
         {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().mmap(
-            self,
-            current_task,
-            addr,
-            vmo_offset,
-            length,
-            prot_flags,
-            vmar_flags,
-            options,
-            filename,
-        )
+        self.ops().mmap(self, current_task, addr, vmo_offset, length, prot_flags, options, filename)
     }
 
     pub fn readdir(

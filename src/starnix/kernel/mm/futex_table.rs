@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::lock::Mutex;
 use crate::logging::impossible_error;
+use crate::mm::ProtectionFlags;
 use crate::task::*;
 use crate::types::*;
 
@@ -101,7 +102,7 @@ impl FutexTable {
         task: &Task,
         addr: UserAddress,
     ) -> Result<(Arc<zx::Vmo>, FutexKey), Errno> {
-        let (vmo, offset) = task.mm.get_mapping_vmo(addr, zx::VmarFlags::PERM_READ)?;
+        let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
         let koid = vmo.info().map_err(impossible_error)?.koid;
         Ok((vmo, FutexKey { koid, offset }))
     }

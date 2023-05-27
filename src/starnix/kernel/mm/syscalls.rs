@@ -88,20 +88,12 @@ pub fn do_mmap(
 
     // TODO(tbodt): should we consider MAP_NORESERVE?
 
-    let mut vmar_flags = prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS;
-    if addr.ptr() != 0 {
-        vmar_flags |= zx::VmarFlags::SPECIFIC;
-    }
-    if flags & MAP_FIXED != 0 && flags & MAP_FIXED_NOREPLACE == 0 {
-        // SAFETY: We are operating on another process, so it's safe to use SPECIFIC_OVERWRITE
-        vmar_flags |= unsafe {
-            zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
-        };
-    }
-    let addr = if flags & MAP_FIXED != 0 || flags & MAP_FIXED_NOREPLACE != 0 {
-        DesiredAddress::Fixed(addr)
-    } else {
-        DesiredAddress::Hint(addr)
+    let addr = match (addr, flags & MAP_FIXED != 0, flags & MAP_FIXED_NOREPLACE != 0) {
+        (UserAddress::NULL, false, false) => DesiredAddress::Any,
+        (UserAddress::NULL, true, _) | (UserAddress::NULL, _, true) => return error!(EINVAL),
+        (addr, false, false) => DesiredAddress::Hint(addr),
+        (addr, _, true) => DesiredAddress::Fixed(addr),
+        (addr, true, false) => DesiredAddress::FixedOverwrite(addr),
     };
 
     let vmo_offset = if flags & MAP_ANONYMOUS != 0 { 0 } else { offset };
@@ -129,7 +121,6 @@ pub fn do_mmap(
             vmo_offset,
             length,
             prot_flags,
-            vmar_flags,
             options,
             MappingName::None,
         )?;
@@ -137,16 +128,7 @@ pub fn do_mmap(
     } else {
         // TODO(tbodt): maximize protection flags so that mprotect works
         let file = current_task.files.get(fd)?;
-        file.mmap(
-            current_task,
-            addr,
-            vmo_offset,
-            length,
-            prot_flags,
-            vmar_flags,
-            options,
-            file.name.clone(),
-        )?
+        file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())?
     };
 
     if flags & MAP_POPULATE != 0 && prot & (PROT_READ | PROT_WRITE) != 0 {

@@ -131,7 +131,6 @@ impl FileOps for RemoteBinderFileOps {
         _vmo_offset: u64,
         _length: usize,
         _prot_flags: ProtectionFlags,
-        _vmar_flags: zx::VmarFlags,
         _mapping_options: MappingOptions,
         _filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {

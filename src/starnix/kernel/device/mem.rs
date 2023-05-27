@@ -86,7 +86,6 @@ impl FileOps for DevZero {
         vmo_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
-        vmar_flags: zx::VmarFlags,
         mut options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
@@ -109,7 +108,6 @@ impl FileOps for DevZero {
             vmo_offset,
             length,
             prot_flags,
-            vmar_flags,
             options,
             // We set the filename here, even though we are creating what is
             // functionally equivalent to an anonymous mapping. Doing so affects

@@ -18,6 +18,7 @@
 
                 // TODO(https://fxbug.dev/127336)
                 "Shared/MMapProcStatmTest.RssAfterUnmap/0",
+                "Shared/MMapProcStatmTest.RssAfterMapOverride/0",
 
                 // TODO(): Make these tests reliably pass in Starnix then re-enable.
                 "FcntlLockTest.*",

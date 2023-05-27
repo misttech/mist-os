@@ -158,7 +158,6 @@ impl elf_load::Mapper for Mapper<'_> {
                 vmo_offset,
                 length,
                 ProtectionFlags::from_vmar_flags(vmar_flags),
-                vmar_flags,
                 MappingOptions::ELF_BINARY,
                 MappingName::File(self.file.name.clone()),
             )
@@ -395,12 +394,11 @@ pub fn load_executable(
         .map_err(impossible_error)?;
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
     let stack_base = current_task.mm.map(
-        DesiredAddress::Hint(UserAddress::default()),
+        DesiredAddress::Any,
         Arc::clone(&stack_vmo),
         0,
         stack_size,
         prot_flags,
-        prot_flags.to_vmar_flags(),
         MappingOptions::empty(),
         MappingName::Stack,
     )?;
@@ -410,12 +408,11 @@ pub fn load_executable(
         let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
         let map_result = current_task.mm.map(
-            DesiredAddress::Hint(UserAddress::default()),
+            DesiredAddress::Any,
             Arc::clone(vdso_vmo),
             0,
             vmo_size as usize,
             prot_flags,
-            prot_flags.to_vmar_flags(),
             MappingOptions::empty(),
             MappingName::Vdso,
         )?;

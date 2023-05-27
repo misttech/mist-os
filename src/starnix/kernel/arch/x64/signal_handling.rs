@@ -438,12 +438,11 @@ mod tests {
         let stack_base = current_task
             .mm
             .map(
-                DesiredAddress::Hint(UserAddress::default()),
+                DesiredAddress::Any,
                 Arc::new(zx::Vmo::create(STACK_SIZE as u64).expect("failed to create stack VMO")),
                 0,
                 STACK_SIZE,
                 prot_flags,
-                prot_flags.to_vmar_flags(),
                 MappingOptions::empty(),
                 MappingName::Stack,
             )
