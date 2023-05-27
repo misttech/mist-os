@@ -21,6 +21,7 @@ go_library("ffxutil") {
     "//tools/botanist:constants",
     "//tools/build",
     "//tools/lib/jsonutil",
+    "//tools/lib/retry",
     "//tools/lib/subprocess",
   ]
 }

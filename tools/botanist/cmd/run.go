@@ -248,6 +248,10 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		t.SetImageOverrides(build.ImageOverrides(r.imageOverrides))
 	}
 
+	if ffx != nil {
+		return cleanup, ffx.WaitForDaemon(ctx)
+	}
+
 	return cleanup, nil
 }
 

@@ -19,6 +19,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 )
 
@@ -199,6 +200,21 @@ func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
 func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 	args = append([]string{"--target", f.target}, args...)
 	return f.Run(ctx, args...)
+}
+
+// WaitForDaemon tries a few times to check that the daemon is up
+// and returns an error if it fails to respond.
+func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
+	// Discard the stderr since it'll return a string caught by
+	// tefmocheck if the daemon isn't ready yet.
+	origStderr := f.stderr
+	f.stderr = io.Discard
+	defer func() {
+		f.stderr = origStderr
+	}()
+	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(500*time.Millisecond), 3), func() error {
+		return f.Run(ctx, "daemon", "echo")
+	}, nil)
 }
 
 // Stop stops the daemon.
