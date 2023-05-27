@@ -29,6 +29,7 @@ per-file make-integration-patch=thatguy@google.com
 per-file merge-package-config=chaselatta@google.com
 per-file mkinstaller = file: /src/firmware/OWNERS
 per-file mkinstaller-remote = file: /src/firmware/OWNERS
+per-file             pprof,lib/symbol-index.sh = fdurso@google.com,dthorn@google.com,dangyi@google.com
 per-file publish=chandarren@google.com,aaronwood@google.com,etryzelaar@google.com
 per-file             remove-update-source = file: /src/sys/pkg/OWNERS
 per-file run-dart-action=zra@google.com
