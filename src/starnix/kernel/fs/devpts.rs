@@ -287,7 +287,7 @@ impl FileOps for DevPtmxFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.main_read(current_task, data)
+            self.terminal.main_read(current_task, data).map(BlockableOpsResult::Done)
         })
     }
 
@@ -300,7 +300,7 @@ impl FileOps for DevPtmxFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.main_write(current_task, data)
+            self.terminal.main_write(current_task, data).map(BlockableOpsResult::Done)
         })
     }
 
@@ -378,7 +378,7 @@ impl FileOps for DevPtsFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_read(current_task, data)
+            self.terminal.replica_read(current_task, data).map(BlockableOpsResult::Done)
         })
     }
 
@@ -391,7 +391,7 @@ impl FileOps for DevPtsFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_write(current_task, data)
+            self.terminal.replica_write(current_task, data).map(BlockableOpsResult::Done)
         })
     }
 

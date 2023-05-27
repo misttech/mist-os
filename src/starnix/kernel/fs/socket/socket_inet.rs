@@ -82,13 +82,13 @@ impl InetSocket {
         };
 
         let bytes = data.peek_all()?;
-        let sent_bytes = self
+        let send_bytes = self
             .zxio
             .sendmsg(addr, bytes, cmsgs, flags.bits() & !MSG_DONTWAIT)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
-        data.advance(sent_bytes)?;
-        Ok(sent_bytes)
+        data.advance(send_bytes)?;
+        Ok(send_bytes)
     }
 
     pub fn recvmsg(

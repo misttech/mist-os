@@ -316,7 +316,7 @@ impl FileOps for PipeFileObject {
             if actual > 0 {
                 pipe.notify_read();
             }
-            Ok(actual)
+            Ok(BlockableOpsResult::Done(actual))
         })
     }
 
@@ -328,29 +328,25 @@ impl FileOps for PipeFileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        debug_assert!(data.bytes_read() == 0);
-
-        let result = file.blocking_op(current_task, FdEvents::POLLOUT, None, || {
+        file.blocking_op(current_task, FdEvents::POLLOUT, None, || {
             let mut pipe = self.pipe.lock();
-            let offset_before = data.bytes_read();
-            let bytes_written = pipe.write(current_task, data)?;
-            debug_assert!(data.bytes_read() - offset_before == bytes_written);
-            if bytes_written > 0 {
-                pipe.notify_write();
-            }
+            match pipe.write(current_task, data) {
+                Ok(chunk) => {
+                    if chunk > 0 {
+                        pipe.notify_write();
+                    }
+                }
+                Err(errno) if errno == EPIPE && data.bytes_read() > 0 => {
+                    return Ok(BlockableOpsResult::Done(data.bytes_read()))
+                }
+                Err(errno) => return Err(errno),
+            };
             if data.available() > 0 {
-                return error!(EAGAIN);
+                Ok(BlockableOpsResult::Partial(data.bytes_read()))
+            } else {
+                Ok(BlockableOpsResult::Done(data.bytes_read()))
             }
-            Ok(())
-        });
-
-        let bytes_written = data.bytes_read();
-        if bytes_written == 0 {
-            // We can only return an error if no data was actually sent. If partial data was
-            // sent, swallow the error and return how much was sent.
-            result?;
-        }
-        Ok(bytes_written)
+        })
     }
 
     fn wait_async(
@@ -503,7 +499,7 @@ impl PipeFileObject {
             let other = pregen()?;
             let pipe = self.pipe.lock();
             if condition(&pipe) {
-                Ok((other, pipe))
+                Ok(BlockableOpsResult::Done((other, pipe)))
             } else {
                 error!(EAGAIN)
             }

@@ -654,7 +654,7 @@ impl FileOps for RemotePipeObject {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            zxio_read(&self.zxio, data)
+            zxio_read(&self.zxio, data).map(BlockableOpsResult::Done)
         })
     }
 
@@ -667,7 +667,7 @@ impl FileOps for RemotePipeObject {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            zxio_write(&self.zxio, current_task, data)
+            zxio_write(&self.zxio, current_task, data).map(BlockableOpsResult::Done)
         })
     }
 

@@ -72,7 +72,8 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// - `data`: The data to write to the socket.
     /// - `ancillary_data`: Optional ancillary data (a.k.a., control message) to write.
     ///
-    /// Advances the iterator to indicate how much was actually written.
+    /// Returns the number of bytes that were read from the user buffers and written to the socket,
+    /// not counting the ancillary data.
     fn write(
         &self,
         socket: &Socket,
@@ -472,9 +473,10 @@ mod tests {
         )
         .expect("Failed to connect socket.");
         send.connect(&current_task, SocketPeer::Handle(rec_dgram.clone())).unwrap();
-        let mut source_iter = VecInputBuffer::new(&xfer_bytes);
-        send.write(&current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
-        assert_eq!(source_iter.available(), 0);
+        let no_write = send
+            .write(&current_task, &mut VecInputBuffer::new(&xfer_bytes), &mut None, &mut vec![])
+            .unwrap();
+        assert_eq!(no_write, xfer_bytes.len());
         // Previously, this would cause the test to fail,
         // because rec_dgram was shut down.
         send.close();

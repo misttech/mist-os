@@ -220,7 +220,7 @@ impl FileOps for TimerFile {
                 1
             };
 
-            data.write(count.as_bytes())
+            Ok(BlockableOpsResult::Done(data.write(count.as_bytes())?))
         })
     }
 

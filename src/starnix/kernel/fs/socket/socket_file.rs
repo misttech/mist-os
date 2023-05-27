@@ -97,34 +97,32 @@ impl SocketFile {
         mut ancillary_data: Vec<AncillaryData>,
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno> {
-        debug_assert!(data.bytes_read() == 0);
-
         // TODO: Implement more `flags`.
+
         let mut op = || {
-            let offset_before = data.bytes_read();
-            let sent_bytes =
-                self.socket.write(current_task, data, &mut dest_address, &mut ancillary_data)?;
-            debug_assert!(data.bytes_read() - offset_before == sent_bytes);
-            if sent_bytes > 0 {
-                return error!(EAGAIN);
+            match self.socket.write(current_task, data, &mut dest_address, &mut ancillary_data) {
+                Err(e) if e == ENOTCONN && data.bytes_read() > 0 => {
+                    // If the error is ENOTCONN (that is, the write failed because the socket was
+                    // disconnected), then return the amount of bytes that were written before
+                    // the disconnect.
+                    return Ok(BlockableOpsResult::Done(data.bytes_read()));
+                }
+                result => result,
+            }?;
+
+            if data.available() > 0 {
+                Ok(BlockableOpsResult::Partial(data.bytes_read()))
+            } else {
+                Ok(BlockableOpsResult::Done(data.bytes_read()))
             }
-            Ok(())
         };
 
-        let result = if flags.contains(SocketMessageFlags::DONTWAIT) {
-            op()
+        if flags.contains(SocketMessageFlags::DONTWAIT) {
+            op().map(BlockableOpsResult::value)
         } else {
             let deadline = self.socket.send_timeout().map(zx::Time::after);
             file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, deadline, op)
-        };
-
-        let bytes_written = data.bytes_read();
-        if bytes_written == 0 {
-            // We can only return an error if no data was actually sent. If partial data was
-            // sent, swallow the error and return how much was sent.
-            result?;
         }
-        Ok(bytes_written)
     }
 
     /// Reads data from the socket in this file into `data`.
@@ -144,34 +142,40 @@ impl SocketFile {
         deadline: Option<zx::Time>,
     ) -> Result<MessageReadInfo, Errno> {
         // TODO: Implement more `flags`.
-        let mut read_info = MessageReadInfo::default();
+        let mut read_all_info = MessageReadInfo::default();
 
         let mut op = || {
-            let mut info = self.socket.read(current_task, data, flags)?;
-            read_info.append(&mut info);
-            read_info.address = info.address;
+            if self.wait_all(current_task, flags) {
+                self.socket.read(current_task, data, flags).map(|mut read_info| {
+                    read_all_info.append(&mut read_info);
+                    read_all_info.address = read_info.address;
 
-            let should_wait_all = self.socket.socket_type == SocketType::Stream
-                && flags.contains(SocketMessageFlags::WAITALL)
-                && !self.socket.query_events(current_task).contains(FdEvents::POLLHUP);
-            if should_wait_all && data.available() > 0 {
-                return error!(EAGAIN);
+                    if data.available() > 0 {
+                        BlockableOpsResult::Partial(read_all_info.clone())
+                    } else {
+                        BlockableOpsResult::Done(read_all_info.clone())
+                    }
+                })
+            } else {
+                self.socket.read(current_task, data, flags).map(BlockableOpsResult::Done)
             }
-            Ok(())
         };
 
-        let result = if flags.contains(SocketMessageFlags::DONTWAIT) {
-            op()
+        if flags.contains(SocketMessageFlags::DONTWAIT) {
+            op().map(BlockableOpsResult::value)
         } else {
             let deadline = deadline.or_else(|| self.socket.receive_timeout().map(zx::Time::after));
-            file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, deadline, op)
-        };
-
-        if read_info.bytes_read == 0 {
-            // We can only return an error if no data was actually read. If partial data was
-            // read, swallow the error and return how much was read.
-            result?;
+            match file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, deadline, op)
+            {
+                Err(e) if e == EAGAIN && self.wait_all(current_task, flags) => Ok(read_all_info),
+                result => result,
+            }
         }
-        Ok(read_info)
+    }
+
+    fn wait_all(&self, current_task: &CurrentTask, flags: SocketMessageFlags) -> bool {
+        self.socket.socket_type == SocketType::Stream
+            && flags.contains(SocketMessageFlags::WAITALL)
+            && !self.socket.query_events(current_task).contains(FdEvents::POLLHUP)
     }
 }
