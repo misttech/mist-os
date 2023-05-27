@@ -14,9 +14,9 @@
 
 namespace display {
 
-MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_root,
-                                             std::unique_ptr<SysmemDeviceWrapper> sysmem,
-                                             bool start_vsync)
+MockDisplayDeviceTree::MockDisplayDeviceTree(
+    std::shared_ptr<zx_device> mock_root, std::unique_ptr<SysmemDeviceWrapper> sysmem,
+    const fake_display::FakeDisplayDeviceConfig& device_config)
     : mock_root_(mock_root), sysmem_(std::move(sysmem)) {
   pdev_fidl_.SetConfig({
       .use_fake_bti = true,
@@ -47,9 +47,9 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
   mock_root_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_->proto()->ops, sysmem_->proto()->ctx,
                           "sysmem");
 
-  display_ = new fake_display::FakeDisplay(mock_root_.get());
-  if (auto status = display_->Bind(start_vsync); status != ZX_OK) {
-    ZX_PANIC("display_->Bind(start_vsync) return status was not ZX_OK. Error: %s.",
+  display_ = new fake_display::FakeDisplay(mock_root_.get(), device_config);
+  if (auto status = display_->Bind(); status != ZX_OK) {
+    ZX_PANIC("display_->Bind() return status was not ZX_OK. Error: %s.",
              zx_status_get_string(status));
   }
   zx_device_t* mock_display = mock_root_->GetLatestChild();

@@ -34,11 +34,17 @@ namespace fake_display {
 class FakeDisplay;
 using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable, ddk::ChildPreReleaseable>;
 
+struct FakeDisplayDeviceConfig {
+  // If enabled, the fake display device will not automatically emit Vsync
+  // events. `SendVsync()` must be called to emit a Vsync event manually.
+  bool manual_vsync_trigger = false;
+};
+
 class FakeDisplay : public DeviceType,
                     public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol>,
                     public ddk::DisplayClampRgbImplProtocol<FakeDisplay> {
  public:
-  explicit FakeDisplay(zx_device_t* parent);
+  explicit FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config);
 
   FakeDisplay(const FakeDisplay&) = delete;
   FakeDisplay& operator=(const FakeDisplay&) = delete;
@@ -46,7 +52,7 @@ class FakeDisplay : public DeviceType,
   ~FakeDisplay();
 
   // This function is called from the c-bind function upon driver matching.
-  zx_status_t Bind(bool start_vsync_thread);
+  zx_status_t Bind();
 
   // DisplayControllerImplProtocol implementation:
   void DisplayControllerImplSetDisplayControllerInterface(
@@ -155,6 +161,8 @@ class FakeDisplay : public DeviceType,
 
   // Banjo vtable for fuchsia.hardware.display.clamprgb.DisplayClampRgbImpl.
   const display_clamp_rgb_impl_protocol_t display_clamp_rgb_impl_banjo_protocol_;
+
+  FakeDisplayDeviceConfig device_config_;
 
   ddk::PDevFidl pdev_;
   ddk::SysmemProtocolClient sysmem_;

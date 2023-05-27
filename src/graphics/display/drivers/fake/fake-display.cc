@@ -57,10 +57,11 @@ constexpr uint32_t kRefreshRateFps = 60;
 constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
 }  // namespace
 
-FakeDisplay::FakeDisplay(zx_device_t* parent)
+FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config)
     : DeviceType(parent),
       display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
-      display_clamp_rgb_impl_banjo_protocol_({&display_clamp_rgb_impl_protocol_ops_, this}) {
+      display_clamp_rgb_impl_banjo_protocol_({&display_clamp_rgb_impl_protocol_ops_, this}),
+      device_config_(device_config) {
   ZX_DEBUG_ASSERT(parent);
 }
 
@@ -710,7 +711,7 @@ void FakeDisplay::SendVsync() {
   }
 }
 
-zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
+zx_status_t FakeDisplay::Bind() {
   zx::result pdev_result = ddk::PDevFidl::Create(parent(), ddk::PDevFidl::kFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get PDev protocol: %s", pdev_result.status_string());
@@ -737,7 +738,7 @@ zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
     return status;
   }
 
-  if (start_vsync_thread) {
+  if (!device_config_.manual_vsync_trigger) {
     status = thrd_status_to_zx_status(thrd_create_with_name(
         &vsync_thread_,
         [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this,

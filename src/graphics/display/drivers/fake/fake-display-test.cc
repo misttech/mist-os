@@ -29,9 +29,11 @@ class FakeDisplayTest : public testing::Test {
     std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
     auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<sysmem_driver::Device>>(
         mock_root.get());
-    tree_ =
-        std::make_unique<display::MockDisplayDeviceTree>(std::move(mock_root), std::move(sysmem),
-                                                         /*start_vsync=*/false);
+    static constexpr FakeDisplayDeviceConfig kDeviceConfig = {
+        .manual_vsync_trigger = true,
+    };
+    tree_ = std::make_unique<display::MockDisplayDeviceTree>(std::move(mock_root),
+                                                             std::move(sysmem), kDeviceConfig);
   }
 
   void TearDown() override {

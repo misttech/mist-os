@@ -27,7 +27,8 @@ class MockDisplayDeviceTree {
   // MockDisplayDeviceTree.  See SysmemDeviceWrapper for more details, as well as existing
   // specializations of GenericSysmemDeviceWrapper<>.
   MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_root,
-                        std::unique_ptr<SysmemDeviceWrapper> sysmem, bool start_vsync);
+                        std::unique_ptr<SysmemDeviceWrapper> sysmem,
+                        const fake_display::FakeDisplayDeviceConfig& device_config);
   ~MockDisplayDeviceTree();
 
   Controller* coordinator_controller() { return coordinator_controller_; }

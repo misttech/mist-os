@@ -21,8 +21,11 @@ void TestBase::SetUp() {
   loop_.StartThread("display::TestBase::loop_", &loop_thrd_);
   auto sysmem =
       std::make_unique<GenericSysmemDeviceWrapper<sysmem_driver::Device>>(mock_root.get());
+  static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
+      .manual_vsync_trigger = true,
+  };
   tree_ = std::make_unique<MockDisplayDeviceTree>(std::move(mock_root), std::move(sysmem),
-                                                  /*start_vsync=*/false);
+                                                  kDeviceConfig);
 }
 
 void TestBase::TearDown() {

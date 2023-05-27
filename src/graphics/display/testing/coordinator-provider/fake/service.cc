@@ -24,10 +24,13 @@ ProviderService::ProviderService(std::shared_ptr<zx_device> mock_root,
 
   auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<display::SysmemProxyDevice>>(
       mock_root.get());
-  state_ = std::make_shared<State>(
-      State{.dispatcher = dispatcher,
-            .tree = std::make_unique<display::MockDisplayDeviceTree>(
-                std::move(mock_root), std::move(sysmem), /*start_vsync=*/true)});
+  static constexpr FakeDisplayDeviceConfig kDeviceConfig = {
+      .manual_vsync_trigger = false,
+  };
+  state_ =
+      std::make_shared<State>(State{.dispatcher = dispatcher,
+                                    .tree = std::make_unique<display::MockDisplayDeviceTree>(
+                                        std::move(mock_root), std::move(sysmem), kDeviceConfig)});
 }
 
 ProviderService::~ProviderService() { state_->tree->AsyncShutdown(); }
