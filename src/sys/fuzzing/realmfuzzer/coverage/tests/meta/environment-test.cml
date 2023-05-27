@@ -1,0 +1,45 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/realmfuzzer_coverage_test_engine",
+    },
+    children: [
+        {
+            name: "coverage",
+            url: "#meta/coverage.cm",
+        },
+        {
+            name: "adapter",
+            url: "#meta/adapter.cm",
+            environment: "#fuzzed-env",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.fuzzer.CoverageDataProvider",
+            from: "#coverage",
+        },
+        {
+            protocol: "fuchsia.fuzzer.TargetAdapter",
+            from: "#adapter",
+        },
+    ],
+    environments: [
+        {
+            name: "fuzzed-env",
+            extends: "realm",
+            debug: [
+                {
+                    protocol: "fuchsia.fuzzer.CoverageDataCollector",
+                    from: "#coverage",
+                },
+            ],
+        },
+    ],
+}

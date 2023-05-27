@@ -831,6 +831,13 @@
                 source_name: "fuchsia.debugdata.Publisher",
                 target_moniker: "/core/testing/**",
             },
+            {
+                debug: "protocol",
+                environment_name: "fuzzed-env",
+                source_moniker: "/core/test_manager/tests:**",
+                source_name: "fuchsia.fuzzer.CoverageDataCollector",
+                target_moniker: "/core/test_manager/tests:**",
+            },
         ],
     },
 }
