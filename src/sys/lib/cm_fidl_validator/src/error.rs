@@ -28,11 +28,17 @@ pub enum Error {
     #[error("Field `{}` for {} is too long.", .0.field, .0.decl)]
     FieldTooLong(DeclField),
 
-    #[error("\"{0}\" cannot declare a capability of type `{1}`.")]
-    InvalidCapabilityType(DeclField, String),
+    #[error("\"{0}\" capabilities must be offered as a built-in capability.")]
+    CapabilityMustBeBuiltin(DeclType),
+
+    #[error("\"{0}\" capabilities are not currently allowed as built-ins.")]
+    CapabilityCannotBeBuiltin(DeclType),
+
+    #[error("Encountered an unknown capability declaration. This may happen due to ABI skew between the FIDL component declaration and the system.")]
+    UnknownCapability,
 
     #[error("\"{0}\" target \"{1}\" is same as source.")]
-    OfferTargetEqualsSource(String, String),
+    OfferTargetEqualsSource(DeclType, String),
 
     #[error("\"{1}\" is referenced in {0} but it does not appear in children.")]
     InvalidChild(DeclField, String),
@@ -95,126 +101,100 @@ impl Display for AvailabilityList {
 }
 
 impl Error {
-    pub fn missing_field(decl_type: impl Into<String>, keyword: impl Into<String>) -> Self {
-        Error::MissingField(DeclField { decl: decl_type.into(), field: keyword.into() })
+    pub fn missing_field(decl_type: DeclType, keyword: impl Into<String>) -> Self {
+        Error::MissingField(DeclField { decl: decl_type, field: keyword.into() })
     }
 
-    pub fn empty_field(decl_type: impl Into<String>, keyword: impl Into<String>) -> Self {
-        Error::EmptyField(DeclField { decl: decl_type.into(), field: keyword.into() })
+    pub fn empty_field(decl_type: DeclType, keyword: impl Into<String>) -> Self {
+        Error::EmptyField(DeclField { decl: decl_type, field: keyword.into() })
     }
 
-    pub fn extraneous_field(decl_type: impl Into<String>, keyword: impl Into<String>) -> Self {
-        Error::ExtraneousField(DeclField { decl: decl_type.into(), field: keyword.into() })
+    pub fn extraneous_field(decl_type: DeclType, keyword: impl Into<String>) -> Self {
+        Error::ExtraneousField(DeclField { decl: decl_type, field: keyword.into() })
     }
 
     pub fn duplicate_field(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         value: impl Into<String>,
     ) -> Self {
-        Error::DuplicateField(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            value.into(),
-        )
+        Error::DuplicateField(DeclField { decl: decl_type, field: keyword.into() }, value.into())
     }
 
-    pub fn invalid_field(decl_type: impl Into<String>, keyword: impl Into<String>) -> Self {
-        Error::InvalidField(DeclField { decl: decl_type.into(), field: keyword.into() })
+    pub fn invalid_field(decl_type: DeclType, keyword: impl Into<String>) -> Self {
+        Error::InvalidField(DeclField { decl: decl_type, field: keyword.into() })
     }
 
     pub fn invalid_url(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         message: impl Into<String>,
     ) -> Self {
-        Error::InvalidUrl(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            message.into(),
-        )
+        Error::InvalidUrl(DeclField { decl: decl_type, field: keyword.into() }, message.into())
     }
 
-    pub fn field_too_long(decl_type: impl Into<String>, keyword: impl Into<String>) -> Self {
-        Error::FieldTooLong(DeclField { decl: decl_type.into(), field: keyword.into() })
+    pub fn field_too_long(decl_type: DeclType, keyword: impl Into<String>) -> Self {
+        Error::FieldTooLong(DeclField { decl: decl_type, field: keyword.into() })
     }
 
-    pub fn invalid_capability_type(
-        decl_type: impl Into<String>,
-        keyword: impl Into<String>,
-        type_name: impl Into<String>,
-    ) -> Self {
-        Error::InvalidCapabilityType(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            type_name.into(),
-        )
-    }
-
-    pub fn offer_target_equals_source(decl: impl Into<String>, target: impl Into<String>) -> Self {
-        Error::OfferTargetEqualsSource(decl.into(), target.into())
+    pub fn offer_target_equals_source(decl: DeclType, target: impl Into<String>) -> Self {
+        Error::OfferTargetEqualsSource(decl, target.into())
     }
 
     pub fn invalid_child(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         child: impl Into<String>,
     ) -> Self {
-        Error::InvalidChild(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            child.into(),
-        )
+        Error::InvalidChild(DeclField { decl: decl_type, field: keyword.into() }, child.into())
     }
 
     pub fn invalid_collection(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         collection: impl Into<String>,
     ) -> Self {
         Error::InvalidCollection(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
+            DeclField { decl: decl_type, field: keyword.into() },
             collection.into(),
         )
     }
 
     pub fn invalid_storage(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         storage: impl Into<String>,
     ) -> Self {
-        Error::InvalidStorage(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            storage.into(),
-        )
+        Error::InvalidStorage(DeclField { decl: decl_type, field: keyword.into() }, storage.into())
     }
 
     pub fn invalid_environment(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         environment: impl Into<String>,
     ) -> Self {
         Error::InvalidEnvironment(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
+            DeclField { decl: decl_type, field: keyword.into() },
             environment.into(),
         )
     }
 
     // TODO: Replace with `invalid_capability`?
     pub fn invalid_runner(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         runner: impl Into<String>,
     ) -> Self {
-        Error::InvalidRunner(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
-            runner.into(),
-        )
+        Error::InvalidRunner(DeclField { decl: decl_type, field: keyword.into() }, runner.into())
     }
 
     pub fn invalid_capability(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         capability: impl Into<String>,
     ) -> Self {
         Error::InvalidCapability(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
+            DeclField { decl: decl_type, field: keyword.into() },
             capability.into(),
         )
     }
@@ -224,29 +204,29 @@ impl Error {
     }
 
     pub fn invalid_path_overlap(
-        decl: impl Into<String>,
+        decl: DeclType,
         path: impl Into<String>,
-        other_decl: impl Into<String>,
+        other_decl: DeclType,
         other_path: impl Into<String>,
     ) -> Self {
         Error::InvalidPathOverlap {
-            decl: DeclField { decl: decl.into(), field: "target_path".to_string() },
+            decl: DeclField { decl, field: "target_path".to_string() },
             path: path.into(),
-            other_decl: DeclField { decl: other_decl.into(), field: "target_path".to_string() },
+            other_decl: DeclField { decl: other_decl, field: "target_path".to_string() },
             other_path: other_path.into(),
         }
     }
 
-    pub fn pkg_path_overlap(decl: impl Into<String>, path: impl Into<String>) -> Self {
+    pub fn pkg_path_overlap(decl: DeclType, path: impl Into<String>) -> Self {
         Error::PkgPathOverlap {
-            decl: DeclField { decl: decl.into(), field: "target_path".to_string() },
+            decl: DeclField { decl, field: "target_path".to_string() },
             path: path.into(),
         }
     }
 
-    pub fn extraneous_source_path(decl_type: impl Into<String>, path: impl Into<String>) -> Self {
+    pub fn extraneous_source_path(decl_type: DeclType, path: impl Into<String>) -> Self {
         Error::ExtraneousSourcePath(
-            DeclField { decl: decl_type.into(), field: "source_path".to_string() },
+            DeclField { decl: decl_type, field: "source_path".to_string() },
             path.into(),
         )
     }
@@ -256,12 +236,12 @@ impl Error {
     }
 
     pub fn availability_must_be_optional(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         source_name: Option<&String>,
     ) -> Self {
         Error::AvailabilityMustBeOptional(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
+            DeclField { decl: decl_type, field: keyword.into() },
             source_name.cloned().unwrap_or("<unnamed>".to_string()),
         )
     }
@@ -271,12 +251,12 @@ impl Error {
     }
 
     pub fn service_aggregate_not_collection(
-        decl_type: impl Into<String>,
+        decl_type: DeclType,
         keyword: impl Into<String>,
         target_name: impl Into<String>,
     ) -> Self {
         Error::ServiceAggregateNotCollection(
-            DeclField { decl: decl_type.into(), field: keyword.into() },
+            DeclField { decl: decl_type, field: keyword.into() },
             target_name.into(),
         )
     }
@@ -286,9 +266,197 @@ impl Error {
     }
 }
 
+// To regenerate:
+//
+// ```
+//     fx exec env | \
+//         grep FUCHSIA_BUILD_DIR | \
+//         xargs -I {} bash -c 'export {}; grep -E "pub (enum|struct)" $FUCHSIA_BUILD_DIR/fidling/gen/sdk/fidl/fuchsia.component.decl/fuchsia.component.decl/rust/fidl_fuchsia_component_decl.rs' | \
+//         awk '{print $3}' | \
+//         sed 's/[:;]$//' | \
+//         sort | uniq | sed 's/$/,/'
+// ```
+//
+/// The list of all declarations in fuchsia.component.decl, for error reporting purposes.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum DeclType {
+    AllowedOffers,
+    Availability,
+    Capability,
+    CapabilityRef,
+    Child,
+    ChildRef,
+    Collection,
+    CollectionRef,
+    Component,
+    ConfigChecksum,
+    ConfigField,
+    ConfigMutability,
+    ConfigOverride,
+    ConfigSchema,
+    ConfigSingleValue,
+    ConfigType,
+    ConfigTypeLayout,
+    ConfigValue,
+    ConfigValuesData,
+    ConfigValueSource,
+    ConfigValueSpec,
+    ConfigVectorValue,
+    DebugProtocolRegistration,
+    DebugRef,
+    DebugRegistration,
+    DependencyType,
+    Directory,
+    Durability,
+    Environment,
+    EnvironmentExtends,
+    EventStream,
+    EventSubscription,
+    Expose,
+    ExposeDirectory,
+    ExposeProtocol,
+    ExposeResolver,
+    ExposeRunner,
+    ExposeService,
+    FrameworkRef,
+    LayoutConstraint,
+    LayoutParameter,
+    NameMapping,
+    Offer,
+    OfferDirectory,
+    OfferEventStream,
+    OfferProtocol,
+    OfferResolver,
+    OfferRunner,
+    OfferService,
+    OfferStorage,
+    OnTerminate,
+    ParentRef,
+    Program,
+    Protocol,
+    Ref,
+    ResolvedConfig,
+    ResolvedConfigField,
+    Resolver,
+    ResolverRegistration,
+    Runner,
+    RunnerRegistration,
+    SelfRef,
+    Service,
+    StartupMode,
+    Storage,
+    StorageId,
+    Use,
+    UseDirectory,
+    UseEventStream,
+    UseProtocol,
+    UseService,
+    UseStorage,
+    VoidRef,
+
+    // TODO(fxbug.dev/126609): These will be generated when fuchsia.component.config goes away.
+    ValueSpec,
+    ValuesData,
+}
+
+impl fmt::Display for DeclType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match *self {
+            // To regenerate:
+            //
+            // ```
+            //     fx exec env | \
+            //         grep FUCHSIA_BUILD_DIR | \
+            //         xargs -I {} bash -c 'export {}; grep -E "pub (enum|struct)" $FUCHSIA_BUILD_DIR/fidling/gen/sdk/fidl/fuchsia.component.decl/fuchsia.component.decl/rust/fidl_fuchsia_component_decl.rs' | \
+            //         awk '{print $3}' | \
+            //         sed 's/[:;]$//' | \
+            //         sort | uniq | sed 's/\(.*\)/DeclType::\1 => "\1",/'
+            // ```
+            DeclType::AllowedOffers => "AllowedOffers",
+            DeclType::Availability => "Availability",
+            DeclType::Capability => "Capability",
+            DeclType::CapabilityRef => "CapabilityRef",
+            DeclType::Child => "Child",
+            DeclType::ChildRef => "ChildRef",
+            DeclType::Collection => "Collection",
+            DeclType::CollectionRef => "CollectionRef",
+            DeclType::Component => "Component",
+            DeclType::ConfigChecksum => "ConfigChecksum",
+            DeclType::ConfigField => "ConfigField",
+            DeclType::ConfigMutability => "ConfigMutability",
+            DeclType::ConfigOverride => "ConfigOverride",
+            DeclType::ConfigSchema => "ConfigSchema",
+            DeclType::ConfigSingleValue => "ConfigSingleValue",
+            DeclType::ConfigType => "ConfigType",
+            DeclType::ConfigTypeLayout => "ConfigTypeLayout",
+            DeclType::ConfigValue => "ConfigValue",
+            DeclType::ConfigValuesData => "ConfigValuesData",
+            DeclType::ConfigValueSource => "ConfigValueSource",
+            DeclType::ConfigValueSpec => "ConfigValueSpec",
+            DeclType::ConfigVectorValue => "ConfigVectorValue",
+            DeclType::DebugProtocolRegistration => "DebugProtocolRegistration",
+            DeclType::DebugRef => "DebugRef",
+            DeclType::DebugRegistration => "DebugRegistration",
+            DeclType::DependencyType => "DependencyType",
+            DeclType::Directory => "Directory",
+            DeclType::Durability => "Durability",
+            DeclType::Environment => "Environment",
+            DeclType::EnvironmentExtends => "EnvironmentExtends",
+            DeclType::EventStream => "EventStream",
+            DeclType::EventSubscription => "EventSubscription",
+            DeclType::Expose => "Expose",
+            DeclType::ExposeDirectory => "ExposeDirectory",
+            DeclType::ExposeProtocol => "ExposeProtocol",
+            DeclType::ExposeResolver => "ExposeResolver",
+            DeclType::ExposeRunner => "ExposeRunner",
+            DeclType::ExposeService => "ExposeService",
+            DeclType::FrameworkRef => "FrameworkRef",
+            DeclType::LayoutConstraint => "LayoutConstraint",
+            DeclType::LayoutParameter => "LayoutParameter",
+            DeclType::NameMapping => "NameMapping",
+            DeclType::Offer => "Offer",
+            DeclType::OfferDirectory => "OfferDirectory",
+            DeclType::OfferEventStream => "OfferEventStream",
+            DeclType::OfferProtocol => "OfferProtocol",
+            DeclType::OfferResolver => "OfferResolver",
+            DeclType::OfferRunner => "OfferRunner",
+            DeclType::OfferService => "OfferService",
+            DeclType::OfferStorage => "OfferStorage",
+            DeclType::OnTerminate => "OnTerminate",
+            DeclType::ParentRef => "ParentRef",
+            DeclType::Program => "Program",
+            DeclType::Protocol => "Protocol",
+            DeclType::Ref => "Ref",
+            DeclType::ResolvedConfig => "ResolvedConfig",
+            DeclType::ResolvedConfigField => "ResolvedConfigField",
+            DeclType::Resolver => "Resolver",
+            DeclType::ResolverRegistration => "ResolverRegistration",
+            DeclType::Runner => "Runner",
+            DeclType::RunnerRegistration => "RunnerRegistration",
+            DeclType::SelfRef => "SelfRef",
+            DeclType::Service => "Service",
+            DeclType::StartupMode => "StartupMode",
+            DeclType::Storage => "Storage",
+            DeclType::StorageId => "StorageId",
+            DeclType::Use => "Use",
+            DeclType::UseDirectory => "UseDirectory",
+            DeclType::UseEventStream => "UseEventStream",
+            DeclType::UseProtocol => "UseProtocol",
+            DeclType::UseService => "UseService",
+            DeclType::UseStorage => "UseStorage",
+            DeclType::VoidRef => "VoidRef",
+
+            // TODO(fxbug.dev/126609): These will be generated when fuchsia.component.config goes away.
+            DeclType::ValueSpec => "ValueSpec",
+            DeclType::ValuesData => "ValuesData",
+        };
+        write!(f, "{}", name)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeclField {
-    pub decl: String,
+    pub decl: DeclType,
     pub field: String,
 }
 
@@ -324,36 +492,36 @@ mod tests {
     #[test]
     fn test_errors() {
         assert_eq!(
-            format!("{}", Error::missing_field("Decl", "keyword")),
-            "Field `keyword` is missing for Decl."
+            format!("{}", Error::missing_field(DeclType::Child, "keyword")),
+            "Field `keyword` is missing for Child."
         );
         assert_eq!(
-            format!("{}", Error::empty_field("Decl", "keyword")),
-            "Field `keyword` is empty for Decl."
+            format!("{}", Error::empty_field(DeclType::Child, "keyword")),
+            "Field `keyword` is empty for Child."
         );
         assert_eq!(
-            format!("{}", Error::duplicate_field("Decl", "keyword", "foo")),
-            "\"foo\" is duplicated for field `keyword` in Decl."
+            format!("{}", Error::duplicate_field(DeclType::Child, "keyword", "foo")),
+            "\"foo\" is duplicated for field `keyword` in Child."
         );
         assert_eq!(
-            format!("{}", Error::invalid_field("Decl", "keyword")),
-            "Field `keyword` for Decl is invalid."
+            format!("{}", Error::invalid_field(DeclType::Child, "keyword")),
+            "Field `keyword` for Child is invalid."
         );
         assert_eq!(
-            format!("{}", Error::field_too_long("Decl", "keyword")),
-            "Field `keyword` for Decl is too long."
+            format!("{}", Error::field_too_long(DeclType::Child, "keyword")),
+            "Field `keyword` for Child is too long."
         );
         assert_eq!(
-            format!("{}", Error::invalid_child("Decl", "source", "child")),
-            "\"child\" is referenced in Decl.source but it does not appear in children."
+            format!("{}", Error::invalid_child(DeclType::Child, "source", "child")),
+            "\"child\" is referenced in Child.source but it does not appear in children."
         );
         assert_eq!(
-            format!("{}", Error::invalid_collection("Decl", "source", "child")),
-            "\"child\" is referenced in Decl.source but it does not appear in collections."
+            format!("{}", Error::invalid_collection(DeclType::Child, "source", "child")),
+            "\"child\" is referenced in Child.source but it does not appear in collections."
         );
         assert_eq!(
-            format!("{}", Error::invalid_storage("Decl", "source", "name")),
-            "\"name\" is referenced in Decl.source but it does not appear in storage."
+            format!("{}", Error::invalid_storage(DeclType::Child, "source", "name")),
+            "\"name\" is referenced in Child.source but it does not appear in storage."
         );
     }
 }

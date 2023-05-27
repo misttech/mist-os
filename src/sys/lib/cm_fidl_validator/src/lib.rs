@@ -55,7 +55,7 @@ pub fn validate_value_spec(spec: &fdecl::ConfigValueSpec) -> Result<(), ErrorLis
                 | fdecl::ConfigSingleValue::Int64(_)
                 | fdecl::ConfigSingleValue::String(_) => {}
                 fdecl::ConfigSingleValueUnknown!() => {
-                    errors.push(Error::invalid_field("ConfigValueSpec", "value"));
+                    errors.push(Error::invalid_field(DeclType::ConfigValueSpec, "value"));
                 }
             },
             fdecl::ConfigValue::Vector(l) => match l {
@@ -70,15 +70,15 @@ pub fn validate_value_spec(spec: &fdecl::ConfigValueSpec) -> Result<(), ErrorLis
                 | fdecl::ConfigVectorValue::Int64Vector(_)
                 | fdecl::ConfigVectorValue::StringVector(_) => {}
                 fdecl::ConfigVectorValueUnknown!() => {
-                    errors.push(Error::invalid_field("ConfigValueSpec", "value"));
+                    errors.push(Error::invalid_field(DeclType::ConfigValueSpec, "value"));
                 }
             },
             fdecl::ConfigValueUnknown!() => {
-                errors.push(Error::invalid_field("ConfigValueSpec", "value"));
+                errors.push(Error::invalid_field(DeclType::ConfigValueSpec, "value"));
             }
         }
     } else {
-        errors.push(Error::missing_field("ConfigValueSpec", "value"));
+        errors.push(Error::missing_field(DeclType::ConfigValueSpec, "value"));
     }
 
     if errors.is_empty() {
@@ -105,7 +105,7 @@ fn validate_value_spec_todo_fxb_126609(spec: &fconfig::ValueSpec) -> Result<(), 
                 | fconfig::SingleValue::Int64(_)
                 | fconfig::SingleValue::String(_) => {}
                 fconfig::SingleValueUnknown!() => {
-                    errors.push(Error::invalid_field("ValueSpec", "value"));
+                    errors.push(Error::invalid_field(DeclType::ValueSpec, "value"));
                 }
             },
             fconfig::Value::Vector(l) => match l {
@@ -120,15 +120,15 @@ fn validate_value_spec_todo_fxb_126609(spec: &fconfig::ValueSpec) -> Result<(), 
                 | fconfig::VectorValue::Int64Vector(_)
                 | fconfig::VectorValue::StringVector(_) => {}
                 fconfig::VectorValueUnknown!() => {
-                    errors.push(Error::invalid_field("ValueSpec", "value"));
+                    errors.push(Error::invalid_field(DeclType::ValueSpec, "value"));
                 }
             },
             fconfig::ValueUnknown!() => {
-                errors.push(Error::invalid_field("ValueSpec", "value"));
+                errors.push(Error::invalid_field(DeclType::ValueSpec, "value"));
             }
         }
     } else {
-        errors.push(Error::missing_field("ValueSpec", "value"));
+        errors.push(Error::missing_field(DeclType::ValueSpec, "value"));
     }
 
     if errors.is_empty() {
@@ -154,18 +154,18 @@ pub fn validate_values_data(data: &fdecl::ConfigValuesData) -> Result<(), ErrorL
             }
         }
     } else {
-        errors.push(Error::missing_field("ConfigValuesData", "values"));
+        errors.push(Error::missing_field(DeclType::ConfigValuesData, "values"));
     }
 
     if let Some(checksum) = &data.checksum {
         match checksum {
             fdecl::ConfigChecksum::Sha256(_) => {}
             fdecl::ConfigChecksumUnknown!() => {
-                errors.push(Error::invalid_field("ConfigValuesData", "checksum"));
+                errors.push(Error::invalid_field(DeclType::ConfigValuesData, "checksum"));
             }
         }
     } else {
-        errors.push(Error::missing_field("ConfigValuesData", "checksum"));
+        errors.push(Error::missing_field(DeclType::ConfigValuesData, "checksum"));
     }
 
     if errors.is_empty() {
@@ -185,18 +185,18 @@ pub fn validate_values_data_todo_fxb_126609(data: &fconfig::ValuesData) -> Resul
             }
         }
     } else {
-        errors.push(Error::missing_field("ValuesData", "values"));
+        errors.push(Error::missing_field(DeclType::ValuesData, "values"));
     }
 
     if let Some(checksum) = &data.checksum {
         match checksum {
             fdecl::ConfigChecksum::Sha256(_) => {}
             fdecl::ConfigChecksumUnknown!() => {
-                errors.push(Error::invalid_field("ValuesData", "checksum"));
+                errors.push(Error::invalid_field(DeclType::ValuesData, "checksum"));
             }
         }
     } else {
-        errors.push(Error::missing_field("ValuesData", "checksum"));
+        errors.push(Error::missing_field(DeclType::ValuesData, "checksum"));
     }
 
     if errors.is_empty() {
@@ -254,7 +254,7 @@ pub fn validate_capabilities(
 
 /// An interface to call into either `check_dynamic_name()` or `check_name()`, depending on the context
 /// of the caller.
-type CheckChildNameFn = fn(Option<&String>, &str, &str, &mut Vec<Error>) -> bool;
+type CheckChildNameFn = fn(Option<&String>, DeclType, &str, &mut Vec<Error>) -> bool;
 
 pub fn validate_dynamic_child(child: &fdecl::Child) -> Result<(), ErrorList> {
     validate_child(child, check_dynamic_name)
@@ -267,14 +267,14 @@ fn validate_child(
     check_child_name: CheckChildNameFn,
 ) -> Result<(), ErrorList> {
     let mut errors = vec![];
-    check_child_name(child.name.as_ref(), "Child", "name", &mut errors);
-    check_url(child.url.as_ref(), "Child", "url", &mut errors);
+    check_child_name(child.name.as_ref(), DeclType::Child, "name", &mut errors);
+    check_url(child.url.as_ref(), DeclType::Child, "url", &mut errors);
     if child.startup.is_none() {
-        errors.push(Error::missing_field("Child", "startup"));
+        errors.push(Error::missing_field(DeclType::Child, "startup"));
     }
     // Allow `on_terminate` to be unset since the default is almost always desired.
     if child.environment.is_some() {
-        check_name(child.environment.as_ref(), "Child", "environment", &mut errors);
+        check_name(child.environment.as_ref(), DeclType::Child, "environment", &mut errors);
     }
     if errors.is_empty() {
         Ok(())
@@ -301,7 +301,7 @@ pub fn validate_dynamic_offers<'a>(
 
 fn check_offer_name(
     prop: Option<&String>,
-    decl: &str,
+    decl: DeclType,
     keyword: &str,
     offer_type: OfferType,
     errors: &mut Vec<Error>,
@@ -493,7 +493,7 @@ impl<'a> ValidationContext<'a> {
         for env in envs {
             if let Some(name) = env.name.as_ref() {
                 if !self.all_environment_names.insert(name) {
-                    self.errors.push(Error::duplicate_field("Environment", "name", name));
+                    self.errors.push(Error::duplicate_field(DeclType::Environment, "name", name));
                 }
             }
         }
@@ -505,31 +505,31 @@ impl<'a> ValidationContext<'a> {
         if let Some(fields) = &config.fields {
             for field in fields {
                 if field.key.is_none() {
-                    self.errors.push(Error::missing_field("ConfigField", "key"));
+                    self.errors.push(Error::missing_field(DeclType::ConfigField, "key"));
                 }
                 if let Some(type_) = &field.type_ {
                     self.validate_config_type(type_, true);
                 } else {
-                    self.errors.push(Error::missing_field("ConfigField", "value_type"));
+                    self.errors.push(Error::missing_field(DeclType::ConfigField, "value_type"));
                 }
             }
         } else {
-            self.errors.push(Error::missing_field("ConfigSchema", "fields"));
+            self.errors.push(Error::missing_field(DeclType::ConfigSchema, "fields"));
         }
 
         if let Some(checksum) = &config.checksum {
             match checksum {
                 fdecl::ConfigChecksum::Sha256(_) => {}
                 fdecl::ConfigChecksumUnknown!() => {
-                    self.errors.push(Error::invalid_field("ConfigSchema", "checksum"));
+                    self.errors.push(Error::invalid_field(DeclType::ConfigSchema, "checksum"));
                 }
             }
         } else {
-            self.errors.push(Error::missing_field("ConfigSchema", "checksum"));
+            self.errors.push(Error::missing_field(DeclType::ConfigSchema, "checksum"));
         }
 
         if config.value_source.is_none() {
-            self.errors.push(Error::missing_field("ConfigSchema", "value_source"));
+            self.errors.push(Error::missing_field(DeclType::ConfigSchema, "value_source"));
         }
     }
 
@@ -547,33 +547,35 @@ impl<'a> ValidationContext<'a> {
                 // These layouts have no parameters or constraints
                 if let Some(parameters) = &type_.parameters {
                     if !parameters.is_empty() {
-                        self.errors.push(Error::extraneous_field("ConfigType", "parameters"));
+                        self.errors
+                            .push(Error::extraneous_field(DeclType::ConfigType, "parameters"));
                     }
                 } else {
-                    self.errors.push(Error::missing_field("ConfigType", "parameters"));
+                    self.errors.push(Error::missing_field(DeclType::ConfigType, "parameters"));
                 }
 
                 if !type_.constraints.is_empty() {
-                    self.errors.push(Error::extraneous_field("ConfigType", "constraints"));
+                    self.errors.push(Error::extraneous_field(DeclType::ConfigType, "constraints"));
                 }
             }
             fdecl::ConfigTypeLayout::String => {
                 // String has exactly one constraint and no parameter
                 if let Some(parameters) = &type_.parameters {
                     if !parameters.is_empty() {
-                        self.errors.push(Error::extraneous_field("ConfigType", "parameters"));
+                        self.errors
+                            .push(Error::extraneous_field(DeclType::ConfigType, "parameters"));
                     }
                 } else {
-                    self.errors.push(Error::missing_field("ConfigType", "parameters"));
+                    self.errors.push(Error::missing_field(DeclType::ConfigType, "parameters"));
                 }
 
                 if type_.constraints.is_empty() {
-                    self.errors.push(Error::missing_field("ConfigType", "constraints"));
+                    self.errors.push(Error::missing_field(DeclType::ConfigType, "constraints"));
                 } else if type_.constraints.len() > 1 {
-                    self.errors.push(Error::extraneous_field("ConfigType", "constraints"));
+                    self.errors.push(Error::extraneous_field(DeclType::ConfigType, "constraints"));
                 } else if let fdecl::LayoutConstraint::MaxSize(_) = &type_.constraints[0] {
                 } else {
-                    self.errors.push(Error::invalid_field("ConfigType", "constraints"));
+                    self.errors.push(Error::invalid_field(DeclType::ConfigType, "constraints"));
                 }
             }
             fdecl::ConfigTypeLayout::Vector => {
@@ -581,33 +583,37 @@ impl<'a> ValidationContext<'a> {
                     // Vector has exactly one constraint and one parameter
                     if let Some(parameters) = &type_.parameters {
                         if parameters.is_empty() {
-                            self.errors.push(Error::missing_field("ConfigType", "parameters"));
+                            self.errors
+                                .push(Error::missing_field(DeclType::ConfigType, "parameters"));
                         } else if parameters.len() > 1 {
-                            self.errors.push(Error::extraneous_field("ConfigType", "parameters"));
+                            self.errors
+                                .push(Error::extraneous_field(DeclType::ConfigType, "parameters"));
                         } else if let fdecl::LayoutParameter::NestedType(nested_type) =
                             &parameters[0]
                         {
                             self.validate_config_type(nested_type, false);
                         } else {
-                            self.errors.push(Error::invalid_field("ConfigType", "parameters"));
+                            self.errors
+                                .push(Error::invalid_field(DeclType::ConfigType, "parameters"));
                         }
                     } else {
-                        self.errors.push(Error::missing_field("ConfigType", "parameters"))
+                        self.errors.push(Error::missing_field(DeclType::ConfigType, "parameters"))
                     }
 
                     if type_.constraints.is_empty() {
-                        self.errors.push(Error::missing_field("ConfigType", "constraints"));
+                        self.errors.push(Error::missing_field(DeclType::ConfigType, "constraints"));
                     } else if type_.constraints.len() > 1 {
-                        self.errors.push(Error::extraneous_field("ConfigType", "constraints"));
+                        self.errors
+                            .push(Error::extraneous_field(DeclType::ConfigType, "constraints"));
                     } else if let fdecl::LayoutConstraint::MaxSize(_) = &type_.constraints[0] {
                     } else {
-                        self.errors.push(Error::invalid_field("ConfigType", "constraints"));
+                        self.errors.push(Error::invalid_field(DeclType::ConfigType, "constraints"));
                     }
                 } else {
                     self.errors.push(Error::nested_vector());
                 }
             }
-            _ => self.errors.push(Error::invalid_field("ConfigType", "layout")),
+            _ => self.errors.push(Error::invalid_field(DeclType::ConfigType, "layout")),
         }
     }
 
@@ -626,11 +632,7 @@ impl<'a> ValidationContext<'a> {
             }
             fdecl::Capability::Storage(storage) => {
                 if as_builtin {
-                    self.errors.push(Error::invalid_capability_type(
-                        "RuntimeConfig",
-                        "capability",
-                        "storage",
-                    ))
+                    self.errors.push(Error::CapabilityCannotBeBuiltin(DeclType::Storage))
                 } else {
                     self.validate_storage_decl(&storage)
                 }
@@ -643,28 +645,10 @@ impl<'a> ValidationContext<'a> {
                 if as_builtin {
                     self.validate_event_stream_decl(&event)
                 } else {
-                    self.errors.push(Error::invalid_capability_type(
-                        "Component",
-                        "capability",
-                        "event_stream",
-                    ))
+                    self.errors.push(Error::CapabilityMustBeBuiltin(DeclType::EventStream))
                 }
             }
-            _ => {
-                if as_builtin {
-                    self.errors.push(Error::invalid_capability_type(
-                        "RuntimeConfig",
-                        "capability",
-                        "unknown",
-                    ));
-                } else {
-                    self.errors.push(Error::invalid_capability_type(
-                        "Component",
-                        "capability",
-                        "unknown",
-                    ));
-                }
-            }
+            fdecl::CapabilityUnknown!() => self.errors.push(Error::UnknownCapability),
         }
     }
 
@@ -681,7 +665,7 @@ impl<'a> ValidationContext<'a> {
         match use_ {
             fdecl::Use::Service(u) => {
                 self.validate_use_fields(
-                    "UseService",
+                    DeclType::UseService,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
@@ -691,7 +675,7 @@ impl<'a> ValidationContext<'a> {
             }
             fdecl::Use::Protocol(u) => {
                 self.validate_use_fields(
-                    "UseProtocol",
+                    DeclType::UseProtocol,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
@@ -701,7 +685,7 @@ impl<'a> ValidationContext<'a> {
             }
             fdecl::Use::Directory(u) => {
                 self.validate_use_fields(
-                    "UseDirectory",
+                    DeclType::UseDirectory,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
@@ -709,10 +693,15 @@ impl<'a> ValidationContext<'a> {
                     u.availability.as_ref(),
                 );
                 if u.rights.is_none() {
-                    self.errors.push(Error::missing_field("UseDirectory", "rights"));
+                    self.errors.push(Error::missing_field(DeclType::UseDirectory, "rights"));
                 }
                 if let Some(subdir) = u.subdir.as_ref() {
-                    check_relative_path(Some(subdir), "UseDirectory", "subdir", &mut self.errors);
+                    check_relative_path(
+                        Some(subdir),
+                        DeclType::UseDirectory,
+                        "subdir",
+                        &mut self.errors,
+                    );
                 }
             }
             fdecl::Use::Storage(u) => {
@@ -720,7 +709,7 @@ impl<'a> ValidationContext<'a> {
                 const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
                     Some(fdecl::DependencyType::Strong);
                 self.validate_use_fields(
-                    "UseStorage",
+                    DeclType::UseStorage,
                     SOURCE.as_ref(),
                     u.source_name.as_ref(),
                     u.target_path.as_ref(),
@@ -731,7 +720,7 @@ impl<'a> ValidationContext<'a> {
             fdecl::Use::EventStream(u) => {
                 const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
                     Some(fdecl::DependencyType::Strong);
-                let decl = "UseEventStream";
+                let decl = DeclType::UseEventStream;
                 self.validate_use_fields(
                     decl,
                     u.source.as_ref(),
@@ -771,7 +760,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::UseUnknown!() => {
-                self.errors.push(Error::invalid_field("Component", "use"));
+                self.errors.push(Error::invalid_field(DeclType::Component, "use"));
             }
         }
     }
@@ -780,11 +769,11 @@ impl<'a> ValidationContext<'a> {
     /// since those are checked by the runner.
     fn validate_program(&mut self, program: &fdecl::Program) {
         if program.runner.is_none() {
-            self.errors.push(Error::missing_field("Program", "runner"));
+            self.errors.push(Error::missing_field(DeclType::Program, "runner"));
         }
 
         if program.info.is_none() {
-            self.errors.push(Error::missing_field("Program", "info"));
+            self.errors.push(Error::missing_field(DeclType::Program, "info"));
         }
     }
 
@@ -793,7 +782,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_use_paths(&mut self, uses: &[fdecl::Use]) {
         #[derive(Debug, PartialEq, Clone, Copy)]
         struct PathCapability<'a> {
-            decl: &'a str,
+            decl: DeclType,
             dir: &'a Path,
             use_: &'a fdecl::Use,
         }
@@ -810,21 +799,25 @@ impl<'a> ValidationContext<'a> {
                                 Some(p) => p,
                                 None => continue, // Invalid path, validated elsewhere
                             };
-                            PathCapability { decl: "UseService", dir, use_ }
+                            PathCapability { decl: DeclType::UseService, dir, use_ }
                         }
                         fdecl::Use::Protocol(_) => {
                             let dir = match Path::new(path).parent() {
                                 Some(p) => p,
                                 None => continue, // Invalid path, validated elsewhere
                             };
-                            PathCapability { decl: "UseProtocol", dir, use_ }
+                            PathCapability { decl: DeclType::UseProtocol, dir, use_ }
                         }
-                        fdecl::Use::Directory(_) => {
-                            PathCapability { decl: "UseDirectory", dir: Path::new(path), use_ }
-                        }
-                        fdecl::Use::Storage(_) => {
-                            PathCapability { decl: "UseStorage", dir: Path::new(path), use_ }
-                        }
+                        fdecl::Use::Directory(_) => PathCapability {
+                            decl: DeclType::UseDirectory,
+                            dir: Path::new(path),
+                            use_,
+                        },
+                        fdecl::Use::Storage(_) => PathCapability {
+                            decl: DeclType::UseStorage,
+                            dir: Path::new(path),
+                            use_,
+                        },
                         _ => unreachable!(),
                     };
                     if used_paths.insert(path, capability).is_some() {
@@ -885,7 +878,7 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_use_fields(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
         target_path: Option<&'a String>,
@@ -953,7 +946,7 @@ impl<'a> ValidationContext<'a> {
         if let Some(name) = child.name.as_ref() {
             let name: &str = name;
             if self.all_children.insert(name, child).is_some() {
-                self.errors.push(Error::duplicate_field("Child", "name", name));
+                self.errors.push(Error::duplicate_field(DeclType::Child, "name", name));
             }
             if let Some(env) = child.environment.as_ref() {
                 let source = DependencyNode::Environment(env.as_str());
@@ -963,26 +956,30 @@ impl<'a> ValidationContext<'a> {
         }
         if let Some(environment) = child.environment.as_ref() {
             if !self.all_environment_names.contains(environment.as_str()) {
-                self.errors.push(Error::invalid_environment("Child", "environment", environment));
+                self.errors.push(Error::invalid_environment(
+                    DeclType::Child,
+                    "environment",
+                    environment,
+                ));
             }
         }
     }
 
     fn validate_collection_decl(&mut self, collection: &'a fdecl::Collection) {
         let name = collection.name.as_ref();
-        if check_name(name, "Collection", "name", &mut self.errors) {
+        if check_name(name, DeclType::Collection, "name", &mut self.errors) {
             let name: &str = name.unwrap();
             if !self.all_collections.insert(name) {
-                self.errors.push(Error::duplicate_field("Collection", "name", name));
+                self.errors.push(Error::duplicate_field(DeclType::Collection, "name", name));
             }
         }
         if collection.durability.is_none() {
-            self.errors.push(Error::missing_field("Collection", "durability"));
+            self.errors.push(Error::missing_field(DeclType::Collection, "durability"));
         }
         if let Some(environment) = collection.environment.as_ref() {
             if !self.all_environment_names.contains(environment.as_str()) {
                 self.errors.push(Error::invalid_environment(
-                    "Collection",
+                    DeclType::Collection,
                     "environment",
                     environment,
                 ));
@@ -998,9 +995,9 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_environment_decl(&mut self, environment: &'a fdecl::Environment) {
         let name = environment.name.as_ref();
-        check_name(name, "Environment", "name", &mut self.errors);
+        check_name(name, DeclType::Environment, "name", &mut self.errors);
         if environment.extends.is_none() {
-            self.errors.push(Error::missing_field("Environment", "extends"));
+            self.errors.push(Error::missing_field(DeclType::Environment, "extends"));
         }
         if let Some(runners) = environment.runners.as_ref() {
             let mut registered_runners = HashSet::new();
@@ -1022,7 +1019,8 @@ impl<'a> ValidationContext<'a> {
         match environment.extends.as_ref() {
             Some(fdecl::EnvironmentExtends::None) => {
                 if environment.stop_timeout_ms.is_none() {
-                    self.errors.push(Error::missing_field("Environment", "stop_timeout_ms"));
+                    self.errors
+                        .push(Error::missing_field(DeclType::Environment, "stop_timeout_ms"));
                 }
             }
             None | Some(fdecl::EnvironmentExtends::Realm) => {}
@@ -1043,33 +1041,41 @@ impl<'a> ValidationContext<'a> {
     ) {
         check_name(
             runner_registration.source_name.as_ref(),
-            "RunnerRegistration",
+            DeclType::RunnerRegistration,
             "source_name",
             &mut self.errors,
         );
         self.validate_registration_source(
             environment_name,
             runner_registration.source.as_ref(),
-            "RunnerRegistration",
+            DeclType::RunnerRegistration,
         );
         // If the source is `self`, ensure we have a corresponding Runner.
         if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) =
             (&runner_registration.source, &runner_registration.source_name)
         {
             if !self.all_runners.contains(name as &str) {
-                self.errors.push(Error::invalid_runner("RunnerRegistration", "source_name", name));
+                self.errors.push(Error::invalid_runner(
+                    DeclType::RunnerRegistration,
+                    "source_name",
+                    name,
+                ));
             }
         }
 
         check_name(
             runner_registration.target_name.as_ref(),
-            "RunnerRegistration",
+            DeclType::RunnerRegistration,
             "target_name",
             &mut self.errors,
         );
         if let Some(name) = runner_registration.target_name.as_ref() {
             if !runner_names.insert(name.as_str()) {
-                self.errors.push(Error::duplicate_field("RunnerRegistration", "target_name", name));
+                self.errors.push(Error::duplicate_field(
+                    DeclType::RunnerRegistration,
+                    "target_name",
+                    name,
+                ));
             }
         }
     }
@@ -1082,24 +1088,28 @@ impl<'a> ValidationContext<'a> {
     ) {
         check_name(
             resolver_registration.resolver.as_ref(),
-            "ResolverRegistration",
+            DeclType::ResolverRegistration,
             "resolver",
             &mut self.errors,
         );
         self.validate_registration_source(
             environment_name,
             resolver_registration.source.as_ref(),
-            "ResolverRegistration",
+            DeclType::ResolverRegistration,
         );
         check_url_scheme(
             resolver_registration.scheme.as_ref(),
-            "ResolverRegistration",
+            DeclType::ResolverRegistration,
             "scheme",
             &mut self.errors,
         );
         if let Some(scheme) = resolver_registration.scheme.as_ref() {
             if !schemes.insert(scheme.as_str()) {
-                self.errors.push(Error::duplicate_field("ResolverRegistration", "scheme", scheme));
+                self.errors.push(Error::duplicate_field(
+                    DeclType::ResolverRegistration,
+                    "scheme",
+                    scheme,
+                ));
             }
         }
     }
@@ -1108,7 +1118,7 @@ impl<'a> ValidationContext<'a> {
         &mut self,
         environment_name: Option<&'a String>,
         source: Option<&'a fdecl::Ref>,
-        ty: &str,
+        ty: DeclType,
     ) {
         match source {
             Some(fdecl::Ref::Parent(_)) => {}
@@ -1135,23 +1145,23 @@ impl<'a> ValidationContext<'a> {
     }
 
     fn validate_service_decl(&mut self, service: &'a fdecl::Service, as_builtin: bool) {
-        if check_name(service.name.as_ref(), "Service", "name", &mut self.errors) {
+        if check_name(service.name.as_ref(), DeclType::Service, "name", &mut self.errors) {
             let name = service.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Service", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(DeclType::Service, "name", name.as_str()));
             }
             self.all_services.insert(name);
         }
         match as_builtin {
             true => {
                 if let Some(path) = service.source_path.as_ref() {
-                    self.errors.push(Error::extraneous_source_path("Service", path))
+                    self.errors.push(Error::extraneous_source_path(DeclType::Service, path))
                 }
             }
             false => {
                 check_path(
                     service.source_path.as_ref(),
-                    "Service",
+                    DeclType::Service,
                     "source_path",
                     &mut self.errors,
                 );
@@ -1160,23 +1170,23 @@ impl<'a> ValidationContext<'a> {
     }
 
     fn validate_protocol_decl(&mut self, protocol: &'a fdecl::Protocol, as_builtin: bool) {
-        if check_name(protocol.name.as_ref(), "Protocol", "name", &mut self.errors) {
+        if check_name(protocol.name.as_ref(), DeclType::Protocol, "name", &mut self.errors) {
             let name = protocol.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Protocol", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(DeclType::Protocol, "name", name.as_str()));
             }
             self.all_protocols.insert(name);
         }
         match as_builtin {
             true => {
                 if let Some(path) = protocol.source_path.as_ref() {
-                    self.errors.push(Error::extraneous_source_path("Protocol", path))
+                    self.errors.push(Error::extraneous_source_path(DeclType::Protocol, path))
                 }
             }
             false => {
                 check_path(
                     protocol.source_path.as_ref(),
-                    "Protocol",
+                    DeclType::Protocol,
                     "source_path",
                     &mut self.errors,
                 );
@@ -1185,30 +1195,34 @@ impl<'a> ValidationContext<'a> {
     }
 
     fn validate_directory_decl(&mut self, directory: &'a fdecl::Directory, as_builtin: bool) {
-        if check_name(directory.name.as_ref(), "Directory", "name", &mut self.errors) {
+        if check_name(directory.name.as_ref(), DeclType::Directory, "name", &mut self.errors) {
             let name = directory.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Directory", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(
+                    DeclType::Directory,
+                    "name",
+                    name.as_str(),
+                ));
             }
             self.all_directories.insert(name);
         }
         match as_builtin {
             true => {
                 if let Some(path) = directory.source_path.as_ref() {
-                    self.errors.push(Error::extraneous_source_path("Directory", path))
+                    self.errors.push(Error::extraneous_source_path(DeclType::Directory, path))
                 }
             }
             false => {
                 check_path(
                     directory.source_path.as_ref(),
-                    "Directory",
+                    DeclType::Directory,
                     "source_path",
                     &mut self.errors,
                 );
             }
         }
         if directory.rights.is_none() {
-            self.errors.push(Error::missing_field("Directory", "rights"));
+            self.errors.push(Error::missing_field(DeclType::Directory, "rights"));
         }
     }
 
@@ -1217,66 +1231,77 @@ impl<'a> ValidationContext<'a> {
             Some(fdecl::Ref::Parent(_)) => {}
             Some(fdecl::Ref::Self_(_)) => {}
             Some(fdecl::Ref::Child(child)) => {
-                let _ = self.validate_child_ref("Storage", "source", &child, OfferType::Static);
+                let _ =
+                    self.validate_child_ref(DeclType::Storage, "source", &child, OfferType::Static);
             }
             Some(_) => {
-                self.errors.push(Error::invalid_field("Storage", "source"));
+                self.errors.push(Error::invalid_field(DeclType::Storage, "source"));
             }
             None => {
-                self.errors.push(Error::missing_field("Storage", "source"));
+                self.errors.push(Error::missing_field(DeclType::Storage, "source"));
             }
         };
-        if check_name(storage.name.as_ref(), "Storage", "name", &mut self.errors) {
+        if check_name(storage.name.as_ref(), DeclType::Storage, "name", &mut self.errors) {
             let name = storage.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Storage", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(DeclType::Storage, "name", name.as_str()));
             }
             self.all_storage_and_sources.insert(name, storage.source.as_ref());
         }
         if storage.storage_id.is_none() {
-            self.errors.push(Error::missing_field("Storage", "storage_id"));
+            self.errors.push(Error::missing_field(DeclType::Storage, "storage_id"));
         }
-        check_name(storage.backing_dir.as_ref(), "Storage", "backing_dir", &mut self.errors);
+        check_name(
+            storage.backing_dir.as_ref(),
+            DeclType::Storage,
+            "backing_dir",
+            &mut self.errors,
+        );
     }
 
     fn validate_runner_decl(&mut self, runner: &'a fdecl::Runner, as_builtin: bool) {
-        if check_name(runner.name.as_ref(), "Runner", "name", &mut self.errors) {
+        if check_name(runner.name.as_ref(), DeclType::Runner, "name", &mut self.errors) {
             let name = runner.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Runner", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(DeclType::Runner, "name", name.as_str()));
             }
             self.all_runners.insert(name);
         }
         match as_builtin {
             true => {
                 if let Some(path) = runner.source_path.as_ref() {
-                    self.errors.push(Error::extraneous_source_path("Runner", path))
+                    self.errors.push(Error::extraneous_source_path(DeclType::Runner, path))
                 }
             }
             false => {
-                check_path(runner.source_path.as_ref(), "Runner", "source_path", &mut self.errors);
+                check_path(
+                    runner.source_path.as_ref(),
+                    DeclType::Runner,
+                    "source_path",
+                    &mut self.errors,
+                );
             }
         }
     }
 
     fn validate_resolver_decl(&mut self, resolver: &'a fdecl::Resolver, as_builtin: bool) {
-        if check_name(resolver.name.as_ref(), "Resolver", "name", &mut self.errors) {
+        if check_name(resolver.name.as_ref(), DeclType::Resolver, "name", &mut self.errors) {
             let name = resolver.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Resolver", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(DeclType::Resolver, "name", name.as_str()));
             }
             self.all_resolvers.insert(name);
         }
         match as_builtin {
             true => {
                 if let Some(path) = resolver.source_path.as_ref() {
-                    self.errors.push(Error::extraneous_source_path("Resolver", path))
+                    self.errors.push(Error::extraneous_source_path(DeclType::Resolver, path))
                 }
             }
             false => {
                 check_path(
                     resolver.source_path.as_ref(),
-                    "Resolver",
+                    DeclType::Resolver,
                     "source_path",
                     &mut self.errors,
                 );
@@ -1291,7 +1316,7 @@ impl<'a> ValidationContext<'a> {
     ) {
         match debug {
             fdecl::DebugRegistration::Protocol(o) => {
-                let decl = "DebugProtocolRegistration";
+                let decl = DeclType::DebugProtocolRegistration;
                 self.validate_environment_debug_fields(
                     decl,
                     o.source.as_ref(),
@@ -1312,14 +1337,14 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             _ => {
-                self.errors.push(Error::invalid_field("Environment", "debug"));
+                self.errors.push(Error::invalid_field(DeclType::Environment, "debug"));
             }
         }
     }
 
     fn validate_environment_debug_fields(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         source: Option<&fdecl::Ref>,
         source_name: Option<&String>,
         target_name: Option<&'a String>,
@@ -1340,10 +1365,14 @@ impl<'a> ValidationContext<'a> {
     }
 
     fn validate_event_stream_decl(&mut self, event: &'a fdecl::EventStream) {
-        if check_name(event.name.as_ref(), "EventStream", "name", &mut self.errors) {
+        if check_name(event.name.as_ref(), DeclType::EventStream, "name", &mut self.errors) {
             let name = event.name.as_ref().unwrap();
             if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("EventStream", "name", name.as_str()));
+                self.errors.push(Error::duplicate_field(
+                    DeclType::EventStream,
+                    "name",
+                    name.as_str(),
+                ));
             }
         }
     }
@@ -1351,7 +1380,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_source_collection(
         &mut self,
         collection: &fdecl::CollectionRef,
-        decl_type: &str,
+        decl_type: DeclType,
     ) -> bool {
         let num_errors = self.errors.len();
         if check_name(Some(&collection.name), decl_type, "source.collection.name", &mut self.errors)
@@ -1368,7 +1397,7 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_filtered_service_fields(
         &mut self,
-        decl_type: &str,
+        decl_type: DeclType,
         source_instance_filter: Option<&Vec<String>>,
         renamed_instances: Option<&Vec<fdecl::NameMapping>>,
     ) {
@@ -1394,7 +1423,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_source_capability(
         &mut self,
         capability: &fdecl::CapabilityRef,
-        decl_type: &str,
+        decl_type: DeclType,
         field: &str,
     ) -> bool {
         let num_errors = self.errors.len();
@@ -1406,7 +1435,7 @@ impl<'a> ValidationContext<'a> {
         num_errors == self.errors.len()
     }
 
-    fn validate_storage_source(&mut self, source_name: &String, decl_type: &str) {
+    fn validate_storage_source(&mut self, source_name: &String, decl_type: DeclType) {
         if check_name(Some(source_name), decl_type, "source.storage.name", &mut self.errors) {
             if !self.all_storage_and_sources.contains_key(source_name.as_str()) {
                 self.errors.push(Error::invalid_storage(decl_type, "source", source_name));
@@ -1488,7 +1517,7 @@ impl<'a> ValidationContext<'a> {
             let (target_name, _) = p;
             if !expose_group.iter().all(|e| matches!(e.source, Some(fdecl::Ref::Collection(_)))) {
                 self.errors.push(Error::service_aggregate_not_collection(
-                    "ExposeServiceDecl",
+                    DeclType::ExposeService,
                     "source",
                     target_name,
                 ));
@@ -1503,7 +1532,7 @@ impl<'a> ValidationContext<'a> {
     ) {
         match expose {
             fdecl::Expose::Service(e) => {
-                let decl = "ExposeService";
+                let decl = DeclType::ExposeService;
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::Many,
@@ -1524,7 +1553,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Expose::Protocol(e) => {
-                let decl = "ExposeProtocol";
+                let decl = DeclType::ExposeProtocol;
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
@@ -1545,7 +1574,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Expose::Directory(e) => {
-                let decl = "ExposeDirectory";
+                let decl = DeclType::ExposeDirectory;
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
@@ -1584,7 +1613,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Expose::Runner(e) => {
-                let decl = "ExposeRunner";
+                let decl = DeclType::ExposeRunner;
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
@@ -1604,7 +1633,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Expose::Resolver(e) => {
-                let decl = "ExposeResolver";
+                let decl = DeclType::ExposeResolver;
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
@@ -1624,14 +1653,14 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             _ => {
-                self.errors.push(Error::invalid_field("Component", "expose"));
+                self.errors.push(Error::invalid_field(DeclType::Component, "expose"));
             }
         }
     }
 
     fn validate_expose_fields(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         allowable_ids: AllowableIds,
         collection_source: CollectionSource,
         source: Option<&fdecl::Ref>,
@@ -1767,7 +1796,7 @@ impl<'a> ValidationContext<'a> {
                 && !offer_group.iter().all(|o| matches!(o.source, Some(fdecl::Ref::Collection(_))))
             {
                 self.errors.push(Error::service_aggregate_not_collection(
-                    "OfferServiceDecl",
+                    DeclType::OfferService,
                     "source",
                     target_name,
                 ));
@@ -1814,7 +1843,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_offers_decl(&mut self, offer: &'a fdecl::Offer, offer_type: OfferType) {
         match offer {
             fdecl::Offer::Service(o) => {
-                let decl = "OfferService";
+                let decl = DeclType::OfferService;
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::Many,
@@ -1846,7 +1875,7 @@ impl<'a> ValidationContext<'a> {
                 );
             }
             fdecl::Offer::Protocol(o) => {
-                let decl = "OfferProtocol";
+                let decl = DeclType::OfferProtocol;
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
@@ -1878,7 +1907,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Offer::Directory(o) => {
-                let decl = "OfferDirectory";
+                let decl = DeclType::OfferDirectory;
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
@@ -1913,12 +1942,17 @@ impl<'a> ValidationContext<'a> {
                 }
 
                 if let Some(subdir) = o.subdir.as_ref() {
-                    check_relative_path(Some(subdir), "OfferDirectory", "subdir", &mut self.errors);
+                    check_relative_path(
+                        Some(subdir),
+                        DeclType::OfferDirectory,
+                        "subdir",
+                        &mut self.errors,
+                    );
                 }
             }
             fdecl::Offer::Storage(o) => {
                 self.validate_storage_offer_fields(
-                    "OfferStorage",
+                    DeclType::OfferStorage,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
                     o.target.as_ref(),
@@ -1953,7 +1987,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Offer::Runner(o) => {
-                let decl = "OfferRunner";
+                let decl = DeclType::OfferRunner;
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
@@ -1979,7 +2013,7 @@ impl<'a> ValidationContext<'a> {
                 );
             }
             fdecl::Offer::Resolver(o) => {
-                let decl = "OfferResolver";
+                let decl = DeclType::OfferResolver;
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
@@ -2010,14 +2044,14 @@ impl<'a> ValidationContext<'a> {
                 self.validate_event_stream_offer_fields(e, offer_type);
             }
             _ => {
-                self.errors.push(Error::invalid_field("Component", "offer"));
+                self.errors.push(Error::invalid_field(DeclType::Component, "offer"));
             }
         }
     }
 
     fn validate_offer_fields(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         allowable_names: AllowableIds,
         collection_source: CollectionSource,
         source: Option<&'a fdecl::Ref>,
@@ -2061,7 +2095,7 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_storage_offer_fields(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
         target: Option<&'a fdecl::Ref>,
@@ -2100,11 +2134,11 @@ impl<'a> ValidationContext<'a> {
         event_stream: &'a fdecl::OfferEventStream,
         offer_type: OfferType,
     ) {
-        let decl = "OfferEventStream";
+        let decl = DeclType::OfferEventStream;
         check_name(event_stream.source_name.as_ref(), decl, "source_name", &mut self.errors);
         if event_stream.target == Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})) {
             // Expose to framework from framework is never valid.
-            self.errors.push(Error::invalid_field("OfferEventStream", "target"));
+            self.errors.push(Error::invalid_field(DeclType::OfferEventStream, "target"));
         }
         let source_name =
             event_stream.source_name.as_ref().map(|value| value.as_str()).unwrap_or("");
@@ -2122,13 +2156,22 @@ impl<'a> ValidationContext<'a> {
             for value in scope {
                 match value {
                     fdecl::Ref::Child(child) => {
-                        self.validate_child_ref("OfferEventStream", "scope", &child, offer_type);
+                        self.validate_child_ref(
+                            DeclType::OfferEventStream,
+                            "scope",
+                            &child,
+                            offer_type,
+                        );
                     }
                     fdecl::Ref::Collection(collection) => {
-                        self.validate_collection_ref("OfferEventStream", "scope", &collection);
+                        self.validate_collection_ref(
+                            DeclType::OfferEventStream,
+                            "scope",
+                            &collection,
+                        );
                     }
                     _ => {
-                        self.errors.push(Error::invalid_field("OfferEventStream", "scope"));
+                        self.errors.push(Error::invalid_field(DeclType::OfferEventStream, "scope"));
                     }
                 }
             }
@@ -2172,7 +2215,7 @@ impl<'a> ValidationContext<'a> {
     /// Check a `ChildRef` contains a valid child that exists.
     fn validate_child_ref(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         field_name: &str,
         child: &fdecl::ChildRef,
         offer_type: OfferType,
@@ -2217,7 +2260,7 @@ impl<'a> ValidationContext<'a> {
     /// child actually exists, but we can confirm things like the name is valid.
     fn validate_dynamic_child_ref(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         field_name: &str,
         child: &fdecl::ChildRef,
     ) -> bool {
@@ -2247,7 +2290,7 @@ impl<'a> ValidationContext<'a> {
     /// Check a `CollectionRef` is valid and refers to an existing collection.
     fn validate_collection_ref(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         field_name: &str,
         collection: &fdecl::CollectionRef,
     ) -> bool {
@@ -2272,7 +2315,7 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_offer_target(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         allowable_names: AllowableIds,
         source: Option<&'a fdecl::Ref>,
         target: Option<&'a fdecl::Ref>,
@@ -2306,7 +2349,7 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_target_child(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         allowable_names: AllowableIds,
         child: &'a fdecl::ChildRef,
         source: Option<&fdecl::Ref>,
@@ -2347,7 +2390,7 @@ impl<'a> ValidationContext<'a> {
 
     fn validate_target_collection(
         &mut self,
-        decl: &str,
+        decl: DeclType,
         allowable_names: AllowableIds,
         collection: &'a fdecl::CollectionRef,
         target_name: Option<&'a String>,
@@ -2647,11 +2690,11 @@ mod tests {
             results = vec![
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseDirectory", "/foo/bar/baz", "UseDirectory", "/foo/bar"),
+                        DeclType::UseDirectory, "/foo/bar/baz", DeclType::UseDirectory, "/foo/bar"),
                 ])),
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseDirectory", "/foo/bar", "UseDirectory", "/foo/bar/baz"),
+                        DeclType::UseDirectory, "/foo/bar", DeclType::UseDirectory, "/foo/bar/baz"),
                 ])),
             ],
         },
@@ -2675,11 +2718,11 @@ mod tests {
             results = vec![
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseStorage", "/foo/bar/baz", "UseStorage", "/foo/bar"),
+                        DeclType::UseStorage, "/foo/bar/baz", DeclType::UseStorage, "/foo/bar"),
                 ])),
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseStorage", "/foo/bar", "UseStorage", "/foo/bar/baz"),
+                        DeclType::UseStorage, "/foo/bar", DeclType::UseStorage, "/foo/bar/baz"),
                 ])),
             ],
         },
@@ -2707,11 +2750,11 @@ mod tests {
             results = vec![
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseStorage", "/foo/bar/baz", "UseDirectory", "/foo/bar"),
+                        DeclType::UseStorage, "/foo/bar/baz", DeclType::UseDirectory, "/foo/bar"),
                 ])),
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseDirectory", "/foo/bar", "UseStorage", "/foo/bar/baz"),
+                        DeclType::UseDirectory, "/foo/bar", DeclType::UseStorage, "/foo/bar/baz"),
                 ])),
             ],
         },
@@ -2741,11 +2784,11 @@ mod tests {
             results = vec![
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseProtocol", "/foo/bar/fuchsia.2", "UseDirectory", "/foo/bar"),
+                        DeclType::UseProtocol, "/foo/bar/fuchsia.2", DeclType::UseDirectory, "/foo/bar"),
                 ])),
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseDirectory", "/foo/bar", "UseProtocol", "/foo/bar/fuchsia.2"),
+                        DeclType::UseDirectory, "/foo/bar", DeclType::UseProtocol, "/foo/bar/fuchsia.2"),
                 ])),
             ],
         },
@@ -2775,11 +2818,11 @@ mod tests {
             results = vec![
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseService", "/foo/bar/baz/fuchsia.logger.Log", "UseDirectory", "/foo/bar"),
+                        DeclType::UseService, "/foo/bar/baz/fuchsia.logger.Log", DeclType::UseDirectory, "/foo/bar"),
                 ])),
                 Err(ErrorList::new(vec![
                     Error::invalid_path_overlap(
-                        "UseDirectory", "/foo/bar", "UseService", "/foo/bar/baz/fuchsia.logger.Log"),
+                        DeclType::UseDirectory, "/foo/bar", DeclType::UseService, "/foo/bar/baz/fuchsia.logger.Log"),
                 ])),
             ],
         },
@@ -2801,7 +2844,7 @@ mod tests {
             },
             results = vec![
                 Err(ErrorList::new(vec![
-                    Error::pkg_path_overlap("UseDirectory", "/pkg"),
+                    Error::pkg_path_overlap(DeclType::UseDirectory, "/pkg"),
                 ])),
             ],
         },
@@ -2823,7 +2866,7 @@ mod tests {
             },
             results = vec![
                 Err(ErrorList::new(vec![
-                    Error::pkg_path_overlap("UseDirectory", "/pkg/foo"),
+                    Error::pkg_path_overlap(DeclType::UseDirectory, "/pkg/foo"),
                 ])),
             ],
         },
@@ -2850,7 +2893,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigValuesData", "checksum")
+                Error::missing_field(DeclType::ConfigValuesData, "checksum")
             ])),
         },
         test_values_data_unknown_checksum => {
@@ -2860,7 +2903,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ConfigValuesData", "checksum")
+                Error::invalid_field(DeclType::ConfigValuesData, "checksum")
             ])),
         },
         test_values_data_no_values => {
@@ -2870,7 +2913,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigValuesData", "values")
+                Error::missing_field(DeclType::ConfigValuesData, "values")
             ])),
         },
         test_values_data_no_inner_value => {
@@ -2882,7 +2925,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigValueSpec", "value")
+                Error::missing_field(DeclType::ConfigValueSpec, "value")
             ])),
         },
         test_values_data_unknown_inner_value => {
@@ -2897,7 +2940,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ConfigValueSpec", "value")
+                Error::invalid_field(DeclType::ConfigValueSpec, "value")
             ])),
         },
         test_values_data_unknown_single_value => {
@@ -2912,7 +2955,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ConfigValueSpec", "value")
+                Error::invalid_field(DeclType::ConfigValueSpec, "value")
             ])),
         },
         test_values_data_unknown_list_value => {
@@ -2927,7 +2970,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ConfigValueSpec", "value")
+                Error::invalid_field(DeclType::ConfigValueSpec, "value")
             ])),
         },
     }
@@ -2984,21 +3027,21 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("UseService", "source"),
-                Error::missing_field("UseService", "source_name"),
-                Error::missing_field("UseService", "target_path"),
-                Error::missing_field("UseProtocol", "source"),
-                Error::missing_field("UseProtocol", "source_name"),
-                Error::missing_field("UseProtocol", "target_path"),
-                Error::missing_field("UseDirectory", "source"),
-                Error::missing_field("UseDirectory", "source_name"),
-                Error::missing_field("UseDirectory", "target_path"),
-                Error::missing_field("UseDirectory", "rights"),
-                Error::missing_field("UseStorage", "source_name"),
-                Error::missing_field("UseStorage", "target_path"),
-                Error::missing_field("UseEventStream", "source"),
-                Error::missing_field("UseEventStream", "source_name"),
-                Error::missing_field("UseEventStream", "target_path"),
+                Error::missing_field(DeclType::UseService, "source"),
+                Error::missing_field(DeclType::UseService, "source_name"),
+                Error::missing_field(DeclType::UseService, "target_path"),
+                Error::missing_field(DeclType::UseProtocol, "source"),
+                Error::missing_field(DeclType::UseProtocol, "source_name"),
+                Error::missing_field(DeclType::UseProtocol, "target_path"),
+                Error::missing_field(DeclType::UseDirectory, "source"),
+                Error::missing_field(DeclType::UseDirectory, "source_name"),
+                Error::missing_field(DeclType::UseDirectory, "target_path"),
+                Error::missing_field(DeclType::UseDirectory, "rights"),
+                Error::missing_field(DeclType::UseStorage, "source_name"),
+                Error::missing_field(DeclType::UseStorage, "target_path"),
+                Error::missing_field(DeclType::UseEventStream, "source"),
+                Error::missing_field(DeclType::UseEventStream, "source_name"),
+                Error::missing_field(DeclType::UseEventStream, "target_path"),
             ])),
         },
         test_validate_missing_program_info => {
@@ -3012,7 +3055,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Program", "info")
+                Error::missing_field(DeclType::Program, "info")
             ])),
         },
         test_validate_uses_invalid_identifiers => {
@@ -3068,21 +3111,21 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("UseService", "source.capability.name"),
-                Error::invalid_field("UseService", "source_name"),
-                Error::invalid_field("UseService", "target_path"),
-                Error::invalid_field("UseProtocol", "source.child.name"),
-                Error::invalid_field("UseProtocol", "source_name"),
-                Error::invalid_field("UseProtocol", "target_path"),
-                Error::invalid_field("UseDirectory", "source.child.name"),
-                Error::invalid_field("UseDirectory", "source_name"),
-                Error::invalid_field("UseDirectory", "target_path"),
-                Error::invalid_field("UseDirectory", "subdir"),
-                Error::invalid_field("UseStorage", "source_name"),
-                Error::invalid_field("UseStorage", "target_path"),
-                Error::invalid_field("UseEventStream", "source.child.name"),
-                Error::invalid_field("UseEventStream", "source_name"),
-                Error::invalid_field("UseEventStream", "target_path"),
+                Error::invalid_field(DeclType::UseService, "source.capability.name"),
+                Error::invalid_field(DeclType::UseService, "source_name"),
+                Error::invalid_field(DeclType::UseService, "target_path"),
+                Error::invalid_field(DeclType::UseProtocol, "source.child.name"),
+                Error::invalid_field(DeclType::UseProtocol, "source_name"),
+                Error::invalid_field(DeclType::UseProtocol, "target_path"),
+                Error::invalid_field(DeclType::UseDirectory, "source.child.name"),
+                Error::invalid_field(DeclType::UseDirectory, "source_name"),
+                Error::invalid_field(DeclType::UseDirectory, "target_path"),
+                Error::invalid_field(DeclType::UseDirectory, "subdir"),
+                Error::invalid_field(DeclType::UseStorage, "source_name"),
+                Error::invalid_field(DeclType::UseStorage, "target_path"),
+                Error::invalid_field(DeclType::UseEventStream, "source.child.name"),
+                Error::invalid_field(DeclType::UseEventStream, "source_name"),
+                Error::invalid_field(DeclType::UseEventStream, "target_path"),
             ])),
         },
         test_validate_uses_missing_source => {
@@ -3103,7 +3146,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_capability("UseProtocol", "source", "this-storage-doesnt-exist"),
+                Error::invalid_capability(DeclType::UseProtocol, "source", "this-storage-doesnt-exist"),
             ])),
         },
         test_validate_uses_invalid_child => {
@@ -3138,9 +3181,9 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("UseProtocol", "source", "no-such-child"),
-                Error::invalid_child("UseService", "source", "no-such-child"),
-                Error::invalid_child("UseDirectory", "source", "no-such-child"),
+                Error::invalid_child(DeclType::UseProtocol, "source", "no-such-child"),
+                Error::invalid_child(DeclType::UseService, "source", "no-such-child"),
+                Error::invalid_child(DeclType::UseDirectory, "source", "no-such-child"),
             ])),
         },
         test_validate_use_from_child_offer_to_child_strong_cycle => {
@@ -3753,7 +3796,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("UseProtocol", "dependency_type"),
+                Error::invalid_field(DeclType::UseProtocol, "dependency_type"),
             ])),
         },
         test_validate_event_stream_offer_valid_decls => {
@@ -3849,8 +3892,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "OfferEventStream".to_string(), field: "target".to_string() }),
-                Error::InvalidField(DeclField { decl: "OfferEventStream".to_string(), field: "target".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::OfferEventStream, field: "target".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::OfferEventStream, field: "target".to_string() }),
             ])),
         },
         test_validate_event_stream_offer_to_scope_zero_length_invalid => {
@@ -3893,7 +3936,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "OfferEventStream".to_string(), field: "scope".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::OfferEventStream, field: "scope".to_string() }),
             ])),
         },
         test_validate_event_stream_offer_to_scope_framework_invalid => {
@@ -3936,7 +3979,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "OfferEventStream".to_string(), field: "scope".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::OfferEventStream, field: "scope".to_string() }),
             ])),
         },
         test_validate_event_stream_offer_to_scope_valid => {
@@ -4065,7 +4108,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "OfferEventStream".to_string(), field: "filter".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::OfferEventStream, field: "filter".to_string() }),
             ])),
         },
         test_validate_event_stream_offer_with_no_source_name_invalid => {
@@ -4108,7 +4151,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::MissingField(DeclField { decl: "OfferEventStream".to_string(), field: "source_name".to_string() }),
+                Error::MissingField(DeclField { decl: DeclType::OfferEventStream, field: "source_name".to_string() }),
             ])),
         },
         test_validate_event_stream_offer_invalid_source => {
@@ -4157,7 +4200,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "OfferEventStream".to_string(), field: "source".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::OfferEventStream, field: "source".to_string() }),
             ])),
         },
 
@@ -4206,7 +4249,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::MissingField(DeclField { decl: "OfferEventStream".to_string(), field: "source".to_string() }),
+                Error::MissingField(DeclField { decl: DeclType::OfferEventStream, field: "source".to_string() }),
             ])),
         },
         test_validate_event_stream_must_have_target_path => {
@@ -4222,7 +4265,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::MissingField(DeclField { decl: "UseEventStream".to_string(), field: "target_path".to_string() })
+                Error::MissingField(DeclField { decl: DeclType::UseEventStream, field: "target_path".to_string() })
             ])),
         },
         test_validate_event_stream_must_have_source_names => {
@@ -4238,7 +4281,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::MissingField(DeclField { decl: "UseEventStream".to_string(), field: "source_name".to_string() })
+                Error::MissingField(DeclField { decl: DeclType::UseEventStream, field: "source_name".to_string() })
             ])),
         },
         test_validate_event_stream_scope_must_be_child_or_collection => {
@@ -4256,7 +4299,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "UseEventStream".to_string(), field: "scope".to_string() })
+                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
             ])),
         },
         test_validate_event_stream_source_must_be_parent_framework_or_child => {
@@ -4274,7 +4317,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "UseEventStream".to_string(), field: "source".to_string() })
+                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "source".to_string() })
             ])),
         },
         test_validate_event_stream_source_framework_must_have_nonempty_scope => {
@@ -4292,7 +4335,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: "UseEventStream".to_string(), field: "scope".to_string() })
+                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
             ])),
         },
         test_validate_event_stream_source_framework_must_specify_scope => {
@@ -4309,7 +4352,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::MissingField(DeclField { decl: "UseEventStream".to_string(), field: "scope".to_string() })
+                Error::MissingField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
             ])),
         },
         test_validate_uses_no_runner => {
@@ -4326,7 +4369,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Program", "runner"),
+                Error::missing_field(DeclType::Program, "runner"),
             ])),
         },
         test_validate_uses_long_identifiers => {
@@ -4373,13 +4416,13 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("UseService", "source_name"),
-                Error::field_too_long("UseService", "target_path"),
-                Error::field_too_long("UseProtocol", "source_name"),
-                Error::field_too_long("UseProtocol", "target_path"),
-                Error::field_too_long("UseDirectory", "source_name"),
-                Error::field_too_long("UseDirectory", "target_path"),
-                Error::field_too_long("UseStorage", "target_path"),
+                Error::field_too_long(DeclType::UseService, "source_name"),
+                Error::field_too_long(DeclType::UseService, "target_path"),
+                Error::field_too_long(DeclType::UseProtocol, "source_name"),
+                Error::field_too_long(DeclType::UseProtocol, "target_path"),
+                Error::field_too_long(DeclType::UseDirectory, "source_name"),
+                Error::field_too_long(DeclType::UseDirectory, "target_path"),
+                Error::field_too_long(DeclType::UseStorage, "target_path"),
             ])),
         },
         test_validate_conflicting_paths => {
@@ -4413,8 +4456,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::duplicate_field("UseProtocol", "target_path", "/bar"),
-                Error::duplicate_field("UseDirectory", "target_path", "/bar"),
+                Error::duplicate_field(DeclType::UseProtocol, "target_path", "/bar"),
+                Error::duplicate_field(DeclType::UseDirectory, "target_path", "/bar"),
             ])),
         },
         // exposes
@@ -4463,26 +4506,26 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ExposeService", "source"),
-                Error::missing_field("ExposeService", "target"),
-                Error::missing_field("ExposeService", "source_name"),
-                Error::missing_field("ExposeService", "target_name"),
-                Error::missing_field("ExposeProtocol", "source"),
-                Error::missing_field("ExposeProtocol", "target"),
-                Error::missing_field("ExposeProtocol", "source_name"),
-                Error::missing_field("ExposeProtocol", "target_name"),
-                Error::missing_field("ExposeDirectory", "source"),
-                Error::missing_field("ExposeDirectory", "target"),
-                Error::missing_field("ExposeDirectory", "source_name"),
-                Error::missing_field("ExposeDirectory", "target_name"),
-                Error::missing_field("ExposeRunner", "source"),
-                Error::missing_field("ExposeRunner", "target"),
-                Error::missing_field("ExposeRunner", "source_name"),
-                Error::missing_field("ExposeRunner", "target_name"),
-                Error::missing_field("ExposeResolver", "source"),
-                Error::missing_field("ExposeResolver", "target"),
-                Error::missing_field("ExposeResolver", "source_name"),
-                Error::missing_field("ExposeResolver", "target_name"),
+                Error::missing_field(DeclType::ExposeService, "source"),
+                Error::missing_field(DeclType::ExposeService, "target"),
+                Error::missing_field(DeclType::ExposeService, "source_name"),
+                Error::missing_field(DeclType::ExposeService, "target_name"),
+                Error::missing_field(DeclType::ExposeProtocol, "source"),
+                Error::missing_field(DeclType::ExposeProtocol, "target"),
+                Error::missing_field(DeclType::ExposeProtocol, "source_name"),
+                Error::missing_field(DeclType::ExposeProtocol, "target_name"),
+                Error::missing_field(DeclType::ExposeDirectory, "source"),
+                Error::missing_field(DeclType::ExposeDirectory, "target"),
+                Error::missing_field(DeclType::ExposeDirectory, "source_name"),
+                Error::missing_field(DeclType::ExposeDirectory, "target_name"),
+                Error::missing_field(DeclType::ExposeRunner, "source"),
+                Error::missing_field(DeclType::ExposeRunner, "target"),
+                Error::missing_field(DeclType::ExposeRunner, "source_name"),
+                Error::missing_field(DeclType::ExposeRunner, "target_name"),
+                Error::missing_field(DeclType::ExposeResolver, "source"),
+                Error::missing_field(DeclType::ExposeResolver, "target"),
+                Error::missing_field(DeclType::ExposeResolver, "source_name"),
+                Error::missing_field(DeclType::ExposeResolver, "target_name"),
             ])),
         },
         test_validate_exposes_extraneous => {
@@ -4545,11 +4588,11 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::extraneous_field("ExposeService", "source.child.collection"),
-                Error::extraneous_field("ExposeProtocol", "source.child.collection"),
-                Error::extraneous_field("ExposeDirectory", "source.child.collection"),
-                Error::extraneous_field("ExposeRunner", "source.child.collection"),
-                Error::extraneous_field("ExposeResolver", "source.child.collection"),
+                Error::extraneous_field(DeclType::ExposeService, "source.child.collection"),
+                Error::extraneous_field(DeclType::ExposeProtocol, "source.child.collection"),
+                Error::extraneous_field(DeclType::ExposeDirectory, "source.child.collection"),
+                Error::extraneous_field(DeclType::ExposeRunner, "source.child.collection"),
+                Error::extraneous_field(DeclType::ExposeResolver, "source.child.collection"),
             ])),
         },
         test_validate_exposes_invalid_identifiers => {
@@ -4612,22 +4655,22 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ExposeService", "source.child.name"),
-                Error::invalid_field("ExposeService", "source_name"),
-                Error::invalid_field("ExposeService", "target_name"),
-                Error::invalid_field("ExposeProtocol", "source.child.name"),
-                Error::invalid_field("ExposeProtocol", "source_name"),
-                Error::invalid_field("ExposeProtocol", "target_name"),
-                Error::invalid_field("ExposeDirectory", "source.child.name"),
-                Error::invalid_field("ExposeDirectory", "source_name"),
-                Error::invalid_field("ExposeDirectory", "target_name"),
-                Error::invalid_field("ExposeDirectory", "subdir"),
-                Error::invalid_field("ExposeRunner", "source.child.name"),
-                Error::invalid_field("ExposeRunner", "source_name"),
-                Error::invalid_field("ExposeRunner", "target_name"),
-                Error::invalid_field("ExposeResolver", "source.child.name"),
-                Error::invalid_field("ExposeResolver", "source_name"),
-                Error::invalid_field("ExposeResolver", "target_name"),
+                Error::invalid_field(DeclType::ExposeService, "source.child.name"),
+                Error::invalid_field(DeclType::ExposeService, "source_name"),
+                Error::invalid_field(DeclType::ExposeService, "target_name"),
+                Error::invalid_field(DeclType::ExposeProtocol, "source.child.name"),
+                Error::invalid_field(DeclType::ExposeProtocol, "source_name"),
+                Error::invalid_field(DeclType::ExposeProtocol, "target_name"),
+                Error::invalid_field(DeclType::ExposeDirectory, "source.child.name"),
+                Error::invalid_field(DeclType::ExposeDirectory, "source_name"),
+                Error::invalid_field(DeclType::ExposeDirectory, "target_name"),
+                Error::invalid_field(DeclType::ExposeDirectory, "subdir"),
+                Error::invalid_field(DeclType::ExposeRunner, "source.child.name"),
+                Error::invalid_field(DeclType::ExposeRunner, "source_name"),
+                Error::invalid_field(DeclType::ExposeRunner, "target_name"),
+                Error::invalid_field(DeclType::ExposeResolver, "source.child.name"),
+                Error::invalid_field(DeclType::ExposeResolver, "source_name"),
+                Error::invalid_field(DeclType::ExposeResolver, "target_name"),
             ])),
         },
         test_validate_exposes_invalid_source_target => {
@@ -4704,19 +4747,19 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ExposeService", "source"),
-                Error::missing_field("ExposeService", "target"),
-                Error::invalid_field("ExposeProtocol", "source"),
-                Error::invalid_field("ExposeProtocol", "target"),
-                Error::invalid_field("ExposeDirectory", "source"),
-                Error::invalid_field("ExposeDirectory", "target"),
-                Error::invalid_field("ExposeDirectory", "source"),
-                Error::invalid_field("ExposeDirectory", "target"),
-                Error::invalid_field("ExposeRunner", "source"),
-                Error::invalid_field("ExposeRunner", "target"),
-                Error::invalid_field("ExposeResolver", "source"),
-                Error::invalid_field("ExposeResolver", "target"),
-                Error::invalid_field("ExposeDirectory", "target"),
+                Error::missing_field(DeclType::ExposeService, "source"),
+                Error::missing_field(DeclType::ExposeService, "target"),
+                Error::invalid_field(DeclType::ExposeProtocol, "source"),
+                Error::invalid_field(DeclType::ExposeProtocol, "target"),
+                Error::invalid_field(DeclType::ExposeDirectory, "source"),
+                Error::invalid_field(DeclType::ExposeDirectory, "target"),
+                Error::invalid_field(DeclType::ExposeDirectory, "source"),
+                Error::invalid_field(DeclType::ExposeDirectory, "target"),
+                Error::invalid_field(DeclType::ExposeRunner, "source"),
+                Error::invalid_field(DeclType::ExposeRunner, "target"),
+                Error::invalid_field(DeclType::ExposeResolver, "source"),
+                Error::invalid_field(DeclType::ExposeResolver, "target"),
+                Error::invalid_field(DeclType::ExposeDirectory, "target"),
             ])),
         },
         test_validate_exposes_invalid_source_collection => {
@@ -4764,10 +4807,10 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ExposeProtocol", "source"),
-                Error::invalid_field("ExposeDirectory", "source"),
-                Error::invalid_field("ExposeRunner", "source"),
-                Error::invalid_field("ExposeResolver", "source"),
+                Error::invalid_field(DeclType::ExposeProtocol, "source"),
+                Error::invalid_field(DeclType::ExposeDirectory, "source"),
+                Error::invalid_field(DeclType::ExposeRunner, "source"),
+                Error::invalid_field(DeclType::ExposeResolver, "source"),
             ])),
         },
         test_validate_exposes_sources_collection => {
@@ -4855,21 +4898,21 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("ExposeService", "source.child.name"),
-                Error::field_too_long("ExposeService", "source_name"),
-                Error::field_too_long("ExposeService", "target_name"),
-                Error::field_too_long("ExposeProtocol", "source.child.name"),
-                Error::field_too_long("ExposeProtocol", "source_name"),
-                Error::field_too_long("ExposeProtocol", "target_name"),
-                Error::field_too_long("ExposeDirectory", "source.child.name"),
-                Error::field_too_long("ExposeDirectory", "source_name"),
-                Error::field_too_long("ExposeDirectory", "target_name"),
-                Error::field_too_long("ExposeRunner", "source.child.name"),
-                Error::field_too_long("ExposeRunner", "source_name"),
-                Error::field_too_long("ExposeRunner", "target_name"),
-                Error::field_too_long("ExposeResolver", "source.child.name"),
-                Error::field_too_long("ExposeResolver", "source_name"),
-                Error::field_too_long("ExposeResolver", "target_name"),
+                Error::field_too_long(DeclType::ExposeService, "source.child.name"),
+                Error::field_too_long(DeclType::ExposeService, "source_name"),
+                Error::field_too_long(DeclType::ExposeService, "target_name"),
+                Error::field_too_long(DeclType::ExposeProtocol, "source.child.name"),
+                Error::field_too_long(DeclType::ExposeProtocol, "source_name"),
+                Error::field_too_long(DeclType::ExposeProtocol, "target_name"),
+                Error::field_too_long(DeclType::ExposeDirectory, "source.child.name"),
+                Error::field_too_long(DeclType::ExposeDirectory, "source_name"),
+                Error::field_too_long(DeclType::ExposeDirectory, "target_name"),
+                Error::field_too_long(DeclType::ExposeRunner, "source.child.name"),
+                Error::field_too_long(DeclType::ExposeRunner, "source_name"),
+                Error::field_too_long(DeclType::ExposeRunner, "target_name"),
+                Error::field_too_long(DeclType::ExposeResolver, "source.child.name"),
+                Error::field_too_long(DeclType::ExposeResolver, "source_name"),
+                Error::field_too_long(DeclType::ExposeResolver, "target_name"),
             ])),
         },
         test_validate_exposes_invalid_child => {
@@ -4932,11 +4975,11 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("ExposeService", "source", "netstack"),
-                Error::invalid_child("ExposeProtocol", "source", "netstack"),
-                Error::invalid_child("ExposeDirectory", "source", "netstack"),
-                Error::invalid_child("ExposeRunner", "source", "netstack"),
-                Error::invalid_child("ExposeResolver", "source", "netstack"),
+                Error::invalid_child(DeclType::ExposeService, "source", "netstack"),
+                Error::invalid_child(DeclType::ExposeProtocol, "source", "netstack"),
+                Error::invalid_child(DeclType::ExposeDirectory, "source", "netstack"),
+                Error::invalid_child(DeclType::ExposeRunner, "source", "netstack"),
+                Error::invalid_child(DeclType::ExposeResolver, "source", "netstack"),
             ])),
         },
         test_validate_exposes_invalid_source_capability => {
@@ -4957,7 +5000,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_capability("ExposeProtocol", "source", "this-storage-doesnt-exist"),
+                Error::invalid_capability(DeclType::ExposeProtocol, "source", "this-storage-doesnt-exist"),
             ])),
         },
         test_validate_exposes_duplicate_target => {
@@ -5103,13 +5146,13 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 // Duplicate services are allowed.
-                Error::duplicate_field("ExposeProtocol", "target_name",
+                Error::duplicate_field(DeclType::ExposeProtocol, "target_name",
                                     "fuchsia.fonts.Provider"),
-                Error::duplicate_field("ExposeDirectory", "target_name",
+                Error::duplicate_field(DeclType::ExposeDirectory, "target_name",
                                     "stuff"),
-                Error::duplicate_field("ExposeRunner", "target_name",
+                Error::duplicate_field(DeclType::ExposeRunner, "target_name",
                                     "elf"),
-                Error::duplicate_field("ExposeResolver", "target_name", "pkg"),
+                Error::duplicate_field(DeclType::ExposeResolver, "target_name", "pkg"),
             ])),
         },
         // TODO: Add analogous test for offer
@@ -5159,16 +5202,16 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 Error::invalid_capability(
-                    "ExposeService",
+                    DeclType::ExposeService,
                     "source",
                     "fuchsia.some.library.SomeProtocol"),
                 Error::invalid_capability(
-                    "ExposeProtocol",
+                    DeclType::ExposeProtocol,
                     "source",
                     "fuchsia.some.library.SomeProtocol"),
-                Error::invalid_capability("ExposeDirectory", "source", "dir"),
-                Error::invalid_capability("ExposeRunner", "source", "source_elf"),
-                Error::invalid_capability("ExposeResolver", "source", "source_pkg"),
+                Error::invalid_capability(DeclType::ExposeDirectory, "source", "dir"),
+                Error::invalid_capability(DeclType::ExposeRunner, "source", "source_elf"),
+                Error::invalid_capability(DeclType::ExposeResolver, "source", "source_pkg"),
             ])),
         },
 
@@ -5197,12 +5240,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "ExposeService",
+                        DeclType::ExposeService,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "ExposeService",
+                        DeclType::ExposeService,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
@@ -5234,12 +5277,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "ExposeProtocol",
+                        DeclType::ExposeProtocol,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "ExposeProtocol",
+                        DeclType::ExposeProtocol,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
@@ -5272,12 +5315,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "ExposeDirectory",
+                        DeclType::ExposeDirectory,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "ExposeDirectory",
+                        DeclType::ExposeDirectory,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
@@ -5335,33 +5378,33 @@ mod tests {
             // TODO(dgonyeo): we need to handle the availability being unset until we've soft
             // migrated all manifests
             result = Err(ErrorList::new(vec![
-                Error::missing_field("OfferService", "source"),
-                Error::missing_field("OfferService", "source_name"),
-                Error::missing_field("OfferService", "target"),
-                Error::missing_field("OfferService", "target_name"),
-                //Error::missing_field("OfferService", "availability"),
-                Error::missing_field("OfferProtocol", "source"),
-                Error::missing_field("OfferProtocol", "source_name"),
-                Error::missing_field("OfferProtocol", "target"),
-                Error::missing_field("OfferProtocol", "target_name"),
-                Error::missing_field("OfferProtocol", "dependency_type"),
-                //Error::missing_field("OfferProtocol", "availability"),
-                Error::missing_field("OfferDirectory", "source"),
-                Error::missing_field("OfferDirectory", "source_name"),
-                Error::missing_field("OfferDirectory", "target"),
-                Error::missing_field("OfferDirectory", "target_name"),
-                Error::missing_field("OfferDirectory", "dependency_type"),
-                //Error::missing_field("OfferDirectory", "availability"),
-                Error::missing_field("OfferStorage", "source"),
-                Error::missing_field("OfferStorage", "source_name"),
-                Error::missing_field("OfferStorage", "target"),
-                Error::missing_field("OfferStorage", "target_name"),
-                //Error::missing_field("OfferStorage", "availability"),
-                Error::missing_field("OfferRunner", "source"),
-                Error::missing_field("OfferRunner", "source_name"),
-                Error::missing_field("OfferRunner", "target"),
-                Error::missing_field("OfferRunner", "target_name"),
-                //Error::missing_field("OfferRunner", "availability"),
+                Error::missing_field(DeclType::OfferService, "source"),
+                Error::missing_field(DeclType::OfferService, "source_name"),
+                Error::missing_field(DeclType::OfferService, "target"),
+                Error::missing_field(DeclType::OfferService, "target_name"),
+                //Error::missing_field(DeclType::OfferService, "availability"),
+                Error::missing_field(DeclType::OfferProtocol, "source"),
+                Error::missing_field(DeclType::OfferProtocol, "source_name"),
+                Error::missing_field(DeclType::OfferProtocol, "target"),
+                Error::missing_field(DeclType::OfferProtocol, "target_name"),
+                Error::missing_field(DeclType::OfferProtocol, "dependency_type"),
+                //Error::missing_field(DeclType::OfferProtocol, "availability"),
+                Error::missing_field(DeclType::OfferDirectory, "source"),
+                Error::missing_field(DeclType::OfferDirectory, "source_name"),
+                Error::missing_field(DeclType::OfferDirectory, "target"),
+                Error::missing_field(DeclType::OfferDirectory, "target_name"),
+                Error::missing_field(DeclType::OfferDirectory, "dependency_type"),
+                //Error::missing_field(DeclType::OfferDirectory, "availability"),
+                Error::missing_field(DeclType::OfferStorage, "source"),
+                Error::missing_field(DeclType::OfferStorage, "source_name"),
+                Error::missing_field(DeclType::OfferStorage, "target"),
+                Error::missing_field(DeclType::OfferStorage, "target_name"),
+                //Error::missing_field(DeclType::OfferStorage, "availability"),
+                Error::missing_field(DeclType::OfferRunner, "source"),
+                Error::missing_field(DeclType::OfferRunner, "source_name"),
+                Error::missing_field(DeclType::OfferRunner, "target"),
+                Error::missing_field(DeclType::OfferRunner, "target_name"),
+                //Error::missing_field(DeclType::OfferRunner, "availability"),
             ])),
         },
         test_validate_offers_long_identifiers => {
@@ -5507,34 +5550,34 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("OfferService", "source.child.name"),
-                Error::field_too_long("OfferService", "source_name"),
-                Error::field_too_long("OfferService", "target.child.name"),
-                Error::field_too_long("OfferService", "target_name"),
-                Error::field_too_long("OfferService", "target.collection.name"),
-                Error::field_too_long("OfferService", "target_name"),
-                Error::field_too_long("OfferProtocol", "source.child.name"),
-                Error::field_too_long("OfferProtocol", "source_name"),
-                Error::field_too_long("OfferProtocol", "target.child.name"),
-                Error::field_too_long("OfferProtocol", "target_name"),
-                Error::field_too_long("OfferProtocol", "target.collection.name"),
-                Error::field_too_long("OfferProtocol", "target_name"),
-                Error::field_too_long("OfferDirectory", "source.child.name"),
-                Error::field_too_long("OfferDirectory", "source_name"),
-                Error::field_too_long("OfferDirectory", "target.child.name"),
-                Error::field_too_long("OfferDirectory", "target_name"),
-                Error::field_too_long("OfferDirectory", "target.collection.name"),
-                Error::field_too_long("OfferDirectory", "target_name"),
-                Error::field_too_long("OfferStorage", "target.child.name"),
-                Error::field_too_long("OfferStorage", "target.collection.name"),
-                Error::field_too_long("OfferRunner", "source.child.name"),
-                Error::field_too_long("OfferRunner", "source_name"),
-                Error::field_too_long("OfferRunner", "target.collection.name"),
-                Error::field_too_long("OfferRunner", "target_name"),
-                Error::field_too_long("OfferResolver", "source.child.name"),
-                Error::field_too_long("OfferResolver", "source_name"),
-                Error::field_too_long("OfferResolver", "target.collection.name"),
-                Error::field_too_long("OfferResolver", "target_name"),
+                Error::field_too_long(DeclType::OfferService, "source.child.name"),
+                Error::field_too_long(DeclType::OfferService, "source_name"),
+                Error::field_too_long(DeclType::OfferService, "target.child.name"),
+                Error::field_too_long(DeclType::OfferService, "target_name"),
+                Error::field_too_long(DeclType::OfferService, "target.collection.name"),
+                Error::field_too_long(DeclType::OfferService, "target_name"),
+                Error::field_too_long(DeclType::OfferProtocol, "source.child.name"),
+                Error::field_too_long(DeclType::OfferProtocol, "source_name"),
+                Error::field_too_long(DeclType::OfferProtocol, "target.child.name"),
+                Error::field_too_long(DeclType::OfferProtocol, "target_name"),
+                Error::field_too_long(DeclType::OfferProtocol, "target.collection.name"),
+                Error::field_too_long(DeclType::OfferProtocol, "target_name"),
+                Error::field_too_long(DeclType::OfferDirectory, "source.child.name"),
+                Error::field_too_long(DeclType::OfferDirectory, "source_name"),
+                Error::field_too_long(DeclType::OfferDirectory, "target.child.name"),
+                Error::field_too_long(DeclType::OfferDirectory, "target_name"),
+                Error::field_too_long(DeclType::OfferDirectory, "target.collection.name"),
+                Error::field_too_long(DeclType::OfferDirectory, "target_name"),
+                Error::field_too_long(DeclType::OfferStorage, "target.child.name"),
+                Error::field_too_long(DeclType::OfferStorage, "target.collection.name"),
+                Error::field_too_long(DeclType::OfferRunner, "source.child.name"),
+                Error::field_too_long(DeclType::OfferRunner, "source_name"),
+                Error::field_too_long(DeclType::OfferRunner, "target.collection.name"),
+                Error::field_too_long(DeclType::OfferRunner, "target_name"),
+                Error::field_too_long(DeclType::OfferResolver, "source.child.name"),
+                Error::field_too_long(DeclType::OfferResolver, "source_name"),
+                Error::field_too_long(DeclType::OfferResolver, "target.collection.name"),
+                Error::field_too_long(DeclType::OfferResolver, "target_name"),
             ])),
         },
         test_validate_offers_extraneous => {
@@ -5649,17 +5692,17 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::extraneous_field("OfferService", "source.child.collection"),
-                Error::extraneous_field("OfferService", "target.child.collection"),
-                Error::extraneous_field("OfferProtocol", "source.child.collection"),
-                Error::extraneous_field("OfferProtocol", "target.child.collection"),
-                Error::extraneous_field("OfferDirectory", "source.child.collection"),
-                Error::extraneous_field("OfferDirectory", "target.child.collection"),
-                Error::extraneous_field("OfferStorage", "target.child.collection"),
-                Error::extraneous_field("OfferRunner", "source.child.collection"),
-                Error::extraneous_field("OfferRunner", "target.child.collection"),
-                Error::extraneous_field("OfferResolver", "source.child.collection"),
-                Error::extraneous_field("OfferResolver", "target.child.collection"),
+                Error::extraneous_field(DeclType::OfferService, "source.child.collection"),
+                Error::extraneous_field(DeclType::OfferService, "target.child.collection"),
+                Error::extraneous_field(DeclType::OfferProtocol, "source.child.collection"),
+                Error::extraneous_field(DeclType::OfferProtocol, "target.child.collection"),
+                Error::extraneous_field(DeclType::OfferDirectory, "source.child.collection"),
+                Error::extraneous_field(DeclType::OfferDirectory, "target.child.collection"),
+                Error::extraneous_field(DeclType::OfferStorage, "target.child.collection"),
+                Error::extraneous_field(DeclType::OfferRunner, "source.child.collection"),
+                Error::extraneous_field(DeclType::OfferRunner, "target.child.collection"),
+                Error::extraneous_field(DeclType::OfferResolver, "source.child.collection"),
+                Error::extraneous_field(DeclType::OfferResolver, "target.child.collection"),
             ])),
         },
         test_validate_offers_invalid_filtered_service_fields => {
@@ -5706,8 +5749,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("OfferService", "source_instance_filter"),
-                Error::invalid_field("OfferService", "renamed_instances"),
+                Error::invalid_field(DeclType::OfferService, "source_instance_filter"),
+                Error::invalid_field(DeclType::OfferService, "renamed_instances"),
             ])),
         },
         test_validate_offers_invalid_identifiers => {
@@ -5787,27 +5830,27 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("OfferService", "source.child.name"),
-                Error::invalid_field("OfferService", "source_name"),
-                Error::invalid_field("OfferService", "target.child.name"),
-                Error::invalid_field("OfferService", "target_name"),
-                Error::invalid_field("OfferProtocol", "source.child.name"),
-                Error::invalid_field("OfferProtocol", "source_name"),
-                Error::invalid_field("OfferProtocol", "target.child.name"),
-                Error::invalid_field("OfferProtocol", "target_name"),
-                Error::invalid_field("OfferDirectory", "source.child.name"),
-                Error::invalid_field("OfferDirectory", "source_name"),
-                Error::invalid_field("OfferDirectory", "target.child.name"),
-                Error::invalid_field("OfferDirectory", "target_name"),
-                Error::invalid_field("OfferDirectory", "subdir"),
-                Error::invalid_field("OfferRunner", "source.child.name"),
-                Error::invalid_field("OfferRunner", "source_name"),
-                Error::invalid_field("OfferRunner", "target.child.name"),
-                Error::invalid_field("OfferRunner", "target_name"),
-                Error::invalid_field("OfferResolver", "source.child.name"),
-                Error::invalid_field("OfferResolver", "source_name"),
-                Error::invalid_field("OfferResolver", "target.child.name"),
-                Error::invalid_field("OfferResolver", "target_name"),
+                Error::invalid_field(DeclType::OfferService, "source.child.name"),
+                Error::invalid_field(DeclType::OfferService, "source_name"),
+                Error::invalid_field(DeclType::OfferService, "target.child.name"),
+                Error::invalid_field(DeclType::OfferService, "target_name"),
+                Error::invalid_field(DeclType::OfferProtocol, "source.child.name"),
+                Error::invalid_field(DeclType::OfferProtocol, "source_name"),
+                Error::invalid_field(DeclType::OfferProtocol, "target.child.name"),
+                Error::invalid_field(DeclType::OfferProtocol, "target_name"),
+                Error::invalid_field(DeclType::OfferDirectory, "source.child.name"),
+                Error::invalid_field(DeclType::OfferDirectory, "source_name"),
+                Error::invalid_field(DeclType::OfferDirectory, "target.child.name"),
+                Error::invalid_field(DeclType::OfferDirectory, "target_name"),
+                Error::invalid_field(DeclType::OfferDirectory, "subdir"),
+                Error::invalid_field(DeclType::OfferRunner, "source.child.name"),
+                Error::invalid_field(DeclType::OfferRunner, "source_name"),
+                Error::invalid_field(DeclType::OfferRunner, "target.child.name"),
+                Error::invalid_field(DeclType::OfferRunner, "target_name"),
+                Error::invalid_field(DeclType::OfferResolver, "source.child.name"),
+                Error::invalid_field(DeclType::OfferResolver, "source_name"),
+                Error::invalid_field(DeclType::OfferResolver, "target.child.name"),
+                Error::invalid_field(DeclType::OfferResolver, "target_name"),
             ])),
         },
         test_validate_offers_target_equals_source => {
@@ -5921,13 +5964,13 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::offer_target_equals_source("OfferService", "logger"),
+                Error::offer_target_equals_source(DeclType::OfferService, "logger"),
                 // Only the DependencyType::Strong offer-target-equals-source
                 // should result in an error.
-                Error::offer_target_equals_source("OfferProtocol", "logger"),
-                Error::offer_target_equals_source("OfferDirectory", "logger"),
-                Error::offer_target_equals_source("OfferRunner", "logger"),
-                Error::offer_target_equals_source("OfferResolver", "logger"),
+                Error::offer_target_equals_source(DeclType::OfferProtocol, "logger"),
+                Error::offer_target_equals_source(DeclType::OfferDirectory, "logger"),
+                Error::offer_target_equals_source(DeclType::OfferRunner, "logger"),
+                Error::offer_target_equals_source(DeclType::OfferResolver, "logger"),
             ])),
         },
         test_validate_offers_storage_target_equals_source => {
@@ -6062,10 +6105,10 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("Storage", "source", "logger"),
-                Error::invalid_child("OfferService", "source", "logger"),
-                Error::invalid_child("OfferProtocol", "source", "logger"),
-                Error::invalid_child("OfferDirectory", "source", "logger"),
+                Error::invalid_child(DeclType::Storage, "source", "logger"),
+                Error::invalid_child(DeclType::OfferService, "source", "logger"),
+                Error::invalid_child(DeclType::OfferProtocol, "source", "logger"),
+                Error::invalid_child(DeclType::OfferDirectory, "source", "logger"),
             ])),
         },
         test_validate_offers_invalid_source_capability => {
@@ -6092,8 +6135,8 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_capability("OfferProtocol", "source", "this-storage-doesnt-exist"),
-                Error::invalid_child("OfferProtocol", "target", "netstack"),
+                Error::invalid_capability(DeclType::OfferProtocol, "source", "this-storage-doesnt-exist"),
+                Error::invalid_child(DeclType::OfferProtocol, "target", "netstack"),
             ])),
         },
         test_validate_offers_target => {
@@ -6262,12 +6305,12 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 // Duplicate services are allowed, for aggregation.
-                Error::duplicate_field("OfferProtocol", "target_name", "fuchsia.logger.LegacyLog"),
-                Error::duplicate_field("OfferDirectory", "target_name", "assets"),
-                Error::duplicate_field("OfferStorage", "target_name", "data"),
-                Error::duplicate_field("OfferRunner", "target_name", "duplicated"),
-                Error::duplicate_field("OfferResolver", "target_name", "duplicated"),
-                Error::duplicate_field("OfferEventStream", "target_name", "started"),
+                Error::duplicate_field(DeclType::OfferProtocol, "target_name", "fuchsia.logger.LegacyLog"),
+                Error::duplicate_field(DeclType::OfferDirectory, "target_name", "assets"),
+                Error::duplicate_field(DeclType::OfferStorage, "target_name", "data"),
+                Error::duplicate_field(DeclType::OfferRunner, "target_name", "duplicated"),
+                Error::duplicate_field(DeclType::OfferResolver, "target_name", "duplicated"),
+                Error::duplicate_field(DeclType::OfferEventStream, "target_name", "started"),
             ])),
         },
         test_validate_offers_target_invalid => {
@@ -6412,18 +6455,18 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("OfferService", "target", "netstack"),
-                Error::invalid_collection("OfferService", "target", "modular"),
-                Error::invalid_child("OfferProtocol", "target", "netstack"),
-                Error::invalid_collection("OfferProtocol", "target", "modular"),
-                Error::invalid_child("OfferDirectory", "target", "netstack"),
-                Error::invalid_collection("OfferDirectory", "target", "modular"),
-                Error::invalid_child("OfferStorage", "target", "netstack"),
-                Error::invalid_collection("OfferStorage", "target", "modular"),
-                Error::invalid_child("OfferRunner", "target", "netstack"),
-                Error::invalid_collection("OfferRunner", "target", "modular"),
-                Error::invalid_child("OfferResolver", "target", "netstack"),
-                Error::invalid_collection("OfferResolver", "target", "modular"),
+                Error::invalid_child(DeclType::OfferService, "target", "netstack"),
+                Error::invalid_collection(DeclType::OfferService, "target", "modular"),
+                Error::invalid_child(DeclType::OfferProtocol, "target", "netstack"),
+                Error::invalid_collection(DeclType::OfferProtocol, "target", "modular"),
+                Error::invalid_child(DeclType::OfferDirectory, "target", "netstack"),
+                Error::invalid_collection(DeclType::OfferDirectory, "target", "modular"),
+                Error::invalid_child(DeclType::OfferStorage, "target", "netstack"),
+                Error::invalid_collection(DeclType::OfferStorage, "target", "modular"),
+                Error::invalid_child(DeclType::OfferRunner, "target", "netstack"),
+                Error::invalid_collection(DeclType::OfferRunner, "target", "modular"),
+                Error::invalid_child(DeclType::OfferResolver, "target", "netstack"),
+                Error::invalid_collection(DeclType::OfferResolver, "target", "modular"),
             ])),
         },
         test_validate_offers_invalid_source_collection => {
@@ -6491,11 +6534,11 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("OfferProtocol", "source"),
-                Error::invalid_field("OfferDirectory", "source"),
-                Error::invalid_field("OfferStorage", "source"),
-                Error::invalid_field("OfferRunner", "source"),
-                Error::invalid_field("OfferResolver", "source"),
+                Error::invalid_field(DeclType::OfferProtocol, "source"),
+                Error::invalid_field(DeclType::OfferDirectory, "source"),
+                Error::invalid_field(DeclType::OfferStorage, "source"),
+                Error::invalid_field(DeclType::OfferRunner, "source"),
+                Error::invalid_field(DeclType::OfferResolver, "source"),
             ])),
         },
         test_validate_offers_source_collection => {
@@ -6601,12 +6644,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "OfferService",
+                        DeclType::OfferService,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "OfferService",
+                        DeclType::OfferService,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
@@ -6642,12 +6685,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "OfferProtocol",
+                        DeclType::OfferProtocol,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "OfferProtocol",
+                        DeclType::OfferProtocol,
                         "availability",
                         Some(&"fuchsia.examples.Echo".to_string()),
                     ),
@@ -6686,12 +6729,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "OfferDirectory",
+                        DeclType::OfferDirectory,
                         "availability",
                         Some(&"assets".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "OfferDirectory",
+                        DeclType::OfferDirectory,
                         "availability",
                         Some(&"assets".to_string()),
                     ),
@@ -6788,12 +6831,12 @@ mod tests {
             result = {
                 Err(ErrorList::new(vec![
                     Error::availability_must_be_optional(
-                        "OfferStorage",
+                        DeclType::OfferStorage,
                         "availability",
                         Some(&"data".to_string()),
                     ),
                     Error::availability_must_be_optional(
-                        "OfferStorage",
+                        DeclType::OfferStorage,
                         "availability",
                         Some(&"data".to_string()),
                     ),
@@ -6877,8 +6920,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Environment", "name"),
-                Error::missing_field("Environment", "extends"),
+                Error::missing_field(DeclType::Environment, "name"),
+                Error::missing_field(DeclType::Environment, "extends"),
             ])),
         },
 
@@ -6895,7 +6938,7 @@ mod tests {
                 }]);
                 decl
             },
-            result = Err(ErrorList::new(vec![Error::missing_field("Environment", "stop_timeout_ms")])),
+            result = Err(ErrorList::new(vec![Error::missing_field(DeclType::Environment, "stop_timeout_ms")])),
         },
 
         test_validate_environment_extends_stop_timeout => {
@@ -6940,11 +6983,11 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("Environment", "name"),
-                Error::field_too_long("RunnerRegistration", "source_name"),
-                Error::field_too_long("RunnerRegistration", "target_name"),
-                Error::field_too_long("ResolverRegistration", "resolver"),
-                Error::field_too_long("ResolverRegistration", "scheme"),
+                Error::field_too_long(DeclType::Environment, "name"),
+                Error::field_too_long(DeclType::RunnerRegistration, "source_name"),
+                Error::field_too_long(DeclType::RunnerRegistration, "target_name"),
+                Error::field_too_long(DeclType::ResolverRegistration, "resolver"),
+                Error::field_too_long(DeclType::ResolverRegistration, "scheme"),
             ])),
         },
         test_validate_environment_empty_runner_resolver_fields => {
@@ -6975,12 +7018,12 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("RunnerRegistration", "source_name"),
-                Error::missing_field("RunnerRegistration", "source"),
-                Error::missing_field("RunnerRegistration", "target_name"),
-                Error::missing_field("ResolverRegistration", "resolver"),
-                Error::missing_field("ResolverRegistration", "source"),
-                Error::missing_field("ResolverRegistration", "scheme"),
+                Error::missing_field(DeclType::RunnerRegistration, "source_name"),
+                Error::missing_field(DeclType::RunnerRegistration, "source"),
+                Error::missing_field(DeclType::RunnerRegistration, "target_name"),
+                Error::missing_field(DeclType::ResolverRegistration, "resolver"),
+                Error::missing_field(DeclType::ResolverRegistration, "source"),
+                Error::missing_field(DeclType::ResolverRegistration, "scheme"),
             ])),
         },
         test_validate_environment_invalid_fields => {
@@ -7011,12 +7054,12 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("RunnerRegistration", "source_name"),
-                Error::invalid_field("RunnerRegistration", "source"),
-                Error::invalid_field("RunnerRegistration", "target_name"),
-                Error::invalid_field("ResolverRegistration", "resolver"),
-                Error::invalid_field("ResolverRegistration", "source"),
-                Error::invalid_field("ResolverRegistration", "scheme"),
+                Error::invalid_field(DeclType::RunnerRegistration, "source_name"),
+                Error::invalid_field(DeclType::RunnerRegistration, "source"),
+                Error::invalid_field(DeclType::RunnerRegistration, "target_name"),
+                Error::invalid_field(DeclType::ResolverRegistration, "resolver"),
+                Error::invalid_field(DeclType::ResolverRegistration, "source"),
+                Error::invalid_field(DeclType::ResolverRegistration, "scheme"),
             ])),
         },
         test_validate_environment_missing_runner => {
@@ -7040,7 +7083,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_runner("RunnerRegistration", "source_name", "dart"),
+                Error::invalid_runner(DeclType::RunnerRegistration, "source_name", "dart"),
             ])),
         },
         test_validate_environment_duplicate_registrations => {
@@ -7083,8 +7126,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::duplicate_field("RunnerRegistration", "target_name", "dart"),
-                Error::duplicate_field("ResolverRegistration", "scheme", "fuchsia-pkg"),
+                Error::duplicate_field(DeclType::RunnerRegistration, "target_name", "dart"),
+                Error::duplicate_field(DeclType::ResolverRegistration, "scheme", "fuchsia-pkg"),
             ])),
         },
         test_validate_environment_from_missing_child => {
@@ -7121,8 +7164,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("RunnerRegistration", "source", "missing"),
-                Error::invalid_child("ResolverRegistration", "source", "missing"),
+                Error::invalid_child(DeclType::RunnerRegistration, "source", "missing"),
+                Error::invalid_child(DeclType::ResolverRegistration, "source", "missing"),
             ])),
         },
         test_validate_environment_runner_child_cycle => {
@@ -7282,9 +7325,9 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("DebugProtocolRegistration", "source"),
-                Error::missing_field("DebugProtocolRegistration", "source_name"),
-                Error::missing_field("DebugProtocolRegistration", "target_name"),
+                Error::missing_field(DeclType::DebugProtocolRegistration, "source"),
+                Error::missing_field(DeclType::DebugProtocolRegistration, "source_name"),
+                Error::missing_field(DeclType::DebugProtocolRegistration, "target_name"),
             ])),
         },
         test_validate_environment_debug_log_identifier => {
@@ -7317,10 +7360,10 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("DebugProtocolRegistration", "source.child.name"),
-                Error::field_too_long("DebugProtocolRegistration", "source_name"),
-                Error::field_too_long("DebugProtocolRegistration", "target_name"),
-                Error::field_too_long("DebugProtocolRegistration", "target_name"),
+                Error::field_too_long(DeclType::DebugProtocolRegistration, "source.child.name"),
+                Error::field_too_long(DeclType::DebugProtocolRegistration, "source_name"),
+                Error::field_too_long(DeclType::DebugProtocolRegistration, "target_name"),
+                Error::field_too_long(DeclType::DebugProtocolRegistration, "target_name"),
             ])),
         },
         test_validate_environment_debug_log_extraneous => {
@@ -7347,7 +7390,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::extraneous_field("DebugProtocolRegistration", "source.child.collection"),
+                Error::extraneous_field(DeclType::DebugProtocolRegistration, "source.child.collection"),
             ])),
         },
         test_validate_environment_debug_log_invalid_identifiers => {
@@ -7374,9 +7417,9 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("DebugProtocolRegistration", "source.child.name"),
-                Error::invalid_field("DebugProtocolRegistration", "source_name"),
-                Error::invalid_field("DebugProtocolRegistration", "target_name"),
+                Error::invalid_field(DeclType::DebugProtocolRegistration, "source.child.name"),
+                Error::invalid_field(DeclType::DebugProtocolRegistration, "source_name"),
+                Error::invalid_field(DeclType::DebugProtocolRegistration, "target_name"),
             ])),
         },
         test_validate_environment_debug_log_invalid_child => {
@@ -7413,7 +7456,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("DebugProtocolRegistration", "source", "logger"),
+                Error::invalid_child(DeclType::DebugProtocolRegistration, "source", "logger"),
 
             ])),
         },
@@ -7440,7 +7483,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("DebugProtocolRegistration", "source"),
+                Error::invalid_field(DeclType::DebugProtocolRegistration, "source"),
             ])),
         },
 
@@ -7459,9 +7502,9 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Child", "name"),
-                Error::missing_field("Child", "url"),
-                Error::missing_field("Child", "startup"),
+                Error::missing_field(DeclType::Child, "name"),
+                Error::missing_field(DeclType::Child, "url"),
+                Error::missing_field(DeclType::Child, "startup"),
                 // `on_terminate` is allowed to be None
             ])),
         },
@@ -7479,8 +7522,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("Child", "name"),
-                Error::invalid_url("Child", "url", "\"scheme://invalid-port:99999999/path#frag\": Malformed URL: InvalidPort."),
+                Error::invalid_field(DeclType::Child, "name"),
+                Error::invalid_url(DeclType::Child, "url", "\"scheme://invalid-port:99999999/path#frag\": Malformed URL: InvalidPort."),
             ])),
         },
         test_validate_children_long_identifiers => {
@@ -7497,10 +7540,10 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("Child", "name"),
-                Error::field_too_long("Child", "url"),
-                Error::field_too_long("Child", "environment"),
-                Error::invalid_environment("Child", "environment", "a".repeat(1025)),
+                Error::field_too_long(DeclType::Child, "name"),
+                Error::field_too_long(DeclType::Child, "url"),
+                Error::field_too_long(DeclType::Child, "environment"),
+                Error::invalid_environment(DeclType::Child, "environment", "a".repeat(1025)),
             ])),
         },
         test_validate_child_references_unknown_env => {
@@ -7517,7 +7560,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_environment("Child", "environment", "test_env"),
+                Error::invalid_environment(DeclType::Child, "environment", "test_env"),
             ])),
         },
 
@@ -7536,8 +7579,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Collection", "name"),
-                Error::missing_field("Collection", "durability"),
+                Error::missing_field(DeclType::Collection, "name"),
+                Error::missing_field(DeclType::Collection, "durability"),
             ])),
         },
         test_validate_collections_invalid_identifiers => {
@@ -7554,7 +7597,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("Collection", "name"),
+                Error::invalid_field(DeclType::Collection, "name"),
             ])),
         },
         test_validate_collections_long_identifiers => {
@@ -7571,7 +7614,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("Collection", "name"),
+                Error::field_too_long(DeclType::Collection, "name"),
             ])),
         },
         test_validate_collection_references_unknown_env => {
@@ -7588,7 +7631,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_environment("Collection", "environment", "test_env"),
+                Error::invalid_environment(DeclType::Collection, "environment", "test_env"),
             ])),
         },
 
@@ -7635,21 +7678,21 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Service", "name"),
-                Error::missing_field("Service", "source_path"),
-                Error::missing_field("Protocol", "name"),
-                Error::missing_field("Protocol", "source_path"),
-                Error::missing_field("Directory", "name"),
-                Error::missing_field("Directory", "source_path"),
-                Error::missing_field("Directory", "rights"),
-                Error::missing_field("Storage", "source"),
-                Error::missing_field("Storage", "name"),
-                Error::missing_field("Storage", "storage_id"),
-                Error::missing_field("Storage", "backing_dir"),
-                Error::missing_field("Runner", "name"),
-                Error::missing_field("Runner", "source_path"),
-                Error::missing_field("Resolver", "name"),
-                Error::missing_field("Resolver", "source_path"),
+                Error::missing_field(DeclType::Service, "name"),
+                Error::missing_field(DeclType::Service, "source_path"),
+                Error::missing_field(DeclType::Protocol, "name"),
+                Error::missing_field(DeclType::Protocol, "source_path"),
+                Error::missing_field(DeclType::Directory, "name"),
+                Error::missing_field(DeclType::Directory, "source_path"),
+                Error::missing_field(DeclType::Directory, "rights"),
+                Error::missing_field(DeclType::Storage, "source"),
+                Error::missing_field(DeclType::Storage, "name"),
+                Error::missing_field(DeclType::Storage, "storage_id"),
+                Error::missing_field(DeclType::Storage, "backing_dir"),
+                Error::missing_field(DeclType::Runner, "name"),
+                Error::missing_field(DeclType::Runner, "source_path"),
+                Error::missing_field(DeclType::Resolver, "name"),
+                Error::missing_field(DeclType::Resolver, "source_path"),
             ])),
         },
         test_validate_capabilities_invalid_identifiers => {
@@ -7696,19 +7739,19 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("Service", "name"),
-                Error::invalid_field("Service", "source_path"),
-                Error::invalid_field("Protocol", "name"),
-                Error::invalid_field("Protocol", "source_path"),
-                Error::invalid_field("Directory", "name"),
-                Error::invalid_field("Directory", "source_path"),
-                Error::invalid_field("Storage", "source"),
-                Error::invalid_field("Storage", "name"),
-                Error::invalid_field("Storage", "backing_dir"),
-                Error::invalid_field("Runner", "name"),
-                Error::invalid_field("Runner", "source_path"),
-                Error::invalid_field("Resolver", "name"),
-                Error::invalid_field("Resolver", "source_path"),
+                Error::invalid_field(DeclType::Service, "name"),
+                Error::invalid_field(DeclType::Service, "source_path"),
+                Error::invalid_field(DeclType::Protocol, "name"),
+                Error::invalid_field(DeclType::Protocol, "source_path"),
+                Error::invalid_field(DeclType::Directory, "name"),
+                Error::invalid_field(DeclType::Directory, "source_path"),
+                Error::invalid_field(DeclType::Storage, "source"),
+                Error::invalid_field(DeclType::Storage, "name"),
+                Error::invalid_field(DeclType::Storage, "backing_dir"),
+                Error::invalid_field(DeclType::Runner, "name"),
+                Error::invalid_field(DeclType::Runner, "source_path"),
+                Error::invalid_field(DeclType::Resolver, "name"),
+                Error::invalid_field(DeclType::Resolver, "source_path"),
             ])),
         },
         test_validate_capabilities_invalid_child => {
@@ -7729,7 +7772,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("Storage", "source"),
+                Error::invalid_field(DeclType::Storage, "source"),
             ])),
         },
         test_validate_capabilities_long_identifiers => {
@@ -7777,19 +7820,19 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long("Service", "name"),
-                Error::field_too_long("Service", "source_path"),
-                Error::field_too_long("Protocol", "name"),
-                Error::field_too_long("Protocol", "source_path"),
-                Error::field_too_long("Directory", "name"),
-                Error::field_too_long("Directory", "source_path"),
-                Error::field_too_long("Storage", "source.child.name"),
-                Error::field_too_long("Storage", "name"),
-                Error::field_too_long("Storage", "backing_dir"),
-                Error::field_too_long("Runner", "name"),
-                Error::field_too_long("Runner", "source_path"),
-                Error::field_too_long("Resolver", "name"),
-                Error::field_too_long("Resolver", "source_path"),
+                Error::field_too_long(DeclType::Service, "name"),
+                Error::field_too_long(DeclType::Service, "source_path"),
+                Error::field_too_long(DeclType::Protocol, "name"),
+                Error::field_too_long(DeclType::Protocol, "source_path"),
+                Error::field_too_long(DeclType::Directory, "name"),
+                Error::field_too_long(DeclType::Directory, "source_path"),
+                Error::field_too_long(DeclType::Storage, "source.child.name"),
+                Error::field_too_long(DeclType::Storage, "name"),
+                Error::field_too_long(DeclType::Storage, "backing_dir"),
+                Error::field_too_long(DeclType::Runner, "name"),
+                Error::field_too_long(DeclType::Runner, "source_path"),
+                Error::field_too_long(DeclType::Resolver, "name"),
+                Error::field_too_long(DeclType::Resolver, "source_path"),
             ])),
         },
         test_validate_capabilities_duplicate_name => {
@@ -7868,12 +7911,12 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::duplicate_field("Service", "name", "service"),
-                Error::duplicate_field("Protocol", "name", "protocol"),
-                Error::duplicate_field("Directory", "name", "directory"),
-                Error::duplicate_field("Storage", "name", "storage"),
-                Error::duplicate_field("Runner", "name", "runner"),
-                Error::duplicate_field("Resolver", "name", "resolver"),
+                Error::duplicate_field(DeclType::Service, "name", "service"),
+                Error::duplicate_field(DeclType::Protocol, "name", "protocol"),
+                Error::duplicate_field(DeclType::Directory, "name", "directory"),
+                Error::duplicate_field(DeclType::Storage, "name", "storage"),
+                Error::duplicate_field(DeclType::Runner, "name", "runner"),
+                Error::duplicate_field(DeclType::Resolver, "name", "resolver"),
             ])),
         },
 
@@ -8024,7 +8067,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_capability("OfferResolver", "source", "a"),
+                Error::invalid_capability(DeclType::OfferResolver, "source", "a"),
             ])),
         },
         test_validate_resolvers_missing_from_expose => {
@@ -8040,7 +8083,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_capability("ExposeResolver", "source", "a"),
+                Error::invalid_capability(DeclType::ExposeResolver, "source", "a"),
             ])),
         },
 
@@ -8056,9 +8099,9 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigSchema", "fields"),
-                Error::missing_field("ConfigSchema", "checksum"),
-                Error::missing_field("ConfigSchema", "value_source"),
+                Error::missing_field(DeclType::ConfigSchema, "fields"),
+                Error::missing_field(DeclType::ConfigSchema, "checksum"),
+                Error::missing_field(DeclType::ConfigSchema, "value_source"),
             ])),
         },
 
@@ -8080,8 +8123,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigField", "key"),
-                Error::missing_field("ConfigField", "value_type"),
+                Error::missing_field(DeclType::ConfigField, "key"),
+                Error::missing_field(DeclType::ConfigField, "value_type"),
             ])),
         },
 
@@ -8131,7 +8174,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::extraneous_field("ConfigType", "constraints")
+                Error::extraneous_field(DeclType::ConfigType, "constraints")
             ])),
         },
 
@@ -8157,7 +8200,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigType", "parameters")
+                Error::missing_field(DeclType::ConfigType, "parameters")
             ])),
         },
 
@@ -8207,7 +8250,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigType", "parameters")
+                Error::missing_field(DeclType::ConfigType, "parameters")
             ])),
         },
 
@@ -8233,7 +8276,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigType", "constraints")
+                Error::missing_field(DeclType::ConfigType, "constraints")
             ])),
         },
 
@@ -8259,7 +8302,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::extraneous_field("ConfigType", "constraints")
+                Error::extraneous_field(DeclType::ConfigType, "constraints")
             ])),
         },
 
@@ -8321,7 +8364,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::extraneous_field("ConfigType", "parameters")
+                Error::extraneous_field(DeclType::ConfigType, "parameters")
             ])),
         },
 
@@ -8347,7 +8390,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ConfigType", "parameters")
+                Error::missing_field(DeclType::ConfigType, "parameters")
             ])),
         },
 
@@ -8564,11 +8607,11 @@ mod tests {
             ],
             as_builtin = false,
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Protocol", "name"),
-                Error::missing_field("Protocol", "source_path"),
-                Error::missing_field("Directory", "name"),
-                Error::missing_field("Directory", "source_path"),
-                Error::missing_field("Directory", "rights"),
+                Error::missing_field(DeclType::Protocol, "name"),
+                Error::missing_field(DeclType::Protocol, "source_path"),
+                Error::missing_field(DeclType::Directory, "name"),
+                Error::missing_field(DeclType::Directory, "source_path"),
+                Error::missing_field(DeclType::Directory, "rights"),
             ])),
         },
         test_validate_builtin_capabilities_individually_ok => {
@@ -8638,18 +8681,18 @@ mod tests {
             ],
             as_builtin = true,
             result = Err(ErrorList::new(vec![
-                Error::missing_field("Protocol", "name"),
-                Error::extraneous_source_path("Protocol", "/svc/foo"),
-                Error::missing_field("Directory", "name"),
-                Error::extraneous_source_path("Directory", "/foo"),
-                Error::missing_field("Directory", "rights"),
-                Error::missing_field("Service", "name"),
-                Error::extraneous_source_path("Service", "/svc/foo"),
-                Error::missing_field("Runner", "name"),
-                Error::extraneous_source_path("Runner", "/foo"),
-                Error::missing_field("Resolver", "name"),
-                Error::extraneous_source_path("Resolver", "/foo"),
-                Error::invalid_capability_type("RuntimeConfig", "capability", "storage"),
+                Error::missing_field(DeclType::Protocol, "name"),
+                Error::extraneous_source_path(DeclType::Protocol, "/svc/foo"),
+                Error::missing_field(DeclType::Directory, "name"),
+                Error::extraneous_source_path(DeclType::Directory, "/foo"),
+                Error::missing_field(DeclType::Directory, "rights"),
+                Error::missing_field(DeclType::Service, "name"),
+                Error::extraneous_source_path(DeclType::Service, "/svc/foo"),
+                Error::missing_field(DeclType::Runner, "name"),
+                Error::extraneous_source_path(DeclType::Runner, "/foo"),
+                Error::missing_field(DeclType::Resolver, "name"),
+                Error::extraneous_source_path(DeclType::Resolver, "/foo"),
+                Error::CapabilityCannotBeBuiltin(DeclType::Storage),
             ])),
         },
     }
@@ -9134,12 +9177,12 @@ mod tests {
                 }
             ),
             Err(ErrorList::new(vec![
-                Error::missing_field("OfferProtocol", "target"),
-                Error::missing_field("OfferService", "target"),
-                Error::missing_field("OfferDirectory", "target"),
-                Error::missing_field("OfferStorage", "target"),
-                Error::missing_field("OfferRunner", "target"),
-                Error::missing_field("OfferResolver", "target"),
+                Error::missing_field(DeclType::OfferProtocol, "target"),
+                Error::missing_field(DeclType::OfferService, "target"),
+                Error::missing_field(DeclType::OfferDirectory, "target"),
+                Error::missing_field(DeclType::OfferStorage, "target"),
+                Error::missing_field(DeclType::OfferRunner, "target"),
+                Error::missing_field(DeclType::OfferResolver, "target"),
             ]))
         );
     }
@@ -9174,32 +9217,32 @@ mod tests {
                 &fdecl::Component::default()
             ),
             Err(ErrorList::new(vec![
-                Error::missing_field("OfferProtocol", "source"),
-                Error::missing_field("OfferProtocol", "source_name"),
-                Error::missing_field("OfferProtocol", "target"),
-                Error::missing_field("OfferProtocol", "target_name"),
-                Error::missing_field("OfferProtocol", "dependency_type"),
-                Error::missing_field("OfferService", "source"),
-                Error::missing_field("OfferService", "source_name"),
-                Error::missing_field("OfferService", "target"),
-                Error::missing_field("OfferService", "target_name"),
-                Error::missing_field("OfferDirectory", "source"),
-                Error::missing_field("OfferDirectory", "source_name"),
-                Error::missing_field("OfferDirectory", "target"),
-                Error::missing_field("OfferDirectory", "target_name"),
-                Error::missing_field("OfferDirectory", "dependency_type"),
-                Error::missing_field("OfferStorage", "source"),
-                Error::missing_field("OfferStorage", "source_name"),
-                Error::missing_field("OfferStorage", "target"),
-                Error::missing_field("OfferStorage", "target_name"),
-                Error::missing_field("OfferRunner", "source"),
-                Error::missing_field("OfferRunner", "source_name"),
-                Error::missing_field("OfferRunner", "target"),
-                Error::missing_field("OfferRunner", "target_name"),
-                Error::missing_field("OfferResolver", "source"),
-                Error::missing_field("OfferResolver", "source_name"),
-                Error::missing_field("OfferResolver", "target"),
-                Error::missing_field("OfferResolver", "target_name"),
+                Error::missing_field(DeclType::OfferProtocol, "source"),
+                Error::missing_field(DeclType::OfferProtocol, "source_name"),
+                Error::missing_field(DeclType::OfferProtocol, "target"),
+                Error::missing_field(DeclType::OfferProtocol, "target_name"),
+                Error::missing_field(DeclType::OfferProtocol, "dependency_type"),
+                Error::missing_field(DeclType::OfferService, "source"),
+                Error::missing_field(DeclType::OfferService, "source_name"),
+                Error::missing_field(DeclType::OfferService, "target"),
+                Error::missing_field(DeclType::OfferService, "target_name"),
+                Error::missing_field(DeclType::OfferDirectory, "source"),
+                Error::missing_field(DeclType::OfferDirectory, "source_name"),
+                Error::missing_field(DeclType::OfferDirectory, "target"),
+                Error::missing_field(DeclType::OfferDirectory, "target_name"),
+                Error::missing_field(DeclType::OfferDirectory, "dependency_type"),
+                Error::missing_field(DeclType::OfferStorage, "source"),
+                Error::missing_field(DeclType::OfferStorage, "source_name"),
+                Error::missing_field(DeclType::OfferStorage, "target"),
+                Error::missing_field(DeclType::OfferStorage, "target_name"),
+                Error::missing_field(DeclType::OfferRunner, "source"),
+                Error::missing_field(DeclType::OfferRunner, "source_name"),
+                Error::missing_field(DeclType::OfferRunner, "target"),
+                Error::missing_field(DeclType::OfferRunner, "target_name"),
+                Error::missing_field(DeclType::OfferResolver, "source"),
+                Error::missing_field(DeclType::OfferResolver, "source_name"),
+                Error::missing_field(DeclType::OfferResolver, "target"),
+                Error::missing_field(DeclType::OfferResolver, "target_name"),
             ]))
         );
     }

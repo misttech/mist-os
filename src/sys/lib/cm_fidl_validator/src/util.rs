@@ -37,7 +37,7 @@ pub(crate) type IdMap<'a> = HashMap<TargetId<'a>, HashMap<&'a str, AllowableIds>
 
 pub(crate) fn check_path(
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -47,7 +47,7 @@ pub(crate) fn check_path(
 
 pub(crate) fn check_relative_path(
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -57,7 +57,7 @@ pub(crate) fn check_relative_path(
 
 pub(crate) fn check_name(
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -67,7 +67,7 @@ pub(crate) fn check_name(
 
 pub(crate) fn check_dynamic_name(
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -78,7 +78,7 @@ pub(crate) fn check_dynamic_name(
 fn check_identifier(
     conversion_ctor: impl Fn(&String) -> Result<(), ParseError>,
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -110,7 +110,7 @@ fn check_identifier(
 }
 
 pub(crate) fn check_use_availability(
-    decl_type: &str,
+    decl_type: DeclType,
     availability: Option<&fdecl::Availability>,
     errors: &mut Vec<Error>,
 ) {
@@ -128,7 +128,7 @@ pub(crate) fn check_use_availability(
 }
 
 pub(crate) fn check_route_availability(
-    decl: &str,
+    decl: DeclType,
     availability: Option<&fdecl::Availability>,
     source: Option<&fdecl::Ref>,
     source_name: Option<&String>,
@@ -149,7 +149,7 @@ pub(crate) fn check_route_availability(
 
 pub fn check_url(
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -159,7 +159,7 @@ pub fn check_url(
 
 pub(crate) fn check_url_scheme(
     prop: Option<&String>,
-    decl_type: &str,
+    decl_type: DeclType,
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
@@ -195,7 +195,7 @@ mod tests {
         fn check_path_matches_regex(s in PATH_REGEX_STR) {
             if s.len() < MAX_PATH_LENGTH {
                 let mut errors = vec![];
-                prop_assert!(check_path(Some(&s), "", "", &mut errors));
+                prop_assert!(check_path(Some(&s), DeclType::Child, "", &mut errors));
                 prop_assert!(errors.is_empty());
             }
         }
@@ -203,7 +203,7 @@ mod tests {
         fn check_name_matches_regex(s in NAME_REGEX_STR) {
             if s.len() < MAX_NAME_LENGTH {
                 let mut errors = vec![];
-                prop_assert!(check_name(Some(&s), "", "", &mut errors));
+                prop_assert!(check_name(Some(&s), DeclType::Child, "", &mut errors));
                 prop_assert!(errors.is_empty());
             }
         }
@@ -211,7 +211,7 @@ mod tests {
         fn check_path_fails_invalid_input(s in ".*") {
             if !PATH_REGEX.is_match(&s) {
                 let mut errors = vec![];
-                prop_assert!(!check_path(Some(&s), "", "", &mut errors));
+                prop_assert!(!check_path(Some(&s), DeclType::Child, "", &mut errors));
                 prop_assert!(!errors.is_empty());
             }
         }
@@ -219,7 +219,7 @@ mod tests {
         fn check_name_fails_invalid_input(s in ".*") {
             if !NAME_REGEX.is_match(&s) {
                 let mut errors = vec![];
-                prop_assert!(!check_name(Some(&s), "", "", &mut errors));
+                prop_assert!(!check_name(Some(&s), DeclType::Child, "", &mut errors));
                 prop_assert!(!errors.is_empty());
             }
         }
@@ -233,11 +233,11 @@ mod tests {
 
     fn check_test<F>(check_fn: F, input: &str, expected_res: Result<(), ErrorList>)
     where
-        F: FnOnce(Option<&String>, &str, &str, &mut Vec<Error>) -> bool,
+        F: FnOnce(Option<&String>, DeclType, &str, &mut Vec<Error>) -> bool,
     {
         let mut errors = vec![];
         let res: Result<(), ErrorList> =
-            match check_fn(Some(&input.to_string()), "FooDecl", "foo", &mut errors) {
+            match check_fn(Some(&input.to_string()), DeclType::Child, "foo", &mut errors) {
                 true => Ok(()),
                 false => Err(ErrorList::new(errors)),
             };
@@ -296,27 +296,27 @@ mod tests {
         test_identifier_path_invalid_empty => {
             check_fn = check_path,
             input = "",
-            result = Err(ErrorList::new(vec![Error::empty_field("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::empty_field(DeclType::Child, "foo")])),
         },
         test_identifier_path_invalid_root => {
             check_fn = check_path,
             input = "/",
-            result = Err(ErrorList::new(vec![Error::invalid_field("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
         test_identifier_path_invalid_relative => {
             check_fn = check_path,
             input = "foo/bar",
-            result = Err(ErrorList::new(vec![Error::invalid_field("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
         test_identifier_path_invalid_trailing => {
             check_fn = check_path,
             input = "/foo/bar/",
-            result = Err(ErrorList::new(vec![Error::invalid_field("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
         test_identifier_path_too_long => {
             check_fn = check_path,
             input = &format!("/{}", "a".repeat(1024)),
-            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
         },
 
         // name
@@ -333,17 +333,17 @@ mod tests {
         test_identifier_name_invalid => {
             check_fn = check_name,
             input = "^bad",
-            result = Err(ErrorList::new(vec![Error::invalid_field("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
         test_identifier_name_too_long => {
             check_fn = check_name,
             input = &format!("{}", "a".repeat(MAX_NAME_LENGTH + 1)),
-            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
         },
         test_identifier_dynamic_name_too_long => {
             check_fn = check_dynamic_name,
             input = &format!("{}", "a".repeat(MAX_LONG_NAME_LENGTH + 1)),
-            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
         },
 
         // url
@@ -380,24 +380,24 @@ mod tests {
         test_identifier_url_host_pound_invalid => {
             check_fn = check_url,
             input = "my+awesome-scheme.2://abc123!@#$%.com",
-            result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo", "\"my+awesome-scheme.2://abc123!@#$%.com\": Malformed URL: EmptyHost.")])),
+            result = Err(ErrorList::new(vec![Error::invalid_url(DeclType::Child, "foo", "\"my+awesome-scheme.2://abc123!@#$%.com\": Malformed URL: EmptyHost.")])),
         },
         test_identifier_url_invalid => {
             check_fn = check_url,
             input = "fuchsia-pkg://",
-            result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo","\"fuchsia-pkg://\": URL is missing either `host`, `path`, and/or `resource`.")])),
+            result = Err(ErrorList::new(vec![Error::invalid_url(DeclType::Child, "foo","\"fuchsia-pkg://\": URL is missing either `host`, `path`, and/or `resource`.")])),
         },
         test_url_invalid_port => {
             check_fn = check_url,
             input = "scheme://invalid-port:99999999/path#frag",
             result = Err(ErrorList::new(vec![
-                Error::invalid_url("FooDecl", "foo", "\"scheme://invalid-port:99999999/path#frag\": Malformed URL: InvalidPort."),
+                Error::invalid_url(DeclType::Child, "foo", "\"scheme://invalid-port:99999999/path#frag\": Malformed URL: InvalidPort."),
             ])),
         },
         test_identifier_url_too_long => {
             check_fn = check_url,
             input = &format!("fuchsia-pkg://{}", "a".repeat(4083)),
-            result = Err(ErrorList::new(vec![Error::field_too_long("FooDecl", "foo")])),
+            result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
         },
     }
 }

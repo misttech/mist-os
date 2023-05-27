@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    cm_fidl_validator::check_url, cm_types::MAX_URL_LENGTH, lazy_static::lazy_static,
-    proptest::prelude::*, url::Url,
+    cm_fidl_validator::check_url, cm_fidl_validator::error::DeclType, cm_types::MAX_URL_LENGTH,
+    lazy_static::lazy_static, proptest::prelude::*, url::Url,
 };
 
 #[macro_use]
@@ -399,7 +399,7 @@ proptest! {
             // NOTE: IF THIS TEST FLAKES AGAIN WITH `IdnaError`, consider
             // calling `Url::parse(&s)`, and if the result is `Err(IdnaError)`,
             // ignore the value (do not call `check_url()`).
-            let _ = check_url(Some(&s), "", "", &mut errors);
+            let _ = check_url(Some(&s), DeclType::Child, "", &mut errors);
             if !errors.is_empty() {
                 println!("Error parsing URL: {s}");
             }
@@ -414,7 +414,7 @@ proptest! {
     fn check_subpackage_url_matches_regex(s in SUBPACKAGED_COMPONENT_URL!()) {
         if s.len() < MAX_URL_LENGTH {
             let mut errors = vec![];
-            let _ = check_url(Some(&s), "", "", &mut errors);
+            let _ = check_url(Some(&s), DeclType::Child, "", &mut errors);
             if !errors.is_empty() {
                 println!("Error parsing URL: {s}");
             }
@@ -429,7 +429,7 @@ proptest! {
     fn check_fragment_only_url_matches_regex(s in FRAGMENT_ONLY_COMPONENT_URL!()) {
         if s.len() < MAX_URL_LENGTH {
             let mut errors = vec![];
-            let _ = check_url(Some(&s), "", "", &mut errors);
+            let _ = check_url(Some(&s), DeclType::Child, "", &mut errors);
             if !errors.is_empty() {
                 println!("Error parsing URL: {s}");
             }

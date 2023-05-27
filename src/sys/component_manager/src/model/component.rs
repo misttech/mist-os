@@ -42,6 +42,7 @@ use {
         },
     },
     async_trait::async_trait,
+    cm_fidl_validator::error::DeclType,
     cm_moniker::{IncarnationId, InstancedAbsoluteMoniker, InstancedChildMoniker},
     cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
     cm_rust::{
@@ -1586,7 +1587,7 @@ impl ResolvedInstanceState {
                         return Err(DynamicOfferError::OfferInvalid {
                             err: cm_fidl_validator::error::ErrorList {
                                 errs: vec![cm_fidl_validator::error::Error::extraneous_field(
-                                    "OfferDecl",
+                                    DeclType::Offer,
                                     "target",
                                 )],
                             },
