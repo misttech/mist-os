@@ -19,12 +19,38 @@ namespace Profiles = ::nl::Weave::Profiles;
 namespace Security = ::nl::Weave::Profiles::Security;
 namespace ServiceProvisioning = ::nl::Weave::Profiles::ServiceProvisioning;
 
+using Profiles::Security::CertificateKeyId;
+using Profiles::Security::kDecodeFlag_IsTrusted;
+using Profiles::Security::PackedCertDateToTime;
+using Profiles::Security::WeaveDN;
 using Security::WeaveCertificateData;
 
 // TODO(fxbug.dev/51130): Allow build-time configuration of these values.
 constexpr size_t kMaxCerts = 10;
 constexpr size_t kMaxServiceConfigSize = 10000;
 constexpr size_t kCertDecodeBufferSize = 5000;
+
+WEAVE_ERROR GetEffectiveTime(uint32_t& effective_time) {
+  // Set the effective time for certificate validation. Use the current time if
+  // the system's real time clock is synchronized, but otherwise use the
+  // firmware build time and arrange to ignore the 'not before' date in the
+  // peer's certificate.
+  uint64_t now_ms;
+  WEAVE_ERROR err = System::Layer::GetClock_RealTimeMS(now_ms);
+  if (err == WEAVE_NO_ERROR) {
+    // TODO(fxbug.dev/51890): The default implementation of GetClock_RealTimeMS only returns
+    // not-synced if the value is before Jan 1, 2000. Use the UTC fidl instead
+    // to confirm whether the clock source is from some external source.
+    effective_time =
+        Security::SecondsSinceEpochToPackedCertTime(static_cast<uint32_t>(now_ms / 1000));
+  } else if (err == WEAVE_SYSTEM_ERROR_REAL_TIME_NOT_SYNCED) {
+    // TODO(fxbug.dev/51890): Acquire the firmware build time, for now we set it to May 26, 2023
+    // as reasonable default time.
+    effective_time = Security::SecondsSinceEpochToPackedCertTime(1685059200U);
+    FX_LOGS(WARNING) << "Real time clock not synchronized, using default time for cert validation.";
+  }
+  return err;
+}
 
 }  // namespace
 
@@ -346,12 +372,55 @@ WEAVE_ERROR PlatformAuthDelegate::GenerateNodeSignature(const uint8_t* msg_hash,
   return Security::ConvertECDSASignature_DERToWeave(output->data(), output->size(), writer, tag);
 }
 
+// If the service config contains a dev root cert that has expired, replace it.
+WEAVE_ERROR PlatformAuthDelegate::ReplaceExpiredCertInServiceConfig(WeaveCertificateSet& cert_set) {
+  WEAVE_ERROR err;
+  WeaveCertificateData* candidate = nullptr;
+  const CertificateKeyId skid = {
+      .Id = nl::NestCerts::Development::Root::SubjectKeyId,
+      .Len = static_cast<uint8_t>(nl::NestCerts::Development::Root::SubjectKeyIdLength)};
+
+  const WeaveDN dn = {.AttrValue = {.WeaveId = nl::NestCerts::Development::Root::CAId},
+                      .AttrOID = ASN1::kOID_AttributeType_WeaveCAId};
+  ValidationContext valid_ctx;
+  enum { kLastSecondOfDay = nl::kSecondsPerDay - 1 };
+
+  // Search for dev root cert, return if not found.
+  candidate = cert_set.FindCert(skid);
+  if (!candidate) {
+    return WEAVE_NO_ERROR;
+  }
+
+  if (!candidate->SubjectDN.IsEqual(dn)) {
+    return WEAVE_NO_ERROR;
+  }
+
+  FX_LOGS(INFO) << "Found Dev root CA";
+
+  uint32_t effective_time = 0;
+  err = GetEffectiveTime(effective_time);
+  valid_ctx.EffectiveTime = effective_time;
+
+  if (candidate->NotAfterDate != 0 &&
+      valid_ctx.EffectiveTime > PackedCertDateToTime(candidate->NotAfterDate) + kLastSecondOfDay) {
+    FX_LOGS(INFO) << "Dev root CA expired, so replace it.";
+    err = cert_set.ReplaceCert(nl::NestCerts::Development::Root::Cert,
+                               nl::NestCerts::Development::Root::CertLength, kDecodeFlag_IsTrusted,
+                               candidate);
+    if (err != WEAVE_NO_ERROR) {
+      FX_LOGS(ERROR) << "Failed to replace Dev root CA";
+      return err;
+    }
+  }
+
+  return WEAVE_NO_ERROR;
+}
+
 WEAVE_ERROR PlatformAuthDelegate::BeginCertValidation(ValidationContext& valid_ctx,
                                                       WeaveCertificateSet& cert_set,
                                                       bool is_initiator) {
   WEAVE_ERROR err = WEAVE_NO_ERROR;
   size_t service_config_len = 0;
-  uint64_t now_ms;
 
   service_config_.clear();
   service_config_.resize(kMaxServiceConfigSize);
@@ -376,6 +445,11 @@ WEAVE_ERROR PlatformAuthDelegate::BeginCertValidation(ValidationContext& valid_c
     return err;
   }
 
+  err = ReplaceExpiredCertInServiceConfig(cert_set);
+  if (err != WEAVE_NO_ERROR) {
+    return err;
+  }
+
   // Scan the list of trusted certs loaded from the service config. If the list
   // contains a general certificate with a CommonName subject, presume this is
   // the access token certificate.
@@ -390,24 +464,12 @@ WEAVE_ERROR PlatformAuthDelegate::BeginCertValidation(ValidationContext& valid_c
 
   memset(&valid_ctx, 0, sizeof(valid_ctx));
 
-  // Set the effective time for certificate validation. Use the current time if
-  // the system's real time clock is synchronized, but otherwise use the
-  // firmware build time and arrange to ignore the 'not before' date in the
-  // peer's certificate.
-  err = System::Layer::GetClock_RealTimeMS(now_ms);
-  if (err == WEAVE_NO_ERROR) {
-    // TODO(fxbug.dev/51890): The default implementation of GetClock_RealTimeMS only returns
-    // not-synced if the value is before Jan 1, 2000. Use the UTC fidl instead
-    // to confirm whether the clock source is from some external source.
-    valid_ctx.EffectiveTime =
-        Security::SecondsSinceEpochToPackedCertTime(static_cast<uint32_t>(now_ms / 1000));
-  } else if (err == WEAVE_SYSTEM_ERROR_REAL_TIME_NOT_SYNCED) {
-    // TODO(fxbug.dev/51890): Acquire the firmware build time, for now we set it to Jan 1, 2020
-    // as reasonable default time.
-    valid_ctx.EffectiveTime = Security::SecondsSinceEpochToPackedCertTime(1577836800U);
+  uint32_t effective_time = 0;
+  err = GetEffectiveTime(effective_time);
+  if (err == WEAVE_SYSTEM_ERROR_REAL_TIME_NOT_SYNCED) {
     valid_ctx.ValidateFlags |= Security::kValidateFlag_IgnoreNotBefore;
-    FX_LOGS(WARNING) << "Real time clock not synchronized, using default time for cert validation.";
   }
+  valid_ctx.EffectiveTime = effective_time;
 
   valid_ctx.RequiredKeyUsages = Security::kKeyUsageFlag_DigitalSignature;
   valid_ctx.RequiredKeyPurposes =

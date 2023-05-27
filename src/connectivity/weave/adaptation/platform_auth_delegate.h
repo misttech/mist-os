@@ -56,6 +56,7 @@ class PlatformAuthDelegate final : public WeaveCASEAuthDelegate, public WeaveKey
                                  WeaveCertificateSet& cert_set) override;
   WEAVE_ERROR GenerateNodeSignature(WeaveKeyExport* key_export, const uint8_t* msg_hash,
                                     uint8_t msg_hash_len, TLVWriter& writer) override;
+  WEAVE_ERROR ReplaceExpiredCertInServiceConfig(WeaveCertificateSet& cert_set);
   WEAVE_ERROR BeginCertValidation(WeaveKeyExport* key_export, ValidationContext& valid_ctx,
                                   WeaveCertificateSet& cert_set) override;
   WEAVE_ERROR HandleCertValidationResult(WeaveKeyExport* key_export, ValidationContext& valid_ctx,
