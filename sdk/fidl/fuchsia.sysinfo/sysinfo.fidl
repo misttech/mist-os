@@ -9,11 +9,21 @@ using zx;
 const BOARD_NAME_LEN uint8 = 32;
 const BOOTLOADER_VENDOR_LEN uint8 = 32;
 
+@available(removed=12)
 type InterruptControllerType = strict enum {
     UNKNOWN = 0;
     APIC = 1;
     GIC_V2 = 2;
     GIC_V3 = 3;
+};
+
+@available(added=12)
+type InterruptControllerType = flexible enum {
+    UNKNOWN = 0;
+    APIC = 1;
+    GIC_V2 = 2;
+    GIC_V3 = 3;
+    PLIC = 4;
 };
 
 type InterruptControllerInfo = struct {

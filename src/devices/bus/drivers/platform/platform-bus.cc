@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
+#include <fidl/fuchsia.sysinfo/cpp/wire_types.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -982,19 +983,21 @@ zx_status_t PlatformBus::Init() {
 #if __x86_64__
   interrupt_controller_type_ = fuchsia_sysinfo::wire::InterruptControllerType::kApic;
 #else
-  auto boot_item = GetBootItem(ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_GIC_V2);
-  if (boot_item.is_error() && boot_item.status_value() != ZX_ERR_NOT_FOUND) {
-    return boot_item.status_value();
-  }
-  if (boot_item.is_ok()) {
-    interrupt_controller_type_ = fuchsia_sysinfo::wire::InterruptControllerType::kGicV2;
-  }
-  boot_item = GetBootItem(ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_GIC_V3);
-  if (boot_item.is_error() && boot_item.status_value() != ZX_ERR_NOT_FOUND) {
-    return boot_item.status_value();
-  }
-  if (boot_item.is_ok()) {
-    interrupt_controller_type_ = fuchsia_sysinfo::wire::InterruptControllerType::kGicV3;
+  std::array<std::pair<zbi_kernel_driver_t, fuchsia_sysinfo::wire::InterruptControllerType>, 3>
+      interrupt_driver_type_mapping = {
+          {{ZBI_KERNEL_DRIVER_ARM_GIC_V2, fuchsia_sysinfo::wire::InterruptControllerType::kGicV2},
+           {ZBI_KERNEL_DRIVER_ARM_GIC_V3, fuchsia_sysinfo::wire::InterruptControllerType::kGicV3},
+           {ZBI_KERNEL_DRIVER_RISCV_PLIC, fuchsia_sysinfo::wire::InterruptControllerType::kPlic}},
+      };
+
+  for (const auto& [driver, controller] : interrupt_driver_type_mapping) {
+    auto boot_item = GetBootItem(ZBI_TYPE_KERNEL_DRIVER, driver);
+    if (boot_item.is_error() && boot_item.status_value() != ZX_ERR_NOT_FOUND) {
+      return boot_item.status_value();
+    }
+    if (boot_item.is_ok()) {
+      interrupt_controller_type_ = controller;
+    }
   }
 #endif
 

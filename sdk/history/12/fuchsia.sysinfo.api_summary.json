@@ -38,13 +38,18 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.sysinfo/InterruptControllerType.PLIC",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.sysinfo/InterruptControllerType.UNKNOWN",
         "value": "0"
     },
     {
         "kind": "enum",
         "name": "fuchsia.sysinfo/InterruptControllerType",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {
