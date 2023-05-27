@@ -5,12 +5,9 @@
 import("//build/components.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/test.gni")
+import("//src/sys/core/build/core_shard.gni")
 
 ## Groups
-group("device_registry") {
-  deps = []
-}
-
 group("tests") {
   testonly = true
   deps = [
@@ -19,7 +16,18 @@ group("tests") {
   ]
 }
 
+## Shards
+core_shard("core_shard") {
+  shard_file = "meta/audio_device_registry.core_shard.cml"
+}
+
 ## Packages
+fuchsia_package("device_registry") {
+  package_name = "audio_device_registry"
+
+  deps = [ ":device_registry_comp" ]
+}
+
 fuchsia_unittest_package("audio_services_device_registry_unittests") {
   deps = [ ":device_registry_unittests_bin" ]
 
@@ -40,7 +48,25 @@ fuchsia_unittest_package("audio_services_device_registry_warning_unittests") {
   }
 }
 
+## Components
+fuchsia_component("device_registry_comp") {
+  component_name = "audio_device_registry"
+  manifest = "//src/media/audio/services/device_registry/meta/audio_device_registry.cml"
+
+  deps = [ ":device_registry_bin" ]
+}
+
 ## Executables
+executable("device_registry_bin") {
+  output_name = "audio_device_registry"
+  sources = [ "main.cc" ]
+  deps = [
+    ":device_registry_lib",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
 executable("device_registry_unittests_bin") {
   testonly = true
 

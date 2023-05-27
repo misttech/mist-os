@@ -68,6 +68,9 @@ user_platform_aib_names =
       # Feature-level / Subsystem-level bundles
       # Keep sorted alphabetically.
 
+      # Media
+      "audio_device_registry",
+
       # Fonts
       "fonts",
 

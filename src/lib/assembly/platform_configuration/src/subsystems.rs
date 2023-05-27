@@ -217,7 +217,7 @@ fn configure_subsystems(
     input::InputSubsystemConfig::define_configuration(context, &config.platform.input, builder)
         .context("Configuring the 'input' subsystem")?;
 
-    media::MediaSubsystem::define_configuration(context, &(), builder)
+    media::MediaSubsystem::define_configuration(context, &config.platform.media, builder)
         .context("Configuring the 'media' subsystem")?;
 
     radar::RadarSubsystemConfig::define_configuration(context, &(), builder)

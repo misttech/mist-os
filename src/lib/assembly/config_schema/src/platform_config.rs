@@ -14,6 +14,7 @@ pub mod graphics_config;
 pub mod icu_config;
 pub mod identity_config;
 pub mod input_config;
+pub mod media_config;
 pub mod session_manager_config;
 pub mod starnix_config;
 pub mod storage_config;
@@ -77,6 +78,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the input area.
     #[serde(default)]
     pub input: input_config::PlatformInputConfig,
+
+    /// Platform configuration options for the media area.
+    #[serde(default)]
+    pub media: media_config::PlatformMediaConfig,
 
     /// Platform configuration options for the session manager.
     #[serde(default)]

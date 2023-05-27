@@ -1,0 +1,54 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "audio_device_registry",
+            url: "fuchsia-pkg://fuchsia.com/audio_device_registry#meta/audio_device_registry.cm",
+            startup: "eager",
+        },
+    ],
+    capabilities: [
+        {
+            // Make these available to v1 components...
+            protocol: [
+                "fuchsia.audio.device.Controller",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
+            ],
+        },
+    ],
+    use: [
+        {
+            // ... after consuming them from v2 components...
+            protocol: [
+                "fuchsia.audio.device.Controller",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
+            ],
+            from: "#audio_device_registry",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: "#audio_device_registry",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-audio-input",
+            to: "#audio_device_registry",
+            subdir: "audio-input",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-audio-output",
+            to: "#audio_device_registry",
+            subdir: "audio-output",
+        },
+    ],
+}
