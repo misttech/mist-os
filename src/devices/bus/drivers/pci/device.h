@@ -111,11 +111,11 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
 
     // All the strings used for inspect PropertyValue and Node names.
     static constexpr char kInspectHeaderBars[] = "BARs";
-    static constexpr char kInspectHeaderBarsInitial[] = "0. Initial";
-    static constexpr char kInspectHeaderBarsProbed[] = "1. Probed";
-    static constexpr char kInspectHeaderBarsConfigured[] = "2. Configured";
+    static constexpr char kInspectHeaderBarsInitial[] = "0. Initial Value";
+    static constexpr char kInspectHeaderBarsProbed[] = "1. Probe Details";
+    static constexpr char kInspectHeaderBarsConfigured[] = "3. Configured Value";
     static constexpr char kInspectHeaderBarsFailed[] = "Failed Range";
-    static constexpr char kInspectHeaderBarsReallocated[] = "Reallocated Range";
+    static constexpr char kInspectHeaderBarsReallocated[] = "2. Allocated Range";
     static constexpr char kInspectHeaderInterrupts[] = "Interrupts";
     static constexpr char kInspectIrqMode[] = "Mode";
     static constexpr char kInspectLegacyInterrupt[] = "Legacy Interrupt";
@@ -365,7 +365,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   void InspectRecordBarConfiguredState(uint8_t bar_id, uint64_t bar_val);
   void InspectRecordBarRange(const char* name, uint8_t bar_id, ralloc_region_t region);
   void InspectRecordBarFailure(uint8_t bar_id, ralloc_region_t region);
-  void InspectRecordBarReallocation(uint8_t bar_id, ralloc_region_t region);
+  void InspectRecordBarAllocation(uint8_t bar_id, ralloc_region_t region);
   void InspectRecordBarProbedState(uint8_t bar_id, const Bar& bar);
 
   mutable fbl::Mutex dev_lock_;

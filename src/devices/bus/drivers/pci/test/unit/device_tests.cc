@@ -123,8 +123,8 @@ TEST_F(PciDeviceTests, CreationTest) {
   ASSERT_OK(Device::Create(parent(), std::move(fake_cfg), &upstream(), &bus(), GetInspectNode(),
                            /*has_acpi=*/false));
 
-  auto* allocator = reinterpret_cast<FakeAllocator*>(&upstream().mmio_regions());
-  allocator->FailNextAllocation(true);
+  reinterpret_cast<FakeAllocator*>(&upstream().mmio_regions())->FailNextAllocation(true);
+  reinterpret_cast<FakeAllocator*>(&upstream().pf_mmio_regions())->FailNextAllocation(true);
   ConfigureDownstreamDevices();
 
   // Verify the created device's BDF.
@@ -135,23 +135,24 @@ TEST_F(PciDeviceTests, CreationTest) {
 
   // Did the device BARs get allocated (and re-allocated) as expected?
   ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-  // First BAR is re-allocated so we should have 4 entries.
-  EXPECT_EQ(4, hierarchy()
+  // We primed the MMIO allocators to fail the first round for BAR 0 so it
+  // should have a 5th inspect entry for the failed allocation.
+  EXPECT_EQ(5, hierarchy()
                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "0"})
                    ->node()
                    .properties()
                    .size());
-  EXPECT_EQ(3, hierarchy()
+  EXPECT_EQ(4, hierarchy()
                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "1"})
                    ->node()
                    .properties()
                    .size());
-  EXPECT_EQ(3, hierarchy()
+  EXPECT_EQ(4, hierarchy()
                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "2"})
                    ->node()
                    .properties()
                    .size());
-  EXPECT_EQ(3, hierarchy()
+  EXPECT_EQ(4, hierarchy()
                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "3"})
                    ->node()
                    .properties()
@@ -159,7 +160,7 @@ TEST_F(PciDeviceTests, CreationTest) {
   // There should be no BAR 4, so no node at this path.
   EXPECT_EQ(nullptr,
             hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "4"}));
-  EXPECT_EQ(3, hierarchy()
+  EXPECT_EQ(4, hierarchy()
                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "5"})
                    ->node()
                    .properties()

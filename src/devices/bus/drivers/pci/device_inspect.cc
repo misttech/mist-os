@@ -107,7 +107,7 @@ void Device::InspectRecordBarFailure(uint8_t bar_id, ralloc_region_t region) {
   InspectRecordBarRange(Inspect::kInspectHeaderBarsFailed, bar_id, region);
 }
 
-void Device::InspectRecordBarReallocation(uint8_t bar_id, ralloc_region_t region) {
+void Device::InspectRecordBarAllocation(uint8_t bar_id, ralloc_region_t region) {
   InspectRecordBarRange(Inspect::kInspectHeaderBarsReallocated, bar_id, region);
 }
 

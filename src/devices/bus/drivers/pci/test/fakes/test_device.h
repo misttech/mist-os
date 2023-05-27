@@ -58,7 +58,7 @@ static std::array<uint8_t, PCI_EXT_CONFIG_SIZE> kFakeQuadroDeviceConfig = {
     0x00, // Latency Timer
     0x80, // Header Type
     0x00, // BIST
-    0x00, 0x00, 0x00, 0x00, // BAR 0 (32-bit mmio, non-pf, size 16M)
+    0x00, 0x00, 0x80, 0x00, // BAR 0 (32-bit mmio, non-pf, size 16M). Starting address 0x800000.
     0x08, 0x00, 0x00, 0x00, // BAR 1 (32-bit mmio, pf, size 256M)
     0x00, 0x00, 0x00, 0x00, // BAR 2 (MSI-X bar, size 1024)
     0x0c, 0x00, 0x00, 0x00, // BAR 3 (64-bit mmio, pf, size 32M)

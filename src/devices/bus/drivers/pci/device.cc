@@ -424,14 +424,19 @@ zx::result<std::unique_ptr<PciAllocation>> Device::AllocateFromUpstream(
   // If the allocation fits within the low MMIO window then attempt to allocate
   // it there. Ensure it can't cross the low to high boundary between 4GB and
   // beyond. Any prefetchable BARs at this point are downstream of a root so it
-  // doesn't matter which allocator we use.
+  // doesn't matter which allocator we use for prefetchability specifically.
+  // It's worth noting that if a BAR did not have an existing allocation then
+  // its start address will be 0, so we'll always try to allocate from the low
+  // MMIO allocator first in that case.
   zx_paddr_t end_offset = 0;
   if (!add_overflow(start, bar.size - 1, &end_offset) &&
       end_offset <= std::numeric_limits<uint32_t>::max()) {
-    return upstream_->mmio_regions().Allocate(base, bar.size);
+    if (auto result = upstream_->mmio_regions().Allocate(base, bar.size); result.is_ok()) {
+      return result.take_value();
+    }
   }
 
-  // Otherwise, use the high MMIO allocator.
+  // Otherwise, try to use the high MMIO allocator.
   return upstream_->pf_mmio_regions().Allocate(base, bar.size);
 }
 
@@ -443,22 +448,34 @@ zx::result<> Device::AllocateBar(uint8_t bar_id) {
   ZX_DEBUG_ASSERT(bars_[bar_id].has_value());
 
   Bar& bar = *bars_[bar_id];
-  // The goal is to try to allocate the same window configured by the
-  // bootloader/bios, but if unavailable then allocate an appropriately sized
-  // window from anywhere in the upstream allocator.
-  if (auto result = AllocateFromUpstream(bar, bar.address); result.is_ok()) {
-    bar.allocation = std::move(result.value());
-  } else if (auto result = AllocateFromUpstream(bar, std::nullopt); result.is_ok()) {
-    InspectRecordBarReallocation(bar_id, {result.value()->base(), result.value()->size()});
-    bar.allocation = std::move(result.value());
-  } else {
-    InspectRecordBarFailure(bar_id, {bar.address, bar.size});
+  // First try to allocate any address that we found during the probe. If it
+  // fails then log it because it most likely failed due to an expected address
+  // region being in use already. If the address is zero due to being
+  // uninitialized when PCI comes up then we can skip this step because we know
+  // we will never be able to allocate from address 0 in any address space type.
+  zx::result<std::unique_ptr<PciAllocation>> result;
+  if (bar.address) {
+    result = AllocateFromUpstream(bar, bar.address);
+    if (!result.is_ok()) {
+      InspectRecordBarFailure(bar_id, {bar.address, bar.size});
+    }
+  }
+
+  // If the previous allocation failed, or result has been unused, then try to
+  // reallocate from any allocator at any location.
+  if (!result.is_ok()) {
+    result = AllocateFromUpstream(bar, std::nullopt);
+  }
+
+  if (result.is_error()) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
+  InspectRecordBarAllocation(bar_id, {result.value()->base(), result.value()->size()});
+  bar.allocation = std::move(result.value());
   bar.address = bar.allocation->base();
   WriteBarInformation(bar);
-  InspectRecordBarConfiguredState(bar_id, bar.address);
+  InspectRecordBarConfiguredState(bar_id, cfg_->Read(Config::kBar(bar_id)));
 
   return zx::ok();
 }
