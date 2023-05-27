@@ -349,8 +349,6 @@ fn translate_expose(
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
                 for source in &sources {
-                    // TODO(fxbug.dev/127214): All sources that feed into an aggregation operation
-                    // should have the same `availability`.
                     let (source, availability) = derive_source_and_availability(
                         expose.availability.as_ref(),
                         clone_ref(source)?,
@@ -1630,6 +1628,9 @@ mod tests {
             RunnerRegistration, Use, UseFromRef,
         },
         assert_matches::assert_matches,
+        cm_fidl_validator::error::AvailabilityList,
+        cm_fidl_validator::error::Error as CmFidlError,
+        cm_fidl_validator::error::{DeclField, ErrorList},
         cm_types::{self as cm, Name},
         difference::Changeset,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -4517,28 +4518,156 @@ mod tests {
         };
     }
 
-    /// This is a smoke test that [compile] will use [cm_fidl_validator] to validate the FIDL
-    /// component declaration. The expected error output format may change over time as we move
-    /// which validation is performed in which module.
     #[test]
-    fn test_validation_from_cm_fidl_validator() {
-        let missing_stop_timeout = must_parse_cml!({
-            "environments": [
+    fn test_expose_void_service_capability() {
+        let input = must_parse_cml!({
+            "expose": [
                 {
-                    "name": "myenv3",
-                    "extends": "none",
-                }
+                    "service": "fuchsia.foo.Bar",
+                    "from": [ "#non_existent_child" ],
+                    "source_availability": "unknown",
+                },
             ],
         });
-        use cm_fidl_validator::error::Error as CmFidlError;
-        use cm_fidl_validator::error::ErrorList;
+        let result = compile(&input, None);
+        assert_matches!(result, Ok(_));
+    }
+
+    /// Different availabilities aggregated by several service expose declarations is an error.
+    #[test]
+    fn test_aggregated_capabilities_must_use_same_availability_expose() {
+        // Same availability.
+        let input = must_parse_cml!({
+            "expose": [
+                {
+                    "service": "fuchsia.foo.Bar",
+                    "from": [ "#a", "#b" ],
+                    "availability": "optional",
+                },
+            ],
+            "collections": [
+                {
+                    "name": "a",
+                    "durability": "transient",
+                },
+                {
+                    "name": "b",
+                    "durability": "transient",
+                },
+            ],
+        });
+        let result = compile(&input, None);
+        assert_matches!(result, Ok(_));
+
+        // Different availability.
+        let input = must_parse_cml!({
+            "expose": [
+                {
+                    "service": "fuchsia.foo.Bar",
+                    "from": [ "#a", "#non_existent" ],
+                    "source_availability": "unknown",
+                },
+            ],
+            "collections": [
+                {
+                    "name": "a",
+                    "durability": "transient",
+                },
+            ],
+        });
+        let result = compile(&input, None);
         assert_matches!(
-            compile(&missing_stop_timeout, None),
+            result,
             Err(Error::FidlValidator  { errs: ErrorList { errs } })
             if matches!(
                 &errs[..],
-                [ CmFidlError::MissingField(decl_field) ]
-                if &decl_field.decl == "Environment" && &decl_field.field == "stop_timeout_ms"
+                [
+                    CmFidlError::DifferentAvailabilityInAggregation(AvailabilityList(availabilities)),
+                    // There is an additional error because `#non_existent` is translated to
+                    // `void`, and aggregating from `void` is not allowed. But we do not care about
+                    // the specifics.
+                    CmFidlError::ServiceAggregateNotCollection(_, _),
+                ]
+                if matches!(
+                    &availabilities[..],
+                    [ fdecl::Availability::Required, fdecl::Availability::Optional, ]
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn test_aggregated_capabilities_must_use_same_availability_offer() {
+        // Same availability.
+        let input = must_parse_cml!({
+            "offer": [
+                {
+                    "service": "fuchsia.foo.Bar",
+                    "from": [ "#a", "#b" ],
+                    "to": "#c",
+                    "availability": "optional",
+                },
+            ],
+            "collections": [
+                {
+                    "name": "a",
+                    "durability": "transient",
+                },
+                {
+                    "name": "b",
+                    "durability": "transient",
+                },
+            ],
+            "children": [
+                {
+                    "name": "c",
+                    "url": "fuchsia-pkg://fuchsia.com/c/c#meta/c.cm",
+                },
+            ],
+        });
+        let result = compile(&input, None);
+        assert_matches!(result, Ok(_));
+
+        // Different availability.
+        let input = must_parse_cml!({
+            "offer": [
+                {
+                    "service": "fuchsia.foo.Bar",
+                    "from": [ "#a", "#non_existent" ],
+                    "to": "#c",
+                    "source_availability": "unknown",
+                },
+            ],
+            "collections": [
+                {
+                    "name": "a",
+                    "durability": "transient",
+                },
+            ],
+            "children": [
+                {
+                    "name": "c",
+                    "url": "fuchsia-pkg://fuchsia.com/c/c#meta/c.cm",
+                },
+            ],
+        });
+        let result = compile(&input, None);
+        assert_matches!(
+            result,
+            Err(Error::FidlValidator  { errs: ErrorList { errs } })
+            if matches!(
+                &errs[..],
+                [
+                    CmFidlError::DifferentAvailabilityInAggregation(AvailabilityList(availabilities)),
+                    // There is an additional error because `#non_existent` is translated to
+                    // `void`, and aggregating from `void` is not allowed. But we do not care about
+                    // the specifics.
+                    CmFidlError::ServiceAggregateNotCollection(_, _),
+                ]
+                if matches!(
+                    &availabilities[..],
+                    [ fdecl::Availability::Required, fdecl::Availability::Optional, ]
+                )
             )
         );
     }

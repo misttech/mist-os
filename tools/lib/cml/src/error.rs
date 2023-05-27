@@ -5,6 +5,7 @@
 use {
     cm_fidl_validator::error::ErrorList,
     cm_types::ParseError,
+    fidl_fuchsia_component_decl as fdecl,
     std::path::Path,
     std::str::Utf8Error,
     std::{convert::TryFrom, error, fmt, io},
@@ -176,10 +177,28 @@ fn format_multiple_fidl_validator_errors(e: &ErrorList, f: &mut fmt::Formatter<'
     //   As such, we will surface this kind of errors as `Internal` as an indication.
     //   That is represented by the `_` match arm here.
     //
+    use cm_fidl_validator::error::Error as CmFidlError;
     let mut found_internal_errors = false;
     for e in e.errs.iter() {
         match e {
             // Add more branches as we come up with good transformations.
+            CmFidlError::DifferentAvailabilityInAggregation(availability_list) => {
+                // Format the availability in `cml` syntax.
+                let comma_separated = availability_list
+                    .0
+                    .iter()
+                    .map(|s| match s {
+                        fdecl::Availability::Required => "\"required\"".to_string(),
+                        fdecl::Availability::Optional => "\"optional\"".to_string(),
+                        fdecl::Availability::SameAsTarget => "\"same_as_target\"".to_string(),
+                        fdecl::Availability::Transitional => "\"transitional\"".to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                write!(f, "All sources that feed into an aggregation operation should have the same availability. ")?;
+                write!(f, "Got [ {comma_separated} ].")?;
+            }
             _ => {
                 write!(f, "Internal error: {}\n", e)?;
                 found_internal_errors = true;
@@ -311,5 +330,24 @@ mod tests {
             *filename = Some("test.cml".to_string());
         }
         assert_eq!(format!("{}", result), "Error at test.cml: oops");
+    }
+
+    #[test]
+    fn test_format_multiple_fidl_validator_errors() {
+        use cm_fidl_validator::error::AvailabilityList;
+        use cm_fidl_validator::error::Error as CmFidlError;
+
+        let error = Error::FidlValidator {
+            errs: ErrorList {
+                errs: vec![CmFidlError::DifferentAvailabilityInAggregation(AvailabilityList(
+                    vec![fdecl::Availability::Required, fdecl::Availability::Optional],
+                ))],
+            },
+        };
+        assert_eq!(
+            format!("{error}"),
+            "All sources that feed into an aggregation operation should \
+            have the same availability. Got [ \"required\", \"optional\" ]."
+        );
     }
 }

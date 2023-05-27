@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {std::fmt, thiserror::Error};
+use {fidl_fuchsia_component_decl as fdecl, std::fmt, std::fmt::Display, thiserror::Error};
 
 /// Enum type that can represent any error encountered during validation.
 #[derive(Debug, Error, PartialEq, Clone)]
@@ -76,6 +76,22 @@ pub enum Error {
     #[error("{} for {1} is an aggregate, but one of the sources is not a collection. \
             Aggregation from non-collection sources in not currently supported.", .0.field)]
     ServiceAggregateNotCollection(DeclField, String),
+
+    #[error("All sources that feed into an aggregation operation should have the same availability. Got {0}.")]
+    DifferentAvailabilityInAggregation(AvailabilityList),
+}
+
+/// [AvailabilityList] is a newtype to provide a human friendly [Display] impl for a vector
+/// of availabilities.
+#[derive(Debug, PartialEq, Clone)]
+pub struct AvailabilityList(pub Vec<fdecl::Availability>);
+
+impl Display for AvailabilityList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let comma_separated =
+            self.0.iter().map(|s| format!("{:?}", s)).collect::<Vec<_>>().join(", ");
+        write!(f, "[ {comma_separated} ]")
+    }
 }
 
 impl Error {
@@ -263,6 +279,10 @@ impl Error {
             DeclField { decl: decl_type.into(), field: keyword.into() },
             target_name.into(),
         )
+    }
+
+    pub fn different_availability_in_aggregation(availability: Vec<fdecl::Availability>) -> Self {
+        Error::DifferentAvailabilityInAggregation(AvailabilityList(availability))
     }
 }
 

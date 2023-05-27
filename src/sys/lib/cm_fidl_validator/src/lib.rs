@@ -14,11 +14,27 @@ use {
     fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
     itertools::Itertools,
     std::{
-        collections::{HashMap, HashSet},
+        collections::{BTreeSet, HashMap, HashSet},
         fmt,
         path::Path,
     },
 };
+
+trait HasAvailability {
+    fn availability(&self) -> fdecl::Availability;
+}
+
+impl HasAvailability for fdecl::ExposeService {
+    fn availability(&self) -> fdecl::Availability {
+        return self.availability.unwrap_or(fdecl::Availability::Required);
+    }
+}
+
+impl HasAvailability for fdecl::OfferService {
+    fn availability(&self) -> fdecl::Availability {
+        return self.availability.unwrap_or(fdecl::Availability::Required);
+    }
+}
 
 /// Validates Configuration Value Spec.
 ///
@@ -1427,6 +1443,22 @@ impl<'a> ValidationContext<'a> {
         Some((target_name, target))
     }
 
+    fn validate_aggregation_has_same_availability(
+        &mut self,
+        route_group: &Vec<impl HasAvailability>,
+    ) {
+        // Use `BtreeSet` for stable ordering of items in error message.
+        let availability_of_sources: BTreeSet<_> =
+            route_group.iter().map(|r| r.availability()).collect();
+
+        // All sources that feed into an aggregation operation should have the same availability.
+        if availability_of_sources.len() > 1 {
+            self.errors.push(Error::different_availability_in_aggregation(
+                availability_of_sources.into_iter().collect(),
+            ));
+        }
+    }
+
     // Checks a group of expose decls to confirm that any duplicate exposes are
     // valid aggregate expose declarations.
     fn validate_expose_group(&mut self, exposes: &'a Vec<fdecl::Expose>) {
@@ -1446,10 +1478,13 @@ impl<'a> ValidationContext<'a> {
         }
         for (p, expose_group) in expose_groups {
             if expose_group.len() == 1 {
-                // If there is not multiple exposes for a (target_name, target) pair then there are
+                // If there are not multiple exposes for a (target_name, target) pair then there are
                 // no aggregation conditions to check.
                 continue;
             }
+
+            self.validate_aggregation_has_same_availability(&expose_group);
+
             let (target_name, _) = p;
             if !expose_group.iter().all(|e| matches!(e.source, Some(fdecl::Ref::Collection(_)))) {
                 self.errors.push(Error::service_aggregate_not_collection(
@@ -1724,6 +1759,9 @@ impl<'a> ValidationContext<'a> {
                 // no aggregation conditions to check.
                 continue;
             }
+
+            self.validate_aggregation_has_same_availability(&offer_group);
+
             let (target_name, _) = p;
             if offer_type == OfferType::Static
                 && !offer_group.iter().all(|o| matches!(o.source, Some(fdecl::Ref::Collection(_))))
@@ -1734,6 +1772,7 @@ impl<'a> ValidationContext<'a> {
                     target_name,
                 ));
             }
+
             let mut source_instance_filter_entries: HashSet<String> = HashSet::new();
             let mut service_source_names: HashSet<String> = HashSet::new();
             for o in offer_group {
@@ -1762,6 +1801,7 @@ impl<'a> ValidationContext<'a> {
                         .expect("Offer Service declarations must always contain source_name"),
                 );
             }
+
             if service_source_names.len() > 1 {
                 self.errors.push(Error::invalid_aggregate_offer(format!(
                     "All aggregate service offers must have the same source_name, saw {}. Use renamed_instances to rename instance names to avoid conflict.",
@@ -1770,6 +1810,7 @@ impl<'a> ValidationContext<'a> {
             }
         }
     }
+
     fn validate_offers_decl(&mut self, offer: &'a fdecl::Offer, offer_type: OfferType) {
         match offer {
             fdecl::Offer::Service(o) => {
@@ -2521,11 +2562,13 @@ mod tests {
         }
     }
 
+    #[track_caller]
     fn validate_test(input: fdecl::Component, expected_res: Result<(), ErrorList>) {
         let res = validate(&input);
         assert_eq!(res, expected_res);
     }
 
+    #[track_caller]
     fn validate_test_any_result(input: fdecl::Component, expected_res: Vec<Result<(), ErrorList>>) {
         let res = format!("{:?}", validate(&input));
         let expected_res_debug = format!("{:?}", expected_res);
@@ -2541,6 +2584,7 @@ mod tests {
         );
     }
 
+    #[track_caller]
     fn validate_values_data_test(
         input: fdecl::ConfigValuesData,
         expected_res: Result<(), ErrorList>,
@@ -2549,6 +2593,7 @@ mod tests {
         assert_eq!(res, expected_res);
     }
 
+    #[track_caller]
     fn validate_capabilities_test(
         input: Vec<fdecl::Capability>,
         as_builtin: bool,
@@ -8365,6 +8410,122 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 Error::nested_vector()
+            ])),
+        },
+
+        test_validate_exposes_invalid_aggregation_different_availability => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.exposes = Some(vec![
+                    fdecl::Expose::Service(fdecl::ExposeService {
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_a".into()
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        availability: Some(fdecl::Availability::Required),
+                        ..Default::default()
+                    }),
+                    fdecl::Expose::Service(fdecl::ExposeService {
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_b".into()
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
+                        ..Default::default()
+                    })
+                ]);
+                decl.collections = Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll_a".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("coll_b".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::DifferentAvailabilityInAggregation(AvailabilityList(vec![
+                    fdecl::Availability::Required,
+                    fdecl::Availability::Optional,
+                ]))
+            ])),
+        },
+
+        test_validate_offers_invalid_aggregation_different_availability => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.offers = Some(vec![
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_a".into()
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(
+                            fdecl::ChildRef {
+                                name: "child_c".to_string(),
+                                collection: None,
+                            }
+                        )),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        source_instance_filter: Some(vec!["default".to_string()]),
+                        availability: Some(fdecl::Availability::Required),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll_b".into()
+                        })),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(
+                            fdecl::ChildRef {
+                                name: "child_c".to_string(),
+                                collection: None,
+                            }
+                        )),
+                        target_name: Some("fuchsia.logger.Log".to_string()),
+                        source_instance_filter: Some(vec!["a_different_default".to_string()]),
+                        availability: Some(fdecl::Availability::Optional),
+                        ..Default::default()
+                    })
+                ]);
+                decl.collections = Some(vec![
+                    fdecl::Collection {
+                        name: Some("coll_a".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                    fdecl::Collection {
+                        name: Some("coll_b".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },
+                ]);
+                decl.children = Some(vec![
+                    fdecl::Child {
+                        name: Some("child_c".to_string()),
+                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        on_terminate: None,
+                        environment: None,
+                        ..Default::default()
+                    },
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::DifferentAvailabilityInAggregation(AvailabilityList(vec![
+                    fdecl::Availability::Required,
+                    fdecl::Availability::Optional,
+                ]))
             ])),
         },
     }
