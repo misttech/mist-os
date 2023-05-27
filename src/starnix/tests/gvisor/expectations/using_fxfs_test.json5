@@ -744,6 +744,9 @@
                 "AbsAndRelTarget/ParamSymlinkTest.OpenLinkCreatesTarget/*",
                 "AbsAndRelTarget/ParamSymlinkTest.CreatLinkCreatesTarget/*",
                 "SymlinkTest.*",
+
+                // tcp_socket_test
+                "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
             ],
         },
     ],
