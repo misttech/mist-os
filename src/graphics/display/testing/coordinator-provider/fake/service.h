@@ -11,7 +11,7 @@
 #include <memory>
 #include <queue>
 
-#include "src/graphics/display/drivers/fake/mock-display-device-tree.h"
+#include "src/graphics/display/drivers/fake/fake-display-stack.h"
 #include "src/lib/fxl/macros.h"
 
 namespace sys {
@@ -53,12 +53,12 @@ class ProviderService : public fuchsia::hardware::display::Provider {
     OpenCoordinatorForPrimaryCallback callback;
   };
 
-  // Encapsulates state for thread safety, since |display::MockDisplayDeviceTree| invokes callbacks
+  // Encapsulates state for thread safety, since |display::FakeDisplayStack| invokes callbacks
   // from other threads.
   struct State {
     async_dispatcher_t* const dispatcher;
 
-    std::unique_ptr<display::MockDisplayDeviceTree> tree;
+    std::unique_ptr<display::FakeDisplayStack> tree;
 
     bool coordinator_claimed = false;
     bool virtcon_coordinator_claimed = false;

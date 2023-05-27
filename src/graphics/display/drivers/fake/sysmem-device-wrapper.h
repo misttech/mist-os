@@ -14,7 +14,7 @@
 
 namespace display {
 
-// Clients of MockDisplayDeviceTree pass a SysmemDeviceWrapper into the constructor to provide a
+// Clients of FakeDisplayStack pass a SysmemDeviceWrapper into the constructor to provide a
 // sysmem implementation to the display driver, with the goal of supporting the following use cases:
 //   - display driver unit tests want to use a self-contained/hermetic sysmem implementation, to
 //     improve reliability of test results.

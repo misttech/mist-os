@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "mock-display-device-tree.h"
+#include "fake-display-stack.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
@@ -14,9 +14,9 @@
 
 namespace display {
 
-MockDisplayDeviceTree::MockDisplayDeviceTree(
-    std::shared_ptr<zx_device> mock_root, std::unique_ptr<SysmemDeviceWrapper> sysmem,
-    const fake_display::FakeDisplayDeviceConfig& device_config)
+FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
+                                   std::unique_ptr<SysmemDeviceWrapper> sysmem,
+                                   const fake_display::FakeDisplayDeviceConfig& device_config)
     : mock_root_(mock_root), sysmem_(std::move(sysmem)) {
   pdev_fidl_.SetConfig({
       .use_fake_bti = true,
@@ -77,12 +77,12 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(
       std::move(display_endpoints->client));
 }
 
-MockDisplayDeviceTree::~MockDisplayDeviceTree() {
-  // AsyncShutdown() must be called before ~MockDisplayDeviceTree().
+FakeDisplayStack::~FakeDisplayStack() {
+  // AsyncShutdown() must be called before ~FakeDisplayStack().
   ZX_ASSERT(shutdown_);
 }
 
-fidl::ClientEnd<fuchsia_io::Directory> MockDisplayDeviceTree::SetUpPDevFidlServer() {
+fidl::ClientEnd<fuchsia_io::Directory> FakeDisplayStack::SetUpPDevFidlServer() {
   auto device_handler = [this](fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
     fidl::BindServer(pdev_loop_.dispatcher(), std::move(request), &pdev_fidl_);
   };
@@ -108,17 +108,15 @@ fidl::ClientEnd<fuchsia_io::Directory> MockDisplayDeviceTree::SetUpPDevFidlServe
   return std::move(endpoints->client);
 }
 
-const fidl::WireSyncClient<fuchsia_hardware_display::Provider>&
-MockDisplayDeviceTree::display_client() {
+const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack::display_client() {
   return display_provider_client_;
 }
 
-const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>&
-MockDisplayDeviceTree::sysmem_client() {
+const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& FakeDisplayStack::sysmem_client() {
   return sysmem_client_;
 }
 
-void MockDisplayDeviceTree::AsyncShutdown() {
+void FakeDisplayStack::AsyncShutdown() {
   if (shutdown_) {
     // AsyncShutdown() was already called.
     return;

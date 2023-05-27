@@ -15,7 +15,7 @@
 
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/graphics/display/drivers/fake/mock-display-device-tree.h"
+#include "src/graphics/display/drivers/fake/fake-display-stack.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -32,8 +32,8 @@ class FakeDisplayTest : public testing::Test {
     static constexpr FakeDisplayDeviceConfig kDeviceConfig = {
         .manual_vsync_trigger = true,
     };
-    tree_ = std::make_unique<display::MockDisplayDeviceTree>(std::move(mock_root),
-                                                             std::move(sysmem), kDeviceConfig);
+    tree_ = std::make_unique<display::FakeDisplayStack>(std::move(mock_root), std::move(sysmem),
+                                                        kDeviceConfig);
   }
 
   void TearDown() override {
@@ -48,7 +48,7 @@ class FakeDisplayTest : public testing::Test {
   }
 
  private:
-  std::unique_ptr<display::MockDisplayDeviceTree> tree_;
+  std::unique_ptr<display::FakeDisplayStack> tree_;
 };
 
 class FakeDisplaySysmemTest : public FakeDisplayTest {

@@ -24,8 +24,8 @@ void TestBase::SetUp() {
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
       .manual_vsync_trigger = true,
   };
-  tree_ = std::make_unique<MockDisplayDeviceTree>(std::move(mock_root), std::move(sysmem),
-                                                  kDeviceConfig);
+  tree_ =
+      std::make_unique<FakeDisplayStack>(std::move(mock_root), std::move(sysmem), kDeviceConfig);
 }
 
 void TestBase::TearDown() {

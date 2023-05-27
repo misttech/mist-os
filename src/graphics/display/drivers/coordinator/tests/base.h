@@ -24,7 +24,7 @@
 #include <fbl/array.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/fake/mock-display-device-tree.h"
+#include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
 namespace display {
 
@@ -50,7 +50,7 @@ class TestBase : public testing::Test {
   async::Loop loop_;
   thrd_t loop_thrd_ = 0;
 
-  std::unique_ptr<MockDisplayDeviceTree> tree_;
+  std::unique_ptr<FakeDisplayStack> tree_;
 };
 
 }  // namespace display

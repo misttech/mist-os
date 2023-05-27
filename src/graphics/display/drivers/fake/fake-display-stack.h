@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_MOCK_DISPLAY_DEVICE_TREE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_MOCK_DISPLAY_DEVICE_TREE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_TREE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_TREE_H_
 
 #include <fuchsia/sysmem/c/banjo.h>
 #include <lib/async-loop/loop.h>
@@ -19,17 +19,18 @@
 
 namespace display {
 
-// MockDisplayDeviceTree encapusulates the requirements for creating a fake DDK device tree with a
-// FakeDisplay device attached to it.
-class MockDisplayDeviceTree {
+// FakeDisplayStack creates and holds a FakeDisplay device as well as the
+// Sysmem device and the display coordinator Controller which are attached to
+// the fake display device and clients can connect to.
+class FakeDisplayStack {
  public:
   // |sysmem| allows the caller to customize the sysmem implementation used by the
-  // MockDisplayDeviceTree.  See SysmemDeviceWrapper for more details, as well as existing
+  // FakeDisplayStack.  See SysmemDeviceWrapper for more details, as well as existing
   // specializations of GenericSysmemDeviceWrapper<>.
-  MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_root,
-                        std::unique_ptr<SysmemDeviceWrapper> sysmem,
-                        const fake_display::FakeDisplayDeviceConfig& device_config);
-  ~MockDisplayDeviceTree();
+  FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
+                   std::unique_ptr<SysmemDeviceWrapper> sysmem,
+                   const fake_display::FakeDisplayDeviceConfig& device_config);
+  ~FakeDisplayStack();
 
   Controller* coordinator_controller() { return coordinator_controller_; }
   fake_display::FakeDisplay* display() { return display_; }
@@ -75,4 +76,4 @@ class MockDisplayDeviceTree {
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_MOCK_DISPLAY_DEVICE_TREE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_TREE_H_

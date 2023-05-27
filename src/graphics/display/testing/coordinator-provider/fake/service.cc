@@ -29,7 +29,7 @@ ProviderService::ProviderService(std::shared_ptr<zx_device> mock_root,
   };
   state_ =
       std::make_shared<State>(State{.dispatcher = dispatcher,
-                                    .tree = std::make_unique<display::MockDisplayDeviceTree>(
+                                    .tree = std::make_unique<display::FakeDisplayStack>(
                                         std::move(mock_root), std::move(sysmem), kDeviceConfig)});
 }
 
@@ -77,7 +77,7 @@ void ProviderService::ConnectClient(Request req, const std::shared_ptr<State>& s
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator>{req.coordinator_request.TakeChannel()},
       [weak = std::weak_ptr<State>(state), is_virtcon{req.is_virtcon}]() mutable {
         // Redispatch, in case this callback is invoked on a different thread (this depends
-        // on the implementation of MockDisplayDeviceTree, which makes no guarantees).
+        // on the implementation of FakeDisplayStack, which makes no guarantees).
         if (auto state = weak.lock()) {
           async::PostTask(state->dispatcher, [weak, is_virtcon]() mutable {
             if (auto state = weak.lock()) {
