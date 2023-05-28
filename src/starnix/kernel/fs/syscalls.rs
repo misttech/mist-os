@@ -1884,6 +1884,10 @@ pub fn sys_ppoll(
 
     let poll_result = poll(current_task, user_fds, num_fds, mask, deadline);
 
+    if user_timespec.is_null() {
+        return poll_result;
+    }
+
     let now = zx::Time::get_monotonic();
     let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
     let remaining_timespec = timespec_from_duration(remaining);
