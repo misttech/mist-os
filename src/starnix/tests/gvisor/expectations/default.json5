@@ -614,10 +614,6 @@
                 // sigaltstack_test - https://fxbug.dev/79359
                 "SigaltstackTest.ResetByExecve",
 
-                // signalfd_test
-                "Signalfd/SignalfdTest.SetMask/kSigno",
-                "Signalfd/SignalfdTest.SetMask/kSignoMax",
-
                 // socket_abstract_test - https://fxbug.dev/79366
                 "AbstractUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AbstractUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",

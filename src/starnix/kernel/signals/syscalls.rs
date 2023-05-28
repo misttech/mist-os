@@ -225,22 +225,25 @@ pub fn sys_signalfd4(
     mask_size: usize,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    if fd.raw() != -1 {
-        not_implemented!("changing mask of a signalfd");
-        return error!(EINVAL);
-    }
     if flags & !(SFD_CLOEXEC | SFD_NONBLOCK) != 0 {
         return error!(EINVAL);
     }
     if mask_size != std::mem::size_of::<SigSet>() {
         return error!(EINVAL);
     }
-
     let mask = current_task.mm.read_object(mask_addr)?;
-    let signalfd = SignalFd::new_file(current_task, mask, flags);
-    let flags = if flags & SFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.add_file(signalfd, flags)?;
-    Ok(fd)
+
+    if fd.raw() != -1 {
+        let file = current_task.files.get(fd)?;
+        let file = file.downcast_file::<SignalFd>().ok_or_else(|| errno!(EINVAL))?;
+        file.set_mask(mask);
+        Ok(fd)
+    } else {
+        let signalfd = SignalFd::new_file(current_task, mask, flags);
+        let flags = if flags & SFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
+        let fd = current_task.add_file(signalfd, flags)?;
+        Ok(fd)
+    }
 }
 
 fn send_unchecked_signal(task: &Task, unchecked_signal: &UncheckedSignal) -> Result<(), Errno> {

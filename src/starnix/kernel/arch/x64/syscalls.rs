@@ -17,6 +17,7 @@ use crate::fs::{
     DirentSink, DirentSink32, FdNumber,
 };
 use crate::mm::MemoryAccessorExt;
+use crate::signals::syscalls::sys_signalfd4;
 use crate::syscalls::not_implemented;
 use crate::task::{syscalls::do_clone, CurrentTask, Waiter};
 use crate::types::*;
@@ -298,6 +299,15 @@ pub fn sys_time(
 
 pub fn sys_unlink(current_task: &CurrentTask, user_path: UserCString) -> Result<(), Errno> {
     sys_unlinkat(current_task, FdNumber::AT_FDCWD, user_path, 0)
+}
+
+pub fn sys_signalfd(
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    mask_addr: UserRef<SigSet>,
+    mask_size: usize,
+) -> Result<FdNumber, Errno> {
+    sys_signalfd4(current_task, fd, mask_addr, mask_size, 0)
 }
 
 pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {

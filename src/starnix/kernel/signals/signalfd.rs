@@ -4,6 +4,7 @@
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
+use crate::lock::Mutex;
 use crate::signals::*;
 use crate::task::*;
 use crate::types::*;
@@ -12,7 +13,7 @@ use std::convert::TryInto;
 use zerocopy::AsBytes;
 
 pub struct SignalFd {
-    mask: SigSet,
+    mask: Mutex<SigSet>,
 }
 
 impl SignalFd {
@@ -21,7 +22,11 @@ impl SignalFd {
         if flags & SFD_NONBLOCK != 0 {
             open_flags |= OpenFlags::NONBLOCK;
         }
-        Anon::new_file(current_task, Box::new(SignalFd { mask }), open_flags)
+        Anon::new_file(current_task, Box::new(SignalFd { mask: Mutex::new(mask) }), open_flags)
+    }
+
+    pub fn set_mask(&self, mask: SigSet) {
+        *self.mask.lock() = mask;
     }
 }
 
@@ -37,13 +42,14 @@ impl FileOps for SignalFd {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            let mask = *self.mask.lock();
             let data_len = data.available();
             let mut buf = Vec::new();
             while buf.len() + std::mem::size_of::<signalfd_siginfo>() <= data_len {
                 let signal = current_task
                     .write()
                     .signals
-                    .take_next_where(|sig| self.mask.has_signal(sig.signal))
+                    .take_next_where(|sig| mask.has_signal(sig.signal))
                     .ok_or_else(|| errno!(EAGAIN))?;
                 let mut siginfo = signalfd_siginfo {
                     ssi_signo: signal.signal.number(),
@@ -106,7 +112,7 @@ impl FileOps for SignalFd {
 
     fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
         let mut events = FdEvents::empty();
-        if current_task.read().signals.is_any_allowed_by_mask(self.mask.to_inverted()) {
+        if current_task.read().signals.is_any_allowed_by_mask(self.mask.lock().to_inverted()) {
             events |= FdEvents::POLLIN;
         }
         events

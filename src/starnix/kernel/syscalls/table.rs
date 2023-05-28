@@ -243,6 +243,7 @@ pub fn dispatch_syscall(
         setxattr[5],
         shutdown[2],
         sigaltstack[2],
+        #[cfg(target_arch = "x86_64")] signalfd[3],
         signalfd4[4],
         socket[3],
         socketpair[4],
