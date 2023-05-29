@@ -460,7 +460,7 @@ The number of pager threads to spawn for blobfs.
 
 **Current value (from the default):** `2`
 
-From //src/storage/bin/blobfs/BUILD.gn:11
+From //src/storage/bin/blobfs/BUILD.gn:22
 
 ### blobfs_page_in_metrics_recording
 
