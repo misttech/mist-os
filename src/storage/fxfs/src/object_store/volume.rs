@@ -8,7 +8,7 @@ use {
         filesystem::Filesystem,
         object_store::{
             allocator::Allocator, directory::Directory, load_store_info, transaction::Options,
-            LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
+            transaction::Transaction, LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
         },
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -124,7 +124,13 @@ impl RootVolume {
         Ok(store)
     }
 
-    pub async fn delete_volume(&self, volume_name: &str) -> Result<(), Error> {
+    /// Deletes the given volume.  Consumes |transaction| and runs |callback| during commit.
+    pub async fn delete_volume(
+        &self,
+        volume_name: &str,
+        mut transaction: Transaction<'_>,
+        callback: impl FnOnce() + Send,
+    ) -> Result<(), Error> {
         let object_id =
             match self.volume_directory().lookup(volume_name).await?.ok_or(FxfsError::NotFound)? {
                 (object_id, ObjectDescriptor::Volume) => object_id,
@@ -137,11 +143,6 @@ impl RootVolume {
         let mut objects_to_delete = load_store_info(&root_store, object_id).await?.parent_objects();
         objects_to_delete.push(object_id);
 
-        let mut transaction = self
-            .filesystem
-            .clone()
-            .new_transaction(&[], Options { borrow_metadata_space: true, ..Default::default() })
-            .await?;
         for object_id in &objects_to_delete {
             root_store.adjust_refs(&mut transaction, *object_id, -1).await?;
         }
@@ -151,7 +152,7 @@ impl RootVolume {
         self.volume_directory()
             .delete_child_volume(&mut transaction, volume_name, object_id)
             .await?;
-        transaction.commit().await.context("commit")?;
+        transaction.commit_with_callback(|_| callback()).await.context("commit")?;
         // Tombstone the deleted objects.
         for object_id in &objects_to_delete {
             root_store.tombstone(*object_id, Options::default()).await?;
@@ -316,7 +317,18 @@ mod tests {
                 Some(&8192)
             );
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-            root_volume.delete_volume("vol").await.expect("delete_volume");
+            let transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(
+                        root_volume.volume_directory().store().store_object_id(),
+                        root_volume.volume_directory().object_id(),
+                    )],
+                    Options { borrow_metadata_space: true, ..Default::default() },
+                )
+                .await
+                .expect("new_transaction failed");
+            root_volume.delete_volume("vol", transaction, || {}).await.expect("delete_volume");
             // Confirm data allocation is gone.
             assert_eq!(
                 filesystem

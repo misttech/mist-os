@@ -645,7 +645,20 @@ impl<'a> Transaction<'a> {
                     // TODO(fxbug.dev/122977): Check lock requirements.
                 }
                 ObjectKeyData::Child { .. } => {
-                    // TODO(fxbug.dev/122973): Check lock requirements.
+                    let id = key.object_id;
+                    if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
+                        && !self.new_objects.contains(&(*store_object_id, id))
+                    {
+                        debug_assert!(
+                            false,
+                            "Not holding required lock for object {id} \
+                                in store {store_object_id}"
+                        );
+                        error!(
+                            "Not holding required lock for object {id} in store \
+                                {store_object_id}"
+                        )
+                    }
                 }
                 ObjectKeyData::GraveyardEntry { .. } => {
                     // TODO(fxbug.dev/122974): Check lock requirements.

@@ -151,8 +151,8 @@ impl VolumesDirectory {
     ) -> Result<FxVolumeAndRoot, Error> {
         let store = self.root_volume.volume_directory().store();
         let fs = store.filesystem();
-        let _write_guard = fs
-            .write_lock(&[LockKey::object(
+        let _guard = fs
+            .transaction_lock(&[LockKey::object(
                 store.store_object_id(),
                 self.root_volume.volume_directory().object_id(),
             )])
@@ -195,13 +195,16 @@ impl VolumesDirectory {
     /// Removes a volume. The volume must exist but encrypted volume keys are not required.
     pub async fn remove_volume(&self, name: &str) -> Result<(), Error> {
         let store = self.root_volume.volume_directory().store();
-        let fs = store.filesystem();
-        let _write_guard = fs
-            .write_lock(&[LockKey::object(
-                store.store_object_id(),
-                self.root_volume.volume_directory().object_id(),
-            )])
-            .await;
+        let transaction = store
+            .filesystem()
+            .new_transaction(
+                &[LockKey::object(
+                    store.store_object_id(),
+                    self.root_volume.volume_directory().object_id(),
+                )],
+                Options { borrow_metadata_space: true, ..Default::default() },
+            )
+            .await?;
         let object_id = match self
             .root_volume
             .volume_directory()
@@ -220,9 +223,13 @@ impl VolumesDirectory {
         if let Some(inspect) = self.inspect_tree.upgrade() {
             inspect.unregister_volume(name.to_string());
         }
-        self.root_volume.delete_volume(name).await?;
-        // This shouldn't fail because the entry should exist.
-        self.directory_node.remove_entry(name, /* must_be_directory: */ false).unwrap();
+        let directory_node = self.directory_node.clone();
+        self.root_volume
+            .delete_volume(name, transaction, || {
+                // This shouldn't fail because the entry should exist.
+                directory_node.remove_entry(name, /* must_be_directory: */ false).unwrap();
+            })
+            .await?;
         Ok(())
     }
 
@@ -230,8 +237,8 @@ impl VolumesDirectory {
     pub async fn terminate(&self) {
         let root_store = self.root_volume.volume_directory().store();
         let fs = root_store.filesystem();
-        let _write_guard = fs
-            .write_lock(&[LockKey::object(
+        let _guard = fs
+            .transaction_lock(&[LockKey::object(
                 root_store.store_object_id(),
                 self.root_volume.volume_directory().object_id(),
             )])
@@ -302,8 +309,8 @@ impl VolumesDirectory {
 
             let root_store = me.root_volume.volume_directory().store();
             let fs = root_store.filesystem();
-            let _write_guard = fs
-                .write_lock(&[LockKey::object(
+            let _guard = fs
+                .transaction_lock(&[LockKey::object(
                     root_store.store_object_id(),
                     me.root_volume.volume_directory().object_id(),
                 )])
@@ -477,8 +484,8 @@ impl VolumesDirectory {
         tracing::info!(%name, %store_id, ?options, "Received mount request");
         let store = self.root_volume.volume_directory().store();
         let fs = store.filesystem();
-        let _write_guard = fs
-            .write_lock(&[LockKey::object(
+        let _guard = fs
+            .transaction_lock(&[LockKey::object(
                 store.store_object_id(),
                 self.root_volume.volume_directory().object_id(),
             )])
@@ -527,8 +534,8 @@ impl VolumesDirectory {
 
                     let root_store = self.root_volume.volume_directory().store();
                     let fs = root_store.filesystem();
-                    let write_guard = fs
-                        .write_lock(&[LockKey::object(
+                    let guard = fs
+                        .transaction_lock(&[LockKey::object(
                             root_store.store_object_id(),
                             self.root_volume.volume_directory().object_id(),
                         )])
@@ -541,7 +548,7 @@ impl VolumesDirectory {
                     // pseudo-filesystem.
                     fasync::Task::spawn(async move {
                         let _ = stream;
-                        let _ = write_guard;
+                        let _ = guard;
                         let _ = me.unmount(store_id).await;
                         responder
                             .send()
@@ -584,6 +591,7 @@ mod tests {
         },
         fxfs_crypto::Crypt,
         fxfs_insecure_crypto::InsecureCrypt,
+        rand::Rng as _,
         std::{
             sync::{Arc, Weak},
             time::Duration,
@@ -996,6 +1004,151 @@ mod tests {
                     .expect("handle_request failed");
             }
         );
+        // Make sure the background thread that actually calls terminate() on the volume finishes
+        // before exiting the test. terminate() should be a no-op since we already verified
+        // mounted_directories is empty, but the volume's terminate() future in the background task
+        // may still be outstanding. As both the background task and VolumesDirectory::terminate()
+        // hold the write lock, we use that to block until the background task has completed.
+        volumes_directory.terminate().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_volume_dir_races() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let crypt = Arc::new(InsecureCrypt::new()) as Arc<dyn Crypt>;
+        let store_id = {
+            let vol = volumes_directory
+                .create_volume("encrypted", Some(crypt.clone()))
+                .await
+                .expect("create encrypted volume failed");
+            vol.volume().store().store_object_id()
+        };
+        volumes_directory.unmount(store_id).await.expect("unmount failed");
+
+        let (volume_proxy, volume_server_end) =
+            fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+        volumes_directory.directory_node().clone().open(
+            ExecutionScope::new(),
+            fio::OpenFlags::RIGHT_READABLE,
+            Path::validate_and_split("encrypted").unwrap(),
+            volume_server_end.into_channel().into(),
+        );
+
+        let crypt_service = Arc::new(fxfs_crypt::CryptService::new());
+        crypt_service
+            .add_wrapping_key(0, fxfs_insecure_crypto::DATA_KEY.to_vec())
+            .expect("add_wrapping_key failed");
+        crypt_service
+            .add_wrapping_key(1, fxfs_insecure_crypto::METADATA_KEY.to_vec())
+            .expect("add_wrapping_key failed");
+        crypt_service.set_active_key(KeyPurpose::Data, 0).expect("set_active_key failed");
+        crypt_service.set_active_key(KeyPurpose::Metadata, 1).expect("set_active_key failed");
+        let (client1, stream1) = create_request_stream().expect("create_endpoints failed");
+        let (client2, stream2) = create_request_stream().expect("create_endpoints failed");
+        let crypt_service_clone = crypt_service.clone();
+        let crypt_task1 = fasync::Task::spawn(async move {
+            crypt_service_clone
+                .handle_request(fxfs_crypt::Services::Crypt(stream1))
+                .await
+                .expect("handle_request failed");
+        });
+        let crypt_task2 = fasync::Task::spawn(async move {
+            crypt_service
+                .handle_request(fxfs_crypt::Services::Crypt(stream2))
+                .await
+                .expect("handle_request failed");
+        });
+
+        // Create two tasks each of mount and remove, and one to recreate the volume, so that we get
+        // to exercise a wide variety of concurrent actions.
+        // Delay remove and create a bit, since mount is slower due to FIDL.
+        join!(
+            async {
+                let (_dir_proxy, dir_server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create proxy to succeed");
+                if let Err(status) = volume_proxy
+                    .mount(dir_server_end, MountOptions { crypt: Some(client1), as_blob: false })
+                    .await
+                    .expect("mount (fidl) failed")
+                {
+                    let status = Status::from_raw(status);
+                    if status != Status::NOT_FOUND && status != Status::ALREADY_BOUND {
+                        assert!(false, "Unexpected status {:}", status);
+                    }
+                }
+            },
+            async {
+                let (_dir_proxy, dir_server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create proxy to succeed");
+                if let Err(status) = volume_proxy
+                    .mount(dir_server_end, MountOptions { crypt: Some(client2), as_blob: false })
+                    .await
+                    .expect("mount (fidl) failed")
+                {
+                    let status = Status::from_raw(status);
+                    if status != Status::NOT_FOUND && status != Status::ALREADY_BOUND {
+                        assert!(false, "Unexpected status {:}", status);
+                    }
+                }
+            },
+            async {
+                let volumes_directory = volumes_directory.clone();
+                let wait_time = rand::thread_rng().gen_range(0..5);
+                fasync::Timer::new(Duration::from_millis(wait_time)).await;
+                if let Err(err) = volumes_directory.remove_volume("encrypted").await {
+                    assert!(
+                        FxfsError::NotFound.matches(&err) || FxfsError::AlreadyBound.matches(&err),
+                        "Unexpected error {:?}",
+                        err
+                    );
+                }
+            },
+            async {
+                let volumes_directory = volumes_directory.clone();
+                let wait_time = rand::thread_rng().gen_range(0..5);
+                fasync::Timer::new(Duration::from_millis(wait_time)).await;
+                if let Err(err) = volumes_directory.remove_volume("encrypted").await {
+                    assert!(
+                        FxfsError::NotFound.matches(&err) || FxfsError::AlreadyBound.matches(&err),
+                        "Unexpected error {:?}",
+                        err
+                    );
+                }
+            },
+            async {
+                let volumes_directory = volumes_directory.clone();
+                let wait_time = rand::thread_rng().gen_range(0..5);
+                fasync::Timer::new(Duration::from_millis(wait_time)).await;
+                match volumes_directory.create_volume("encrypted", Some(crypt.clone())).await {
+                    Ok(vol) => {
+                        let store_id = vol.volume().store().store_object_id();
+                        std::mem::drop(vol);
+                        volumes_directory.unmount(store_id).await.expect("unmount failed");
+                    }
+                    Err(err) => {
+                        assert!(
+                            FxfsError::AlreadyExists.matches(&err)
+                                || FxfsError::AlreadyBound.matches(&err),
+                            "Unexpected error {:?}",
+                            err
+                        );
+                    }
+                }
+            }
+        );
+        std::mem::drop(crypt_task1);
+        std::mem::drop(crypt_task2);
         // Make sure the background thread that actually calls terminate() on the volume finishes
         // before exiting the test. terminate() should be a no-op since we already verified
         // mounted_directories is empty, but the volume's terminate() future in the background task
