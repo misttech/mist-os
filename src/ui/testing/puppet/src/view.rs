@@ -425,6 +425,7 @@ impl View {
             .expect("pointer sample missing position_in_viewport");
         let local_position =
             self.get_local_position(Point2D::new(position_in_viewport[0], position_in_viewport[1]));
+        let pointer_id = pointer_sample.interaction.expect("interaction id is missing").pointer_id;
 
         let local_x: f64 = local_position.x.try_into().expect("failed to convert to f64");
         let local_y: f64 = local_position.y.try_into().expect("failed to convert to f64");
@@ -442,6 +443,7 @@ impl View {
             local_x: Some(local_x),
             local_y: Some(local_y),
             phase: pointer_sample.phase,
+            pointer_id: Some(pointer_id),
             time_received: touch_event.timestamp,
             device_pixel_ratio: Some(self.device_pixel_ratio as f64),
             ..Default::default()

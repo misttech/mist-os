@@ -314,6 +314,12 @@ fn handle_touchscreen_request_stream(
 
                     responder.send().expect("Failed to send SimulateSwipe response");
                 }
+                Ok(TouchScreenRequest::SimulateMultiTap { payload: _, responder: _ }) => {
+                    todo!();
+                }
+                Ok(TouchScreenRequest::SimulateMultiFingerGesture { payload: _, responder: _ }) => {
+                    todo!();
+                }
                 Err(e) => {
                     error!("Error on touchscreen channel: {}", e);
                     return;

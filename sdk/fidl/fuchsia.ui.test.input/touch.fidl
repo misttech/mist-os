@@ -8,6 +8,9 @@ using fuchsia.math;
 using fuchsia.ui.pointer;
 using zx;
 
+@available(added=12)
+const MAX_FINGERS uint8 = 10;
+
 /// A tool to inject touch events into Input Pipeline.
 ///
 /// Please extend as necessary.
@@ -17,6 +20,14 @@ protocol TouchScreen {
         /// Location of the tap event, in the coordinate units specified during
         /// registration.
         1: tap_location fuchsia.math.Vec;
+    }) -> ();
+
+    /// Simulates multi finger tap at the requested locations.
+    @available(added=12)
+    SimulateMultiTap(table {
+        /// Locations of the tap event, in the coordinate units specified during
+        /// registration.
+        1: tap_locations vector<fuchsia.math.Vec>:MAX_FINGERS;
     }) -> ();
 
     /// Simulates a swipe that starts at `start_location` and ends at `end_location`,
@@ -41,14 +52,38 @@ protocol TouchScreen {
         /// Number of move events in the swipe.
         3: move_event_count uint32;
     }) -> ();
+
+
+    /// Simulates a multi fingers linear gesture that starts at `start_locations`
+    /// and ends at `end_locations`, with a total number of move events equal to
+    /// `move_event_count`. if the arguments are invalid, the server should close
+    /// the connection.
+    ///
+    /// The generated pointer event stream will be:
+    ///
+    /// DOWN + CHANGE_1 + ... + CHANGE_n + UP, where n == `move_event_count`
+    ///
+    /// Events are injected with a small explicit delay in between.
+    @available(added=12)
+    SimulateMultiFingerGesture(table {
+        /// Starting locations of the gesture, in the coordinate units specified during
+        /// registration.
+        1: start_locations array<fuchsia.math.Vec, MAX_FINGERS>;
+
+        /// End locations of the gesture, in the coordinate units specified during
+        /// registration.
+        2: end_locations array<fuchsia.math.Vec, MAX_FINGERS>;
+
+        /// Number of move events in the pinch.
+        3: move_event_count uint32;
+    }) -> ();
 };
 
 /// A tool for applications to report touch input to interested parties (e.g. a test
 /// fixture).
 @discoverable
 protocol TouchInputListener {
-    /// Report that component under test has received expected input. This structure
-    /// only support single pointer touch.
+    /// Report that component under test has received expected input.
     ReportTouchInput(table {
         /// The horizontal coordinate, in the reporter's coordinate system.
         1: local_x float64;
@@ -73,5 +108,11 @@ protocol TouchInputListener {
         /// The phase of the touch event.
         @available(added=12)
         6: phase fuchsia.ui.pointer.EventPhase;
+
+        /// pointer_id is used to identify finger in multi touch. each finger
+        /// is sent in a separate call to `ReportTouchInput()`, and the callee
+        /// is responsible for assembling the fingers as needed
+        @available(added=12)
+        7: pointer_id uint32;
     });
 };
