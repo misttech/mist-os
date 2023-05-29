@@ -81,9 +81,9 @@ test_deps = [
   "//src/devices/testing/mock-ddk",
   "//src/lib/json_parser",
   "//src/lib/storage/block_client/cpp",
-  "//src/storage/fs_test",
   "//zircon/system/ulib/fdio-caller",
   "//zircon/system/ulib/zxtest",
+  "//zircon/third_party/ulib/safemath",
 ]
 
 test("ufs-unit-tests-bin") {

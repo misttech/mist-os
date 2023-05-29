@@ -421,6 +421,11 @@ pub struct ServingSingleVolumeFilesystem {
 }
 
 impl ServingSingleVolumeFilesystem {
+    /// Returns a proxy to the exposed directory of the serving filesystem.
+    pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
+        &self.exposed_dir
+    }
+
     /// Returns a proxy to the root directory of the serving filesystem.
     pub fn root(&self) -> &fio::DirectoryProxy {
         &self.root_dir

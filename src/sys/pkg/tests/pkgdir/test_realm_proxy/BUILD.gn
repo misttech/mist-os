@@ -37,7 +37,6 @@ fuchsia_component("test_realm_proxy_component") {
   manifest = "meta/default.cml"
   deps = [
     ":bin",
-    "//src/storage/bin/blobfs",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }

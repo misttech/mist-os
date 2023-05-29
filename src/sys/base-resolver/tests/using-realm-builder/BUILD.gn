@@ -39,8 +39,6 @@ fuchsia_component("component") {
   manifest = "meta/base-resolver-integration-test.cml"
   deps = [
     ":driver",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/base-resolver:base-resolver-component",
     "//src/sys/pkg/bin/pm:pm_bin",

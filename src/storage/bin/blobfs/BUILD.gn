@@ -6,12 +6,24 @@ import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 
+# Include the .cm and .cvf in the bundle. Do not include bin/blobfs
+# since that is included in the legacy bundle via //bundles:bootstrap-zedboot
+bootfs_files_for_assembly("bootfs") {
+  deps = [
+    ":blobfs-component-config-values",
+    ":blobfs.cml",
+  ]
+}
+
+visibility = [ "//src/storage/*" ]
+
 declare_args() {
   # The number of pager threads to spawn for blobfs.
   blobfs_num_pager_threads = 2
 }
 
 executable("blobfs") {
+  visibility += [ "//src/lib/storage/fs_management/cpp:fs-management-test" ]
   sources = [ "main.cc" ]
   deps = [
     ":blobfs-component-config",
@@ -48,7 +60,15 @@ fuchsia_component("component") {
   ]
 }
 
+# Prefer this over the previous target for tests.
 group("blobfs-component") {
+  visibility += [
+    "//src/lib/storage/fs_management/rust:*",
+    "//src/recovery/system:*",
+    "//src/security/tests/pkg_test/fshost:*",
+    "//src/sys/pkg/testing/blobfs-ramdisk:*",
+    "//tools/blackout/blobfs-checkerboard:*",
+  ]
   deps = [
     ":blobfs_fs_management_shard",
     ":component",
@@ -64,15 +84,6 @@ fuchsia_structured_config_values("blobfs-component-config-values") {
   values = {
     pager_threads = blobfs_num_pager_threads
   }
-}
-
-# Include the .cm and .cvf in the bundle. Do not include bin/blobfs
-# since that is included in the legacy bundle via //bundles:bootstrap-zedboot
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":blobfs-component-config-values",
-    ":blobfs.cml",
-  ]
 }
 
 test("blobfs_component_test") {

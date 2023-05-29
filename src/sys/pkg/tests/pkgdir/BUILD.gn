@@ -49,10 +49,7 @@ ctf_fuchsia_package("pkgdir-tests") {
 fuchsia_component("test-root") {
   testonly = true
   manifest = "meta/test-root.cml"
-  deps = [
-    "//src/storage/blobfs:decompressor-sandbox",
-    "//src/storage/testing:storage_driver_test_realm",
-  ]
+  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
 }
 
 fuchsia_test_package("pkgdir-integration-tests") {

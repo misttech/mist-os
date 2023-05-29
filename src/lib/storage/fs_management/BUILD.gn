@@ -2,8 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//tools/cmc/build/expect_includes.gni")
+
 group("fs_management") {
   public_deps = [ "cpp:fs-management" ]
+}
+
+expect_includes("fs_management_shard") {
+  includes = [ "client.shard.cml" ]
 }
 
 group("tests") {

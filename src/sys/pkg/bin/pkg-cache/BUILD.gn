@@ -157,11 +157,7 @@ fuchsia_test_package("pkg-cache-tests") {
     }
   }
   test_components = [ ":pkg-cache-test" ]
-  deps = [
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
-    "//src/storage/testing:storage_driver_test_realm",
-  ]
+  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
 }
 
 group("tests") {

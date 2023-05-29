@@ -70,8 +70,6 @@ fuchsia_component("pkg-cache-integration-test") {
   manifest = "meta/pkg-cache-integration-test.cml"
   deps = [
     ":driver",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]

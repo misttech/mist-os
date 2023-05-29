@@ -86,7 +86,6 @@ fuchsia_unittest_package("fuchsia-pkg-testing-tests") {
     ":fuchsia-pkg-testing_test",
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
-    "//src/storage/bin/blobfs",
     "//src/storage/tools/blobfs-compression",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]

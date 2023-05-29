@@ -46,8 +46,6 @@ fuchsia_unittest_package("blobfs-lib-tests") {
   manifest = "meta/blobfs-lib-test.cml"
   deps = [
     ":blobfs_test",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-compression",
   ]

@@ -6,21 +6,22 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
 rustc_library("blobfs-ramdisk") {
+  testonly = true
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
   deps = [
-    "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/scoped_task",
+    "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/ramdevice_client",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/bin/blobfs:blobfs-component",
     "//src/sys/pkg/lib/blobfs",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
@@ -45,8 +46,6 @@ fuchsia_component("test-component") {
   manifest = "meta/test_driver.cml"
   deps = [
     ":blobfs-ramdisk_test",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-corrupt",
   ]

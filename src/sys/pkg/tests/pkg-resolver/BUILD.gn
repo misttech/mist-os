@@ -482,8 +482,6 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
 
     # Isolated, low-deps netstack
     "//src/connectivity/network/netstack:component",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/tools/blobfs-compression",
     "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/bin/system-update-committer:component",

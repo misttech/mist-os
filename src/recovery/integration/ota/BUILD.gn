@@ -46,8 +46,6 @@ fuchsia_test_component("ota_integration_test_component") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
     "//src/recovery/system:component_ota",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-compression",
     "//src/sys/pkg/bin/pm:pm_bin",

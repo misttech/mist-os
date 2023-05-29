@@ -16,8 +16,6 @@ blobfs binary, decompressor sandbox and storage driver test realm. Add the
 ```
 fuchsia_test_package("example-test-package") {
   deps = [
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-corrupt",
     ...
@@ -33,7 +31,6 @@ sandbox shard and driver test realm shard:
 ```json5
 {
     include: [
-        "//src/storage/blobfs/meta/decompressor_sandbox.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
     ],
 }

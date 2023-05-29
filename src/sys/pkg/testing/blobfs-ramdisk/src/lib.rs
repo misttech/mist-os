@@ -11,17 +11,18 @@
 use {
     anyhow::{format_err, Context as _, Error},
     fdio::{SpawnAction, SpawnOptions},
-    fidl::endpoints::{ClientEnd, ServerEnd},
-    fidl_fuchsia_fs::AdminMarker,
+    fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_protocol_at_dir_root,
+    fs_management::{
+        filesystem::{Filesystem, ServingSingleVolumeFilesystem},
+        Blobfs,
+    },
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
-    fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, prelude::*},
     futures::prelude::*,
     ramdevice_client::RamdiskClient,
-    scoped_task::Scoped,
     std::{borrow::Cow, collections::BTreeSet, ffi::CString},
 };
 
@@ -78,46 +79,15 @@ impl BlobfsRamdiskBuilder {
         let ramdisk = if let Some(ramdisk) = self.ramdisk {
             ramdisk
         } else {
-            Ramdisk::start().await.context("creating backing ramdisk for blobfs")?.format()?
+            Ramdisk::start().await.context("creating backing ramdisk for blobfs")?.format().await?
         };
 
         // Spawn blobfs on top of the ramdisk.
-        let block_device_handle_id = HandleInfo::new(HandleType::User0, 1);
-        let export_root_handle_id = HandleInfo::new(HandleType::DirectoryRequest, 0);
-
         let block_handle = ramdisk.clone_channel().context("cloning ramdisk channel")?;
 
-        let (export_root_proxy, blobfs_server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-        let process = scoped_task::spawn_etc(
-            scoped_task::job_default(),
-            SpawnOptions::CLONE_ALL,
-            &CString::new("/pkg/bin/blobfs").unwrap(),
-            &[
-                &CString::new("blobfs").unwrap(),
-                &CString::new("mount").unwrap(),
-                &CString::new("--allow_delivery_blobs").unwrap(),
-            ],
-            None,
-            &mut [
-                SpawnAction::add_handle(block_device_handle_id, block_handle.into()),
-                SpawnAction::add_handle(export_root_handle_id, blobfs_server_end.into()),
-            ],
-        )
-        .map_err(|(status, _)| status)
-        .context("spawning 'blobfs mount'")?;
+        let fs = blobfs(block_handle)?.serve().await?;
 
-        let (root_proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-        export_root_proxy.open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::ModeType::empty(),
-            "root",
-            server.into_channel().into(),
-        )?;
-        let blobfs =
-            BlobfsRamdisk { backing_ramdisk: ramdisk, process, export_root_proxy, root_proxy };
+        let blobfs = BlobfsRamdisk { backing_ramdisk: ramdisk, fs };
 
         // Write all the requested missing blobs to the mounted filesystem.
         if !self.blobs.is_empty() {
@@ -141,9 +111,7 @@ impl BlobfsRamdiskBuilder {
 /// A ramdisk-backed blobfs instance
 pub struct BlobfsRamdisk {
     backing_ramdisk: FormattedRamdisk,
-    process: Scoped<fuchsia_zircon::Process>,
-    export_root_proxy: fio::DirectoryProxy,
-    root_proxy: fio::DirectoryProxy,
+    fs: ServingSingleVolumeFilesystem,
 }
 
 impl BlobfsRamdisk {
@@ -169,7 +137,14 @@ impl BlobfsRamdisk {
     /// Returns a new connection to blobfs's root directory as a raw zircon channel.
     pub fn root_dir_handle(&self) -> Result<ClientEnd<fio::DirectoryMarker>, Error> {
         let (root_clone, server_end) = zx::Channel::create();
-        self.root_proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into())?;
+        self.fs.exposed_dir().open(
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::POSIX_WRITABLE
+                | fio::OpenFlags::POSIX_EXECUTABLE,
+            fio::ModeType::empty(),
+            "blob-exec",
+            server_end.into(),
+        )?;
         Ok(root_clone.into())
     }
 
@@ -192,22 +167,7 @@ impl BlobfsRamdisk {
 
     /// Signals blobfs to unmount and waits for it to exit cleanly, returning the backing Ramdisk.
     pub async fn unmount(self) -> Result<FormattedRamdisk, Error> {
-        connect_to_protocol_at_dir_root::<AdminMarker>(&self.export_root_proxy)?
-            .shutdown()
-            .await
-            .context("sending blobfs shutdown")?;
-
-        self.process
-            .wait_handle(
-                zx::Signals::PROCESS_TERMINATED,
-                zx::Time::after(zx::Duration::from_seconds(30)),
-            )
-            .context("waiting for 'blobfs mount' to exit")?;
-        let ret = self.process.info().context("getting 'blobfs mount' process info")?.return_code;
-        if ret != 0 {
-            return Err(format_err!("'blobfs mount' returned nonzero exit code {}", ret));
-        }
-
+        self.fs.shutdown().await?;
         Ok(self.backing_ramdisk)
     }
 
@@ -279,7 +239,7 @@ impl RamdiskBuilder {
 
     /// Create a [`BlobfsRamdiskBuilder`] that uses this as its backing ramdisk.
     pub async fn into_blobfs_builder(self) -> Result<BlobfsRamdiskBuilder, Error> {
-        Ok(BlobfsRamdiskBuilder::new().ramdisk(self.start().await?.format()?))
+        Ok(BlobfsRamdiskBuilder::new().ramdisk(self.start().await?.format().await?))
     }
 }
 
@@ -309,12 +269,8 @@ impl Ramdisk {
         Ok(result)
     }
 
-    fn clone_handle(&self) -> Result<zx::Handle, Error> {
-        Ok(self.clone_channel().context("cloning ramdisk channel")?.into())
-    }
-
-    fn format(self) -> Result<FormattedRamdisk, Error> {
-        mkblobfs_block(self.clone_handle()?)?;
+    async fn format(self) -> Result<FormattedRamdisk, Error> {
+        blobfs(self.clone_channel()?)?.format().await?;
         Ok(FormattedRamdisk(self))
     }
 
@@ -404,32 +360,11 @@ async fn wait_for_process_async(proc: fuchsia_zircon::Process) -> Result<(), Err
     Ok(())
 }
 
-fn mkblobfs_block(block_device: zx::Handle) -> Result<(), Error> {
-    let block_device_handle_id = HandleInfo::new(HandleType::User0, 1);
-    let p = fdio::spawn_etc(
-        &fuchsia_runtime::job_default(),
-        SpawnOptions::CLONE_ALL,
-        &CString::new("/pkg/bin/blobfs").unwrap(),
-        &[&CString::new("blobfs").unwrap(), &CString::new("mkfs").unwrap()],
-        None,
-        &mut [SpawnAction::add_handle(block_device_handle_id, block_device)],
-    )
-    .map_err(|(status, _)| status)
-    .context("spawning 'blobfs mkfs'")?;
-
-    // Frequently takes more than 30 seconds on profile builds.
-    wait_for_process(p, zx::Duration::from_seconds(90)).context("waiting for 'blobfs mkfs'")?;
-    Ok(())
-}
-
-fn wait_for_process(proc: fuchsia_zircon::Process, duration: zx::Duration) -> Result<(), Error> {
-    proc.wait_handle(zx::Signals::PROCESS_TERMINATED, zx::Time::after(duration))
-        .context("waiting for tool to terminate")?;
-    let ret = proc.info().context("getting tool process info")?.return_code;
-    if ret != 0 {
-        return Err(format_err!("tool returned nonzero exit code {}", ret));
-    }
-    Ok(())
+fn blobfs(block_channel: zx::Channel) -> Result<Filesystem, Error> {
+    Ok(Filesystem::new(
+        Proxy::from_channel(fasync::Channel::from_channel(block_channel)?),
+        Blobfs { allow_delivery_blobs: true, ..Blobfs::dynamic_child() },
+    ))
 }
 
 #[cfg(test)]

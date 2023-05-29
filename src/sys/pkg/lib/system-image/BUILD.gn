@@ -58,8 +58,6 @@ fuchsia_component("system-image-test-component") {
   manifest = "meta/system-image-lib-test.cml"
   deps = [
     ":system-image_test",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]

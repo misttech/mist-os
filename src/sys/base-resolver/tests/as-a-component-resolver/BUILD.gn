@@ -66,8 +66,6 @@ fuchsia_component("fake-dependencies") {
   manifest = "meta/fake-dependencies.cml"
   deps = [
     ":fake_dependencies_bin",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]

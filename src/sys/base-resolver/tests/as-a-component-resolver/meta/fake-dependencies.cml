@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/storage/blobfs/meta/decompressor_sandbox.shard.cml",
+        "//src/lib/storage/fs_management/client.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
         "inspect/client.shard.cml",
@@ -22,17 +22,19 @@
         },
     ],
     use: [
-        {
-            protocol: [
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.process.Launcher",
-            ],
-        },
+        { protocol: "fuchsia.process.Launcher" },
         {
             directory: "the-subpackage",
             from: "parent",
             rights: [ "r*" ],
             path: "/the-subpackage",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.kernel.VmexResource",
+            from: "parent",
+            to: "#fs-collection",
         },
     ],
     expose: [

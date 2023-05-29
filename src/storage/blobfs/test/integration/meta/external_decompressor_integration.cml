@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/lib/storage/fs_management/client.shard.cml",
         "//src/storage/blobfs/test/integration/meta/decompressor.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
