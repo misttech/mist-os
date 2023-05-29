@@ -12,6 +12,7 @@
 #![deny(missing_docs)]
 
 mod client;
+mod interfaces;
 pub mod messaging;
 mod multicast_groups;
 mod netlink_packet;
@@ -30,6 +31,7 @@ use netlink_packet_route::RtnlMessage;
 
 use crate::{
     client::{ClientTable, InternalClient},
+    interfaces::InterfacesEventLoopError,
     messaging::{Receiver, Sender, SenderReceiverProvider},
     protocol_family::{
         route::{NetlinkRoute, NetlinkRouteClient},
@@ -138,6 +140,26 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
             match routes::EventLoop::<P>::new(clients3).run::<Ipv6>().await {
                 RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
                     panic!("Ipv6 routes event loop error: {:?}", e)
+                }
+            }
+        }),
+        // Interfaces Worker.
+        fasync::Task::spawn(async move {
+            let worker = match interfaces::EventLoop::new() {
+                Ok(worker) => worker,
+                Err(InterfacesEventLoopError::Fidl(e)) => {
+                    panic!("Interfaces event loop creation error: {:?}", e)
+                }
+                Err(InterfacesEventLoopError::Netstack(_)) => {
+                    unreachable!("The Netstack variant is not returned when creating a new worker");
+                }
+            };
+            match worker.run().await {
+                InterfacesEventLoopError::Fidl(e) => {
+                    panic!("Interfaces event loop error: {:?}", e)
+                }
+                InterfacesEventLoopError::Netstack(e) => {
+                    panic!("Interfaces event loop error: {:?}", e)
                 }
             }
         }),

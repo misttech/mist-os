@@ -11,9 +11,12 @@ rustc_library("netlink") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//src/connectivity/lib/net-types",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bit-set",
@@ -26,15 +29,18 @@ rustc_library("netlink") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//src/connectivity/lib/net-declare",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
   ]
 
   sources = [
     "src/client.rs",
+    "src/interfaces.rs",
     "src/lib.rs",
     "src/messaging.rs",
     "src/multicast_groups.rs",
