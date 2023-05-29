@@ -1570,7 +1570,7 @@ async fn test_orphaned_keys() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(&[LockKey::object(store_id, 1000)], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(

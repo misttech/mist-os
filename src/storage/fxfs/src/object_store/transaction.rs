@@ -606,11 +606,16 @@ impl<'a> Transaction<'a> {
     pub fn remove(&mut self, object_id: u64, mutation: Mutation) {
         let txn_mutation = TxnMutation { object_id, mutation, associated_object: AssocObj::None };
         if self.mutations.remove(&txn_mutation) {
-            if let Mutation::ObjectStore {
-                0: ObjectStoreMutation { item: ObjectItem { key, .. }, op: Operation::Insert },
-            } = txn_mutation.mutation
+            if let Mutation::ObjectStore(ObjectStoreMutation {
+                item:
+                    ObjectItem {
+                        key: ObjectKey { object_id: new_object_id, data: ObjectKeyData::Object },
+                        ..
+                    },
+                op: Operation::Insert,
+            }) = txn_mutation.mutation
             {
-                self.new_objects.remove(&(object_id, key.object_id));
+                self.new_objects.remove(&(object_id, new_object_id));
             }
         }
     }
@@ -664,7 +669,20 @@ impl<'a> Transaction<'a> {
                     // TODO(fxbug.dev/122974): Check lock requirements.
                 }
                 ObjectKeyData::Keys => {
-                    // TODO(fxbug.dev/122975): Check lock requirements.
+                    let id = key.object_id;
+                    if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
+                        && !self.new_objects.contains(&(*store_object_id, id))
+                    {
+                        debug_assert!(
+                            false,
+                            "Not holding required lock for object {id} \
+                                in store {store_object_id}"
+                        );
+                        error!(
+                            "Not holding required lock for object {id} in store \
+                                {store_object_id}"
+                        )
+                    }
                 }
                 ObjectKeyData::Object => match op {
                     // Insert implies the caller expects no object with which to race
