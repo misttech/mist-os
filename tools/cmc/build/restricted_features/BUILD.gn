@@ -64,6 +64,7 @@ group("allow_non_hermetic_packages") {
     "//src/ui/tests/integration_input_tests/text-input:*",
     "//src/ui/tests/integration_input_tests/touch:*",
     "//src/ui/tests/integration_input_tests/virtual-keyboard:*",
+    "//src/ui/tests/integration_input_tests/web-touch-input:*",
     "//vendor/google/bin/*",
     "//vendor/google/media/*",
   ]

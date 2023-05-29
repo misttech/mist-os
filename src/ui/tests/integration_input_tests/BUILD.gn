@@ -26,6 +26,7 @@ group("integration_input_tests") {
     "factory-reset-handler:tests",
     "media-buttons:tests",
     "virtual-keyboard:tests",
+    "web-touch-input:tests",
   ]
 }
 

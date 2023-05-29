@@ -389,6 +389,7 @@ hlcpp_visibility = [
   "//src/ui/tests/integration_input_tests/touch/touch-flatland-client:*",
   "//src/ui/tests/integration_input_tests/touch/touch-gfx-client:*",
   "//src/ui/tests/integration_input_tests/virtual-keyboard/*",
+  "//src/ui/tests/integration_input_tests/web-touch-input/*",
   "//src/ui/tools/tiles:*",
   "//src/virtualization/bin/guest_manager:*",
   "//src/virtualization/bin/termina_guest_manager:*",

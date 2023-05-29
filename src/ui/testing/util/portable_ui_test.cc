@@ -9,6 +9,7 @@
 #include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
+#include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
@@ -58,9 +59,10 @@ void PortableUITest::SetUpRealmBase() {
             .source = ParentRef{},
             .targets = {kTestUIStackRef}});
 
-  // Capabilities routed to test driver.
+  // Route UI capabilities from test-ui-stack to test driver.
   realm_builder_.AddRoute(
-      Route{.capabilities = {Protocol{fuchsia::ui::test::input::Registry::Name_},
+      Route{.capabilities = {Protocol{fuchsia::ui::display::singleton::Info::Name_},
+                             Protocol{fuchsia::ui::test::input::Registry::Name_},
                              Protocol{fuchsia::ui::test::scene::Controller::Name_}},
             .source = kTestUIStackRef,
             .targets = {ParentRef{}}});

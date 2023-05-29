@@ -1,0 +1,52 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/chromium/web_engine/meta/shards/test/launch_context_provider.shard.cml",
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "sys/component/realm_builder.shard.cml",
+        "sys/testing/system-test.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/web-touch-input-test",
+    },
+    offer: [
+        {
+            // Offer capabilities needed by components in this test realm.
+            // Keep it minimal, describe only what's actually needed.
+            // TODO(fxbug.dev/81446): Remove this list.
+            protocol: [
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.Stats",
+                "fuchsia.process.Launcher",
+                "fuchsia.scheduler.ProfileProvider",
+
+                // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+                // successful transition to CFv2.
+                "fuchsia.sys.Environment",
+                "fuchsia.sysmem.Allocator",
+
+                // Explicitly offer as there is no `vulkan/offer.shard.cml`.
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            // Required for `fonts_provider` to provide fonts.
+            directory: "config-data",
+            from: "parent",
+            as: "config-data",
+            to: "#realm_builder",
+            availability: "required",
+        },
+    ],
+    facets: {
+        "fuchsia.test": {
+            "deprecated-allowed-packages": [ "web_engine" ],
+        },
+    },
+}

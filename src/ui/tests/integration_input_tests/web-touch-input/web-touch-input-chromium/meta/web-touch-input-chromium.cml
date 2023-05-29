@@ -1,0 +1,37 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/chromium/web_engine/meta/shards/context_provider_create_base.shard.cml",
+        "//src/chromium/web_engine/meta/shards/context_provider_create_with_network.shard.cml",
+        "//src/chromium/web_engine/meta/shards/context_provider_create_with_view.shard.cml",
+        "sys/component/realm_builder.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/web-touch-input-chromium",
+    },
+    capabilities: [
+        {
+            protocol: [ "fuchsia.ui.app.ViewProvider" ],
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                // Used by the test.
+                "fuchsia.ui.test.input.TouchInputListener",
+
+                // Provided to this Component by the test.
+                "fuchsia.web.ContextProvider",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.ui.app.ViewProvider" ],
+            from: "self",
+        },
+    ],
+}
