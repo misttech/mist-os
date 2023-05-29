@@ -48,7 +48,7 @@ class MockSerialIoProtocol : public MockProtocolBase<MockSerialIoProtocol, efi_s
   }
 
  private:
-  serial_io_mode mode_;
+  serial_io_mode mode_ = {.Parity = DefaultParity, .StopBits = DefaultStopBits};
 };
 
 }  // namespace efi

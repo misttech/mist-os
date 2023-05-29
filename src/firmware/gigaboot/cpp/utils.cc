@@ -361,4 +361,70 @@ fbl::Vector<char> ToStr(const efi_guid& g) {
   return res;
 }
 
+fit::result<efi_status> Timer::SetTimer(efi_timer_delay type, zx::duration timeout) {
+  if (type == TimerCancel) {
+    return fit::error(EFI_INVALID_PARAMETER);
+  }
+  if (timeout == zx::duration::infinite()) {
+    state_ = State::kInfinite;
+    return fit::ok();
+  }
+  if (timeout == zx::duration(0)) {
+    state_ = State::kZero;
+    return fit::ok();
+  }
+
+  state_ = State::kNormal;
+  if (!timer_event_) {
+    efi_status status =
+        sys_->BootServices->CreateEvent(EVT_TIMER, 0, nullptr, nullptr, &timer_event_);
+    if (status != EFI_SUCCESS) {
+      return fit::error(status);
+    }
+  }
+
+  // Timer ticks are in 100ns.
+  efi_status res = sys_->BootServices->SetTimer(timer_event_, type, timeout.to_usecs() * 10);
+  if (res == EFI_SUCCESS) {
+    return fit::ok();
+  }
+
+  return fit::error(res);
+}
+
+fit::result<efi_status> Timer::Cancel() {
+  if (!timer_event_) {
+    return fit::ok();
+  }
+
+  efi_status res = sys_->BootServices->SetTimer(timer_event_, TimerCancel, 0);
+  if (res == EFI_SUCCESS) {
+    return fit::ok();
+  }
+
+  return fit::error(res);
+}
+
+Timer::Status Timer::CheckTimer() {
+  if (state_ == State::kZero) {
+    return Status::kReady;
+  }
+  if (state_ == State::kInfinite) {
+    return Status::kWaiting;
+  }
+  if (!timer_event_) {
+    return Status::kError;
+  }
+
+  efi_status res = sys_->BootServices->CheckEvent(timer_event_);
+  switch (res) {
+    case EFI_SUCCESS:
+      return Status::kReady;
+    case EFI_NOT_READY:
+      return Status::kWaiting;
+    default:
+      return Status::kError;
+  }
+}
+
 }  // namespace gigaboot

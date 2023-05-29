@@ -26,6 +26,8 @@ source_set("lib") {
     "fastboot.h",
     "gpt.cc",
     "gpt.h",
+    "input.cc",
+    "input.h",
     "partition.cc",
     "partition.h",
     "tss2_uefi.cc",

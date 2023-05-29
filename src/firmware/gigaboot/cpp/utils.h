@@ -6,20 +6,26 @@
 #define SRC_FIRMWARE_GIGABOOT_CPP_UTILS_H_
 
 #include <lib/stdcompat/span.h>
+#include <lib/zx/time.h>
+#include <xefi.h>
 
 #include <optional>
 #include <string_view>
 
+#include <efi/boot-services.h>
 #include <efi/protocol/block-io.h>
 #include <efi/protocol/device-path.h>
 #include <efi/protocol/disk-io.h>
+#include <efi/protocol/file.h>
 #include <efi/protocol/graphics-output.h>
+#include <efi/protocol/serial-io.h>
+#include <efi/protocol/simple-text-output.h>
 #include <efi/protocol/tcg2.h>
+#include <efi/system-table.h>
 #include <efi/types.h>
 #include <fbl/vector.h>
+#include <phys/efi/main.h>
 #include <phys/efi/protocol.h>
-
-#include "phys/efi/main.h"
 
 template <>
 inline constexpr const efi_guid& kEfiProtocolGuid<efi_device_path_protocol> = DevicePathProtocol;
@@ -36,6 +42,9 @@ inline constexpr const efi_guid& kEfiProtocolGuid<efi_tcg2_protocol> = Tcg2Proto
 template <>
 inline constexpr const efi_guid& kEfiProtocolGuid<efi_graphics_output_protocol> =
     GraphicsOutputProtocol;
+
+template <>
+inline constexpr const efi_guid& kEfiProtocolGuid<efi_serial_io_protocol> = SerialIoProtocol;
 
 namespace gigaboot {
 
@@ -141,6 +150,57 @@ fit::result<efi_status, efi_guid> ToGuid(std::string_view guid_str);
 constexpr size_t kByteToHexLen = 2;
 constexpr size_t kEfiGuidStrLen = (sizeof(efi_guid) * kByteToHexLen + 4 /*dashes*/);
 fbl::Vector<char> ToStr(const efi_guid& g);
+
+// A wrapper around a UEFI timer.
+class Timer {
+ public:
+  enum class Status {
+    kReady,
+    kWaiting,
+    kError,
+  };
+
+  explicit Timer(efi_system_table* sys) : sys_(sys) {}
+  Timer() = delete;
+  Timer(const Timer&) = delete;
+  Timer(Timer&&) = delete;
+  Timer& operator=(const Timer&) = delete;
+  Timer& operator=(Timer&&) = delete;
+
+  ~Timer() {
+    // The timer event is lazily constructed, so it may be null.
+    if (timer_event_) {
+      gEfiSystemTable->BootServices->CloseEvent(timer_event_);
+    }
+  }
+
+  // Configure the timer's behavior.
+  //
+  // Both 0 and zx::duration::infinite() are valid values for timeout.
+  // See the comment for CheckTimer for their semantics.
+  fit::result<efi_status> SetTimer(efi_timer_delay type, zx::duration timeout);
+
+  // Check to see if the timer has expired or if an error has occurred.
+  //
+  // A timer set with a duration of 0 will ALWAYS return Status::kReady.
+  // A timer set with an infinite duration will ALWAYS return Status::kWaiting.
+  // Calling CheckTimer on a timer that has not been set will return Status::kError.
+  Status CheckTimer();
+
+  // Cancel the timer.
+  fit::result<efi_status> Cancel();
+
+ private:
+  enum class State {
+    kNormal,
+    kZero,
+    kInfinite,
+  };
+
+  State state_ = State::kNormal;
+  efi_system_table* sys_;
+  efi_event timer_event_ = nullptr;
+};
 
 }  // namespace gigaboot
 

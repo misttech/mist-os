@@ -44,6 +44,14 @@ class MockSimpleTextInputProtocol
           return EFI_SUCCESS;
         });
   }
+
+  void ExpectRepeatedReadKeyStroke(char input) {
+    EXPECT_CALL(*this, ReadKeyStroke).WillRepeatedly([input](efi_input_key* key) {
+      key->ScanCode = 0;
+      key->UnicodeChar = input;
+      return EFI_SUCCESS;
+    });
+  }
 };
 
 }  // namespace efi

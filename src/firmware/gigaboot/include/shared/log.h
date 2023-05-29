@@ -5,6 +5,7 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_INCLUDE_SHARED_LOG_H_
 #define SRC_FIRMWARE_GIGABOOT_INCLUDE_SHARED_LOG_H_
 
+#include <stdio.h>
 #include <xefi.h>
 
 // LOG/WLOG/ELOG are always printed, the only difference is that WLOG and ELOG

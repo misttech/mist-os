@@ -11,6 +11,7 @@ test("gigaboot_unittests") {
     "efi_variables_test.cc",
     "fastboot_test.cc",
     "gpt_tests.cc",
+    "input_test.cc",
     "mock_boot_service.cc",
     "mock_boot_service.h",
     "mock_efi_variables.h",
