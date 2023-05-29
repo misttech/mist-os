@@ -123,47 +123,7 @@ pub trait WriteBytes {
     /// Called to flush to the handle.  Named to avoid confluct with the flush method above.
     async fn complete(&mut self) -> Result<(), Error>;
 
-    /// Moves the offset forward by `amount`, which will result in zeroes in the output stream.
+    /// Moves the offset forward by `amount`, which will result in zeroes in the output stream, even
+    /// if no other data is appended to it.
     async fn skip(&mut self, amount: u64) -> Result<(), Error>;
-}
-
-const BUFFER_SIZE: usize = 131_072;
-
-pub struct Writer<'a> {
-    handle: &'a dyn WriteObjectHandle,
-    buffer: Buffer<'a>,
-    offset: u64,
-}
-
-impl<'a> Writer<'a> {
-    pub fn new(handle: &'a dyn WriteObjectHandle) -> Self {
-        Self { handle, buffer: handle.allocate_buffer(BUFFER_SIZE), offset: 0 }
-    }
-}
-
-#[async_trait]
-impl WriteBytes for Writer<'_> {
-    fn handle(&self) -> &dyn WriteObjectHandle {
-        self.handle
-    }
-
-    async fn write_bytes(&mut self, mut buf: &[u8]) -> Result<(), Error> {
-        while buf.len() > 0 {
-            let to_do = std::cmp::min(buf.len(), BUFFER_SIZE);
-            self.buffer.subslice_mut(..to_do).as_mut_slice().copy_from_slice(&buf[..to_do]);
-            self.handle.write_or_append(Some(self.offset), self.buffer.subslice(..to_do)).await?;
-            self.offset += to_do as u64;
-            buf = &buf[to_do..];
-        }
-        Ok(())
-    }
-
-    async fn complete(&mut self) -> Result<(), Error> {
-        self.handle.flush().await
-    }
-
-    async fn skip(&mut self, amount: u64) -> Result<(), Error> {
-        self.offset += amount;
-        Ok(())
-    }
 }

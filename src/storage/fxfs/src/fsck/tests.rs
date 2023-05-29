@@ -15,7 +15,7 @@ use {
             simple_persistent_layer::SimplePersistentLayerWriter,
             types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Value},
         },
-        object_handle::{ObjectHandle, ObjectHandleExt, Writer, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ObjectHandleExt, INVALID_OBJECT_ID},
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
@@ -27,6 +27,7 @@ use {
         },
         round::round_down,
         serialized_types::VersionedLatest,
+        testing::writer::Writer,
     },
     anyhow::{Context, Error},
     assert_matches::assert_matches,

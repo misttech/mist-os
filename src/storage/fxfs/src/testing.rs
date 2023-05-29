@@ -3,3 +3,4 @@
 // found in the LICENSE file.
 
 pub mod fake_object;
+pub mod writer;

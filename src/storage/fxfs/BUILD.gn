@@ -105,6 +105,7 @@ fxfs_sources = [
   "src/serialized_types/types.rs",
   "src/testing.rs",
   "src/testing/fake_object.rs",
+  "src/testing/writer.rs",
   "src/trace.rs",
 ]
 

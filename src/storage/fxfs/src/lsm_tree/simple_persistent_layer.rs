@@ -32,7 +32,8 @@
 // except for the first one. The entries should be monotonically increasing, as they represent some
 // mapping for how the keys for the first item in each block would be predominantly sorted, and
 // there may be duplicate entries. There should be exactly as many seek blocks as are required to
-// house one entry fewer than the number of data blocks.
+// house one entry fewer than the number of data blocks, and the final block may be incomplete if
+// the entire block isn't needed.
 
 use {
     crate::{
@@ -620,7 +621,6 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
             len += 8;
         }
         self.writer.write_bytes(&self.buf).await?;
-        self.writer.skip(self.block_size - (len as u64 % self.block_size)).await?;
         Ok(())
     }
 }
@@ -690,12 +690,14 @@ mod tests {
                 },
                 LayerIterator,
             },
-            object_handle::Writer,
             round::round_up,
             serialized_types::{
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
-            testing::fake_object::{FakeObject, FakeObjectHandle},
+            testing::{
+                fake_object::{FakeObject, FakeObjectHandle},
+                writer::Writer,
+            },
         },
         fprint::TypeFingerprint,
         std::{
@@ -1163,6 +1165,56 @@ mod tests {
             // generated in the seek blocks for those entries and then ensure that is the right
             // amount of space reserved for the seek blocks.
             round_up((data_blocks - 1) * 8, block_size).unwrap() / block_size == seek_blocks
+        }
+    }
+
+    // Verifies behaviour around creating full seek blocks, to ensure that it is able to be opened
+    // and parsed afterward.
+    #[fuchsia::test]
+    async fn test_full_seek_block() {
+        const BLOCK_SIZE: u64 = 512;
+
+        // Items will be 37 bytes each. Max length varint u64 is 9 bytes, 3 of those plus one
+        // straight encoded sequence number for another 8 bytes. Then 2 more for each seek table
+        // entry.
+        const ITEMS_TO_FILL_BLOCK: u64 = BLOCK_SIZE / 37;
+
+        // How many entries there are in a seek table block.
+        const SEEK_TABLE_ENTRIES: u64 = BLOCK_SIZE / 8;
+
+        // Number of entries to fill a seek block would need one more block of entries, but we're
+        // starting low here on purpose to do a range and make sure we hit the size we are
+        // interested in.
+        const START_ENTRIES_COUNT: u64 = ITEMS_TO_FILL_BLOCK * SEEK_TABLE_ENTRIES;
+
+        for entries in START_ENTRIES_COUNT..START_ENTRIES_COUNT + (ITEMS_TO_FILL_BLOCK * 2) {
+            let handle = FakeObjectHandle::new_with_block_size(
+                Arc::new(FakeObject::new()),
+                BLOCK_SIZE as usize,
+            );
+            {
+                let mut writer = SimplePersistentLayerWriter::<Writer<'_>, TestKey, u64>::new(
+                    Writer::new(&handle),
+                    BLOCK_SIZE,
+                )
+                .await
+                .expect("writer new");
+
+                // Make all values take up maximum space for varint encoding.
+                let initial_value = u32::MAX as u64 + 1;
+                for i in 0..entries {
+                    writer
+                        .write(
+                            Item::new(TestKey(initial_value + i..initial_value + i), initial_value)
+                                .as_item_ref(),
+                        )
+                        .await
+                        .expect("write failed");
+                }
+
+                writer.flush().await.expect("flush failed");
+            }
+            SimplePersistentLayer::open(handle).await.expect("new failed");
         }
     }
 

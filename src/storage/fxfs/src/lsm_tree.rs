@@ -11,7 +11,7 @@ use {
     crate::{
         drop_event::DropEvent,
         log::*,
-        object_handle::{ReadObjectHandle, WriteBytes, WriteObjectHandle, Writer},
+        object_handle::{ReadObjectHandle, WriteBytes},
         serialized_types::{Version, LATEST_VERSION},
         trace_duration,
     },
@@ -158,15 +158,6 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             iterator.advance().await?;
         }
         writer.flush().await
-    }
-
-    /// Compacts all the immutable layers.
-    pub async fn compact(&self, object_handle: &impl WriteObjectHandle) -> Result<(), Error> {
-        let layer_set = self.immutable_layer_set();
-        let mut merger = layer_set.merger();
-        let iter = merger.seek(Bound::Unbounded).await?;
-        self.compact_with_iterator(iter, Writer::new(object_handle), object_handle.block_size())
-            .await
     }
 
     /// Returns an empty layer-set for this tree.
@@ -365,10 +356,14 @@ mod tests {
                     OrdUpperBound, SortByU64,
                 },
             },
+            object_handle::ObjectHandle,
             serialized_types::{
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
-            testing::fake_object::{FakeObject, FakeObjectHandle},
+            testing::{
+                fake_object::{FakeObject, FakeObjectHandle},
+                writer::Writer,
+            },
         },
         fprint::TypeFingerprint,
         rand::{seq::SliceRandom, thread_rng},
@@ -451,7 +446,14 @@ mod tests {
         tree.seal().await;
         let object = Arc::new(FakeObject::new());
         let handle = FakeObjectHandle::new(object.clone());
-        tree.compact(&handle).await.expect("compact failed");
+        {
+            let layer_set = tree.immutable_layer_set();
+            let mut merger = layer_set.merger();
+            let iter = merger.seek(Bound::Unbounded).await.expect("create merger");
+            tree.compact_with_iterator(iter, Writer::new(&handle), handle.block_size())
+                .await
+                .expect("compact failed");
+        }
         tree.set_layers(
             layers_from_handles(Box::new([handle])).await.expect("layers_from_handles failed"),
         );
@@ -497,7 +499,14 @@ mod tests {
         tree.insert(item.clone()).await.expect("insert error");
         let object = Arc::new(FakeObject::new());
         let handle = FakeObjectHandle::new(object.clone());
-        tree.compact(&handle).await.expect("compact failed");
+        {
+            let layer_set = tree.immutable_layer_set();
+            let mut merger = layer_set.merger();
+            let iter = merger.seek(Bound::Unbounded).await.expect("create merger");
+            tree.compact_with_iterator(iter, Writer::new(&handle), handle.block_size())
+                .await
+                .expect("compact failed");
+        }
         tree.set_layers(
             layers_from_handles(Box::new([handle])).await.expect("layers_from_handles failed"),
         );
