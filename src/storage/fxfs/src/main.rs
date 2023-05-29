@@ -11,7 +11,7 @@ use {
     fuchsia_runtime::HandleType,
     fuchsia_zircon as zx,
     fxfs::{
-        filesystem::{mkfs_with_default, FxFilesystem, OpenOptions},
+        filesystem::{mkfs_with_default, FxFilesystemBuilder},
         fsck,
         log::*,
         serialized_types::LATEST_VERSION,
@@ -129,11 +129,11 @@ async fn main() -> Result<(), Error> {
             Ok(())
         }
         TopLevel { nested: SubCommand::Fsck(FsckSubCommand {}), verbose } => {
-            let fs = FxFilesystem::open_with_options(
-                DeviceHolder::new(BlockDevice::new(Box::new(client), true).await?),
-                OpenOptions { trace: verbose, ..OpenOptions::read_only(true) },
-            )
-            .await?;
+            let fs = FxFilesystemBuilder::new()
+                .trace(verbose)
+                .read_only(true)
+                .open(DeviceHolder::new(BlockDevice::new(Box::new(client), true).await?))
+                .await?;
             let mut options = fsck::FsckOptions::default();
             options.verbose = verbose;
             fsck::fsck_with_options(fs.clone(), &options).await

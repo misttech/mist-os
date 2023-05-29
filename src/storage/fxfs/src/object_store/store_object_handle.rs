@@ -1695,7 +1695,7 @@ mod tests {
         crate::{
             errors::FxfsError,
             filesystem::{
-                self, Filesystem, FxFilesystem, JournalingObject, OpenFxFilesystem, OpenOptions,
+                Filesystem, FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem,
                 SyncOptions,
             },
             fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
@@ -2574,22 +2574,11 @@ mod tests {
 
                 let object_id = shared_context.lock().unwrap().object_id.clone();
 
-                let fs2 = FxFilesystem::open_with_options(
-                    device,
-                    if object_id.is_some() {
-                        OpenOptions::default()
-                    } else {
-                        OpenOptions {
-                            filesystem_options: filesystem::Options {
-                                skip_initial_reap: true,
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }
-                    },
-                )
-                .await
-                .expect("open failed");
+                let fs2 = FxFilesystemBuilder::new()
+                    .skip_initial_reap(object_id.is_none())
+                    .open(device)
+                    .await
+                    .expect("open failed");
 
                 // If the "foo" file exists check that allocated size matches content size.
                 let root_vol = root_volume(fs2.clone()).await.expect("root_volume failed");
@@ -2641,18 +2630,11 @@ mod tests {
             .boxed()
         };
 
-        let fs = FxFilesystem::open_with_options(
-            device,
-            OpenOptions {
-                filesystem_options: filesystem::Options {
-                    post_commit_hook: Some(Box::new(post_commit)),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("open failed");
+        let fs = FxFilesystemBuilder::new()
+            .post_commit_hook(post_commit)
+            .open(device)
+            .await
+            .expect("open failed");
 
         let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
         let store = root_vol.volume("test", None).await.expect("volume failed");

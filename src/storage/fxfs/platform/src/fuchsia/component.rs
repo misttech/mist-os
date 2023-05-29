@@ -26,7 +26,8 @@ use {
     futures::{lock::Mutex, TryStreamExt},
     fxfs::{
         filesystem::{
-            mkfs, Filesystem as _, FxFilesystem, OpenFxFilesystem, OpenOptions, MIN_BLOCK_SIZE,
+            mkfs, Filesystem as _, FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem,
+            MIN_BLOCK_SIZE,
         },
         fsck,
         log::*,
@@ -283,14 +284,11 @@ impl Component {
         // TODO(https://fxbug.dev/122125): fxblob delivery blob support.
         assert!(!options.allow_delivery_blobs);
 
-        let fs = FxFilesystem::open_with_options(
-            DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?),
-            OpenOptions {
-                fsck_after_every_transaction: options.fsck_after_every_transaction,
-                ..OpenOptions::read_only(options.read_only)
-            },
-        )
-        .await?;
+        let fs = FxFilesystemBuilder::new()
+            .fsck_after_every_transaction(options.fsck_after_every_transaction)
+            .read_only(options.read_only)
+            .open(DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?))
+            .await?;
         let root_volume = root_volume(fs.clone()).await?;
         let fs: Arc<InspectedFxFilesystem> = Arc::new(fs.into());
         let weak_fs = Arc::downgrade(&fs) as Weak<dyn FsInspect + Send + Sync>;
@@ -349,13 +347,12 @@ impl Component {
         let (fs_container, fs) = match *state {
             State::ComponentStarted => {
                 let client = new_block_client(device).await?;
-                let fs_container = FxFilesystem::open_with_options(
-                    DeviceHolder::new(
+                let fs_container = FxFilesystemBuilder::new()
+                    .read_only(true)
+                    .open(DeviceHolder::new(
                         BlockDevice::new(Box::new(client), /* read_only: */ true).await?,
-                    ),
-                    OpenOptions::read_only(true),
-                )
-                .await?;
+                    ))
+                    .await?;
                 let fs = fs_container.clone();
                 (Some(fs_container), fs)
             }

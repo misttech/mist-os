@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     argh::FromArgs,
     fxfs::{
-        filesystem::{mkfs_with_default, FxFilesystem, OpenOptions},
+        filesystem::{mkfs_with_default, FxFilesystem, FxFilesystemBuilder},
         fsck,
     },
     fxfs_crypto::Crypt,
@@ -218,8 +218,7 @@ async fn main() -> Result<(), Error> {
                         std::fs::OpenOptions::new().read(true).open(cmd.file)?,
                         512,
                     ));
-                    let fs = FxFilesystem::open_with_options(device, OpenOptions::read_only(true))
-                        .await?;
+                    let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
                     let vol = ops::open_volume(&fs, crypt).await?;
                     let data = ops::get(&vol, &Path::new(&getargs.src)).await?;
                     let mut reader = std::io::Cursor::new(&data);
@@ -253,8 +252,7 @@ async fn main() -> Result<(), Error> {
                         std::fs::OpenOptions::new().read(true).open(cmd.file)?,
                         512,
                     ));
-                    let fs = FxFilesystem::open_with_options(device, OpenOptions::read_only(true))
-                        .await?;
+                    let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
                     let options = fsck::FsckOptions {
                         on_error: Box::new(|err| eprintln!("{:?}", err.to_string())),
                         verbose: args.verbose,
@@ -267,8 +265,7 @@ async fn main() -> Result<(), Error> {
                         std::fs::OpenOptions::new().read(true).open(cmd.file)?,
                         512,
                     ));
-                    let fs = FxFilesystem::open_with_options(device, OpenOptions::read_only(true))
-                        .await?;
+                    let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
                     let vol = ops::open_volume(&fs, crypt).await?;
                     let dir = ops::walk_dir(&vol, &Path::new(&lsargs.path)).await?;
                     ops::print_ls(&dir).await?;

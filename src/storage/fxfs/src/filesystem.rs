@@ -28,7 +28,7 @@ use {
         serialized_types::Version,
         trace_duration,
     },
-    anyhow::{Context, Error},
+    anyhow::{bail, Context, Error},
     async_trait::async_trait,
     event_listener::Event,
     fuchsia_async as fasync,
@@ -247,6 +247,207 @@ impl std::ops::Deref for OpenFxFilesystem {
     }
 }
 
+pub struct FxFilesystemBuilder {
+    format: bool,
+    trace: bool,
+    options: Options,
+    journal_options: JournalOptions,
+    on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
+    on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>,
+    fsck_after_every_transaction: bool,
+}
+
+impl FxFilesystemBuilder {
+    pub fn new() -> Self {
+        Self {
+            format: false,
+            trace: false,
+            options: Options::default(),
+            journal_options: JournalOptions::default(),
+            on_new_allocator: None,
+            on_new_store: None,
+            fsck_after_every_transaction: false,
+        }
+    }
+
+    /// Sets whether the block device should be formatted when opened. Defaults to `false`.
+    pub fn format(mut self, format: bool) -> Self {
+        self.format = format;
+        self
+    }
+
+    /// Enables or disables trace level logging. Defaults to `false`.
+    pub fn trace(mut self, trace: bool) -> Self {
+        self.trace = trace;
+        self
+    }
+
+    /// Sets whether the filesystem will be opened in read-only mode. Defaults to `false`.
+    /// Incompatible with `format`.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.options.read_only = read_only;
+        self
+    }
+
+    /// Sets how often the metadata keys are rolled. See `Options::roll_metadata_key_byte_count`.
+    pub fn roll_metadata_key_byte_count(mut self, roll_metadata_key_byte_count: u64) -> Self {
+        self.options.roll_metadata_key_byte_count = roll_metadata_key_byte_count;
+        self
+    }
+
+    /// Sets a callback that runs after every transaction has been committed. See
+    /// `Options::post_commit_hook`.
+    pub fn post_commit_hook(
+        mut self,
+        hook: impl Fn() -> futures::future::BoxFuture<'static, ()> + Send + Sync + 'static,
+    ) -> Self {
+        self.options.post_commit_hook = Some(Box::new(hook));
+        self
+    }
+
+    /// Sets whether to do an initial reap of the graveyard at mount time. See
+    /// `Options::skip_initial_reap`. Defaults to `false`.
+    pub fn skip_initial_reap(mut self, skip_initial_reap: bool) -> Self {
+        self.options.skip_initial_reap = skip_initial_reap;
+        self
+    }
+
+    /// Sets the options for the journal.
+    pub fn journal_options(mut self, journal_options: JournalOptions) -> Self {
+        self.journal_options = journal_options;
+        self
+    }
+
+    /// Sets a method to be called immediately after creating the allocator.
+    pub fn on_new_allocator(
+        mut self,
+        on_new_allocator: impl Fn(Arc<SimpleAllocator>) + Send + Sync + 'static,
+    ) -> Self {
+        self.on_new_allocator = Some(Box::new(on_new_allocator));
+        self
+    }
+
+    /// Sets a method to be called each time a new store is registered with `ObjectManager`.
+    pub fn on_new_store(
+        mut self,
+        on_new_store: impl Fn(&ObjectStore) + Send + Sync + 'static,
+    ) -> Self {
+        self.on_new_store = Some(Box::new(on_new_store));
+        self
+    }
+
+    /// Enables or disables running fsck after every transaction. Defaults to `false`.
+    pub fn fsck_after_every_transaction(mut self, fsck_after_every_transaction: bool) -> Self {
+        self.fsck_after_every_transaction = fsck_after_every_transaction;
+        self
+    }
+
+    /// Constructs an `FxFilesystem` object with the specified settings.
+    pub async fn open(self, device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
+        let read_only = self.options.read_only;
+        if self.format && read_only {
+            bail!("Cannot initialize a filesystem as read-only");
+        }
+
+        let objects = Arc::new(ObjectManager::new(self.on_new_store));
+        let journal = Arc::new(Journal::new(objects.clone(), self.journal_options));
+
+        let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
+        assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
+        assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
+
+        let mut fsck_after_every_transaction = None;
+        let mut filesystem_options = self.options;
+        if self.fsck_after_every_transaction {
+            let instance =
+                FsckAfterEveryTransaction::new(filesystem_options.post_commit_hook.take());
+            fsck_after_every_transaction = Some(instance.clone());
+            filesystem_options.post_commit_hook =
+                Some(Box::new(move || instance.clone().run().boxed()));
+        }
+
+        let filesystem = Arc::new(FxFilesystem {
+            device: OnceCell::new(),
+            block_size,
+            objects: objects.clone(),
+            journal,
+            commit_mutex: futures::lock::Mutex::new(()),
+            lock_manager: LockManager::new(),
+            flush_task: Mutex::new(None),
+            device_sender: OnceCell::new(),
+            closed: AtomicBool::new(true),
+            trace: self.trace,
+            graveyard: Graveyard::new(objects.clone()),
+            completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
+            options: filesystem_options,
+            in_flight_transactions: AtomicU64::new(0),
+            event: Event::new(),
+        });
+
+        if let Some(fsck_after_every_transaction) = fsck_after_every_transaction {
+            fsck_after_every_transaction
+                .fs
+                .set(Arc::downgrade(&filesystem))
+                .unwrap_or_else(|_| unreachable!());
+        }
+
+        if !read_only && !self.format {
+            // See comment in JournalRecord::DidFlushDevice for why we need to flush the device
+            // before replay.
+            device.flush().await.context("Device flush failed")?;
+        }
+        filesystem.device.set(device).unwrap_or_else(|_| unreachable!());
+
+        filesystem.journal.set_trace(self.trace);
+        if self.format {
+            filesystem.journal.init_empty(filesystem.clone()).await?;
+            // Start the graveyard's background reaping task.
+            filesystem.graveyard.clone().reap_async();
+
+            // Create the root volume directory.
+            let root_store = filesystem.root_store();
+            root_store.set_trace(self.trace);
+            let root_directory =
+                Directory::open(&root_store, root_store.root_directory_object_id())
+                    .await
+                    .context("Unable to open root volume directory")?;
+            let mut transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                    transaction::Options::default(),
+                )
+                .await?;
+            let volume_directory = root_directory
+                .create_child_dir(&mut transaction, VOLUMES_DIRECTORY, Default::default())
+                .await?;
+            transaction.commit().await?;
+            objects.set_volume_directory(volume_directory);
+        } else {
+            filesystem
+                .journal
+                .replay(filesystem.clone(), self.on_new_allocator)
+                .await
+                .context("Journal replay failed")?;
+            filesystem.root_store().set_trace(self.trace);
+
+            if !read_only {
+                // Queue all purged entries for tombstoning.  Don't start the reaper yet because
+                // that can trigger a flush which can add more entries to the graveyard which might
+                // get caught in the initial reap and cause objects to be prematurely tombstoned.
+                for store in objects.unlocked_stores() {
+                    filesystem.graveyard.initial_reap(&store).await?;
+                }
+                // Now start the async reaper.
+                filesystem.graveyard.clone().reap_async();
+            }
+        }
+
+        filesystem.closed.store(false, Ordering::SeqCst);
+        Ok(filesystem.into())
+    }
+}
+
 pub struct FxFilesystem {
     device: OnceCell<DeviceHolder>,
     block_size: u64,
@@ -270,162 +471,13 @@ pub struct FxFilesystem {
     event: Event,
 }
 
-#[derive(Default)]
-pub struct OpenOptions {
-    pub trace: bool,
-    pub journal_options: JournalOptions,
-
-    /// Called immediately after creating the allocator.
-    pub on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
-
-    /// Called each time a new store is registered with ObjectManager.
-    pub on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>,
-
-    /// Run fsck after every transaction.
-    pub fsck_after_every_transaction: bool,
-
-    /// Filesystem options.
-    pub filesystem_options: Options,
-}
-
-impl OpenOptions {
-    /// Shorthand for default options with read_only set as specified.
-    pub fn read_only(read_only: bool) -> Self {
-        OpenOptions {
-            filesystem_options: Options { read_only, ..Default::default() },
-            ..Default::default()
-        }
-    }
-}
-
 impl FxFilesystem {
     pub async fn new_empty(device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
-        let objects = Arc::new(ObjectManager::new(None));
-        let journal = Arc::new(Journal::new(objects.clone(), JournalOptions::default()));
-        let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
-        assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
-        assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
-        let filesystem = Arc::new(FxFilesystem {
-            device: OnceCell::new(),
-            block_size,
-            objects: objects.clone(),
-            journal,
-            commit_mutex: futures::lock::Mutex::new(()),
-            lock_manager: LockManager::new(),
-            flush_task: Mutex::new(None),
-            device_sender: OnceCell::new(),
-            closed: AtomicBool::new(true),
-            trace: false,
-            graveyard: Graveyard::new(objects.clone()),
-            completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
-            options: Default::default(),
-            in_flight_transactions: AtomicU64::new(0),
-            event: Event::new(),
-        });
-        filesystem.device.set(device).unwrap_or_else(|_| unreachable!());
-        filesystem.journal.init_empty(filesystem.clone()).await?;
-
-        // Start the graveyard's background reaping task.
-        filesystem.graveyard.clone().reap_async();
-
-        // Create the root volume directory.
-        let root_store = filesystem.root_store();
-        let root_directory = Directory::open(&root_store, root_store.root_directory_object_id())
-            .await
-            .context("Unable to open root volume directory")?;
-        let mut transaction = filesystem
-            .clone()
-            .new_transaction(
-                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
-                transaction::Options::default(),
-            )
-            .await?;
-        let volume_directory = root_directory
-            .create_child_dir(&mut transaction, VOLUMES_DIRECTORY, Default::default())
-            .await?;
-        transaction.commit().await?;
-
-        objects.set_volume_directory(volume_directory);
-        filesystem.closed.store(false, Ordering::SeqCst);
-        Ok(filesystem.into())
-    }
-
-    pub async fn open_with_options(
-        device: DeviceHolder,
-        options: OpenOptions,
-    ) -> Result<OpenFxFilesystem, Error> {
-        let objects = Arc::new(ObjectManager::new(options.on_new_store));
-
-        let mut fsck_after_every_transaction = None;
-        let mut filesystem_options = options.filesystem_options;
-        if options.fsck_after_every_transaction {
-            let instance =
-                FsckAfterEveryTransaction::new(filesystem_options.post_commit_hook.take());
-            fsck_after_every_transaction = Some(instance.clone());
-            filesystem_options.post_commit_hook =
-                Some(Box::new(move || instance.clone().run().boxed()));
-        }
-
-        let journal = Arc::new(Journal::new(objects.clone(), options.journal_options));
-        let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
-        assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
-        assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
-        let read_only = filesystem_options.read_only;
-
-        let filesystem = Arc::new(FxFilesystem {
-            device: OnceCell::new(),
-            block_size,
-            objects: objects.clone(),
-            journal,
-            commit_mutex: futures::lock::Mutex::new(()),
-            lock_manager: LockManager::new(),
-            flush_task: Mutex::new(None),
-            device_sender: OnceCell::new(),
-            closed: AtomicBool::new(true),
-            trace: options.trace,
-            graveyard: Graveyard::new(objects.clone()),
-            completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
-            options: filesystem_options,
-            in_flight_transactions: AtomicU64::new(0),
-            event: Event::new(),
-        });
-
-        if let Some(fsck_after_every_transaction) = fsck_after_every_transaction {
-            fsck_after_every_transaction
-                .fs
-                .set(Arc::downgrade(&filesystem))
-                .unwrap_or_else(|_| unreachable!());
-        }
-
-        if !read_only {
-            // See comment in JournalRecord::DidFlushDevice for why we need to flush the device
-            // before replay.
-            device.flush().await.context("Device flush failed")?;
-        }
-        filesystem.device.set(device).unwrap_or_else(|_| unreachable!());
-        filesystem
-            .journal
-            .replay(filesystem.clone(), options.on_new_allocator)
-            .await
-            .context("Journal replay failed")?;
-        filesystem.journal.set_trace(filesystem.trace);
-        filesystem.root_store().set_trace(filesystem.trace);
-        if !read_only {
-            // Queue all purged entries for tombstoning.  Don't start the reaper yet because that
-            // can trigger a flush which can add more entries to the graveyard which might get
-            // caught in the initial reap and cause objects to be prematurely tombstoned.
-            for store in objects.unlocked_stores() {
-                filesystem.graveyard.initial_reap(&store).await?;
-            }
-            // Now start the async reaper.
-            filesystem.graveyard.clone().reap_async();
-        }
-        filesystem.closed.store(false, Ordering::SeqCst);
-        Ok(filesystem.into())
+        FxFilesystemBuilder::new().format(true).open(device).await
     }
 
     pub async fn open(device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
-        Self::open_with_options(device, OpenOptions::default()).await
+        FxFilesystemBuilder::new().open(device).await
     }
 
     pub fn root_parent_store(&self) -> Arc<ObjectStore> {
@@ -758,7 +810,7 @@ impl FsckAfterEveryTransaction {
 #[cfg(test)]
 mod tests {
     use {
-        super::{Filesystem, FxFilesystem, OpenOptions, SyncOptions},
+        super::{Filesystem, FxFilesystem, FxFilesystemBuilder, SyncOptions},
         crate::{
             fsck::fsck,
             lsm_tree::{types::Item, Operation},
@@ -849,34 +901,27 @@ mod tests {
         let open_fs = |device,
                        object_mutations: Arc<Mutex<HashMap<_, _>>>,
                        allocator_mutations: Arc<Mutations<_, _>>| async {
-            FxFilesystem::open_with_options(
-                device,
-                OpenOptions {
-                    journal_options: JournalOptions {
-                        reclaim_size: u64::MAX,
-                        ..Default::default()
-                    },
-                    on_new_allocator: Some(Box::new(move |allocator| {
-                        let allocator_mutations = allocator_mutations.clone();
-                        allocator.tree().set_mutation_callback(Some(Box::new(move |op, item| {
-                            allocator_mutations.push(op, item)
-                        })));
-                    })),
-                    on_new_store: Some(Box::new(move |store| {
-                        let mutations = Arc::new(Mutations::new());
-                        object_mutations
-                            .lock()
-                            .unwrap()
-                            .insert(store.store_object_id(), mutations.clone());
-                        store.tree().set_mutation_callback(Some(Box::new(move |op, item| {
-                            mutations.push(op, item)
-                        })));
-                    })),
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect("open_with_options failed")
+            FxFilesystemBuilder::new()
+                .journal_options(JournalOptions { reclaim_size: u64::MAX, ..Default::default() })
+                .on_new_allocator(move |allocator| {
+                    let allocator_mutations = allocator_mutations.clone();
+                    allocator.tree().set_mutation_callback(Some(Box::new(move |op, item| {
+                        allocator_mutations.push(op, item)
+                    })));
+                })
+                .on_new_store(move |store| {
+                    let mutations = Arc::new(Mutations::new());
+                    object_mutations
+                        .lock()
+                        .unwrap()
+                        .insert(store.store_object_id(), mutations.clone());
+                    store.tree().set_mutation_callback(Some(Box::new(move |op, item| {
+                        mutations.push(op, item)
+                    })));
+                })
+                .open(device)
+                .await
+                .expect("open failed")
         };
 
         let allocator_mutations = Arc::new(Mutations::new());

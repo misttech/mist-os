@@ -4,7 +4,9 @@
 
 use {
     crate::{
-        filesystem::{Filesystem, FxFilesystem, JournalingObject, OpenFxFilesystem, OpenOptions},
+        filesystem::{
+            Filesystem, FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem,
+        },
         fsck::{
             errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
             fsck_volume_with_options, fsck_with_options, FsckOptions,
@@ -70,7 +72,9 @@ impl FsckTest {
         let device = fs.take_device().await;
         device.reopen(true);
         self.filesystem = Some(
-            FxFilesystem::open_with_options(device, OpenOptions::read_only(true))
+            FxFilesystemBuilder::new()
+                .read_only(true)
+                .open(device)
                 .await
                 .context("Failed to open FS")?,
         );

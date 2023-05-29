@@ -432,7 +432,9 @@ impl ObjectStore {
 mod tests {
     use {
         crate::{
-            filesystem::{self, Filesystem, FxFilesystem, JournalingObject, SyncOptions},
+            filesystem::{
+                Filesystem, FxFilesystem, FxFilesystemBuilder, JournalingObject, SyncOptions,
+            },
             object_handle::ObjectHandle,
             object_store::{
                 directory::Directory,
@@ -462,15 +464,11 @@ mod tests {
         let device = fs.take_device().await;
         device.reopen(false);
 
-        let filesystem_options =
-            filesystem::Options { roll_metadata_key_byte_count: 512 * 1024, ..Default::default() };
-
-        let fs = FxFilesystem::open_with_options(
-            device,
-            filesystem::OpenOptions { filesystem_options, ..Default::default() },
-        )
-        .await
-        .expect("open failed");
+        let fs = FxFilesystemBuilder::new()
+            .roll_metadata_key_byte_count(512 * 1024)
+            .open(device)
+            .await
+            .expect("open failed");
 
         let (first_filename, last_filename) = {
             let store = fs.object_manager().store(store_id).expect("store not found");
@@ -534,18 +532,11 @@ mod tests {
         // Reopen and make sure replay succeeds.
         let device = fs.take_device().await;
         device.reopen(false);
-        let fs = FxFilesystem::open_with_options(
-            device,
-            filesystem::OpenOptions {
-                filesystem_options: filesystem::Options {
-                    roll_metadata_key_byte_count: 512 * 1024,
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("open failed");
+        let fs = FxFilesystemBuilder::new()
+            .roll_metadata_key_byte_count(512 * 1024)
+            .open(device)
+            .await
+            .expect("open failed");
 
         if flush_before_unlock {
             // Flush before unlocking the store which will see that the encrypted mutations get
