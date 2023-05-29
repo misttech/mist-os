@@ -248,6 +248,7 @@ pub enum FsckError {
     MissingEncryptionKeys(u64, u64),
     MissingKey(u64, u64, u64),
     DuplicateKey(u64, u64, u64),
+    ZombieFile(u64, u64, Vec<u64>),
 }
 
 impl FsckError {
@@ -403,6 +404,12 @@ impl FsckError {
             FsckError::DuplicateKey(store_id, object_id, key_id) => {
                 format!("Duplicate key for <{}, {}, {}>", store_id, object_id, key_id)
             }
+            FsckError::ZombieFile(store_id, object_id, parent_object_ids) => {
+                format!(
+                    "Object {} in store {} is in graveyard but still has links from {:?}",
+                    store_id, object_id, parent_object_ids
+                )
+            }
         }
     }
 
@@ -518,6 +525,9 @@ impl FsckError {
             }
             FsckError::DuplicateKey(store_id, oid, key_id) => {
                 error!(store_id, oid, key_id, "Duplicate key")
+            }
+            FsckError::ZombieFile(store_id, oid, parent_oids) => {
+                error!(store_id, oid, ?parent_oids, "Links exist to file in graveyard")
             }
         }
     }

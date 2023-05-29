@@ -812,6 +812,14 @@ pub(super) async fn scan_store(
                 if parents.is_empty() {
                     fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
                 }
+                if parents.contains(&INVALID_OBJECT_ID) && parents.len() > 1 {
+                    let parents = parents
+                        .iter()
+                        .filter(|oid| **oid != INVALID_OBJECT_ID)
+                        .cloned()
+                        .collect::<Vec<u64>>();
+                    fsck.error(FsckError::ZombieFile(store_id, *object_id, parents))?;
+                }
             }
             ScannedObject::Directory(ScannedDir {
                 stored_sub_dirs,
