@@ -31,8 +31,7 @@ host machine, not directly from the target device. In general, this should not a
 delay to the log viewer, except in rare cases where the device is producing extremely large log
 volumes.
 
-Note: Proactive logging is currently _required_ to use the `ffx log` command. In other words, you
-cannot currently stream logs directly from a device. Support for this is tracked in fxbug.dev/68162.
+Note: Proactive logging is currently deprecated and is being removed.
 
 ### Features
 
