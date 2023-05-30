@@ -1,4 +1,4 @@
-# Copyright {{ year }} The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -15,7 +15,7 @@ rustc_binary("bin") {
     "src/realm_factory_server.rs",
   ]
   deps = [
-    "../fidl:{{ fidl_library_name }}_rust",
+    "../fidl:test.examplecomponent_rust",
     "//src/lib/fidl_server",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

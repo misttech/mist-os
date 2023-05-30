@@ -1,4 +1,4 @@
-# Copyright {{ year }} The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -9,16 +9,16 @@ import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":{{ test_package_name }}" ]
+  deps = [ ":example-component-test" ]
 }
 
 rustc_test("bin") {
   edition = "2021"
   source_root = "src/main.rs"
   sources = [ source_root ]
-  name = "{{ test_binary_name }}"
+  name = "example_component_test"
   deps = [
-    "../testing/fidl:{{ fidl_library_name }}_rust",
+    "../testing/fidl:test.examplecomponent_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -45,7 +45,7 @@ fuchsia_component("test-root") {
   manifest = "meta/test-root.cml"
 }
 
-fuchsia_test_package("{{ test_package_name }}") {
+fuchsia_test_package("example-component-test") {
   test_components = [ ":test-root" ]
   subpackages = [
     "../testing/realm-factory",
