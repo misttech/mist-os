@@ -12,13 +12,14 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/syscalls/smc.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/nelson_aml_gpu_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace nelson {
@@ -104,21 +105,40 @@ zx_status_t Nelson::MaliInit() {
         }},
     };
     aml_gpu_dev.metadata() = mali_metadata_list;
-
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('MALI');
-    auto result = pbus_.buffer(arena)->AddComposite(
-        fidl::ToWire(fidl_arena, aml_gpu_dev),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, aml_gpu_fragments,
-                                                 std::size(aml_gpu_fragments)),
-        "pdev");
+
+    auto aml_gpu_register_reset_node = fuchsia_driver_framework::ParentSpec{{
+        .bind_rules =
+            {
+                fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                        bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
+                fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
+                                        bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_MALI_RESET),
+            },
+        .properties =
+            {
+                fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                  bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
+                fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
+                                  bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_MALI_RESET),
+            },
+    }};
+
+    auto parents = std::vector<fuchsia_driver_framework::ParentSpec>{aml_gpu_register_reset_node};
+
+    auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec(
+        {.name = "aml-gpu-composite", .parents = parents});
+
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, aml_gpu_dev), fidl::ToWire(fidl_arena, composite_node_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "AddComposite Mali(mali_dev) request failed: %s",
+      zxlogf(ERROR, "AddCompositeNodeSpec Mali(aml-gpu-composite) request failed: %s",
              result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "AddComposite Mali(mali_dev) failed: %s",
+      zxlogf(ERROR, "AddCompositeNodeSpec Mali(aml-gpu-composite) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }

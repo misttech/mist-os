@@ -54,7 +54,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
       "sys/platform/05:04:e/aml-video",
       "sys/platform/05:04:23/aml-video-enc",
-      "sys/platform/05:04:17/aml_gpu/aml-gpu",
+      "sys/platform/05:04:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:04:13/sherlock-audio-pdm-in",
       "sys/platform/05:04:12:1/aml_tdm/sherlock-audio-i2s-out",
       "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch",

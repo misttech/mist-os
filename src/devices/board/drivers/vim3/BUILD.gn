@@ -32,17 +32,6 @@ driver_bind_rules("vim3-sdio-bind") {
   ]
 }
 
-driver_bind_rules("vim3-aml-gpu-bind") {
-  rules = "vim3-aml-gpu.bind"
-  header_output = "vim3-aml-gpu-bind.h"
-  bind_output = "vim3-aml-gpu-bind.bc"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("vim3-emmc-bind") {
   rules = "vim3-emmc.bind"
   header_output = "vim3-emmc-bind.h"
@@ -136,7 +125,6 @@ fuchsia_driver("vim3-driver") {
     "vim3.cc",
   ]
   deps = [
-    ":vim3-aml-gpu-bind_header",
     ":vim3-bind",
     ":vim3-cpu-bind_header",
     ":vim3-emmc-bind_header",

@@ -43,18 +43,6 @@ driver_bind_rules("sherlock-pwm-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-aml-gpu-bind") {
-  rules = "bind/sherlock-aml-gpu.bind"
-  header_output = "sherlock-aml-gpu-bind.h"
-  bind_output = "sherlock-aml-gpu-bind.bc"
-  tests = "bind-tests/sherlock-aml-gpu-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("sherlock-spi-bind") {
   rules = "bind/sherlock-spi.bind"
   header_output = "sherlock-spi-bind.h"
@@ -342,7 +330,6 @@ template("sherlock_driver") {
 
     deps = [
       ":camera-isp-bind_header",
-      ":sherlock-aml-gpu-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
       ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
@@ -458,7 +445,6 @@ group("tests") {
   testonly = true
   deps = [
     ":camera-isp-bind_test",
-    ":sherlock-aml-gpu-bind_test",
     ":sherlock-aml-usb-phy-v2-bind_test",
     ":sherlock-bind_test",
     ":sherlock-dwc2-phy-bind_test",

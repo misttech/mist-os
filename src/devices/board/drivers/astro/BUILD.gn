@@ -66,19 +66,6 @@ driver_bind_rules("astro-cpu-bind") {
   ]
 }
 
-driver_bind_rules("astro-aml-gpu-bind") {
-  rules = "bind/astro-aml-gpu.bind"
-  header_output = "astro-aml-gpu-bind.h"
-  bind_output = "astro-aml-gpu-bind.bc"
-
-  tests = "bind-tests/astro-aml-gpu-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("astro-pwm-bind") {
   rules = "bind/astro-pwm.bind"
   header_output = "astro-pwm-bind.h"
@@ -250,7 +237,6 @@ fuchsia_driver("astro-driver") {
     "astro.cc",
   ]
   deps = [
-    ":astro-aml-gpu-bind_header",
     ":astro-aml-sdio-bind_header",
     ":astro-aml-usb-phy-v2-bind_header",
     ":astro-bind",
@@ -287,6 +273,7 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
+    "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
@@ -340,7 +327,6 @@ fuchsia_driver_component("astro") {
 group("tests") {
   testonly = true
   deps = [
-    ":astro-aml-gpu-bind_test",
     ":astro-aml-sdio-bind_test",
     ":astro-aml-usb-phy-v2-bind_test",
     ":astro-bind_test",
