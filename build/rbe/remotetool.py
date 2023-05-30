@@ -223,71 +223,123 @@ def read_config_file_lines(lines: Iterable[str]) -> Dict[str, str]:
     return result
 
 
-def run(
-    args: Sequence[str],
-    reproxy_cfg: Dict[str, str],
-    show_command: bool = False,
-    **kwargs,
-) -> cl_utils.SubprocessResult:
-    """Runs `remotetool` using the given reproxy configuration.
+class RemoteTool(object):
 
-    Args:
-      args: remotetool command-line arguments
-      reproxy_cfg: reproxy configuration as a dictionary.
-      show_command: if True, print the full remotetool command before executing.
-      **kwargs: additional arguments forwarded to cl_utils.subprocess_call.
+    def __init__(self, reproxy_cfg: Path):
+        self._reproxy_cfg = reproxy_cfg
 
-    Returns:
-      SubprocessResult with exit code and captured stdout.
-    """
-    service = reproxy_cfg["service"]
-    instance = reproxy_cfg["instance"]
-    auto_args = [
-        f'--service={service}',
-        f'--instance={instance}',
-    ]
-    use_adc = reproxy_cfg.get("use_application_default_credentials", None)
-    if use_adc:
-        auto_args.append(f"--use_application_default_credentials={use_adc}")
+    def __eq__(self, other) -> bool:
+        return self.config == other.config
 
-    command = [
-        str(PROJECT_ROOT_REL / fuchsia.HOST_REMOTETOOL),
-    ] + auto_args + args
-    command_str = cl_utils.command_quoted_str(command)
-    if show_command:
-        print(command_str)
+    @property
+    def config(self) -> Dict[str, str]:
+        return self._reproxy_cfg
 
-    result = cl_utils.subprocess_call(command, **kwargs)
-    if result.returncode != 0:
-        for line in result.stderr:
-            print(line)
-        raise subprocess.CalledProcessError(result.returncode, command)
-    return result
+    def run(
+        self,
+        args: Sequence[str],
+        show_command: bool = False,
+        **kwargs,
+    ) -> cl_utils.SubprocessResult:
+        """Runs `remotetool` using the given reproxy configuration.
 
+        Args:
+          args: remotetool command-line arguments
+          show_command: if True, print the full remotetool command before executing.
+          **kwargs: additional arguments forwarded to cl_utils.subprocess_call.
 
-def show_action(
-        digest: str, reproxy_cfg: Dict[str, str], **kwargs) -> ShowActionResult:
-    """Reads parameters of a remote action using `remotetool`.
+        Returns:
+          SubprocessResult with exit code and captured stdout.
+        """
+        service = self.config["service"]
+        instance = self.config["instance"]
+        auto_args = [
+            f'--service={service}',
+            f'--instance={instance}',
+        ]
+        use_adc = self.config.get("use_application_default_credentials", None)
+        if use_adc:
+            auto_args.append(f"--use_application_default_credentials={use_adc}")
 
-    Args:
-      digest: the hash/size of the action to lookup.
-      reproxy_cfg: reproxy configuration.
-      **kwargs: arguments forwarded to cl_utils.subprocess_call.
+        command = [
+            str(PROJECT_ROOT_REL / fuchsia.HOST_REMOTETOOL),
+        ] + auto_args + args
+        command_str = cl_utils.command_quoted_str(command)
+        if show_command:
+            print(command_str)
 
-    Returns:
-      ShowActionResult describing command, inputs, outputs.
-    """
-    args = ['--operation', 'show_action', '--digest', digest]
-    final_kwargs = kwargs
-    final_kwargs["quiet"] = True
-    result = run(args, reproxy_cfg, **final_kwargs)
-    return parse_show_action_output(result.stdout)
+        result = cl_utils.subprocess_call(command, **kwargs)
+        if result.returncode != 0:
+            for line in result.stderr:
+                print(line)
+            raise subprocess.CalledProcessError(result.returncode, command)
+        return result
+
+    def show_action(self, digest: str, **kwargs) -> ShowActionResult:
+        """Reads parameters of a remote action using `remotetool`.
+
+        Args:
+          digest: the hash/size of the action to lookup.
+          **kwargs: arguments forwarded to cl_utils.subprocess_call.
+
+        Returns:
+          ShowActionResult describing command, inputs, outputs.
+        """
+        args = ['--operation', 'show_action', '--digest', digest]
+        final_kwargs = kwargs
+        final_kwargs["quiet"] = True
+        result = self.run(args, **final_kwargs)
+        return parse_show_action_output(result.stdout)
+
+    def download_blob(
+            self, path: Path, digest: str,
+            **kwargs) -> cl_utils.SubprocessResult:
+        """Downloads a remote artifact.
+
+        Args:
+          path: location of output to download.
+          digest: the hash/size of the blob to retrieve.
+          **kwargs: arguments forwarded to cl_utils.subprocess_call.
+
+        Returns:
+          return code of remotetool
+        """
+        # TODO: use filelock.FileLock to guard against concurrent conflicts
+        args = [
+            '--operation', 'download_blob', '--digest', digest, '--path',
+            str(path)
+        ]
+        final_kwargs = kwargs
+        final_kwargs["quiet"] = True
+        return self.run(args, **final_kwargs)
+
+    def download_dir(
+            self, path: Path, digest: str,
+            **kwargs) -> cl_utils.SubprocessResult:
+        """Downloads a remote directory of artifacts.
+
+        Args:
+          path: location of output to download.
+          digest: the hash/size of the dir to retrieve.
+          **kwargs: arguments forwarded to cl_utils.subprocess_call.
+
+        Returns:
+          return code of remotetool
+        """
+        # TODO: use filelock.FileLock to guard against concurrent conflicts
+        args = [
+            '--operation', 'download_dir', '--digest', digest, '--path',
+            str(path)
+        ]
+        final_kwargs = kwargs
+        final_kwargs["quiet"] = True
+        return self.run(args, **final_kwargs)
 
 
 def main(argv: Sequence[str]) -> int:
     with open(_REPROXY_CFG) as cfg:
-        reproxy_cfg = read_config_file_lines(cfg.readlines())
-    result = run(argv, reproxy_cfg, show_command=True, quiet=False)
+        tool = RemoteTool(read_config_file_lines(cfg))
+    result = tool.run(argv, show_command=True, quiet=False)
     return result.returncode
 
 

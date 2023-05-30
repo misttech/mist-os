@@ -70,10 +70,9 @@ def read_download_stub_infos(
     dry_run: bool = False,
 ) -> Iterable[remote_action.DownloadStubInfo]:
     for p in stub_paths:
-        stub_info = remote_action.get_download_stub_info(p)
-        if stub_info:
+        if remote_action.is_download_stub_file(p):
             vmsg(verbose, f"Read download stub for {p}.")
-            yield stub_info
+            yield remote_action.DownloadStubInfo.read_from_file(p)
         else:
             vmsg(verbose, f"{p} is not a download stub, skipping.")
 

@@ -53,19 +53,23 @@ class ReadDownloadStubInfosTests(unittest.TestCase):
             action_digest='87ac8eb9865d/43',
             build_id='10293-ab8e-bc72',
         )
-        with mock.patch.object(remote_action, 'get_download_stub_info',
-                               return_value=stub_info) as mock_get_infos:
-            stub_infos = list(dlwrap.read_download_stub_infos([path]))
+        with mock.patch.object(remote_action, 'is_download_stub_file',
+                               return_value=True) as mock_is_stub:
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'read_from_file',
+                                   return_value=stub_info) as mock_read:
+                stub_infos = list(dlwrap.read_download_stub_infos([path]))
         self.assertEqual(stub_infos, [stub_info])
-        mock_get_infos.assert_called_with(path)
+        mock_is_stub.assert_called_with(path)
+        mock_read.assert_called_with(path)
 
     def test_not_a_stub(self):
         path = 'path/to/already/downloaded.obj'
-        with mock.patch.object(remote_action, 'get_download_stub_info',
-                               return_value=None) as mock_get_infos:
+        with mock.patch.object(remote_action, 'is_download_stub_file',
+                               return_value=False) as mock_is_stub:
             stub_infos = list(dlwrap.read_download_stub_infos([path]))
         self.assertEqual(stub_infos, [])
-        mock_get_infos.assert_called_with(path)
+        mock_is_stub.assert_called_with(path)
 
 
 class DownloadArtifactsTests(unittest.TestCase):

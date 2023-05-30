@@ -8,6 +8,7 @@ import subprocess
 import unittest
 from pathlib import Path
 from unittest import mock
+from typing import Dict
 
 import remotetool
 import cl_utils
@@ -253,21 +254,25 @@ class RemotetoolRunTests(unittest.TestCase):
             'instance': 'projects/my-project/instance/default',
         }
 
+    @property
+    def tool(self):
+        return remotetool.RemoteTool(reproxy_cfg=self._cfg)
+
     def test_missing_params(self):
+        tool = remotetool.RemoteTool(reproxy_cfg={})
         with self.assertRaises(KeyError):
-            remotetool.run(args=[], reproxy_cfg={})
+            tool.run(args=[])
 
     def test_run_success(self):
         exit_code = 0
         with mock.patch.object(
                 cl_utils, 'subprocess_call',
                 return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
-            result = remotetool.run(
+            result = self.tool.run(
                 args=[
                     '--operation', 'show_action', '--digest',
                     '198273aaabbef87/323'
-                ],
-                reproxy_cfg=self._cfg)
+                ])
         self.assertEqual(result.returncode, exit_code)
         mock_call.assert_called_once()
 
@@ -277,12 +282,11 @@ class RemotetoolRunTests(unittest.TestCase):
                 cl_utils, 'subprocess_call',
                 return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
             with self.assertRaises(subprocess.CalledProcessError):
-                remotetool.run(
+                self.tool.run(
                     args=[
                         '--operation',
                         'show_action',  # missing '--digest'
-                    ],
-                    reproxy_cfg=self._cfg)
+                    ])
         mock_call.assert_called_once()
 
     def test_show_action(self):
@@ -294,12 +298,35 @@ class RemotetoolRunTests(unittest.TestCase):
                 return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
             with mock.patch.object(remotetool, 'parse_show_action_output',
                                    return_value=action_result) as mock_parse:
-                result = remotetool.show_action(
-                    digest='0abb771b3198273aaabbef87/323',
-                    reproxy_cfg=self._cfg)
+                result = self.tool.show_action(
+                    digest='0abb771b3198273aaabbef87/323')
         self.assertEqual(result, action_result)
         mock_call.assert_called_once()
         mock_parse.assert_called_once()
+
+    def test_download_blob(self):
+        exit_code = 0
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            result = self.tool.download_blob(
+                path='stash/me/here.txt',
+                digest='17177bbbbe81001bccc/9696',
+            )
+        mock_call.assert_called_once()
+        self.assertEqual(result.returncode, exit_code)
+
+    def test_download_dir(self):
+        exit_code = 0
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            result = self.tool.download_dir(
+                path='stash/me/dir',
+                digest='000abe888ecedbb11/6936',
+            )
+        mock_call.assert_called_once()
+        self.assertEqual(result.returncode, exit_code)
 
 
 if __name__ == '__main__':

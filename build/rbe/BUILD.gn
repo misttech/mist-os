@@ -42,7 +42,8 @@ if (is_host) {
       [ "remotetool.py" ] + _fuchsia_sources + _cl_utils_sources
   _remote_action_sources =
       [ "remote_action.py" ] + _fuchsia_sources + _cl_utils_sources +
-      [ "output_leak_scanner.py" ] + _depfile_sources + _textpb_sources
+      [ "output_leak_scanner.py" ] + _depfile_sources + _textpb_sources +
+      [ "remotetool.py" ]
   _dlwrap_sources = [ "dlwrap.py" ] + _remote_action_sources
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =

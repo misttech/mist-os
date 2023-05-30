@@ -23,6 +23,7 @@ import fuchsia
 import cl_utils
 import depfile
 import output_leak_scanner
+import remotetool
 import textpb
 
 from pathlib import Path
@@ -50,7 +51,7 @@ _REMOTE_LOG_SCRIPT = Path('build', 'rbe', 'log-it.sh')
 
 _DETAIL_DIFF_SCRIPT = Path('build', 'rbe', 'detail-diff.sh')
 
-_REMOTETOOL_SCRIPT = Path('build', 'rbe', 'remotetool.sh')
+_REPROXY_CFG = Path('build', 'rbe', 'fuchsia-reproxy.cfg')
 
 _CHECK_DETERMINISM_SCRIPT = Path('build', 'tracer', 'output_cacher.py')
 
@@ -85,6 +86,12 @@ def _write_lines_to_file(path: Path, lines: Iterable[str]):
     with open(path, 'w') as f:
         f.write(contents)
 
+def _fill_string_to_size(text: str, size: int, pattern: str) -> str:
+    """Append string with a filler pattern to bring it up to a size."""
+    to_fill = size - len(text)
+    if to_fill <= 0:
+        return text
+    return text + pattern * (to_fill // len(pattern)) + pattern[:to_fill % len(pattern)]
 
 def _files_match(file1: Path, file2: Path) -> bool:
     """Compares two files, returns True if they both exist and match."""
@@ -423,9 +430,13 @@ class ReproxyLogEntry(object):
           path: the full path of the output file or dir, absolute.
           build_id: a unique identifier for a particular build (reproxy) session.
           working_dir_abs: working dir.
+
+        Returns:
+          download stub information (that was written to file)
         """
         stub_info = self.make_download_stub_info(path, build_id)
         stub_info.create(working_dir_abs)
+        return stub_info
 
     def make_download_stubs(
         self,
@@ -433,8 +444,10 @@ class ReproxyLogEntry(object):
         dirs: Iterable[Path],
         working_dir_abs: Path,
         build_id: str,
-    ):
+    ) -> Dict[Path, 'DownloadStubInfo']:
         """Establish placeholders from which real artifacts can be retrieved later.
+
+        Writes stub information to file and returns objects of them.
 
         Args:
           files: files to create download stubs for.
@@ -442,20 +455,27 @@ class ReproxyLogEntry(object):
           working_dir_abs: absolute path to current working dir, relative to which
               files are created.
           build_id: any string that corresponds to a unique build.
+
+        Returns:
+          Dictionary of paths to their stubs objects.
         """
+        stubs = dict()
         # TODO: the following could be parallelized
-        for f in files:
+        stubs.update({
+            f:
             self._write_download_stub(
                 path=f,
                 build_id=build_id,
                 working_dir_abs=working_dir_abs,
-            )
-        for d in dirs:
+            ) for f in files})
+        stubs.update({
+            d:
             self._write_download_stub(
                 path=d,
                 build_id=build_id,
                 working_dir_abs=working_dir_abs,
-            )
+            ) for d in dirs})
+        return stubs
 
     @staticmethod
     def parse_action_log(log: Path) -> 'ReproxyLogEntry':
@@ -592,7 +612,7 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
 
 
 _RBE_DOWNLOAD_STUB_IDENTIFIER = '# RBE download stub'
-
+_RBE_DOWNLOAD_STUB_HELP = '# run //build/rbe/dlwrap.py on this file to download'
 _RBE_DOWNLOAD_STUB_SUFFIX = '.dl-stub'
 
 # Filesystem extended attribute for digests.
@@ -620,6 +640,7 @@ class DownloadStubInfo(object):
         assert type in {"file", "dir"}
         self._type = type
         self._blob_digest = blob_digest
+        assert '/' in blob_digest, 'Expecting SHA256SUM/SIZE'
         self._action_digest = action_digest
         self._build_id = build_id
 
@@ -649,22 +670,28 @@ class DownloadStubInfo(object):
         assert output_abspath.is_absolute(), f'got: {output_abspath}'
         lines = [
             _RBE_DOWNLOAD_STUB_IDENTIFIER,
+            _RBE_DOWNLOAD_STUB_HELP,
             f'path={self.path}',
             f'type={self.type}',
             f'blob_digest={self.blob_digest}',  # hash/size
             f'action_digest={self._action_digest}',
             f'build_id={self._build_id}',
         ]
-        _write_lines_to_file(output_abspath, lines)
+        # Want this:
+        #   _write_lines_to_file(output_abspath, lines)
+        # but we need a temporary ugly workaround:
+        sha256sum, slash, size = self.blob_digest.partition('/')
+        with open(output_abspath, 'w') as f:
+            f.write(_fill_string_to_size(
+                text='\n'.join(lines),
+                size=int(size),
+                pattern='\n# TODO(b/284380439): avoid resizing stub file',
+            ))
 
     def create(self, working_dir_abs: Path):
-        """Create a stub file along with a symlink.
+        """Create a download stub file.
 
-        The stub file is written to a location next to self.path,
-        and a symlink at the destination points to the stub file.
-
-        The stub file will be preserved when this is 'downloaded',
-        which replaces only the symlink with a real file.
+        The stub file will be backed-up to PATH.dl-stub it is 'downloaded'.
 
         Args:
           working_dir_abs: absolute path to the working dir, to which
@@ -674,18 +701,17 @@ class DownloadStubInfo(object):
         assert working_dir_abs.is_absolute()
         path = working_dir_abs / self.path
         path.parent.mkdir(parents=True, exist_ok=True)
-        stub_dest = Path(str(path) + _RBE_DOWNLOAD_STUB_SUFFIX)
-        self._write(stub_dest)
-        cl_utils.symlink_relative(stub_dest, path)
+        self._write(path)
 
         if _HAVE_XATTR:
+            sha256sum, slash, size = self.blob_digest.partition('/')
             # Signal to the next reproxy invocation that the object already
             # exists in the CAS and does not need to be uploaded.
             os.setxattr(
                 path,
                 _RBE_XATTR_NAME,
-                self.blob_digest.encode(),
-                follow_symlinks=False,  # want the attribute on the link
+                # TODO(b/284380439): use full self.blob_digest.encode()
+                sha256sum.encode(),
             )
 
     @staticmethod
@@ -713,113 +739,73 @@ class DownloadStubInfo(object):
             build_id=variables["build_id"],
         )
 
-    def download(self, exec_root: Path, working_dir_abs: Path) -> int:
-        """Retrieves the file referenced by the stub.
+    def download(self, downloader: remotetool.RemoteTool, working_dir_abs: Path) -> cl_utils.SubprocessResult:
+        """Retrieves the file or dir referenced by the stub.
 
-        Reads the stub info from file though a symlink.
+        Reads the stub info from file.
         Downloads to a temporarily location, and then moves it
-        to replace the symlink upon completion.
-        The stub file is left untouched.
+        into place when completed.
+        The stub file is backed up to "<name>.dl-stub".
 
         Args:
-          exec_root: project root (from which _REMOTETOOL_SCRIPT can be found).
+          downloader: 'remotetool' instance to use to download.
           working_dir_abs: working dir.
+
+        Returns:
+          subprocess results, including exit code.
         """
         # TODO: use filelock.FileLock when downloading from outside
         # of this remote action, e.g. when lazily fetching local inputs.
         # This would gracefully handle concurrent requests for the same file.
         dest = working_dir_abs / self.path  # this is a symlink
         temp_dl = Path(str(dest) + '.download-tmp')
-        status = _download_blob(
-            output=temp_dl,
-            is_dir=(self.type == "dir"),
+
+        downloader = {
+            "dir": downloader.download_dir,
+            "file": downloader.download_blob,
+        }[self.type]
+
+        status = downloader(
+            path=temp_dl,
             digest=self._blob_digest,
-            exec_root=exec_root,
-            working_dir_abs=working_dir_abs,
+            cwd=working_dir_abs,
         )
 
-        if status == 0:  # download complete, success
-            self.path.unlink()  # break symlink
+        if status.returncode == 0:  # download complete, success
+            # Backup the download stub.  This preserves the xattr.
+            dest.rename(Path(str(dest) + _RBE_DOWNLOAD_STUB_SUFFIX))
             temp_dl.rename(dest)
-            # Removing this xattr will cause the next reproxy invocation
-            # to re-check the hash of this file before trying to upload it.
-            if _HAVE_XATTR:
-                os.removexattr(
-                    self.path,
-                    _RBE_XATTR_NAME,
-                    follow_symlinks=False,
-                )
 
         return status
 
+def _file_starts_with(path: Path, text: str) -> bool:
+    with open(path, 'rb') as f:
+        # read only a small number of bytes to compare
+        return os.pread(f.fileno(), len(text), 0) == text.encode()
 
-def get_download_stub_file(path: Path) -> Optional[Path]:
-    if not path.is_symlink():
-        return None
-    dest = Path(os.readlink(path))  # No Path.readlink until Python 3.9
-    suffixes = dest.suffixes
-    if not suffixes:
-        return None
-    if suffixes[-1] == _RBE_DOWNLOAD_STUB_SUFFIX:
-        return Path(os.path.normpath(path.parent / dest))
-    return None
-
-
-def get_download_stub_info(path: Path) -> Optional[DownloadStubInfo]:
-    stub_file = get_download_stub_file(path)
-    if not stub_file:
-        return None
-    # path is a link to a stub
-    return DownloadStubInfo.read_from_file(stub_file)
+def is_download_stub_file(path: Path) -> Optional[Path]:
+    """Returns true if the path points to a download stub."""
+    if _HAVE_XATTR:
+        return _RBE_XATTR_NAME in os.listxattr(path)
+    else:
+        return _file_starts_with(path, _RBE_DOWNLOAD_STUB_IDENTIFIER)
 
 
 def download_from_stub(
-        stub: Path, exec_root: Path, working_dir_abs: Path) -> int:
+        stub: Path, downloader: remotetool.RemoteTool, working_dir_abs: Path) -> cl_utils.SubprocessResult:
     """Possibly downloads a file over a stub link.
     Args:
+      downloader: remotetool instance used to download.
       stub: is a path to a possible download stub.
 
     Returns:
       download exit status, or 0 if there is nothing to download.
     """
-    stub_info = get_download_stub_info(stub)
-    if not stub_info:
-        return 0
-    return stub_info.download(
-        exec_root=exec_root,
-        working_dir_abs=working_dir_abs,
-    )
+    if not is_download_stub_file(stub):
+        return cl_utils.SubprocessResult(0)
 
-
-def _download_blob(
-    output: Path,
-    is_dir: bool,
-    digest: str,
-    exec_root: Path,
-    working_dir_abs: Path,
-) -> int:
-    """Download a blob from the RBE CAS at a given path.
-
-    Args:
-      output: path at which to retrieve the blob, relative to working_dir_abs.
-      file_digest: hash/size of blob to download.
-      exec_root: location of project root that contains the download tools,
-        can be relative or absolute.
-      working_dir_abs: working dir
-    """
-    operation = 'download_dir' if is_dir else 'download_blob'
-    return subprocess.call(
-        [
-            str(exec_root / _REMOTETOOL_SCRIPT),  #
-            '--operation',
-            operation,  #
-            '--digest',
-            digest,  #
-            '--path',
-            output
-        ],
-        cwd=working_dir_abs,
-    )
+    stub_info = DownloadStubInfo.read_from_file(stub)
+    return stub_info.download(downloader=downloader, working_dir_abs=working_dir_abs)
 
 
 class RemoteAction(object):
@@ -1306,7 +1292,7 @@ class RemoteAction(object):
         self.vmsg("Creating download stubs for remote outputs.")
         # Create stubs, even for artifacts that are always_download-ed.
         build_id = _reproxy_log_dir()  # unique per build
-        log_record.make_download_stubs(
+        stub_infos = log_record.make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
             working_dir_abs=self.working_dir,
@@ -1315,12 +1301,19 @@ class RemoteAction(object):
         # Download outputs that were explicitly requested.
         # With 'log_record', we can just go directly to stub info without
         # having to read the stub file we just wrote.
+        downloader = self.downloader()
         for path in self.always_download:
-            stub_info = log_record.make_download_stub_info(path, build_id)
+            stub_info = stub_infos[path]
             status = stub_info.download(
-                exec_root=self.exec_root, working_dir=self.working_dir)
-            if status != 0:  # alert, but do not fail
+                downloader=downloader,
+                working_dir_abs=self.working_dir)
+            if status.returncode != 0:  # alert, but do not fail
                 msg(f"Unable to download {path}.")
+
+    def downloader(self) -> remotetool.RemoteTool:
+        with open(self.exec_root / _REPROXY_CFG) as cfg:
+            return remotetool.RemoteTool(
+                reproxy_cfg=remotetool.read_config_file_lines(cfg))
 
     def _cleanup(self):
         self.vmsg("Cleaning up temporary files.")
