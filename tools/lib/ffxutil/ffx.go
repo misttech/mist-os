@@ -115,6 +115,7 @@ func NewFFXInstance(
 		isolateDir: outputDir,
 	}
 	ffxCmds := [][]string{
+		{"config", "set", "log.dir", filepath.Join(outputDir, "ffx_logs")},
 		{"config", "set", "ffx.subtool-search-paths", filepath.Dir(ffxPath)},
 		{"config", "set", "target.default", target},
 		{"config", "set", "test.experimental_json_input", "true"},
