@@ -7,7 +7,7 @@
 pub mod error;
 pub mod features;
 pub mod one_or_many;
-pub mod validate;
+pub(crate) mod validate;
 
 #[allow(unused)] // A test-only macro is defined outside of a test builds.
 pub mod translate;
@@ -41,7 +41,10 @@ pub use cm_types::{
 };
 use error::Location;
 
-pub use crate::{one_or_many::OneOrMany, translate::compile, translate::CompileOptions};
+pub use crate::{
+    one_or_many::OneOrMany, translate::compile, translate::CompileOptions,
+    validate::ProtocolRequirements,
+};
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();

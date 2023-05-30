@@ -22,14 +22,14 @@ use {
     },
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ProtocolRequirements<'a> {
     pub must_offer: &'a [String],
     pub must_use: &'a [String],
 }
 
 /// Validates a given cml.
-pub fn validate_cml(
+pub(crate) fn validate_cml(
     document: &Document,
     file: Option<&Path>,
     features: &FeatureSet,

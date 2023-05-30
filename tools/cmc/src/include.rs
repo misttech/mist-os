@@ -4,11 +4,9 @@
 
 use {
     crate::error::Error,
-    crate::features::FeatureSet,
     crate::merge::merge_json,
     crate::util,
     crate::util::{json_or_json5_from_file, write_depfile},
-    cml::validate::{validate_cml, ProtocolRequirements},
     serde_json::Value,
     std::{
         collections::HashSet,
@@ -41,12 +39,7 @@ pub fn merge_includes(
         }
         document.include = None;
         if validate {
-            validate_cml(
-                &document,
-                Some(file.as_path()),
-                &FeatureSet::empty(),
-                &ProtocolRequirements { must_offer: &[], must_use: &[] },
-            )?;
+            cml::compile(&document, cml::CompileOptions::new().file(file.as_path()))?;
         }
         serde_json::to_string_pretty(&document)?
     } else {

@@ -45,7 +45,7 @@ fn run_cmc() -> Result<(), Error> {
             validate::validate(
                 &files,
                 &features::FeatureSet::empty(),
-                &cml::validate::ProtocolRequirements {
+                cml::ProtocolRequirements {
                     must_offer: &must_offer_protocol,
                     must_use: &must_use_protocol,
                 },
@@ -121,7 +121,7 @@ fn run_cmc() -> Result<(), Error> {
                 config_package_path.as_ref().map(String::as_str),
                 &features.into(),
                 &experimental_force_runner,
-                cml::validate::ProtocolRequirements {
+                cml::ProtocolRequirements {
                     must_offer: &must_offer_protocol,
                     must_use: &must_use_protocol,
                 },

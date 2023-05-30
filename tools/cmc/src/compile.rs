@@ -23,7 +23,7 @@ pub fn compile(
     config_package_path: Option<&str>,
     features: &FeatureSet,
     experimental_force_runner: &Option<String>,
-    required_protocols: cml::validate::ProtocolRequirements<'_>,
+    required_protocols: cml::ProtocolRequirements<'_>,
 ) -> Result<(), Error> {
     match file.extension().and_then(|e| e.to_str()) {
         Some("cml") => Ok(()),
@@ -61,7 +61,7 @@ pub fn compile(
     let mut out_file =
         fs::OpenOptions::new().create(true).truncate(true).write(true).open(output)?;
 
-    let mut options = cml::CompileOptions::new()
+    let options = cml::CompileOptions::new()
         .file(&file)
         .features(features)
         .protocol_requirements(required_protocols);
@@ -143,7 +143,7 @@ mod tests {
             Some("test.cvf"),
             features,
             experimental_force_runner,
-            cml::validate::ProtocolRequirements { must_offer, must_use },
+            cml::ProtocolRequirements { must_offer, must_use },
         )?;
         let mut buffer = Vec::new();
         fs::File::open(&out_path).unwrap().read_to_end(&mut buffer).unwrap();
@@ -1086,7 +1086,7 @@ mod tests {
                 None,
                 &FeatureSet::empty(),
                 &None,
-                cml::validate::ProtocolRequirements { must_offer: &[], must_use: &[] },
+                cml::ProtocolRequirements { must_offer: &[], must_use: &[] },
             );
             assert_matches!(
                 result,
