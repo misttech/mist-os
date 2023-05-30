@@ -32,6 +32,8 @@ pub async fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
     let symbol_index_path = pathbuf_to_string(symbol_index_path)?;
 
     let global_symbol_index = global_symbol_index_path()?;
+
+    // Note: This clobbers the existing global symbol-index if it is invalid.
     let mut index = SymbolIndex::load(&global_symbol_index).unwrap_or(SymbolIndex::new());
     if !index.includes.contains(&symbol_index_path) {
         index.includes.push(symbol_index_path);
@@ -60,6 +62,13 @@ pub struct GcsFlat {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct DebugInfoD {
+    pub url: String,
+    #[serde(default)]
+    pub require_authentication: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SymbolIndex {
     #[serde(default)]
     pub includes: Vec<String>,
@@ -69,6 +78,8 @@ pub struct SymbolIndex {
     pub ids_txts: Vec<IdsTxt>,
     #[serde(default)]
     pub gcs_flat: Vec<GcsFlat>,
+    #[serde(default)]
+    pub debuginfod: Vec<DebugInfoD>,
 }
 
 impl SymbolIndex {
@@ -78,6 +89,7 @@ impl SymbolIndex {
             build_id_dirs: Vec::new(),
             ids_txts: Vec::new(),
             gcs_flat: Vec::new(),
+            debuginfod: Vec::new(),
         }
     }
 
@@ -138,6 +150,7 @@ impl SymbolIndex {
                     index.build_id_dirs.append(&mut sub.build_id_dirs);
                     index.ids_txts.append(&mut sub.ids_txts);
                     index.gcs_flat.append(&mut sub.gcs_flat);
+                    index.debuginfod.append(&mut sub.debuginfod);
                 }
                 Err(err) => {
                     // Only report error for the main entry.
@@ -241,6 +254,8 @@ mod tests {
         );
         assert_eq!(index.gcs_flat.len(), 1);
         assert_eq!(index.gcs_flat[0].require_authentication, false);
+        assert_eq!(index.debuginfod.len(), 1);
+        assert_eq!(index.debuginfod[0].require_authentication, false);
     }
 
     #[test]
@@ -249,6 +264,8 @@ mod tests {
         assert_eq!(index.includes.len(), 0);
         assert_eq!(index.gcs_flat.len(), 2);
         assert_eq!(index.gcs_flat[1].require_authentication, true);
+        assert_eq!(index.debuginfod.len(), 1);
+        assert_eq!(index.debuginfod[0].require_authentication, false);
     }
 
     #[test]

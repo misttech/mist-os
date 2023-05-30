@@ -19,5 +19,10 @@
             "url": "gs://public-bucket/debug"
         }
     ],
+    "debuginfod": [
+        {
+            "url": "https://debuginfod.debian.net"
+        }
+    ],
     "invalid_key_is_ignored": "for the best compatibility"
 }

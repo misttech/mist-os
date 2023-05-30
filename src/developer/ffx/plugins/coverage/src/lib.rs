@@ -447,6 +447,7 @@ mod tests {
                     includes: Vec::new(),
                     ids_txts: Vec::new(),
                     gcs_flat: Vec::new(),
+                    debuginfod: Vec::new(),
                 },
                 &PathBuf::new(),   // llvm_profdata_bin, unused in test
                 &[PathBuf::new()], // profraws, actual values don't matter
@@ -486,6 +487,7 @@ mod tests {
                     includes: Vec::new(),
                     ids_txts: Vec::new(),
                     gcs_flat: Vec::new(),
+                    debuginfod: Vec::new(),
                 },
                 &PathBuf::new(), // llvm_profdata_bin, unused in test
                 &[PathBuf::new(), PathBuf::new()], // profraws, actual values don't matter
@@ -508,6 +510,7 @@ mod tests {
                 includes: Vec::new(),
                 ids_txts: Vec::new(),
                 gcs_flat: Vec::new(),
+                debuginfod: Vec::new(),
             },
             &PathBuf::new(),   // llvm_profdata_bin, unused in test
             &[PathBuf::new()], // profraws, actual values don't matter
@@ -524,6 +527,7 @@ mod tests {
                 includes: Vec::new(),
                 ids_txts: Vec::new(),
                 gcs_flat: Vec::new(),
+                debuginfod: Vec::new(),
             },
             &PathBuf::new(),   // llvm_profdata_bin, unused in test
             &[PathBuf::new()], // profraws, actual values don't matter
@@ -540,6 +544,7 @@ mod tests {
                 includes: Vec::new(),
                 ids_txts: Vec::new(),
                 gcs_flat: Vec::new(),
+                debuginfod: Vec::new(),
             },
             &PathBuf::new(),   // llvm_profdata_bin, unused in test
             &[PathBuf::new()], // profraws, actual values don't matter
