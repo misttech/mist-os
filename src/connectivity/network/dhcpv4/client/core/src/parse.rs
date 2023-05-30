@@ -257,6 +257,26 @@ impl OptionCodeMap<OptionRequested> {
             OptionRequested::Optional => None,
         })
     }
+
+    /// Converts `self` into the representation required for
+    /// `DhcpOption::ParameterRequestList`.
+    ///
+    /// Returns None if `self` is empty.
+    pub(crate) fn try_to_parameter_request_list(
+        &self,
+    ) -> Option<
+        AtLeast<1, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<dhcp_protocol::OptionCode>>>,
+    > {
+        match AtLeast::try_from(self.iter_keys().collect::<Vec<_>>()) {
+            Ok(parameters) => Some(parameters),
+            Err((dhcp_protocol::SizeConstrainedError::SizeConstraintViolated, parameters)) => {
+                // This can only have happened because parameters is empty.
+                assert_eq!(parameters, Vec::new());
+                // Thus, we must omit the ParameterRequestList option.
+                None
+            }
+        }
+    }
 }
 
 /// Represents a set of OptionCodes as an array of booleans.

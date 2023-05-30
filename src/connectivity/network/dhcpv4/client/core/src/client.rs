@@ -337,7 +337,7 @@ pub struct ClientConfig {
     /// If set, the preferred IP address lease time in seconds.
     pub preferred_lease_time_secs: Option<NonZeroU32>,
     /// If set, the IP address to request from DHCP servers.
-    pub requested_ip_address: Option<Ipv4Addr>,
+    pub requested_ip_address: Option<SpecifiedAddr<net_types::ip::Ipv4Addr>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -416,28 +416,22 @@ impl<I: deps::Instant> WaitingToRestart<I> {
 }
 
 fn build_decline(
-    ClientConfig {
-        client_hardware_address,
-        client_identifier,
-        requested_parameters: _,
-        preferred_lease_time_secs: _,
-        requested_ip_address: _,
-    }: &ClientConfig,
+    client_config: &ClientConfig,
     discover_options: &DiscoverOptions,
     ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
     server_identifier: SpecifiedAddr<net_types::ip::Ipv4Addr>,
 ) -> dhcp_protocol::Message {
-    build_outgoing_message_while_not_assigned_address(
-        *client_hardware_address,
-        client_identifier.clone(),
+    build_outgoing_message(
+        client_config,
         discover_options,
         OutgoingOptions {
-            offered_ip_address_lease_time_secs: None,
-            offered_ip_address: Some(ip_address.get().into()),
-            server_identifier: Some(server_identifier.get().into()),
+            ciaddr: None,
+            requested_ip_address: Some(ip_address),
+            ip_address_lease_time_secs: None,
             message_type: dhcp_protocol::MessageType::DHCPDECLINE,
+            server_identifier: Some(server_identifier),
+            include_parameter_request_list: false,
         },
-        Vec::new(),
     )
 }
 
@@ -504,126 +498,93 @@ fn recv_stream<'a, T, U: Send>(
 }
 
 struct OutgoingOptions {
-    offered_ip_address_lease_time_secs: Option<NonZeroU32>,
-    offered_ip_address: Option<Ipv4Addr>,
-    server_identifier: Option<Ipv4Addr>,
+    ciaddr: Option<SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    requested_ip_address: Option<SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    ip_address_lease_time_secs: Option<NonZeroU32>,
     message_type: dhcp_protocol::MessageType,
+    server_identifier: Option<SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    include_parameter_request_list: bool,
 }
 
-// Populates fields that don't differ between outgoing client messages in the
-// same DHCP transaction while the client is not assigned an address.
-fn build_outgoing_message_while_not_assigned_address(
-    client_hardware_address: Mac,
-    client_identifier: Option<
-        AtLeast<
-            { dhcp_protocol::CLIENT_IDENTIFIER_MINIMUM_LENGTH },
-            AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>,
-        >,
-    >,
-    DiscoverOptions { xid: TransactionId(xid) }: &DiscoverOptions,
-    OutgoingOptions {
-        offered_ip_address_lease_time_secs,
-        offered_ip_address,
-        server_identifier,
-        message_type,
-    }: OutgoingOptions,
-    other_options: Vec<dhcp_protocol::DhcpOption>,
-) -> dhcp_protocol::Message {
-    use dhcp_protocol::DhcpOption;
-    dhcp_protocol::Message {
-        // The following fields are set according to
-        // https://www.rfc-editor.org/rfc/rfc2131#section-4.4.1.
-        op: dhcp_protocol::OpCode::BOOTREQUEST,
-        xid: xid.get(),
-        // Must be 0, or the number of seconds since the DHCP process started.
-        // Since it has to be the same in DHCPDISCOVER and DHCPREQUEST, it's
-        // easiest to have it be 0.
-        // TODO(https://fxbug.dev/125232): consider setting this to something
-        // else to help DHCP servers prioritize our requests when they're close
-        // to expiring.
-        secs: 0,
-        // Because packet sockets are available to us, the DHCP client is
-        // assumed to be able to receive unicast datagrams without having an IP
-        // address configured yet.
-        bdcast_flag: false,
-        ciaddr: Ipv4Addr::UNSPECIFIED,
-        yiaddr: Ipv4Addr::UNSPECIFIED,
-        siaddr: Ipv4Addr::UNSPECIFIED,
-        giaddr: Ipv4Addr::UNSPECIFIED,
-        chaddr: client_hardware_address,
-        sname: String::new(),
-        file: String::new(),
-        options: [
-            offered_ip_address_lease_time_secs.map(|n| DhcpOption::IpAddressLeaseTime(n.get())),
-            offered_ip_address.map(DhcpOption::RequestedIpAddress),
-            client_identifier.map(DhcpOption::ClientIdentifier),
-            server_identifier.map(DhcpOption::ServerIdentifier),
-        ]
-        .into_iter()
-        .flatten()
-        .chain(other_options)
-        .chain([DhcpOption::DhcpMessageType(message_type)])
-        .collect(),
-    }
-}
-
-// Populates fields that don't differ between outgoing client messages in the
-// same DHCP address acquisition transaction.
-fn build_outgoing_message_during_address_acquisition(
+fn build_outgoing_message(
     ClientConfig {
         client_hardware_address,
         client_identifier,
         requested_parameters,
-        preferred_lease_time_secs,
-        requested_ip_address,
+        preferred_lease_time_secs: _,
+        requested_ip_address: _,
     }: &ClientConfig,
-    discover_options: &DiscoverOptions,
+    DiscoverOptions { xid: TransactionId(xid) }: &DiscoverOptions,
     OutgoingOptions {
-        offered_ip_address_lease_time_secs,
-        offered_ip_address,
-        server_identifier,
+        ciaddr,
+        requested_ip_address,
+        ip_address_lease_time_secs,
         message_type,
+        server_identifier,
+        include_parameter_request_list,
     }: OutgoingOptions,
 ) -> dhcp_protocol::Message {
     use dhcp_protocol::DhcpOption;
-    build_outgoing_message_while_not_assigned_address(
-        *client_hardware_address,
-        // TODO(https://fxbug.dev/122602): Avoid cloning
-        client_identifier.clone(),
-        discover_options,
-        OutgoingOptions {
-            offered_ip_address_lease_time_secs: offered_ip_address_lease_time_secs
-                .or((*preferred_lease_time_secs).map(Into::into)),
-            offered_ip_address: offered_ip_address.or(*requested_ip_address),
-            server_identifier,
-            message_type,
-        },
-        match AtLeast::try_from(requested_parameters.iter_keys().collect::<Vec<_>>()) {
-            Ok(parameters) => Some(DhcpOption::ParameterRequestList(parameters)),
-            Err((dhcp_protocol::SizeConstrainedError::SizeConstraintViolated, parameters)) => {
-                // This can only have happened because parameters is empty.
-                assert_eq!(parameters, Vec::new());
-                // Thus, we must omit the ParameterRequestList option.
-                None
-            }
-        }
+
+    dhcp_protocol::Message {
+        op: dhcp_protocol::OpCode::BOOTREQUEST,
+        xid: xid.get(),
+        secs: 0,
+        bdcast_flag: false,
+        ciaddr: ciaddr.map(|ip| ip.get().into()).unwrap_or(Ipv4Addr::UNSPECIFIED),
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        siaddr: Ipv4Addr::UNSPECIFIED,
+        giaddr: Ipv4Addr::UNSPECIFIED,
+        chaddr: *client_hardware_address,
+        sname: String::new(),
+        file: String::new(),
+        options: [
+            requested_ip_address.map(|ip| DhcpOption::RequestedIpAddress(ip.get().into())),
+            ip_address_lease_time_secs.map(|time| DhcpOption::IpAddressLeaseTime(time.get())),
+            Some(DhcpOption::DhcpMessageType(message_type)),
+            client_identifier.clone().map(DhcpOption::ClientIdentifier),
+            server_identifier.map(|ip| DhcpOption::ServerIdentifier(ip.get().into())),
+            include_parameter_request_list
+                .then(|| requested_parameters.try_to_parameter_request_list())
+                .flatten()
+                .map(DhcpOption::ParameterRequestList),
+        ]
         .into_iter()
+        .flatten()
         .collect(),
-    )
+    }
 }
 
 fn build_discover(
     client_config: &ClientConfig,
     discover_options: &DiscoverOptions,
 ) -> dhcp_protocol::Message {
-    build_outgoing_message_during_address_acquisition(
+    let ClientConfig {
+        client_hardware_address: _,
+        client_identifier: _,
+        requested_parameters: _,
+        preferred_lease_time_secs,
+        requested_ip_address,
+    } = client_config;
+
+    // Per the table in RFC 2131 section 4.4.1:
+    //
+    // 'ciaddr'                 0 (DHCPDISCOVER)
+    // Requested IP Address     MAY (DISCOVER)
+    // IP address lease time    MAY
+    // DHCP message type        DHCPDISCOVER
+    // Server Identifier        MUST NOT
+    // Parameter Request List   MAY
+    build_outgoing_message(
         client_config,
         discover_options,
         OutgoingOptions {
-            offered_ip_address_lease_time_secs: None,
-            offered_ip_address: None,
-            server_identifier: None,
+            ciaddr: None,
+            requested_ip_address: *requested_ip_address,
+            ip_address_lease_time_secs: *preferred_lease_time_secs,
             message_type: dhcp_protocol::MessageType::DHCPDISCOVER,
+            server_identifier: None,
+            include_parameter_request_list: true,
         },
     )
 }
@@ -823,8 +784,11 @@ impl<I: deps::Instant> Requesting<I> {
     ) -> Result<RequestingOutcome<I>, Error> {
         let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
         let Requesting { discover_options, fields_from_offer_to_use_in_request, start_time } = self;
-        let message =
-            build_request(client_config, discover_options, fields_from_offer_to_use_in_request);
+        let message = build_request_during_address_acquisition(
+            client_config,
+            discover_options,
+            fields_from_offer_to_use_in_request,
+        );
 
         let message = crate::parse::serialize_dhcp_message_to_ip_packet(
             message,
@@ -933,7 +897,7 @@ impl<I: deps::Instant> Requesting<I> {
     }
 }
 
-fn build_request(
+fn build_request_during_address_acquisition(
     client_config: &ClientConfig,
     discover_options: &DiscoverOptions,
     crate::parse::FieldsFromOfferToUseInRequest {
@@ -942,14 +906,32 @@ fn build_request(
         ip_address_to_request,
     }: &crate::parse::FieldsFromOfferToUseInRequest,
 ) -> dhcp_protocol::Message {
-    build_outgoing_message_during_address_acquisition(
+    let ClientConfig {
+        client_hardware_address: _,
+        client_identifier: _,
+        requested_parameters: _,
+        preferred_lease_time_secs,
+        requested_ip_address: _,
+    } = client_config;
+
+    // Per the table in RFC 2131 section 4.4.1:
+    //
+    // 'ciaddr'                 0 or client's network address (currently 0)
+    // Requested IP Address     MUST (in SELECTING)
+    // IP address lease time    MAY
+    // DHCP message type        DHCPREQUEST
+    // Server Identifier        MUST (after SELECTING)
+    // Parameter Request List   MAY
+    build_outgoing_message(
         client_config,
         discover_options,
         OutgoingOptions {
-            offered_ip_address_lease_time_secs: *ip_address_lease_time_secs,
-            offered_ip_address: Some(ip_address_to_request.get().into()),
-            server_identifier: Some(server_identifier.get().into()),
+            ciaddr: None,
+            requested_ip_address: Some(*ip_address_to_request),
+            ip_address_lease_time_secs: ip_address_lease_time_secs.or(*preferred_lease_time_secs),
             message_type: dhcp_protocol::MessageType::DHCPREQUEST,
+            server_identifier: Some(*server_identifier),
+            include_parameter_request_list: true,
         },
     )
 }
@@ -1289,15 +1271,15 @@ mod test {
                     VaryingOutgoingMessageFields {
                         xid: msg.xid,
                         options: vec![
+                            dhcp_protocol::DhcpOption::DhcpMessageType(
+                                dhcp_protocol::MessageType::DHCPDISCOVER,
+                            ),
                             dhcp_protocol::DhcpOption::ParameterRequestList(
                                 test_requested_parameters()
                                     .iter_keys()
                                     .collect::<Vec<_>>()
                                     .try_into()
                                     .expect("should fit parameter request list size constraints"),
-                            ),
-                            dhcp_protocol::DhcpOption::DhcpMessageType(
-                                dhcp_protocol::MessageType::DHCPDISCOVER,
                             ),
                         ],
                     },
@@ -1440,15 +1422,15 @@ mod test {
                 VaryingOutgoingMessageFields {
                     xid: msg.xid,
                     options: vec![
+                        dhcp_protocol::DhcpOption::DhcpMessageType(
+                            dhcp_protocol::MessageType::DHCPDISCOVER,
+                        ),
                         dhcp_protocol::DhcpOption::ParameterRequestList(
                             test_requested_parameters()
                                 .iter_keys()
                                 .collect::<Vec<_>>()
                                 .try_into()
                                 .expect("should fit parameter request list size constraints"),
-                        ),
-                        dhcp_protocol::DhcpOption::DhcpMessageType(
-                            dhcp_protocol::MessageType::DHCPDISCOVER,
                         ),
                     ],
                 },
@@ -1693,10 +1675,13 @@ mod test {
                     VaryingOutgoingMessageFields {
                         xid: msg.xid,
                         options: vec![
+                            dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
                             dhcp_protocol::DhcpOption::IpAddressLeaseTime(
                                 DEFAULT_LEASE_LENGTH_SECONDS,
                             ),
-                            dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
+                            dhcp_protocol::DhcpOption::DhcpMessageType(
+                                dhcp_protocol::MessageType::DHCPREQUEST,
+                            ),
                             dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                             dhcp_protocol::DhcpOption::ParameterRequestList(
                                 test_requested_parameters()
@@ -1704,9 +1689,6 @@ mod test {
                                     .collect::<Vec<_>>()
                                     .try_into()
                                     .expect("should fit parameter request list size constraints"),
-                            ),
-                            dhcp_protocol::DhcpOption::DhcpMessageType(
-                                dhcp_protocol::MessageType::DHCPREQUEST,
                             ),
                         ],
                     },
@@ -1877,8 +1859,11 @@ mod test {
                 VaryingOutgoingMessageFields {
                     xid: msg.xid,
                     options: vec![
-                        dhcp_protocol::DhcpOption::IpAddressLeaseTime(DEFAULT_LEASE_LENGTH_SECONDS),
                         dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
+                        dhcp_protocol::DhcpOption::IpAddressLeaseTime(DEFAULT_LEASE_LENGTH_SECONDS),
+                        dhcp_protocol::DhcpOption::DhcpMessageType(
+                            dhcp_protocol::MessageType::DHCPREQUEST,
+                        ),
                         dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                         dhcp_protocol::DhcpOption::ParameterRequestList(
                             test_requested_parameters()
@@ -1886,9 +1871,6 @@ mod test {
                                 .collect::<Vec<_>>()
                                 .try_into()
                                 .expect("should fit parameter request list size constraints"),
-                        ),
-                        dhcp_protocol::DhcpOption::DhcpMessageType(
-                            dhcp_protocol::MessageType::DHCPREQUEST,
                         ),
                     ],
                 },
@@ -2054,8 +2036,8 @@ mod test {
                     xid: message.xid,
                     options: vec![
                         DhcpOption::RequestedIpAddress(YIADDR),
-                        DhcpOption::ServerIdentifier(SERVER_IP),
                         DhcpOption::DhcpMessageType(dhcp_protocol::MessageType::DHCPDECLINE),
+                        DhcpOption::ServerIdentifier(SERVER_IP),
                     ],
                 },
             );
