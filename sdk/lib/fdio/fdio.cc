@@ -116,3 +116,15 @@ fdio_t* fdio_zxio_create(zxio_storage_t** out_storage) {
   std::variant reference = GetLastReference(std::move(io.value()));
   return std::get<fdio::last_reference>(reference).ExportToRawPtr();
 }
+
+__EXPORT
+size_t fdio_currently_allocated_fd_count(void) {
+  size_t count = 0;
+  fbl::AutoLock lock(&fdio_lock);
+  for (size_t fd = 0; fd < FDIO_MAX_FD; ++fd) {
+    if (fdio_fdtab[fd].allocated()) {
+      ++count;
+    }
+  }
+  return count;
+}

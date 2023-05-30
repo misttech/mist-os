@@ -80,6 +80,7 @@ test("fdio-test") {
     sources += [
       "fdio_atexit.cc",
       "fdio_chroot.cc",
+      "fdio_currently_allocated_fd_count.cc",
       "fdio_directory.cc",
       "fdio_eventfd.cc",
       "fdio_fd.cc",

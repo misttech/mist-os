@@ -117,6 +117,9 @@ typedef struct zxio_storage zxio_storage_t;
 // Upon failure, returns NULL.
 fdio_t* fdio_zxio_create(zxio_storage_t** out_storage) ZX_AVAILABLE_SINCE(1);
 
+// Returns the number of file descriptors currently allocated in this process.
+size_t fdio_currently_allocated_fd_count(void) ZX_AVAILABLE_SINCE(12);
+
 __END_CDECLS
 
 #endif  // LIB_FDIO_FDIO_H_

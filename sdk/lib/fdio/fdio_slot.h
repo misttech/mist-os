@@ -31,6 +31,8 @@ struct fdio_slot {
 
   bool try_fill(fbl::RefPtr<fdio> io);
 
+  bool allocated() const;
+
  private:
   struct available {};
   struct reserved {};

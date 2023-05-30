@@ -57,6 +57,8 @@ bool fdio_slot::try_fill(fbl::RefPtr<fdio> io) {
   return false;
 }
 
+bool fdio_slot::allocated() const { return !std::holds_alternative<available>(inner_); }
+
 void fdio_slot::release_reservation() {
   if (std::holds_alternative<reserved>(inner_)) {
     inner_ = available{};

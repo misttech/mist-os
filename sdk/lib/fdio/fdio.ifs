@@ -36,6 +36,7 @@ Symbols:
   - { Name: fdatasync, Type: Func }
   - { Name: fdio_bind_to_fd, Type: Func }
   - { Name: fdio_create, Type: Func }
+  - { Name: fdio_currently_allocated_fd_count, Type: Func }
   - { Name: fdio_cwd_clone, Type: Func }
   - { Name: fdio_default_create, Type: Func }
   - { Name: fdio_fd_clone, Type: Func }
