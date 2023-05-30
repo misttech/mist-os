@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef PERFTEST_RESULTS_H_
+#define PERFTEST_RESULTS_H_
 
 #include <stdio.h>
 
@@ -51,7 +52,6 @@ struct TestCaseResults {
   fbl::String label;
   fbl::String unit;
   fbl::Vector<double> values;
-  uint64_t bytes_processed_per_run = 0;
 };
 
 // This represents the results for a set of test cases.
@@ -80,3 +80,5 @@ class ResultsSet {
 };
 
 }  // namespace perftest
+
+#endif  // PERFTEST_RESULTS_H_

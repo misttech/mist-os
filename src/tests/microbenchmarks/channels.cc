@@ -21,7 +21,6 @@ bool ChannelWriteReadTest(perftest::RepeatState* state, uint32_t message_size,
                           uint32_t handle_count) {
   state->DeclareStep("write");
   state->DeclareStep("read");
-  state->SetBytesProcessedPerRun(message_size);
 
   zx::channel channel1;
   zx::channel channel2;
@@ -54,7 +53,6 @@ bool ChannelWriteEtcReadEtcTest(perftest::RepeatState* state, uint32_t message_s
                                 uint32_t handle_count) {
   state->DeclareStep("write_etc");
   state->DeclareStep("read_etc");
-  state->SetBytesProcessedPerRun(message_size);
 
   zx::channel channel1;
   zx::channel channel2;
@@ -103,7 +101,6 @@ bool ChannelWriteEtcReadEtcIovecTest(perftest::RepeatState* state, uint32_t mess
                                      uint32_t num_iovecs, uint32_t handle_count) {
   state->DeclareStep("write_etc");
   state->DeclareStep("read_etc");
-  state->SetBytesProcessedPerRun(message_size);
 
   zx::channel channel1;
   zx::channel channel2;

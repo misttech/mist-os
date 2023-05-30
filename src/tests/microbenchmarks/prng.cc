@@ -12,11 +12,9 @@
 
 namespace {
 
-// Measure the time per call, as well as throughput, for retrieving random bytes
-// from |RandFunc|.
+// Measure the time per call for retrieving random bytes from |RandFunc|.
 template <auto RandFunc>
 bool GetFrom(perftest::RepeatState* state) {
-  state->SetBytesProcessedPerRun(sizeof(RandFunc()));
   while (state->KeepRunning()) {
     auto r = RandFunc();
     perftest::DoNotOptimize(r);
@@ -24,11 +22,9 @@ bool GetFrom(perftest::RepeatState* state) {
   return true;
 }
 
-// Measure the time per call, as well as throughput, for reading random bytes
-// from std::radnom_device.
+// Measure the time per call for reading random bytes from std::random_device.
 bool GetFromRandomDevice(perftest::RepeatState* state) {
   std::random_device rd;
-  state->SetBytesProcessedPerRun(sizeof(decltype(rd)::result_type));
   while (state->KeepRunning()) {
     auto r = rd();
     perftest::DoNotOptimize(r);
@@ -36,11 +32,9 @@ bool GetFromRandomDevice(perftest::RepeatState* state) {
   return true;
 }
 
-// Measure the time per call, as well as throughput, for reading random data
-// from Zircon.
+// Measure the time per call for reading random data from Zircon.
 bool GetFromZxCprng(perftest::RepeatState* state) {
   uint64_t r;
-  state->SetBytesProcessedPerRun(sizeof(r));
   while (state->KeepRunning()) {
     zx_cprng_draw(&r, sizeof(r));
     perftest::DoNotOptimize(r);

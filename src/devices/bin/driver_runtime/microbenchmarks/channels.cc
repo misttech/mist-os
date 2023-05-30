@@ -18,7 +18,6 @@ bool ChannelWriteReadTest(perftest::RepeatState* state, uint32_t message_size,
                           uint32_t handle_count) {
   state->DeclareStep("write");
   state->DeclareStep("read");
-  state->SetBytesProcessedPerRun(message_size);
 
   auto channel_pair = fdf::ChannelPair::Create(0);
   ASSERT_OK(channel_pair.status_value());
@@ -58,7 +57,6 @@ bool ChannelWriteReadCTest(perftest::RepeatState* state, uint32_t message_size,
                            uint32_t handle_count) {
   state->DeclareStep("write");
   state->DeclareStep("read");
-  state->SetBytesProcessedPerRun(message_size);
 
   auto channel_pair = fdf::ChannelPair::Create(0);
   ASSERT_OK(channel_pair.status_value());

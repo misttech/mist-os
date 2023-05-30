@@ -18,8 +18,6 @@ namespace {
 // Measure the time taken to write to a zx::stream for various sizes of writes and with various
 // length iovecs.
 bool StreamWriteAtTest(perftest::RepeatState* state, uint32_t message_size, size_t vector_count) {
-  state->SetBytesProcessedPerRun(message_size);
-
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(std::max<size_t>(zx_system_get_page_size(), message_size), 0, &vmo));
   size_t content_size = message_size;
@@ -48,8 +46,6 @@ bool StreamWriteAtTest(perftest::RepeatState* state, uint32_t message_size, size
 // Measure the time taken to read from a zx::stream for various sizes of reads and with various
 // length iovecs.
 bool StreamReadAtTest(perftest::RepeatState* state, uint32_t message_size, size_t vector_count) {
-  state->SetBytesProcessedPerRun(message_size);
-
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(std::max<size_t>(zx_system_get_page_size(), message_size), 0, &vmo));
   size_t content_size = message_size;

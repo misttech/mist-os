@@ -156,7 +156,6 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   send_bytes.resize(transfer, 0xAA);
   recv_bytes.resize(transfer, 0xBB);
 
-  state->SetBytesProcessedPerRun(transfer);
   while (state->KeepRunning()) {
     for (int sent = 0; sent < transfer;) {
       ssize_t wr;
@@ -243,7 +242,6 @@ bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_co
   send_bytes.resize(message_size, 0xAA);
   recv_bytes.resize(message_size, 0xBB);
 
-  state->SetBytesProcessedPerRun(message_size);
   while (state->KeepRunning()) {
     for (int i = 0; i < message_count; i++) {
       ssize_t wr;

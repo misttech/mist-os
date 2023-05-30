@@ -64,7 +64,6 @@ bool RandomMemcpy(perftest::RepeatState* state, size_t block_size_bytes, size_t 
                 [&] { return buf.get() + rand_offset_gen(rand_dev); });
 
   // Run the benchmark task.
-  state->SetBytesProcessedPerRun(block_size_bytes);
   for (size_t i = 0; state->KeepRunning(); ++i) {
     // The blocks might overlap, so we use memmove() instead of memcpy().
     memmove(dst_addrs[i % access_sequence_len], src_addrs[i % access_sequence_len],

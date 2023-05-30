@@ -20,7 +20,6 @@ namespace {
 bool FifoWriteReadTest(perftest::RepeatState* state, uint32_t entry_size, uint32_t batch_size) {
   state->DeclareStep("write");
   state->DeclareStep("read");
-  state->SetBytesProcessedPerRun(entry_size * batch_size);
 
   zx::fifo fifo1;
   zx::fifo fifo2;

@@ -57,22 +57,6 @@ class RepeatStateImpl : public RepeatState {
  public:
   explicit RepeatStateImpl(uint32_t run_count) : run_count_(run_count) {}
 
-  void SetBytesProcessedPerRun(uint64_t bytes) override {
-    if (started_) {
-      SetError("SetBytesProcessedPerRun() was called after KeepRunning()");
-      return;
-    }
-    if (bytes == 0) {
-      SetError("Zero argument to SetBytesProcessedPerRun()");
-      return;
-    }
-    if (bytes_processed_per_run_ != 0) {
-      SetError("Multiple calls to SetBytesProcessedPerRun()");
-      return;
-    }
-    bytes_processed_per_run_ = bytes;
-  }
-
   void DeclareStep(const char* name) override {
     if (started_) {
       SetError("DeclareStep() was called after KeepRunning()");
@@ -159,19 +143,11 @@ class RepeatStateImpl : public RepeatState {
   }
 
   void CopyTimeResults(const char* test_suite, const char* test_name, ResultsSet* dest) const {
-    // bytes_processed_per_run is used for calculating throughput, but
-    // throughput is only really meaningful to calculate for the test
-    // overall, not for individual steps.  Therefore we only report
-    // bytes_processed_per_run on the overall times.
-
     // Report the times for each test run.
-    if (step_count_ == 1 || bytes_processed_per_run_ != 0) {
+    if (step_count_ == 1) {
       TestCaseResults* results = dest->AddTestCase(test_suite, test_name, "nanoseconds");
-      results->bytes_processed_per_run = bytes_processed_per_run_;
       CopyStepTimes(0, step_count_, results);
-    }
-
-    if (step_count_ > 1) {
+    } else {
       // Report times for individual steps.
       for (uint32_t step = 0; step < step_count_; ++step) {
         fbl::String name = fbl::StringPrintf("%s.%s", test_name, step_names_[step].c_str());
@@ -299,8 +275,6 @@ class RepeatStateImpl : public RepeatState {
   Timestamp overall_start_time_;
   // End time, after the test's teardown phase.
   Timestamp overall_end_time_;
-  // Used for calculating throughput in bytes per unit time.
-  uint64_t bytes_processed_per_run_ = 0;
 };
 
 bool CompareTestNames(internal::NamedTest* test1, internal::NamedTest* test2) {

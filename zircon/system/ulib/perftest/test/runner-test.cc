@@ -83,7 +83,6 @@ TEST(PerfTestRunner, TestResults) {
   EXPECT_EQ(test_case->values.size(), kRunCount);
   EXPECT_STREQ(test_case->label.c_str(), "no_op_example_test");
   EXPECT_TRUE(check_times(test_case));
-  EXPECT_EQ(test_case->bytes_processed_per_run, 0);
 }
 
 // Test that if a perf test fails by returning "false", the failure gets
@@ -242,61 +241,6 @@ TEST(PerfTestRunner, TestBadNextStepCalls) {
     EXPECT_EQ(results.results()->size(),
               static_cast<size_t>(actual_calls == kCorrectNumberOfCalls ? 3 : 0));
   }
-}
-
-// Check that the bytes_processed_per_run parameter is propagated through.
-TEST(PerfTestRunner, TestBytesProcessedParameter) {
-  auto test_func = [&](perftest::RepeatState* state) {
-    state->SetBytesProcessedPerRun(1234);
-    while (state->KeepRunning()) {
-    }
-    return true;
-  };
-  perftest::internal::TestList test_list;
-  perftest::internal::NamedTest test{"throughput_test", test_func};
-  test_list.push_back(std::move(test));
-
-  const uint32_t kRunCount = 5;
-  perftest::ResultsSet results;
-  DummyOutputStream out;
-  EXPECT_TRUE(
-      perftest::internal::RunTests("test-suite", &test_list, kRunCount, "", out.fp(), &results));
-  auto* test_cases = results.results();
-  ASSERT_EQ(test_cases->size(), 1);
-  EXPECT_EQ((*test_cases)[0].bytes_processed_per_run, 1234);
-}
-
-// If we have a multi-step test that specifies a bytes_processed_per_run
-// parameter, we should get a result reported for the overall times with a
-// bytes_processed_per_run value.  The results for the individual steps
-// should not report bytes_processed_per_run.
-TEST(PerfTestRunner, TestBytesProcessedParameterMultistep) {
-  auto test_func = [&](perftest::RepeatState* state) {
-    state->SetBytesProcessedPerRun(1234);
-    state->DeclareStep("step1");
-    state->DeclareStep("step2");
-    while (state->KeepRunning()) {
-      state->NextStep();
-    }
-    return true;
-  };
-  perftest::internal::TestList test_list;
-  perftest::internal::NamedTest test{"throughput_test", test_func};
-  test_list.push_back(std::move(test));
-
-  const uint32_t kRunCount = 5;
-  perftest::ResultsSet results;
-  DummyOutputStream out;
-  EXPECT_TRUE(
-      perftest::internal::RunTests("test-suite", &test_list, kRunCount, "", out.fp(), &results));
-  auto* test_cases = results.results();
-  ASSERT_EQ(test_cases->size(), 3);
-  EXPECT_STREQ((*test_cases)[0].label.c_str(), "throughput_test");
-  EXPECT_STREQ((*test_cases)[1].label.c_str(), "throughput_test.step1");
-  EXPECT_STREQ((*test_cases)[2].label.c_str(), "throughput_test.step2");
-  EXPECT_EQ((*test_cases)[0].bytes_processed_per_run, 1234);
-  EXPECT_EQ((*test_cases)[1].bytes_processed_per_run, 0);
-  EXPECT_EQ((*test_cases)[2].bytes_processed_per_run, 0);
 }
 
 // When no tests have been registered, a null pointer is passed to

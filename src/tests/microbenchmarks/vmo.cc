@@ -27,8 +27,6 @@ bool VmoReadOrWriteTest(perftest::RepeatState* state, uint32_t copy_size, bool d
     ZX_ASSERT(do_write);
   }
 
-  state->SetBytesProcessedPerRun(copy_size);
-
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(copy_size, 0, &vmo));
 
@@ -76,8 +74,6 @@ bool VmoReadOrWriteTest(perftest::RepeatState* state, uint32_t copy_size, bool d
 // zx_vmo_read()/zx_vmo_write() (when user_memcpy=false).
 bool VmoReadOrWriteMapTestImpl(perftest::RepeatState* state, uint32_t copy_size, bool do_write,
                                int flags, bool user_memcpy) {
-  state->SetBytesProcessedPerRun(copy_size);
-
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(copy_size, 0, &vmo));
   std::vector<char> buffer(copy_size);
@@ -228,7 +224,6 @@ bool VmoCloneReadOrWriteTest(perftest::RepeatState* state, uint32_t copy_size, b
   state->DeclareStep("clone");
   state->DeclareStep(do_write ? "write" : "read");
   state->DeclareStep("close");
-  state->SetBytesProcessedPerRun(copy_size);
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(copy_size, 0, &vmo));
@@ -283,7 +278,6 @@ bool VmoCreateWriteReadCloseTest(perftest::RepeatState* state, uint32_t copy_siz
   state->DeclareStep("write");
   state->DeclareStep("read");
   state->DeclareStep("close");
-  state->SetBytesProcessedPerRun(copy_size);
 
   // Use a vmo as the buffer to read from / write to.
   zx::vmo buffer_vmo;

@@ -24,7 +24,6 @@ bool SocketWriteReadTest(perftest::RepeatState* state, uint32_t socket_flags, ui
                          uint32_t queued) {
   state->DeclareStep("write");
   state->DeclareStep("read");
-  state->SetBytesProcessedPerRun(message_size);
 
   zx::socket socket1;
   zx::socket socket2;

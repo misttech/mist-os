@@ -1,4 +1,3 @@
-fuchsia.microbenchmarks.tracing_categories_disabled: Channel/WriteRead/1024bytes/1handles
 fuchsia.microbenchmarks.tracing_categories_disabled: Channel/WriteRead/1024bytes/1handles.read
 fuchsia.microbenchmarks.tracing_categories_disabled: Channel/WriteRead/1024bytes/1handles.write
 fuchsia.microbenchmarks.tracing_categories_disabled: Syscall/ManyArgs

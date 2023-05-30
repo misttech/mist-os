@@ -13,8 +13,6 @@ namespace {
 
 // Test performance of memcpy() on a block of the given size.
 bool MemcpyTest(perftest::RepeatState* state, size_t size) {
-  state->SetBytesProcessedPerRun(size);
-
   std::unique_ptr<char[]> src(new char[size]);
   std::unique_ptr<char[]> dest(new char[size]);
   // Initialize src so that we are not copying from uninitialized memory.
