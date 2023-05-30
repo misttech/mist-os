@@ -269,7 +269,6 @@ hlcpp_visibility = [
   "//src/media/lib/internal_buffer",
   "//src/media/lib/test:*",
   "//src/media/playback/examples/audio_player:*",
-  "//src/media/playback/mediaplayer/*",
   "//src/media/sounds/soundplayer:*",
   "//src/media/testing/mock_profile_provider:*",
   "//src/modular/bin/basemgr/*",

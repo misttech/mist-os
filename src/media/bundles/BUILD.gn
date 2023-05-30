@@ -20,7 +20,6 @@ group("services") {
     "//src/media/audio/bundles:services",
     "//src/media/audio/consumer/bundles:services",
     "//src/media/codec/bundles:services",
-    "//src/media/playback/bundles:services",
     "//src/media/sessions/bundles:services",
     "//src/media/sounds/bundles:services",
     "//src/media/stream_processors/bundles:services",
@@ -32,7 +31,6 @@ group("tools") {
   deps = [
     "//src/media/audio/bundles:tools",
     "//src/media/codec/bundles:tools",
-    "//src/media/playback/bundles:tools",
     "//src/media/sessions/bundles:tools",
     "//src/media/sounds/bundles:tools",
     "//src/media/stream_processors/bundles:tools",
@@ -44,7 +42,6 @@ group("examples") {
   deps = [
     "//src/media/audio/bundles:examples",
     "//src/media/codec/bundles:examples",
-    "//src/media/playback/bundles:examples",
     "//src/media/sessions/bundles:examples",
     "//src/media/sounds/bundles:examples",
     "//src/media/stream_processors/bundles:examples",

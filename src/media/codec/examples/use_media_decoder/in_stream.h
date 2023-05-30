@@ -29,10 +29,6 @@
 //
 // It is only safe to delete the instance from a thread that is not the
 // fidl_thread.
-//
-// TODO(dustingreen): Probably we could combine this with
-// src/media/playback/mediaplayer/demux/reader.h, assuming it's fine to consume
-// that here.
 class InStream {
  public:
   // All sub-classes must retain the property that it's safe to delete this
