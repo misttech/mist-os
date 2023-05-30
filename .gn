@@ -30,7 +30,7 @@ exec_script_whitelist = [
   "//build/config/mac/mac_sdk.gni",
   "//build/config/profile/BUILD.gn",
   "//build/config/sanitizers/BUILD.gn",
-  "//build/toolchain/default_concurrent_jobs.gni",
+  "//build/toolchain/concurrent_jobs.gni",
   "//build/toolchain/zircon/zircon_toolchain.gni",
   "//build/icu/config.gni",
   "//zircon/kernel/arch/x86/phys/BUILD.gn",
