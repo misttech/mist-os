@@ -99,7 +99,8 @@ class NetworkDevice : public Device,
 
  private:
   friend class NetworkDeviceTests;
-  uint16_t NegotiateHeaderLength();
+  zx_status_t AckFeatures(bool* is_status_supported, bool* is_multiqueue_supported,
+                          uint16_t* virtio_hdr_len);
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(NetworkDevice);
 
@@ -153,6 +154,11 @@ class NetworkDevice : public Device,
   };
   FifoQueue tx_in_flight_ __TA_GUARDED(tx_lock_);
   FifoQueue rx_in_flight_ __TA_GUARDED(rx_lock_);
+
+  // Whether the status field in virtio_net_config is supported.
+  bool is_status_supported_;
+  // Whether the device supports multiqueue with automatic receive steering.
+  bool is_multiqueue_supported_;
 
   fuchsia_net::wire::MacAddress mac_;
   uint16_t virtio_hdr_len_;

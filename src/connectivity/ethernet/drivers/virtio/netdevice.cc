@@ -32,6 +32,30 @@
 
 namespace virtio {
 
+namespace {
+
+bool IsLinkActive(const virtio_net_config& config, bool is_status_supported) {
+  // 5.1.4.2 Driver Requirements: Device configuration layout
+  //
+  // If the driver does not negotiate the VIRTIO_NET_F_STATUS feature, it SHOULD assume the link
+  // is active, otherwise it SHOULD read the link status from the bottom bit of status.
+  //
+  // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-2000004
+  return is_status_supported ? config.status & VIRTIO_NET_S_LINK_UP : true;
+}
+
+uint16_t MaxVirtqueuePairs(const virtio_net_config& config, bool is_mq_supported) {
+  // 5.1.5 Device Initialization
+  //
+  // Identify and initialize the receive and transmission virtqueues, up to N of each kind. If
+  // VIRTIO_NET_F_MQ feature bit is negotiated, N=max_virtqueue_pairs, otherwise identify N=1.
+  //
+  // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-2040005
+  return is_mq_supported ? config.max_virtqueue_pairs : 1;
+}
+
+}  // namespace
+
 NetworkDevice::NetworkDevice(zx_device_t* bus_device, zx::bti bti_handle,
                              std::unique_ptr<Backend> backend)
     : virtio::Device(bus_device, std::move(bti_handle), std::move(backend)),
@@ -57,22 +81,33 @@ NetworkDevice::~NetworkDevice() {}
 zx_status_t NetworkDevice::Init() {
   fbl::AutoLock lock(&state_lock_);
 
-  // Reset the device and read our configuration.
+  // Reset the device.
   DeviceReset();
-  virtio_net_config_t config;
-  CopyDeviceConfig(&config, sizeof(config));
-
-  zxlogf(DEBUG, "mac %02x:%02x:%02x:%02x:%02x:%02x", config.mac[0], config.mac[1], config.mac[2],
-         config.mac[3], config.mac[4], config.mac[5]);
-  zxlogf(DEBUG, "status %u", config.status);
-  zxlogf(DEBUG, "max_virtqueue_pairs  %u", config.max_virtqueue_pairs);
-
-  static_assert(sizeof(config.mac) == sizeof(mac_.octets));
-  std::copy(std::begin(config.mac), std::end(config.mac), mac_.octets.begin());
 
   // Ack and set the driver status bit.
   DriverStatusAck();
-  virtio_hdr_len_ = NegotiateHeaderLength();
+
+  // Ack features. We do DeviceStatusFeaturesOk() when we actually start the network device (in
+  // NetworkDeviceImplStart()).
+  if (zx_status_t status =
+          AckFeatures(&is_status_supported_, &is_multiqueue_supported_, &virtio_hdr_len_);
+      status != ZX_OK) {
+    zxlogf(ERROR, "failed to ack features: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Read device configuration.
+  virtio_net_config_t config;
+  CopyDeviceConfig(&config, sizeof(config));
+
+  // We've checked that the config.mac field is valid (VIRTIO_NET_F_MAC) in AckFeatures().
+  zxlogf(DEBUG, "mac: %02x:%02x:%02x:%02x:%02x:%02x", config.mac[0], config.mac[1], config.mac[2],
+         config.mac[3], config.mac[4], config.mac[5]);
+  zxlogf(DEBUG, "link active: %u", IsLinkActive(config, is_status_supported_));
+  zxlogf(DEBUG, "max virtqueue pairs: %u", MaxVirtqueuePairs(config, is_multiqueue_supported_));
+
+  static_assert(sizeof(config.mac) == sizeof(mac_.octets));
+  std::copy(std::begin(config.mac), std::end(config.mac), mac_.octets.begin());
 
   if (zx_status_t status = vmo_store_.Reserve(MAX_VMOS); status != ZX_OK) {
     zxlogf(ERROR, "failed to initialize vmo store: %s", zx_status_get_string(status));
@@ -94,19 +129,42 @@ zx_status_t NetworkDevice::Init() {
   return ZX_OK;
 }
 
-uint16_t NetworkDevice::NegotiateHeaderLength() {
+zx_status_t NetworkDevice::AckFeatures(bool* is_status_supported, bool* is_multiqueue_supported,
+                                       uint16_t* virtio_hdr_len) {
+  if (!DeviceFeaturesSupported(VIRTIO_NET_F_MAC)) {
+    zxlogf(ERROR, "device does not have a given MAC address.");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  DriverFeaturesAck(VIRTIO_NET_F_MAC);
+
+  if (DeviceFeaturesSupported(VIRTIO_NET_F_STATUS)) {
+    DriverFeaturesAck(VIRTIO_NET_F_STATUS);
+    *is_status_supported = true;
+  } else {
+    *is_status_supported = false;
+  }
+
+  if (DeviceFeaturesSupported(VIRTIO_NET_F_MQ)) {
+    DriverFeaturesAck(VIRTIO_NET_F_MQ);
+    *is_multiqueue_supported = true;
+  } else {
+    *is_multiqueue_supported = false;
+  }
+
   if (DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
     DriverFeaturesAck(VIRTIO_F_VERSION_1);
-    return sizeof(virtio_net_hdr_t);
+    *virtio_hdr_len = sizeof(virtio_net_hdr_t);
+  } else {
+    // 5.1.6.1 Legacy Interface: Device Operation.
+    //
+    // The legacy driver only presented num_buffers in the struct
+    // virtio_net_hdr when VIRTIO_NET_F_MRG_RXBUF was negotiated; without
+    // that feature the structure was 2 bytes shorter.
+    //
+    // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-2050006
+    *virtio_hdr_len = sizeof(virtio_legacy_net_hdr_t);
   }
-  // 5.1.6.1 Legacy Interface: Device Operation.
-  //
-  // The legacy driver only presented num_buffers in the struct
-  // virtio_net_hdr when VIRTIO_NET_F_MRG_RXBUF was negotiated; without
-  // that feature the structure was 2 bytes shorter.
-  //
-  // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-2050006
-  return sizeof(virtio_legacy_net_hdr_t);
+  return ZX_OK;
 }
 
 void NetworkDevice::DdkRelease() {
@@ -227,7 +285,7 @@ port_status_t NetworkDevice::ReadStatus() const {
   CopyDeviceConfig(&config, sizeof(config));
   return {
       .mtu = kMtu,
-      .flags = (config.status & VIRTIO_NET_S_LINK_UP)
+      .flags = IsLinkActive(config, is_status_supported_)
                    ? static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline)
                    : 0,
   };
@@ -247,7 +305,20 @@ void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback ca
     DeviceReset();
     WaitForDeviceReset();
     DriverStatusAck();
-    uint16_t header_length = NegotiateHeaderLength();
+    bool is_status_supported, is_multiqueue_supported;
+    uint16_t header_length;
+    if (zx_status_t status =
+            AckFeatures(&is_status_supported, &is_multiqueue_supported, &header_length);
+        status != ZX_OK) {
+      zxlogf(ERROR, "failed to ack features: %s", zx_status_get_string(status));
+      return status;
+    }
+    ZX_ASSERT_MSG(is_status_supported == is_status_supported_,
+                  "status support changed from %u to %u between init and start",
+                  is_status_supported_, is_status_supported);
+    ZX_ASSERT_MSG(is_multiqueue_supported == is_multiqueue_supported_,
+                  "max queue support changed from %u to %u between init and start",
+                  is_multiqueue_supported_, is_multiqueue_supported);
     ZX_ASSERT_MSG(header_length == virtio_hdr_len_,
                   "header length changed from %u to %u between init and start", virtio_hdr_len_,
                   header_length);

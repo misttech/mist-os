@@ -91,6 +91,13 @@ class FakeBackendForNetdeviceTest : public FakeBackend {
 
   bool ReadSingleFeature(uint32_t bit_offset) override {
     switch (1ul << bit_offset) {
+      case VIRTIO_NET_F_MAC:
+        // Required by driver implementation.
+        return true;
+      case VIRTIO_NET_F_STATUS:
+        // If not supported, spec assumes link is always active. Enable this so we can test link
+        // status changes.
+        return true;
       case VIRTIO_F_VERSION_1:
         return support_feature_v1_;
       default:
@@ -284,9 +291,9 @@ TEST_P(VirtioVersionTests, Start) {
   EXPECT_TRUE(backend().tx_ring_started());
   ASSERT_EQ(backend().DeviceState(), FakeBackend::State::DRIVER_OK);
   if (IsV1Virtio()) {
-    EXPECT_EQ(backend().feature_bits(), VIRTIO_F_VERSION_1);
+    EXPECT_TRUE(backend().feature_bits() & VIRTIO_F_VERSION_1);
   } else {
-    EXPECT_EQ(backend().feature_bits(), 0);
+    EXPECT_FALSE(backend().feature_bits() & VIRTIO_F_VERSION_1);
   }
 }
 
