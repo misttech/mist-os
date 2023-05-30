@@ -672,13 +672,39 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 
 	// If the TestOutDirEnvKey was set, that means botanist is being run in an infra
 	// setting and thus needs an isolated environment.
-	_, needsIsolatedEnv := os.LookupEnv(testrunnerconstants.TestOutDirEnvKey)
+	testOutDir, needsIsolatedEnv := os.LookupEnv(testrunnerconstants.TestOutDirEnvKey)
 	cleanUp, err := environment.Ensure(needsIsolatedEnv)
 	if err != nil {
 		logger.Errorf(ctx, "failed to setup environment: %s", err)
 		return subcommands.ExitFailure
 	}
 	defer cleanUp()
+
+	if needsIsolatedEnv {
+		// Use a temp directory for the output directory which we will move to the
+		// actual testOutDir once the command completes. Otherwise, when run in a
+		// swarming task, a subprocess that doesn't properly finish could still be
+		// writing to the out dir as we try to upload the contents with the swarming
+		// task outputs which will result in the swarming bot failing with BOT_DIED.
+		tmpOutDir, err := os.MkdirTemp("", "")
+		if err != nil {
+			return subcommands.ExitFailure
+		}
+		if err := os.Setenv(testrunnerconstants.TestOutDirEnvKey, tmpOutDir); err != nil {
+			return subcommands.ExitFailure
+		}
+		defer func() {
+			if err := osmisc.CopyDir(tmpOutDir, testOutDir); err != nil {
+				logger.Errorf(ctx, "failed to copy outputs to %s", testOutDir)
+			}
+			if err := os.Setenv(testrunnerconstants.TestOutDirEnvKey, testOutDir); err != nil {
+				logger.Errorf(ctx, "failed to reset %s to %s", testrunnerconstants.TestOutDirEnvKey, testOutDir)
+			}
+			if err := os.RemoveAll(tmpOutDir); err != nil {
+				logger.Errorf(ctx, "failed to remove temp outputs dir %s", tmpOutDir)
+			}
+		}()
+	}
 
 	r.blobURL = os.ExpandEnv(r.blobURL)
 	r.repoURL = os.ExpandEnv(r.repoURL)
