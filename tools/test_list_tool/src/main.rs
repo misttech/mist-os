@@ -340,56 +340,62 @@ fn run_tool() -> Result<(), Error> {
     let tests_json = read_tests_json(&opt.input)?;
     let test_components_json = read_test_components_json(&opt.test_components_list)?;
     let test_components_map = TestComponentsJsonEntry::convert_to_map(test_components_json)?;
-    let mut test_list = TestList::Experimental { data: vec![] };
-    let mut inputs: Vec<Utf8PathBuf> = vec![];
 
-    for entry in tests_json {
-        let realm = match &entry.test.component_label {
-            Some(component_label) => match test_components_map.get(component_label) {
-                Some(test_component) => test_component.test_component.moniker.clone(),
+    use rayon::prelude::*;
+    let (data, inputs): (Vec<Option<TestListEntry>>, Vec<Vec<Utf8PathBuf>>) = tests_json
+        .par_iter()
+        .map(|entry| {
+            let realm = match &entry.test.component_label {
+                Some(component_label) => match test_components_map.get(component_label) {
+                    Some(test_component) => test_component.test_component.moniker.clone(),
+                    None => None,
+                },
                 None => None,
-            },
-            None => None,
-        };
+            };
 
-        // Construct the base TestListEntry.
-        let mut test_list_entry = to_test_list_entry(&entry.test, realm.clone());
-        let mut test_tags = FuchsiaTestTags::new();
-        let pkg_manifests = entry.test.package_manifests.clone().unwrap_or(vec![]);
+            // Construct the base TestListEntry.
+            let mut test_list_entry = to_test_list_entry(&entry.test, realm.clone());
+            let mut test_tags = FuchsiaTestTags::new();
+            let pkg_manifests = entry.test.package_manifests.clone().unwrap_or(vec![]);
 
-        // Aggregate any tags from the component manifest of the test.
-        if entry.test.package_url.is_some() && pkg_manifests.len() > 0 {
-            let pkg_url = entry.test.package_url.clone().unwrap();
-            let pkg_manifest = pkg_manifests[0].clone();
-            inputs.push(pkg_manifest.clone().into());
+            // Aggregate any tags from the component manifest of the test.
+            let mut inputs: Vec<Utf8PathBuf> = vec![];
+            if entry.test.package_url.is_some() && pkg_manifests.len() > 0 {
+                let pkg_url = entry.test.package_url.clone().unwrap();
+                let pkg_manifest = pkg_manifests[0].clone();
+                inputs.push(pkg_manifest.clone().into());
 
-            let res = find_meta_far(&opt.build_dir, pkg_manifest.clone());
-            if res.is_err() {
-                println!(
-                    "error finding meta.far file in package manifest {}: {:?}",
-                    &pkg_manifest,
-                    res.unwrap_err()
-                );
-                continue;
-            }
-            let meta_far_path = res.unwrap();
-            inputs.push(meta_far_path.clone());
-            test_tags.realm = realm;
-
-            // Find additional tags. Note that this can override existing tags (e.g. to set the test type based on realm)
-            match update_tags_from_manifest(&mut test_tags, pkg_url.clone(), &meta_far_path) {
-                Err(e) => {
-                    println!("error processing manifest for package URL {}: {:?}", &pkg_url, e)
+                let res = find_meta_far(&opt.build_dir, pkg_manifest.clone());
+                if res.is_err() {
+                    println!(
+                        "error finding meta.far file in package manifest {}: {:?}",
+                        &pkg_manifest,
+                        res.unwrap_err()
+                    );
+                    return (None, inputs);
                 }
-                _ => {}
-            }
-        }
+                let meta_far_path = res.unwrap();
+                inputs.push(meta_far_path.clone());
+                test_tags.realm = realm;
 
-        update_tags_with_test_entry(&mut test_tags, &entry.test);
-        test_list_entry.tags = test_tags.into_vec();
-        let TestList::Experimental { data } = &mut test_list;
-        data.push(test_list_entry);
-    }
+                // Find additional tags. Note that this can override existing tags (e.g. to set the test type based on realm)
+                match update_tags_from_manifest(&mut test_tags, pkg_url.clone(), &meta_far_path) {
+                    Err(e) => {
+                        println!("error processing manifest for package URL {}: {:?}", &pkg_url, e)
+                    }
+                    _ => {}
+                }
+            }
+
+            update_tags_with_test_entry(&mut test_tags, &entry.test);
+            test_list_entry.tags = test_tags.into_vec();
+            (Some(test_list_entry), inputs)
+        })
+        .unzip();
+    let data = data.into_par_iter().flatten().collect();
+    let inputs = inputs.into_par_iter().flatten().collect();
+
+    let test_list = TestList::Experimental { data };
     let test_list_json = serde_json::to_string_pretty(&test_list)?;
     fs::write(&opt.output, test_list_json)?;
     if let Some(depfile) = opt.depfile {
