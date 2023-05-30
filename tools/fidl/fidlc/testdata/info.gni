@@ -174,10 +174,6 @@ fidl_testdata_info = [
   {
     name = "empty_struct"
     target = "//tools/fidl/fidlc/testdata:test.emptystruct"
-    build_denylist = [
-      # TODO(fxbug.dev/101743): Fix.
-      "fidlgen_libfuzzer",
-    ]
     host_build_denylist = [
       # TODO(fxbug.dev/62573): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
