@@ -16,10 +16,10 @@
 namespace page_table {
 
 // Virtual address.
-DEFINE_STRONG_INT(Vaddr, uint64_t)
+DEFINE_STRONG_INT(Vaddr, uint64_t);
 
 // Physical address.
-DEFINE_STRONG_INT(Paddr, uint64_t)
+DEFINE_STRONG_INT(Paddr, uint64_t);
 
 // Interface abstracting away memory operations, such as mapping addresses
 // to and from physical addresses.

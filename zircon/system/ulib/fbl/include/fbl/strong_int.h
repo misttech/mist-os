@@ -23,8 +23,8 @@
 // StrongInt types are the same size as the underlying type.
 //
 // Example:
-//     DEFINE_STRONG_INT(CpuCount, uint64_t)
-//     DEFINE_STRONG_INT(MemoryBytes, uint64_t)
+//     DEFINE_STRONG_INT(CpuCount, uint64_t);
+//     DEFINE_STRONG_INT(MemoryBytes, uint64_t);
 //     ...
 //     CpuCount c1(3);
 //     CpuCount c2(5);
@@ -86,7 +86,7 @@
 #define DEFINE_STRONG_INT(type_name, base_type)                                  \
   struct type_name##_strong_int_type_tag_ {};                                    \
   using type_name = fbl::StrongInt<type_name##_strong_int_type_tag_, base_type>; \
-  static_assert(sizeof(type_name) == sizeof(base_type));
+  static_assert(sizeof(type_name) == sizeof(base_type))
 
 namespace fbl {
 
