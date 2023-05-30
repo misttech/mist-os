@@ -1402,7 +1402,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:119
+From //build/toolchain/rbe.gni:124
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1410,7 +1410,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:119
+From //build/toolchain/rbe.gni:124
 
 ### cxx_rbe_exec_strategy
 
@@ -1433,7 +1433,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:137
+From //build/toolchain/rbe.gni:142
 
 ### dart_aot_debug_build_cfg
 
@@ -7376,6 +7376,16 @@ One of:
 **Current value (from the default):** `"none"`
 
 From //build/toolchain/rbe.gni:111
+
+### rust_rbe_download_unstripped_binaries
+
+Controls whether or not to download (often large) unstripped Rust
+binaries.  When downloading is disabled, the build produces stubs
+that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+
+**Current value (from the default):** `true`
+
+From //build/toolchain/rbe.gni:116
 
 ### rust_rbe_enable
 
