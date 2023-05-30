@@ -536,7 +536,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_libcgroup_freezer.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_link04.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_link08.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_linkat01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_linkat02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_llseek01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_lremovexattr01.cm",
@@ -698,6 +697,9 @@
 
                 // TODO(fxbug.dev/127726) Re-enable once flake is resolved.
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_waitid08.cm",
+
+                // TODO(fxbug.dev/128184) Re-enable once flake is resolved.
+                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_linkat01.cm",
 
                 // Times out because getrusage is not implemented yet.
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getrusage04.cm",
