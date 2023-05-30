@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cml::{compile, Document};
+use cml::{compile, CompileOptions, Document};
 use fidl::persist;
 use serde_json::json;
 
 fn compile_from_json(contents: serde_json::Value) -> Vec<u8> {
     let document: Document =
         serde_json::from_str(&contents.to_string()).expect("failed to parse JSON");
-    let compiled = compile(&document, None).expect("failed to compile manifest");
+    let compiled =
+        compile(&document, CompileOptions::default()).expect("failed to compile manifest");
     persist(&compiled).expect("failed to persist FIDL manifest")
 }
 
