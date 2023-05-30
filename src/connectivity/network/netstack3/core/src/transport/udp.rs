@@ -54,7 +54,7 @@ use crate::{
             DatagramSocketId, DatagramSocketSpec, DatagramSocketStateSpec, DatagramSockets,
             DatagramStateContext, DatagramStateNonSyncContext, FoundSockets, InUseError,
             ListenerState, LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
-            SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
+            SendError as DatagramSendError, SetMulticastMembershipError, Shutdown, ShutdownType,
             SockCreationError, SocketHopLimits, UnboundSocketState,
         },
         posix::{PosixAddrState, PosixAddrVecTag, PosixSharingOptions, ToPosixSharingOptions},
@@ -457,13 +457,14 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
     /// Uses the provided addresses and receiving device to look up sockets that
     /// should receive a matching incoming packet. The returned iterator may
     /// yield 0, 1, or multiple sockets.
-    fn lookup(
+    fn lookup_recipients(
         &self,
         (src_ip, src_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
         (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
         device: D,
     ) -> impl Iterator<Item = LookupResult<I, D>> + '_ {
         let matching_entries = self.iter_receivers((src_ip, src_port), (dst_ip, dst_port), device);
+        let Self { bound: _, bound_state, unbound: _ } = self;
 
         match matching_entries {
             None => Either::Left(None),
@@ -483,6 +484,23 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
             }
         }
         .into_iter()
+        .filter(|lookup_result| match lookup_result {
+            LookupResult::Conn(id, _) => {
+                let (
+                    ConnState {
+                        socket: _,
+                        shutdown: Shutdown { send: _, receive: shutdown_receive },
+                        clear_device_on_disconnect: _,
+                    },
+                    _sharing,
+                    _addr,
+                ) = Connection::from_socket_state_ref(
+                    bound_state.get(&id.clone().into()).expect("invalid conn ID"),
+                );
+                !shutdown_receive
+            }
+            LookupResult::Listener(_, _) => true,
+        })
     }
 }
 
@@ -951,7 +969,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
                 let Sockets {sockets, lazy_port_alloc: _} = state;
 
                 let receiver = sockets
-                    .lookup((dst_ip, dst_port), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
+                    .lookup_recipients((dst_ip, dst_port), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
                     .next();
 
             if let Some(id) = receiver {
@@ -1007,7 +1025,7 @@ impl<
             let mut recipients = SpecifiedAddr::new(src_ip)
                 .and_then(|src_ip| {
                     packet.src_port().map(|src_port| {
-                        sockets.lookup(
+                        sockets.lookup_recipients(
                             (src_ip, src_port),
                             (dst_ip, packet.dst_port()),
                             device_weak.clone(),
@@ -1149,6 +1167,8 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     fn disconnect_udp_connected(&mut self, ctx: &mut C, id: ConnId<I>) -> ListenerId<I>;
 
     fn shutdown(&mut self, ctx: &C, id: ConnId<I>, which: ShutdownType);
+
+    fn get_shutdown(&mut self, ctx: &C, id: ConnId<I>) -> Option<ShutdownType>;
 
     fn reconnect_udp(
         &mut self,
@@ -1377,6 +1397,10 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
     fn shutdown(&mut self, ctx: &C, id: ConnId<I>, which: ShutdownType) {
         datagram::shutdown_connected(self, ctx, id, which)
+    }
+
+    fn get_shutdown(&mut self, ctx: &C, id: ConnId<I>) -> Option<ShutdownType> {
+        datagram::get_shutdown_connected(self, ctx, id)
     }
 
     fn reconnect_udp(
@@ -1712,8 +1736,8 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
     }
 }
 
-impl<I: IpExt, D: WeakId, C: StateNonSyncContext<I>> DatagramStateNonSyncContext<IpPortSpec<I, D>>
-    for C
+impl<I: IpExt, D: WeakId, C: StateNonSyncContext<I>>
+    DatagramStateNonSyncContext<IpPortSpec<I, D>, Udp<I, D>> for C
 {
     fn try_alloc_listen_identifier(
         &mut self,
@@ -2216,6 +2240,7 @@ pub fn reconnect_udp<I: IpExt, C: crate::NonSyncContext>(
     )
     .map_err(IpInvariant::into_inner)
 }
+
 /// Shuts down a socket for reading and/or writing.
 ///
 /// # Panics
@@ -2235,6 +2260,28 @@ pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
         },
         |(IpInvariant((sync_ctx, ctx, which)), id)| {
             SocketHandler::<Ipv6, _>::shutdown(sync_ctx, ctx, id, which)
+        },
+    )
+}
+
+/// Get the shutdown state for a socket.
+///
+/// # Panics
+///
+/// Panics if `id` is not a valid `ConnId`.
+pub fn get_shutdown<I: IpExt, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: ConnId<I>,
+) -> Option<ShutdownType> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx)), id),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv4, _>::get_shutdown(sync_ctx, ctx, id)
+        },
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv6, _>::get_shutdown(sync_ctx, ctx, id)
         },
     )
 }
@@ -3507,9 +3554,11 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(false; "send")]
-    #[test_case(true; "sendto")]
-    fn test_send_udp_after_shutdown<I: Ip + TestIpExt>(send_to: bool) {
+    #[test_case(false, ShutdownType::Send; "shutdown send then send")]
+    #[test_case(false, ShutdownType::SendAndReceive; "shutdown both then send")]
+    #[test_case(true, ShutdownType::Send; "shutdown send then sendto")]
+    #[test_case(true, ShutdownType::SendAndReceive; "shutdown both then sendto")]
+    fn test_send_udp_after_shutdown<I: Ip + TestIpExt>(send_to: bool, shutdown: ShutdownType) {
         set_logger_for_test();
 
         #[derive(Debug)]
@@ -3563,12 +3612,84 @@ mod tests {
         .expect("connect_udp failed");
 
         send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn).expect("can send");
-        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, ShutdownType::Send);
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, shutdown);
 
         assert_matches!(
             send(send_to_ip, &mut sync_ctx, &mut non_sync_ctx, conn),
             Err(NotWriteableError)
         );
+    }
+
+    #[ip_test]
+    #[test_case(ShutdownType::Receive; "receive")]
+    #[test_case(ShutdownType::SendAndReceive; "both")]
+    fn test_marked_for_receive_shutdown<I: Ip + TestIpExt>(which: ShutdownType) {
+        set_logger_for_test();
+
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+        const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
+
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        let bound = SocketHandler::<I, _>::listen_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            Some(local_ip::<I>().into()),
+            Some(LOCAL_PORT),
+        )
+        .expect("can bind");
+        let conn = SocketHandler::<I, _>::connect_udp_listener(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            bound,
+            ZonedAddr::Unzoned(remote_ip::<I>()),
+            REMOTE_PORT,
+        )
+        .expect("can connect");
+
+        // Receive once, then set the shutdown flag, then receive again and
+        // check that it doesn't get to the socket.
+
+        let packet = [1, 1, 1, 1];
+        receive_udp_packet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            FakeDeviceId,
+            remote_ip::<I>().get(),
+            local_ip::<I>().get(),
+            REMOTE_PORT,
+            LOCAL_PORT,
+            &packet[..],
+        );
+
+        assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, which);
+        receive_udp_packet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            FakeDeviceId,
+            remote_ip::<I>().get(),
+            local_ip::<I>().get(),
+            REMOTE_PORT,
+            LOCAL_PORT,
+            &packet[..],
+        );
+        assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
+
+        // Calling shutdown for the send direction doesn't change anything.
+        SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, ShutdownType::Send);
+        receive_udp_packet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            FakeDeviceId,
+            remote_ip::<I>().get(),
+            local_ip::<I>().get(),
+            REMOTE_PORT,
+            LOCAL_PORT,
+            &packet[..],
+        );
+        assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
     }
 
     /// Tests that if we have multiple listeners and connections, demuxing the

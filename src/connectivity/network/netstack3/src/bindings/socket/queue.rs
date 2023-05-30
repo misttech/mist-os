@@ -6,12 +6,11 @@
 
 use std::collections::VecDeque;
 
-use fidl_fuchsia_posix_socket as psocket;
-
-use const_unwrap::const_unwrap_option;
 use fuchsia_zircon::{self as zx, Peered as _};
 use thiserror::Error;
 use tracing::{error, trace};
+
+use crate::bindings::socket::ZXSIO_SIGNAL_INCOMING;
 
 // These values were picked to match Linux behavior.
 
@@ -24,9 +23,6 @@ pub(crate) const DEFAULT_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 208 * 10
 /// The minimum value for the amount of data that can be queued for an
 /// application socket to be read before packets are dropped.
 pub(crate) const MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 256;
-
-const ZXSIO_SIGNAL_INCOMING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_INCOMING));
 
 #[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
 #[error("application buffers are full")]

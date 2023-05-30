@@ -184,7 +184,11 @@ pub(crate) struct Shutdown {
     /// True if the send path is shut down for the owning socket.
     ///
     /// If this is true, the socket should not be able to send packets.
-    send: bool,
+    pub(crate) send: bool,
+    /// True if the receive path is shut down for the owning socket.
+    ///
+    /// If this is true, the socket should not be able to receive packets.
+    pub(crate) receive: bool,
 }
 
 #[derive(Clone, Debug, Derivative)]
@@ -349,7 +353,7 @@ where
     ) -> O;
 }
 
-pub(crate) trait DatagramStateNonSyncContext<A: SocketMapAddrSpec> {
+pub(crate) trait DatagramStateNonSyncContext<A: SocketMapAddrSpec, S: SocketMapStateSpec> {
     /// Attempts to allocate an identifier for a listener.
     ///
     /// `is_available` checks whether the provided address could be used without
@@ -493,7 +497,7 @@ where
 pub(crate) fn remove_unbound<
     A: SocketMapAddrSpec,
     S: DatagramSocketStateSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
 >(
     sync_ctx: &mut SC,
@@ -514,7 +518,7 @@ pub(crate) fn remove_unbound<
 
 pub(crate) fn remove_listener<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -546,7 +550,7 @@ where
 
 pub(crate) fn remove_conn<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -577,7 +581,7 @@ where
 
 pub(crate) fn listen<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -710,7 +714,7 @@ pub enum SockCreationError {
 
 pub(crate) fn connect<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -809,7 +813,7 @@ pub enum ConnectListenerError {
 
 pub(crate) fn connect_listener<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -909,7 +913,7 @@ where
 
 pub(crate) fn reconnect<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -998,7 +1002,7 @@ where
 
 pub(crate) fn set_unbound_device<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1019,7 +1023,7 @@ pub(crate) fn set_unbound_device<
 
 pub(crate) fn disconnect_connected<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1069,14 +1073,19 @@ where
 }
 
 /// Which direction(s) to shut down for a socket.
+#[derive(Copy, Clone, Debug, GenericOverIp)]
 pub enum ShutdownType {
     /// Prevent sending packets on the socket.
     Send,
+    /// Prevent receiving packets on the socket.
+    Receive,
+    /// Prevent sending and receiving packets on the socket.
+    SendAndReceive,
 }
 
 pub(crate) fn shutdown_connected<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1093,12 +1102,43 @@ pub(crate) fn shutdown_connected<
             Connection::from_socket_state_mut(
                 bound_state.get_mut(&Connection::to_socket_id(id)).expect("no such connection"),
             );
-        let Shutdown { send } = shutdown;
-        match which {
-            ShutdownType::Send => {
-                *send = true;
-            }
-        }
+        let (shutdown_send, shutdown_receive) = match which {
+            ShutdownType::Send => (true, false),
+            ShutdownType::Receive => (false, true),
+            ShutdownType::SendAndReceive => (true, true),
+        };
+        let Shutdown { send, receive } = shutdown;
+        *send |= shutdown_send;
+        *receive |= shutdown_receive;
+    })
+}
+
+pub(crate) fn get_shutdown_connected<
+    A: SocketMapAddrSpec,
+    C: DatagramStateNonSyncContext<A, S>,
+    SC: DatagramStateContext<A, C, S>,
+    S: DatagramSocketSpec<A>,
+>(
+    sync_ctx: &mut SC,
+    _ctx: &C,
+    id: S::ConnId,
+) -> Option<ShutdownType>
+where
+    Bound<S>: Tagged<AddrVec<A>>,
+{
+    sync_ctx.with_sockets(|_sync_ctx, state| {
+        let DatagramSockets { bound_state, bound: _, unbound: _ } = state;
+        let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
+            Connection::from_socket_state_ref(
+                bound_state.get(&Connection::to_socket_id(id)).expect("no such connection"),
+            );
+        let Shutdown { send, receive } = shutdown;
+        Some(match (send, receive) {
+            (false, false) => return None,
+            (true, false) => ShutdownType::Send,
+            (false, true) => ShutdownType::Receive,
+            (true, true) => ShutdownType::SendAndReceive,
+        })
     })
 }
 
@@ -1112,7 +1152,7 @@ pub enum SendError<B, S> {
 
 pub(crate) fn send_conn<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: BufferDatagramStateContext<A, C, S, B>,
     S: DatagramSocketSpec<A>,
     B: BufferMut,
@@ -1131,7 +1171,7 @@ where
             ConnState {
                 socket,
                 clear_device_on_disconnect: _,
-                shutdown: Shutdown { send: shutdown_send },
+                shutdown: Shutdown { send: shutdown_send, receive: _ },
             },
             _sharing,
             addr,
@@ -1158,7 +1198,7 @@ pub(crate) enum SendToError<B, S> {
 
 pub(crate) fn send_conn_to<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: BufferDatagramStateContext<A, C, S, B>,
     S: DatagramSocketSpec<A>,
     B: BufferMut,
@@ -1185,7 +1225,7 @@ where
             ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
         ): &(_, S::ConnSharingState, _) = Connection::from_socket_state_ref(state);
 
-        let Shutdown { send: shutdown_write } = shutdown;
+        let Shutdown { send: shutdown_write, receive: _ } = shutdown;
         if *shutdown_write {
             return Err(SendToError::NotWriteable(body));
         }
@@ -1207,7 +1247,7 @@ where
 
 pub(crate) fn send_listener_to<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: BufferDatagramStateContext<A, C, S, B>,
     S: DatagramSocketSpec<A>,
     B: BufferMut,
@@ -1309,7 +1349,7 @@ pub(crate) type DatagramBoundId<S> = SocketId<S>;
 
 pub(crate) fn set_listener_device<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1369,7 +1409,7 @@ where
 
 pub(crate) fn set_connected_device<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1455,7 +1495,7 @@ where
 
 pub(crate) fn get_bound_device<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1520,7 +1560,8 @@ pub enum SetMulticastMembershipError {
 /// constraint on the source address.
 fn pick_interface_for_addr<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    S: SocketMapStateSpec,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: TransportIpContext<A::IpVersion, C, WeakDeviceId = A::WeakDeviceId>,
 >(
     sync_ctx: &mut SC,
@@ -1584,7 +1625,7 @@ impl<A: IpAddress, D> From<MulticastInterfaceSelector<A, D>>
 /// socket state.
 pub(crate) fn set_multicast_membership<
     A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
@@ -1797,7 +1838,7 @@ where
 pub(crate) fn update_ip_hop_limit<
     A: SocketMapAddrSpec,
     SC: DatagramStateContext<A, C, S>,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     S: DatagramSocketSpec<A>,
 >(
     sync_ctx: &mut SC,
@@ -1821,7 +1862,7 @@ pub(crate) fn update_ip_hop_limit<
 pub(crate) fn get_ip_hop_limits<
     A: SocketMapAddrSpec,
     SC: DatagramStateContext<A, C, S>,
-    C: DatagramStateNonSyncContext<A>,
+    C: DatagramStateNonSyncContext<A, S>,
     S: DatagramSocketSpec<A>,
 >(
     sync_ctx: &mut SC,
@@ -2087,8 +2128,11 @@ mod test {
         }
     }
 
-    impl<I: IpExt> DatagramStateNonSyncContext<FakeAddrSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
-        for FakeNonSyncCtx
+    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
+        DatagramStateNonSyncContext<
+            FakeAddrSpec<I, FakeWeakDeviceId<FakeDeviceId>>,
+            FakeStateSpec<I, FakeWeakDeviceId<D>>,
+        > for FakeNonSyncCtx
     {
         fn try_alloc_listen_identifier(
             &mut self,

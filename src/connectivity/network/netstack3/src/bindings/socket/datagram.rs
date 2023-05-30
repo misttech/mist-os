@@ -289,6 +289,12 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         which: ShutdownType,
     );
 
+    fn get_shutdown<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: Self::ConnId,
+    ) -> Option<ShutdownType>;
+
     fn get_conn_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
@@ -521,6 +527,14 @@ impl<I: IpExt> TransportState<I> for Udp {
         which: ShutdownType,
     ) {
         udp::shutdown(sync_ctx, ctx, id, which)
+    }
+
+    fn get_shutdown<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: Self::ConnId,
+    ) -> Option<ShutdownType> {
+        udp::get_shutdown(sync_ctx, ctx, id)
     }
 
     fn get_conn_info<C: NonSyncContext>(
@@ -1048,6 +1062,14 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
+    fn get_shutdown<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _ctx: &C,
+        _id: Self::ConnId,
+    ) -> Option<ShutdownType> {
+        todo!("https://fxbug.dev/47321: needs Core implementation")
+    }
+
     fn reconnect_conn<NonSyncCtx: NonSyncContext>(
         _sync_ctx: &SyncCtx<NonSyncCtx>,
         _ctx: &mut NonSyncCtx,
@@ -1367,17 +1389,9 @@ pub(crate) struct SocketControlInfo<I: Ip, T: Transport<I>> {
 /// Possible states for a datagram socket.
 #[derive(Debug)]
 enum SocketState<I: Ip, T: Transport<I>> {
-    Unbound {
-        unbound_id: T::UnboundId,
-    },
-    BoundListen {
-        listener_id: T::ListenerId,
-    },
-    BoundConnect {
-        conn_id: T::ConnId,
-        // TODO(https://fxbug.dev/126141): Move read shutdown into core.
-        shutdown_read: bool,
-    },
+    Unbound { unbound_id: T::UnboundId },
+    BoundListen { listener_id: T::ListenerId },
+    BoundConnect { conn_id: T::ConnId },
 }
 
 impl<'a, I: Ip, T: Transport<I>> From<&'a SocketState<I, T>> for SocketId<I, T> {
@@ -1387,9 +1401,7 @@ impl<'a, I: Ip, T: Transport<I>> From<&'a SocketState<I, T>> for SocketId<I, T> 
             SocketState::BoundListen { listener_id } => {
                 BoundSocketId::Listener(*listener_id).into()
             }
-            SocketState::BoundConnect { conn_id, shutdown_read: _ } => {
-                BoundSocketId::Connected(*conn_id).into()
-            }
+            SocketState::BoundConnect { conn_id } => BoundSocketId::Connected(*conn_id).into(),
         }
     }
 }
@@ -2045,7 +2057,7 @@ where
                     }
                 }
             }
-            SocketState::BoundConnect { conn_id, shutdown_read: _ } => {
+            SocketState::BoundConnect { conn_id } => {
                 return T::reconnect_conn(
                     sync_ctx,
                     non_sync_ctx,
@@ -2057,7 +2069,7 @@ where
             }
         };
 
-        self.data.info.state = SocketState::BoundConnect { conn_id, shutdown_read: false };
+        self.data.info.state = SocketState::BoundConnect { conn_id };
         assert_matches!(
             I::with_collection_mut(non_sync_ctx, |c| c.conns.insert(&conn_id, messages)),
             None
@@ -2081,9 +2093,7 @@ where
         let unbound_id = match self.data.info.state {
             SocketState::Unbound { unbound_id } => Ok(unbound_id),
             SocketState::BoundListen { listener_id: _ }
-            | SocketState::BoundConnect { conn_id: _, shutdown_read: _ } => {
-                Err(fposix::Errno::Einval)
-            }
+            | SocketState::BoundConnect { conn_id: _ } => Err(fposix::Errno::Einval),
         }?;
         let listener_id = Self::bind_inner(
             sync_ctx,
@@ -2233,23 +2243,45 @@ where
     > {
         trace_duration!("datagram::recv_msg");
 
-        let Self { ctx: _, data: BindingData { peer_event: _, info, messages } } = self;
+        let Self { ctx, data: BindingData { peer_event: _, info, messages } } = self;
+        let Ctx { sync_ctx, non_sync_ctx } = ctx;
+
+        let conn_id = match info.state {
+            SocketState::Unbound { unbound_id: _ }
+            | SocketState::BoundListen { listener_id: _ } => None,
+            SocketState::BoundConnect { conn_id } => Some(conn_id),
+        };
         let mut messages = messages.lock();
         let front = if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
             messages.peek().cloned()
         } else {
             messages.pop()
         };
-        let available = if let Some(front) = front {
-            front
-        } else {
-            if let SocketState::BoundConnect { shutdown_read, .. } = info.state {
-                if shutdown_read {
-                    // Return empty data to signal EOF.
-                    return Ok((None, Vec::new(), Default::default(), 0));
-                }
+
+        let available = match front {
+            None => {
+                // This is safe from races only because the setting of the
+                // shutdown flag can only be done by the worker executing this
+                // code. Otherwise, a packet being delivered, followed by
+                // another thread setting the shutdown flag, then this check
+                // executing, could result in a race that causes this this code
+                // to signal EOF with a packet still waiting.
+                let shutdown =
+                    conn_id.and_then(|conn_id| T::get_shutdown(sync_ctx, non_sync_ctx, conn_id));
+                return match shutdown {
+                    Some(ShutdownType::Receive | ShutdownType::SendAndReceive) => {
+                        // Return empty data to signal EOF.
+                        Ok((
+                            None,
+                            Vec::new(),
+                            fposix_socket::DatagramSocketRecvControlData::default(),
+                            0,
+                        ))
+                    }
+                    None | Some(ShutdownType::Send) => Err(fposix::Errno::Eagain),
+                };
             }
-            return Err(fposix::Errno::Eagain);
+            Some(front) => front,
         };
         let addr = want_addr.then(|| {
             I::SocketAddress::new(
@@ -2316,7 +2348,7 @@ where
                 }
                 None => Err(fposix::Errno::Edestaddrreq),
             },
-            SocketState::BoundConnect { conn_id, shutdown_read: _ } => match remote {
+            SocketState::BoundConnect { conn_id } => match remote {
                 None => T::send_conn(sync_ctx, non_sync_ctx, conn_id, body)
                     .map_err(|(_body, err)| err.into_errno()),
                 Some(remote) => T::send_conn_to(sync_ctx, non_sync_ctx, conn_id, body, remote)
@@ -2399,28 +2431,37 @@ where
         let Ctx { sync_ctx, non_sync_ctx } = ctx;
 
         // Only "connected" sockets can be shutdown.
-        if let SocketState::BoundConnect { ref mut shutdown_read, conn_id } = info.state {
-            if how.is_empty() {
-                return Err(fposix::Errno::Einval);
-            }
-            // Shutting down a socket twice is valid so we can just blindly set
-            // the corresponding flags.
-            if how.contains(fposix_socket::ShutdownMode::WRITE) {
-                T::shutdown(sync_ctx, non_sync_ctx, conn_id, ShutdownType::Send);
-            }
-            if how.contains(fposix_socket::ShutdownMode::READ) {
-                *shutdown_read = true;
-                if let Err(e) = messages
-                    .lock()
-                    .local_event()
-                    .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-                {
-                    error!("Failed to signal peer when shutting down: {:?}", e);
+        if let SocketState::BoundConnect { conn_id } = info.state {
+            let how = match (
+                how.contains(fposix_socket::ShutdownMode::READ),
+                how.contains(fposix_socket::ShutdownMode::WRITE),
+            ) {
+                (true, true) => ShutdownType::SendAndReceive,
+                (false, true) => ShutdownType::Send,
+                (true, false) => ShutdownType::Receive,
+                (false, false) => return Err(fposix::Errno::Einval),
+            };
+            T::shutdown(sync_ctx, non_sync_ctx, conn_id, how);
+
+            match how {
+                ShutdownType::Receive | ShutdownType::SendAndReceive => {
+                    // Make sure to signal the peer so any ongoing call to
+                    // receive that is waiting for a signal will poll again.
+                    if let Err(e) = messages
+                        .lock()
+                        .local_event()
+                        .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
+                    {
+                        error!("Failed to signal peer when shutting down: {:?}", e);
+                    }
                 }
+                ShutdownType::Send => (),
             }
-            return Ok(());
+
+            Ok(())
+        } else {
+            Err(fposix::Errno::Enotconn)
         }
-        Err(fposix::Errno::Enotconn)
     }
 
     fn set_multicast_membership<
