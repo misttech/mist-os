@@ -6,10 +6,10 @@ use {
     crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    fidl_fuchsia_input_report as fidl_input_report,
+    fidl_fuchsia_input_report::{self as fidl_input_report, ConsumerControlButton},
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fuchsia_inspect::health::Reporter,
+    fuchsia_inspect::{health::Reporter, ArrayProperty},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
 };
@@ -22,12 +22,12 @@ use {
 ///
 /// ```
 /// let volume_event = input_device::InputDeviceEvent::ConsumerControls(ConsumerControlsEvent::new(
-///     vec![fidl_input_report::ConsumerControlButton::VOLUME_UP],
+///     vec![ConsumerControlButton::VOLUME_UP],
 /// ));
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConsumerControlsEvent {
-    pub pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>,
+    pub pressed_buttons: Vec<ConsumerControlButton>,
 }
 
 impl ConsumerControlsEvent {
@@ -35,8 +35,29 @@ impl ConsumerControlsEvent {
     ///
     /// # Parameters
     /// - `pressed_buttons`: The buttons relevant to this event.
-    pub fn new(pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>) -> Self {
+    pub fn new(pressed_buttons: Vec<ConsumerControlButton>) -> Self {
         Self { pressed_buttons }
+    }
+
+    pub fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        let pressed_buttons_node =
+            node.create_string_array("pressed_buttons", self.pressed_buttons.len());
+        self.pressed_buttons.iter().enumerate().for_each(|(i, &ref button)| {
+            pressed_buttons_node.set(
+                i,
+                match button {
+                    ConsumerControlButton::VolumeUp => "volume_up",
+                    ConsumerControlButton::VolumeDown => "volume_down",
+                    ConsumerControlButton::Pause => "pause",
+                    ConsumerControlButton::FactoryReset => "factory_reset",
+                    ConsumerControlButton::MicMute => "mic_mute",
+                    ConsumerControlButton::Reboot => "reboot",
+                    ConsumerControlButton::CameraDisable => "camera_disable",
+                    _ => "unknown",
+                },
+            );
+        });
+        node.record(pressed_buttons_node);
     }
 }
 
@@ -57,7 +78,7 @@ pub struct ConsumerControlsBinding {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConsumerControlsDeviceDescriptor {
     /// The list of buttons that this device contains.
-    pub buttons: Vec<fidl_input_report::ConsumerControlButton>,
+    pub buttons: Vec<ConsumerControlButton>,
 }
 
 #[async_trait]
@@ -196,18 +217,17 @@ impl ConsumerControlsBinding {
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
         inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a ConsumerControlInputReport.
-        let pressed_buttons: Vec<fidl_input_report::ConsumerControlButton> =
-            match report.consumer_control {
-                Some(ref consumer_control_report) => consumer_control_report
-                    .pressed_buttons
-                    .as_ref()
-                    .map(|buttons| buttons.iter().cloned().collect())
-                    .unwrap_or_default(),
-                None => {
-                    inspect_status.count_filtered_reports(1u64);
-                    return (previous_report, None);
-                }
-            };
+        let pressed_buttons: Vec<ConsumerControlButton> = match report.consumer_control {
+            Some(ref consumer_control_report) => consumer_control_report
+                .pressed_buttons
+                .as_ref()
+                .map(|buttons| buttons.iter().cloned().collect())
+                .unwrap_or_default(),
+            None => {
+                inspect_status.count_filtered_reports(1u64);
+                return (previous_report, None);
+            }
+        };
 
         send_consumer_controls_event(
             pressed_buttons,
@@ -227,7 +247,7 @@ impl ConsumerControlsBinding {
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
 /// - `sender`: The stream to send the InputEvent to.
 fn send_consumer_controls_event(
-    pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>,
+    pressed_buttons: Vec<ConsumerControlButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
     sender: &mut UnboundedSender<input_device::InputEvent>,
     inspect_status: &InputDeviceStatus,
@@ -260,7 +280,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn volume_up_only() {
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let pressed_buttons = vec![fidl_input_report::ConsumerControlButton::VolumeUp];
+        let pressed_buttons = vec![ConsumerControlButton::VolumeUp];
         let first_report = testing_utilities::create_consumer_control_input_report(
             pressed_buttons.clone(),
             event_time_i64,
@@ -287,10 +307,8 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn volume_up_and_down() {
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let pressed_buttons = vec![
-            fidl_input_report::ConsumerControlButton::VolumeUp,
-            fidl_input_report::ConsumerControlButton::VolumeDown,
-        ];
+        let pressed_buttons =
+            vec![ConsumerControlButton::VolumeUp, ConsumerControlButton::VolumeDown];
         let first_report = testing_utilities::create_consumer_control_input_report(
             pressed_buttons.clone(),
             event_time_i64,
@@ -318,15 +336,15 @@ mod tests {
     async fn sequence_of_buttons() {
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
         let first_report = testing_utilities::create_consumer_control_input_report(
-            vec![fidl_input_report::ConsumerControlButton::VolumeUp],
+            vec![ConsumerControlButton::VolumeUp],
             event_time_i64,
         );
         let second_report = testing_utilities::create_consumer_control_input_report(
-            vec![fidl_input_report::ConsumerControlButton::VolumeDown],
+            vec![ConsumerControlButton::VolumeDown],
             event_time_i64,
         );
         let third_report = testing_utilities::create_consumer_control_input_report(
-            vec![fidl_input_report::ConsumerControlButton::CameraDisable],
+            vec![ConsumerControlButton::CameraDisable],
             event_time_i64,
         );
         let descriptor = testing_utilities::consumer_controls_device_descriptor();
@@ -334,17 +352,17 @@ mod tests {
         let input_reports = vec![first_report, second_report, third_report];
         let expected_events = vec![
             testing_utilities::create_consumer_controls_event(
-                vec![fidl_input_report::ConsumerControlButton::VolumeUp],
+                vec![ConsumerControlButton::VolumeUp],
                 event_time_u64,
                 &descriptor,
             ),
             testing_utilities::create_consumer_controls_event(
-                vec![fidl_input_report::ConsumerControlButton::VolumeDown],
+                vec![ConsumerControlButton::VolumeDown],
                 event_time_u64,
                 &descriptor,
             ),
             testing_utilities::create_consumer_controls_event(
-                vec![fidl_input_report::ConsumerControlButton::CameraDisable],
+                vec![ConsumerControlButton::CameraDisable],
                 event_time_u64,
                 &descriptor,
             ),

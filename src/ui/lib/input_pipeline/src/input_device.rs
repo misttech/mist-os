@@ -509,8 +509,19 @@ impl InputEvent {
         }
     }
 
-    pub fn record_inspect(&self, _node: &fuchsia_inspect::Node) {
-        // TODO(fxbug.dev/127462): Implement record_inspect according to event type.
+    pub fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        node.record_int("event_time", self.event_time.into_nanos());
+        match &self.device_event {
+            InputDeviceEvent::LightSensor(e) => e.record_inspect(node),
+            InputDeviceEvent::ConsumerControls(e) => e.record_inspect(node),
+            InputDeviceEvent::Mouse(e) => e.record_inspect(node),
+            InputDeviceEvent::TouchScreen(e) => e.record_inspect(node),
+            InputDeviceEvent::Touchpad(e) => e.record_inspect(node),
+            // No-op for KeyboardEvent, since we don't want to potentially record sensitive information to Inspect.
+            InputDeviceEvent::Keyboard(_) => (),
+            #[cfg(test)] // No-op for Fake InputDeviceEvent.
+            InputDeviceEvent::Fake => (),
+        }
     }
 }
 

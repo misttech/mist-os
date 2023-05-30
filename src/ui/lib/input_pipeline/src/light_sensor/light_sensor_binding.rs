@@ -28,6 +28,15 @@ impl PartialEq for LightSensorEvent {
 
 impl Eq for LightSensorEvent {}
 
+impl LightSensorEvent {
+    pub fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        node.record_uint("red", u64::from(self.rgbc.red));
+        node.record_uint("green", u64::from(self.rgbc.green));
+        node.record_uint("blue", u64::from(self.rgbc.blue));
+        node.record_uint("clear", u64::from(self.rgbc.clear));
+    }
+}
+
 /// A [`LightSensorBinding`] represents a connection to a light sensor input device.
 ///
 /// TODO more details

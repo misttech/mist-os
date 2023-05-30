@@ -8,7 +8,7 @@ pub mod light_sensor_binding;
 pub mod light_sensor_handler;
 #[cfg(test)]
 mod test_utils;
-mod types;
+pub mod types;
 
 pub use calibrator::FactoryFileLoader;
 pub use led_watcher::CancelableTask;

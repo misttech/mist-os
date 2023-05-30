@@ -248,13 +248,23 @@ impl InspectHandler {
 mod tests {
     use super::*;
     use crate::{
-        input_device::InputDeviceDescriptor,
+        input_device::{self, InputDeviceDescriptor, InputDeviceEvent, InputEvent},
         keyboard_binding::KeyboardDeviceDescriptor,
-        mouse_binding::{MouseDeviceDescriptor, MouseLocation, MousePhase},
+        light_sensor::types::Rgbc,
+        light_sensor_binding::{LightSensorDeviceDescriptor, LightSensorEvent},
+        mouse_binding::{
+            MouseDeviceDescriptor, MouseLocation, MousePhase, PrecisionScroll, RawWheelDelta,
+            WheelDelta,
+        },
         testing_utilities,
+        touch_binding::{TouchScreenDeviceDescriptor, TouchpadDeviceDescriptor},
+        utils::Position,
     };
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_input_report::InputDeviceMarker;
     use fuchsia_async as fasync;
-    use fuchsia_inspect::assert_data_tree;
+    use fuchsia_inspect::{assert_data_tree, AnyProperty};
+    use maplit::hashmap;
     use std::collections::HashSet;
 
     fn fixed_now() -> zx::Time {
@@ -301,23 +311,45 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn circular_buffer_record_inspect() {
-        let mut inspector = fuchsia_inspect::Inspector::default();
-        let mut recent_events_log = CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE);
+    async fn recent_events_log_records_inspect() {
+        let inspector = fuchsia_inspect::Inspector::default();
+
+        let recent_events_log =
+            Arc::new(Mutex::new(CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE)));
+        InspectHandler::record_lazy_recent_events(inspector.root(), Arc::clone(&recent_events_log));
 
         let keyboard_descriptor = InputDeviceDescriptor::Keyboard(KeyboardDeviceDescriptor {
             keys: vec![fidl_fuchsia_input::Key::A, fidl_fuchsia_input::Key::B],
             ..Default::default()
         });
         let mouse_descriptor = InputDeviceDescriptor::Mouse(MouseDeviceDescriptor {
-            device_id: 1 as u32, // Value does not matter
+            device_id: 1u32,
             absolute_x_range: None,
             absolute_y_range: None,
             wheel_v_range: None,
             wheel_h_range: None,
             buttons: None,
-            counts_per_mm: 12 as u32, // Value does not matter
+            counts_per_mm: 12u32,
         });
+        let touch_screen_descriptor =
+            InputDeviceDescriptor::TouchScreen(TouchScreenDeviceDescriptor {
+                device_id: 1,
+                contacts: vec![],
+            });
+        let touchpad_descriptor = InputDeviceDescriptor::Touchpad(TouchpadDeviceDescriptor {
+            device_id: 1,
+            contacts: vec![],
+        });
+
+        let pressed_buttons = HashSet::from([1u8, 21u8, 15u8]);
+        let mut pressed_buttons_vec: Vec<u64> = vec![];
+        pressed_buttons.iter().for_each(|button| {
+            pressed_buttons_vec.push(*button as u64);
+        });
+
+        let (light_sensor_proxy, _) =
+            create_proxy_and_stream::<InputDeviceMarker>().expect("proxy created");
+
         let recent_events = vec![
             testing_utilities::create_keyboard_event(
                 fidl_fuchsia_input::Key::A,
@@ -327,21 +359,72 @@ mod tests {
                 None,
             ),
             testing_utilities::create_consumer_controls_event(
-                vec![fidl_fuchsia_input_report::ConsumerControlButton::VolumeUp],
+                vec![
+                    fidl_fuchsia_input_report::ConsumerControlButton::VolumeUp,
+                    fidl_fuchsia_input_report::ConsumerControlButton::VolumeUp,
+                    fidl_fuchsia_input_report::ConsumerControlButton::Pause,
+                    fidl_fuchsia_input_report::ConsumerControlButton::VolumeDown,
+                    fidl_fuchsia_input_report::ConsumerControlButton::MicMute,
+                    fidl_fuchsia_input_report::ConsumerControlButton::CameraDisable,
+                    fidl_fuchsia_input_report::ConsumerControlButton::FactoryReset,
+                    fidl_fuchsia_input_report::ConsumerControlButton::Reboot,
+                ],
                 zx::Time::get_monotonic(),
                 &testing_utilities::consumer_controls_device_descriptor(),
             ),
             testing_utilities::create_mouse_event(
-                MouseLocation::Relative(Default::default()),
-                None,
-                None,
-                None,
-                MousePhase::Down,
-                HashSet::from_iter(vec![].into_iter()),
-                HashSet::from_iter(vec![].into_iter()),
+                MouseLocation::Absolute(Position { x: 7.0f32, y: 15.0f32 }),
+                Some(WheelDelta {
+                    raw_data: RawWheelDelta::Ticks(5i64),
+                    physical_pixel: Some(8.0f32),
+                }),
+                Some(WheelDelta {
+                    raw_data: RawWheelDelta::Millimeters(10.0f32),
+                    physical_pixel: Some(8.0f32),
+                }),
+                Some(PrecisionScroll::Yes),
+                MousePhase::Move,
+                HashSet::from([1u8]),
+                pressed_buttons.clone(),
                 zx::Time::get_monotonic(),
                 &mouse_descriptor,
             ),
+            testing_utilities::create_touch_screen_event(
+                hashmap! {
+                    fidl_fuchsia_ui_input::PointerEventPhase::Add
+                        => vec![testing_utilities::create_touch_contact(1u32, Position { x: 10.0, y: 30.0 })],
+                    fidl_fuchsia_ui_input::PointerEventPhase::Move
+                        => vec![testing_utilities::create_touch_contact(1u32, Position { x: 11.0, y: 31.0 })],
+                },
+                zx::Time::get_monotonic(),
+                &touch_screen_descriptor,
+            ),
+            testing_utilities::create_touchpad_event(
+                vec![
+                    testing_utilities::create_touch_contact(1u32, Position { x: 0.0, y: 0.0 }),
+                    testing_utilities::create_touch_contact(2u32, Position { x: 10.0, y: 10.0 }),
+                ],
+                pressed_buttons,
+                zx::Time::get_monotonic(),
+                &touchpad_descriptor,
+            ),
+            InputEvent {
+                device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
+                    device_proxy: light_sensor_proxy,
+                    rgbc: Rgbc { red: 1, green: 2, blue: 3, clear: 14747 },
+                }),
+                device_descriptor: InputDeviceDescriptor::LightSensor(
+                    LightSensorDeviceDescriptor {
+                        vendor_id: 1,
+                        product_id: 2,
+                        device_id: 3,
+                        sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
+                    },
+                ),
+                event_time: zx::Time::get_monotonic(),
+                handled: input_device::Handled::No,
+                trace_id: None,
+            },
             testing_utilities::create_keyboard_event(
                 fidl_fuchsia_input::Key::B,
                 fidl_fuchsia_ui_input3::KeyEventType::Pressed,
@@ -351,15 +434,78 @@ mod tests {
             ),
         ];
 
-        for event in recent_events.iter() {
-            recent_events_log.push(event.clone());
+        for event in recent_events.into_iter() {
+            recent_events_log.lock().await.push(event);
         }
-        inspector = recent_events_log.record_all_lazy_inspect(inspector);
+
         assert_data_tree!(inspector, root: {
-            keyboard_event_0: {},
-            consumer_controls_event_1: {},
-            mouse_event_2: {},
-            keyboard_event_3: {},
+            recent_events_log: {
+                keyboard_event_0: {
+                    event_time: AnyProperty,
+                },
+                consumer_controls_event_1: {
+                    event_time: AnyProperty,
+                    pressed_buttons: vec!["volume_up", "volume_up", "pause", "volume_down", "mic_mute", "camera_disable", "factory_reset", "reboot"],
+                },
+                mouse_event_2: {
+                    event_time: AnyProperty,
+                    location_absolute: { x: 7.0f64, y: 15.0f64},
+                    wheel_delta_v: {
+                        ticks: 5i64,
+                        physical_pixel: 8.0f64,
+                    },
+                    wheel_delta_h: {
+                        millimeters: 10.0f64,
+                        physical_pixel: 8.0f64,
+                    },
+                    is_precision_scroll: "yes",
+                    phase: "move",
+                    affected_buttons: vec![1u64],
+                    pressed_buttons: pressed_buttons_vec.clone(),
+                },
+                touch_screen_event_3: {
+                    event_time: AnyProperty,
+                    injector_contacts: {
+                        add: {
+                            "1": {
+                                position_x_mm: 10.0f64,
+                                position_y_mm: 30.0f64,
+                            },
+                        },
+                        change: {
+                            "1": {
+                                position_x_mm: 11.0f64,
+                                position_y_mm: 31.0f64,
+                            },
+                        },
+                        remove: {},
+                    },
+                },
+                touchpad_event_4: {
+                    event_time: AnyProperty,
+                    pressed_buttons: pressed_buttons_vec,
+                    injector_contacts: {
+                        "1": {
+                            position_x_mm: 0.0f64,
+                            position_y_mm: 0.0f64,
+                        },
+                        "2": {
+                            position_x_mm: 10.0f64,
+                            position_y_mm: 10.0f64,
+                        },
+                    },
+                },
+                light_sensor_event_5: {
+                    event_time: AnyProperty,
+                    red: 1u64,
+                    green: 2u64,
+                    blue: 3u64,
+                    clear: 14747u64,
+                },
+                keyboard_event_6: {
+                    event_time: AnyProperty,
+                },
+            }
         });
     }
 
@@ -663,7 +809,9 @@ mod tests {
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 43i64,
                 recent_events_log: {
-                    fake_event_0: {},
+                    fake_event_0: {
+                        event_time: 43i64,
+                    },
                 },
                 consumer_controls: {
                      events_count: 0u64,
@@ -722,8 +870,12 @@ mod tests {
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
                 recent_events_log: {
-                    fake_event_0: {},
-                    fake_event_1: {},
+                    fake_event_0: {
+                        event_time: 43i64,
+                    },
+                    fake_event_1: {
+                        event_time: 44i64,
+                    },
                 },
                 consumer_controls: {
                      events_count: 0u64,
@@ -782,9 +934,15 @@ mod tests {
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
                 recent_events_log: {
-                    fake_event_0: {},
-                    fake_event_1: {},
-                    fake_event_2: {},
+                    fake_event_0: {
+                        event_time: 43i64,
+                    },
+                    fake_event_1: {
+                        event_time: 44i64,
+                    },
+                    fake_event_2: {
+                        event_time: 44i64,
+                    },
                 },
                 consumer_controls: {
                      events_count: 0u64,

@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_input_report as fidl_input_report,
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fuchsia_inspect::health::Reporter,
+    fuchsia_inspect::{health::Reporter, ArrayProperty},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
     std::collections::HashSet,
@@ -146,6 +146,79 @@ impl MouseEvent {
             pressed_buttons,
             is_precision_scroll,
         }
+    }
+
+    pub fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        match self.location {
+            MouseLocation::Relative(pos) => {
+                node.record_child("location_relative", move |location_node| {
+                    location_node.record_double("x", f64::from(pos.millimeters.x));
+                    location_node.record_double("y", f64::from(pos.millimeters.y));
+                })
+            }
+            MouseLocation::Absolute(pos) => {
+                node.record_child("location_absolute", move |location_node| {
+                    location_node.record_double("x", f64::from(pos.x));
+                    location_node.record_double("y", f64::from(pos.y));
+                })
+            }
+        };
+
+        if let Some(wheel_delta_v) = &self.wheel_delta_v {
+            node.record_child("wheel_delta_v", move |wheel_delta_v_node| {
+                match wheel_delta_v.raw_data {
+                    RawWheelDelta::Ticks(ticks) => wheel_delta_v_node.record_int("ticks", ticks),
+                    RawWheelDelta::Millimeters(mm) => {
+                        wheel_delta_v_node.record_double("millimeters", f64::from(mm))
+                    }
+                }
+                if let Some(physical_pixel) = wheel_delta_v.physical_pixel {
+                    wheel_delta_v_node.record_double("physical_pixel", f64::from(physical_pixel));
+                }
+            });
+        }
+
+        if let Some(wheel_delta_h) = &self.wheel_delta_h {
+            node.record_child("wheel_delta_h", move |wheel_delta_h_node| {
+                match wheel_delta_h.raw_data {
+                    RawWheelDelta::Ticks(ticks) => wheel_delta_h_node.record_int("ticks", ticks),
+                    RawWheelDelta::Millimeters(mm) => {
+                        wheel_delta_h_node.record_double("millimeters", f64::from(mm))
+                    }
+                }
+                if let Some(physical_pixel) = wheel_delta_h.physical_pixel {
+                    wheel_delta_h_node.record_double("physical_pixel", f64::from(physical_pixel));
+                }
+            });
+        }
+
+        if let Some(is_precision_scroll) = self.is_precision_scroll {
+            match is_precision_scroll {
+                PrecisionScroll::Yes => node.record_string("is_precision_scroll", "yes"),
+                PrecisionScroll::No => node.record_string("is_precision_scroll", "no"),
+            }
+        }
+
+        match self.phase {
+            MousePhase::Down => node.record_string("phase", "down"),
+            MousePhase::Move => node.record_string("phase", "move"),
+            MousePhase::Up => node.record_string("phase", "up"),
+            MousePhase::Wheel => node.record_string("phase", "wheel"),
+        }
+
+        let affected_buttons_node =
+            node.create_uint_array("affected_buttons", self.affected_buttons.len());
+        self.affected_buttons.iter().enumerate().for_each(|(i, button)| {
+            affected_buttons_node.set(i, *button);
+        });
+        node.record(affected_buttons_node);
+
+        let pressed_buttons_node =
+            node.create_uint_array("pressed_buttons", self.pressed_buttons.len());
+        self.pressed_buttons.iter().enumerate().for_each(|(i, button)| {
+            pressed_buttons_node.set(i, *button);
+        });
+        node.record(pressed_buttons_node);
     }
 }
 

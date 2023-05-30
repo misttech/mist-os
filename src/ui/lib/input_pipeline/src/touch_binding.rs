@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_inspect::health::Reporter,
+    fuchsia_inspect::{health::Reporter, ArrayProperty},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
     maplit::hashmap,
@@ -53,6 +53,45 @@ pub struct TouchScreenEvent {
     pub injector_contacts: HashMap<pointerinjector::EventPhase, Vec<TouchContact>>,
 }
 
+impl TouchScreenEvent {
+    pub fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        let contacts_clone = self.injector_contacts.clone();
+        node.record_child("injector_contacts", move |contacts_node| {
+            for (phase, contacts) in contacts_clone.iter() {
+                let phase_str = match phase {
+                    pointerinjector::EventPhase::Add => "add",
+                    pointerinjector::EventPhase::Change => "change",
+                    pointerinjector::EventPhase::Remove => "remove",
+                    pointerinjector::EventPhase::Cancel => "cancel",
+                };
+                contacts_node.record_child(phase_str, move |phase_node| {
+                    for contact in contacts.iter() {
+                        phase_node.record_child(contact.id.to_string(), move |contact_node| {
+                            contact_node
+                                .record_double("position_x_mm", f64::from(contact.position.x));
+                            contact_node
+                                .record_double("position_y_mm", f64::from(contact.position.y));
+                            if let Some(pressure) = contact.pressure {
+                                contact_node.record_int("pressure", pressure);
+                            }
+                            if let Some(contact_size) = contact.contact_size {
+                                contact_node.record_double(
+                                    "contact_width_mm",
+                                    f64::from(contact_size.width),
+                                );
+                                contact_node.record_double(
+                                    "contact_height_mm",
+                                    f64::from(contact_size.height),
+                                );
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+}
+
 /// A [`TouchpadEvent`] represents a set of contacts.
 ///
 /// For example, when a user touches a touch screen with two fingers, there will be two
@@ -65,6 +104,37 @@ pub struct TouchpadEvent {
 
     /// The complete button state including this event.
     pub pressed_buttons: HashSet<mouse_binding::MouseButton>,
+}
+
+impl TouchpadEvent {
+    pub fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        let pressed_buttons_node =
+            node.create_uint_array("pressed_buttons", self.pressed_buttons.len());
+        self.pressed_buttons.iter().enumerate().for_each(|(i, button)| {
+            pressed_buttons_node.set(i, *button);
+        });
+        node.record(pressed_buttons_node);
+
+        // Populate TouchpadEvent contact details.
+        let contacts_clone = self.injector_contacts.clone();
+        node.record_child("injector_contacts", move |contacts_node| {
+            for contact in contacts_clone.iter() {
+                contacts_node.record_child(contact.id.to_string(), move |contact_node| {
+                    contact_node.record_double("position_x_mm", f64::from(contact.position.x));
+                    contact_node.record_double("position_y_mm", f64::from(contact.position.y));
+                    if let Some(pressure) = contact.pressure {
+                        contact_node.record_int("pressure", pressure);
+                    }
+                    if let Some(contact_size) = contact.contact_size {
+                        contact_node
+                            .record_double("contact_width_mm", f64::from(contact_size.width));
+                        contact_node
+                            .record_double("contact_height_mm", f64::from(contact_size.height));
+                    }
+                })
+            }
+        });
+    }
 }
 
 /// [`TouchDeviceType`] indicates the type of touch device. Both Touch Screen and Windows Precision
