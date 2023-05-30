@@ -92,6 +92,21 @@ pub async fn create_image() -> Result<(), Error> {
     ops::put(&fs, &vol, &Path::new("some/deleted.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
     ops::unlink(&fs, &vol, &Path::new("some/deleted.txt")).await?;
 
+    ops::set_extended_attribute_for_node(
+        &vol,
+        &Path::new("some"),
+        b"security.selinux",
+        b"test value",
+    )
+    .await?;
+    ops::set_extended_attribute_for_node(
+        &vol,
+        &Path::new("some/file.txt"),
+        b"user.hash",
+        b"different value",
+    )
+    .await?;
+
     // Write enough stuff to the journal (journal::BLOCK_SIZE per sync) to ensure we would fill
     // the disk without reclaim of both journal and file data.
     let num_iters = 2000;

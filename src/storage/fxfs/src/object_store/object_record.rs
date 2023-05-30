@@ -62,9 +62,23 @@ pub enum ObjectKeyData {
     /// configured limit and the usage tracking which are ordered after the `project_id` to provide
     /// locality of the two related values.
     Project { project_id: u64, property: ProjectProperty },
+    /// An extended attribute associated with an object. It stores the name used for the extended
+    /// attribute, which has a maximum size of 255 bytes enforced by fuchsia.io.
+    ExtendedAttribute { name: Vec<u8> },
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+pub enum ObjectKeyDataV25 {
+    Object,
+    Keys,
+    Attribute(u64, AttributeKey),
+    Child { name: String },
+    GraveyardEntry { object_id: u64 },
+    Project { project_id: u64, property: ProjectProperty },
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[migrate_to_version(ObjectKeyDataV25)]
 pub enum ObjectKeyDataV5 {
     Object,
     Keys,
@@ -95,6 +109,14 @@ pub struct ObjectKey {
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_nodefault]
+pub struct ObjectKeyV25 {
+    pub object_id: u64,
+    pub data: ObjectKeyDataV25,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectKeyV25)]
 pub struct ObjectKeyV5 {
     pub object_id: u64,
     pub data: ObjectKeyDataV5,
@@ -167,6 +189,10 @@ impl ObjectKey {
         }
     }
 
+    pub fn extended_attribute(object_id: u64, name: Vec<u8>) -> Self {
+        Self { object_id, data: ObjectKeyData::ExtendedAttribute { name } }
+    }
+
     /// Returns the search key for this extent; that is, a key which is <= this key under Ord and
     /// OrdLowerBound.
     /// This would be used when searching for an extent with |find| (when we want to find any
@@ -232,9 +258,8 @@ impl LayerKey for ObjectKey {
             | ObjectKeyData::Attribute(..)
             | ObjectKeyData::Child { .. }
             | ObjectKeyData::GraveyardEntry { .. }
-            | ObjectKeyData::Project { property: ProjectProperty::Limit, .. } => {
-                MergeType::OptimizedMerge
-            }
+            | ObjectKeyData::Project { property: ProjectProperty::Limit, .. }
+            | ObjectKeyData::ExtendedAttribute { .. } => MergeType::OptimizedMerge,
             ObjectKeyData::Project { property: ProjectProperty::Usage, .. } => MergeType::FullMerge,
         }
     }
@@ -428,6 +453,17 @@ pub struct ObjectAttributesV5 {
     modification_time: Timestamp,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum ExtendedAttributeValue {
+    /// The extended attribute value is stored directly in this object. If the value is above a
+    /// certain size, it should be stored as an attribute with extents instead.
+    Inline(Vec<u8>),
+    /// The extended attribute value is stored as an attribute with extents. The attribute id
+    /// should be chosen to be within the range of 64-2048.
+    AttributeId(u64),
+}
+
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
@@ -458,9 +494,26 @@ pub enum ObjectValue {
     Trim,
     /// Tracking a bytes and nodes pair. Added to support tracking Project ID usage and limits.
     BytesAndNodes { bytes: i64, nodes: i64 },
+    /// A value for an extended attribute. Either inline or a redirection to an attribute with
+    /// extents.
+    ExtendedAttribute(ExtendedAttributeValue),
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum ObjectValueV29 {
+    None,
+    Some,
+    Object { kind: ObjectKind, attributes: ObjectAttributes },
+    Keys(EncryptionKeys),
+    Attribute { size: u64 },
+    Extent(ExtentValue),
+    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(ObjectValueV29)]
 pub enum ObjectValueV25 {
     None,
     Some,
@@ -546,10 +599,14 @@ impl ObjectValue {
             },
         }
     }
+    pub fn inline_extended_attribute(value: impl Into<Vec<u8>>) -> ObjectValue {
+        ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value.into()))
+    }
 }
 
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
-pub type ObjectItemV25 = Item<ObjectKey, ObjectValueV25>;
+pub type ObjectItemV29 = Item<ObjectKeyV25, ObjectValueV29>;
+pub type ObjectItemV25 = Item<ObjectKeyV25, ObjectValueV25>;
 pub type ObjectItemV5 = Item<ObjectKeyV5, ObjectValueV5>;
 
 impl ObjectItem {

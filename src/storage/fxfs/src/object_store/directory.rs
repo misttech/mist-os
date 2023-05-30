@@ -16,7 +16,7 @@ use {
                 PosixAttributes, Timestamp,
             },
             transaction::{LockKey, Mutation, Options, Transaction},
-            HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle,
+            BasicObjectHandle, HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle,
         },
         trace_duration,
     },
@@ -446,6 +446,30 @@ impl<S: HandleOwner> Directory<S> {
                     .context("get_properties: Expected object value"))
             }
         }
+    }
+
+    pub async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        handle.list_extended_attributes().await
+    }
+
+    pub async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        handle.get_extended_attribute(name).await
+    }
+
+    pub async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        handle.set_extended_attribute(name, value).await
+    }
+
+    pub async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        handle.remove_extended_attribute(name).await
     }
 
     /// Returns an iterator that will return directory entries skipping deleted ones.  Example

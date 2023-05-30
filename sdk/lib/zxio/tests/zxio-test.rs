@@ -103,6 +103,126 @@ async fn test_read_link_error() {
     .await;
 }
 
+#[fuchsia::test]
+async fn test_xattr_dir() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .open(
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::CREATE,
+            fio::ModeType::empty(),
+            "foo",
+            dir_server.into(),
+        )
+        .expect("open failed");
+
+    fasync::unblock(|| {
+        let foo_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        {
+            let mut value = vec![0u8; 5];
+            assert_matches!(
+                foo_zxio.xattr_get(b"security.selinux", &mut value),
+                Err(zx::Status::NOT_FOUND)
+            );
+            assert_eq!(value, b"\0\0\0\0\0");
+        }
+
+        foo_zxio.xattr_set(b"security.selinux", b"bar").unwrap();
+
+        {
+            let mut value = vec![0u8; 5];
+            let actual_value_len = foo_zxio.xattr_get(b"security.selinux", &mut value).unwrap();
+            assert_eq!(actual_value_len, 3);
+            assert_eq!(value, b"bar\0\0");
+        }
+
+        {
+            let names = foo_zxio.xattr_list().unwrap();
+            assert_eq!(names, vec![b"security.selinux".to_owned()]);
+        }
+
+        foo_zxio.xattr_remove(b"security.selinux").unwrap();
+
+        {
+            let mut value = vec![0u8; 5];
+            assert_matches!(
+                foo_zxio.xattr_get(b"security.selinux", &mut value),
+                Err(zx::Status::NOT_FOUND)
+            );
+            assert_eq!(value, b"\0\0\0\0\0");
+        }
+
+        {
+            let names = foo_zxio.xattr_list().unwrap();
+            assert_eq!(names, Vec::<Vec<u8>>::new());
+        }
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_xattr_dir_multiple_attributes() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .open(
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::CREATE,
+            fio::ModeType::empty(),
+            "foo",
+            dir_server.into(),
+        )
+        .expect("open failed");
+
+    fasync::unblock(|| {
+        let foo_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        let names = &[
+            b"security.selinux".to_vec(),
+            b"user.sha".to_vec(),
+            b"fuchsia.merkle".to_vec(),
+            b"starnix.mode".to_vec(),
+            b"invalid in linux but fine for fuchsia!".to_vec(),
+        ];
+        let mut sorted_names = names.to_vec();
+        sorted_names.sort();
+        let values = &[
+            b"important security attribute".to_vec(),
+            b"abc1234".to_vec(),
+            b"fffffffffff".to_vec(),
+            b"drwxrwxrwx".to_vec(),
+            b"\0\0 nulls are fine in the value \0\0\0".to_vec(),
+        ];
+
+        for (name, value) in names.iter().zip(values.iter()) {
+            foo_zxio.xattr_set(&name, &value).unwrap();
+        }
+
+        let mut listed_names = foo_zxio.xattr_list().unwrap();
+        listed_names.sort();
+        // Sort the two lists, because there isn't any guaranteed order they will come back from the
+        // server.
+        assert_eq!(listed_names, sorted_names);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+// TODO(fxbug.dev/122123): Once fxfs supports large attributes, point this test at the fixture
+// instead of using a fake file implementation.
 struct XattrFile {
     extended_attributes: Mutex<HashMap<Vec<u8>, Vec<u8>>>,
 }
@@ -161,7 +281,6 @@ impl File for XattrFile {
     async fn close(&self) -> Result<(), Status> {
         Ok(())
     }
-
     async fn truncate(&self, _length: u64) -> Result<(), Status> {
         unimplemented!()
     }
@@ -184,131 +303,22 @@ impl File for XattrFile {
     async fn sync(&self) -> Result<(), Status> {
         unimplemented!()
     }
-
     async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
         let map = self.extended_attributes.lock().await;
         Ok(map.keys().map(|k| k.clone()).collect())
     }
-
     async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
         let map = self.extended_attributes.lock().await;
         map.get(&name).cloned().ok_or(zx::Status::NOT_FOUND)
     }
-
     async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
         let mut map = self.extended_attributes.lock().await;
         Ok(map.insert(name, value).map(|_| ()).unwrap_or(()))
     }
-
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         let mut map = self.extended_attributes.lock().await;
         map.remove(&name).map(|_| ()).ok_or(zx::Status::NOT_FOUND)
     }
-}
-
-#[fuchsia::test]
-async fn test_xattr_file() {
-    let dir = pseudo_directory! {
-        "foo" => XattrFile::new(),
-    };
-    let (dir_client, dir_server) = create_endpoints();
-    let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        dir_server,
-    );
-
-    fasync::unblock(|| {
-        let dir_zxio =
-            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
-        let foo_zxio = dir_zxio
-            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .expect("open failed");
-
-        {
-            let mut value = vec![0u8; 5];
-            assert_matches!(
-                foo_zxio.xattr_get(b"security.selinux", &mut value),
-                Err(zx::Status::NOT_FOUND)
-            );
-            assert_eq!(value, b"\0\0\0\0\0");
-        }
-
-        foo_zxio.xattr_set(b"security.selinux", b"bar").unwrap();
-
-        {
-            let names = foo_zxio.xattr_list().unwrap();
-            assert_eq!(names, vec![b"security.selinux".to_owned()]);
-        }
-
-        {
-            let mut value = vec![0u8; 5];
-            let actual_value_len = foo_zxio.xattr_get(b"security.selinux", &mut value).unwrap();
-            assert_eq!(actual_value_len, 3);
-            assert_eq!(value, b"bar\0\0");
-        }
-
-        foo_zxio.xattr_remove(b"security.selinux").unwrap();
-
-        {
-            let names = foo_zxio.xattr_list().unwrap();
-            assert_eq!(names, Vec::<Vec<u8>>::new());
-        }
-    })
-    .await;
-}
-
-#[fuchsia::test]
-async fn test_xattr_file_multiple_attributes() {
-    let dir = pseudo_directory! {
-        "foo" => XattrFile::new(),
-    };
-    let (dir_client, dir_server) = create_endpoints();
-    let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        dir_server,
-    );
-
-    fasync::unblock(|| {
-        let dir_zxio =
-            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
-        let foo_zxio = dir_zxio
-            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .expect("open failed");
-
-        let names = &[
-            b"security.selinux".to_vec(),
-            b"user.sha".to_vec(),
-            b"fuchsia.merkle".to_vec(),
-            b"starnix.mode".to_vec(),
-            b"invalid in linux but fine for fuchsia!".to_vec(),
-        ];
-        let mut sorted_names = names.to_vec();
-        sorted_names.sort();
-        let values = &[
-            b"important security attribute".to_vec(),
-            b"abc1234".to_vec(),
-            b"fffffffffff".to_vec(),
-            b"drwxrwxrwx".to_vec(),
-            b"\0\0 nulls are fine in the value \0\0\0".to_vec(),
-        ];
-
-        for (name, value) in names.iter().zip(values.iter()) {
-            foo_zxio.xattr_set(&name, &value).unwrap();
-        }
-
-        let mut listed_names = foo_zxio.xattr_list().unwrap();
-        listed_names.sort();
-        // Sort the two lists, because there isn't any guaranteed order they will come back from the
-        // server.
-        assert_eq!(listed_names, sorted_names);
-    })
-    .await;
 }
 
 #[fuchsia::test]

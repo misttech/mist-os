@@ -13,9 +13,9 @@ use {
         object_store::{
             allocator::{self, AllocatorKey, AllocatorValue},
             graveyard::Graveyard,
-            AttributeKey, EncryptionKeys, ExtentKey, ExtentValue, ObjectAttributes,
-            ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue,
-            ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
+            AttributeKey, EncryptionKeys, ExtendedAttributeValue, ExtentKey, ExtentValue,
+            ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
+            ObjectValue, ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
         },
         range::RangeExt,
         round::round_up,
@@ -405,6 +405,20 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
+            ObjectKeyData::ExtendedAttribute { .. } => match value {
+                ObjectValue::None => {}
+                ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(_)) => {}
+                // TODO(fxbug.dev/122123): do more validation on the non-inline values once we
+                // support them.
+                ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(_)) => {}
+                _ => {
+                    self.fsck.error(FsckError::MalformedObjectRecord(
+                        self.store_id,
+                        key.into(),
+                        value.into(),
+                    ))?;
+                }
+            },
             ObjectKeyData::GraveyardEntry { .. } => {}
         }
         Ok(())

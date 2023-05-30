@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod allocator;
+pub mod basic_object_handle;
 pub mod caching_object_handle;
 pub mod directory;
 mod extent_record;
@@ -21,6 +22,7 @@ mod tree;
 pub mod volume;
 pub mod writeback_cache;
 
+pub use basic_object_handle::BasicObjectHandle;
 pub use caching_object_handle::CachingObjectHandle;
 pub use directory::Directory;
 pub use object_record::{ObjectDescriptor, PosixAttributes, Timestamp};
@@ -85,13 +87,13 @@ pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
 };
 pub use journal::{
-    JournalRecord, JournalRecordV20, JournalRecordV25, SuperBlockHeader, SuperBlockRecord,
-    SuperBlockRecordV25, SuperBlockRecordV5,
+    JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, SuperBlockHeader,
+    SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29, SuperBlockRecordV5,
 };
 pub use object_record::{
-    AttributeKey, EncryptionKeys, ObjectAttributes, ObjectAttributesV5, ObjectKey, ObjectKeyData,
-    ObjectKeyDataV5, ObjectKeyV5, ObjectKind, ObjectValue, ObjectValueV25, ObjectValueV5,
-    ProjectProperty,
+    AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectAttributesV5,
+    ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5, ObjectKind, ObjectValue,
+    ObjectValueV25, ObjectValueV29, ObjectValueV5, ProjectProperty,
 };
 pub use transaction::Mutation;
 

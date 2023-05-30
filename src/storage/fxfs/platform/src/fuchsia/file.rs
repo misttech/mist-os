@@ -360,6 +360,26 @@ impl File for FxFile {
         Ok(())
     }
 
+    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
+        let basic = self.handle.basic_handle();
+        basic.list_extended_attributes().await.map_err(map_to_status)
+    }
+
+    async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
+        let basic = self.handle.basic_handle();
+        basic.get_extended_attribute(name).await.map_err(map_to_status)
+    }
+
+    async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
+        let basic = self.handle.basic_handle();
+        basic.set_extended_attribute(name, value).await.map_err(map_to_status)
+    }
+
+    async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
+        let basic = self.handle.basic_handle();
+        basic.remove_extended_attribute(name).await.map_err(map_to_status)
+    }
+
     async fn close(&self) -> Result<(), Status> {
         if self.has_written.load(Ordering::Relaxed) {
             self.handle.flush().await.map_err(map_to_status)?;
@@ -1438,6 +1458,98 @@ mod tests {
         let err = vmo.set_size(10).expect_err("VMO should not be resizable");
         assert_eq!(err, Status::ACCESS_DENIED);
         vmo.set_content_size(&20).expect("content is still modifiable");
+
+        close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn extended_attributes() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let name = b"security.selinux";
+        let value_vec = b"bar".to_vec();
+
+        {
+            let (iterator_client, iterator_server) =
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+            file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
+            let (chunk, last) = iterator_client
+                .get_next()
+                .await
+                .expect("Failed to make FIDL call")
+                .expect("Failed to get next iterator chunk");
+            assert!(last);
+            assert_eq!(chunk, Vec::<Vec<u8>>::new());
+        }
+        assert_eq!(
+            file.get_extended_attribute(name)
+                .await
+                .expect("Failed to make FIDL call")
+                .expect_err("Got successful message back for missing attribute"),
+            Status::NOT_FOUND.into_raw(),
+        );
+
+        file.set_extended_attribute(name, fio::ExtendedAttributeValue::Bytes(value_vec.clone()))
+            .await
+            .expect("Failed to make FIDL call")
+            .expect("Failed to set extended attribute");
+
+        {
+            let (iterator_client, iterator_server) =
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+            file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
+            let (chunk, last) = iterator_client
+                .get_next()
+                .await
+                .expect("Failed to make FIDL call")
+                .expect("Failed to get next iterator chunk");
+            assert!(last);
+            assert_eq!(chunk, vec![name]);
+        }
+        assert_eq!(
+            file.get_extended_attribute(name)
+                .await
+                .expect("Failed to make FIDL call")
+                .expect("Failed to get extended attribute"),
+            fio::ExtendedAttributeValue::Bytes(value_vec)
+        );
+
+        file.remove_extended_attribute(name)
+            .await
+            .expect("Failed to make FIDL call")
+            .expect("Failed to remove extended attribute");
+
+        {
+            let (iterator_client, iterator_server) =
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+            file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
+            let (chunk, last) = iterator_client
+                .get_next()
+                .await
+                .expect("Failed to make FIDL call")
+                .expect("Failed to get next iterator chunk");
+            assert!(last);
+            assert_eq!(chunk, Vec::<Vec<u8>>::new());
+        }
+        assert_eq!(
+            file.get_extended_attribute(name)
+                .await
+                .expect("Failed to make FIDL call")
+                .expect_err("Got successful message back for missing attribute"),
+            Status::NOT_FOUND.into_raw(),
+        );
 
         close_file_checked(file).await;
         fixture.close().await;

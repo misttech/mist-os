@@ -12,8 +12,8 @@ use {
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
             object_record::{
-                ObjectItem, ObjectItemV25, ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue,
-                ProjectProperty,
+                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV5, ObjectKey, ObjectKeyData,
+                ObjectValue, ProjectProperty,
             },
         },
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
@@ -158,6 +158,19 @@ pub enum Mutation {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum MutationV29 {
+    ObjectStore(ObjectStoreMutationV29),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutation),
+    BeginFlush,
+    EndFlush,
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKey),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(MutationV29)]
 pub enum MutationV25 {
     ObjectStore(ObjectStoreMutationV25),
     EncryptedObjectStore(Box<[u8]>),
@@ -226,6 +239,14 @@ pub struct ObjectStoreMutation {
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
+pub struct ObjectStoreMutationV29 {
+    item: ObjectItemV29,
+    op: Operation,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV29)]
 pub struct ObjectStoreMutationV25 {
     item: ObjectItemV25,
     op: Operation,
@@ -732,6 +753,9 @@ impl<'a> Transaction<'a> {
                     // Merges are all handled like atomic +/- and serialized by the tree locks.
                     Operation::Merge => {}
                 },
+                ObjectKeyData::ExtendedAttribute { .. } => {
+                    // TODO(fxbug.dev/122975): Check lock requirements.
+                }
             }
         }
     }

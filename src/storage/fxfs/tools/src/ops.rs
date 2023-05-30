@@ -14,7 +14,7 @@ use {
             directory::{replace_child, ReplacedChild},
             transaction::{LockKey, Options, TransactionHandler},
             volume::root_volume,
-            Directory, HandleOptions, ObjectDescriptor, ObjectStore,
+            BasicObjectHandle, Directory, HandleOptions, ObjectDescriptor, ObjectStore,
         },
     },
     fxfs_crypto::Crypt,
@@ -244,4 +244,17 @@ pub async fn set_project_for_node(
     let filename = path.file_name().unwrap().to_str().unwrap();
     let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
     vol.set_project_for_node(node_id, project_id).await
+}
+
+pub async fn set_extended_attribute_for_node(
+    vol: &Arc<ObjectStore>,
+    path: &Path,
+    name: &[u8],
+    value: &[u8],
+) -> Result<(), Error> {
+    let dir = walk_dir(vol, path.parent().unwrap()).await?;
+    let filename = path.file_name().unwrap().to_str().unwrap();
+    let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
+    let handle = BasicObjectHandle::new(vol.clone(), node_id);
+    handle.set_extended_attribute(name.to_vec(), value.to_vec()).await
 }

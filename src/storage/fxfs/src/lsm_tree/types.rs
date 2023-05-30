@@ -7,7 +7,10 @@ use {
         drop_event::DropEvent,
         lsm_tree::merge,
         object_handle::ReadObjectHandle,
-        object_store::{ObjectKey, ObjectKeyV5, ObjectValue, ObjectValueV25, ObjectValueV5},
+        object_store::{
+            ObjectKey, ObjectKeyV25, ObjectKeyV5, ObjectValue, ObjectValueV25, ObjectValueV29,
+            ObjectValueV5,
+        },
         serialized_types::{Version, Versioned, VersionedLatest},
     },
     anyhow::Error,
@@ -117,14 +120,20 @@ impl<K: TypeFingerprint, V: TypeFingerprint> TypeFingerprint for Item<K, V> {
     }
 }
 
-impl From<Item<ObjectKeyV5, ObjectValueV5>> for Item<ObjectKey, ObjectValueV25> {
+impl From<Item<ObjectKeyV5, ObjectValueV5>> for Item<ObjectKeyV25, ObjectValueV25> {
     fn from(item: Item<ObjectKeyV5, ObjectValueV5>) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
     }
 }
 
-impl From<Item<ObjectKey, ObjectValueV25>> for Item<ObjectKey, ObjectValue> {
-    fn from(item: Item<ObjectKey, ObjectValueV25>) -> Self {
+impl From<Item<ObjectKeyV25, ObjectValueV25>> for Item<ObjectKeyV25, ObjectValueV29> {
+    fn from(item: Item<ObjectKeyV25, ObjectValueV25>) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
+
+impl From<Item<ObjectKeyV25, ObjectValueV29>> for Item<ObjectKey, ObjectValue> {
+    fn from(item: Item<ObjectKeyV25, ObjectValueV29>) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
     }
 }
