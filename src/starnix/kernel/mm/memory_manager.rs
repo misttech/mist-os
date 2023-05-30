@@ -1371,16 +1371,20 @@ impl MemoryManager {
         // we use SNAPSHOT_AT_LEAST_ON_WRITE and then eagerly copy the mapped regions. These
         // mappings should generally be small.
 
-        // Returns the target VMO and a bool indicating whether or not the mapping needs to be
-        // eagerly copied.
-        fn clone_vmo(
-            vmo: &Arc<zx::Vmo>,
-            rights: zx::Rights,
-        ) -> Result<(Arc<zx::Vmo>, bool), Errno> {
+        struct VmoInfo {
+            vmo: Arc<zx::Vmo>,
+            size: u64,
+
+            // Indicates whether or not the contents of the VMO need to be eagerly copied.
+            needs_copy: bool,
+        }
+
+        // Clones the `vmo` and returns the `VmoInfo` with the clone.
+        fn clone_vmo(vmo: &Arc<zx::Vmo>, rights: zx::Rights) -> Result<VmoInfo, Errno> {
             let vmo_info = vmo.info().map_err(impossible_error)?;
             let pager_backed = vmo_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
             Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
-                (vmo.clone(), false)
+                VmoInfo { vmo: vmo.clone(), size: vmo_info.size_bytes, needs_copy: false }
             } else {
                 let mut cloned_vmo = vmo
                     .create_child(
@@ -1398,13 +1402,17 @@ impl MemoryManager {
                         .replace_as_executable(&VMEX_RESOURCE)
                         .map_err(impossible_error)?;
                 }
-                (Arc::new(cloned_vmo), pager_backed)
+                VmoInfo {
+                    vmo: Arc::new(cloned_vmo),
+                    size: vmo_info.size_bytes,
+                    needs_copy: pager_backed,
+                }
             })
         }
 
         let state = self.state.read();
         let mut target_state = target.state.write();
-        let mut vmos = HashMap::<zx::Koid, (Arc<zx::Vmo>, bool)>::new();
+        let mut vmos = HashMap::<zx::Koid, VmoInfo>::new();
 
         for (range, mapping) in state.mappings.iter() {
             let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
@@ -1415,15 +1423,18 @@ impl MemoryManager {
             let target_vmo = if mapping.options.contains(MappingOptions::SHARED) {
                 &mapping.vmo
             } else {
-                let (vmo, needs_copy) = match vmos.entry(basic_info.koid) {
+                let VmoInfo { vmo, size: vmo_size, needs_copy } = match vmos.entry(basic_info.koid)
+                {
                     Entry::Occupied(o) => o.into_mut(),
                     Entry::Vacant(v) => v.insert(clone_vmo(&mapping.vmo, basic_info.rights)?),
                 };
-                if *needs_copy {
+                if *needs_copy && vmo_offset < *vmo_size {
+                    // The mapping may extend past the bounds of the VMO.
+                    let length_to_copy = std::cmp::min(*vmo_size - vmo_offset, length as u64);
                     vmo.write(
                         &mapping
                             .vmo
-                            .read_to_vec(vmo_offset, length as u64)
+                            .read_to_vec(vmo_offset, length_to_copy)
                             .map_err(impossible_error)?,
                         vmo_offset,
                     )

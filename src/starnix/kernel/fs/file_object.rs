@@ -12,7 +12,10 @@ use crate::fs::file_server::serve_file;
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, not_implemented};
-use crate::mm::{DesiredAddress, MappedVmo, MappingName, MappingOptions, ProtectionFlags};
+use crate::mm::{
+    vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,
+    ProtectionFlags,
+};
 use crate::syscalls::*;
 use crate::task::*;
 use crate::types::as_any::*;
@@ -153,16 +156,15 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
+        let min_vmo_size = (vmo_offset as usize)
+            .checked_add(round_up_to_system_page_size(length)?)
+            .ok_or(errno!(EINVAL))?;
         let vmo = if options.contains(MappingOptions::SHARED) {
-            self.get_vmo(file, current_task, Some(length), prot_flags)?
+            self.get_vmo(file, current_task, Some(min_vmo_size), prot_flags)?
         } else {
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
-            let vmo = self.get_vmo(
-                file,
-                current_task,
-                Some(length),
-                prot_flags - ProtectionFlags::WRITE,
-            )?;
+            let base_prot_flags = (prot_flags | ProtectionFlags::READ) - ProtectionFlags::WRITE;
+            let vmo = self.get_vmo(file, current_task, Some(min_vmo_size), base_prot_flags)?;
             let mut clone_flags = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
             if !prot_flags.contains(ProtectionFlags::WRITE) {
                 clone_flags |= zx::VmoChildOptions::NO_WRITE;
