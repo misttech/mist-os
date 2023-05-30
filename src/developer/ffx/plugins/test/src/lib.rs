@@ -189,6 +189,33 @@ async fn run_test<W: 'static + Write + Send + Sync>(
             run_test_suite_lib::RunTestSuiteError::Connection(conn_err) => {
                 ffx_bail_with_code!(*SETUP_FAILED_CODE, "{:?}", conn_err)
             }
+            run_test_suite_lib::RunTestSuiteError::Launch(launch_err) => match launch_err {
+                ftest_manager::LaunchError::ResourceUnavailable => {
+                    ffx_bail!("There were insufficient resources to launch the test.")
+                }
+                ftest_manager::LaunchError::InstanceCannotResolve => {
+                    ffx_bail!("Cannot resolve test URL.")
+                }
+                ftest_manager::LaunchError::InvalidArgs => {
+                    ffx_bail!("One or more invalid arguments passed.")
+                }
+                ftest_manager::LaunchError::FailedToConnectToTestSuite => {
+                    ffx_bail!("Failed to connect to test suite.")
+                }
+                ftest_manager::LaunchError::CaseEnumeration => {
+                    ffx_bail!("Failed to enumerate tests.")
+                }
+                ftest_manager::LaunchError::InternalError => {
+                    ffx_bail!("An internal error occurred. Please check logs and report bug.")
+                }
+                ftest_manager::LaunchError::NoMatchingCases => {
+                    ffx_bail!("No test cases match specified test filters.")
+                }
+                ftest_manager::LaunchError::InvalidManifest => {
+                    ffx_bail!("Test manifest is invalid.")
+                }
+                other => ffx_bail!("Launch error: {:?}.", other),
+            },
             other if other.is_internal_error() => {
                 Err(anyhow!("There was an internal error running tests: {:?}", other))
             }
