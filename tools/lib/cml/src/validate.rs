@@ -22,6 +22,7 @@ use {
     },
 };
 
+#[derive(Default)]
 pub struct ProtocolRequirements<'a> {
     pub must_offer: &'a [String],
     pub must_use: &'a [String],
@@ -30,14 +31,16 @@ pub struct ProtocolRequirements<'a> {
 /// Validates a given cml.
 pub fn validate_cml(
     document: &Document,
-    file: &Path,
+    file: Option<&Path>,
     features: &FeatureSet,
     protocol_requirements: &ProtocolRequirements<'_>,
 ) -> Result<(), Error> {
     let mut ctx = ValidationContext::new(&document, features, protocol_requirements);
     let mut res = ctx.validate();
     if let Err(Error::Validate { filename, .. }) = &mut res {
-        *filename = Some(file.to_string_lossy().into_owned());
+        if let Some(file) = file {
+            *filename = Some(file.to_string_lossy().into_owned());
+        }
     }
     res
 }
@@ -413,9 +416,6 @@ impl<'a> ValidationContext<'a> {
         if use_.directory.is_some() && use_.r#as.is_some() {
             return Err(Error::validate("\"as\" cannot be used with \"directory\""));
         }
-        if use_.event_stream.is_some() && use_.from.is_none() {
-            return Err(Error::validate("\"from\" should be present with \"event_stream\""));
-        }
         if use_.event_stream.is_some() && use_.availability.is_some() {
             return Err(Error::validate("\"availability\" cannot be used with \"event_stream\""));
         }
@@ -577,20 +577,6 @@ impl<'a> ValidationContext<'a> {
                    )));
                     }
                 }
-
-                if expose.from.len() > 1
-                    && !expose.from.iter().all(|r| match r {
-                        ExposeFromRef::Named(r) => self.all_collections.contains(r),
-                        _ => false,
-                    })
-                {
-                    return Err(Error::validate(format!(
-                        "Service \"{}\" is exposed with multiple `from`, but one of them is not a \
-                        collection. Aggregation from non-collection sources is not currently \
-                        supported.",
-                        service
-                    )));
-                }
             }
         }
 
@@ -748,19 +734,6 @@ impl<'a> ValidationContext<'a> {
                             service
                         )));
                     }
-                }
-                if offer.from.len() > 1
-                    && !offer.from.iter().all(|r| match r {
-                        OfferFromRef::Named(r) => self.all_collections.contains(r),
-                        _ => false,
-                    })
-                {
-                    return Err(Error::validate(format!(
-                        "Service \"{}\" is offered with multiple `from`, but one of them is not a \
-                        collection. Aggregation from non-collection sources is not currently \
-                        supported.",
-                        service
-                    )));
                 }
             }
         }
@@ -952,7 +925,6 @@ impl<'a> ValidationContext<'a> {
                     )));
                 }
             }
-
             // Ensure that a target is not offered more than once.
             let ids_for_entity = used_ids.entry(to_target).or_insert(HashMap::new());
             for target_cap_id in &target_cap_ids {
@@ -1694,7 +1666,7 @@ mod tests {
         let document = crate::parse(&input, &file)?;
         validate_cml(
             &document,
-            &file,
+            Some(&file),
             &features,
             &ProtocolRequirements { must_offer: required_offers, must_use: required_uses },
         )
@@ -2672,7 +2644,6 @@ mod tests {
         test_cml_use_event_stream_overlapping_path(
             json!({
                 "use": [
-
                     { "directory": "foobarbaz", "path": "/foo/bar/baz", "rights": [ "r*" ] },
                     {
                         "event_stream": ["started"],
@@ -2682,18 +2653,6 @@ mod tests {
                 ],
             }),
             Err(Error::Validate { err, .. }) if &err == "directory \"/foo/bar/baz\" is a prefix of \"use\" target event_stream \"/foo/bar/baz/er\""
-        ),
-        test_cml_use_event_stream_no_from(
-            json!({
-                "use": [
-
-                    {
-                        "event_stream": ["started"],
-                        "path": "/foo/bar/baz/er",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"from\" should be present with \"event_stream\""
         ),
         test_cml_use_event_stream_invalid_path(
             json!({
@@ -6090,30 +6049,6 @@ mod tests {
             }),
             Ok(())
         ),
-        test_cml_offer_service_multiple_from(
-            json!({
-                "offer": [
-                    {
-                        "service": "fuchsia.logger.Log",
-                        "from": [ "#coll", "parent" ],
-                        "to": [ "#echo_server" ],
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
-                    },
-                ],
-                "collections": [
-                    {
-                        "name": "coll",
-                        "durability": "transient",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Service \"fuchsia.logger.Log\" is offered with multiple `from`, but one of them is not a collection. Aggregation from non-collection sources is not currently supported."
-        ),
         test_cml_offer_service_from_self_missing(
             json!({
                 "offer": [
@@ -6158,32 +6093,6 @@ mod tests {
                 }
             ),
             Ok(())
-        ),
-        test_cml_expose_service_multiple_from(
-            json!({
-                "expose": [
-                    {
-                        "service": "fuchsia.logger.Log",
-                        "from": [ "#logger", "#coll" ],
-                    },
-                ],
-                "capabilities": [
-                    { "service": "fuchsia.logger.Log" },
-                ],
-                "children": [
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
-                    },
-                ],
-                "collections": [
-                    {
-                        "name": "coll",
-                        "durability": "transient",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Service \"fuchsia.logger.Log\" is exposed with multiple `from`, but one of them is not a collection. Aggregation from non-collection sources is not currently supported."
         ),
         test_cml_expose_service_from_self_missing(
             json!({
@@ -6713,4 +6622,134 @@ mod tests {
             Ok(())
         ),
     }}
+
+    // Tests that offering and exposing service capabilities to the same target and target name is
+    // allowed.
+    test_validate_cml! {
+        test_cml_aggregate_expose(
+            json!({
+                "expose": [
+                    {
+                        "service": "fuchsia.foo.Bar",
+                        "from": ["#a", "#b"],
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "fuchsia-pkg://fuchsia.com/a#meta/a.cm",
+                    },
+                    {
+                        "name": "b",
+                        "url": "fuchsia-pkg://fuchsia.com/b#meta/b.cm",
+                    },
+                ],
+            }),
+            Ok(())
+        ),
+        test_cml_aggregate_offer(
+            json!({
+                "offer": [
+                    {
+                        "service": "fuchsia.foo.Bar",
+                        "from": ["#a", "#b"],
+                        "to": "#target",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "fuchsia-pkg://fuchsia.com/a#meta/a.cm",
+                    },
+                    {
+                        "name": "b",
+                        "url": "fuchsia-pkg://fuchsia.com/b#meta/b.cm",
+                    },
+                    {
+                        "name": "target",
+                        "url": "fuchsia-pkg://fuchsia.com/target#meta/target.cm",
+                    },
+                ],
+            }),
+            Ok(())
+        ),
+    }
+
+    use {
+        crate::translate::test_util::must_parse_cml,
+        crate::translate::{compile, CompileOptions},
+        cm_fidl_validator::error::Error as CmFidlError,
+        cm_fidl_validator::error::{DeclType, ErrorList},
+    };
+
+    #[test]
+    fn test_cml_offer_service_multiple_from() {
+        let input = must_parse_cml!({
+            "offer": [
+                {
+                    "service": "fuchsia.logger.Log",
+                    "from": [ "#coll", "parent" ],
+                    "to": [ "#logger" ],
+                },
+            ],
+            "children": [
+                {
+                    "name": "logger",
+                    "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                },
+            ],
+            "collections": [
+                {
+                    "name": "coll",
+                    "durability": "transient",
+                },
+            ],
+        });
+        assert_matches!(
+            compile(&input, CompileOptions::default()),
+            Err(Error::FidlValidator  { errs: ErrorList { errs } })
+            if matches!(
+                &errs[..],
+                [CmFidlError::ServiceAggregateNotCollection(decl_field, target_name)]
+                if decl_field.decl == DeclType::OfferService && &decl_field.field == "source" && target_name == "fuchsia.logger.Log"
+            )
+        );
+    }
+
+    #[test]
+    fn test_cml_expose_service_multiple_from() {
+        let input = must_parse_cml!({
+            "expose": [
+                {
+                    "service": "fuchsia.logger.Log",
+                    "from": [ "#logger", "#coll" ],
+                },
+            ],
+            "capabilities": [
+                { "service": "fuchsia.logger.Log" },
+            ],
+            "children": [
+                {
+                    "name": "logger",
+                    "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+            ],
+            "collections": [
+                {
+                    "name": "coll",
+                    "durability": "transient",
+                },
+            ],
+        });
+
+        assert_matches!(
+            compile(&input, CompileOptions::default()),
+            Err(Error::FidlValidator  { errs: ErrorList { errs } })
+            if matches!(
+                &errs[..],
+                [CmFidlError::ServiceAggregateNotCollection(decl_field, target_name)]
+                if decl_field.decl == DeclType::ExposeService && &decl_field.field == "source" && target_name == "fuchsia.logger.Log"
+            )
+        );
+    }
 }

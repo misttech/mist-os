@@ -43,7 +43,7 @@ pub fn merge_includes(
         if validate {
             validate_cml(
                 &document,
-                &file,
+                Some(file.as_path()),
                 &FeatureSet::empty(),
                 &ProtocolRequirements { must_offer: &[], must_use: &[] },
             )?;

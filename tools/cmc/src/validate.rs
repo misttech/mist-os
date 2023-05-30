@@ -24,7 +24,7 @@ pub fn validate<P: AsRef<Path>>(
     for file in files {
         let file = file.as_ref();
         let document = util::read_cml(file)?;
-        cml::validate::validate_cml(&document, file, features, protocol_requirements)?;
+        cml::validate::validate_cml(&document, Some(file), features, protocol_requirements)?;
     }
     Ok(())
 }

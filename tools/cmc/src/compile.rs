@@ -57,12 +57,17 @@ pub fn compile(
         }
     }
 
-    cml::validate::validate_cml(&document, &file, &features, &required_protocols)?;
-
     util::ensure_directory_exists(&output)?;
     let mut out_file =
         fs::OpenOptions::new().create(true).truncate(true).write(true).open(output)?;
-    let out_data = cml::compile(&document, config_package_path)?;
+
+    let mut options = cml::CompileOptions::new()
+        .file(&file)
+        .features(features)
+        .protocol_requirements(required_protocols);
+    let options =
+        if let Some(s) = config_package_path { options.config_package_path(s) } else { options };
+    let out_data = cml::compile(&document, options)?;
     out_file.write_all(&persist(&out_data)?)?;
 
     // Write includes to depfile

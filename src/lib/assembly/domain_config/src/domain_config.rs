@@ -68,8 +68,8 @@ impl DomainConfigPackage {
         }
 
         let cml = cml::Document { expose: Some(exposes), ..Default::default() };
-        let out_data =
-            cml::compile(&cml, None).with_context(|| format!("compiling domain config routes"))?;
+        let out_data = cml::compile(&cml, cml::CompileOptions::default())
+            .with_context(|| format!("compiling domain config routes"))?;
         let cm_name = format!("{}.cm", &self.config.name);
         let cm_path = outdir.join(&cm_name);
         let mut cm_file = std::fs::File::create(&cm_path)

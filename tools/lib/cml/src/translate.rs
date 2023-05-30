@@ -4,7 +4,8 @@
 
 use {
     crate::{
-        error::Error, offer_to_all_would_duplicate, AnyRef, AsClause, Availability, Capability,
+        error::Error, features::FeatureSet, offer_to_all_would_duplicate, validate,
+        validate::ProtocolRequirements, AnyRef, AsClause, Availability, Capability,
         CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigRuntimeSource,
         ConfigValueType, DebugRegistration, Document, Environment, EnvironmentExtends,
         EnvironmentRef, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer,
@@ -19,15 +20,69 @@ use {
     sha2::{Digest, Sha256},
     std::collections::{BTreeMap, BTreeSet},
     std::convert::{Into, TryInto},
+    std::path::PathBuf,
 };
 
-/// Compiles the Document into a FIDL `Component`.
+/// Options for CML compilation. Uses the builder pattern.
+#[derive(Default)]
+pub struct CompileOptions<'a> {
+    file: Option<PathBuf>,
+    config_package_path: Option<String>,
+    features: Option<&'a FeatureSet>,
+    protocol_requirements: ProtocolRequirements<'a>,
+}
+
+impl<'a> CompileOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// The path to the CML file, if applicable. Used for error reporting.
+    pub fn file(mut self, file: &std::path::Path) -> CompileOptions<'a> {
+        self.file = Some(file.to_path_buf());
+        self
+    }
+
+    /// The path within the component's package at which to find config value files.
+    pub fn config_package_path(mut self, config_package_path: &str) -> CompileOptions<'a> {
+        self.config_package_path = Some(config_package_path.to_string());
+        self
+    }
+
+    /// Which additional features are enabled. Defaults to none.
+    pub fn features(mut self, features: &'a FeatureSet) -> CompileOptions<'a> {
+        self.features = Some(features);
+        self
+    }
+
+    /// Require that the component must use or offer particular protocols. Defaults to no
+    /// requirements.
+    pub fn protocol_requirements(
+        mut self,
+        protocol_requirements: ProtocolRequirements<'a>,
+    ) -> CompileOptions<'a> {
+        self.protocol_requirements = protocol_requirements;
+        self
+    }
+}
+
+/// Compiles the [Document] into a FIDL [fdecl::Component].
+/// `options` is a builder used to provide additional options, such as file path for debugging
+/// purposes.
+///
 /// Note: This function ignores the `include` section of the document. It is
 /// assumed that those entries were already processed.
 pub fn compile(
     document: &Document,
-    config_package_path: Option<&str>,
+    options: CompileOptions<'_>,
 ) -> Result<fdecl::Component, Error> {
+    validate::validate_cml(
+        &document,
+        options.file.as_ref().map(PathBuf::as_path),
+        options.features.unwrap_or(&FeatureSet::empty()),
+        &options.protocol_requirements,
+    )?;
+
     let all_capability_names: BTreeSet<Name> =
         document.all_capability_names().into_iter().collect();
     let all_children = document.all_children_names().into_iter().collect();
@@ -68,8 +123,8 @@ pub fn compile(
             .config
             .as_ref()
             .map(|c| {
-                if let Some(p) = config_package_path {
-                    Ok(translate_config(c, p))
+                if let Some(p) = options.config_package_path {
+                    Ok(translate_config(c, &p))
                 } else {
                     Err(Error::invalid_args(
                         "can't translate config: no package path for value file",
@@ -1617,15 +1672,28 @@ pub fn offer_source_from_ref(
 }
 
 #[cfg(test)]
+pub mod test_util {
+    /// Construct a CML [Document] from the provided JSON literal expression or panic if error.
+    macro_rules! must_parse_cml {
+        ($($input:tt)+) => {
+            serde_json::from_str::<Document>(&json!($($input)+).to_string())
+                .expect("deserialization failed")
+        };
+    }
+    pub(crate) use must_parse_cml;
+}
+
+#[cfg(test)]
 mod tests {
     use {
         super::*,
+        crate::translate::test_util::must_parse_cml,
         crate::{
-            create_offer, error::Error, AnyRef, AsClause, Capability, CapabilityClause, Child,
-            Collection, DebugRegistration, Document, Environment, EnvironmentExtends,
-            EnvironmentRef, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef,
-            OneOrMany, Path, PathClause, Program, ResolverRegistration, RightsClause,
-            RunnerRegistration, Use, UseFromRef,
+            create_offer, error::Error, features::Feature, AnyRef, AsClause, Capability,
+            CapabilityClause, Child, Collection, DebugRegistration, Document, Environment,
+            EnvironmentExtends, EnvironmentRef, Expose, ExposeFromRef, ExposeToRef, FromClause,
+            Offer, OfferFromRef, OneOrMany, Path, PathClause, Program, ResolverRegistration,
+            RightsClause, RunnerRegistration, Use, UseFromRef,
         },
         assert_matches::assert_matches,
         cm_fidl_validator::error::AvailabilityList,
@@ -1641,30 +1709,34 @@ mod tests {
     };
 
     macro_rules! test_compile {
-    (
-        $(
-            $(#[$m:meta])*
-            $test_name:ident => {
-                input = $input:expr,
-                output = $expected:expr,
-            },
-        )+
-    ) => {
-        $(
-            $(#[$m])*
-            #[test]
-            fn $test_name() {
-                let input = serde_json::from_str(&$input.to_string()).expect("deserialization failed");
-                let actual = compile(&input, Some("fake.cvf")).expect("compilation failed");
-                if actual != $expected {
-                    let e = format!("{:#?}", $expected);
-                    let a = format!("{:#?}", actual);
-                    panic!("{}", Changeset::new(&a, &e, "\n"));
+        (
+            $(
+                $(#[$m:meta])*
+                $test_name:ident => {
+                    $(features = $features:expr,)?
+                    input = $input:expr,
+                    output = $expected:expr,
+                },
+            )+
+        ) => {
+            $(
+                $(#[$m])*
+                #[test]
+                fn $test_name() {
+                    let input = serde_json::from_str(&$input.to_string()).expect("deserialization failed");
+                    let options = CompileOptions::new().config_package_path("fake.cvf");
+                    // Optionally specify features.
+                    $(let features = $features; let options = options.features(&features);)?
+                    let actual = compile(&input, options).expect("compilation failed");
+                    if actual != $expected {
+                        let e = format!("{:#?}", $expected);
+                        let a = format!("{:#?}", actual);
+                        panic!("{}", Changeset::new(&a, &e, "\n"));
+                    }
                 }
-            }
-        )+
+            )+
+        };
     }
-}
 
     fn default_component_decl() -> fdecl::Component {
         fdecl::Component::default()
@@ -1908,7 +1980,7 @@ mod tests {
             },
         },
 
-        test_compile_offer_to_all_exact_duplicate => {
+        test_compile_offer_to_all_hides_individual_duplicate_routes => {
             input = json!({
                 "children": [
                     {
@@ -1938,7 +2010,7 @@ mod tests {
                     {
                         "protocol": "fuchsia.logger.LogSink",
                         "from": "parent",
-                        "to": "all",
+                        "to": "#logger",
                     },
                     {
                         "protocol": "fuchsia.logger.LogSink",
@@ -1959,6 +2031,18 @@ mod tests {
             }),
             output = fdecl::Component {
                 offers: Some(vec![
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("fuchsia.logger.LogSink".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "logger".into(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.LogSink".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        availability: Some(fdecl::Availability::Required),
+                        ..Default::default()
+                    }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some("fuchsia.logger.LogSink".into()),
@@ -1999,18 +2083,6 @@ mod tests {
                         source_name: Some("fuchsia.logger.LogSink".into()),
                         target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
                             name: "coll".into(),
-                        })),
-                        target_name: Some("fuchsia.logger.LogSink".into()),
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        availability: Some(fdecl::Availability::Required),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some("fuchsia.logger.LogSink".into()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "logger".into(),
-                            collection: None,
                         })),
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
@@ -2435,7 +2507,8 @@ mod tests {
                     },
                     {
                         "event_stream": ["foobar", "stream"],
-                        "scope": ["#logger", "#modular"]
+                        "scope": ["#logger", "#modular"],
+                        "path": "/event_stream/another",
                     }
                 ],
                 "capabilities": [
@@ -2569,7 +2642,7 @@ mod tests {
                         source_name: Some("foobar".to_string()),
                         scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef{name:"logger".to_string(), collection: None}), fdecl::Ref::Collection(fdecl::CollectionRef{name:"modular".to_string()})]),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
-                        target_path: Some("/svc/fuchsia.component.EventStream".to_string()),
+                        target_path: Some("/event_stream/another".to_string()),
                         availability: Some(fdecl::Availability::Required),
                         ..Default::default()
                     }),
@@ -2577,7 +2650,7 @@ mod tests {
                         source_name: Some("stream".to_string()),
                         scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef{name:"logger".to_string(), collection: None}), fdecl::Ref::Collection(fdecl::CollectionRef{name:"modular".to_string()})]),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
-                        target_path: Some("/svc/fuchsia.component.EventStream".to_string()),
+                        target_path: Some("/event_stream/another".to_string()),
                         availability: Some(fdecl::Availability::Required),
                         ..Default::default()
                     })
@@ -2620,6 +2693,7 @@ mod tests {
         },
 
         test_compile_expose => {
+            features = FeatureSet::from(vec![Feature::Hub]),
             input = json!({
                 "expose": [
                     {
@@ -3114,6 +3188,7 @@ mod tests {
         },
 
         test_compile_offer => {
+            features = FeatureSet::from(vec![Feature::Hub]),
             input = json!({
                 "offer": [
                     {
@@ -4510,14 +4585,6 @@ mod tests {
         .is_empty());
     }
 
-    /// Construct a CML [Document] from the provided JSON literal expression or panic if error.
-    macro_rules! must_parse_cml {
-        ($($input:tt)+) => {
-            serde_json::from_str::<Document>(&json!($($input)+).to_string())
-                .expect("deserialization failed")
-        };
-    }
-
     #[test]
     fn test_expose_void_service_capability() {
         let input = must_parse_cml!({
@@ -4529,7 +4596,7 @@ mod tests {
                 },
             ],
         });
-        let result = compile(&input, None);
+        let result = compile(&input, CompileOptions::default());
         assert_matches!(result, Ok(_));
     }
 
@@ -4556,7 +4623,7 @@ mod tests {
                 },
             ],
         });
-        let result = compile(&input, None);
+        let result = compile(&input, CompileOptions::default());
         assert_matches!(result, Ok(_));
 
         // Different availability.
@@ -4575,7 +4642,7 @@ mod tests {
                 },
             ],
         });
-        let result = compile(&input, None);
+        let result = compile(&input, CompileOptions::default());
         assert_matches!(
             result,
             Err(Error::FidlValidator  { errs: ErrorList { errs } })
@@ -4625,7 +4692,7 @@ mod tests {
                 },
             ],
         });
-        let result = compile(&input, None);
+        let result = compile(&input, CompileOptions::default());
         assert_matches!(result, Ok(_));
 
         // Different availability.
@@ -4651,7 +4718,7 @@ mod tests {
                 },
             ],
         });
-        let result = compile(&input, None);
+        let result = compile(&input, CompileOptions::default());
         assert_matches!(
             result,
             Err(Error::FidlValidator  { errs: ErrorList { errs } })
@@ -4669,6 +4736,35 @@ mod tests {
                     [ fdecl::Availability::Required, fdecl::Availability::Optional, ]
                 )
             )
+        );
+    }
+
+    #[test]
+    fn test_compile_offer_to_all_exact_duplicate_disallowed() {
+        let input = must_parse_cml!({
+            "children": [
+                {
+                    "name": "logger",
+                    "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+            ],
+            "offer": [
+                {
+                    "protocol": "fuchsia.logger.LogSink",
+                    "from": "parent",
+                    "to": "all",
+                },
+                {
+                    "protocol": "fuchsia.logger.LogSink",
+                    "from": "parent",
+                    "to": "all",
+                },
+            ],
+        });
+        assert_matches!(
+            compile(&input, CompileOptions::default()),
+            Err(Error::Validate { err, .. })
+            if &err == "Protocol(s) [\"fuchsia.logger.LogSink\"] offered to \"all\" multiple times"
         );
     }
 }

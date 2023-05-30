@@ -41,7 +41,7 @@ pub use cm_types::{
 };
 use error::Location;
 
-pub use crate::{one_or_many::OneOrMany, translate::compile};
+pub use crate::{one_or_many::OneOrMany, translate::compile, translate::CompileOptions};
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();

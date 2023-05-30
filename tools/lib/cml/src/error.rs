@@ -177,11 +177,24 @@ fn format_multiple_fidl_validator_errors(e: &ErrorList, f: &mut fmt::Formatter<'
     //   As such, we will surface this kind of errors as `Internal` as an indication.
     //   That is represented by the `_` match arm here.
     //
+    use cm_fidl_validator::error::DeclType;
     use cm_fidl_validator::error::Error as CmFidlError;
     let mut found_internal_errors = false;
     for e in e.errs.iter() {
         match e {
             // Add more branches as we come up with good transformations.
+            CmFidlError::ServiceAggregateNotCollection(decl_field, target_name)
+                if decl_field.decl == DeclType::OfferService =>
+            {
+                write!(f, "Service {target_name} is offered with multiple `from`, but one of them is not a collection. \
+                Aggregation from non-collection sources is not currently supported.")?;
+            }
+            CmFidlError::ServiceAggregateNotCollection(decl_field, target_name)
+                if decl_field.decl == DeclType::ExposeService =>
+            {
+                write!(f, "Service {target_name} is exposed with multiple `from`, but one of them is not a collection. \
+                Aggregation from non-collection sources is not currently supported.")?;
+            }
             CmFidlError::DifferentAvailabilityInAggregation(availability_list) => {
                 // Format the availability in `cml` syntax.
                 let comma_separated = availability_list

@@ -17,7 +17,8 @@ pub const TEST_RUNNER_NAME: &str = "test_runner";
 /// to ComponentDecl.
 pub fn new_decl_from_json(object: serde_json::Value) -> Result<ComponentDecl, Error> {
     let doc = serde_json::from_value(object).context("failed to deserialize manifest")?;
-    let cm = cml::compile(&doc, None).context("failed to compile manifest")?;
+    let cm =
+        cml::compile(&doc, cml::CompileOptions::default()).context("failed to compile manifest")?;
     Ok(cm.fidl_into_native())
 }
 
