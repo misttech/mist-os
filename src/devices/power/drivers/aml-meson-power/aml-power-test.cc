@@ -4,25 +4,28 @@
 
 #include "aml-power.h"
 
+#include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.vreg/cpp/wire_test_base.h>
-#include <fuchsia/hardware/pwm/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <list>
 #include <memory>
 #include <optional>
 
 #include <soc/aml-common/aml-pwm-regs.h>
 #include <zxtest/zxtest.h>
 
-bool operator==(const pwm_config_t& lhs, const pwm_config_t& rhs) {
+bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
+                const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) && (lhs.mode_config_size == rhs.mode_config_size) &&
-         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config_buffer)->mode ==
-          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config_buffer)->mode);
+         (lhs.duty_cycle == rhs.duty_cycle) &&
+         (lhs.mode_config.count() == rhs.mode_config.count()) &&
+         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
+          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
 }
 
 namespace power {
@@ -42,47 +45,52 @@ constexpr voltage_pwm_period_ns_t kTestPwmPeriodNs = 1250;
 
 class AmlPowerTestWrapper : public AmlPower {
  public:
-  AmlPowerTestWrapper(ddk::MockPwm& mock_big_pwm, ddk::MockPwm& mock_little_pwm,
+  AmlPowerTestWrapper(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_big_pwm,
+                      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_little_pwm,
                       std::vector<aml_voltage_table_t> voltage_table,
                       voltage_pwm_period_ns_t pwm_period)
-      : AmlPower(nullptr, mock_big_pwm.GetProto(), mock_little_pwm.GetProto(), voltage_table,
+      : AmlPower(nullptr, std::move(mock_big_pwm), std::move(mock_little_pwm), voltage_table,
                  pwm_period) {}
 
   AmlPowerTestWrapper(fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg,
-                      ddk::MockPwm& mock_little_pwm, std::vector<aml_voltage_table_t> voltage_table,
+                      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_little_pwm,
+                      std::vector<aml_voltage_table_t> voltage_table,
                       voltage_pwm_period_ns_t pwm_period)
-      : AmlPower(nullptr, std::move(mock_big_vreg), mock_little_pwm.GetProto(), voltage_table,
+      : AmlPower(nullptr, std::move(mock_big_vreg), std::move(mock_little_pwm), voltage_table,
                  pwm_period) {}
 
-  AmlPowerTestWrapper(ddk::MockPwm& mock_big_pwm, std::vector<aml_voltage_table_t> voltage_table,
+  AmlPowerTestWrapper(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_big_pwm,
+                      std::vector<aml_voltage_table_t> voltage_table,
                       voltage_pwm_period_ns_t pwm_period)
-      : AmlPower(nullptr, mock_big_pwm.GetProto(), voltage_table, pwm_period) {}
+      : AmlPower(nullptr, std::move(mock_big_pwm), voltage_table, pwm_period) {}
 
   AmlPowerTestWrapper(fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg,
                       fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_little_vreg)
       : AmlPower(nullptr, std::move(mock_big_vreg), std::move(mock_little_vreg)) {}
 
-  static std::unique_ptr<AmlPowerTestWrapper> Create(ddk::MockPwm& mock_big_pwm,
-                                                     std::vector<aml_voltage_table_t> voltage_table,
-                                                     voltage_pwm_period_ns_t pwm_period) {
-    auto result = std::make_unique<AmlPowerTestWrapper>(mock_big_pwm, voltage_table, pwm_period);
+  static std::unique_ptr<AmlPowerTestWrapper> Create(
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_big_pwm,
+      std::vector<aml_voltage_table_t> voltage_table, voltage_pwm_period_ns_t pwm_period) {
+    auto result =
+        std::make_unique<AmlPowerTestWrapper>(std::move(mock_big_pwm), voltage_table, pwm_period);
     return result;
   }
 
   static std::unique_ptr<AmlPowerTestWrapper> Create(
-      fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg, ddk::MockPwm& mock_little_pwm,
+      fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg,
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_little_pwm,
       std::vector<aml_voltage_table_t> voltage_table, voltage_pwm_period_ns_t pwm_period) {
-    auto result = std::make_unique<AmlPowerTestWrapper>(std::move(mock_big_vreg), mock_little_pwm,
-                                                        voltage_table, pwm_period);
+    auto result = std::make_unique<AmlPowerTestWrapper>(
+        std::move(mock_big_vreg), std::move(mock_little_pwm), voltage_table, pwm_period);
     return result;
   }
 
-  static std::unique_ptr<AmlPowerTestWrapper> Create(ddk::MockPwm& mock_big_pwm,
-                                                     ddk::MockPwm& mock_little_pwm,
-                                                     std::vector<aml_voltage_table_t> voltage_table,
-                                                     voltage_pwm_period_ns_t pwm_period) {
-    auto result = std::make_unique<AmlPowerTestWrapper>(mock_big_pwm, mock_little_pwm,
-                                                        voltage_table, pwm_period);
+  static std::unique_ptr<AmlPowerTestWrapper> Create(
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_big_pwm,
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> mock_little_pwm,
+      std::vector<aml_voltage_table_t> voltage_table, voltage_pwm_period_ns_t pwm_period) {
+    auto result = std::make_unique<AmlPowerTestWrapper>(
+        std::move(mock_big_pwm), std::move(mock_little_pwm), voltage_table, pwm_period);
     return result;
   }
 
@@ -95,6 +103,52 @@ class AmlPowerTestWrapper : public AmlPower {
   }
 
  private:
+};
+
+class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_pwm::Pwm> {
+ public:
+  void SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) override {
+    ASSERT_TRUE(expect_configs_.size() > 0);
+    auto expect_config = expect_configs_.front();
+
+    ASSERT_EQ(request->config, expect_config);
+
+    expect_configs_.pop_front();
+    mode_config_buffers_.pop_front();
+    completer.ReplySuccess();
+  }
+  void Enable(EnableCompleter::Sync& completer) override { completer.ReplySuccess(); }
+
+  void ExpectSetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
+    std::unique_ptr<uint8_t[]> mode_config =
+        std::make_unique<uint8_t[]>(config.mode_config.count());
+    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.count());
+    auto copy = config;
+    copy.mode_config =
+        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
+    expect_configs_.push_back(std::move(copy));
+    mode_config_buffers_.push_back(std::move(mode_config));
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> BindServer() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
+    EXPECT_TRUE(endpoints.is_ok());
+    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
+    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints->client));
+  }
+
+  void VerifyAndClear() {
+    ASSERT_TRUE(expect_configs_.size() == 0);
+    ASSERT_TRUE(mode_config_buffers_.size() == 0);
+  }
+
+ private:
+  std::list<fuchsia_hardware_pwm::wire::PwmConfig> expect_configs_;
+  std::list<std::unique_ptr<uint8_t[]>> mode_config_buffers_;
 };
 
 class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware_vreg::Vreg> {
@@ -144,29 +198,36 @@ class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware
 class AmlPowerTest : public zxtest::Test {
  public:
   void TearDown() override {
-    big_cluster_pwm_.VerifyAndClear();
-    little_cluster_pwm_.VerifyAndClear();
+    big_cluster_pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
+    little_cluster_pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
+    pwm_loop_.Shutdown();
     vreg_loop_.Shutdown();
   }
 
   zx_status_t Create(uint32_t pid, std::vector<aml_voltage_table_t> voltage_table,
                      voltage_pwm_period_ns_t pwm_period) {
+    EXPECT_OK(pwm_loop_.StartThread("pwm-servers"));
     EXPECT_OK(vreg_loop_.StartThread("vreg-servers"));
+    auto big_cluster_pwm_client = big_cluster_pwm_.SyncCall(&MockPwmServer::BindServer);
+    auto little_cluster_pwm_client = little_cluster_pwm_.SyncCall(&MockPwmServer::BindServer);
     auto big_cluster_vreg_client = big_cluster_vreg_.SyncCall(&FakeVregServer::BindServer);
     auto little_cluster_vreg_client = little_cluster_vreg_.SyncCall(&FakeVregServer::BindServer);
     switch (pid) {
       case PDEV_PID_ASTRO: {
-        aml_power_ = AmlPowerTestWrapper::Create(big_cluster_pwm_, voltage_table, pwm_period);
+        aml_power_ = AmlPowerTestWrapper::Create(std::move(big_cluster_pwm_client), voltage_table,
+                                                 pwm_period);
         return ZX_OK;
       }
       case PDEV_PID_SHERLOCK: {
-        aml_power_ = AmlPowerTestWrapper::Create(big_cluster_pwm_, little_cluster_pwm_,
+        aml_power_ = AmlPowerTestWrapper::Create(std::move(big_cluster_pwm_client),
+                                                 std::move(little_cluster_pwm_client),
                                                  voltage_table, pwm_period);
         return ZX_OK;
       }
       case PDEV_PID_LUIS: {
         aml_power_ = AmlPowerTestWrapper::Create(std::move(big_cluster_vreg_client),
-                                                 little_cluster_pwm_, voltage_table, pwm_period);
+                                                 std::move(little_cluster_pwm_client),
+                                                 voltage_table, pwm_period);
         return ZX_OK;
       }
       case PDEV_PID_AMLOGIC_A311D: {
@@ -183,11 +244,14 @@ class AmlPowerTest : public zxtest::Test {
 
  protected:
   std::unique_ptr<AmlPowerTestWrapper> aml_power_;
+  async::Loop pwm_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async::Loop vreg_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   // Mmio Regs and Regions
-  ddk::MockPwm big_cluster_pwm_;
-  ddk::MockPwm little_cluster_pwm_;
+  async_patterns::TestDispatcherBound<MockPwmServer> big_cluster_pwm_{pwm_loop_.dispatcher(),
+                                                                      std::in_place};
+  async_patterns::TestDispatcherBound<MockPwmServer> little_cluster_pwm_{pwm_loop_.dispatcher(),
+                                                                         std::in_place};
   async_patterns::TestDispatcherBound<FakeVregServer> big_cluster_vreg_{vreg_loop_.dispatcher(),
                                                                         std::in_place};
   async_patterns::TestDispatcherBound<FakeVregServer> little_cluster_vreg_{vreg_loop_.dispatcher(),
@@ -203,34 +267,48 @@ TEST_F(AmlPowerTest, SetVoltage) {
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
 
   // Initialize to 0.69V
-  pwm_config_t cfg = {false, 1250, 100, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, 1250, 100,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
   // Scale up to 1.05V
-  cfg = {false, 1250, 92, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 84, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 76, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 68, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 59, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 51, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 43, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 34, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 26, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 17, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 8, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 3, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  cfg = {false, 1250, 92,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 84,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 76,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 68,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 59,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 51,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 43,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 34,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 26,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 17,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 8,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 3,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
   uint32_t actual;
   st = aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain,
@@ -274,8 +352,10 @@ TEST_F(AmlPowerTest, GetVoltage) {
 
   // Initialize to 0.69V
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {false, 1250, 100, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, 1250, 100,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
   uint32_t requested_voltage, actual_voltage;
   st = aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, kTestVoltage,
@@ -309,16 +389,22 @@ TEST_F(AmlPowerTest, SetVoltageRoundDown) {
   constexpr uint32_t kTestVoltageFinalActual = 930'000;
 
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {false, 1250, 62, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 54, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 45, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 37, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 34, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, 1250, 62,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 54,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 45,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 37,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 34,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
   uint32_t actual;
   zx_status_t st;
@@ -342,22 +428,31 @@ TEST_F(AmlPowerTest, SetVoltageLittleCluster) {
   constexpr uint32_t kTestVoltageFinal = 930'000;
 
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {false, 1250, 89, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 81, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 73, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 65, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 56, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 48, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 40, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
-  cfg = {false, 1250, 34, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, 1250, 89,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 81,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 73,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 65,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 56,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 48,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 40,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
+  cfg = {false, 1250, 34,
+         fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
   uint32_t actual;
   zx_status_t st;

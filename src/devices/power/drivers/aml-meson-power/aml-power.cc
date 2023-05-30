@@ -5,7 +5,6 @@
 #include "aml-power.h"
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
@@ -27,18 +26,22 @@ constexpr uint32_t kVoltageSettleTimeUs = 200;
 // voltage and not directly. Source: Amlogic SDK
 constexpr int kMaxVoltageChangeSteps = 3;
 
-zx_status_t InitPwmProtocolClient(const ddk::PwmProtocolClient& client) {
+zx_status_t InitPwmProtocolClient(const fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& client) {
   if (client.is_valid() == false) {
     // Optional fragment. See comment in AmlPower::Create.
     return ZX_OK;
   }
 
-  zx_status_t result;
-  if ((result = client.Enable()) != ZX_OK) {
+  auto result = client->Enable();
+  if (!result.ok()) {
     zxlogf(ERROR, "%s: Could not enable PWM", __func__);
+    return result.status();
   }
-
-  return result;
+  if (result.value().is_error()) {
+    zxlogf(ERROR, "%s: Could not enable PWM", __func__);
+    return result.value().error_value();
+  }
+  return ZX_OK;
 }
 
 bool IsSortedDescending(const std::vector<aml_voltage_table_t>& vt) {
@@ -183,8 +186,8 @@ zx::result<AmlPower::ClusterArgs> AmlPower::GetClusterArgs(uint32_t cluster_inde
   }
 }
 
-zx_status_t AmlPower::GetTargetIndex(const ddk::PwmProtocolClient& pwm, uint32_t u_volts,
-                                     uint32_t* target_index) {
+zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& pwm,
+                                     uint32_t u_volts, uint32_t* target_index) {
   if (!target_index) {
     return ZX_ERR_INTERNAL;
   }
@@ -241,11 +244,20 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
   return ZX_OK;
 }
 
-zx_status_t AmlPower::Update(const ddk::PwmProtocolClient& pwm, uint32_t idx) {
+zx_status_t AmlPower::Update(const fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& pwm,
+                             uint32_t idx) {
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {false, pwm_period_, static_cast<float>(voltage_table_[idx].duty_cycle),
-                      reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  return pwm.SetConfig(&cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, pwm_period_, static_cast<float>(voltage_table_[idx].duty_cycle),
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  auto result = pwm->SetConfig(cfg);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result.value().is_error()) {
+    return result.value().error_value();
+  }
+  return ZX_OK;
 }
 
 zx_status_t AmlPower::Update(const fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg,
@@ -439,22 +451,29 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
     return pwm_period.error_value();
   }
 
-  ddk::PwmProtocolClient first_cluster_pwm;
-  first_cluster_pwm = ddk::PwmProtocolClient(parent, "pwm-ao-d");
-  st = InitPwmProtocolClient(first_cluster_pwm);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to initialize Big Cluster PWM Client, st = %d", __func__, st);
-    return st;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> first_cluster_pwm;
+  zx::result client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-ao-d");
+  // The fragment may be optional, so we do not return on error.
+  if (!client_end.is_error()) {
+    first_cluster_pwm.Bind(std::move(client_end.value()));
+    st = InitPwmProtocolClient(first_cluster_pwm);
+    if (st != ZX_OK) {
+      zxlogf(ERROR, "%s: Failed to initialize Big Cluster PWM Client, st = %d", __func__, st);
+      return st;
+    }
   }
-
-  ddk::PwmProtocolClient second_cluster_pwm;
-  second_cluster_pwm = ddk::PwmProtocolClient(parent, "pwm-a");
-  st = InitPwmProtocolClient(second_cluster_pwm);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to initialize Little Cluster PWM Client, st = %d", __func__, st);
-    return st;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> second_cluster_pwm;
+  client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-a");
+  // The fragment may be optional, so we do not return on error.
+  if (!client_end.is_error()) {
+    second_cluster_pwm.Bind(std::move(client_end.value()));
+    st = InitPwmProtocolClient(second_cluster_pwm);
+    if (st != ZX_OK) {
+      zxlogf(ERROR, "%s: Failed to initialize Little Cluster PWM Client, st = %d", __func__, st);
+      return st;
+    }
   }
-
   zx::result first_cluster_vreg =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_vreg::Service::Vreg>(parent, "vreg-pwm-a");
   zx::result second_cluster_vreg =
@@ -470,8 +489,9 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
                "Invalid args. Astro requires first cluster pwm, voltage table, and pwm period");
         return ZX_ERR_INTERNAL;
       }
-      power_impl_device = std::make_unique<AmlPower>(
-          parent, first_cluster_pwm, std::move(*voltage_table), *(pwm_period.value().get()));
+      power_impl_device =
+          std::make_unique<AmlPower>(parent, std::move(first_cluster_pwm),
+                                     std::move(*voltage_table), *(pwm_period.value().get()));
       break;
     case PDEV_PID_LUIS:
       if (!first_cluster_pwm.is_valid() || !voltage_table.is_ok() || !pwm_period.is_ok() ||
@@ -481,9 +501,9 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
                "second cluster vreg");
         return ZX_ERR_INTERNAL;
       }
-      power_impl_device = std::make_unique<AmlPower>(parent, std::move(second_cluster_vreg.value()),
-                                                     first_cluster_pwm, std::move(*voltage_table),
-                                                     *(pwm_period.value().get()));
+      power_impl_device = std::make_unique<AmlPower>(
+          parent, std::move(second_cluster_vreg.value()), std::move(first_cluster_pwm),
+          std::move(*voltage_table), *(pwm_period.value().get()));
       break;
     case PDEV_PID_SHERLOCK:
       if (!first_cluster_pwm.is_valid() || !voltage_table.is_ok() || !pwm_period.is_ok() ||
@@ -493,9 +513,9 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
                "second cluster pwm");
         return ZX_ERR_INTERNAL;
       }
-      power_impl_device =
-          std::make_unique<AmlPower>(parent, first_cluster_pwm, second_cluster_pwm,
-                                     std::move(*voltage_table), *(pwm_period.value().get()));
+      power_impl_device = std::make_unique<AmlPower>(
+          parent, std::move(first_cluster_pwm), std::move(second_cluster_pwm),
+          std::move(*voltage_table), *(pwm_period.value().get()));
       break;
     case PDEV_PID_AMLOGIC_A311D:
       if (first_cluster_vreg.is_error() || second_cluster_vreg.is_error()) {
@@ -506,7 +526,15 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
                                                      std::move(second_cluster_vreg.value()));
       break;
     case PDEV_PID_AMLOGIC_A5:
-      first_cluster_pwm = ddk::PwmProtocolClient(parent, "pwm-f");
+      client_end =
+          DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-f");
+      if (client_end.is_error()) {
+        zxlogf(ERROR, "%s: Failed to initialize Cluster PWM Client, st = %d", __func__,
+               client_end.status_value());
+        return client_end.status_value();
+      }
+      first_cluster_pwm =
+          fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(client_end.value()));
       st = InitPwmProtocolClient(first_cluster_pwm);
       if (st != ZX_OK) {
         zxlogf(ERROR, "Failed to initialize Cluster PWM Client: %s", zx_status_get_string(st));
@@ -516,8 +544,9 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
         zxlogf(ERROR, "Invalid args. A5 requires first cluster pwm, voltage table, and pwm period");
         return ZX_ERR_INTERNAL;
       }
-      power_impl_device = std::make_unique<AmlPower>(
-          parent, first_cluster_pwm, std::move(*voltage_table), *(pwm_period.value().get()));
+      power_impl_device =
+          std::make_unique<AmlPower>(parent, std::move(first_cluster_pwm),
+                                     std::move(*voltage_table), *(pwm_period.value().get()));
       break;
     default:
       zxlogf(ERROR, "Unsupported device pid = %u", device_info.pid);
