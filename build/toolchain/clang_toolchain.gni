@@ -485,6 +485,9 @@ template("clang_toolchain") {
         command += "{{rustenv}}${ld_location_env} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
         command += " -o \"{{UNSTRIPPED_OUTFILE}}\" {{rustdeps}} {{externs}}"
+        if (rust_rbe_enable && !rust_rbe_download_unstripped_binaries) {
+          command += " --remote-flag=--download_outputs=false"
+        }
         command +=
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 

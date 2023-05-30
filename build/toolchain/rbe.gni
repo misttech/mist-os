@@ -110,6 +110,11 @@ declare_args() {
   #
   rust_rbe_check = "none"
 
+  # Controls whether or not to download (often large) unstripped Rust
+  # binaries.  When downloading is disabled, the build produces stubs
+  # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+  rust_rbe_download_unstripped_binaries = true
+
   ########################
   ### C++ RBE controls ###
   ########################

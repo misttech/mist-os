@@ -207,6 +207,17 @@ config("rbe_strategy_racing") {
   }
 }
 
+# Disable downloading outputs, and instead write download stubs that can be
+# used to fetch remote outputs later as needed.
+# Even in this mode, depfiles are always still downloaded.
+config("no_download") {
+  if (rust_rbe_enable) {
+    # --remote-flag=* is a pseudo flag that is intercepted by
+    # build/rbe/rustc_remote_wrapper.py and forwarded to rewrapper (reclient).
+    rustflags = [ "--remote-flag=--download_outputs=false" ]
+  }
+}
+
 # Unstable features
 #
 # These configs enable unstable Rust features. Configs that enable unstable
