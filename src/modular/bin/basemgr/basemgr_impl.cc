@@ -36,7 +36,7 @@ namespace modular {
 BasemgrImpl::BasemgrImpl(modular::ModularConfigAccessor config_accessor,
                          std::shared_ptr<sys::OutgoingDirectory> outgoing_services,
                          bool use_flatland, fuchsia::sys::LauncherPtr launcher,
-                         SceneOwnerPtr scene_owner,
+                         fuchsia::session::scene::ManagerPtr scene_manager,
                          fuchsia::hardware::power::statecontrol::AdminPtr device_administrator,
                          fuchsia::session::RestarterPtr session_restarter,
                          std::unique_ptr<ChildListener> child_listener,
@@ -45,7 +45,7 @@ BasemgrImpl::BasemgrImpl(modular::ModularConfigAccessor config_accessor,
     : config_accessor_(std::move(config_accessor)),
       outgoing_services_(std::move(outgoing_services)),
       launcher_(std::move(launcher)),
-      scene_owner_(std::move(scene_owner)),
+      scene_manager_(std::move(scene_manager)),
       child_listener_(std::move(child_listener)),
       device_administrator_(std::move(device_administrator)),
       session_restarter_(std::move(session_restarter)),
@@ -178,10 +178,6 @@ BasemgrImpl::StartSessionResult BasemgrImpl::StartSession() {
     auto start_session_result = session_provider_->StartSession(/*view_params=*/nullptr);
     FX_CHECK(start_session_result.is_ok());
   } else if (use_flatland_) {
-    fuchsia::session::scene::ManagerPtr* scene_manager =
-        std::get_if<fuchsia::session::scene::ManagerPtr>(&scene_owner_);
-    FX_CHECK(scene_manager != nullptr);
-
     auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
 
     fuchsia::modular::internal::ViewParamsPtr view_params =
@@ -202,11 +198,10 @@ BasemgrImpl::StartSessionResult BasemgrImpl::StartSession() {
     auto start_session_result = session_provider_->StartSession(std::move(view_params));
     FX_CHECK(start_session_result.is_ok());
 
-    // TODO(fxbug.dev/56132): Ownership of the Presenter should be moved to the session shell.
-    scene_manager->set_error_handler([](zx_status_t error) {
+    scene_manager_.set_error_handler([](zx_status_t error) {
       FX_PLOGS(ERROR, error) << "Error on fuchsia.session.scene.Manager.";
     });
-    (*scene_manager)->PresentRootView(std::move(viewport_creation_token), [](auto) {});
+    scene_manager_->PresentRootView(std::move(viewport_creation_token), [](auto) {});
   } else {
     auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
     scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
@@ -233,27 +228,11 @@ BasemgrImpl::StartSessionResult BasemgrImpl::StartSession() {
     auto start_session_result = session_provider_->StartSession(std::move(view_params));
     FX_CHECK(start_session_result.is_ok());
 
-    fuchsia::session::scene::ManagerPtr* scene_manager =
-        std::get_if<fuchsia::session::scene::ManagerPtr>(&scene_owner_);
-    fuchsia::ui::policy::PresenterPtr* root_presenter =
-        std::get_if<fuchsia::ui::policy::PresenterPtr>(&scene_owner_);
-    // TODO(fxbug.dev/56132): Ownership of the Presenter should be moved to the session shell.
-    if (scene_manager) {
-      scene_manager->set_error_handler([](zx_status_t error) {
-        FX_PLOGS(ERROR, error) << "Error on fuchsia.session.scene.Manager.";
-      });
-      (*scene_manager)
-          ->PresentRootViewLegacy(std::move(view_holder_token), std::move(view_ref_clone),
-                                  [](auto) {});
-    } else if (root_presenter) {
-      root_presenter->set_error_handler([this](zx_status_t error) {
-        FX_LOGS(ERROR) << "Error on fuchsia.ui.policy.Presenter: " << zx_status_get_string(error);
-        presentation_.Unbind();
-      });
-      (*root_presenter)
-          ->PresentOrReplaceView2(std::move(view_holder_token), std::move(view_ref_clone),
-                                  presentation_.NewRequest());
-    }
+    scene_manager_.set_error_handler([](zx_status_t error) {
+      FX_PLOGS(ERROR, error) << "Error on fuchsia.session.scene.Manager.";
+    });
+    scene_manager_->PresentRootViewLegacy(std::move(view_holder_token), std::move(view_ref_clone),
+                                          [](auto) {});
   }
 
   return fpromise::ok();

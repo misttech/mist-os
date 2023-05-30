@@ -116,7 +116,7 @@ class BasemgrImplTestFixture : public gtest::RealLoopFixture {
   void CreateBasemgrImpl(fuchsia::modular::session::ModularConfig config) {
     basemgr_impl_ = std::make_unique<BasemgrImpl>(
         ModularConfigAccessor(std::move(config)), outgoing_directory_, false, GetLauncher(),
-        std::move(presenter_), std::move(device_administrator_),
+        std::move(scene_manager_), std::move(device_administrator_),
         /*session_restarter_=*/nullptr,
         /*child_listener=*/nullptr, std::move(view_provider_), std::move(on_shutdown_));
   }
@@ -136,7 +136,7 @@ class BasemgrImplTestFixture : public gtest::RealLoopFixture {
   fit::function<void()> on_shutdown_ = [&]() { did_shut_down_ = true; };
   std::shared_ptr<sys::OutgoingDirectory> outgoing_directory_ =
       std::make_shared<sys::OutgoingDirectory>();
-  fuchsia::ui::policy::PresenterPtr presenter_;
+  fuchsia::session::scene::ManagerPtr scene_manager_;
   fuchsia::hardware::power::statecontrol::AdminPtr device_administrator_;
   fuchsia::ui::app::ViewProviderPtr view_provider_;
   sys::testing::FakeLauncher fake_launcher_;

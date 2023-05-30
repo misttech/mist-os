@@ -8,8 +8,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     fidl_fuchsia_modular_internal as fmodular, fidl_fuchsia_session as fsession,
-    fidl_fuchsia_sys as fsys, fidl_fuchsia_ui_app as fuiapp, fidl_fuchsia_ui_policy as fuipolicy,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync,
+    fidl_fuchsia_sys as fsys, fidl_fuchsia_ui_app as fuiapp, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -160,27 +159,6 @@ impl TestFixture {
         self.with_config(r#"{ "basemgr": { "enable_cobalt": false } }"#).await
     }
 
-    async fn with_noop_presenter(self) -> Result<TestFixture, Error> {
-        let presenter = self
-            .builder
-            .add_local_child(
-                "presenter",
-                move |handles| Box::pin(presenter_noop(handles)),
-                ChildOptions::new(),
-            )
-            .await?;
-        let () = self
-            .builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fuipolicy::PresenterMarker>())
-                    .from(&presenter)
-                    .to(&self.basemgr),
-            )
-            .await?;
-        Ok(self)
-    }
-
     async fn with_noop_sys_launcher(self) -> Result<TestFixture, Error> {
         let sys_launcher = self
             .builder
@@ -250,8 +228,6 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
     let fixture = TestFixture::new(BASEMGR_URL)
         .await?
         .with_default_config()
-        .await?
-        .with_noop_presenter()
         .await?
         .with_placeholder_restarter()
         .await?;
@@ -343,8 +319,6 @@ async fn test_launch_v2_eager_children() -> Result<(), Error> {
         .await?
         .with_default_config()
         .await?
-        .with_noop_presenter()
-        .await?
         .with_placeholder_restarter()
         .await?
         .with_noop_sys_launcher()
@@ -420,8 +394,6 @@ async fn test_restart_session_after_critical_child_crashes() -> Result<(), Error
     let fixture = TestFixture::new(BASEMGR_WITH_CRITICAL_CHILDREN_URL)
         .await?
         .with_default_config()
-        .await?
-        .with_noop_presenter()
         .await?
         .with_restarter_with_sender(restart_sender)
         .await?
@@ -503,8 +475,6 @@ async fn test_eager_children_restart_are_tracked_in_inspect() -> Result<(), Erro
         .await?
         .with_default_config()
         .await?
-        .with_noop_presenter()
-        .await?
         .with_placeholder_restarter()
         .await?
         .with_noop_sys_launcher()
@@ -568,26 +538,6 @@ async fn test_v2_session_shell() -> Result<(), Error> {
         .with_noop_sys_launcher()
         .await?;
 
-    // Add a local component that serves `fuchsia.ui.policy.Presenter` to the realm.
-    let (holder_token_sender, holder_token_receiver) = mpsc::channel(1);
-    let presenter = fixture
-        .builder
-        .add_local_child(
-            "presenter",
-            move |handles| Box::pin(presenter_with_sender(holder_token_sender.clone(), handles)),
-            ChildOptions::new(),
-        )
-        .await?;
-    let () = fixture
-        .builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fuipolicy::PresenterMarker>())
-                .from(&presenter)
-                .to(&fixture.basemgr),
-        )
-        .await?;
-
     // Add a local component that serves `fuchsia.ui.app.ViewProvider` to the realm.
     let (token_sender, token_receiver) = mpsc::channel(1);
     let session_shell = fixture
@@ -610,9 +560,8 @@ async fn test_v2_session_shell() -> Result<(), Error> {
 
     let _instance = fixture.builder.build().await?;
 
-    // basemgr should have created a view via ViewProvider and presented it via Presenter.
+    // basemgr should have created a view via ViewProvider.
     assert!(token_receiver.take(1).next().await.is_some());
-    assert!(holder_token_receiver.take(1).next().await.is_some());
 
     Ok(())
 }
@@ -773,60 +722,6 @@ async fn sys_launcher_noop(handles: LocalComponentHandles) -> Result<(), Error> 
                         )
                         .await
                         .unwrap();
-                    }
-                }
-            }
-        })
-        .detach();
-    });
-    fs.serve_connection(handles.outgoing_dir)?;
-    fs.collect::<()>().await;
-    Ok(())
-}
-
-// Implements a `fuchsia.ui.policy.Presenter` that does nothing.
-async fn presenter_noop(handles: LocalComponentHandles) -> Result<(), Error> {
-    let mut fs = ServiceFs::new();
-    fs.dir("svc").add_fidl_service(|mut stream: fuipolicy::PresenterRequestStream| {
-        fasync::Task::local(async move {
-            while let Some(request) = stream.try_next().await.expect("failed to serve Presenter") {
-                match request {
-                    fuipolicy::PresenterRequest::PresentView { .. }
-                    | fuipolicy::PresenterRequest::PresentOrReplaceView { .. }
-                    | fuipolicy::PresenterRequest::PresentOrReplaceView2 { .. } => {}
-                }
-            }
-        })
-        .detach();
-    });
-    fs.serve_connection(handles.outgoing_dir)?;
-    fs.collect::<()>().await;
-    Ok(())
-}
-
-// Implements a `fuchsia.ui.policy.Presenter` that sends the presented ViewHolderToken
-// over a channel.
-async fn presenter_with_sender(
-    token_sender: mpsc::Sender<fuiviews::ViewHolderToken>,
-    handles: LocalComponentHandles,
-) -> Result<(), Error> {
-    let mut fs = ServiceFs::new();
-    fs.dir("svc").add_fidl_service(|mut stream: fuipolicy::PresenterRequestStream| {
-        let mut token_sender = token_sender.clone();
-        fasync::Task::local(async move {
-            while let Some(request) = stream.try_next().await.expect("failed to serve Presenter") {
-                match request {
-                    fuipolicy::PresenterRequest::PresentView { view_holder_token, .. }
-                    | fuipolicy::PresenterRequest::PresentOrReplaceView {
-                        view_holder_token, ..
-                    }
-                    | fuipolicy::PresenterRequest::PresentOrReplaceView2 {
-                        view_holder_token,
-                        ..
-                    } => {
-                        token_sender
-                            .try_send(view_holder_token)
-                            .expect("Failed to send ViewHolderToken");
                     }
                 }
             }

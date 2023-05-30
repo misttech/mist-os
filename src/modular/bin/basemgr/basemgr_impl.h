@@ -44,9 +44,6 @@ class LauncherImpl;
 // 2) Manages the lifecycle of sessions, represented as |sessionmgr| processes.
 class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
  public:
-  using SceneOwnerPtr =
-      std::variant<fuchsia::ui::policy::PresenterPtr, fuchsia::session::scene::ManagerPtr>;
-
   enum class State {
     // Normal mode of operation.
     RUNNING,
@@ -69,7 +66,7 @@ class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
   // |on_shutdown| Callback invoked when this basemgr instance is shutdown.
   BasemgrImpl(modular::ModularConfigAccessor config_accessor,
               std::shared_ptr<sys::OutgoingDirectory> outgoing_services, bool use_flatland,
-              fuchsia::sys::LauncherPtr launcher, SceneOwnerPtr scene_owner,
+              fuchsia::sys::LauncherPtr launcher, fuchsia::session::scene::ManagerPtr scene_manager,
               fuchsia::hardware::power::statecontrol::AdminPtr device_administrator,
               fuchsia::session::RestarterPtr session_restarter,
               std::unique_ptr<ChildListener> child_listener,
@@ -118,10 +115,6 @@ class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
 
   // Used to launch component instances.
   fuchsia::sys::LauncherPtr launcher_;
-
-  // Used to connect the session's view to the scene owner.
-  SceneOwnerPtr scene_owner_;
-  fuchsia::ui::policy::PresentationPtr presentation_;
 
   // Used to connect the session's view to scene_manager.
   fuchsia::session::scene::ManagerPtr scene_manager_;

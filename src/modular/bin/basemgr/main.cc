@@ -85,17 +85,10 @@ std::unique_ptr<modular::BasemgrImpl> CreateBasemgrImpl(
     FX_CHECK(status == ZX_OK) << "Failed to connect to fuchsia.ui.app.ViewProvider.";
   }
 
-#ifndef USE_SCENE_MANAGER
-  FX_CHECK(!use_flatland);
-#endif
   return std::make_unique<modular::BasemgrImpl>(
       std::move(config_accessor), component_context->outgoing(), use_flatland,
       component_context->svc()->Connect<fuchsia::sys::Launcher>(),
-#ifdef USE_SCENE_MANAGER
       component_context->svc()->Connect<fuchsia::session::scene::Manager>(),
-#else
-      component_context->svc()->Connect<fuchsia::ui::policy::Presenter>(),
-#endif
       component_context->svc()->Connect<fuchsia::hardware::power::statecontrol::Admin>(),
       component_context->svc()->Connect<fuchsia::session::Restarter>(), std::move(child_listener),
       std::move(view_provider),

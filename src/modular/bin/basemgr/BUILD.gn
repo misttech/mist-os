@@ -13,8 +13,6 @@ executable("basemgr_bin") {
   output_name = "basemgr"
   sources = [ "main.cc" ]
 
-  defines = [ "USE_SCENE_MANAGER" ]
-
   deps = [
     ":basemgr_impl",
     ":lib",
@@ -254,9 +252,9 @@ rustc_test("basemgr_v1_to_v2_test_realm_bin") {
     "//sdk/fidl/fuchsia.modular:fuchsia.modular_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.session:fuchsia.session_rust",
+    "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_rust",
     "//sdk/fidl/fuchsia.sys:fuchsia.sys_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

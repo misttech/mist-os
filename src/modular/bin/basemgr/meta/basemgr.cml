@@ -30,7 +30,6 @@
         {
             protocol: [
                 "fuchsia.session.scene.Manager",
-                "fuchsia.ui.policy.Presenter",
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
