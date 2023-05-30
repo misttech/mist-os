@@ -11,6 +11,7 @@ rustc_library("netlink") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//src/connectivity/lib/net-types",
     "//src/lib/fidl/rust/fidl",
@@ -29,7 +30,6 @@ rustc_library("netlink") {
   ]
 
   test_deps = [
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//src/connectivity/lib/net-declare",
     "//src/lib/fuchsia",

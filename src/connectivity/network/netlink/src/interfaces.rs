@@ -12,6 +12,10 @@ use anyhow::anyhow;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 use futures::{pin_mut, StreamExt as _, TryStreamExt as _};
+use netlink_packet_route::{
+    LinkHeader, LinkMessage, AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID,
+    IFF_LOOPBACK, IFF_RUNNING, IFF_UP,
+};
 use tracing::debug;
 
 use crate::NETLINK_LOG_TAG;
@@ -232,16 +236,135 @@ fn handle_interface_watcher_event(
     Ok(())
 }
 
+/// A wrapper type for the netlink_packet_route `LinkMessage` to enable conversions
+/// from [`fnet_interfaces_ext::Properties`]. The addresses component of this
+/// struct will be handled separately.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NetlinkLinkMessage(LinkMessage);
+
+// NetlinkLinkMessage conversion related errors.
+#[derive(Debug, PartialEq)]
+enum NetlinkLinkMessageConversionError {
+    // Interface id could not be downcasted to fit into the expected u32.
+    InvalidInterfaceId(u64),
+}
+
+fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 {
+    match device_class {
+        fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => ARPHRD_LOOPBACK,
+        fnet_interfaces::DeviceClass::Device(device_class) => match device_class {
+            fidl_fuchsia_hardware_network::DeviceClass::Ethernet
+            | fidl_fuchsia_hardware_network::DeviceClass::Wlan
+            | fidl_fuchsia_hardware_network::DeviceClass::WlanAp => ARPHRD_ETHER,
+            fidl_fuchsia_hardware_network::DeviceClass::Ppp => ARPHRD_PPP,
+            // TODO(https://issuetracker.google.com/284962255): Find a better mapping for
+            // Bridge and Virtual device class
+            fidl_fuchsia_hardware_network::DeviceClass::Bridge
+            | fidl_fuchsia_hardware_network::DeviceClass::Virtual => ARPHRD_VOID,
+        },
+    }
+}
+
+// Implement conversions from `Properties` to `NetlinkLinkMessage`
+// which is fallible iff, the interface has an id greater than u32.
+impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
+    type Error = NetlinkLinkMessageConversionError;
+    fn try_from(
+        fnet_interfaces_ext::Properties {
+            id,
+            name,
+            device_class,
+            online,
+            addresses: _,
+            has_default_ipv4_route: _,
+            has_default_ipv6_route: _,
+        }: fnet_interfaces_ext::Properties,
+    ) -> Result<Self, Self::Error> {
+        let mut link_header = LinkHeader::default();
+
+        // This constant is in the range of u8-accepted values, so it can be safely casted to a u8.
+        link_header.interface_family = AF_UNSPEC.try_into().expect("should fit into u8");
+
+        // We expect interface ids to safely fit in the range of u32 values.
+        let id: u32 = match id.get().try_into() {
+            Err(std::num::TryFromIntError { .. }) => {
+                return Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id.into()))
+            }
+            Ok(id) => id,
+        };
+        link_header.index = id;
+
+        let link_layer_type = device_class_to_link_type(device_class);
+        link_header.link_layer_type = link_layer_type;
+
+        let mut flags = 0;
+        if online {
+            // Netstack only reports 'online' when the 'admin status' is 'enabled' and the 'link
+            // state' is UP. IFF_RUNNING represents only `link state` UP, so it is likely that
+            // there will be cases where a flag should be set to IFF_RUNNING but we can not make
+            // the determination with the information provided.
+            flags |= IFF_UP | IFF_RUNNING;
+        };
+        if link_header.link_layer_type == ARPHRD_LOOPBACK {
+            flags |= IFF_LOOPBACK;
+        };
+        link_header.flags = flags;
+
+        // As per netlink_package_route and rtnetlink documentation, this should be set to
+        // `0xffff_ffff` and reserved for future use.
+        link_header.change_mask = u32::MAX;
+
+        // The NLA order follows the list that attributes are listed on the
+        // rtnetlink man page.
+        // The following fields are used in the options in the NLA, but they do
+        // not have any corresponding values in `fnet_interfaces_ext::Properties`.
+        //
+        // IFLA_ADDRESS
+        // IFLA_BROADCAST
+        // IFLA_MTU
+        // IFLA_LINK
+        // IFLA_QDISC
+        // IFLA_STATS
+        //
+        // There are other NLAs observed via the netlink_packet_route crate, and do
+        // not have corresponding values in `fnet_interfaces_ext::Properties`.
+        // This list is documented within issuetracker.google.com/283137644.
+        let nlas = vec![
+            netlink_packet_route::link::nlas::Nla::IfName(name),
+            netlink_packet_route::link::nlas::Nla::Link(link_layer_type.into()),
+            // Netstack only exposes enough state to determine between `Up` and `Down`
+            // operating state.
+            netlink_packet_route::link::nlas::Nla::OperState(if online {
+                netlink_packet_route::nlas::link::State::Up
+            } else {
+                netlink_packet_route::nlas::link::State::Down
+            }),
+        ];
+
+        let mut link_message = LinkMessage::default();
+        link_message.header = link_header;
+        link_message.nlas = nlas;
+
+        return Ok(NetlinkLinkMessage(link_message));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl as _;
     use fidl_fuchsia_hardware_network;
     use fuchsia_async::{self as fasync};
     use std::num::NonZeroU64;
+    use test_case::test_case;
     const ETHERNET: fnet_interfaces::DeviceClass =
         fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Ethernet);
+    const WLAN: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Wlan);
+    const WLAN_AP: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::WlanAp);
+    const PPP: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Ppp);
     const LOOPBACK: fnet_interfaces::DeviceClass =
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
 
@@ -260,6 +383,41 @@ mod tests {
             has_default_ipv4_route: false,
             has_default_ipv6_route: false,
         }
+    }
+
+    fn create_netlink_link_message(
+        id: u64,
+        link_type: u16,
+        flags: u32,
+        nlas: Vec<netlink_packet_route::link::nlas::Nla>,
+    ) -> NetlinkLinkMessage {
+        let mut link_header = LinkHeader::default();
+        link_header.index = id.try_into().expect("should fit into u32");
+        link_header.link_layer_type = link_type;
+        link_header.flags = flags;
+        link_header.change_mask = u32::MAX;
+
+        let mut link_message = LinkMessage::default();
+        link_message.header = link_header;
+        link_message.nlas = nlas;
+
+        NetlinkLinkMessage(link_message)
+    }
+
+    fn create_nlas(
+        name: String,
+        link_type: u16,
+        online: bool,
+    ) -> Vec<netlink_packet_route::link::nlas::Nla> {
+        vec![
+            netlink_packet_route::link::nlas::Nla::IfName(name),
+            netlink_packet_route::link::nlas::Nla::Link(link_type.into()),
+            netlink_packet_route::link::nlas::Nla::OperState(if online {
+                netlink_packet_route::nlas::link::State::Up
+            } else {
+                netlink_packet_route::nlas::link::State::Down
+            }),
+        ]
     }
 
     #[fuchsia::test]
@@ -631,6 +789,48 @@ mod tests {
             InterfacesEventLoopError::Netstack(
                 NetstackError::ExistingEventReceived(properties)
             ) if properties.id.get() == 3
+        );
+    }
+
+    #[test_case(ETHERNET, false, 0)]
+    #[test_case(ETHERNET, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(WLAN, false, 0)]
+    #[test_case(WLAN, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(WLAN_AP, false, 0)]
+    #[test_case(WLAN_AP, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(PPP, false, 0)]
+    #[test_case(PPP, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(LOOPBACK, false, IFF_LOOPBACK)]
+    #[test_case(LOOPBACK, true, IFF_UP | IFF_RUNNING | IFF_LOOPBACK)]
+    fn test_interface_conversion(
+        device_class: fnet_interfaces::DeviceClass,
+        online: bool,
+        flags: u32,
+    ) {
+        let interface_id = 1;
+        let interface_name: String = "test".into();
+
+        let interface =
+            create_no_address_interface(interface_id, interface_name.clone(), device_class, online);
+        let actual: NetlinkLinkMessage = interface.try_into().unwrap();
+
+        let link_layer_type = device_class_to_link_type(device_class);
+        let nlas = create_nlas(interface_name, link_layer_type, online);
+        let expected = create_netlink_link_message(interface_id, link_layer_type, flags, nlas);
+        assert_eq!(actual, expected);
+    }
+
+    #[fuchsia::test]
+    fn test_oversized_interface_id_interface_conversion() {
+        let invalid_interface_id = (u32::MAX as u64) + 1;
+        let interface =
+            create_no_address_interface(invalid_interface_id, "test".into(), ETHERNET, true);
+
+        let actual: Result<NetlinkLinkMessage, NetlinkLinkMessageConversionError> =
+            interface.try_into();
+        assert_eq!(
+            actual,
+            Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(invalid_interface_id))
         );
     }
 }
