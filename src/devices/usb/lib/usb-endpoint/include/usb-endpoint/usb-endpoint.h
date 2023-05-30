@@ -54,7 +54,6 @@ class UsbEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint>
   std::vector<fuchsia_hardware_usb_endpoint::Completion> completions_;
 
   struct RegisteredVmo {
-    zx::vmo vmo;
     zx_handle_t pmt;
     uint64_t* phys_list;
     size_t phys_count;

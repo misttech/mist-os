@@ -34,16 +34,26 @@ type EndpointInfo = flexible union {
     4: interrupt InterruptEndpointInfo;
 };
 
-/// Arbitrary limit on the number of VMOs in one call to `RegisterVmos()` or `UnregisterVmos()`
+/// Arbitrary limit on the number of VMOs in one call to `RegisterVmos()` or `UnregisterVmos()`.
 const VMO_VECTOR_MAX uint32 = 300;
-/// Arbitrary limit on the number of Requests in one call to `QueueRequest()`
+/// Arbitrary limit on the number of Requests in one call to `QueueRequest()`.
 const REQUEST_MAX uint32 = 300;
 
-/// VMO information for registering VMOs
-type VmoInfo = resource table {
-    // ID corresponding to the registered VMO
-    1: vmo_id uint64;
-    // VMO to register
+/// VMO information for registering VMOs. Only used for `RegisterVmos()` to convey the ID to register
+/// a VMO to and its size.
+type VmoInfo = table {
+    /// ID corresponding to the VMO to be registered.
+    1: id fuchsia.hardware.usb.request.VmoId;
+    /// Size of VMO to register.
+    2: size uint64;
+};
+
+/// VMO handle returned for registered VMOs. Only used as a return value for `UnregisterVmos()` to
+/// associate a VMO handle with the VmoId it was registered to.
+type VmoHandle = resource table {
+    /// ID corresponding to the registered VMO as passed in by `RegisterVmos()` through `VmoInfo`.
+    1: id fuchsia.hardware.usb.request.VmoId;
+    /// Handle to VMO.
     2: vmo zx.Handle:VMO;
 };
 
@@ -69,23 +79,21 @@ protocol Endpoint {
     }) error zx.Status;
 
     /// Registers and pins VMOs to the vmo_ids. Returns
-    ///  * status: failure status for each unsuccessfully registered VMO. Should 1:1 correspond to
-    ///            the failed_vmos below.
-    ///      + ZX_ERR_ALREADY_EXISTS: vmo_id is already in use
-    ///      + other errors corresponding to vmo::get_size() or PhysMap.
-    ///  * failed_vmos: VMOs that were not successfully registered.
+    ///  * vmo: Handles to successfully registered vmo_ids.
+    /// VMO IDs that are already are registered to will fail.
     RegisterVmos(resource struct {
-        vmos vector<VmoInfo>:VMO_VECTOR_MAX;
+        vmo_ids vector<VmoInfo>:VMO_VECTOR_MAX;
     }) -> (resource struct {
-        status vector<zx.Status>:VMO_VECTOR_MAX;
-        failed_vmos vector<VmoInfo>:VMO_VECTOR_MAX;
+        vmos vector<VmoHandle>:VMO_VECTOR_MAX;
     });
     /// Unregisters the VMOs corresponding to the vmo_ids. Returns
-    ///  * vmos: IDs and handles to the VMOs successfully unregistered.
+    ///  * failed_vmo_ids: vmo_ids that failed to unregister.
+    ///  * errors: Error values that correspond 1:1 to failed_vmo_ids above.
     UnregisterVmos(struct {
-        vmo_ids vector<uint64>:VMO_VECTOR_MAX;
+        vmo_ids vector<fuchsia.hardware.usb.request.VmoId>:VMO_VECTOR_MAX;
     }) -> (resource struct {
-        vmos vector<VmoInfo>:VMO_VECTOR_MAX;
+        failed_vmo_ids vector<fuchsia.hardware.usb.request.VmoId>:VMO_VECTOR_MAX;
+        errors vector<zx.Status>:VMO_VECTOR_MAX;
     });
 
     /// Submit Requests to queue. Processed starting with the 0th Request. Submitting a vector of
@@ -105,6 +113,14 @@ protocol Endpoint {
     /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
     ///   client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
+    ///
+    /// Requests may be pre-buffered. In other words, requests may be queued for data that is not
+    /// present/ready in the buffer yet. The USB Endpoint Server consuming requests does not care
+    /// if the data in the buffer is ready or not and will always process requests on schedule. It
+    /// is the responsibility of the USB Endpoint Client that submits requests to ensure that data
+    /// is ready on schedule.
+    ///  * Definition of "on schedule" varies for different endpoints and controllers. In general,
+    ///    this will be communicated by the `lead_time` parameter returned by `GetInfo`.
     QueueRequests(resource struct {
         req vector<fuchsia.hardware.usb.request.Request>:REQUEST_MAX;
     });

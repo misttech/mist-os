@@ -301,9 +301,22 @@ TEST_F(EndpointHarness, GetInfo) {
   sync_completion_wait(&wait, zx::time::infinite().get());
 }
 
-TEST_F(EndpointHarness, QueueControlRequestVmo) {
+TEST_F(EndpointHarness, QueueControlRequest) {
   // ep_addr needs to be 0 to queue a control request.
   Init(0);
+
+  std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
+  vmo_info.emplace_back(std::move(
+      fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(2 * zx_system_get_page_size())));
+  sync_completion_t wait;
+  client_->RegisterVmos({std::move(vmo_info)})
+      .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
+        ASSERT_TRUE(result.is_ok());
+        EXPECT_EQ(result->vmos().size(), 1);
+        EXPECT_EQ(result->vmos().at(0).id(), 8);
+        sync_completion_signal(&wait);
+      });
+  sync_completion_wait(&wait, zx::time::infinite().get());
 
   expected_ring_doorbell_.emplace(kSlot, 1);
   zx::vmo vmo;
@@ -324,7 +337,7 @@ TEST_F(EndpointHarness, QueueControlRequestVmo) {
       .emplace_back()
       .offset(0)
       .size(zx_system_get_page_size() * 2)
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo)));
+      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(8));
   auto result = client_->QueueRequests(std::move(requests));
   ASSERT_TRUE(result.is_ok());
 
@@ -358,65 +371,19 @@ TEST_F(EndpointHarness, QueueControlRequestVmo) {
   EXPECT_TRUE(status_trb->IOC());
 }
 
-TEST_F(EndpointHarness, QueueNormalRequestVmo) {
-  // ep_addr needs to be non-0 to queue a normal request.
-  Init(1);
-
-  expected_ring_doorbell_.emplace(kSlot, 2 + kDeviceId);
-  zx::vmo vmo;
-  EXPECT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &vmo));
-  std::vector<fuchsia_hardware_usb_request::Request> requests;
-  requests.emplace_back()
-      .defer_completion(false)
-      .information(fuchsia_hardware_usb_request::RequestInfo::WithBulk(
-          fuchsia_hardware_usb_request::BulkRequestInfo()))
-      .data()
-      .emplace()
-      .emplace_back()
-      .offset(0)
-      .size(zx_system_get_page_size() * 2)
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo)));
-  auto result = client_->QueueRequests(std::move(requests));
-  ASSERT_TRUE(result.is_ok());
-
-  sync_completion_wait(&doorbell_, zx::time::infinite().get());
-
-  // Data (page 0)
-  auto trb = (++trbs().begin())->get()->contig.data();
-  EXPECT_EQ(Control::FromTRB(trb).Type(), Control::Normal);
-  auto data_trb = static_cast<Normal*>(trb);
-  EXPECT_EQ(data_trb->IOC(), 0);
-  EXPECT_EQ(data_trb->ISP(), 1);
-  EXPECT_EQ(data_trb->INTERRUPTER(), 0);
-  EXPECT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  EXPECT_EQ(data_trb->SIZE(), 1);
-  EXPECT_TRUE(data_trb->NO_SNOOP());
-
-  // Data (page 1, contiguous)
-  data_trb = static_cast<Normal*>(++trb);
-  EXPECT_EQ(data_trb->IOC(), 1);
-  EXPECT_EQ(data_trb->ISP(), 1);
-  EXPECT_EQ(data_trb->INTERRUPTER(), 0);
-  EXPECT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  EXPECT_EQ(data_trb->SIZE(), 0);
-  EXPECT_TRUE(data_trb->NO_SNOOP());
-}
-
-TEST_F(EndpointHarness, QueueNormalRequestVmoId) {
+TEST_F(EndpointHarness, QueueNormalRequest) {
   // ep_addr needs to be non-0 to queue a normal request.
   Init(1);
 
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(2 * zx_system_get_page_size(), 0, &vmo));
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(8).vmo(std::move(vmo))));
+  vmo_info.emplace_back(std::move(
+      fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(2 * zx_system_get_page_size())));
   sync_completion_t wait;
   client_->RegisterVmos({std::move(vmo_info)})
       .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
         ASSERT_TRUE(result.is_ok());
-        EXPECT_EQ(result->status().size(), 0);
-        EXPECT_EQ(result->failed_vmos().size(), 0);
+        EXPECT_EQ(result->vmos().size(), 1);
+        EXPECT_EQ(result->vmos().at(0).id(), 8);
         sync_completion_signal(&wait);
       });
   sync_completion_wait(&wait, zx::time::infinite().get());

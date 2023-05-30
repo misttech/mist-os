@@ -43,7 +43,6 @@ zx::result<std::vector<ddk::PhysIter>> UsbEndpoint::get_iter(RequestVariant& req
                                     registered_vmos_.at(d.buffer()->vmo_id().value()).phys_count,
                                     *d.size(), max_length));
           break;
-        case fuchsia_hardware_usb_request::Buffer::Tag::kVmo:
         case fuchsia_hardware_usb_request::Buffer::Tag::kData:
           iters.push_back(fidl_request.phys_iter(i, max_length));
           break;
@@ -86,27 +85,28 @@ void UsbEndpoint::OnUnbound(fidl::UnbindInfo info,
 
 void UsbEndpoint::RegisterVmos(RegisterVmosRequest& request,
                                RegisterVmosCompleter::Sync& completer) {
-  std::vector<zx_status_t> statuses;
-  std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> failed_vmos;
-  for (auto& v : request.vmos()) {
-    ZX_ASSERT(v.vmo_id());
-    ZX_ASSERT(v.vmo());
+  std::vector<fuchsia_hardware_usb_endpoint::VmoHandle> vmos;
+  for (const auto& info : request.vmo_ids()) {
+    ZX_ASSERT(info.id());
+    ZX_ASSERT(info.size());
+    auto id = *info.id();
+    auto size = *info.size();
 
-    if (registered_vmos_.find(*v.vmo_id()) != registered_vmos_.end()) {
-      statuses.emplace_back(ZX_ERR_ALREADY_EXISTS);
-      failed_vmos.emplace_back(std::move(v));
+    if (registered_vmos_.find(id) != registered_vmos_.end()) {
+      zxlogf(ERROR, "VMO ID %lu already registered", id);
       continue;
     }
-    uint64_t size;
-    auto status = v.vmo()->get_size(&size);
+
+    zx::vmo vmo;
+    auto status = zx::vmo::create(size, 0, &vmo);
     if (status != ZX_OK) {
-      statuses.emplace_back(status);
-      failed_vmos.emplace_back(std::move(v));
+      zxlogf(ERROR, "Failed to pin registered VMO %d", status);
       continue;
     }
+
     // Pin VMO. Abusing usb_request_physmap
     usb_request_t req = {
-        .vmo_handle = v.vmo()->get(),
+        .vmo_handle = vmo.get(),
         .size = size,
         .offset = 0,
         .pmt = ZX_HANDLE_INVALID,
@@ -115,41 +115,42 @@ void UsbEndpoint::RegisterVmos(RegisterVmosRequest& request,
     };
     status = usb_request_physmap(&req, bti_.get());
     if (status != ZX_OK) {
-      statuses.emplace_back(status);
-      failed_vmos.emplace_back(std::move(v));
+      zxlogf(ERROR, "Failed to pin registered VMO %d", status);
       continue;
     }
 
     // Save
-    registered_vmos_[*v.vmo_id()] = {.vmo = std::move(*v.vmo()),
-                                     .pmt = req.pmt,
-                                     .phys_list = req.phys_list,
-                                     .phys_count = req.phys_count};
+    vmos.emplace_back(
+        std::move(fuchsia_hardware_usb_endpoint::VmoHandle().id(id).vmo(std::move(vmo))));
+    registered_vmos_[id] = {
+        .pmt = req.pmt, .phys_list = req.phys_list, .phys_count = req.phys_count};
   }
 
-  completer.Reply({std::move(statuses), std::move(failed_vmos)});
+  completer.Reply({std::move(vmos)});
 }
 
 void UsbEndpoint::UnregisterVmos(UnregisterVmosRequest& request,
                                  UnregisterVmosCompleter::Sync& completer) {
-  std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> ret;
+  std::vector<zx_status_t> errors;
+  std::vector<uint64_t> failed_vmo_ids;
   for (const auto& id : request.vmo_ids()) {
     auto registered_vmo = registered_vmos_.extract(id);
     if (registered_vmo.empty()) {
+      failed_vmo_ids.emplace_back(id);
+      errors.emplace_back(ZX_ERR_NOT_FOUND);
       continue;
     }
 
     zx_status_t status = zx_pmt_unpin(registered_vmo.mapped().pmt);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to unpin registered VMO %d", status);
+      failed_vmo_ids.emplace_back(id);
+      errors.emplace_back(status);
       continue;
     }
     free(registered_vmo.mapped().phys_list);
-
-    ret.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(id).vmo(
-        std::move(registered_vmo.mapped().vmo))));
   }
-  completer.Reply({std::move(ret)});
+  completer.Reply({std::move(failed_vmo_ids), std::move(errors)});
 }
 
 void UsbEndpoint::RequestComplete(zx_status_t status, size_t actual, RequestVariant request) {

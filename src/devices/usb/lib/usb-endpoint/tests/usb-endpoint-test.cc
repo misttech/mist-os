@@ -85,16 +85,13 @@ class UsbEndpointTest : public zxtest::Test {
 
 TEST_F(UsbEndpointTest, RegisterVmosTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(32, 0, &vmo));
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(8).vmo(std::move(vmo))));
+  vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   sync_completion_t wait;
   client_->RegisterVmos({std::move(vmo_info)})
       .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
         ASSERT_TRUE(result.is_ok());
-        EXPECT_EQ(result->status().size(), 0);
-        EXPECT_EQ(result->failed_vmos().size(), 0);
+        EXPECT_EQ(result->vmos().size(), 1);
+        EXPECT_EQ(result->vmos().at(0).id(), 8);
         sync_completion_signal(&wait);
       });
   sync_completion_wait(&wait, zx::time::infinite().get());
@@ -116,28 +113,16 @@ TEST_F(UsbEndpointTest, RegisterVmosTest) {
 
 TEST_F(UsbEndpointTest, RegisterMultipleVmosTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
-  zx::vmo vmo1;
-  ASSERT_OK(zx::vmo::create(32, 0, &vmo1));
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(8).vmo(std::move(vmo1))));
-  zx::vmo vmo2;
-  ASSERT_OK(zx::vmo::create(16, 0, &vmo2));
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(5).vmo(std::move(vmo2))));
-  zx::vmo vmo3;
-  ASSERT_OK(zx::vmo::create(48, 0, &vmo3));
-  zx_handle_t vmo3_handle = vmo3.get();
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(8).vmo(std::move(vmo3))));
+  vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
+  vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(5).size(16)));
+  vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(48)));
   sync_completion_t wait;
   client_->RegisterVmos({std::move(vmo_info)})
       .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
         ASSERT_TRUE(result.is_ok());
-        EXPECT_EQ(result->status().size(), 1);
-        EXPECT_EQ(result->status().at(0), ZX_ERR_ALREADY_EXISTS);
-        EXPECT_EQ(result->failed_vmos().size(), 1);
-        EXPECT_EQ(result->failed_vmos().at(0).vmo_id(), 8);
-        EXPECT_EQ(result->failed_vmos().at(0).vmo()->get(), vmo3_handle);
+        EXPECT_EQ(result->vmos().size(), 2);
+        EXPECT_EQ(result->vmos().at(0).id(), 8);
+        EXPECT_EQ(result->vmos().at(1).id(), 5);
         sync_completion_signal(&wait);
       });
   sync_completion_wait(&wait, zx::time::infinite().get());
@@ -165,11 +150,7 @@ TEST_F(UsbEndpointTest, RegisterMultipleVmosTest) {
 
 TEST_F(UsbEndpointTest, UnregisterVmosTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(32, 0, &vmo));
-  zx_handle_t vmo_handle = vmo.get();
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(8).vmo(std::move(vmo))));
+  vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   sync_completion_t wait;
   client_->RegisterVmos({std::move(vmo_info)})
       .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
@@ -185,7 +166,8 @@ TEST_F(UsbEndpointTest, UnregisterVmosTest) {
       .Then(
           [&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::UnregisterVmos>& result) {
             ASSERT_TRUE(result.is_ok());
-            EXPECT_EQ(result->vmos().size(), 0);
+            EXPECT_EQ(result->failed_vmo_ids().size(), 1);
+            EXPECT_EQ(result->failed_vmo_ids().at(0), 4);
             sync_completion_signal(&wait);
           });
   sync_completion_wait(&wait, zx::time::infinite().get());
@@ -197,9 +179,8 @@ TEST_F(UsbEndpointTest, UnregisterVmosTest) {
       .Then(
           [&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::UnregisterVmos>& result) {
             ASSERT_TRUE(result.is_ok());
-            EXPECT_EQ(result->vmos().size(), 1);
-            EXPECT_EQ(result->vmos().at(0).vmo_id(), 8);
-            EXPECT_EQ(result->vmos().at(0).vmo()->get(), vmo_handle);
+            EXPECT_EQ(result->failed_vmo_ids().size(), 1);
+            EXPECT_EQ(result->failed_vmo_ids().at(0), 3);
             sync_completion_signal(&wait);
           });
   sync_completion_wait(&wait, zx::time::infinite().get());
@@ -210,10 +191,7 @@ TEST_F(UsbEndpointTest, UnregisterVmosTest) {
 
 TEST_F(UsbEndpointTest, UnboundTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(32, 0, &vmo));
-  vmo_info.emplace_back(
-      std::move(fuchsia_hardware_usb_endpoint::VmoInfo().vmo_id(8).vmo(std::move(vmo))));
+  vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   sync_completion_t wait;
   client_->RegisterVmos({std::move(vmo_info)})
       .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {

@@ -103,18 +103,6 @@ class FidlRequest {
         .size(size);
     return *this;
   }
-  FidlRequest& add_vmo(zx::vmo vmo, size_t size = 0, size_t offset = 0) {
-    if (!request_.data().has_value()) {
-      request_.data().emplace();
-    }
-
-    request_.data()
-        ->emplace_back()
-        .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo)))
-        .offset(offset)
-        .size(size);
-    return *this;
-  }
   FidlRequest& add_data(std::vector<uint8_t> data = {}, size_t size = 0, size_t offset = 0) {
     if (!request_.data().has_value()) {
       request_.data().emplace();
@@ -141,8 +129,7 @@ class FidlRequest {
     for (auto& d : *request_.data()) {
       d.offset(0);
       switch (d.buffer()->Which()) {
-        case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
-        case fuchsia_hardware_usb_request::Buffer::Tag::kVmo: {
+        case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId: {
           auto mapped = GetMapped(*d.buffer());
           ZX_ASSERT(mapped.is_ok());
           d.size(mapped->size);
@@ -319,9 +306,6 @@ class FidlRequest {
         case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
           // Pre-registered and already pinned. Does not need to be pinned again.
           continue;
-        case fuchsia_hardware_usb_request::Buffer::Tag::kVmo: {
-          vmo_handle = d.buffer()->vmo()->get();
-        } break;
         case fuchsia_hardware_usb_request::Buffer::Tag::kData: {
           // The price to pay for using fuchsia_hardware_usb_request::Buffer::Tag::kData instead
           // of VMOs is that a VMO needs to be created, mapped, pinned, data needs to be copied

@@ -16,19 +16,8 @@ TEST(RequestFidlTest, EmptyRequestTest) {
 }
 
 TEST(RequestFidlTest, LengthTest) {
-  fuchsia_hardware_usb_request::Request request;
-  request.data()
-      .emplace()
-      .emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(0))
-      .offset(0)
-      .size(16);
-  request.data()
-      ->emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(zx::vmo()))
-      .offset(0)
-      .size(16);
-  usb::FidlRequest fidl_request(std::move(request));
+  usb::FidlRequest fidl_request;
+  fidl_request.add_vmo_id(0, 16, 0).add_data({}, 16, 0);
 
   EXPECT_EQ(fidl_request.length(), 32);
 }
@@ -40,11 +29,6 @@ TEST(RequestFidlTest, UnpinTest) {
   request.data()
       .emplace()
       .emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo)))
-      .offset(0)
-      .size(16);
-  request.data()
-      ->emplace_back()
       .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(1))
       .offset(0)
       .size(32);
@@ -61,26 +45,23 @@ TEST(RequestFidlTest, UnpinTest) {
 
   EXPECT_OK(fidl_request.PhysMap(fake_bti));
   size_t actual;
-  fake_bti_pinned_vmo_info_t info[2];
-  EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), info, 2, &actual));
-  EXPECT_EQ(actual, 2);
-
-  auto iter1 = fidl_request.phys_iter(0, zx_system_get_page_size());
-  EXPECT_EQ((*iter1.begin()).second, 16);
+  fake_bti_pinned_vmo_info_t info[1];
+  EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), info, 1, &actual));
+  EXPECT_EQ(actual, 1);
 
   void* mapped;
-  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, zx::vmo(info[1].vmo),
-                                       0, info[1].size, reinterpret_cast<uintptr_t*>(&mapped)));
-  auto iter3 = fidl_request.phys_iter(2, zx_system_get_page_size());
+  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, zx::vmo(info[0].vmo),
+                                       0, info[0].size, reinterpret_cast<uintptr_t*>(&mapped)));
+  auto iter3 = fidl_request.phys_iter(1, zx_system_get_page_size());
   EXPECT_EQ((*iter3.begin()).second, 4);
   uint8_t expected_vals[] = {0xA, 0xB, 0xC, 0xC};
   memcpy(mapped, expected_vals, sizeof(expected_vals));
-  EXPECT_OK(zx::vmar::root_self()->unmap(reinterpret_cast<uintptr_t>(mapped), info[1].size));
+  EXPECT_OK(zx::vmar::root_self()->unmap(reinterpret_cast<uintptr_t>(mapped), info[0].size));
 
   EXPECT_OK(fidl_request.Unpin());
   EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), nullptr, 0, &actual));
   EXPECT_EQ(actual, 0);
-  EXPECT_BYTES_EQ((*fidl_request.request().data())[2].buffer()->data()->data(), expected_vals,
+  EXPECT_BYTES_EQ((*fidl_request.request().data())[1].buffer()->data()->data(), expected_vals,
                   sizeof(expected_vals));
 }
 
@@ -112,39 +93,6 @@ TEST(RequestFidlTest, VmoIdTest) {
   size_t actual;
   EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), nullptr, 0, &actual));
   EXPECT_EQ(actual, 0);
-}
-
-TEST(RequestFidlTest, VmoTest) {
-  zx::vmo vmo1, vmo2;
-  ASSERT_OK(zx::vmo::create(16, 0, &vmo1));
-  ASSERT_OK(zx::vmo::create(32, 0, &vmo2));
-  fuchsia_hardware_usb_request::Request request;
-  request.data()
-      .emplace()
-      .emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo1)))
-      .offset(0)
-      .size(16);
-  request.data()
-      ->emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo2)))
-      .offset(0)
-      .size(32);
-  usb::FidlRequest fidl_request(std::move(request));
-
-  zx::bti fake_bti;
-  ASSERT_OK(fake_bti_create(fake_bti.reset_and_get_address()));
-
-  EXPECT_OK(fidl_request.PhysMap(fake_bti));
-  size_t actual;
-  EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), nullptr, 0, &actual));
-  EXPECT_EQ(actual, 2);
-
-  auto iter1 = fidl_request.phys_iter(0, zx_system_get_page_size());
-  EXPECT_EQ((*iter1.begin()).second, 16);
-
-  auto iter2 = fidl_request.phys_iter(1, zx_system_get_page_size());
-  EXPECT_EQ((*iter2.begin()).second, 32);
 }
 
 TEST(RequestFidlTest, DataTest) {
@@ -195,32 +143,9 @@ TEST(RequestFidlTest, DataTest) {
 }
 
 TEST(RequestFidlTest, MixedTest) {
-  zx::vmo vmo1, vmo2;
-  ASSERT_OK(zx::vmo::create(16, 0, &vmo1));
-  ASSERT_OK(zx::vmo::create(32, 0, &vmo2));
-  fuchsia_hardware_usb_request::Request request;
-  request.data()
-      .emplace()
-      .emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(3))
-      .offset(0)
-      .size(16);
-  request.data()
-      ->emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo1)))
-      .offset(0)
-      .size(16);
-  request.data()
-      ->emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(7))
-      .offset(0)
-      .size(16);
-  request.data()
-      ->emplace_back()
-      .buffer(fuchsia_hardware_usb_request::Buffer::WithVmo(std::move(vmo2)))
-      .offset(0)
-      .size(32);
-  usb::FidlRequest fidl_request(std::move(request));
+  std::vector<uint8_t> tmp(32);
+  usb::FidlRequest fidl_request;
+  fidl_request.add_vmo_id(3, 16, 0).add_vmo_id(7, 16, 0).add_data(std::move(tmp), 32, 0);
 
   zx::bti fake_bti;
   ASSERT_OK(fake_bti_create(fake_bti.reset_and_get_address()));
@@ -228,13 +153,10 @@ TEST(RequestFidlTest, MixedTest) {
   EXPECT_OK(fidl_request.PhysMap(fake_bti));
   size_t actual;
   EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), nullptr, 0, &actual));
-  EXPECT_EQ(actual, 2);
+  EXPECT_EQ(actual, 1);
 
-  auto iter1 = fidl_request.phys_iter(1, zx_system_get_page_size());
-  EXPECT_EQ((*iter1.begin()).second, 16);
-
-  auto iter2 = fidl_request.phys_iter(3, zx_system_get_page_size());
-  EXPECT_EQ((*iter2.begin()).second, 32);
+  auto iter = fidl_request.phys_iter(2, zx_system_get_page_size());
+  EXPECT_EQ((*iter.begin()).second, 32);
 }
 
 TEST(RequestFidlTest, PoolTest) {
