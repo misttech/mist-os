@@ -20,6 +20,7 @@ group("tests") {
     "fidl_fuchsia_net_ext:fidl-fuchsia-net-ext-tests",
     "fidl_fuchsia_net_interfaces_ext:tests",
     "fidl_fuchsia_net_routes_ext:tests",
+    "fidl_fuchsia_posix_socket_ext:tests",
     "netsvc-proto:tests",
     "packet:tests",
   ]

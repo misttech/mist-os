@@ -7,6 +7,7 @@ use std::num::NonZeroU64;
 use async_trait::async_trait;
 use dhcp_client_core::deps::PacketSocketProvider;
 use fidl_fuchsia_posix as fposix;
+use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use fuchsia_async as fasync;
 use sockaddr::{EthernetSockaddr, IntoSockAddr as _, TryToSockaddrLl as _};
@@ -290,14 +291,10 @@ impl PacketSocketProvider for PacketSocketProviderImpl {
     async fn get_packet_socket(&self) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
         let PacketSocketProviderImpl { provider, interface_id } = self;
 
-        let sock = provider
-            .socket(fpacket::Kind::Network)
+        let socket = fposix_socket_ext::packet_socket(provider, fpacket::Kind::Network)
             .await
             .map_err(|e: fidl::Error| dhcp_client_core::deps::SocketError::FailedToOpen(e.into()))?
-            .map_err(|errno| {
-                translate_io_error(std::io::Error::from_raw_os_error(errno.into_primitive()))
-            })?;
-        let socket: socket2::Socket = fdio::create_fd(sock.into()).unwrap();
+            .map_err(translate_io_error)?;
 
         let sockaddr_ll = libc::sockaddr_ll::from(EthernetSockaddr {
             interface_id: Some(*interface_id),

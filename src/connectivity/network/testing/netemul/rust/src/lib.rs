@@ -25,6 +25,7 @@ use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_netemul_network as fnetemul_network;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_zircon as zx;
@@ -445,21 +446,11 @@ impl<'a> TestRealm<'a> {
         let socket_provider = self
             .connect_to_protocol::<fposix_socket::ProviderMarker>()
             .context("failed to connect to socket provider")?;
-        let response = socket_provider
-            .datagram_socket(domain, proto)
+
+        fposix_socket_ext::datagram_socket(&socket_provider, domain, proto)
             .await
             .context("failed to call socket")?
-            .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
-            .context("failed to create socket")?;
-
-        match response {
-            fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(sock) => {
-                Ok(fdio::create_fd(sock.into()).context("failed to create fd")?)
-            }
-            fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(sock) => {
-                Ok(fdio::create_fd(sock.into()).context("failed to create fd")?)
-            }
-        }
+            .context("failed to create socket")
     }
 
     /// Creates a raw [`socket2::Socket`] backed by the implementation of
@@ -490,14 +481,11 @@ impl<'a> TestRealm<'a> {
         let socket_provider = self
             .connect_to_protocol::<fposix_socket_packet::ProviderMarker>()
             .context("failed to connect to socket provider")?;
-        let sock = socket_provider
-            .socket(kind)
+
+        fposix_socket_ext::packet_socket(&socket_provider, kind)
             .await
             .context("failed to call socket")?
-            .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
-            .context("failed to create socket")?;
-
-        Ok(fdio::create_fd(sock.into()).context("failed to create fd")?)
+            .context("failed to create socket")
     }
 
     /// Creates a Stream [`socket2::Socket`] backed by the implementation of

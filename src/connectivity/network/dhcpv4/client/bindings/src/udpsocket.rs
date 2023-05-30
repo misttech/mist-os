@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
 use async_trait::async_trait;
 use dhcp_client_core::deps::UdpSocketProvider;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fuchsia_async as fasync;
 
 pub(crate) struct UdpSocket {
@@ -225,32 +225,16 @@ impl UdpSocketProvider for UdpSocketProviderImpl {
         bound_addr: std::net::SocketAddr,
     ) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
         let Self { provider } = self;
-        let response = provider
-            .datagram_socket(
-                fposix_socket::Domain::Ipv4,
-                fposix_socket::DatagramSocketProtocol::Udp,
-            )
-            .await
-            .map_err(|e: fidl::Error| dhcp_client_core::deps::SocketError::FailedToOpen(e.into()))?
-            .map_err(|errno| {
-                translate_io_error(std::io::Error::from_raw_os_error(errno.into_primitive()))
-            })?;
-        let socket: socket2::Socket = match response {
-            fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(client_end) => {
-                fdio::create_fd(client_end.into()).map_err(|status| {
-                    dhcp_client_core::deps::SocketError::FailedToOpen(anyhow!(
-                        "unexpected zx_status: {status:?}"
-                    ))
-                })?
-            }
-            fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
-                client_end,
-            ) => fdio::create_fd(client_end.into()).map_err(|status| {
-                dhcp_client_core::deps::SocketError::FailedToOpen(anyhow!(
-                    "unexpected zx_status: {status:?}"
-                ))
-            })?,
-        };
+
+        let socket = fposix_socket_ext::datagram_socket(
+            provider,
+            fposix_socket::Domain::Ipv4,
+            fposix_socket::DatagramSocketProtocol::Udp,
+        )
+        .await
+        .map_err(|e: fidl::Error| dhcp_client_core::deps::SocketError::FailedToOpen(e.into()))?
+        .map_err(translate_io_error)?;
+
         socket.bind(&bound_addr.into()).map_err(translate_io_error)?;
         socket.set_broadcast(true).map_err(translate_io_error)?;
 

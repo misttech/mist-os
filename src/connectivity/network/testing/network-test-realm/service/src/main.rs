@@ -22,6 +22,7 @@ use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -541,8 +542,8 @@ async fn create_socket(
     connector: &HermeticNetworkConnector,
 ) -> Result<socket2::Socket, fntr::Error> {
     let socket_provider = connector.connect_to_protocol::<fposix_socket::ProviderMarker>()?;
-    let response = socket_provider
-        .datagram_socket(domain, protocol)
+
+    fposix_socket_ext::datagram_socket(&socket_provider, domain, protocol)
         .await
         .map_err(|e| {
             error!("datagram_socket failed: {:?}", e);
@@ -551,22 +552,7 @@ async fn create_socket(
         .map_err(|e| {
             error!("datagram_socket error: {:?}", e);
             fntr::Error::Internal
-        })?;
-
-    match response {
-        fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(sock) => {
-            fdio::create_fd(sock.into()).map_err(|e| {
-                error!("create_fd from DatagramSocket failed: {:?}", e);
-                fntr::Error::Internal
-            })
-        }
-        fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(sock) => {
-            fdio::create_fd(sock.into()).map_err(|e| {
-                error!("create_fd from SynchronousDatagramSocket failed: {:?}", e);
-                fntr::Error::Internal
-            })
-        }
-    }
+        })
 }
 
 async fn create_icmp_socket(
