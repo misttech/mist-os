@@ -139,16 +139,12 @@ gvisor_tests = [
   "socket_ip_tcp_loopback_test",
   "socket_ip_tcp_udp_generic_loopback_test",
   "socket_ip_udp_loopback_non_blocking_test",
-
-  # TODO(https://fxbug.dev/127991): Disabled due to high flake rate.
-  #"socket_ip_udp_loopback_test",
+  "socket_ip_udp_loopback_test",
   "socket_ip_unbound_test",
   "socket_ipv4_udp_unbound_external_networking_test",
   "socket_ipv4_udp_unbound_loopback_netlink_test",
   "socket_ipv4_udp_unbound_loopback_nogotsan_test",
-
-  # TODO(https://fxbug.dev/127990): Disabled due to high flake rate.
-  #"socket_ipv4_udp_unbound_loopback_test",
+  "socket_ipv4_udp_unbound_loopback_test",
   "socket_ipv6_udp_unbound_external_networking_test",
   "socket_ipv6_udp_unbound_loopback_netlink_test",
   "socket_ipv6_udp_unbound_loopback_test",
@@ -227,9 +223,7 @@ gvisor_tests_run_as_root = [
   "proc_test",
   "processes_test",
   "raw_socket_icmp_test",
-
-  # TODO(https://fxbug.dev/127996): Disabled due to high flake rate.
-  #"raw_socket_test",
+  "raw_socket_test",
   "rlimits_test",
   "socket_bind_to_device_distribution_test",
   "socket_bind_to_device_sequence_test",
