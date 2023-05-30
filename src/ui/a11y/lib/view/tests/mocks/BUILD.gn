@@ -20,11 +20,11 @@ source_set("mocks") {
   public_deps = [
     "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
+    "//sdk/lib/sys/cpp/testing:unit",
   ]
   deps = [
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl",
     "//src/ui/a11y/lib/annotation/tests/mocks",
     "//src/ui/a11y/lib/semantics/tests/mocks",
