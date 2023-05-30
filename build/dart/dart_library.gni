@@ -372,6 +372,7 @@ if (current_toolchain == dart_toolchain) {
 
       # Runs analysis on the sources.
       action(analysis_target_name) {
+        print(concurrent_jobs.local)
         forward_variables_from(concurrent_jobs.local, "*")
         forward_variables_from(invoker, [ "testonly" ])
 
