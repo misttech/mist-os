@@ -78,8 +78,6 @@ def _prebuilt_platform_subdir() -> str:
 HOST_PREBUILT_PLATFORM = _prebuilt_platform_subdir()
 HOST_PREBUILT_PLATFORM_SUBDIR = HOST_PREBUILT_PLATFORM
 
-HOST_REMOTETOOL = Path('prebuilt/third_party/remote-apis-sdks', HOST_PREBUILT_PLATFORM, 'remotetool')
-
 # RBE workers are only linux-x64 at this time, so all binaries uploaded
 # for remote execution should use this platform.
 # This is also used as a subdir component of prebuilt tool paths.

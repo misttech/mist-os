@@ -27,6 +27,7 @@ PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
 
 _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 
+_HOST_REMOTETOOL = fuchsia.RECLIENT_BINDIR / 'remotetool'
 
 class ParseError(ValueError):
 
@@ -262,7 +263,7 @@ class RemoteTool(object):
             auto_args.append(f"--use_application_default_credentials={use_adc}")
 
         command = [
-            str(PROJECT_ROOT_REL / fuchsia.HOST_REMOTETOOL),
+            str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
         ] + auto_args + args
         command_str = cl_utils.command_quoted_str(command)
         if show_command:
