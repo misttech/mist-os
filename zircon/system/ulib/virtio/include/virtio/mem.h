@@ -9,8 +9,8 @@
 #include <zircon/compiler.h>
 
 // clang-format off
-#define VIRTIO_MEM_F_ACPI_PXM                 (1u << 0)
-#define VIRTIO_MEM_F_UNPLUGGED_INACCESSIBLE   (1u << 1)
+#define VIRTIO_MEM_F_ACPI_PXM                 ((uint64_t)1 << 0)
+#define VIRTIO_MEM_F_UNPLUGGED_INACCESSIBLE   ((uint64_t)1 << 1)
 
 #define VIRTIO_MEM_REQ_PLUG               0
 #define VIRTIO_MEM_REQ_UNPLUG             1

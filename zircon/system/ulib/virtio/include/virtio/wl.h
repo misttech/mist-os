@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef VIRTIO_WL_H_
+#define VIRTIO_WL_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
 
-#define VIRTIO_WL_F_TRANS_FLAGS (1u << 1)
+#define VIRTIO_WL_F_TRANS_FLAGS ((uint64_t)1 << 1)
 
 __BEGIN_CDECLS
 
@@ -91,3 +92,5 @@ typedef struct virtio_wl_ctrl_vfd_dmabuf_sync {
 } __PACKED virtio_wl_ctrl_vfd_dmabuf_sync_t;
 
 __END_CDECLS
+
+#endif  // VIRTIO_WL_H_

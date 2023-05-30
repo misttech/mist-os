@@ -8,12 +8,14 @@
 #include <stdint.h>
 #include <zircon/compiler.h>
 
-#define VIRTIO_STATUS_ACKNOWLEDGE (1u << 0)
-#define VIRTIO_STATUS_DRIVER (1u << 1)
-#define VIRTIO_STATUS_DRIVER_OK (1u << 2)
-#define VIRTIO_STATUS_FEATURES_OK (1u << 3)
-#define VIRTIO_STATUS_DEVICE_NEEDS_RESET (1u << 6)
-#define VIRTIO_STATUS_FAILED (1u << 7)
+// clang-format off
+#define VIRTIO_STATUS_ACKNOWLEDGE        ((uint8_t)1 << 0)
+#define VIRTIO_STATUS_DRIVER             ((uint8_t)1 << 1)
+#define VIRTIO_STATUS_DRIVER_OK          ((uint8_t)1 << 2)
+#define VIRTIO_STATUS_FEATURES_OK        ((uint8_t)1 << 3)
+#define VIRTIO_STATUS_DEVICE_NEEDS_RESET ((uint8_t)1 << 6)
+#define VIRTIO_STATUS_FAILED             ((uint8_t)1 << 7)
+// clang-format on
 
 // PCI config space for non-transitional devices.
 #define VIRTIO_PCI_COMMON_CFG_DEVICE_FEATURES_SEL 0x0
@@ -60,7 +62,7 @@
 #define VIRTIO_ISR_QUEUE_INT 0x1
 #define VIRTIO_ISR_DEV_CFG_INT 0x2
 
-#define VIRTIO_F_VERSION_1 (1ul << 32)
+#define VIRTIO_F_VERSION_1 ((uint64_t)1 << 32)
 
 __BEGIN_CDECLS
 

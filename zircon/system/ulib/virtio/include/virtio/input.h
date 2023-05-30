@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef VIRTIO_INPUT_H_
+#define VIRTIO_INPUT_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -108,3 +109,5 @@ typedef struct virtio_input_event {
 } __PACKED virtio_input_event_t;
 
 __END_CDECLS
+
+#endif  // VIRTIO_INPUT_H_

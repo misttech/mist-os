@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_VIRTIO_INCLUDE_VIRTIO_SOUND_H
-#define ZIRCON_SYSTEM_ULIB_VIRTIO_INCLUDE_VIRTIO_SOUND_H
+#ifndef VIRTIO_SOUND_H_
+#define VIRTIO_SOUND_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -242,4 +242,4 @@ typedef struct virtio_snd_chmap_info {
 
 __END_CDECLS
 
-#endif
+#endif  // VIRTIO_SOUND_H_

@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef VIRTIO_CONSOLE_H_
+#define VIRTIO_CONSOLE_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
 
 // clang-format off
 
-#define VIRTIO_CONSOLE_F_SIZE               (1u << 0)
-#define VIRTIO_CONSOLE_F_MULTIPORT          (1u << 1)
-#define VIRTIO_CONSOLE_F_EMERG_WRITE        (1u << 2)
+#define VIRTIO_CONSOLE_F_SIZE               ((uint64_t)1 << 0)
+#define VIRTIO_CONSOLE_F_MULTIPORT          ((uint64_t)1 << 1)
+#define VIRTIO_CONSOLE_F_EMERG_WRITE        ((uint64_t)1 << 2)
 
 // clang-format on
 
@@ -25,3 +26,5 @@ typedef struct virtio_console_config {
 } __PACKED virtio_console_config_t;
 
 __END_CDECLS
+
+#endif  // VIRTIO_CONSOLE_H_

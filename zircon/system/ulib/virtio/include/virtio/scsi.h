@@ -6,7 +6,8 @@
 // Reference: https://ozlabs.org/~rusty/virtio-spec/virtio-0.9.5.pdf,
 //   Appendix I
 
-#pragma once
+#ifndef VIRTIO_SCSI_H_
+#define VIRTIO_SCSI_H_
 
 #include <assert.h>
 #include <stdint.h>
@@ -72,3 +73,5 @@ enum class ScsiResponse : uint8_t {
 };
 
 __END_CDECLS
+
+#endif  // VIRTIO_SCSI_H_

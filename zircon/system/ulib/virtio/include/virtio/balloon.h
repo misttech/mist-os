@@ -9,12 +9,12 @@
 #include <zircon/compiler.h>
 
 // clang-format off
-#define VIRTIO_BALLOON_F_MUST_TELL_HOST   (1u << 0)
-#define VIRTIO_BALLOON_F_STATS_VQ         (1u << 1)
-#define VIRTIO_BALLOON_F_DEFLATE_ON_OOM   (1u << 2)
-#define VIRTIO_BALLOON_F_FREE_PAGE_HINT   (1u << 3)
-#define VIRTIO_BALLOON_F_PAGE_POISON      (1u << 4)
-#define VIRTIO_BALLOON_F_PAGE_REPORTING   (1u << 5)
+#define VIRTIO_BALLOON_F_MUST_TELL_HOST   ((uint64_t)1 << 0)
+#define VIRTIO_BALLOON_F_STATS_VQ         ((uint64_t)1 << 1)
+#define VIRTIO_BALLOON_F_DEFLATE_ON_OOM   ((uint64_t)1 << 2)
+#define VIRTIO_BALLOON_F_FREE_PAGE_HINT   ((uint64_t)1 << 3)
+#define VIRTIO_BALLOON_F_PAGE_POISON      ((uint64_t)1 << 4)
+#define VIRTIO_BALLOON_F_PAGE_REPORTING   ((uint64_t)1 << 5)
 
 #define VIRTIO_BALLOON_S_SWAP_IN          0
 #define VIRTIO_BALLOON_S_SWAP_OUT         1

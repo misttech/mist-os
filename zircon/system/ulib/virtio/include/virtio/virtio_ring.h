@@ -1,6 +1,6 @@
 /* taken from linux source 3.15 at include/uapi/linux/virtio_ring.h */
-#ifndef _UAPI_LINUX_VIRTIO_RING_H
-#define _UAPI_LINUX_VIRTIO_RING_H
+#ifndef VIRTIO_VIRTIO_RING_H_
+#define VIRTIO_VIRTIO_RING_H_
 /* An interface for efficient virtio implementation, currently for use by KVM
  * and lguest, but hopefully others soon.  Do NOT change this since it will
  * break existing servers and clients.
@@ -32,8 +32,8 @@
  * SUCH DAMAGE.
  *
  * Copyright Rusty Russell IBM Corporation 2007. */
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* This marks a buffer as continuing via the next field. */
 #define VRING_DESC_F_NEXT 1
@@ -177,4 +177,4 @@ static inline int vring_need_event(uint16_t event_idx, uint16_t new_idx, uint16_
   return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old);
 }
 
-#endif /* _UAPI_LINUX_VIRTIO_RING_H */
+#endif  // VIRTIO_VIRTIO_RING_H_

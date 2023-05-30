@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef VIRTIO_GPU_H_
+#define VIRTIO_GPU_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
 
 // clang-format off
 
-#define VIRTIO_GPU_F_VIRGL        (1u << 0)
+#define VIRTIO_GPU_F_VIRGL        ((uint64_t)1 << 0)
 
 #define VIRTIO_GPU_EVENT_DISPLAY  (1 << 0)
 #define VIRTIO_GPU_FLAG_FENCE     (1 << 0)
@@ -159,3 +160,5 @@ typedef struct virtio_gpu_update_cursor {
 } __PACKED virtio_gpu_update_cursor_t;
 
 __END_CDECLS
+
+#endif  // VIRTIO_GPU_H_
