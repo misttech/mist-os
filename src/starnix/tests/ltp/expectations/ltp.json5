@@ -103,7 +103,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_gettime03.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_gettime04.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_nanosleep01.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_nanosleep02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_nanosleep03.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_nanosleep04.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_clock_settime01.cm",
@@ -180,9 +179,7 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_endian_switch01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_epoll_ctl01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_epoll_ctl04.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_epoll_pwait03.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_epoll_pwait04.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_epoll_wait02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_event_generator.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_eventfd01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_exec_with_inh.cm",
@@ -324,7 +321,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fsxtest.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fsxtest02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fsync01.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fsync02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fsync03.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_fsync04.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_ftrace_stress.cm",
@@ -334,7 +330,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_ftruncate04_64.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_futex_cmp_requeue01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_futex_cmp_requeue02.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_futex_wait05.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_futex_waitv01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_futex_waitv02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_futex_waitv03.cm",
@@ -375,7 +370,6 @@
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getresuid02_16.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getresuid03_16.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getrusage03_child.cm",
-                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getrusage04.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getsid02.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getsockopt01.cm",
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getsockopt01.cm",
@@ -704,6 +698,9 @@
 
                 // TODO(fxbug.dev/127726) Re-enable once flake is resolved.
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_waitid08.cm",
+
+                // Times out because getrusage is not implemented yet.
+                "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_getrusage04.cm",
 
                 // Flaky test.
                 "fuchsia-pkg://fuchsia.com/starnix_ltp_tests#meta/ltp_cve-2017-17052.cm",

@@ -43,6 +43,7 @@ impl ProcDirectory {
         let kernel_stats = Arc::new(KernelStatsStore::default());
 
         let nodes = btreemap! {
+            &b"cpuinfo"[..] => fs.create_node(CpuinfoFile::new_node(), mode!(IFREG, 0o444), FsCred::root()),
             &b"cmdline"[..] => {
                 let cmdline = kernel.upgrade().unwrap().cmdline.clone();
                 fs.create_node(BytesFile::new_node(cmdline), mode!(IFREG, 0o444), FsCred::root())
@@ -330,6 +331,23 @@ impl KernelStatsStore {
                 .expect("Failed to connect to fuchsia.kernel.Stats.");
             fidl_fuchsia_kernel::StatsSynchronousProxy::new(client_end)
         })
+    }
+}
+
+#[derive(Clone)]
+struct CpuinfoFile {}
+impl CpuinfoFile {
+    pub fn new_node() -> impl FsNodeOps {
+        DynamicFile::new_node(Self {})
+    }
+}
+impl DynamicFileSource for CpuinfoFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        for i in 0..fuchsia_zircon::system_get_num_cpus() {
+            writeln!(sink, "processor\t: {}", i)?;
+            writeln!(sink)?;
+        }
+        Ok(())
     }
 }
 

@@ -15,7 +15,6 @@
                 // affinity_test
                 "AffinityTest.LargeCpuMask",
                 "AffinityTest.NewThread",
-                "AffinityTest.ConsistentWithProcCpuInfo",
                 "AffinityTest.Sanity",
 
                 // aio_test
@@ -470,8 +469,8 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
+                "ProcCpuinfo.DeniesWriteNonRoot",
                 "ProcCpuinfo.RequiredFieldsArePresent",
-                "ProcCpuinfo.Stable",
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",
                 "ProcPidSymlink.SubprocessZombied",
@@ -491,8 +490,6 @@
                 "Proc.PidTidIOAccounting",
                 "ProcPidMem.DifferentUserAttached",
                 "ProcPidMem.DifferentUser",
-                "ProcCpuinfo.DeniesWriteNonRoot",
-                "ProcCpuinfo.DeniesWriteRoot",
 
                 // proc_isolated_test
                 "ProcDefaults.PresenceOfSem",
