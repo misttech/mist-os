@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 
 #include <mutex>
@@ -17,12 +18,14 @@
 namespace pwm {
 
 class PwmDevice;
-using PwmDeviceType = ddk::Device<PwmDevice, ddk::Messageable<fuchsia_hardware_pwm::Pwm>::Mixin>;
+using PwmDeviceType =
+    ddk::Device<PwmDevice, ddk::Initializable, ddk::Messageable<fuchsia_hardware_pwm::Pwm>::Mixin>;
 
 class PwmDevice : public PwmDeviceType, public ddk::PwmProtocol<PwmDevice, ddk::base_protocol> {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease() { delete this; }
 
   // Ddk Mixins.
@@ -45,6 +48,10 @@ class PwmDevice : public PwmDeviceType, public ddk::PwmProtocol<PwmDevice, ddk::
 
   // Protect against concurrent access from both the FIDL and Banjo interfaces.
   std::mutex lock_;
+
+  std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pwm::Pwm> bindings_;
 };
 
 }  // namespace pwm

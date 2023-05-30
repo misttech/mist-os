@@ -26,3 +26,7 @@ protocol Pwm {
     Enable() -> () error zx.Status;
     Disable() -> () error zx.Status;
 };
+
+service Service {
+    pwm client_end:Pwm;
+};

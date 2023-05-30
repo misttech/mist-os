@@ -40,8 +40,22 @@ zx_status_t PwmDevice::Create(void* ctx, zx_device_t* parent) {
         {BIND_PWM_ID, 0, pwm_id.id},
     };
 
-    status = dev->DdkAdd(
-        ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE).set_props(props));
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return endpoints.status_value();
+    }
+
+    std::array offers = {
+        fuchsia_hardware_pwm::Service::Name,
+    };
+
+    dev->outgoing_server_end_ = std::move(endpoints->server);
+
+    status = dev->DdkAdd(ddk::DeviceAddArgs(name)
+                             .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                             .set_props(props)
+                             .set_fidl_service_offers(offers)
+                             .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
       return status;
     }
@@ -51,6 +65,32 @@ zx_status_t PwmDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   return ZX_OK;
+}
+
+void PwmDevice::DdkInit(ddk::InitTxn txn) {
+  fdf_dispatcher_t* fdf_dispatcher = fdf_dispatcher_get_current_dispatcher();
+  ZX_ASSERT(fdf_dispatcher);
+  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+
+  fuchsia_hardware_pwm::Service::InstanceHandler handler({
+      .pwm = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_pwm::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    txn.Reply(result.status_value());
+    return;
+  }
+
+  result = outgoing_->Serve(std::move(outgoing_server_end_));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve the outgoing directory");
+    txn.Reply(result.status_value());
+    return;
+  }
+
+  txn.Reply(ZX_OK);
 }
 
 zx_status_t PwmDevice::PwmGetConfig(pwm_config_t* out_config) {
