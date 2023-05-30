@@ -2769,14 +2769,9 @@ From //build/images/args.gni:88
 
 ### enable_netstack2_tracing
 
-TODO(https://fxbug.dev/122670): If we make tracing in netstack3
-conditionally compiled, make this flag generic over netstack and choose the
-appropriate netstack package based on the combination of netstack3
-(true/false) and tracing (true/false).
-
 **Current value (from the default):** `false`
 
-From //src/connectivity/network/BUILD.gn:14
+From //src/connectivity/network/BUILD.gn:10
 
 ### enable_perfetto_benchmarks
 
