@@ -17,6 +17,59 @@ namespace fdf_testing {
 
 using OpaqueDriverPtr = void*;
 
+// The |DriverUnderTest| is a templated class so we pull out the non-template specifics into this
+// base class so we don't have to put the implementation in the header.
+class DriverUnderTestBase {
+ public:
+  explicit DriverUnderTestBase(
+      fdf_dispatcher_t* driver_dispatcher = nullptr,
+      const DriverLifecycle& driver_lifecycle_symbol = __fuchsia_driver_lifecycle__);
+  ~DriverUnderTestBase();
+
+  zx::result<std::shared_ptr<libsync::Completion>> Start(fdf::DriverStartArgs start_args);
+  zx::result<std::shared_ptr<libsync::Completion>> StartWithErrorHandler(
+      fdf::DriverStartArgs start_args, fit::callback<void(zx_status_t error)> error_handler);
+
+  std::shared_ptr<libsync::Completion> PrepareStop();
+  std::shared_ptr<libsync::Completion> PrepareStopWithErrorHandler(
+      fit::callback<void(zx_status_t error)> error_handler);
+  zx::result<> Stop();
+
+ protected:
+  async::synchronization_checker& checker() { return checker_; }
+  std::optional<OpaqueDriverPtr>& driver() { return driver_; }
+
+ private:
+  fdf_dispatcher_t* driver_dispatcher_;
+  const DriverLifecycle& driver_lifecycle_symbol_;
+  async::synchronization_checker checker_;
+  std::optional<OpaqueDriverPtr> driver_ __TA_GUARDED(checker_);
+  std::shared_ptr<libsync::Completion> prepare_stop_completer_ __TA_GUARDED(checker_);
+};
+
+// This is a RAII wrapper over a driver under test. On destruction, it will stop the driver.
+// # Thread safety
+//
+// This class is thread-unsafe. Instances must be managed and used from a synchronized dispatcher.
+// See
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
+//
+template <typename Driver>
+class DriverUnderTest : public DriverUnderTestBase {
+ public:
+  Driver* operator->() {
+    std::lock_guard guard(checker());
+    ZX_ASSERT_MSG(driver().has_value(), "Driver does not exist.");
+    return static_cast<Driver*>(driver().value());
+  }
+
+  Driver* operator*() {
+    std::lock_guard guard(checker());
+    ZX_ASSERT_MSG(driver().has_value(), "Driver does not exist.");
+    return static_cast<Driver*>(driver().value());
+  }
+};
+
 // Start a driver using the DriverLifecycle symbol's start hook. This is optional to use, the test
 // can also construct and start the driver on its own if it wants to do so.
 //

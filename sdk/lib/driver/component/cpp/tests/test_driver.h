@@ -18,7 +18,7 @@ class TestDriver : public fdf::DriverBase,
       : fdf::DriverBase("test_driver", std::move(start_args), std::move(driver_dispatcher)),
         devfs_connector_(fit::bind_member<&TestDriver::Connect>(this)) {}
 
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
 
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 

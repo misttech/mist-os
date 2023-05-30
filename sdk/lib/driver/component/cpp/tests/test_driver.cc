@@ -4,9 +4,12 @@
 
 #include <lib/driver/component/cpp/tests/test_driver.h>
 
-zx::result<> TestDriver::Start() {
+void TestDriver::Start(fdf::StartCompleter completer) {
   node_client_.Bind(std::move(node()), dispatcher());
-  return zx::ok();
+  // Delay the completion to simulate an async workload.
+  async::PostDelayedTask(
+      dispatcher(), [completer = std::move(completer)]() mutable { completer(zx::ok()); },
+      zx::msec(100));
 }
 
 zx::result<> TestDriver::ExportDevfsNodeSync() {
@@ -119,7 +122,7 @@ void TestDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
   // Delay the completion to simulate an async workload.
   async::PostDelayedTask(
       dispatcher(), [completer = std::move(completer)]() mutable { completer(zx::ok()); },
-      zx::sec(1));
+      zx::msec(100));
 }
 
 void TestDriver::CreateChildNodeSync() {
