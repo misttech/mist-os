@@ -16,5 +16,7 @@ toc:
   path: /docs/contribute/governance/policy/programming_languages.md
 - title: "Update channel usage policy"
   path: /docs/contribute/governance/policy/update_channel_usage_policy.md
+- title: "Analytics collected by Fuchsia tools"
+  path: /docs/contribute/governance/policy/analytics_collected_fuchsia_tools.md
 - title: "Project Areas"
 - include: /docs/contribute/governance/areas/_toc.yaml
