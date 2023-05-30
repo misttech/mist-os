@@ -38,7 +38,6 @@ source_set("cpp_log_tester") {
     "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/stdcompat",
-    "//sdk/lib/syslog/streams/cpp:streams-encoder",
     "//src/diagnostics/lib/cpp-log-decoder:lib",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/fsl",

@@ -59,18 +59,6 @@ fuchsia_test_component("component") {
   deps = [ ":test_bin" ]
 }
 
-fuchsia_test_package("log-encoding-validator-cpp") {
-  deps = [ ":test_bin" ]
-  subpackages = [ ":validator" ]
-  renameable_subpackages = [
-    {
-      name = "puppet"
-      package = "//src/diagnostics/validator/logs/encoding/puppet/cpp"
-    },
-  ]
-  test_components = [ ":component" ]
-}
-
 fuchsia_test_package("log-encoding-validator-rust") {
   deps = [ ":test_bin" ]
   subpackages = [ ":validator" ]
@@ -100,7 +88,6 @@ group("tests") {
 
   deps = [
     ":encoding-validator-tests",
-    ":log-encoding-validator-cpp",
     ":log-encoding-validator-dart",
     ":log-encoding-validator-rust",
   ]
