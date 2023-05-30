@@ -8,8 +8,8 @@ use {
     fuchsia_criterion::{criterion::Benchmark, FuchsiaCriterion},
     std::{mem, time::Duration},
 };
+
 fn main() {
-    // TODO(fxbug.dev/52171): Do not use Criterion.
     let all = &benchmark_suite::ALL_BENCHMARKS;
     let mut benchmark_defs = all.iter().copied().flatten();
     let (first_label, first_function) = benchmark_defs.next().unwrap();
@@ -32,6 +32,7 @@ fn main() {
         .sample_size(5);
     fc.bench("fuchsia.fidl_microbenchmarks", benchmark);
 }
+
 fn wall_time_label(base: &str) -> String {
     format!("Rust/{}/WallTime", base)
 }
