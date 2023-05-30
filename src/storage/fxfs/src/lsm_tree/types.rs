@@ -59,8 +59,8 @@ impl<K> Key for K where
 {
 }
 
-pub trait MergeableKey: Key + Eq + NextKey + OrdLowerBound {}
-impl<K> MergeableKey for K where K: Key + Eq + NextKey + OrdLowerBound {}
+pub trait MergeableKey: Key + Eq + LayerKey + OrdLowerBound {}
+impl<K> MergeableKey for K where K: Key + Eq + LayerKey + OrdLowerBound {}
 
 pub trait Value:
     Clone + Send + Sync + Versioned + VersionedLatest + Debug + std::marker::Unpin + 'static
@@ -191,28 +191,49 @@ impl<T: DefaultOrdLowerBound> OrdLowerBound for T {
     }
 }
 
-/// The NextKey trait allows for an optimisation which allows the merger to avoid querying a layer
-/// if it knows it has found the next possible key.  Consider the following example showing two
-/// layers with range based keys.
-///
-///      +----------+------------+
-///  0   |  0..100  |  100..200  |
-///      +----------+------------+
-///  1              |  100..200  |
-///                 +------------+
-///
-/// If you search and find the 0..100 key, then only layer 0 will be touched.  If you then want to
-/// advance to the 100..200 record, you can find it in layer 0 but unless you know that it
-/// immediately follows the 0..100 key i.e. that there is no possible key, K, such that 0..100 < K <
-/// 100..200, the merger has to consult all other layers to check.  next_key should return a key, N,
-/// such that if the merger encounters a key that is <= N (using OrdLowerBound), it can stop
-/// touching more layers.  The key N should also be the the key to search for in other layers if the
-/// merger needs to do so.  In the example above, it should be a key that is > 0..100 and 99..100,
-/// but <= 100..200 (using OrdUpperBound).  In practice, what this means is that for range based
-/// keys, OrdUpperBound should use the end of the range, OrdLowerBound should use the start of the
-/// range, and next_key should return end..end + 1.  This is purely an optimisation; the default
-/// will be correct but not performant.
-pub trait NextKey: Clone {
+/// Result returned by `merge_type()` to determine how to properly merge values within a layerset.
+#[derive(Clone, PartialEq)]
+pub enum MergeType {
+    /// Always includes every layer in the merger, when seeking or advancing. Always correct, but
+    /// always as slow as possible.
+    FullMerge,
+
+    /// Stops seeking older layers when an exact key match is found in a newer one. Useful for keys
+    /// that only replace data, or with `next_key()` implementations to decide on continued merging.
+    OptimizedMerge,
+}
+
+/// Determines how to iterate forward from the current key, and how many older layers to include
+/// when merging. See the different variants of `MergeKeyType` for more details.
+pub trait LayerKey: Clone {
+    /// Called to determine how to perform merge behaviours while advancing through a layer set.
+    fn merge_type(&self) -> MergeType {
+        // Defaults to full merge. The slowest, but most predictable in behaviour.
+        MergeType::FullMerge
+    }
+
+    /// The next_key() call allows for an optimisation which allows the merger to avoid querying a
+    /// layer if it knows it has found the next possible key.  It only makes sense for this to
+    /// return Some() when merge_type() returns OptimizedMerge. Consider the following example
+    /// showing two layers with range based keys.
+    ///
+    ///      +----------+------------+
+    ///  0   |  0..100  |  100..200  |
+    ///      +----------+------------+
+    ///  1              |  100..200  |
+    ///                 +------------+
+    ///
+    /// If you search and find the 0..100 key, then only layer 0 will be touched.  If you then want
+    /// to advance to the 100..200 record, you can find it in layer 0 but unless you know that it
+    /// immediately follows the 0..100 key i.e. that there is no possible key, K, such that
+    /// 0..100 < K < 100..200, the merger has to consult all other layers to check.  next_key should
+    /// return a key, N, such that if the merger encounters a key that is <= N (using
+    /// OrdLowerBound), it can stop touching more layers.  The key N should also be the the key to
+    /// search for in other layers if the merger needs to do so.  In the example above, it should be
+    /// a key that is > 0..100 and 99..100, but <= 100..200 (using OrdUpperBound).  In practice,
+    /// what this means is that for range based keys, OrdUpperBound should use the end of the range,
+    /// OrdLowerBound should use the start of the range, and next_key should return end..end + 1.
+    /// This is purely an optimisation; the default None will be correct but not performant.
     fn next_key(&self) -> Option<Self> {
         None
     }

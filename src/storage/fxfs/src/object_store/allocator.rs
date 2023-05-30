@@ -15,8 +15,8 @@ use {
             merge::Merger,
             skip_list_layer::SkipListLayer,
             types::{
-                BoxedLayerIterator, Item, ItemRef, Layer, LayerIterator, MutableLayer, NextKey,
-                OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+                BoxedLayerIterator, Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType,
+                MutableLayer, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
             },
             LSMTree, LayerSet,
         },
@@ -328,7 +328,11 @@ impl AllocatorKey {
     }
 }
 
-impl NextKey for AllocatorKey {}
+impl LayerKey for AllocatorKey {
+    fn merge_type(&self) -> MergeType {
+        MergeType::OptimizedMerge
+    }
+}
 
 impl OrdUpperBound for AllocatorKey {
     fn cmp_upper_bound(&self, other: &AllocatorKey) -> std::cmp::Ordering {

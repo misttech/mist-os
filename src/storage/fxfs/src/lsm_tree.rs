@@ -24,8 +24,8 @@ use {
         sync::{Arc, RwLock},
     },
     types::{
-        IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, MergeableKey,
-        MutableLayer, NextKey, OrdLowerBound, Value,
+        IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter,
+        MergeableKey, MutableLayer, OrdLowerBound, Value,
     },
 };
 
@@ -323,7 +323,7 @@ pub struct LayerSet<K, V> {
     merge_fn: merge::MergeFn<K, V>,
 }
 
-impl<K: Key + NextKey + OrdLowerBound, V: Value> LayerSet<K, V> {
+impl<K: Key + LayerKey + OrdLowerBound, V: Value> LayerSet<K, V> {
     pub fn merger(&self) -> merge::Merger<'_, K, V> {
         merge::Merger::new(&self.layers.as_slice().into_layer_refs(), self.merge_fn)
     }
@@ -352,7 +352,7 @@ mod tests {
                 layers_from_handles,
                 merge::{MergeLayerIterator, MergeResult},
                 types::{
-                    Item, ItemRef, LayerIterator, LayerIteratorFilter, NextKey, OrdLowerBound,
+                    Item, ItemRef, LayerIterator, LayerIteratorFilter, LayerKey, OrdLowerBound,
                     OrdUpperBound, SortByU64,
                 },
             },
@@ -390,7 +390,7 @@ mod tests {
         }
     }
 
-    impl NextKey for TestKey {}
+    impl LayerKey for TestKey {}
 
     impl OrdUpperBound for TestKey {
         fn cmp_upper_bound(&self, other: &TestKey) -> std::cmp::Ordering {
@@ -588,7 +588,7 @@ mod tests {
 mod fuzz {
     use {
         crate::{
-            lsm_tree::types::{Item, NextKey, OrdLowerBound, OrdUpperBound, SortByU64},
+            lsm_tree::types::{Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64},
             serialized_types::{
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
@@ -616,7 +616,7 @@ mod fuzz {
     impl Versioned for u64 {}
     versioned_type! { 1.. => u64 }
 
-    impl NextKey for TestKey {}
+    impl LayerKey for TestKey {}
 
     impl SortByU64 for TestKey {
         fn get_leading_u64(&self) -> u64 {

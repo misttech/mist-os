@@ -6,8 +6,8 @@ use {
     crate::{
         log::*,
         lsm_tree::types::{
-            Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, NextKey, OrdLowerBound,
-            Value,
+            Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerKey, MergeType,
+            OrdLowerBound, Value,
         },
     },
     anyhow::Error,
@@ -285,7 +285,7 @@ pub struct Merger<'a, K, V> {
     trace: bool,
 }
 
-impl<'a, K: Key + NextKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
+impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
     pub(super) fn new(layers: &[&'a dyn Layer<K, V>], merge_fn: MergeFn<K, V>) -> Merger<'a, K, V> {
         Merger {
             iterators: layers
@@ -342,7 +342,7 @@ pub struct MergerIterator<'a, 'b, K, V> {
     history: String,
 }
 
-impl<'a, 'b, K: Key + NextKey + OrdLowerBound, V: Value> MergerIterator<'a, 'b, K, V> {
+impl<'a, 'b, K: Key + LayerKey + OrdLowerBound, V: Value> MergerIterator<'a, 'b, K, V> {
     async fn seek(&mut self, bound: Bound<&K>) -> Result<(), Error> {
         let next_key = match bound {
             Bound::Unbounded => None,
@@ -441,25 +441,45 @@ impl<'a, 'b, K: Key + NextKey + OrdLowerBound, V: Value> MergerIterator<'a, 'b, 
     }
 
     // Returns whether more iterators are required for the given `next_key`.  See push_iterators.
-    fn needs_more_iterators(&self, next_key: Option<&K>) -> bool {
-        !self.pending_iterators.is_empty()
-            && (self.heap.is_empty()
-                || next_key.is_none()
-                || self.heap.peek().unwrap().key().cmp_lower_bound(next_key.as_ref().unwrap())
-                    == Ordering::Greater)
+    fn needs_more_iterators(&self, next_key: Option<&K>, next_key_bound: Bound<&K>) -> bool {
+        if self.pending_iterators.is_empty() {
+            return false;
+        }
+        if self.heap.is_empty() {
+            return true;
+        }
+        let target;
+        match next_key_bound {
+            Bound::Included(k) => target = k,
+            Bound::Excluded(_) | Bound::Unbounded => return true,
+        }
+        match target.merge_type() {
+            MergeType::FullMerge => true,
+            MergeType::OptimizedMerge => {
+                match next_key {
+                    Some(k) => {
+                        self.heap.peek().unwrap().key().cmp_lower_bound(k) == Ordering::Greater
+                    }
+                    None => {
+                        // If we've found an exact match, return it since nothing needs to merge.
+                        self.heap.peek().unwrap().key().cmp_lower_bound(target) != Ordering::Equal
+                    }
+                }
+            }
+        }
     }
 
     // Pushes additional iterators onto the heap until we are confident that the top element will
     // yield what we are looking for.  If next_key is set, we will stop pushing iterators as soon as
     // a key is encountered that equals or precedes it.  If next_key is None, then all layers are
     // pushed.  next_key_bound is the bound to search for if another layer does need to be
-    // consulted.  See the comment for the NextKey trait.
+    // consulted.  See the comment for the MergeType trait.
     async fn push_iterators(
         &mut self,
         next_key: Option<&K>,
         next_key_bound: Bound<&K>,
     ) -> Result<(), Error> {
-        while self.needs_more_iterators(next_key) {
+        while self.needs_more_iterators(next_key, next_key_bound) {
             let iter = self.pending_iterators.pop().unwrap();
             let sub_iter = iter.layer.as_ref().unwrap().seek(next_key_bound).await?;
             if self.trace {
@@ -500,7 +520,7 @@ impl<'a, 'b, K: Key + NextKey + OrdLowerBound, V: Value> MergerIterator<'a, 'b, 
 }
 
 #[async_trait]
-impl<'a, K: Key + NextKey + OrdLowerBound, V: Value> LayerIterator<K, V>
+impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> LayerIterator<K, V>
     for MergerIterator<'a, '_, K, V>
 {
     async fn advance(&mut self) -> Result<(), Error> {
@@ -525,7 +545,7 @@ impl<'a, K: Key + NextKey + OrdLowerBound, V: Value> LayerIterator<K, V>
         // Advance the iterator for the current item and push it onto the heap, and also push any
         // additional iterators onto the heap (by calling push_iterators).
         if let Some(iterator) = self.item.take_iterator() {
-            if self.needs_more_iterators(next_key.as_ref()) {
+            if self.needs_more_iterators(next_key.as_ref(), next_key_bound) {
                 let existing_item = iterator.item().cloned();
                 iterator.advance().await?;
                 match &next_key {
@@ -687,8 +707,8 @@ mod tests {
             lsm_tree::{
                 skip_list_layer::SkipListLayer,
                 types::{
-                    IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, MutableLayer, NextKey,
-                    OrdLowerBound, OrdUpperBound, SortByU64,
+                    IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType,
+                    MutableLayer, OrdLowerBound, OrdUpperBound, SortByU64,
                 },
             },
             serialized_types::{
@@ -720,7 +740,11 @@ mod tests {
         }
     }
 
-    impl NextKey for TestKey {
+    impl LayerKey for TestKey {
+        fn merge_type(&self) -> MergeType {
+            MergeType::OptimizedMerge
+        }
+
         fn next_key(&self) -> Option<Self> {
             Some(TestKey(self.0.end..self.0.end + 1))
         }
@@ -842,7 +866,7 @@ mod tests {
         skip_lists[1].insert(item.clone()).await.expect("insert error");
         let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
             assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
-            assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
+            assert_eq!((right.key(), right.value()), (&TestKey(1..1), &1));
             assert_eq!(left.layer_index, 0);
             assert_eq!(right.layer_index, 1);
             MergeResult::EmitLeft
@@ -1203,7 +1227,7 @@ mod tests {
 
     // Checks that merging the given layers produces |expected| sequence of items starting from
     // |start|.
-    async fn test_advance<K: Eq + Key + NextKey + OrdLowerBound>(
+    async fn test_advance<K: Eq + Key + LayerKey + OrdLowerBound>(
         layers: &[&[(K, i64)]],
         start: Bound<&K>,
         expected: &[(K, i64)],
@@ -1232,11 +1256,11 @@ mod tests {
         // The 1..2 and the 2..3 items are overwritten and merging them should be skipped.
         test_advance(
             &[
-                &[(TestKey(1..2), 1), (TestKey(2..3), 2)],
-                &[(TestKey(1..2), 3), (TestKey(2..3), 4), (TestKey(3..4), 5)],
+                &[(TestKey(1..2), 1), (TestKey(2..3), 2), (TestKey(4..5), 3)],
+                &[(TestKey(1..2), 4), (TestKey(2..3), 5), (TestKey(3..4), 6)],
             ],
             Bound::Included(&TestKey(1..2)),
-            &[(TestKey(1..2), 1), (TestKey(2..3), 2), (TestKey(3..4), 5)],
+            &[(TestKey(1..2), 1), (TestKey(2..3), 2), (TestKey(3..4), 6), (TestKey(4..5), 3)],
         )
         .await;
     }
@@ -1263,65 +1287,252 @@ mod tests {
         TypeFingerprint,
         Versioned,
     )]
-    struct TestKeyWithDefaultNextKey(Range<u64>);
+    struct TestKeyWithFullMerge(Range<u64>);
 
-    versioned_type! { 1.. => TestKeyWithDefaultNextKey }
+    versioned_type! { 1.. => TestKeyWithFullMerge }
 
-    impl NextKey for TestKeyWithDefaultNextKey {}
+    impl LayerKey for TestKeyWithFullMerge {
+        fn merge_type(&self) -> MergeType {
+            MergeType::FullMerge
+        }
+    }
 
-    impl SortByU64 for TestKeyWithDefaultNextKey {
+    impl SortByU64 for TestKeyWithFullMerge {
         fn get_leading_u64(&self) -> u64 {
             self.0.start
         }
     }
 
-    impl OrdUpperBound for TestKeyWithDefaultNextKey {
-        fn cmp_upper_bound(&self, other: &TestKeyWithDefaultNextKey) -> std::cmp::Ordering {
+    impl OrdUpperBound for TestKeyWithFullMerge {
+        fn cmp_upper_bound(&self, other: &TestKeyWithFullMerge) -> std::cmp::Ordering {
             self.0.end.cmp(&other.0.end)
         }
     }
 
-    impl OrdLowerBound for TestKeyWithDefaultNextKey {
+    impl OrdLowerBound for TestKeyWithFullMerge {
+        fn cmp_lower_bound(&self, other: &Self) -> std::cmp::Ordering {
+            self.0.start.cmp(&other.0.start)
+        }
+    }
+
+    // Same set up as `test_seek_skips_replaced_items` except here nothing should skip. Any seek
+    // should just place the iterator at a particular spot in the merged layers.
+    #[fuchsia::test]
+    async fn test_full_merge_consistent_advance_ordering() {
+        let layer_set = [
+            [
+                (TestKeyWithFullMerge(1..2), 1i64),
+                (TestKeyWithFullMerge(2..3), 2i64),
+                (TestKeyWithFullMerge(4..5), 3i64),
+            ]
+            .as_slice(),
+            [
+                (TestKeyWithFullMerge(1..2), 4i64),
+                (TestKeyWithFullMerge(2..3), 5i64),
+                (TestKeyWithFullMerge(3..4), 6i64),
+            ]
+            .as_slice(),
+        ];
+
+        let full_merge_result = [
+            (TestKeyWithFullMerge(1..2), 1),
+            (TestKeyWithFullMerge(1..2), 4),
+            (TestKeyWithFullMerge(2..3), 2),
+            (TestKeyWithFullMerge(2..3), 5),
+            (TestKeyWithFullMerge(3..4), 6),
+            (TestKeyWithFullMerge(4..5), 3),
+        ];
+
+        test_advance(layer_set.as_slice(), Bound::Unbounded, &full_merge_result).await;
+
+        test_advance(
+            layer_set.as_slice(),
+            Bound::Included(&TestKeyWithFullMerge(1..2)),
+            &full_merge_result,
+        )
+        .await;
+
+        test_advance(
+            layer_set.as_slice(),
+            Bound::Included(&TestKeyWithFullMerge(2..3)),
+            &full_merge_result[2..],
+        )
+        .await;
+
+        test_advance(
+            layer_set.as_slice(),
+            Bound::Included(&TestKeyWithFullMerge(3..4)),
+            &full_merge_result[4..],
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn test_full_merge_always_consult_all_layers() {
+        // | 1 |   |
+        // |   | 2 |
+        // | 3 | 4 |
+        let skip_lists =
+            [SkipListLayer::new(100), SkipListLayer::new(100), SkipListLayer::new(100)];
+        let items = [
+            Item::new(TestKeyWithFullMerge(1..2), 1),
+            Item::new(TestKeyWithFullMerge(2..3), 2),
+            Item::new(TestKeyWithFullMerge(1..2), 3),
+            Item::new(TestKeyWithFullMerge(2..3), 4),
+        ];
+        skip_lists[0].insert(items[0].clone()).await.expect("insert error");
+        skip_lists[1].insert(items[1].clone()).await.expect("insert error");
+        skip_lists[2].insert(items[2].clone()).await.expect("insert error");
+        skip_lists[2].insert(items[3].clone()).await.expect("insert error");
+        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
+            // Sum matching keys.
+            if left.key() == right.key() {
+                MergeResult::Other {
+                    emit: None,
+                    left: Discard,
+                    right: Replace(Item::new(left.key().clone(), left.value() + right.value())),
+                }
+            } else {
+                MergeResult::EmitLeft
+            }
+        });
+        let mut iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
+
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[0].key, items[0].value + items[2].value));
+        iter.advance().await.expect("advance");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[1].key, items[1].value + items[3].value));
+        iter.advance().await.expect("advance");
+        assert!(iter.get().is_none());
+    }
+
+    #[derive(
+        Clone,
+        Eq,
+        PartialEq,
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        TypeFingerprint,
+        Versioned,
+    )]
+    struct TestKeyWithDefaultLayerKey(Range<u64>);
+
+    versioned_type! { 1.. => TestKeyWithDefaultLayerKey }
+
+    // Default layer key is using `MergeType::FullMerge` and returns None for `next_key()`.
+    impl LayerKey for TestKeyWithDefaultLayerKey {}
+
+    impl SortByU64 for TestKeyWithDefaultLayerKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0.start
+        }
+    }
+
+    impl OrdUpperBound for TestKeyWithDefaultLayerKey {
+        fn cmp_upper_bound(&self, other: &TestKeyWithDefaultLayerKey) -> std::cmp::Ordering {
+            self.0.end.cmp(&other.0.end)
+        }
+    }
+
+    impl OrdLowerBound for TestKeyWithDefaultLayerKey {
         fn cmp_lower_bound(&self, other: &Self) -> std::cmp::Ordering {
             self.0.start.cmp(&other.0.start)
         }
     }
 
     #[fuchsia::test]
-    async fn test_seek_skips_replaced_items_with_default_next_key() {
-        // This differs from the earlier test because with a default next key implementation, the
-        // overwritten 2..3 key will get merged because the merger is unable to know whether the
-        // 2..3 is the immediate successor to 1..2.
+    async fn test_no_merge_unbounded_include_all_layers() {
         test_advance(
             &[
-                &[(TestKeyWithDefaultNextKey(1..2), 1), (TestKeyWithDefaultNextKey(2..3), 2)],
                 &[
-                    (TestKeyWithDefaultNextKey(1..2), 3),
-                    (TestKeyWithDefaultNextKey(2..3), 4),
-                    (TestKeyWithDefaultNextKey(3..4), 5),
+                    (TestKeyWithDefaultLayerKey(1..2), 1),
+                    (TestKeyWithDefaultLayerKey(2..3), 2),
+                    (TestKeyWithDefaultLayerKey(4..5), 3),
+                ],
+                &[
+                    (TestKeyWithDefaultLayerKey(1..2), 4),
+                    (TestKeyWithDefaultLayerKey(2..3), 5),
+                    (TestKeyWithDefaultLayerKey(3..4), 6),
                 ],
             ],
-            Bound::Included(&TestKeyWithDefaultNextKey(1..2)),
+            Bound::Unbounded,
             &[
-                (TestKeyWithDefaultNextKey(1..2), 1),
-                (TestKeyWithDefaultNextKey(2..3), 2),
-                (TestKeyWithDefaultNextKey(2..3), 4), // <-- This is the difference.
-                (TestKeyWithDefaultNextKey(3..4), 5),
+                (TestKeyWithDefaultLayerKey(1..2), 1),
+                (TestKeyWithDefaultLayerKey(1..2), 4),
+                (TestKeyWithDefaultLayerKey(2..3), 2),
+                (TestKeyWithDefaultLayerKey(2..3), 5),
+                (TestKeyWithDefaultLayerKey(3..4), 6),
+                (TestKeyWithDefaultLayerKey(4..5), 3),
             ],
         )
         .await;
     }
 
     #[fuchsia::test]
-    async fn test_advance_skips_replaced_items_at_end_with_default_next_key() {
-        // Like the last test, the 1..2 item is overwritten and seeking for it should skip the merge
-        // but this time, the keys are at the end.
+    async fn test_no_merge_proceeds_comprehensively_after_seek() {
         test_advance(
-            &[&[(TestKeyWithDefaultNextKey(1..2), 1)], &[(TestKeyWithDefaultNextKey(1..2), 2)]],
-            Bound::Included(&TestKeyWithDefaultNextKey(1..2)),
-            &[(TestKeyWithDefaultNextKey(1..2), 1)],
+            &[
+                &[
+                    (TestKeyWithDefaultLayerKey(1..2), 1),
+                    (TestKeyWithDefaultLayerKey(2..3), 2),
+                    (TestKeyWithDefaultLayerKey(4..5), 3),
+                ],
+                &[
+                    (TestKeyWithDefaultLayerKey(1..2), 4),
+                    (TestKeyWithDefaultLayerKey(2..3), 5),
+                    (TestKeyWithDefaultLayerKey(3..4), 6),
+                ],
+            ],
+            Bound::Included(&TestKeyWithDefaultLayerKey(1..2)),
+            &[
+                (TestKeyWithDefaultLayerKey(1..2), 1),
+                (TestKeyWithDefaultLayerKey(1..2), 4),
+                (TestKeyWithDefaultLayerKey(2..3), 2),
+                (TestKeyWithDefaultLayerKey(2..3), 5),
+                (TestKeyWithDefaultLayerKey(3..4), 6),
+                (TestKeyWithDefaultLayerKey(4..5), 3),
+            ],
         )
         .await;
+    }
+
+    #[fuchsia::test]
+    async fn test_no_merge_seek_finds_lower_layer() {
+        let skip_lists = [SkipListLayer::new(100), SkipListLayer::new(100)];
+        let items = [
+            Item::new(TestKeyWithDefaultLayerKey(2..3), 1),
+            Item::new(TestKeyWithDefaultLayerKey(1..1), 2),
+        ];
+        skip_lists[0].insert(items[0].clone()).await.expect("insert error");
+        skip_lists[1].insert(items[1].clone()).await.expect("insert error");
+        let mut merger =
+            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::EmitLeft);
+        let iter = merger.seek(Bound::Included(&items[1].key)).await.expect("seek failed");
+
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, value), (&items[1].key, &items[1].value));
+    }
+
+    #[fuchsia::test]
+    async fn test_no_merge_seek_stops_at_exact_match() {
+        let skip_lists = [SkipListLayer::new(100), SkipListLayer::new(100)];
+        let items = [
+            Item::new(TestKeyWithDefaultLayerKey(2..3), 1),
+            Item::new(TestKeyWithDefaultLayerKey(1..4), 2),
+        ];
+        skip_lists[0].insert(items[0].clone()).await.expect("insert error");
+        skip_lists[1].insert(items[1].clone()).await.expect("insert error");
+        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |_left, _right| {
+            MergeResult::Other { emit: None, left: Discard, right: Keep }
+        });
+        let iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
+
+        // Seek should only search in the first skip list, so no merge should take place, and we'll
+        // know if it has because we'll see a different value (2 rather than 1).
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, value), (&items[0].key, &items[0].value));
     }
 
     #[fuchsia::test]

@@ -686,7 +686,8 @@ mod tests {
             filesystem::MAX_BLOCK_SIZE,
             lsm_tree::{
                 types::{
-                    DefaultOrdUpperBound, Item, ItemRef, Layer, LayerWriter, NextKey, SortByU64,
+                    DefaultOrdUpperBound, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType,
+                    SortByU64,
                 },
                 LayerIterator,
             },
@@ -961,7 +962,11 @@ mod tests {
             self.0.start
         }
     }
-    impl NextKey for TestKey {
+    impl LayerKey for TestKey {
+        fn merge_type(&self) -> crate::lsm_tree::types::MergeType {
+            MergeType::OptimizedMerge
+        }
+
         fn next_key(&self) -> Option<Self> {
             Some(TestKey(self.0.end..self.0.end + 1))
         }

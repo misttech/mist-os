@@ -6,7 +6,7 @@
 use {
     crate::{
         lsm_tree::types::{
-            Item, ItemRef, NextKey, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+            Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
         },
         object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
@@ -222,23 +222,40 @@ impl OrdLowerBound for ObjectKey {
     }
 }
 
-impl NextKey for ObjectKey {
-    fn next_key(&self) -> Option<Self> {
-        if let ObjectKey { data: ObjectKeyData::Attribute(_, AttributeKey::Extent(_)), .. } = self {
-            let mut key = self.clone();
-            if let ObjectKey {
-                data: ObjectKeyData::Attribute(_, AttributeKey::Extent(ExtentKey { range })),
-                ..
-            } = &mut key
-            {
-                // We want a key such that cmp_lower_bound returns Greater for any key which starts
-                // after end, and a key such that if you search for it, you'll get an extent whose
-                // end > range.end.
-                *range = range.end..range.end + 1;
+impl LayerKey for ObjectKey {
+    fn merge_type(&self) -> MergeType {
+        // This listing is intentionally exhaustive to force folks to think about how certain
+        // subsets of the keyspace are merged.
+        match self.data {
+            ObjectKeyData::Object
+            | ObjectKeyData::Keys
+            | ObjectKeyData::Attribute(..)
+            | ObjectKeyData::Child { .. }
+            | ObjectKeyData::GraveyardEntry { .. }
+            | ObjectKeyData::Project { property: ProjectProperty::Limit, .. } => {
+                MergeType::OptimizedMerge
             }
-            Some(key)
-        } else {
-            None
+            ObjectKeyData::Project { property: ProjectProperty::Usage, .. } => MergeType::FullMerge,
+        }
+    }
+
+    fn next_key(&self) -> Option<Self> {
+        match self.data {
+            ObjectKeyData::Attribute(_, AttributeKey::Extent(_)) => {
+                let mut key = self.clone();
+                if let ObjectKey {
+                    data: ObjectKeyData::Attribute(_, AttributeKey::Extent(ExtentKey { range })),
+                    ..
+                } = &mut key
+                {
+                    // We want a key such that cmp_lower_bound returns Greater for any key which
+                    // starts after end, and a key such that if you search for it, you'll get an
+                    // extent whose end > range.end.
+                    *range = range.end..range.end + 1;
+                }
+                Some(key)
+            }
+            _ => None,
         }
     }
 }
@@ -576,7 +593,7 @@ impl<'a> From<ItemRef<'a, ObjectKey, ObjectValue>>
 mod tests {
     use {
         super::ObjectKey,
-        crate::lsm_tree::types::{NextKey, OrdLowerBound, OrdUpperBound, RangeKey},
+        crate::lsm_tree::types::{LayerKey, OrdLowerBound, OrdUpperBound, RangeKey},
         std::cmp::Ordering,
     };
 

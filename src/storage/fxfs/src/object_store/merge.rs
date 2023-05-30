@@ -1163,6 +1163,65 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_merge_project_usage_gap_layer() {
+        let tree = LSMTree::new(merge);
+        let key = ObjectKey::project_usage(5, 6);
+        let key2 = ObjectKey::project_usage(5, 7);
+
+        tree.insert(Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 100, nodes: 1000 }))
+            .await
+            .expect("insert error");
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 4, nodes: 8 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        assert_eq!(
+            tree.find(&key).await.expect("Find").unwrap().value,
+            ObjectValue::BytesAndNodes { bytes: 104, nodes: 1008 }
+        );
+
+        tree.merge_into(
+            Item::new(key2.clone(), ObjectValue::BytesAndNodes { bytes: 13, nodes: 17 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        assert_eq!(
+            tree.find(&key).await.expect("Find").unwrap().value,
+            ObjectValue::BytesAndNodes { bytes: 104, nodes: 1008 }
+        );
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 16, nodes: 32 }),
+            &key,
+        )
+        .await;
+
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        assert_eq!(iter.get().unwrap().key, &key);
+        assert_eq!(
+            iter.get().unwrap().value,
+            &ObjectValue::BytesAndNodes { bytes: 120, nodes: 1040 }
+        );
+        iter.advance().await.unwrap();
+        assert_eq!(iter.get().unwrap().key, &key2);
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::BytesAndNodes { bytes: 13, nodes: 17 });
+        iter.advance().await.unwrap();
+        assert!(iter.get().is_none());
+
+        assert_eq!(
+            tree.find(&key).await.expect("Find").unwrap().value,
+            ObjectValue::BytesAndNodes { bytes: 120, nodes: 1040 }
+        );
+    }
+
+    #[fuchsia::test]
     async fn test_merge_project_usage_to_zero() {
         let tree = LSMTree::new(merge);
         let key = ObjectKey::project_usage(5, 6);
