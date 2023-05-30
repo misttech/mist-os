@@ -48,16 +48,26 @@ ffx log --filter starnix
 ```
 
 Starnix produces a large amount of logs and this can overload archivist's ability to
-retain them, instead printing messages like:
+retain them, instead printing messages with `[dropped=N]` or `[rolled=N]` like:
 
 ```text
-[starnix] WARNING: Dropped logs count: 5165
+[00251.246717][149962][179421][starnix][19:19[sleep],starnix] TRACE: readlinkat:267(0xffffff9c, 0x1b5a6891270, 0x1b5a6890270, 0xfff, 0xffffffffffffffff, 0x0) [dropped=15]
+...
+[00311.111743][149962][289720][starnix][100:100[binder:100_2],starnix] TRACE: Reading 92 bytes of memory from UserAddress(0x2f33f942770) [rolled=67]
 ```
 
-If you see this, you can reduce or eliminate the dropped messages by increasing
-the value of `max_cached_original_bytes` the the JSON file
-`//src/diagnostics/archivist/configs/archivist_config.json' in your local checkout.
-Increasing by a facfor of 10 seems to work well.
+If you see this, you can reduce or eliminate the lost messages by setting a
+custom value for the GN arg which controls the size of retained logs in
+archivist:
+
+```
+fx set ... --args=archivist_max_cached_logs_bytes=41943040
+```
+
+A value of `41943040` (10x the default) seems to work well.
+
+This can also be added to [`$FUCHSIA_DIR/local/args.gn`][local-args] if you want
+it to apply to all of your builds.
 
 ### Run a Linux binary
 
@@ -259,3 +269,4 @@ where key='name' and display_value='clock_getres' and name='RunTaskLoop'
 ```
 
 [adb.docs]: https://developer.android.com/studio/command-line/adb#copyfiles
+[local-args]: /docs/development/build/fx.md#defining_persistent_local_build_arguments
