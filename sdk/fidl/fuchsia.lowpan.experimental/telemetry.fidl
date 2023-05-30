@@ -282,6 +282,85 @@ type LeaderData = table {
     5: router_id uint8;
 };
 
+type Nat64State = flexible enum {
+    NAT64_STATE_UNSPECIFIED = 0;
+    NAT64_STATE_DISABLED = 1;
+    NAT64_STATE_NOT_RUNNING = 2;
+    NAT64_STATE_IDLE = 3;
+    NAT64_STATE_ACTIVE = 4;
+};
+
+/// Information about the state of components of NAT64
+type BorderRoutingNat64State = table {
+    /// prefix manager state
+    1: prefix_manager_state Nat64State;
+    /// translator state
+    2: translator_state Nat64State;
+};
+
+type Nat64TrafficCounters = table {
+    /// Number of packets translated from IPv4 to IPv6
+    1: ipv4_to_ipv6_packets int64;
+    /// Sum of size of packets translated from IPv4 to IPv6
+    2: ipv4_to_ipv6_bytes int64;
+    /// Number of packets translated from IPv6 to IPv4
+    3: ipv6_to_ipv4_packets int64;
+    /// Sum of size of packets translated from IPv6 to IPv4
+    4: ipv6_to_ipv4_bytes int64;
+};
+
+type Nat64ProtocolCounters = table {
+    /// TCP counters
+    1: tcp Nat64TrafficCounters;
+    /// UDP counters
+    2: udp Nat64TrafficCounters;
+    /// ICMP counters
+    3: icmp Nat64TrafficCounters;
+    /// Total counters
+    4: total Nat64TrafficCounters;
+};
+
+/// Information about the mappings of NAT64 translator
+type Nat64Mapping = table {
+    /// The unique id for a mapping session
+    1: mapping_id uint64;
+    /// The IPv4 address of the mapping
+    2: ip4_addr vector<uint8>:MAX;
+    /// The IPv6 address of the mapping
+    3: ip6_addr vector<uint8>:MAX;
+    /// Remaining time before expiry in milliseconds
+    4: remaining_time_ms uint32;
+    /// Nat64 Counters
+    5: counters Nat64ProtocolCounters;
+};
+
+type Nat64PacketCounters = table {
+    /// Number of packets translated from IPv4 to IPv6
+    1: ipv4_to_ipv6_packets uint64;
+    /// Number of packets translated from IPv6 to IPv4
+    2: ipv6_to_ipv4_packets uint64;
+};
+
+type Nat64ErrorCounters = table {
+    /// Packet drop for unknown reasons
+    1: unkonwn Nat64PacketCounters;
+    /// Packet drop due to failed to parse the datagram
+    2: illegal_packet Nat64PacketCounters;
+    /// Packet drop due to unsupported IP protocol
+    3: unsupported_protocol Nat64PacketCounters;
+    /// Packet drop due to no mappings found or mapping pool exhausted
+    4: no_mapping Nat64PacketCounters;
+};
+
+type Nat64Info = table {
+    /// NAT64 border routing state
+    1: nat64_state BorderRoutingNat64State;
+    /// NAT64 mapping
+    2: nat64_mappings vector<Nat64Mapping>:MAX;
+    /// NAT64 error counters
+    3: nat64_error_counters Nat64ErrorCounters;
+};
+
 /// LoWPAN Interface Telemetry Information.
 ///
 /// The fields in this table are used for providing low-level telemetry and information about the
@@ -370,4 +449,9 @@ type Telemetry = table {
     ///
     /// Required.
    18: uptime zx.Duration;
+
+    /// Information about the NAT64
+    ///
+    /// Only present on Thread networks.
+   19: nat64_info Nat64Info;
 };
