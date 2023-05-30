@@ -53,4 +53,8 @@
 // This tells libc++ not to expect full locale APIs in some places.
 #define _LIBCPP_HAS_NO_LOCALIZATION
 
+// This tells pstl headers to use serial algorithms and not try to
+// do any multithreading.
+#define _LIBCPP_PSTL_CPU_BACKEND_SERIAL
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE___CONFIG_SITE_
