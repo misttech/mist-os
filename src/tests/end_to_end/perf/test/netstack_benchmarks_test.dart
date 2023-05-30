@@ -104,6 +104,14 @@ void main() {
           'socket-benchmarks-with-fast-udp-tracing'),
       timeout: Timeout.none);
 
+  // TODO(https://fxbug.dev/125224): Remove this when the target-side only test
+  // is sufficient for generating the trace as an artifact.
+  test(
+      'socket_benchmarks_with_netstack3_tracing',
+      () => runSocketBenchmarksWithTracing(
+          'socket-benchmarks-with-netstack3-tracing'),
+      timeout: Timeout.none);
+
   test('resource_usage_benchmarks', () async {
     await runTestComponent(
         packageName: 'resource-usage-benchmarks',

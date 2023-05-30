@@ -119,10 +119,19 @@ fuchsia_unittest_component("socket-benchmarks-with-fast-udp-tracing") {
   ]
 }
 
+fuchsia_unittest_component("socket-benchmarks-with-netstack3-tracing") {
+  manifest = "meta/socket-benchmarks-with-netstack3-tracing.cml"
+  deps = [
+    ":socket_benchmarks",
+    "//src/connectivity/network/netstack3:component",
+  ]
+}
+
 fuchsia_test_package("socket-benchmarks-with-tracing-pkg") {
   test_components = [
     ":socket-benchmarks-with-tracing",
     ":socket-benchmarks-with-fast-udp-tracing",
+    ":socket-benchmarks-with-netstack3-tracing",
   ]
 
   # Prevent this test from being run as a target-side test, since it's kicked
@@ -141,6 +150,7 @@ group("tests") {
   testonly = true
   deps = [
     ":socket-benchmarks-tests",
+    ":socket-benchmarks-with-tracing-pkg",
     ":udp-serde-benchmarks",
     "resource-usage:tests",
   ]
