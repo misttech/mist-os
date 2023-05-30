@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 import("common/riscv64-common.gni")
+_imports = {  # Import into hidden scope, to avoid importing into args.gn.
+  import("//boards/emulation/virtio_drivers.gni")
+}
 
 # BoardInformation for Product Assembly
 board_information_for_assembly = "//boards/riscv64/board_information.json5"
@@ -13,6 +16,13 @@ board_description = "A generic emulated riscv64 device."
 # Supports only virtual devices.
 board_is_emu = true
 board_is_phys = false
+
+platform_enable_user_pci = true
+board_bootfs_labels += [
+  "//src/devices/bus/drivers/pci:bus-pci",
+  "//src/devices/board/drivers/qemu-riscv64",
+]
+board_bootfs_labels += _imports.virtio_drivers
 
 images_config_label = "//boards/images:riscv64"
 zedboot_images_config_label = "//boards/images:zedboot_default"

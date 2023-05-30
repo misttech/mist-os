@@ -190,7 +190,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   shim.Get<PlatformIdItem>().set_payload(zbi_platform_id_t{
       .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_QEMU,
       .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_QEMU,
-      .board_name = "qemu",
+      .board_name = "qemu-riscv64",
   });
   shim.Get<BoardInfoItem>().set_payload(zbi_board_info_t{
       .revision = 0x1,

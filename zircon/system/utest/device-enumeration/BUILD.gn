@@ -49,6 +49,7 @@ test("device-enumeration") {
     "boards/nuc.cc",
     "boards/pinecrest.cc",
     "boards/qemu_arm64.cc",
+    "boards/qemu_riscv64.cc",
     "boards/qemu_x64.cc",
     "boards/sherlock.cc",
     "boards/vim3.cc",
@@ -117,6 +118,15 @@ _boards = [
       dimensions = {
         device_type = "QEMU"
         cpu = "arm64"
+      }
+    },
+  ],
+  [
+    "qemu_riscv64",
+    {
+      dimensions = {
+        device_type = "QEMU"
+        cpu = "riscv64"
       }
     },
   ],

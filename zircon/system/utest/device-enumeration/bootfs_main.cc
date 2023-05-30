@@ -32,8 +32,10 @@ fbl::String GetTestFilter() {
 
   std::cout << "Found board " << board_name << std::endl;
 
-  if (board_name == "qemu") {
+  if (board_name == "qemu-arm64") {
     return "*QemuArm64*";
+  } else if (board_name == "qemu-riscv64") {
+    return "*QemuRiscv64*";
   } else if (board_name == "vim3") {
     return "*Vim3*";
   } else if (board_name == "astro") {
