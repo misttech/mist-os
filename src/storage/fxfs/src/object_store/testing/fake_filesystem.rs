@@ -20,6 +20,7 @@ use {
     },
     anyhow::Error,
     async_trait::async_trait,
+    fuchsia_async as fasync,
     std::sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -102,6 +103,10 @@ impl Filesystem for FakeFilesystem {
 
     fn options(&self) -> &filesystem::Options {
         &self.options
+    }
+
+    fn spawn_background_task(&self, future: futures::future::BoxFuture<'static, ()>) {
+        fasync::Task::spawn(future).detach();
     }
 }
 

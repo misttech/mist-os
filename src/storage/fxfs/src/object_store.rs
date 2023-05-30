@@ -813,7 +813,9 @@ impl ObjectStore {
         let keys = if let Some(crypt) = crypt {
             match store.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::NotFound)? {
                 Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => {
-                    Some(KeyUnwrapper::new_from_wrapped(object_id, crypt, keys))
+                    let (keys, task) = KeyUnwrapper::new_from_wrapped(object_id, crypt, keys);
+                    store.filesystem().spawn_background_task(Box::pin(task));
+                    Some(keys)
                 }
                 _ => {
                     bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys"))

@@ -66,6 +66,11 @@ pub async fn new_block_client(remote: ClientEnd<BlockMarker>) -> Result<RemoteBl
     .await
 }
 
+/// Spawns tasks on the pager's executor.
+pub fn spawn_on_pager_executor(future: futures::future::BoxFuture<'static, ()>) {
+    fasync::Task::spawn_on(PagerExecutor::global_instance().executor_handle(), future).detach();
+}
+
 /// Runs Fxfs as a component.
 pub struct Component {
     state: futures::lock::Mutex<State>,
@@ -287,6 +292,7 @@ impl Component {
         let fs = FxFilesystemBuilder::new()
             .fsck_after_every_transaction(options.fsck_after_every_transaction)
             .read_only(options.read_only)
+            .background_task_spawner(spawn_on_pager_executor)
             .open(DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?))
             .await?;
         let root_volume = root_volume(fs.clone()).await?;

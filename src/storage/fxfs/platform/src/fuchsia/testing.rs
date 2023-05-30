@@ -4,8 +4,8 @@
 
 use {
     crate::fuchsia::{
-        blob::BlobDirectory, directory::FxDirectory, file::FxFile, pager::PagerBackedVmo,
-        volume::FxVolumeAndRoot,
+        blob::BlobDirectory, component::spawn_on_pager_executor, directory::FxDirectory,
+        file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
     },
     anyhow::Context,
     anyhow::Error,
@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, Status},
     fxfs::{
-        filesystem::{FxFilesystem, OpenFxFilesystem},
+        filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem},
         fsck::{errors::FsckIssue, fsck_volume_with_options, fsck_with_options, FsckOptions},
         object_store::volume::root_volume,
     },
@@ -65,7 +65,12 @@ impl TestFixture {
 
     pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
         let (filesystem, volume) = if options.format {
-            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+            let filesystem = FxFilesystemBuilder::new()
+                .background_task_spawner(spawn_on_pager_executor)
+                .format(true)
+                .open(device)
+                .await
+                .unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
                 .new_volume(
@@ -86,7 +91,11 @@ impl TestFixture {
             };
             (filesystem, vol)
         } else {
-            let filesystem = FxFilesystem::open(device).await.unwrap();
+            let filesystem = FxFilesystemBuilder::new()
+                .background_task_spawner(spawn_on_pager_executor)
+                .open(device)
+                .await
+                .unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
                 .volume(
