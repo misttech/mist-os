@@ -49,6 +49,7 @@ source_set("network_service") {
 }
 
 source_set("netdump") {
+  testonly = true
   sources = [
     "netdump.cc",
     "netdump.h",

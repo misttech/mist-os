@@ -76,6 +76,7 @@ executable("bin") {
 }
 
 fidl("fuchsia.netemul.guest") {
+  testonly = true
   sources = [ "fidl/guest.fidl" ]
 
   public_deps = [

@@ -6,6 +6,7 @@ import("//build/rust/rustc_library.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 rustc_library("lib") {
+  testonly = true
   name = "netemul"
   edition = "2021"
 

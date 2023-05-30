@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.netemul") {
+  testonly = true
   name = "fuchsia.netemul"
   sources = [
     "configurable_netstack.fidl",

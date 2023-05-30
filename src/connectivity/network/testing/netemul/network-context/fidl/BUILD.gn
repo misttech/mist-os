@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("internal") {
   name = "fuchsia.netemul.internal"
+  testonly = true
   sources = [ "internal.fidl" ]
 
   public_deps = [
@@ -18,6 +19,7 @@ fidl("internal") {
 
 fidl("network") {
   name = "fuchsia.netemul.network"
+  testonly = true
   sources = [ "network.fidl" ]
 
   public_deps = [
