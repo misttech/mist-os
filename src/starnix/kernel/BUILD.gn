@@ -89,6 +89,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/ui/fuchsia-vulkan",
     "//src/lib/vulkan",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/kernel_config",
     "//src/starnix/lib/kill_job_on_panic",
     "//src/starnix/lib/linux_uapi",

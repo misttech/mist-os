@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use extended_pstate::ExtendedPstateState;
 use fuchsia_zircon::{self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals};
 use once_cell::sync::OnceCell;
 use std::cmp;
@@ -40,6 +41,9 @@ pub struct CurrentTask {
     /// from `self.handle.read_state_general_regs()`. To write these values back to the thread, call
     /// `self.handle.write_state_general_regs(self.registers.into())`.
     pub registers: RegisterState,
+
+    /// Copy of the current extended processor state including floating point and vector registers.
+    pub extended_pstate: ExtendedPstateState,
 
     /// A custom function to resume a syscall that has been interrupted by SIGSTOP.
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
@@ -1016,6 +1020,7 @@ impl CurrentTask {
         CurrentTask {
             task: Arc::new(task),
             registers: RegisterState::default(),
+            extended_pstate: ExtendedPstateState::default(),
             syscall_restart_func: None,
         }
     }
@@ -1394,6 +1399,7 @@ impl CurrentTask {
             // capabilities accordingly.
             creds.exec();
         }
+        self.extended_pstate.reset();
 
         self.thread_group.signal_actions.reset_for_exec();
 

@@ -20,13 +20,14 @@ test_list = [
   "audio_mixer_profiler_test",
   "diagnostics_benchmarks_test",
   "diagnostics_log_rust_benchmarks_test",
+  "extended_pstate_benchmarks_test",
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
   "kernel_boot_stats_test",
   "microbenchmarks_test",
-  "netstack_benchmarks_test",
   "netstack3_benchmarks_test",
+  "netstack_benchmarks_test",
   "network_device_microbenchmarks_test",
   "perftest_trace_events_test",
   "rust_inspect_benchmarks_test",
@@ -172,6 +173,7 @@ if (is_host) {
     "fuchsia.diagnostics.txt",
     "fuchsia.diagnostics_log_rust.core.txt",
     "fuchsia.diagnostics_log_rust.encoding.txt",
+    "fuchsia.extended_pstate.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
     "fuchsia.fidl_microbenchmarks.dart.txt",
     "fuchsia.fidl_microbenchmarks.driver_cpp.txt",
@@ -187,9 +189,9 @@ if (is_host) {
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
     "fuchsia.kernel.boot.txt",
+    "fuchsia.microbenchmarks.starnix.txt",
     "fuchsia.microbenchmarks.tracing.txt",
     "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
-    "fuchsia.microbenchmarks.starnix.txt",
     "fuchsia.microbenchmarks.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_recv.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_send.txt",
@@ -219,8 +221,8 @@ if (is_host) {
     "fuchsia.starnix.gvisor_benchmarks.getpid.txt",
     "fuchsia.starnix.gvisor_benchmarks.gettid.txt",
     "fuchsia.starnix.gvisor_benchmarks.mapping.txt",
-    "fuchsia.starnix.gvisor_benchmarks.open_read_close.txt",
     "fuchsia.starnix.gvisor_benchmarks.open.txt",
+    "fuchsia.starnix.gvisor_benchmarks.open_read_close.txt",
     "fuchsia.starnix.gvisor_benchmarks.pipe.txt",
     "fuchsia.starnix.gvisor_benchmarks.randread.txt",
     "fuchsia.starnix.gvisor_benchmarks.read.txt",
@@ -284,6 +286,9 @@ group("package_deps") {
 
     # These are used by storage_benchmarks_test
     "//src/storage/benchmarks",
+
+    # These are used by extended_pstate_test
+    "//src/starnix/lib/extended_pstate",
   ]
 
   if (target_cpu == "x64" && !is_asan) {

@@ -10,6 +10,12 @@ import("//src/starnix/tests/build/starnix_linux_test_component.gni")
 group("tests") {
   testonly = true
   deps = [ ":starnix_syscall_tests" ]
+  if (is_linux) {
+    deps += [
+      ":extended_pstate_initial_state_child",
+      ":syscalls_test_bin",
+    ]
+  }
 }
 
 source_set("test_utils") {
@@ -51,6 +57,7 @@ test("syscalls_test_bin") {
     "bpf_test.cc",
     "custom_artifact_test.cc",
     "epoll_test.cc",
+    "extended_pstate_initial_state.cc",
     "fcntl_test.cc",
     "fs_test.cc",
     "fuse_test.cc",
@@ -108,6 +115,36 @@ test("crash") {
   ]
 }
 
+if (is_linux) {
+  executable("extended_pstate_initial_state_child") {
+    exclude_toolchain_tags = [ "instrumented" ]
+    sources = [ "extended_pstate_initial_state_child.cc" ]
+
+    # This binary does not use libc or a dynamic linker since it is testing the state
+    # presented to _start.
+    disable_syslog_backend = true
+    cflags = [ "-fno-builtin" ]
+    ldflags = [
+      "-nostdlib",
+      "-nostartfiles",
+      "-static",
+    ]
+    configs -= [
+      "//build/config/linux:default-pie",
+      "//build/config/linux:implicit-host-libs",
+    ]
+  }
+}
+
+resource("extended_pstate_initial_state_child_resource") {
+  binary_name = "extended_pstate_initial_state_child"
+  exe_label = ":${binary_name}($target_linux_toolchain)"
+  out_dir = get_label_info(exe_label, "root_out_dir")
+  sources = [ "${out_dir}/${binary_name}" ]
+  outputs = [ "data/tests/${binary_name}" ]
+  deps = [ exe_label ]
+}
+
 starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
@@ -138,6 +175,7 @@ fuchsia_test_package("starnix_syscall_tests") {
 
   deps = [
     ":container_resources",
+    ":extended_pstate_initial_state_child_resource",
     "//src/lib/testing/expectation:expectation_comparer",
   ]
 }

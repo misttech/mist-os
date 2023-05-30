@@ -25,6 +25,9 @@ use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 
+#[cfg(target_arch = "x86_64")]
+use fuchsia_inspect as inspect;
+
 #[macro_use]
 mod trace;
 
@@ -132,6 +135,13 @@ async fn main() -> Result<(), Error> {
         fio::DirectoryProxy::new(fidl::AsyncChannel::from_channel(root_client_end.into_channel())?),
     );
 
+    #[cfg(target_arch = "x86_64")]
+    {
+        inspect::component::inspector().root().record_string(
+            "x86_64_extended_pstate_strategy",
+            format!("{:?}", *extended_pstate::x86_64::PREFERRED_STRATEGY),
+        );
+    }
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
     if let Some(local_container) = execution::maybe_create_container_from_startup_handles().await? {

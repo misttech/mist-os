@@ -1,0 +1,77 @@
+# Copyright 2023 The Fuchsia Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("extended_pstate") {
+  testonly = true
+  deps = [
+    ":package",
+    ":tests",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":extended_pstate-unittests" ]
+}
+
+rustc_library("lib") {
+  name = "extended_pstate"
+  edition = "2021"
+  with_unit_tests = true
+
+  sources = [ "src/lib.rs" ]
+
+  deps = [ "//third_party/rust_crates:static_assertions" ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+
+  if (target_cpu == "x64") {
+    sources += [ "src/x86_64.rs" ]
+    deps += [ "//third_party/rust_crates:once_cell" ]
+  }
+  if (target_cpu == "arm64") {
+    sources += [ "src/aarch64.rs" ]
+  }
+}
+
+rustc_binary("bin") {
+  output_name = "extended_pstate_bench"
+  edition = "2021"
+
+  # Generates a GN target for unit-tests with the label `bin_test`, and
+  # a binary named `extended_pstate_bin_test`.
+  with_unit_tests = true
+
+  source_root = "src/benchmark.rs"
+  sources = [ "src/benchmark.rs" ]
+
+  deps = [
+    ":lib",
+    "//src/developer/fuchsia-criterion",
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:criterion",
+  ]
+}
+
+fuchsia_component("component") {
+  component_name = "extended_pstate_bench"
+  manifest = "meta/extended_pstate_bench.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("package") {
+  package_name = "extended_pstate"
+  deps = [ ":component" ]
+}
+
+fuchsia_shell_package("extended_pstate_bench") {
+  deps = [ ":bin" ]
+}
+
+fuchsia_unittest_package("extended_pstate-unittests") {
+  deps = [ ":lib_test" ]
+}

@@ -314,11 +314,16 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
         trace_duration_begin!(trace_category_starnix!(), trace_name_user_space!());
         let status = zx::Status::from_raw(unsafe {
-            restricted_enter(
-                RESTRICTED_ENTER_OPTIONS,
-                restricted_return_ptr as usize,
-                &mut reason_code,
-            )
+            // The closure provided to run_with_saved_state must be minimal to avoid using floating point
+            // or vector state. In particular, the zx::Status conversion compiles to a vector register operation
+            // by default and must happen outside this closure.
+            current_task.extended_pstate.run_with_saved_state(|| {
+                restricted_enter(
+                    RESTRICTED_ENTER_OPTIONS,
+                    restricted_return_ptr as usize,
+                    &mut reason_code,
+                )
+            })
         });
         trace_duration_end!(trace_category_starnix!(), trace_name_user_space!());
         match { status } {
