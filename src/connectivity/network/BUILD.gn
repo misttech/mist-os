@@ -7,10 +7,6 @@ import("//src/connectivity/network/use_netstack3.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
-  # TODO(https://fxbug.dev/122670): If we make tracing in netstack3
-  # conditionally compiled, make this flag generic over netstack and choose the
-  # appropriate netstack package based on the combination of netstack3
-  # (true/false) and tracing (true/false).
   enable_netstack2_tracing = false
 }
 
