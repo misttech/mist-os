@@ -136,10 +136,10 @@ core_shard("eager_core_shard") {
   shard_file = "meta/bt-a2dp-eager.core_shard.cml"
 }
 
-# This version of the core shard offers fuchsia.media.SessionAudioConsumerFactory from the mediaplayer component
+# This version of the core shard offers fuchsia.media.SessionAudioConsumerFactory from audio_consumer component
 # which is a child component of core in only some product configurations.
 core_shard("eager_with_mediaplayer_core_shard") {
-  shard_file = "meta/bt-a2dp-eager-with-mediaplayer.core_shard.cml"
+  shard_file = "meta/bt-a2dp-eager-with-audio-consumer.core_shard.cml"
 }
 
 # The core realm shards to be used by product integrators.
