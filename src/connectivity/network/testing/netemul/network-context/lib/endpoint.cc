@@ -47,7 +47,11 @@ class EndpointImpl : public data::Consumer {
 
   virtual void SetLinkUp(bool up, fit::callback<void()> done) = 0;
 
-  virtual void ServeDevice(zx::channel req) = 0;
+  virtual void ServeMultiplexedDevice(zx::channel req) = 0;
+  virtual void ServeDevice(
+      ::fidl::InterfaceRequest<::fuchsia::hardware::network::DeviceInstance> device) = 0;
+  virtual void ServeController(
+      fidl::InterfaceRequest<::fuchsia::device::Controller> controller) = 0;
 
   virtual void GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> port) = 0;
 
@@ -146,10 +150,24 @@ class NetworkDeviceImpl : public EndpointImpl,
     tun_port_->GetPort(std::move(port));
   }
 
-  void ServeDevice(zx::channel req) override {
+  void ServeMultiplexedDevice(zx::channel req) override {
     instance_bindings_.AddBinding(
         this,
         fidl::InterfaceRequest<fuchsia::netemul::internal::NetworkDeviceInstance>(std::move(req)));
+  }
+
+  void ServeDevice(
+      ::fidl::InterfaceRequest<::fuchsia::hardware::network::DeviceInstance> device) override {
+    instance_bindings_.AddBinding(
+        this, fidl::InterfaceRequest<fuchsia::netemul::internal::NetworkDeviceInstance>(
+                  device.TakeChannel()));
+  }
+
+  void ServeController(
+      ::fidl::InterfaceRequest<::fuchsia::device::Controller> controller) override {
+    instance_bindings_.AddBinding(
+        this, fidl::InterfaceRequest<fuchsia::netemul::internal::NetworkDeviceInstance>(
+                  controller.TakeChannel()));
   }
 
   void Consume(const void* data, size_t len) override {
@@ -306,7 +324,17 @@ void Endpoint::GetProxy(fidl::InterfaceRequest<FProxy> proxy) {
   proxy_bindings_.AddBinding(this, std::move(proxy), parent_->dispatcher());
 }
 
-void Endpoint::ServeDevice(zx::channel channel) { impl_->ServeDevice(std::move(channel)); }
+void Endpoint::ServeMultiplexedDevice(zx::channel channel) {
+  impl_->ServeMultiplexedDevice(std::move(channel));
+}
+
+void Endpoint::ServeController(::fidl::InterfaceRequest<::fuchsia::device::Controller> controller) {
+  impl_->ServeController(std::move(controller));
+}
+void Endpoint::ServeDevice(
+    fidl::InterfaceRequest<fuchsia::hardware::network::DeviceInstance> device) {
+  impl_->ServeDevice(std::move(device));
+}
 
 void Endpoint::Bind(fidl::InterfaceRequest<FEndpoint> req) {
   bindings_.AddBinding(this, std::move(req), parent_->dispatcher());

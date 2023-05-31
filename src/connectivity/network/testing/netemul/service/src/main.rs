@@ -571,7 +571,7 @@ impl ManagedRealm {
                                 move |_: vfs::execution_scope::ExecutionScope, channel| {
                                     let () = device
                                         .clone()
-                                        .serve_device(channel.into_zx_channel())
+                                        .serve_multiplexed_device(channel.into_zx_channel())
                                         .unwrap_or_else(|e| {
                                             // PEER_CLOSED errors are expected
                                             // to happen during test teardown.
@@ -1920,13 +1920,13 @@ mod tests {
             zx::Status::ALREADY_EXISTS,
         );
 
-        // Expect the device to implement `fuchsia.device/Controller.GetTopologicalPath`.
+        // Check the device's `fuchsia.device/Controller.GetTopologicalPath`.
         let (controller, server_end) = fidl::endpoints::create_proxy::<fdevice::ControllerMarker>()
             .expect("failed to create proxy");
         let () = get_device_proxy(&endpoint)
             .into_proxy()
             .expect("failed to create device proxy from client end")
-            .serve_device(server_end.into_channel())
+            .serve_controller(server_end)
             .expect("failed to serve device");
         let path = controller
             .get_topological_path()

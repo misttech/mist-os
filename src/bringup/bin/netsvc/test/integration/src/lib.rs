@@ -1383,8 +1383,21 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
     let netdevice = netdevice.into_proxy().expect("netdevice proxy");
     let netdevice = &netdevice;
     let connector_fut = connector_stream.for_each_concurrent(None, |r| async move {
-        let fnetemul_network::DeviceProxy_Request::ServeDevice { req, control_handle: _ } =
-            r.expect("connector error");
+        let req = match r.expect("connector error") {
+            fnetemul_network::DeviceProxy_Request::ServeMultiplexedDevice {
+                req,
+                control_handle: _,
+            } => req,
+            fnetemul_network::DeviceProxy_Request::ServeDevice { req: _, control_handle: _ } => {
+                panic!("Got Unexpected ServeDevice request");
+            }
+            fnetemul_network::DeviceProxy_Request::ServeController {
+                req: _,
+                control_handle: _,
+            } => {
+                panic!("Got Unexpected ServeController request");
+            }
+        };
         let server: fidl::endpoints::ServerEnd<fnetemul_internal::NetworkDeviceInstanceMarker> =
             req.into();
         let rs = server.into_stream().expect("into request stream");
