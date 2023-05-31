@@ -4930,3 +4930,7 @@ dependencies = [
 [[patch.unused]]
 name = "nix"
 version = "0.26.1"
+
+[[patch.unused]]
+name = "regex-automata"
+version = "0.1.9"

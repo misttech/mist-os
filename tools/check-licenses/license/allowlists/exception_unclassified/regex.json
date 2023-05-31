@@ -6,8 +6,7 @@
           {
             "bug": "",
             "projects": [
-              "third_party/rust_crates/ask2patch/regex-automata/data/fowler-tests",
-              "third_party/rust_crates/ask2patch/regex-automata/data/tests/fowler"
+              "third_party/rust_crates/ask2patch/regex-automata"
             ]
           }
         ],
