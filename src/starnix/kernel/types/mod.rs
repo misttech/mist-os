@@ -10,7 +10,6 @@ mod mount_flags;
 mod open_flags;
 mod resource_limits;
 mod seal_flags;
-mod signals;
 mod stats;
 mod time;
 mod union;
@@ -20,6 +19,7 @@ mod user_buffer;
 pub mod as_any;
 pub mod errno;
 pub mod range_ext;
+pub mod signals;
 pub mod uapi;
 
 pub(crate) use union::*;

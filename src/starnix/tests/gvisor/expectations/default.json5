@@ -47,6 +47,9 @@
                 // eventfd_test - splice() isn't implemented fxbug.dev/119324
                 "EventfdTest.SpliceReturnsEINVAL",
 
+                // exceptions_test
+                "ExceptionTest.AlignmentCheck",
+
                 // exec_test
                 // Disable InterpreterScript because the script has the path /bin/bash which is not
                 // where bash is located on the Android system image.
@@ -973,16 +976,6 @@
                 "Call32Bit.Disallowed",
                 "ChrootTest.ProcMemSelfMapsNoEscapeProcOpen",
                 "ConcurrencyTest.MultiProcessConcurrency",
-                "ExceptionTest.AlignmentCheck",
-                "ExceptionTest.AlignmentHalt",
-                "ExceptionTest.Halt",
-                "ExceptionTest.DivideByZero",
-                "ExceptionTest.X87DivideByZeroUnmasked",
-                "ExceptionTest.X87StatusClobber",
-                "ExceptionTest.SSEDivideByZeroUnmasked",
-                "ExceptionTest.IOAccessFault",
-                "ExceptionTest.Int3Normal",
-                "ExceptionTest.Int3Compact",
                 "ElfTest.Execute",
                 "ElfTest.MissingText",
                 "ElfTest.ExtraMemPages",
@@ -1074,6 +1067,7 @@
                 "AllInetTests/RawSocketTest.MultipleSocketReceive/*",
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
+                "ExceptionTest.IOAccessFault",
                 "MountTest.BindToSelf",
                 "UnameTest.Sanity",
                 "MountTest.BindToSelf",

@@ -9,7 +9,7 @@ use crate::arch::{
     execution::{generate_cfi_directives, restore_cfi_directives},
     registers::RegisterState,
 };
-use crate::logging::{log_error, log_trace, log_warn, set_current_task_info, set_zx_name};
+use crate::logging::{log_trace, log_warn, set_current_task_info, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::syscalls::decls::SyscallDecl;
@@ -398,12 +398,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                     // Matches the default disposition on zx::Exception objects.
                     exception_state: zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT,
                 };
-                process_completed_exception(
-                    task,
-                    exception_result,
-                    &mut exception,
-                    &restricted_exception.exception,
-                );
+                process_completed_exception(task, exception_result, &mut exception);
 
                 match exception.exception_state {
                     zx::sys::ZX_EXCEPTION_STATE_HANDLED => {}
@@ -501,7 +496,6 @@ fn process_completed_exception<E: ExceptionContext>(
     task: Arc<Task>,
     exception_result: ExceptionResult,
     exception: &mut E,
-    report: &zx::sys::zx_exception_report_t,
 ) {
     match exception_result {
         ExceptionResult::Handled => {
@@ -562,10 +556,6 @@ fn process_completed_exception<E: ExceptionContext>(
                 exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
             }
         }
-        ExceptionResult::Unhandled => {
-            log_error!("Unhandled exception {:?}", report);
-            exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT).unwrap();
-        }
     }
 }
 
@@ -600,7 +590,7 @@ fn start_exception_handler_thread<T: std::ops::Deref<Target = Option<zx::Thread>
             let mut exception = ChannelException { exception, thread };
 
             let exception_result = task.process_exception(&report);
-            process_completed_exception(task.clone(), exception_result, &mut exception, &report);
+            process_completed_exception(task.clone(), exception_result, &mut exception);
         }
     });
     Ok(())

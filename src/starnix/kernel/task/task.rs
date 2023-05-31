@@ -12,7 +12,10 @@ use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::arch::{registers::RegisterState, task::decode_page_fault_exception_report};
+use crate::arch::{
+    registers::RegisterState,
+    task::{decode_page_fault_exception_report, get_signal_for_general_exception},
+};
 use crate::auth::*;
 use crate::execution::*;
 use crate::fs::*;
@@ -250,9 +253,6 @@ pub enum ExceptionResult {
 
     // The exception generated a signal that should be delivered.
     Signal(SignalInfo),
-
-    // The exception was not understood or could not be handled.
-    Unhandled,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -975,14 +975,27 @@ impl Task {
             }
         }
         match report.header.type_ {
+            zx::sys::ZX_EXCP_GENERAL => match get_signal_for_general_exception(&report.context) {
+                Some(sig) => ExceptionResult::Signal(SignalInfo::default(sig)),
+                None => {
+                    log_warn!("Unrecognized general exception: {:?}", report);
+                    ExceptionResult::Signal(SignalInfo::default(SIGILL))
+                }
+            },
             zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
                 ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
             }
             zx::sys::ZX_EXCP_UNDEFINED_INSTRUCTION => {
                 ExceptionResult::Signal(SignalInfo::default(SIGILL))
             }
+            zx::sys::ZX_EXCP_UNALIGNED_ACCESS => {
+                ExceptionResult::Signal(SignalInfo::default(SIGBUS))
+            }
             zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
-            _ => ExceptionResult::Unhandled,
+            _ => {
+                log_error!("Unknown exception {:?}", report);
+                ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
+            }
         }
     }
 
