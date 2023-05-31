@@ -16,6 +16,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
+#include <fstream>
 #include <memory>
 #include <vector>
 
@@ -76,6 +77,22 @@ class FakeBootResolver final : public fidl::WireServer<fuchsia_component_resolut
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
     }
 
+    // Not all boot components resolved by this resolver are packaged (e.g. root.cm) so they do not
+    // have an ABI revision. As a workaround, apply the ABI revision of this package so components
+    // can pass runtime ABI compatibility checks during testing.
+    std::ifstream abi_revision_file("/pkg/meta/fuchsia.abi/abi-revision");
+    if (!abi_revision_file) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+      return;
+    }
+    uint64_t abi_revision;
+    abi_revision_file.read(reinterpret_cast<char*>(&abi_revision), sizeof(abi_revision));
+    if (!abi_revision_file) {
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+      return;
+    }
+    abi_revision_file.close();
+
     zx::result directory = component::Clone(pkg_dir_->client_end());
     if (directory.is_error()) {
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
@@ -90,6 +107,7 @@ class FakeBootResolver final : public fidl::WireServer<fuchsia_component_resolut
 
     auto component = fuchsia_component_resolution::wire::Component::Builder(arena)
                          .url(request->component_url)
+                         .abi_revision(abi_revision)
                          .decl(fuchsia_mem::wire::Data::WithBuffer(arena,
                                                                    fuchsia_mem::wire::Buffer{
                                                                        .vmo = std::move(vmo),
