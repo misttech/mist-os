@@ -38,12 +38,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.ui.app/ViewProvider.CreateView",
-        "ordinal": "4602213985402103992",
-        "type": "(zx/Handle:EVENTPAIR token,server_end:<fuchsia.sys/ServiceProvider,optional> incoming_services,fuchsia.sys/ServiceProvider:optional outgoing_services)"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.ui.app/ViewProvider.CreateView2",
         "ordinal": "8697758317325517954",
         "type": "(fuchsia.ui.app/CreateView2Args args)"
