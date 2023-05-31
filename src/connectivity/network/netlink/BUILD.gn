@@ -21,6 +21,10 @@ rustc_library("netlink") {
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:anyhow",
+
+    # TODO(https://github.com/rust-lang/rust/issues/91611): Replace this with
+    # #![feature(async_fn_in_trait)] once it supports `Send` bounds.
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bit-set",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",

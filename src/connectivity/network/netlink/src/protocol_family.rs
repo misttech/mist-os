@@ -4,10 +4,16 @@
 
 //! A module for managing protocol-specific aspects of Netlink.
 
-use netlink_packet_core::NetlinkMessage;
+use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
 use netlink_packet_utils::Emitable;
 
 use std::fmt::Debug;
+
+// TODO(https://github.com/rust-lang/rust/issues/91611): Replace this with
+// #![feature(async_fn_in_trait)] once it supports `Send` bounds. See
+// https://blog.rust-lang.org/inside-rust/2023/05/03/stabilizing-async-fn-in-trait.html.
+use async_trait::async_trait;
+use tracing::warn;
 
 use crate::{
     client::ExternalClient,
@@ -18,10 +24,20 @@ use crate::{
 };
 
 /// A type representing a Netlink Protocol Family.
-pub(crate) trait ProtocolFamily: MulticastCapableNetlinkFamily {
+pub(crate) trait ProtocolFamily: MulticastCapableNetlinkFamily + Send + 'static {
+    /// The message type associated with the protocol family.
     type Message: Clone + Debug + Emitable + Send + 'static;
+    /// The implementation for handling requests from this protocol family.
+    type RequestHandler: NetlinkFamilyRequestHandler<Self::Message>;
 
     const NAME: &'static str;
+}
+
+#[async_trait]
+/// A request handler implementation for a particular Netlink protocol family.
+pub(crate) trait NetlinkFamilyRequestHandler<M>: Clone + Send + 'static {
+    /// Handles the given request and generates the associated response(s).
+    async fn handle_request(&mut self, req: M) -> Vec<M>;
 }
 
 pub mod route {
@@ -127,8 +143,95 @@ pub mod route {
 
     impl ProtocolFamily for NetlinkRoute {
         type Message = NetlinkMessage<RtnlMessage>;
+        type RequestHandler = NetlinkRouteRequestHandler;
 
         const NAME: &'static str = "NETLINK_ROUTE";
+    }
+
+    #[derive(Clone)]
+    pub(crate) struct NetlinkRouteRequestHandler;
+
+    #[async_trait]
+    impl NetlinkFamilyRequestHandler<NetlinkMessage<RtnlMessage>> for NetlinkRouteRequestHandler {
+        async fn handle_request(
+            &mut self,
+            req: NetlinkMessage<RtnlMessage>,
+        ) -> Vec<NetlinkMessage<RtnlMessage>> {
+            let (req_header, payload) = req.into_parts();
+            let req = match payload {
+                NetlinkPayload::InnerMessage(p) => p,
+                p => panic!("Unexpected netlink payload: {:?}", p),
+            };
+            use RtnlMessage::*;
+            match req {
+                NewLink(_)
+                | DelLink(_)
+                | NewLinkProp(_)
+                | DelLinkProp(_)
+                | NewNeighbourTable(_)
+                | SetNeighbourTable(_)
+                | NewTrafficClass(_)
+                | DelTrafficClass(_)
+                | NewTrafficFilter(_)
+                | DelTrafficFilter(_)
+                | NewTrafficChain(_)
+                | DelTrafficChain(_)
+                | NewNsId(_)
+                | DelNsId(_)
+                // TODO(https://issuetracker.google.com/285127790): Implement NewNeighbour.
+                | NewNeighbour(_)
+                // TODO(https://issuetracker.google.com/285127790): Implement DelNeighbour.
+                | DelNeighbour(_)
+                // TODO(https://issuetracker.google.com/283136220): Implement SetLink.
+                | SetLink(_)
+                // TODO(https://issuetracker.google.com/283134942): Implement NewAddress.
+                | NewAddress(_)
+                // TODO(https://issuetracker.google.com/283134942): Implement DelAddress.
+                | DelAddress(_)
+                // TODO(https://issuetracker.google.com/283136222): Implement NewRoute.
+                | NewRoute(_)
+                // TODO(https://issuetracker.google.com/283136222): Implement DelRoute.
+                | DelRoute(_)
+                // TODO(https://issuetracker.google.com/283137907): Implement NewQueueDiscipline.
+                | NewQueueDiscipline(_)
+                // TODO(https://issuetracker.google.com/283137907): Implement DelQueueDiscipline.
+                | DelQueueDiscipline(_)
+                // TODO(https://issuetracker.google.com/283134947): Implement NewRule.
+                | NewRule(_)
+                // TODO(https://issuetracker.google.com/283134947): Implement DelRule.
+                | DelRule(_) => {
+                    warn!(
+                        "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
+                        req
+                    );
+                    vec![crate::netlink_packet::new_ack(req_header)]
+                }
+                GetNeighbourTable(_)
+                | GetTrafficClass(_)
+                | GetTrafficFilter(_)
+                | GetTrafficChain(_)
+                | GetNsId(_)
+                // TODO(https://issuetracker.google.com/285127384): Implement GetNeighbour.
+                | GetNeighbour(_)
+                // TODO(https://issuetracker.google.com/283134954): Implement GetLink.
+                | GetLink(_)
+                // TODO(https://issuetracker.google.com/283134032): Implement GetAddress.
+                | GetAddress(_)
+                // TODO(https://issuetracker.google.com/283137647): Implement GetRoute.
+                | GetRoute(_)
+                // TODO(https://issuetracker.google.com/283137907): Implement GetQueueDiscipline.
+                | GetQueueDiscipline(_)
+                // TODO(https://issuetracker.google.com/283134947): Implement GetRule.
+                | GetRule(_) => {
+                    warn!(
+                        "Received unsupported NETLINK_ROUTE request; responding with Done: {:?}",
+                        req
+                    );
+                    vec![crate::netlink_packet::new_done()]
+                },
+                req => panic!("unexpected RtnlMessage: {:?}", req),
+            }
+        }
     }
 
     /// A connection to the Route Netlink Protocol family.
@@ -204,8 +307,22 @@ pub(crate) mod testutil {
         fn emit(&self, _buffer: &mut [u8]) {}
     }
 
+    /// Handler of [`FakeNetlinkMessage`] requests.
+    ///
+    /// Reflects the given request back as the response.
+    #[derive(Clone)]
+    pub(crate) struct FakeNetlinkRequestHandler;
+
+    #[async_trait]
+    impl<M: Send + 'static> NetlinkFamilyRequestHandler<M> for FakeNetlinkRequestHandler {
+        async fn handle_request(&mut self, req: M) -> Vec<M> {
+            vec![req]
+        }
+    }
+
     impl ProtocolFamily for FakeProtocolFamily {
         type Message = FakeNetlinkMessage;
+        type RequestHandler = FakeNetlinkRequestHandler;
 
         const NAME: &'static str = "FAKE_PROTOCOL_FAMILY";
     }

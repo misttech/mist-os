@@ -10,7 +10,7 @@ use derivative::Derivative;
 use tracing::debug;
 
 use crate::{
-    messaging::{Receiver, Sender},
+    messaging::Sender,
     multicast_groups::{
         InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
         MulticastGroupMemberships,
@@ -21,23 +21,21 @@ use crate::{
 
 /// The internal half of a Netlink client, with the external half being provided
 /// by ['ExternalClient'].
-pub(crate) struct InternalClient<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>>
-{
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub(crate) struct InternalClient<F: ProtocolFamily, S: Sender<F::Message>> {
     /// The client's current multicast group memberships.
     group_memberships: Arc<Mutex<MulticastGroupMemberships<F>>>,
     /// The [`Sender`] of messages from Netlink to the Client.
     sender: S,
-    /// The receiver of messages from the client to Netlink.
-    // TODO(https://issuetracker.google.com/283136408): Use this field to
-    // receive requests from the client.
-    _receiver: R,
 }
 
-impl<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> InternalClient<F, S, R> {
+impl<F: ProtocolFamily, S: Sender<F::Message>> InternalClient<F, S> {
     /// Returns true if this client is a member of the provided group.
     pub(crate) fn member_of_group(&self, group: ModernGroup) -> bool {
         self.group_memberships.lock().unwrap().member_of_group(group)
     }
+
     /// Sends the given message to the external half of this client.
     pub(crate) fn send(&mut self, message: F::Message) {
         self.sender.send(message)
@@ -72,27 +70,26 @@ impl<F: ProtocolFamily> ExternalClient<F> {
 }
 
 // Instantiate a new client pair.
-pub(crate) fn new_client_pair<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>>(
+pub(crate) fn new_client_pair<F: ProtocolFamily, S: Sender<F::Message>>(
     sender: S,
-    receiver: R,
-) -> (ExternalClient<F>, InternalClient<F, S, R>) {
+) -> (ExternalClient<F>, InternalClient<F, S>) {
     let group_memberships = Arc::new(Mutex::new(MulticastGroupMemberships::new()));
     (
         ExternalClient { group_memberships: group_memberships.clone() },
-        InternalClient { group_memberships, sender: sender, _receiver: receiver },
+        InternalClient { group_memberships, sender: sender },
     )
 }
 
 /// The table of connected clients for a given ProtocolFamily.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Default(bound = ""))]
-pub(crate) struct ClientTable<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> {
-    clients: Arc<Mutex<Vec<InternalClient<F, S, R>>>>,
+pub(crate) struct ClientTable<F: ProtocolFamily, S: Sender<F::Message>> {
+    clients: Arc<Mutex<Vec<InternalClient<F, S>>>>,
 }
 
-impl<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> ClientTable<F, S, R> {
+impl<F: ProtocolFamily, S: Sender<F::Message>> ClientTable<F, S> {
     /// Adds the given client to this [`ClientTable`].
-    pub(crate) fn add_client(&self, client: InternalClient<F, S, R>) {
+    pub(crate) fn add_client(&self, client: InternalClient<F, S>) {
         self.clients.lock().unwrap().push(client);
     }
 
@@ -121,19 +118,16 @@ impl<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> ClientTa
 pub(crate) mod testutil {
     use super::*;
     use crate::{
-        messaging::testutil::{FakeReceiver, FakeSender, FakeSenderSink},
+        messaging::testutil::{FakeSender, FakeSenderSink},
         protocol_family::ProtocolFamily,
     };
 
     /// Creates a new client with memberships to the given groups.
     pub(crate) fn new_fake_client<F: ProtocolFamily>(
         group_memberships: &[ModernGroup],
-    ) -> (
-        FakeSenderSink<F::Message>,
-        InternalClient<F, FakeSender<F::Message>, FakeReceiver<F::Message>>,
-    ) {
+    ) -> (FakeSenderSink<F::Message>, InternalClient<F, FakeSender<F::Message>>) {
         let (sender, sender_sink) = crate::messaging::testutil::fake_sender_with_sink();
-        let (external_client, internal_client) = new_client_pair(sender, FakeReceiver::default());
+        let (external_client, internal_client) = new_client_pair(sender);
         for group in group_memberships {
             external_client.add_membership(*group).expect("add group membership");
         }
@@ -146,7 +140,7 @@ mod tests {
     use super::*;
 
     use crate::{
-        messaging::testutil::{FakeReceiver, FakeSender},
+        messaging::testutil::FakeSender,
         protocol_family::testutil::{
             FakeNetlinkMessage, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
         },
@@ -156,10 +150,8 @@ mod tests {
     // client are observed on the internal client.
     #[test]
     fn test_group_memberships() {
-        let (external_client, internal_client) = new_client_pair::<FakeProtocolFamily, _, _>(
-            FakeSender::default(),
-            FakeReceiver::default(),
-        );
+        let (external_client, internal_client) =
+            new_client_pair::<FakeProtocolFamily, _>(FakeSender::default());
 
         assert!(!internal_client.member_of_group(MODERN_GROUP1));
         assert!(!internal_client.member_of_group(MODERN_GROUP2));

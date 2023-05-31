@@ -40,11 +40,7 @@ pub(crate) struct EventLoop<P: SenderReceiverProvider> {
     /// Netlink messages to send when requested.
     route_messages: HashSet<NetlinkRouteMessage>,
     /// The current set of clients of NETLINK_ROUTE protocol family.
-    route_clients: ClientTable<
-        NetlinkRoute,
-        P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-        P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
-    >,
+    route_clients: ClientTable<NetlinkRoute, P::Sender<<NetlinkRoute as ProtocolFamily>::Message>>,
 }
 
 /// RTM_ROUTE related event loop errors.
@@ -67,7 +63,6 @@ impl<P: SenderReceiverProvider> EventLoop<P> {
         route_clients: ClientTable<
             NetlinkRoute,
             P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-            P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
         >,
     ) -> Self {
         EventLoop { route_messages: Default::default(), route_clients }
@@ -214,11 +209,7 @@ enum RouteEventHandlerError<I: Ip> {
 /// Returns a `RoutesEventLoopError` when unexpected events or HashSet issues occur.
 fn handle_route_watcher_event<I: Ip, P: SenderReceiverProvider>(
     route_messages: &mut HashSet<NetlinkRouteMessage>,
-    route_clients: &ClientTable<
-        NetlinkRoute,
-        P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-        P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
-    >,
+    route_clients: &ClientTable<NetlinkRoute, P::Sender<<NetlinkRoute as ProtocolFamily>::Message>>,
     event: fnet_routes_ext::Event<I>,
 ) -> Result<(), RouteEventHandlerError<I>> {
     let message_for_clients = match event {
@@ -448,7 +439,7 @@ mod tests {
     };
     use test_case::test_case;
 
-    use crate::messaging::testutil::{FakeReceiver, FakeSender, FakeSenderReceiverProvider};
+    use crate::messaging::testutil::{FakeSender, FakeSenderReceiverProvider};
 
     fn create_installed_route<I: Ip>(
         subnet: Subnet<I::Addr>,
@@ -561,8 +552,7 @@ mod tests {
             crate::client::testutil::new_fake_client::<NetlinkRoute>(&[right_group]);
         let (mut wrong_sink, wrong_client) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(&[wrong_group]);
-        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>, FakeReceiver<_>> =
-            ClientTable::default();
+        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
         route_clients.add_client(right_client);
         route_clients.add_client(wrong_client);
 

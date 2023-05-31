@@ -23,19 +23,20 @@ use fuchsia_async as fasync;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     future::Future,
-    StreamExt as _,
+    FutureExt as _, StreamExt as _,
 };
 use net_types::ip::{Ipv4, Ipv6};
 use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::RtnlMessage;
+use tracing::debug;
 
 use crate::{
     client::{ClientTable, InternalClient},
     interfaces::InterfacesEventLoopError,
     messaging::{Receiver, Sender, SenderReceiverProvider},
     protocol_family::{
-        route::{NetlinkRoute, NetlinkRouteClient},
-        ProtocolFamily,
+        route::{NetlinkRoute, NetlinkRouteClient, NetlinkRouteRequestHandler},
+        NetlinkFamilyRequestHandler as _, ProtocolFamily,
     },
     routes::RoutesEventLoopError,
 };
@@ -47,7 +48,7 @@ pub const NETLINK_LOG_TAG: &'static str = "netlink";
 pub struct Netlink<P: SenderReceiverProvider> {
     /// Sender to attach new `NETLINK_ROUTE` clients to the Netlink worker.
     route_client_sender: UnboundedSender<
-        InternalClient<
+        ClientWithReceiver<
             NetlinkRoute,
             P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
             P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
@@ -78,15 +79,22 @@ impl<P: SenderReceiverProvider> Netlink<P> {
         sender: P::Sender<NetlinkMessage<RtnlMessage>>,
         receiver: P::Receiver<NetlinkMessage<RtnlMessage>>,
     ) -> Result<NetlinkRouteClient, NewClientError> {
-        let (external_client, internal_client) =
-            client::new_client_pair::<NetlinkRoute, _, _>(sender, receiver);
-        self.route_client_sender.unbounded_send(internal_client).map_err(|e| {
-            // Sending on an `UnboundedSender` can never fail with `is_full()`.
-            debug_assert!(e.is_disconnected());
-            NewClientError::Disconnected
-        })?;
+        let (external_client, internal_client) = client::new_client_pair::<NetlinkRoute, _>(sender);
+        self.route_client_sender
+            .unbounded_send(ClientWithReceiver { client: internal_client, receiver })
+            .map_err(|e| {
+                // Sending on an `UnboundedSender` can never fail with `is_full()`.
+                debug_assert!(e.is_disconnected());
+                NewClientError::Disconnected
+            })?;
         Ok(NetlinkRouteClient(external_client))
     }
+}
+
+/// A wrapper to hold an [`InternalClient`], and its [`Receiver`] of requests.
+struct ClientWithReceiver<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> {
+    client: InternalClient<F, S>,
+    receiver: R,
 }
 
 /// The possible error types when instantiating a new client.
@@ -100,7 +108,7 @@ pub enum NewClientError {
 struct NetlinkWorkerParams<P: SenderReceiverProvider> {
     /// Receiver of newly created `NETLINK_ROUTE` clients.
     route_client_receiver: UnboundedReceiver<
-        InternalClient<
+        ClientWithReceiver<
             NetlinkRoute,
             P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
             P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
@@ -124,7 +132,12 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
     let _: Vec<()> = futures::future::join_all([
         // Accept new NETLINK_ROUTE clients.
         fasync::Task::spawn(async move {
-            connect_new_clients::<NetlinkRoute, _, _>(clients1, route_client_receiver).await;
+            connect_new_clients::<NetlinkRoute, _, _>(
+                clients1,
+                route_client_receiver,
+                NetlinkRouteRequestHandler,
+            )
+            .await;
             panic!("route_client_receiver stream unexpectedly finished")
         }),
         // IPv4 Routes Worker.
@@ -168,9 +181,160 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
 }
 
 /// Receives clients from the given receiver, adding them to the given table.
+///
+/// A "Request Handler" Task will be spawned for each received client. The given
+/// `request_handler_impl` defines how the requests will be handled.
 async fn connect_new_clients<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>>(
-    client_table: ClientTable<F, S, R>,
-    client_receiver: UnboundedReceiver<InternalClient<F, S, R>>,
+    client_table: ClientTable<F, S>,
+    client_receiver: UnboundedReceiver<ClientWithReceiver<F, S, R>>,
+    request_handler_impl: F::RequestHandler,
 ) {
-    client_receiver.for_each(|client| futures::future::ready(client_table.add_client(client))).await
+    client_receiver
+        // Drive each client concurrently with `for_each_concurrent`. Note that
+        // because each client is spawned in a separate Task, they will run in
+        // parallel.
+        .for_each_concurrent(None, |ClientWithReceiver { client, receiver }| {
+            client_table.add_client(client.clone());
+            spawn_client_request_handler::<F, S, R>(client, receiver, request_handler_impl.clone())
+            // TODO(https://issuetracker.google.com/285013342): Close the client
+            // once the "request handler" Task finishes.
+        })
+        .await
+}
+
+/// Spawns a [`Task`] to handle requests from the given client.
+fn spawn_client_request_handler<
+    F: ProtocolFamily,
+    S: Sender<F::Message>,
+    R: Receiver<F::Message>,
+>(
+    client: InternalClient<F, S>,
+    receiver: R,
+    handler: F::RequestHandler,
+) -> fasync::Task<()> {
+    // State needed to handle an individual request, that is cycled through the
+    // `fold` combinator below.
+    struct FoldState<C, H> {
+        client: C,
+        handler: H,
+    }
+    fasync::Task::spawn(
+        // Use `fold` for two reasons. First, it processes requests serially,
+        // ensuring requests are handled in order. Second, it allows us to
+        // "hand-off" the client/handler from one request to the other, avoiding
+        // copies for each request.
+        receiver
+            .fold(
+                FoldState { client, handler },
+                |FoldState { mut client, mut handler }, req| async {
+                    debug!(tag = NETLINK_LOG_TAG, "Received {} request: {:?}", F::NAME, req);
+                    let responses = handler.handle_request(req).await;
+                    for response in responses {
+                        debug!(tag = NETLINK_LOG_TAG, "Responding with {:?}", response);
+                        client.send(response);
+                    }
+                    FoldState { client, handler }
+                },
+            )
+            .map(|_: FoldState<_, _>| ()),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use futures::channel::mpsc;
+
+    use crate::protocol_family::testutil::{
+        FakeNetlinkMessage, FakeNetlinkRequestHandler, FakeProtocolFamily,
+    };
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_spawn_client_request_handler() {
+        let (mut req_sender, req_receiver) = mpsc::channel(0);
+        let (mut client_sink, client) =
+            crate::client::testutil::new_fake_client::<FakeProtocolFamily>(&[]);
+
+        let mut client_task = spawn_client_request_handler::<FakeProtocolFamily, _, _>(
+            client,
+            req_receiver,
+            FakeNetlinkRequestHandler,
+        )
+        .fuse();
+
+        assert_eq!((&mut client_task).now_or_never(), None);
+        assert_eq!(&client_sink.take_messages()[..], &[]);
+
+        // Send a message and expect to see the response on the `client_sink`.
+        // NB: Use the sender's channel size as a synchronization method; If a
+        // second message could be sent, the first *must* have been handled.
+        req_sender.try_send(FakeNetlinkMessage).expect("should send without error");
+        let could_send_fut = futures::future::poll_fn(|ctx| req_sender.poll_ready(ctx)).fuse();
+        futures::pin_mut!(client_task, could_send_fut);
+        futures::select!(
+            res = could_send_fut => res.expect("should be able to send without error"),
+            () = client_task => panic!("client task unexpectedly finished"),
+        );
+        assert_eq!(&client_sink.take_messages()[..], &[FakeNetlinkMessage]);
+
+        // Close the sender, and expect the Task to exit.
+        req_sender.close_channel();
+        client_task.await;
+        assert_eq!(&client_sink.take_messages()[..], &[]);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_connect_new_clients() {
+        let client_table = ClientTable::default();
+        let (client_sender, client_receiver) = futures::channel::mpsc::unbounded();
+        let mut client_acceptor_fut = Box::pin(
+            connect_new_clients::<FakeProtocolFamily, _, _>(
+                client_table,
+                client_receiver,
+                FakeNetlinkRequestHandler,
+            )
+            .fuse(),
+        );
+
+        assert_eq!((&mut client_acceptor_fut).now_or_never(), None);
+
+        // Connect Client 1.
+        let (mut _client_sink1, client1) =
+            crate::client::testutil::new_fake_client::<FakeProtocolFamily>(&[]);
+        let (mut req_sender1, req_receiver1) = mpsc::channel(0);
+        client_sender
+            .unbounded_send(ClientWithReceiver { client: client1, receiver: req_receiver1 })
+            .expect("should send without error");
+
+        // Connect Client 2.
+        let (mut client_sink2, client2) =
+            crate::client::testutil::new_fake_client::<FakeProtocolFamily>(&[]);
+        let (mut req_sender2, req_receiver2) = mpsc::channel(0);
+        client_sender
+            .unbounded_send(ClientWithReceiver { client: client2, receiver: req_receiver2 })
+            .expect("should send without error");
+
+        // Send a request to Client 2, and verify it's handled despite Client 1
+        // being open (e.g. concurrent handling of requests across clients).
+        // NB: Use the sender's channel size as a synchronization method; If a
+        // second message could be sent, the first *must* have been handled.
+        req_sender2.try_send(FakeNetlinkMessage).expect("should send without error");
+        let could_send_fut = futures::future::poll_fn(|ctx| req_sender2.poll_ready(ctx)).fuse();
+        futures::pin_mut!(client_acceptor_fut, could_send_fut);
+        futures::select!(
+            res = could_send_fut => res.expect("should be able to send without error"),
+            () = client_acceptor_fut => panic!("client acceptor unexpectedly finished"),
+        );
+        assert_eq!(&client_sink2.take_messages()[..], &[FakeNetlinkMessage]);
+
+        // Close the two clients, and verify the acceptor fut is still pending.
+        req_sender1.close_channel();
+        req_sender2.close_channel();
+        assert_eq!((&mut client_acceptor_fut).now_or_never(), None);
+
+        // Close the client_sender, and verify the acceptor fut finishes.
+        client_sender.close_channel();
+        client_acceptor_fut.await;
+    }
 }
