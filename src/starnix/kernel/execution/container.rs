@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Error};
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl::AsyncChannel;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
@@ -17,6 +17,7 @@ use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Task as _;
+use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec, get_value};
 use starnix_kernel_config::Config;
@@ -190,6 +191,8 @@ enum ExposedServices {
     ContainerController(fstarcontainer::ControllerRequestStream),
 }
 
+type TaskResult = Result<ExitStatus, Error>;
+
 /// Attempts to read /container_config/config and the startup handles to create a container.
 ///
 /// Returns None if /container_config/config does not exist.
@@ -198,11 +201,56 @@ enum ExposedServices {
 /// but this function exists to make a soft transition.
 pub async fn maybe_create_container_from_startup_handles() -> Result<Option<Arc<Container>>, Error>
 {
-    Ok(if let Some(config) = get_config() {
-        Some(create_container(config, None).await?)
-    } else {
-        None
-    })
+    if let Some(config) = get_config() {
+        let (sender, receiver) = oneshot::channel::<TaskResult>();
+        let container = create_container(config, sender).await?;
+        fasync::Task::spawn(async {
+            let _ = receiver.await;
+            // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
+            fruntime::job_default().kill().expect("Failed to kill job");
+        })
+        .detach();
+        return Ok(Some(container));
+    }
+    Ok(None)
+}
+
+async fn server_component_controller(
+    request_stream: frunner::ComponentControllerRequestStream,
+    task_complete: oneshot::Receiver<TaskResult>,
+) {
+    let request_stream_control = request_stream.control_handle();
+
+    enum Event<T, U> {
+        Controller(T),
+        Completion(U),
+    }
+
+    let mut stream = futures::stream::select(
+        request_stream.map(Event::Controller),
+        task_complete.into_stream().map(Event::Completion),
+    );
+
+    if let Some(event) = stream.next().await {
+        match event {
+            Event::Controller(_) => {
+                // If we get a `Stop` request, we would ideally like to ask userspace to shut
+                // down gracefully.
+            }
+            Event::Completion(result) => {
+                match result {
+                    Ok(Ok(ExitStatus::Exit(0))) => {
+                        request_stream_control.shutdown_with_epitaph(zx::Status::OK)
+                    }
+                    _ => request_stream_control.shutdown_with_epitaph(zx::Status::from_raw(
+                        fcomponent::Error::InstanceDied.into_primitive() as i32,
+                    )),
+                };
+            }
+        }
+    }
+    // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
+    fruntime::job_default().kill().expect("Failed to kill job");
 }
 
 pub async fn create_component_from_stream(
@@ -211,8 +259,12 @@ pub async fn create_component_from_stream(
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                let request_stream = controller.into_stream()?;
                 let config = get_config_from_component_start_info(start_info);
-                return create_container(config, Some(controller)).await;
+                let (sender, receiver) = oneshot::channel::<TaskResult>();
+                let container = create_container(config, sender).await?;
+                fasync::Task::spawn(server_component_controller(request_stream, receiver)).detach();
+                return Ok(container);
             }
         }
     }
@@ -221,7 +273,7 @@ pub async fn create_component_from_stream(
 
 async fn create_container(
     mut config: ConfigWrapper,
-    controller: Option<ServerEnd<frunner::ComponentControllerMarker>>,
+    task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Arc<Container>, Error> {
     trace_duration!(trace_category_starnix!(), trace_name_create_container!());
     const DEFAULT_INIT: &str = "/container/init";
@@ -281,19 +333,7 @@ async fn create_container(
     init_task.exec(executable, argv[0].clone(), argv.clone(), vec![])?;
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
-
-        // Notify the client that the container is exiting.
-        if let Some(controller) = controller {
-            let _ = match result {
-                Ok(ExitStatus::Exit(0)) => controller.close_with_epitaph(zx::Status::OK),
-                _ => controller.close_with_epitaph(zx::Status::from_raw(
-                    fcomponent::Error::InstanceDied.into_primitive() as i32,
-                )),
-            };
-        }
-
-        // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
-        fruntime::job_default().kill().expect("Failed to kill job");
+        let _ = task_complete.send(result);
     });
     if let Some(startup_file_path) = startup_file_path {
         wait_for_init_file(&startup_file_path, system_task).await?;
