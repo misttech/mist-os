@@ -30,9 +30,16 @@ static_assert(kNelsonPwmPeriod.to_nsecs() <= UINT32_MAX);
 }  // namespace
 
 zx_status_t LightDevice::Init(bool init_on) {
-  zx_status_t status = ZX_OK;
-  if (pwm_.has_value() && ((status = pwm_->Enable()) != ZX_OK)) {
-    return status;
+  if (pwm_.has_value()) {
+    auto result = (*pwm_)->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "PWM enable failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "PWM enable failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
   return pwm_.has_value() ? SetBrightnessValue(init_on ? kMaxBrightness : kMinBrightness)
                           : SetSimpleValue(init_on);
@@ -45,7 +52,7 @@ zx_status_t LightDevice::SetSimpleValue(bool value) {
 
   zx_status_t status = ZX_OK;
   if ((status = gpio_.Write(value)) != ZX_OK) {
-    zxlogf(ERROR, "%s: GPIO write failed", __func__);
+    zxlogf(ERROR, "GPIO write failed");
     return status;
   }
 
@@ -61,20 +68,23 @@ zx_status_t LightDevice::SetBrightnessValue(double value) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  zx_status_t status = ZX_OK;
   aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t config = {
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
       .polarity = false,
       .period_ns = static_cast<uint32_t>(pwm_period_.to_nsecs()),
       .duty_cycle = static_cast<float>(value * 100.0 / (kMaxBrightness * 1.0)),
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&regular),
-      .mode_config_size = sizeof(regular),
+      .mode_config = fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&regular),
+                                                             sizeof(regular)),
   };
-  if ((status = pwm_->SetConfig(&config)) != ZX_OK) {
-    zxlogf(ERROR, "%s: PWM set config failed", __func__);
-    return status;
+  auto result = (*pwm_)->SetConfig(cfg);
+  if (!result.ok()) {
+    zxlogf(ERROR, "PWM set config failed: %s", result.status_string());
+    return result.status();
   }
-
+  if (result->is_error()) {
+    zxlogf(ERROR, "PWM set config failed: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
   value_ = value;
   return ZX_OK;
 }
@@ -197,8 +207,8 @@ zx_status_t AmlLight::Init() {
     return configs.error_value();
   }
   if (names->size() != configs->size()) {
-    zxlogf(ERROR, "%s: number of names [%lu] does not match number of configs [%lu]", __func__,
-           names->size(), configs->size());
+    zxlogf(ERROR, "number of names [%lu] does not match number of configs [%lu]", names->size(),
+           configs->size());
     return ZX_ERR_INTERNAL;
   }
 
@@ -227,25 +237,28 @@ zx_status_t AmlLight::Init() {
 
     ddk::GpioProtocolClient gpio(fragments[count].device);
     if (!gpio.is_valid()) {
-      zxlogf(ERROR, "%s: could not get gpio protocol: %d", __func__, status);
+      zxlogf(ERROR, "could not get gpio protocol: %d", status);
       return status;
     }
     count++;
 
     if (config->brightness) {
-      ddk::PwmProtocolClient pwm(fragments[count].device);
-      if (!pwm.is_valid()) {
-        zxlogf(ERROR, "%s: could not get pwm protocol: %d", __func__, status);
-        return status;
+      zx::result client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(
+          parent(), fragments[count].name);
+      if (client_end.is_error()) {
+        zxlogf(ERROR, "Failed to initialize PWM Client, st = %s", client_end.status_string());
+        return client_end.status_value();
       }
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
+
       count++;
-      lights_.emplace_back(name, gpio, pwm, pwm_period);
+      lights_.emplace_back(name, gpio, std::move(pwm), pwm_period);
     } else {
       lights_.emplace_back(name, gpio, std::nullopt, pwm_period);
     }
 
     if ((status = lights_.back().Init(config->init_on)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Could not initialize light", __func__);
+      zxlogf(ERROR, "Could not initialize light");
       return status;
     }
 

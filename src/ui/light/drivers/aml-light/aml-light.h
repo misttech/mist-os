@@ -6,8 +6,8 @@
 #define SRC_UI_LIGHT_DRIVERS_AML_LIGHT_AML_LIGHT_H_
 
 #include <fidl/fuchsia.hardware.light/cpp/wire.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <threads.h>
 
@@ -33,8 +33,9 @@ using AmlLightType = ddk::Device<AmlLight, ddk::Messageable<Light>::Mixin>;
 class LightDevice {
  public:
   LightDevice(std::string name, ddk::GpioProtocolClient gpio,
-              std::optional<ddk::PwmProtocolClient> pwm, zx::duration pwm_period)
-      : name_(std::move(name)), gpio_(gpio), pwm_(pwm), pwm_period_(pwm_period) {}
+              std::optional<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> pwm,
+              zx::duration pwm_period)
+      : name_(std::move(name)), gpio_(gpio), pwm_(std::move(pwm)), pwm_period_(pwm_period) {}
 
   zx_status_t Init(bool init_on);
 
@@ -50,7 +51,7 @@ class LightDevice {
  private:
   std::string name_;
   ddk::GpioProtocolClient gpio_;
-  std::optional<ddk::PwmProtocolClient> pwm_;
+  std::optional<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> pwm_;
 
   double value_ = 0;
   const zx::duration pwm_period_;

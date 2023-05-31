@@ -4,40 +4,100 @@
 
 #include "aml-light.h"
 
+#include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
-#include <fuchsia/hardware/pwm/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/fidl-async/cpp/bind.h>
 
 #include <cmath>
+#include <list>
 
 #include <fbl/alloc_checker.h>
 
-bool operator==(const pwm_config_t& lhs, const pwm_config_t& rhs) {
+bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
+                const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) && (lhs.mode_config_size == rhs.mode_config_size) &&
-         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config_buffer)->mode ==
-          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config_buffer)->mode);
+         (lhs.duty_cycle == rhs.duty_cycle) &&
+         (lhs.mode_config.count() == rhs.mode_config.count()) &&
+         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
+          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
 }
 
 namespace aml_light {
+class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_pwm::Pwm> {
+ public:
+  void SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) override {
+    ASSERT_GT(expect_configs_.size(), 0);
+    auto expect_config = expect_configs_.front();
+
+    ASSERT_EQ(request->config, expect_config);
+
+    expect_configs_.erase(expect_configs_.begin());
+    mode_config_buffers_.pop_front();
+    completer.ReplySuccess();
+  }
+  void Enable(EnableCompleter::Sync& completer) override {
+    ASSERT_TRUE(expect_enable_);
+    expect_enable_ = false;
+    completer.ReplySuccess();
+  }
+
+  void ExpectEnable() { expect_enable_ = true; }
+
+  void ExpectSetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
+    std::unique_ptr<uint8_t[]> mode_config =
+        std::make_unique<uint8_t[]>(config.mode_config.count());
+    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.count());
+
+    auto copy = config;
+    copy.mode_config =
+        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
+    expect_configs_.push_back(std::move(copy));
+    mode_config_buffers_.push_back(std::move(mode_config));
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> BindServer() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
+    EXPECT_TRUE(endpoints.is_ok());
+    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
+    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints->client));
+  }
+
+  void VerifyAndClear() {
+    ASSERT_EQ(expect_configs_.size(), 0);
+    ASSERT_EQ(mode_config_buffers_.size(), 0);
+    ASSERT_FALSE(expect_enable_);
+  }
+
+ private:
+  std::list<fuchsia_hardware_pwm::wire::PwmConfig> expect_configs_;
+  std::list<std::unique_ptr<uint8_t[]>> mode_config_buffers_;
+
+  bool expect_enable_ = false;
+};
 
 class FakeAmlLight : public AmlLight {
  public:
-  static std::unique_ptr<FakeAmlLight> Create(const gpio_protocol_t* gpio,
-                                              std::optional<const pwm_protocol_t*> pwm,
-                                              zx_duration_t pwm_period = 170'625) {
+  static std::unique_ptr<FakeAmlLight> Create(
+      const gpio_protocol_t* gpio,
+      std::optional<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> pwm,
+      zx_duration_t pwm_period = 170'625) {
     fbl::AllocChecker ac;
     auto device = fbl::make_unique_checked<FakeAmlLight>(&ac);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: device object alloc failed", __func__);
       return nullptr;
     }
-    device->lights_.emplace_back(
-        "test", ddk::GpioProtocolClient(gpio),
-        pwm.has_value() ? std::optional<ddk::PwmProtocolClient>(*pwm) : std::nullopt,
-        zx::duration(pwm_period));
+    device->lights_.emplace_back("test", ddk::GpioProtocolClient(gpio),
+                                 pwm.has_value() ? std::move(pwm) : std::nullopt,
+                                 zx::duration(pwm_period));
     EXPECT_OK(device->lights_.back().Init(true));
     return device;
   }
@@ -54,6 +114,8 @@ namespace {
 
 class AmlLightTest : public zxtest::Test {
  public:
+  void SetUp() override { EXPECT_OK(pwm_loop_.StartThread("pwm-servers")); }
+
   void Init() {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
 
@@ -65,7 +127,9 @@ class AmlLightTest : public zxtest::Test {
 
   void TearDown() override {
     gpio_.VerifyAndClear();
-    pwm_.VerifyAndClear();
+    pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
+
+    pwm_loop_.Shutdown();
 
     loop_->Quit();
     loop_->JoinThreads();
@@ -76,9 +140,10 @@ class AmlLightTest : public zxtest::Test {
 
   std::unique_ptr<FakeAmlLight> light_;
 
-  ddk::MockGpio gpio_;
-  ddk::MockPwm pwm_;
+  async::Loop pwm_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<MockPwmServer> pwm_{pwm_loop_.dispatcher(), std::in_place};
 
+  ddk::MockGpio gpio_;
   fidl::ClientEnd<fuchsia_hardware_light::Light> client_;
 
  private:
@@ -86,15 +151,17 @@ class AmlLightTest : public zxtest::Test {
 };
 
 TEST_F(AmlLightTest, GetInfoTest1) {
-  pwm_.ExpectEnable(ZX_OK);
+  pwm_.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t init_config = {false, 170625, 100.0, reinterpret_cast<uint8_t*>(&regular),
-                              sizeof(regular)};
-  pwm_.ExpectSetConfig(ZX_OK, init_config);
+  fuchsia_hardware_pwm::wire::PwmConfig init_config = {
+      false, 170625, 100.0,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&regular),
+                                              sizeof(regular))};
+  pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, init_config);
 
   auto gpio = gpio_.GetProto();
-  auto pwm = pwm_.GetProto();
-  light_ = FakeAmlLight::Create(gpio, pwm);
+  auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
+  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client));
   ASSERT_NOT_NULL(light_);
   Init();
 
@@ -176,15 +243,17 @@ TEST_F(AmlLightTest, SetValueTest1) {
 }
 
 TEST_F(AmlLightTest, SetValueTest2) {
-  pwm_.ExpectEnable(ZX_OK);
+  pwm_.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t config = {false, 170625, 100.0, reinterpret_cast<uint8_t*>(&regular),
-                         sizeof(regular)};
-  pwm_.ExpectSetConfig(ZX_OK, config);
+  fuchsia_hardware_pwm::wire::PwmConfig config = {
+      false, 170625, 100.0,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&regular),
+                                              sizeof(regular))};
+  pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
 
   auto gpio = gpio_.GetProto();
-  auto pwm = pwm_.GetProto();
-  light_ = FakeAmlLight::Create(gpio, pwm);
+  auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
+  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client));
   ASSERT_NOT_NULL(light_);
   Init();
 
@@ -203,7 +272,7 @@ TEST_F(AmlLightTest, SetValueTest2) {
   }
   {
     config.duty_cycle = 0;
-    pwm_.ExpectSetConfig(ZX_OK, config);
+    pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
     auto set_result = client->SetBrightnessValue(0, 0.0);
     EXPECT_OK(set_result.status());
     EXPECT_FALSE(set_result->is_error());
@@ -216,13 +285,13 @@ TEST_F(AmlLightTest, SetValueTest2) {
   }
   {
     config.duty_cycle = 20.0;
-    pwm_.ExpectSetConfig(ZX_OK, config);
+    pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
     auto set_result = client->SetBrightnessValue(0, 0.2);
     EXPECT_OK(set_result.status());
     EXPECT_FALSE(set_result->is_error());
   }
   {
-    pwm_.ExpectSetConfig(ZX_OK, config);
+    pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
     auto set_result = client->SetBrightnessValue(0, 0.2);
     EXPECT_OK(set_result.status());
     EXPECT_FALSE(set_result->is_error());
@@ -236,15 +305,17 @@ TEST_F(AmlLightTest, SetValueTest2) {
 }
 
 TEST_F(AmlLightTest, SetInvalidValueTest) {
-  pwm_.ExpectEnable(ZX_OK);
+  pwm_.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t config = {false, 170625, 100.0, reinterpret_cast<uint8_t*>(&regular),
-                         sizeof(regular)};
-  pwm_.ExpectSetConfig(ZX_OK, config);
+  fuchsia_hardware_pwm::wire::PwmConfig config = {
+      false, 170625, 100.0,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&regular),
+                                              sizeof(regular))};
+  pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
 
   auto gpio = gpio_.GetProto();
-  auto pwm = pwm_.GetProto();
-  light_ = FakeAmlLight::Create(gpio, pwm);
+  auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
+  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client));
   ASSERT_NOT_NULL(light_);
   Init();
 
@@ -285,15 +356,17 @@ TEST_F(AmlLightTest, SetInvalidValueTest) {
 }
 
 TEST_F(AmlLightTest, SetValueTestNelson) {
-  pwm_.ExpectEnable(ZX_OK);
+  pwm_.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t config = {false, 500'000, 100.0, reinterpret_cast<uint8_t*>(&regular),
-                         sizeof(regular)};
-  pwm_.ExpectSetConfig(ZX_OK, config);
+  fuchsia_hardware_pwm::wire::PwmConfig config = {
+      false, 500'000, 100.0,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&regular),
+                                              sizeof(regular))};
+  pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
 
   auto gpio = gpio_.GetProto();
-  auto pwm = pwm_.GetProto();
-  light_ = FakeAmlLight::Create(gpio, pwm, 500'000);
+  auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
+  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client), 500'000);
   ASSERT_NOT_NULL(light_);
   Init();
 
@@ -301,21 +374,21 @@ TEST_F(AmlLightTest, SetValueTestNelson) {
 
   {
     config.duty_cycle = 0;
-    pwm_.ExpectSetConfig(ZX_OK, config);
+    pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
     auto set_result = client->SetBrightnessValue(0, 0.0);
     EXPECT_OK(set_result.status());
     EXPECT_FALSE(set_result->is_error());
   }
   {
     config.duty_cycle = 20.0;
-    pwm_.ExpectSetConfig(ZX_OK, config);
+    pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
     auto set_result = client->SetBrightnessValue(0, 0.2);
     EXPECT_OK(set_result.status());
     EXPECT_FALSE(set_result->is_error());
   }
   {
     config.duty_cycle = 100.0;
-    pwm_.ExpectSetConfig(ZX_OK, config);
+    pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, config);
     auto set_result = client->SetBrightnessValue(0, 1.0);
     EXPECT_OK(set_result.status());
     EXPECT_FALSE(set_result->is_error());
