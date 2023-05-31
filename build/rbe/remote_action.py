@@ -805,7 +805,10 @@ def download_from_stub(
         return cl_utils.SubprocessResult(0)
 
     stub_info = DownloadStubInfo.read_from_file(stub)
-    return stub_info.download(downloader=downloader, working_dir_abs=working_dir_abs)
+    return stub_info.download(
+        downloader=downloader,
+        working_dir_abs=working_dir_abs,
+    )
 
 
 class RemoteAction(object):

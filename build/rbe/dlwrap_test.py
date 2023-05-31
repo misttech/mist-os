@@ -12,7 +12,10 @@ from pathlib import Path
 from unittest import mock
 
 import dlwrap
+
+import cl_utils
 import remote_action
+import remotetool
 
 
 class MainArgParserTests(unittest.TestCase):
@@ -72,6 +75,13 @@ class ReadDownloadStubInfosTests(unittest.TestCase):
         mock_is_stub.assert_called_with(path)
 
 
+_fake_downloader = remotetool.RemoteTool(
+    reproxy_cfg={
+        "service": "foo.build.service:443",
+        "instance": "my-project/remote/instances/default",
+    })
+
+
 class DownloadArtifactsTests(unittest.TestCase):
 
     def _stub_info(self, path: Path) -> remote_action.DownloadStubInfo:
@@ -91,15 +101,17 @@ class DownloadArtifactsTests(unittest.TestCase):
         with mock.patch.object(dlwrap, 'read_download_stub_infos',
                                return_value=iter([self._stub_info(path)
                                                  ])) as mock_read_stubs:
-            with mock.patch.object(
-                    remote_action.DownloadStubInfo, 'download',
-                    return_value=download_status) as mock_download:
+            with mock.patch.object(remote_action.DownloadStubInfo, 'download',
+                                   return_value=cl_utils.SubprocessResult(
+                                       download_status)) as mock_download:
                 status = dlwrap.download_artifacts(
-                    [path], exec_root=exec_root, working_dir=working_dir)
+                    [path],
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir)
         self.assertEqual(status, download_status)
         mock_read_stubs.assert_called_once()
         mock_download.assert_called_with(
-            exec_root=exec_root, working_dir=working_dir)
+            downloader=_fake_downloader, working_dir_abs=working_dir)
 
     def test_failure(self):
         path = 'highway/to/hell.obj'
@@ -109,15 +121,17 @@ class DownloadArtifactsTests(unittest.TestCase):
         with mock.patch.object(dlwrap, 'read_download_stub_infos',
                                return_value=iter([self._stub_info(path)
                                                  ])) as mock_read_stubs:
-            with mock.patch.object(
-                    remote_action.DownloadStubInfo, 'download',
-                    return_value=download_status) as mock_download:
+            with mock.patch.object(remote_action.DownloadStubInfo, 'download',
+                                   return_value=cl_utils.SubprocessResult(
+                                       download_status)) as mock_download:
                 status = dlwrap.download_artifacts(
-                    [path], exec_root=exec_root, working_dir=working_dir)
+                    [path],
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir)
         self.assertEqual(status, download_status)
         mock_read_stubs.assert_called_once()
         mock_download.assert_called_with(
-            exec_root=exec_root, working_dir=working_dir)
+            downloader=_fake_downloader, working_dir_abs=working_dir)
 
 
 class MainTests(unittest.TestCase):
@@ -131,8 +145,8 @@ class MainTests(unittest.TestCase):
             with mock.patch.object(subprocess, 'call') as mock_run:
                 status = dlwrap._main(
                     ['--dry-run', '--', 'cat', 'foo'],
-                    exec_root=exec_root,
-                    working_dir=working_dir)
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir)
         self.assertEqual(status, 0)
         mock_run.assert_not_called()
 
@@ -145,8 +159,8 @@ class MainTests(unittest.TestCase):
             with mock.patch.object(subprocess, 'call') as mock_run:
                 status = dlwrap._main(
                     ['--', 'cat', 'foo'],
-                    exec_root=exec_root,
-                    working_dir=working_dir)
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir)
         self.assertEqual(status, 1)
         mock_run.assert_not_called()
 
@@ -159,7 +173,9 @@ class MainTests(unittest.TestCase):
             with mock.patch.object(subprocess, 'call',
                                    return_value=0) as mock_run:
                 status = dlwrap._main(
-                    [], exec_root=exec_root, working_dir=working_dir)
+                    [],
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir)
         self.assertEqual(status, 0)
         mock_run.assert_not_called()
 
@@ -173,8 +189,8 @@ class MainTests(unittest.TestCase):
                                    return_value=0) as mock_run:
                 status = dlwrap._main(
                     ['--', 'cat', 'foo'],
-                    exec_root=exec_root,
-                    working_dir=working_dir)
+                    downloader=_fake_downloader,
+                    working_dir_abs=working_dir)
         self.assertEqual(status, 0)
         mock_run.assert_called_with(['cat', 'foo'])
 

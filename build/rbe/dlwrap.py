@@ -12,13 +12,23 @@ Usage:
 import argparse
 import os
 import subprocess
+import sys
 
+import cl_utils
+import fuchsia
 import remote_action
+import remotetool
 
 from pathlib import Path
 from typing import Iterable, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
+
+_PROJECT_ROOT = fuchsia.project_root_dir()
+
+# Needs to be computed with os.path.relpath instead of Path.relative_to
+# to support testing a fake (test-only) value of PROJECT_ROOT.
+_PROJECT_ROOT_REL = cl_utils.relpath(_PROJECT_ROOT, start=os.curdir)
 
 
 def msg(text: str):
@@ -79,8 +89,8 @@ def read_download_stub_infos(
 
 def download_artifacts(
     stub_paths: Iterable[Path],
-    exec_root: Path,
-    working_dir: Path,
+    downloader: remotetool.RemoteTool,
+    working_dir_abs: Path,
     verbose: bool = False,
     dry_run: bool = False,
 ) -> int:
@@ -90,29 +100,33 @@ def download_artifacts(
     download_statuses = [
         (
             stub.path,
-            stub.download(exec_root=exec_root, working_dir=working_dir))
-        for stub in stub_infos
+            stub.download(
+                downloader=downloader,
+                working_dir_abs=working_dir_abs,
+            )) for stub in stub_infos
     ]
     final_status = 0
     for path, status in download_statuses:
-        if status != 0:
-            final_status = status
-            print(f"Error downloading {path}")
+        if status.returncode != 0:
+            final_status = status.returncode
+            print(f"Error downloading {path}.  stderr was:")
+            for line in status.stderr:
+                print(line, file=sys.stderr)
 
     return final_status
 
 
 def _main(
     argv: Sequence[str],
-    exec_root: Path,
-    working_dir: Path,
+    downloader: remotetool.RemoteTool,
+    working_dir_abs: Path,
 ) -> int:
     main_args = _MAIN_ARG_PARSER.parse_args(argv)
 
     status = download_artifacts(
         stub_paths=main_args.download,
-        exec_root=exec_root,
-        working_dir=working_dir,
+        downloader=downloader,
+        working_dir_abs=working_dir_abs,
         verbose=main_args.verbose,
         dry_run=main_args.dry_run,
     )
@@ -131,10 +145,13 @@ def _main(
 
 
 def main(argv: Sequence[str]) -> int:
+    with open(_PROJECT_ROOT_REL / remote_action._REPROXY_CFG) as cfg:
+        downloader = remotetool.RemoteTool(
+            reproxy_cfg=remotetool.read_config_file_lines(cfg))
     return _main(
         argv,
-        exec_root=remote_action.PROJECT_ROOT_REL,
-        working_dir=Path(os.curdir),
+        downloader=downloader,
+        working_dir_abs=Path(os.curdir).absolute(),
     )
 
 
