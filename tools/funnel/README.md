@@ -7,7 +7,7 @@ you to develop in a remote workflow from your remote host.
 ## Usage
 
 ```
-Usage: funnel_bin -h <host> [-t <target-name>] [-r <repository-port>]
+Usage: funnel -h <host> [-t <target-name>] [-r <repository-port>]
 
 ffx Remote forwarding.
 

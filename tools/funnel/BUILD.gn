@@ -6,6 +6,7 @@ import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("funnel_bin") {
+  output_name = "funnel"
   edition = "2021"
   sources = [
     "src/logging.rs",
