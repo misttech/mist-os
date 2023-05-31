@@ -417,6 +417,10 @@ ElfLib::MemoryRegion ElfLib::GetSegmentData(size_t segment) {
     result.size = header->p_memsz;
   }
 
+  if (result.ptr == nullptr) {
+    result.size = 0;
+  }
+
   return result;
 }
 
@@ -434,21 +438,41 @@ std::optional<std::vector<uint8_t>> ElfLib::GetNote(const std::string& name, uin
     size_t namesz_padded;
     size_t descsz_padded;
 
-    for (const uint8_t* pos = data.ptr; pos < data.ptr + data.size;
+    for (const uint8_t* pos = data.ptr; (pos + sizeof(Elf64_Nhdr)) < data.ptr + data.size;
          pos += sizeof(Elf64_Nhdr) + namesz_padded + descsz_padded) {
+
       header = bit_cast<Elf64_Nhdr, const uint8_t>(*pos);
-      namesz_padded = (header.n_namesz + 3) & ~3UL;
-      descsz_padded = (header.n_descsz + 3) & ~3UL;
+
+      // Don't overflow the padded lengths.
+      if (header.n_namesz > (std::numeric_limits<Elf64_Word>::max() - 3)) {
+        namesz_padded = header.n_namesz;
+      } else {
+        namesz_padded = (header.n_namesz + 3) & ~3UL;
+      }
+      if (header.n_descsz > (std::numeric_limits<Elf64_Word>::max() - 3)) {
+        descsz_padded = header.n_descsz;
+      } else {
+        descsz_padded = (header.n_descsz + 3) & ~3UL;
+      }
 
       if (header.n_type != type) {
         continue;
       }
 
-      auto name_data = pos + sizeof(Elf64_Nhdr);
-      std::string entry_name(reinterpret_cast<const char*>(name_data), header.n_namesz - 1);
+      if (pos + sizeof(Elf64_Nhdr) + namesz_padded + descsz_padded > data.ptr + data.size) {
+        continue;
+      }
+      if (header.n_namesz == 0) {
+        continue;
+      }
 
-      if (entry_name == name) {
+      auto name_data = pos + sizeof(Elf64_Nhdr);
+      if (strncmp(reinterpret_cast<const char*>(name_data), name.c_str(), name.size()) == 0) {
         auto desc_data = name_data + namesz_padded;
+
+        if (header.n_descsz == std::numeric_limits<Elf64_Word>::max()) {
+          return std::nullopt;
+        }
 
         return std::vector(desc_data, desc_data + header.n_descsz);
       }
