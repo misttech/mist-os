@@ -8,7 +8,12 @@
         lifecycle: { stop_event: "notify" },
     },
     capabilities: [
-        { protocol: "fuchsia.net.dhcpv6.PrefixProvider" },
+        {
+            protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
+                "fuchsia.net.masquerade.Factory",
+            ],
+        },
     ],
     use: [
         {
@@ -46,7 +51,10 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.net.dhcpv6.PrefixProvider",
+            protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
+                "fuchsia.net.masquerade.Factory",
+            ],
             from: "self",
         },
     ],

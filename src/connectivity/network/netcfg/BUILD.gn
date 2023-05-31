@@ -22,6 +22,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.masquerade:fuchsia.net.masquerade_rust",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_rust",
@@ -58,6 +59,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:nonzero_ext",
+    "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
   ]
@@ -70,6 +72,7 @@ rustc_library("lib") {
     "src/errors.rs",
     "src/interface.rs",
     "src/lib.rs",
+    "src/masquerade.rs",
     "src/virtualization.rs",
   ]
 

@@ -248,5 +248,9 @@
             protocol: [ "fuchsia.net.reachability.Monitor" ],
             from: "#reachability",
         },
+        {
+            protocol: [ "fuchsia.net.masquerade.Factory" ],
+            from: "#netcfg",
+        },
     ],
 }

@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![deny(unused)]
+
 mod devices;
 mod dhcpv4;
 mod dhcpv6;
 mod dns;
 mod errors;
 mod interface;
+mod masquerade;
 mod virtualization;
 
 use ::dhcpv4::protocol::FromFidlExt as _;
@@ -32,6 +35,7 @@ use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
+use fidl_fuchsia_net_masquerade as fnet_masquerade;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_virtualization as fnet_virtualization;
@@ -177,6 +181,23 @@ enum InterfaceType {
     Wlan,
 }
 
+impl From<fidl_fuchsia_hardware_network::DeviceClass> for InterfaceType {
+    fn from(device_class: fidl_fuchsia_hardware_network::DeviceClass) -> Self {
+        DeviceClass::from(device_class).into()
+    }
+}
+
+impl From<DeviceClass> for InterfaceType {
+    fn from(device_class: DeviceClass) -> Self {
+        match device_class {
+            DeviceClass::Wlan | DeviceClass::WlanAp => InterfaceType::Wlan,
+            DeviceClass::Ethernet
+            | DeviceClass::Virtual
+            | DeviceClass::Ppp
+            | DeviceClass::Bridge => InterfaceType::Ethernet,
+        }
+    }
+}
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -235,6 +256,78 @@ impl Default for AllowedDeviceClasses {
             DeviceClass::Bridge,
             DeviceClass::WlanAp,
         ]))
+    }
+}
+
+#[derive(Debug, Default)]
+struct FilterEnabledState {
+    interface_types: HashSet<InterfaceType>,
+    masquerade_enabled_interface_ids: HashSet<NonZeroU64>,
+    currently_enabled_interfaces: HashSet<NonZeroU64>,
+}
+
+impl FilterEnabledState {
+    pub(crate) fn new(interface_types: HashSet<InterfaceType>) -> Self {
+        Self { interface_types, ..Default::default() }
+    }
+
+    /// Updates the filter state for the provided `interface_id`
+    ///
+    /// `interface_type`: The type of the given interface. If the type cannot be
+    /// determined, this will be None, and `FilterEnabledState::interface_types`
+    /// will be ignored.
+    pub(crate) async fn maybe_update<Filter: fnet_filter::FilterProxyInterface>(
+        &mut self,
+        interface_type: Option<InterfaceType>,
+        interface_id: NonZeroU64,
+        filter: &Filter,
+    ) -> Result<(), fnet_filter::EnableDisableInterfaceError> {
+        let should_be_enabled = self.should_enable(interface_type, interface_id);
+        let is_enabled = self.currently_enabled_interfaces.contains(&interface_id);
+        if should_be_enabled && !is_enabled {
+            if let Err(e) = filter
+                .enable_interface(interface_id.get())
+                .await
+                .unwrap_or_else(|err| exit_with_fidl_error(err))
+            {
+                error!("failed to enable interface {interface_id}: {e:?}");
+                return Err(e);
+            }
+            let _: bool = self.currently_enabled_interfaces.insert(interface_id);
+        } else if !should_be_enabled && is_enabled {
+            if let Err(e) = filter
+                .disable_interface(interface_id.get())
+                .await
+                .unwrap_or_else(|err| exit_with_fidl_error(err))
+            {
+                error!("failed to disable interface {interface_id}: {e:?}");
+                return Err(e);
+            }
+            let _: bool = self.currently_enabled_interfaces.remove(&interface_id);
+        }
+        Ok(())
+    }
+
+    /// Determines wether a given `interface_id` should be enabled.
+    ///
+    /// `interface_type`: The type of the given interface. If the type cannot be
+    /// determined, this will be None, and `FilterEnabledState::interface_types`
+    /// will be ignored.
+    fn should_enable(
+        &self,
+        interface_type: Option<InterfaceType>,
+        interface_id: NonZeroU64,
+    ) -> bool {
+        interface_type.as_ref().map(|ty| self.interface_types.contains(ty)).unwrap_or(false)
+            || self.masquerade_enabled_interface_ids.contains(&interface_id)
+    }
+
+    pub(crate) fn enable_masquerade_interface_id(&mut self, interface_id: NonZeroU64) {
+        let _: bool = self.masquerade_enabled_interface_ids.insert(interface_id);
+    }
+
+    pub(crate) fn disable_masquerade_interface_id(&mut self, interface_id: NonZeroU64) {
+        let _: bool = self.masquerade_enabled_interface_ids.remove(&interface_id);
     }
 }
 
@@ -344,13 +437,6 @@ macro_rules! no_update_filter_rules {
             }
         }
     };
-}
-
-fn should_enable_filter(
-    filter_enabled_interface_types: &HashSet<InterfaceType>,
-    info: &DeviceInfo,
-) -> bool {
-    filter_enabled_interface_types.contains(&info.interface_type())
 }
 
 #[derive(Debug)]
@@ -476,7 +562,7 @@ pub struct NetCfg<'a> {
 
     persisted_interface_config: interface::FileBackedConfig<'a>,
 
-    filter_enabled_interface_types: HashSet<InterfaceType>,
+    filter_enabled_state: FilterEnabledState,
 
     // TODO(https://fxbug.dev/67407): These hashmaps are all indexed by
     // interface ID and store per-interface state, and should be merged.
@@ -693,7 +779,7 @@ impl<'a> NetCfg<'a> {
             dhcpv4_client_provider,
             dhcpv6_client_provider,
             persisted_interface_config,
-            filter_enabled_interface_types,
+            filter_enabled_state: FilterEnabledState::new(filter_enabled_interface_types),
             interface_properties: Default::default(),
             interface_states: Default::default(),
             interface_metrics,
@@ -872,9 +958,12 @@ impl<'a> NetCfg<'a> {
             "dns watchers should be empty"
         );
 
+        let mut masquerade_handler = masquerade::Masquerade::new(self.filter.clone());
+
         enum RequestStream {
             Virtualization(fnet_virtualization::ControlRequestStream),
             Dhcpv6PrefixProvider(fnet_dhcpv6::PrefixProviderRequestStream),
+            Masquerade(fnet_masquerade::FactoryRequestStream),
         }
 
         // Serve fuchsia.net.virtualization/Control.
@@ -883,6 +972,7 @@ impl<'a> NetCfg<'a> {
             fs.dir("svc").add_fidl_service(RequestStream::Virtualization);
         let _: &mut ServiceFsDir<'_, _> =
             fs.dir("svc").add_fidl_service(RequestStream::Dhcpv6PrefixProvider);
+        let _: &mut ServiceFsDir<'_, _> = fs.dir("svc").add_fidl_service(RequestStream::Masquerade);
         let _: &mut ServiceFs<_> =
             fs.take_and_serve_directory_handle().context("take and serve directory handle")?;
         let mut fs = fs.fuse();
@@ -891,6 +981,11 @@ impl<'a> NetCfg<'a> {
 
         // Maintain a queue of virtualization events to be dispatched to the virtualization handler.
         let mut virtualization_events = futures::stream::SelectAll::new();
+
+        // Maintain a queue of masquerade events to be dispatched to the masquerade handler.
+        let mut masquerade_events = futures::stream::SelectAll::<
+            futures::stream::LocalBoxStream<'_, Result<_, fidl::Error>>,
+        >::new();
 
         // Lifecycle handle takes no args, must be set to zero.
         // See zircon/processargs.h.
@@ -927,6 +1022,7 @@ impl<'a> NetCfg<'a> {
             ),
             Dhcpv6Prefixes(Option<(NonZeroU64, Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>)>),
             VirtualizationEvent(virtualization::Event),
+            MasqueradeEvent(masquerade::Event),
             LifecycleRequest(
                 Result<Option<fidl_fuchsia_process_lifecycle::LifecycleRequest>, fidl::Error>,
             ),
@@ -964,6 +1060,9 @@ impl<'a> NetCfg<'a> {
                 }
                 virt_event = virtualization_events.select_next_some() => {
                     Event::VirtualizationEvent(virt_event)
+                }
+                masq_event = masquerade_events.select_next_some() => {
+                    Event::MasqueradeEvent(masq_event.context("error while receiving MasqueradeEvent")?)
                 }
                 req = lifecycle.try_next() => {
                     Event::LifecycleRequest(req)
@@ -1033,6 +1132,16 @@ impl<'a> NetCfg<'a> {
                         RequestStream::Dhcpv6PrefixProvider(req_stream) => {
                             dhcpv6_prefix_provider_requests.push(req_stream);
                         }
+                        RequestStream::Masquerade(req_stream) => {
+                            masquerade_handler
+                                .handle_event(
+                                    masquerade::Event::FactoryRequestStream(req_stream),
+                                    &mut masquerade_events,
+                                    &mut self.filter_enabled_state,
+                                    &self.interface_states,
+                                )
+                                .await;
+                        }
                     }
                 }
                 Event::Dhcpv4Configuration(config) => {
@@ -1096,6 +1205,16 @@ impl<'a> NetCfg<'a> {
                     .await
                     .context("handle virtualization event")
                     .or_else(errors::Error::accept_non_fatal)?,
+                Event::MasqueradeEvent(event) => {
+                    masquerade_handler
+                        .handle_event(
+                            event,
+                            &mut masquerade_events,
+                            &mut self.filter_enabled_state,
+                            &self.interface_states,
+                        )
+                        .await
+                }
                 Event::LifecycleRequest(req) => {
                     let req = req.context("lifecycle request")?.ok_or_else(|| {
                         anyhow::anyhow!("LifecycleRequestStream ended unexpectedly")
@@ -1878,7 +1997,7 @@ impl<'a> NetCfg<'a> {
             info!("discovered host interface with id={}, configuring interface", interface_id);
 
             let () = Self::configure_host(
-                &self.filter_enabled_interface_types,
+                &mut self.filter_enabled_state,
                 &self.filter,
                 &self.stack,
                 interface_id,
@@ -1906,42 +2025,20 @@ impl<'a> NetCfg<'a> {
 
     /// Configure host interface.
     async fn configure_host(
-        filter_enabled_interface_types: &HashSet<InterfaceType>,
+        filter_enabled_state: &mut FilterEnabledState,
         filter: &fnet_filter::FilterProxy,
         stack: &fnet_stack::StackProxy,
         interface_id: NonZeroU64,
         info: &DeviceInfo,
         start_in_stack_dhcpv4: bool,
     ) -> Result<(), errors::Error> {
-        if should_enable_filter(filter_enabled_interface_types, info) {
-            info!("enable filter for nic {}", interface_id);
-            let () = filter
-                .enable_interface(interface_id.get())
-                .await
-                .unwrap_or_else(|err| exit_with_fidl_error(err))
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "failed to enable filter on nic {} with error = {:?}",
-                        interface_id,
-                        e
-                    )
-                })
-                .map_err(errors::Error::NonFatal)?;
-        } else {
-            info!("disable filter for nic {}", interface_id);
-            let () = filter
-                .disable_interface(interface_id.get())
-                .await
-                .unwrap_or_else(|err| exit_with_fidl_error(err))
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "failed to disable filter on nic {} with error = {:?}",
-                        interface_id,
-                        e
-                    )
-                })
-                .map_err(errors::Error::NonFatal)?;
-        };
+        filter_enabled_state
+            .maybe_update(Some(info.interface_type()), interface_id, filter)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!("failed to update filter on nic {interface_id} with error = {e:?}")
+            })
+            .map_err(errors::Error::NonFatal)?;
 
         // Enable DHCP.
         if start_in_stack_dhcpv4 {
@@ -2796,7 +2893,7 @@ mod tests {
                     .then_some(dhcpv4_client_provider),
                 dhcpv6_client_provider: Some(dhcpv6_client_provider),
                 persisted_interface_config,
-                filter_enabled_interface_types: Default::default(),
+                filter_enabled_state: Default::default(),
                 interface_properties: Default::default(),
                 interface_states: Default::default(),
                 interface_metrics: Default::default(),
@@ -4535,6 +4632,8 @@ mod tests {
             [InterfaceType::Ethernet].iter().cloned().collect();
         let types_wlan: HashSet<InterfaceType> = [InterfaceType::Wlan].iter().cloned().collect();
 
+        let id = nonzero_ext::nonzero!(10u64);
+
         let make_info =
             |device_class| DeviceInfo { device_class, mac: None, topological_path: "".to_string() };
 
@@ -4542,16 +4641,28 @@ mod tests {
         let wlan_ap_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::WlanAp);
         let ethernet_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::Ethernet);
 
-        assert_eq!(should_enable_filter(&types_empty, &wlan_info), false);
-        assert_eq!(should_enable_filter(&types_empty, &wlan_ap_info), false);
-        assert_eq!(should_enable_filter(&types_empty, &ethernet_info), false);
+        let mut fes = FilterEnabledState::new(types_empty);
+        assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), false);
+        assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), false);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
 
-        assert_eq!(should_enable_filter(&types_ethernet, &wlan_info), false);
-        assert_eq!(should_enable_filter(&types_ethernet, &wlan_ap_info), false);
-        assert_eq!(should_enable_filter(&types_ethernet, &ethernet_info), true);
+        fes.enable_masquerade_interface_id(id);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
 
-        assert_eq!(should_enable_filter(&types_wlan, &wlan_info), true);
-        assert_eq!(should_enable_filter(&types_wlan, &wlan_ap_info), true);
-        assert_eq!(should_enable_filter(&types_wlan, &ethernet_info), false);
+        let mut fes = FilterEnabledState::new(types_ethernet);
+        assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), false);
+        assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), false);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
+
+        fes.enable_masquerade_interface_id(id);
+        assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), true);
+
+        let mut fes = FilterEnabledState::new(types_wlan);
+        assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), true);
+        assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), true);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
+
+        fes.enable_masquerade_interface_id(id);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
     }
 }

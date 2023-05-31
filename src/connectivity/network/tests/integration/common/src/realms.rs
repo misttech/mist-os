@@ -15,6 +15,7 @@ use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_masquerade as fnet_masquerade;
 use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_neighbor as fnet_neighbor;
@@ -142,12 +143,14 @@ impl ManagementAgent {
     /// Gets the services exposed by this management agent.
     pub fn get_services(&self) -> &[&'static str] {
         match self {
-            Self::NetCfg(NetCfgVersion::Basic) => {
-                &[fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME]
-            }
+            Self::NetCfg(NetCfgVersion::Basic) => &[
+                fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME,
+                fnet_masquerade::FactoryMarker::PROTOCOL_NAME,
+            ],
             Self::NetCfg(NetCfgVersion::Advanced) => &[
                 fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME,
                 fnet_virtualization::ControlMarker::PROTOCOL_NAME,
+                fnet_masquerade::FactoryMarker::PROTOCOL_NAME,
             ],
         }
     }

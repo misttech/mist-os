@@ -60,13 +60,7 @@ pub(super) struct DeviceInfo {
 impl DeviceInfo {
     pub(super) fn interface_type(&self) -> crate::InterfaceType {
         let Self { device_class, mac: _, topological_path: _ } = self;
-        match device_class {
-            fhwnet::DeviceClass::Wlan | fhwnet::DeviceClass::WlanAp => crate::InterfaceType::Wlan,
-            fhwnet::DeviceClass::Ethernet
-            | fhwnet::DeviceClass::Virtual
-            | fhwnet::DeviceClass::Ppp
-            | fhwnet::DeviceClass::Bridge => crate::InterfaceType::Ethernet,
-        }
+        (*device_class).into()
     }
 
     pub(super) fn is_wlan_ap(&self) -> bool {
