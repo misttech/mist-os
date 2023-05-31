@@ -599,10 +599,45 @@ mod tests {
         test_add_remove_ip_addresses::<Ipv6>();
     }
 
+    struct AddGatewayRouteTestCase {
+        should_specify_device: bool,
+        enable_before_final_route_add: bool,
+        expected_first_result: Result<(), AddRouteError>,
+        expected_second_result: Result<(), AddRouteError>,
+    }
+
     #[ip_test]
-    #[test_case(false; "without_specified_device")]
-    #[test_case(true; "with_specified_device")]
-    fn add_gateway_route<I: Ip + TestIpExt>(should_specify_device: bool) {
+    #[test_case(AddGatewayRouteTestCase {
+        should_specify_device: false,
+        enable_before_final_route_add: false,
+        expected_first_result: Err(AddRouteError::GatewayNotNeighbor),
+        expected_second_result: Err(AddRouteError::GatewayNotNeighbor),
+    }; "without_specified_device_no_enable")]
+    #[test_case(AddGatewayRouteTestCase {
+        should_specify_device: true,
+        enable_before_final_route_add: false,
+        expected_first_result: Ok(()),
+        expected_second_result: Ok(()),
+    }; "with_specified_device_no_enable")]
+    #[test_case(AddGatewayRouteTestCase {
+        should_specify_device: false,
+        enable_before_final_route_add: true,
+        expected_first_result: Err(AddRouteError::GatewayNotNeighbor),
+        expected_second_result: Ok(()),
+    }; "without_specified_device_enabled")]
+    #[test_case(AddGatewayRouteTestCase {
+        should_specify_device: true,
+        enable_before_final_route_add: true,
+        expected_first_result: Ok(()),
+        expected_second_result: Ok(()),
+    }; "with_specified_device_enabled")]
+    fn add_gateway_route<I: Ip + TestIpExt>(test_case: AddGatewayRouteTestCase) {
+        let AddGatewayRouteTestCase {
+            should_specify_device,
+            enable_before_final_route_add,
+            expected_first_result,
+            expected_second_result,
+        } = test_case;
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(crate::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
@@ -635,7 +670,12 @@ mod tests {
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
-            Err(AddRouteError::GatewayNotNeighbor)
+            expected_first_result,
+        );
+
+        assert_eq!(
+            crate::del_route(&sync_ctx, &mut non_sync_ctx, gateway_subnet.into()),
+            expected_first_result.map_err(|_: AddRouteError| error::NetstackError::NotFound),
         );
 
         // Then, add a route to the gateway, and try again, expecting success.
@@ -651,6 +691,10 @@ mod tests {
             ),
             Ok(())
         );
+
+        if enable_before_final_route_add {
+            crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device_id);
+        }
         assert_eq!(
             crate::add_route(
                 &sync_ctx,
@@ -662,7 +706,7 @@ mod tests {
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
-            Ok(())
+            expected_second_result,
         );
     }
 

@@ -27,9 +27,12 @@ use crate::{
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
-pub(crate) trait IpForwardingDeviceContext: DeviceIdContext<AnyDevice> {
+pub(crate) trait IpForwardingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
     /// Returns the routing metric for the device.
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
+
+    /// Returns true if the IP device is enabled.
+    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 }
 
 /// An error encountered when adding a forwarding entry.
@@ -64,23 +67,15 @@ pub(crate) fn add_route<
     sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
         let (device, gateway) = match (device, gateway) {
             (None, None) => unreachable!("AddableEntry must have device or gateway set"),
-            (Some(device), None) => (device, None),
-            (device, Some(gateway)) => {
-                // Verify that the routing table has an on-link route to the
-                // gateway via the specified device.
-                table.lookup(sync_ctx, device.as_ref(), *gateway).map_or(
+            (Some(device), gateway) => (device, gateway),
+            (None, Some(gateway)) => {
+                // Find an on-link route to the gateway when the device is not
+                // specified.
+                table.lookup(sync_ctx, None, *gateway).map_or(
                     Err(AddRouteError::GatewayNotNeighbor),
                     |Destination { next_hop: found_next_hop, device: found_device }| {
                         match found_next_hop {
-                            NextHop::RemoteAsNeighbor => {
-                                if let Some(given_device) = device {
-                                    // We restricted the above lookup by the
-                                    // given device, so the found device must be
-                                    // equal.
-                                    assert!(found_device == given_device);
-                                }
-                                Ok((found_device, Some(gateway)))
-                            }
+                            NextHop::RemoteAsNeighbor => Ok((found_device, Some(gateway))),
                             NextHop::Gateway(_intermediary_gateway) => {
                                 Err(AddRouteError::GatewayNotNeighbor)
                             }
@@ -186,7 +181,7 @@ pub(super) fn del_specific_routes<
 
 // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
 // observing the device's metric, if applicable.
-fn observe_metric<SC: IpForwardingDeviceContext>(
+fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
     sync_ctx: &mut SC,
     device: &SC::DeviceId,
     metric: AddableMetric,
@@ -317,7 +312,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     ///
     /// If multiple entries match `address` or the first entry will be selected.
     /// See [`ForwardingTable`] for more details of how entries are sorted.
-    pub(crate) fn lookup<SC: DeviceIdContext<AnyDevice, DeviceId = D>>(
+    pub(crate) fn lookup<SC: IpForwardingDeviceContext<I, DeviceId = D>>(
         &self,
         sync_ctx: &mut SC,
         local_device: Option<&D>,
@@ -331,7 +326,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             .next()
     }
 
-    pub(crate) fn lookup_filter_map<'a, SC: DeviceIdContext<AnyDevice, DeviceId = D>, R>(
+    pub(crate) fn lookup_filter_map<'a, SC: IpForwardingDeviceContext<I, DeviceId = D>, R>(
         &'a self,
         sync_ctx: &'a mut SC,
         local_device: Option<&'a D>,
@@ -348,9 +343,12 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             if local_device.map_or(false, |local_device| local_device != device) {
                 return None;
             }
-            // TODO(https://fxbug.dev/125338): Also make sure that the IP device
-            // is enabled.
+
             if !sync_ctx.is_device_installed(device) {
+                return None;
+            }
+
+            if !sync_ctx.is_ip_device_enabled(device) {
                 return None;
             }
 
@@ -364,7 +362,17 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
 
 #[cfg(test)]
 pub(crate) mod testutil {
+    use alloc::collections::HashSet;
+    use core::marker::PhantomData;
+
+    use derivative::Derivative;
+
     use super::*;
+
+    use crate::{
+        context::testutil::FakeSyncCtx,
+        ip::{testutil::FakeIpDeviceIdCtx, StrongId},
+    };
 
     // Provide tests with access to the private `ForwardingTable.add_entry` fn.
     pub(crate) fn add_entry<I: Ip, D: Clone + Debug + PartialEq>(
@@ -373,11 +381,54 @@ pub(crate) mod testutil {
     ) -> Result<&Entry<I::Addr, D>, crate::error::ExistsError> {
         table.add_entry(entry)
     }
+
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    pub(crate) struct FakeIpForwardingContext<I, D> {
+        disabled_devices: HashSet<D>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<D>,
+        _marker: PhantomData<I>,
+    }
+
+    impl<I, D> FakeIpForwardingContext<I, D> {
+        pub(crate) fn ip_device_id_ctx_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
+            &mut self.ip_device_id_ctx
+        }
+
+        pub(crate) fn disabled_devices_mut(&mut self) -> &mut HashSet<D> {
+            &mut self.disabled_devices
+        }
+    }
+
+    impl<I, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpForwardingContext<I, D> {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
+            &self.ip_device_id_ctx
+        }
+    }
+
+    impl<I, D> AsMut<FakeIpDeviceIdCtx<D>> for FakeIpForwardingContext<I, D> {
+        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
+            &mut self.ip_device_id_ctx
+        }
+    }
+
+    pub(crate) type FakeIpForwardingCtx<I, D> = FakeSyncCtx<FakeIpForwardingContext<I, D>, (), D>;
+
+    impl<I: Ip, D: StrongId> IpForwardingDeviceContext<I> for FakeIpForwardingCtx<I, D>
+    where
+        Self: DeviceIdContext<AnyDevice, DeviceId = D>,
+    {
+        fn get_routing_metric(&mut self, _device_id: &Self::DeviceId) -> RawMetric {
+            unimplemented!()
+        }
+
+        fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+            !self.get_ref().disabled_devices.contains(device_id)
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
-    use core::marker::PhantomData;
-
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
     use itertools::Itertools;
@@ -386,32 +437,20 @@ mod tests {
         ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
         SpecifiedAddr,
     };
+    use test_case::test_case;
     use tracing::trace;
 
     use super::*;
     use crate::{
-        context::testutil::FakeSyncCtx,
         device::testutil::MultipleDevicesId,
         ip::{
-            testutil::FakeIpDeviceIdCtx,
+            forwarding::testutil::FakeIpForwardingCtx,
             types::{Metric, RawMetric},
         },
         testutil::FakeEventDispatcherConfig,
     };
 
-    #[derive(Default)]
-    struct FakeForwardingContext<I> {
-        ip_device_id_ctx: FakeIpDeviceIdCtx<MultipleDevicesId>,
-        _marker: PhantomData<I>,
-    }
-
-    impl<I> AsRef<FakeIpDeviceIdCtx<MultipleDevicesId>> for FakeForwardingContext<I> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<MultipleDevicesId> {
-            &self.ip_device_id_ctx
-        }
-    }
-
-    type FakeCtx<I> = FakeSyncCtx<FakeForwardingContext<I>, (), MultipleDevicesId>;
+    type FakeCtx<I> = FakeIpForwardingCtx<I, MultipleDevicesId>;
 
     impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         /// Print the table.
@@ -792,7 +831,7 @@ mod tests {
         fn lookup_with_devices<I: Ip>(
             table: &ForwardingTable<I, MultipleDevicesId>,
             next_hop: SpecifiedAddr<I::Addr>,
-            sync_ctx: &mut FakeSyncCtx<FakeForwardingContext<I>, (), MultipleDevicesId>,
+            sync_ctx: &mut FakeCtx<I>,
             devices: &[MultipleDevicesId],
         ) -> Vec<Destination<I::Addr, MultipleDevicesId>> {
             table
@@ -878,7 +917,23 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_use_active_device<I: Ip + TestIpExt>() {
+    #[test_case(|sync_ctx, device, device_unusable| {
+        sync_ctx
+            .get_mut()
+            .ip_device_id_ctx_mut()
+            .set_device_removed(device, device_unusable)
+    }; "device_removed")]
+    #[test_case(|sync_ctx, device, device_unusable| {
+        let disabled_devices = sync_ctx.get_mut().disabled_devices_mut();
+        if device_unusable {
+            let _: bool = disabled_devices.insert(device);
+        } else {
+            let _: bool = disabled_devices.remove(&device);
+        }
+    }; "device_disabled")]
+    fn test_usable_device<I: Ip + TestIpExt>(
+        set_inactive: fn(&mut FakeCtx<I>, MultipleDevicesId, bool),
+    ) {
         const MORE_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::A;
         const LESS_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::B;
 
@@ -899,8 +954,8 @@ mod tests {
             metric,
         };
         assert_eq!(table.add_entry(less_specific_entry.clone()), Ok(&less_specific_entry));
-        for (device_removed, expected) in [
-            // If the device is removed, then we cannot use routes through it.
+        for (device_unusable, expected) in [
+            // If the device is unusable, then we cannot use routes through it.
             (true, None),
             (
                 false,
@@ -910,15 +965,12 @@ mod tests {
                 }),
             ),
         ] {
-            sync_ctx
-                .get_mut()
-                .ip_device_id_ctx
-                .set_device_removed(LESS_SPECIFIC_SUB_DEVICE, device_removed);
+            set_inactive(&mut sync_ctx, LESS_SPECIFIC_SUB_DEVICE, device_unusable);
             assert_eq!(
                 table.lookup(&mut sync_ctx, None, *remote),
                 expected,
-                "device_removed={}",
-                device_removed,
+                "device_unusable={}",
+                device_unusable,
             );
         }
 
@@ -929,7 +981,7 @@ mod tests {
             metric,
         };
         assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
-        for (device_removed, expected) in [
+        for (device_unusable, expected) in [
             (
                 false,
                 Some(Destination {
@@ -937,7 +989,7 @@ mod tests {
                     device: MORE_SPECIFIC_SUB_DEVICE.clone(),
                 }),
             ),
-            // If the device is removed, then we cannot use routes through it,
+            // If the device is unusable, then we cannot use routes through it,
             // but can use routes through other (active) devices.
             (
                 true,
@@ -947,20 +999,17 @@ mod tests {
                 }),
             ),
         ] {
-            sync_ctx
-                .get_mut()
-                .ip_device_id_ctx
-                .set_device_removed(MORE_SPECIFIC_SUB_DEVICE, device_removed);
+            set_inactive(&mut sync_ctx, MORE_SPECIFIC_SUB_DEVICE, device_unusable);
             assert_eq!(
                 table.lookup(&mut sync_ctx, None, *remote),
                 expected,
-                "device_removed={}",
-                device_removed,
+                "device_unusable={}",
+                device_unusable,
             );
         }
 
-        // If no devices exist, then we can't get a route.
-        sync_ctx.get_mut().ip_device_id_ctx.set_device_removed(LESS_SPECIFIC_SUB_DEVICE, true);
+        // If no devices are usable, then we can't get a route.
+        set_inactive(&mut sync_ctx, LESS_SPECIFIC_SUB_DEVICE, true);
         assert_eq!(table.lookup(&mut sync_ctx, None, *remote), None,);
     }
 

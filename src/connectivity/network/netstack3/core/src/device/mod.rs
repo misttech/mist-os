@@ -434,12 +434,24 @@ impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> IpForwardingDeviceContext for Locked<&SyncCtx<NonSyncCtx>, L> {
+impl<I: IpDeviceIpExt, NonSyncCtx: NonSyncContext, L> IpForwardingDeviceContext<I>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+where
+    Self: IpDeviceStateContext<I, NonSyncCtx, DeviceId = DeviceId<NonSyncCtx>>,
+{
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
         match device_id {
             DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(self, id),
             DeviceId::Loopback(id) => self::loopback::get_routing_metric(self, id),
         }
+    }
+
+    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        IpDeviceStateContext::<I, _>::with_ip_device_flags(
+            self,
+            device_id,
+            |IpDeviceFlags { ip_enabled }| *ip_enabled,
+        )
     }
 }
 

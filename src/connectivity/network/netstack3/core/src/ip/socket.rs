@@ -898,7 +898,7 @@ pub(crate) mod testutil {
             device::state::{
                 AddrConfig, AssignedAddress as _, IpDeviceState, Ipv6AddressEntry, Ipv6DadState,
             },
-            forwarding::ForwardingTable,
+            forwarding::{testutil::FakeIpForwardingCtx, ForwardingTable},
             testutil::FakeIpDeviceIdCtx,
             types::{Destination, Metric, RawMetric},
             HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
@@ -917,20 +917,20 @@ pub(crate) mod testutil {
     pub(crate) struct FakeIpSocketCtx<I: IpDeviceStateIpExt, D> {
         pub(crate) table: ForwardingTable<I, D>,
         device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<D>,
+        ip_forwarding_ctx: FakeIpForwardingCtx<I, D>,
     }
 
     impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
-            let FakeIpSocketCtx { device_state: _, table: _, ip_device_id_ctx } = self;
-            ip_device_id_ctx
+            let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx } = self;
+            ip_forwarding_ctx.get_ref().as_ref()
         }
     }
 
     impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
         fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
-            let FakeIpSocketCtx { device_state: _, table: _, ip_device_id_ctx } = self;
-            ip_device_id_ctx
+            let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx } = self;
+            ip_forwarding_ctx.get_mut().as_mut()
         }
     }
 
@@ -965,18 +965,18 @@ pub(crate) mod testutil {
             <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
 
         fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
-            self.ip_device_id_ctx.downgrade_device_id(device_id)
+            self.ip_forwarding_ctx.downgrade_device_id(device_id)
         }
 
         fn upgrade_weak_device_id(
             &self,
             device_id: &FakeWeakDeviceId<DeviceId>,
         ) -> Option<DeviceId> {
-            self.ip_device_id_ctx.upgrade_weak_device_id(device_id)
+            self.ip_forwarding_ctx.upgrade_weak_device_id(device_id)
         }
 
         fn is_device_installed(&self, device_id: &DeviceId) -> bool {
-            self.ip_device_id_ctx.is_device_installed(device_id)
+            self.ip_forwarding_ctx.is_device_installed(device_id)
         }
     }
 
@@ -993,10 +993,10 @@ pub(crate) mod testutil {
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
-            let FakeIpSocketCtx { device_state, table, ip_device_id_ctx } = self;
+            let FakeIpSocketCtx { device_state, table, ip_forwarding_ctx } = self;
 
             let (destination, ()) = table
-                .lookup_filter_map(ip_device_id_ctx, device, *addr, |_, d| match &local_ip {
+                .lookup_filter_map(ip_forwarding_ctx, device, *addr, |_, d| match &local_ip {
                     None => Some(()),
                     Some(local_ip) => device_state
                         .get(d)
@@ -1119,14 +1119,14 @@ pub(crate) mod testutil {
                 );
             }
 
-            FakeIpSocketCtx { table, device_state, ip_device_id_ctx: Default::default() }
+            FakeIpSocketCtx { table, device_state, ip_forwarding_ctx: Default::default() }
         }
 
         pub(crate) fn find_devices_with_addr(
             &self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> impl Iterator<Item = D> + '_ {
-            let Self { table: _, device_state, ip_device_id_ctx: _ } = self;
+            let Self { table: _, device_state, ip_forwarding_ctx: _ } = self;
             Box::new(device_state.iter().filter_map(move |(device, state)| {
                 state
                     .addrs
@@ -1137,14 +1137,14 @@ pub(crate) mod testutil {
         }
 
         pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<FakeInstant, I> {
-            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
+            let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
         }
 
         pub(crate) fn multicast_memberships(
             &self,
         ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
-            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
+            let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             device_state
                 .iter()
                 .flat_map(|(device, device_state)| {
@@ -1171,7 +1171,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
+            let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
             state.multicast_groups.write().join_multicast_group(ctx, addr)
@@ -1183,7 +1183,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
+            let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
             state.multicast_groups.write().leave_multicast_group(addr)
