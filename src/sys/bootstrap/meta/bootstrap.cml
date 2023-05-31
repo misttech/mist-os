@@ -541,19 +541,11 @@
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
             from: "#svchost",
             to: [
+                "#boot-drivers",
                 "#fshost",
                 "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
-        },
-        {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
-            from: "#svchost",
-            to: "#boot-drivers",
-
-            // This must be weak because svchost needs sysmem from devfs, which creates
-            // a cycle. Sysmem can be pulled out of svchost to break this cycle.
-            dependency: "weak_for_migration",
         },
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
@@ -583,7 +575,6 @@
             to: [
                 "#console-launcher",
                 "#netsvc",
-                "#svchost",
             ],
         },
         {
@@ -651,17 +642,11 @@
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
             from: "#svchost",
             to: "#driver_manager",
-
-            // This must be weak because svchost needs sysmem from driver_manager, which creates
-            // a cycle. Sysmem can be pulled out of svchost to break this cycle.
-            dependency: "weak_for_migration",
         },
         {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
             ],
             from: "#svchost",
             to: [
@@ -670,25 +655,32 @@
             ],
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#svchost",
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+            from: "#miscsvc",
             to: [
-                "#full-pkg-drivers",
-                "#pkg-drivers",
+                "#console-launcher",
+                "#netsvc",
             ],
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#svchost",
-            to: "#boot-drivers",
+            from: "#miscsvc",
+            to: [
+                "#boot-drivers",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
 
-            // This must be weak because svchost needs sysmem from devfs, which creates
-            // a cycle. Sysmem can be pulled out of svchost to break this cycle.
+            // This must be weak because miscsvc needs sysmem from devfs, which creates
+            // a cycle. sysmem can be made into a non-driver to fix this.
             dependency: "weak_for_migration",
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#svchost",
+            from: "#miscsvc",
             to: "#virtual_console",
         },
         {
@@ -743,13 +735,6 @@
             as: "input-report",
             to: "#virtual_console",
             subdir: "input-report",
-        },
-        {
-            directory: "dev-class",
-            from: "#devfs",
-            as: "sysmem",
-            to: "#svchost",
-            subdir: "sysmem",
         },
         {
             directory: "dev-class",
@@ -815,10 +800,6 @@
                 "#console-launcher",
                 "#netsvc",
             ],
-
-            // TODO: Once svchost is spawned by component manager, we can
-            // remove this.
-            dependency: "weak_for_migration",
         },
         {
             protocol: "fuchsia.hardware.pty.Device",
@@ -1244,6 +1225,8 @@
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.paver.Paver",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
             ],
             from: "#miscsvc",
         },
@@ -1282,8 +1265,6 @@
             protocol: [
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],

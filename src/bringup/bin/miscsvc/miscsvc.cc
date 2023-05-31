@@ -14,6 +14,7 @@
 #include <fbl/algorithm.h>
 
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
+#include "sysmem.h"
 
 // An instance of a zx_service_provider_t.
 //
@@ -105,6 +106,7 @@ int main(int argc, char** argv) {
   }
 
   zx_service_provider_instance_t service_providers[] = {
+      {.provider = sysmem2_get_service_provider(), .ctx = nullptr},
       {.provider = paver_get_service_provider(), .ctx = nullptr},
       {.provider = kcounter_get_service_provider(), .ctx = nullptr},
   };

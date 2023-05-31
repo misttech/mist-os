@@ -12,19 +12,12 @@
             protocol: [
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
         },
     ],
     use: [
-        {
-            directory: "sysmem",
-            rights: [ "r*" ],
-            path: "/dev/class/sysmem",
-        },
         {
             directory: "config-profiles",
             rights: [ "r*" ],
@@ -45,8 +38,6 @@
             protocol: [
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],

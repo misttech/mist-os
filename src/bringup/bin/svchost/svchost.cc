@@ -32,7 +32,6 @@
 
 #include "src/bringup/bin/svchost/svchost_config.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
-#include "sysmem.h"
 
 // An instance of a zx_service_provider_t.
 //
@@ -175,7 +174,6 @@ int main(int argc, char** argv) {
   }
 
   zx_service_provider_instance_t service_providers[] = {
-      {.provider = sysmem2_get_service_provider(), .ctx = nullptr},
       {
           .provider = kernel_debug_get_service_provider(),
           .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(root_resource.get())),

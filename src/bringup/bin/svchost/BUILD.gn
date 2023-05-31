@@ -50,18 +50,13 @@ fuchsia_structured_config_cpp_elf_lib("svchost_config") {
 }
 
 executable("svchost") {
-  sources = [
-    "svchost.cc",
-    "sysmem.cc",
-  ]
+  sources = [ "svchost.cc" ]
   deps = [
     ":crashsvc",
     ":svchost_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -71,7 +66,6 @@ executable("svchost") {
     "//zircon/system/ulib/ktrace",
     "//zircon/system/ulib/profile",
     "//zircon/system/ulib/svc",
-    "//zircon/system/ulib/sysmem-connector",
     "//zircon/system/ulib/zx",
   ]
   output_dir = "$root_out_dir/zircon-migrated"
