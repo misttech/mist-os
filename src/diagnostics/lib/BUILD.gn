@@ -12,7 +12,6 @@ group("tests") {
     "log-command:tests",
     "persistence:tests",
     "sampler-config:tests",
-    "streams/dart:tests",
     "triage:tests",
     "util:tests",
     "validating-log-listener:tests",
