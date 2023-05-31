@@ -13,6 +13,12 @@
 #include <lib/fit/function.h>
 #include <zircon/types.h>
 
+#include <memory>
+#include <optional>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+
 namespace fidl {
 
 namespace internal {
