@@ -593,7 +593,7 @@ if (build_pb_v1) {
     if (board_is_emu) {
       deps += virtual_device_labels
       emu_manifest = {
-        initial_ramdisk = rebase_path(files.zbi, root_out_dir)
+        initial_ramdisk = rebase_path(files.final_zbi, root_out_dir)
         kernel = rebase_path(files.qemu_kernel, root_out_dir)
         disk_images = []
         if (defined(files.fvm)) {
