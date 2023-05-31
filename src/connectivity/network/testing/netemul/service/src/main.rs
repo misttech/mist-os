@@ -501,6 +501,62 @@ where
     }
 }
 
+// This represents a device in devfs. It can serve both the device's FIDL protocol as well
+// as fuchsia.device/Controller protocol.
+// As a DirectoryEntry, the DevfsDevice acts as both a directory, and a protocol (similar to how
+// devfs works).
+struct DevfsDevice {
+    device: fidl_fuchsia_netemul_network::DeviceProxy_Proxy,
+    path: String,
+}
+
+impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
+    fn open(
+        self: Arc<Self>,
+        _scope: vfs::execution_scope::ExecutionScope,
+        _flags: fidl_fuchsia_io::OpenFlags,
+        path: vfs::path::Path,
+        server_end: ServerEnd<fidl_fuchsia_io::NodeMarker>,
+    ) {
+        // If we are opening the device directly we get the device protocol.
+        if path.is_dot() || path.is_empty() {
+            let () = self
+                .device
+                .serve_multiplexed_device(server_end.into_channel())
+                .unwrap_or_else(|e| {
+                    // PEER_CLOSED errors are expected
+                    // to happen during test teardown.
+                    if e.is_closed() {
+                        warn!("failed to serve device on path {}: {}", self.path, e);
+                    } else {
+                        error!("failed to serve device on path {}: {}", self.path, e);
+                    }
+                });
+            return;
+        }
+        // If we are opening "device_controller" then we get fuchsia.device/Controller.
+        if path.as_ref() == "device_controller" {
+            let () = self.device.serve_controller(server_end.into_channel().into()).unwrap_or_else(
+                |e| {
+                    // PEER_CLOSED errors are expected
+                    // to happen during test teardown.
+                    if e.is_closed() {
+                        warn!("failed to serve controller on path {}: {}", self.path, e);
+                    } else {
+                        error!("failed to serve controller on path {}: {}", self.path, e);
+                    }
+                },
+            );
+            return;
+        }
+        error!("failed to serve device or controller: Bad path {}", path.as_ref());
+    }
+
+    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
+        vfs::directory::entry::EntryInfo::new(1, fio::DirentType::Directory)
+    }
+}
+
 impl ManagedRealm {
     async fn run_service(self) -> Result {
         let Self { server_end, realm, devfs } = self;
@@ -564,31 +620,9 @@ impl ManagedRealm {
                             error!("failed to open or create path '{}': {}", path, e);
                             zx::Status::INVALID_ARGS
                         })?;
-                        let path_clone = path.clone();
                         let response = dir.add_entry(
                             device_name,
-                            vfs::service::endpoint(
-                                move |_: vfs::execution_scope::ExecutionScope, channel| {
-                                    let () = device
-                                        .clone()
-                                        .serve_multiplexed_device(channel.into_zx_channel())
-                                        .unwrap_or_else(|e| {
-                                            // PEER_CLOSED errors are expected
-                                            // to happen during test teardown.
-                                            if e.is_closed() {
-                                                warn!(
-                                                    "failed to serve device on path {}: {}",
-                                                    path_clone, e
-                                                );
-                                            } else {
-                                                error!(
-                                                    "failed to serve device on path {}: {}",
-                                                    path_clone, e
-                                                );
-                                            }
-                                        });
-                                },
-                            ),
+                            Arc::new(DevfsDevice { device: device.clone(), path: path.clone() }),
                         );
                         match response {
                             Ok(()) => {
