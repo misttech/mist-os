@@ -70,7 +70,6 @@ source_set("fake-paver") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 

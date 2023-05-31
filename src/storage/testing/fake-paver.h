@@ -21,7 +21,6 @@
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <zxtest/zxtest.h>
 
 namespace paver_test {
 
