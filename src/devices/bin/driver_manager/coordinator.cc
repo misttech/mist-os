@@ -874,19 +874,15 @@ void Coordinator::RemoveTestNode(RemoveTestNodeRequestView request,
 void Coordinator::ShutdownAllDrivers(fit::callback<void()> callback) {
   suspend_resume_manager().Suspend(
       suspend_resume_manager().GetSuspendFlagsFromSystemPowerState(shutdown_system_state()),
-      [cb = std::move(callback)](zx_status_t status) {
+      [cb = std::move(callback)](zx_status_t status) mutable {
         if (status != ZX_OK) {
           // TODO(https://fxbug.dev/56208): Change this log back to error once isolated devmgr
           // is fixed.
           LOGF(WARNING, "Error suspending devices while stopping the component:%s",
                zx_status_get_string(status));
         }
-        LOGF(INFO, "Exiting driver manager gracefully");
-        // TODO(https://fxbug.dev/52627) This event handler should teardown devices and driver
-        // hosts properly for system state transitions where driver manager needs to go down.
-        // Exiting like so, will not run all the destructors and clean things up properly.
-        // Instead the main devcoordinator loop should be quit.
-        exit(0);
+        LOGF(INFO, "Coordinator finished shutting down drivers");
+        cb();
       });
 }
 

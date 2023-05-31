@@ -151,20 +151,6 @@ int main(int argc, char** argv) {
 
 int RunDfv1(driver_manager_config::Config dm_config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args) {
-  SuspendCallback suspend_callback = [](zx_status_t status) {
-    if (status != ZX_OK) {
-      // TODO(https://fxbug.dev/56208): Change this log back to error once isolated devmgr is fixed.
-      LOGF(WARNING, "Error suspending devices while stopping the component:%s",
-           zx_status_get_string(status));
-    }
-    LOGF(INFO, "Exiting driver manager gracefully");
-    // TODO(fxb:52627) This event handler should teardown devices and driver hosts
-    // properly for system state transitions where driver manager needs to go down.
-    // Exiting like so, will not run all the destructors and clean things up properly.
-    // Instead the main devcoordinator loop should be quit.
-    exit(0);
-  };
-
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
