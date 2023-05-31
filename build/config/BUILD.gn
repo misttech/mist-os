@@ -1158,6 +1158,8 @@ config("no-finite-loops") {
 }
 
 if (current_toolchain == default_toolchain) {
+  import("//build/toolchain/default_concurrent_jobs.gni")
+
   # Tools that must be executed locally.
   pool("local") {
     depth = default_concurrent_jobs.local
