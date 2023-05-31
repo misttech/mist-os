@@ -30,12 +30,25 @@ VersionSet set(std::pair<uint64_t, uint64_t> a, std::pair<uint64_t, uint64_t> b)
 
 TEST(VersioningTypesTests, GoodPlatformParse) {
   EXPECT_EQ(Platform::Parse("foo123").value().name(), "foo123");
+  EXPECT_FALSE(Platform::Parse("foo123").value().is_anonymous());
+}
+
+TEST(VersioningTypesTests, GoodPlatformAnonymous) {
+  EXPECT_TRUE(Platform::Anonymous().is_anonymous());
 }
 
 TEST(VersioningTypesTests, BadPlatformParseEmpty) { EXPECT_FALSE(Platform::Parse("").has_value()); }
 
 TEST(VersioningTypesTests, BadPlatformParseInvalidChar) {
   EXPECT_FALSE(Platform::Parse("foo_bar").has_value());
+}
+
+TEST(VersioningTypesTests, GoodPlatformEquality) {
+  EXPECT_EQ(Platform::Parse("foo").value(), Platform::Parse("foo").value());
+  EXPECT_NE(Platform::Parse("foo").value(), Platform::Parse("bar").value());
+  EXPECT_NE(Platform::Parse("foo").value(), Platform::Anonymous());
+  // Anonymous platforms are always unequal, like NaN.
+  EXPECT_NE(Platform::Anonymous(), Platform::Anonymous());
 }
 
 TEST(VersioningTypesTests, GoodVersionFromMinNumeric) {

@@ -345,16 +345,19 @@ std::string Availability::Debug() const {
 }
 
 bool VersionSelection::Insert(Platform platform, Version version) {
+  ZX_ASSERT_MSG(!platform.is_anonymous(), "anonymous platforms do not allow version selection");
   auto [_, inserted] = map_.emplace(std::move(platform), version);
   return inserted;
 }
 
 Version VersionSelection::Lookup(const Platform& platform) const {
-  const auto iter = map_.find(platform);
-  if (iter == map_.end()) {
-    return Version::Head();
+  if (!platform.is_anonymous()) {
+    const auto iter = map_.find(platform);
+    if (iter != map_.end()) {
+      return iter->second;
+    }
   }
-  return iter->second;
+  return Version::Head();
 }
 
 }  // namespace fidl

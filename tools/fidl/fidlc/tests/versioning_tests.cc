@@ -19,24 +19,48 @@ namespace {
 // Largest numeric version accepted by fidl::Version::Parse.
 const std::string kMaxNumericVersion = std::to_string((1ull << 63) - 1);
 
-TEST(VersioningTests, GoodImplicitPlatformOneComponent) {
+TEST(VersioningTests, GoodAnonymousPlatformOneComponent) {
   TestLibrary library(R"FIDL(
 library example;
 )FIDL");
   ASSERT_COMPILED(library);
 
   auto example = library.LookupLibrary("example");
-  EXPECT_EQ(example->platform, fidl::Platform::Parse("example").value());
+  EXPECT_TRUE(example->platform.value().is_anonymous());
 }
 
-TEST(VersioningTests, GoodImplicitPlatformTwoComponents) {
+TEST(VersioningTests, GoodAnonymousPlatformTwoComponents) {
   TestLibrary library(R"FIDL(
 library example.something;
 )FIDL");
   ASSERT_COMPILED(library);
 
   auto example = library.LookupLibrary("example.something");
+  EXPECT_TRUE(example->platform.value().is_anonymous());
+}
+
+TEST(VersioningTests, GoodImplicitPlatformOneComponent) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+)FIDL");
+  ASSERT_COMPILED(library);
+
+  auto example = library.LookupLibrary("example");
   EXPECT_EQ(example->platform, fidl::Platform::Parse("example").value());
+  EXPECT_FALSE(example->platform.value().is_anonymous());
+}
+
+TEST(VersioningTests, GoodImplicitPlatformTwoComponents) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example.something;
+)FIDL");
+  ASSERT_COMPILED(library);
+
+  auto example = library.LookupLibrary("example.something");
+  EXPECT_EQ(example->platform, fidl::Platform::Parse("example").value());
+  EXPECT_FALSE(example->platform.value().is_anonymous());
 }
 
 TEST(VersioningTests, GoodExplicitPlatform) {
@@ -48,6 +72,7 @@ library example;
 
   auto example = library.LookupLibrary("example");
   EXPECT_EQ(example->platform, fidl::Platform::Parse("someplatform").value());
+  EXPECT_FALSE(example->platform.value().is_anonymous());
 }
 
 TEST(VersioningTests, BadInvalidPlatform) {
@@ -2331,6 +2356,33 @@ type Foo = struct {
 };
 )FIDL");
   ASSERT_ERRORED_TWICE_DURING_COMPILE(example, fidl::ErrNameNotFound, fidl::ErrNameNotFound);
+}
+
+TEST(VersioningTests, GoodMultiplePlatformsNamedAndAnonymous) {
+  SharedAmongstLibraries shared;
+  shared.SelectVersion("example", "1");
+
+  TestLibrary versioned(&shared, "versioned.fidl", R"FIDL(
+@available(added=1, removed=2)
+library example.versioned;
+
+type Foo = struct {};
+)FIDL");
+  ASSERT_COMPILED(versioned);
+
+  TestLibrary unversioned(&shared, "unversioned.fidl", R"FIDL(
+library example.unversioned;
+
+using example.versioned;
+
+alias Foo = example.versioned.Foo;
+)FIDL");
+  ASSERT_COMPILED(unversioned);
+
+  // The example.unversioned library is added=HEAD by default, but not HEAD of
+  // the "example" platform -- that would confusingly result in empty IR, since
+  // we selected "example" version 1 -- rather HEAD of an anonymous platform.
+  ASSERT_NOT_NULL(unversioned.LookupAlias("Foo"));
 }
 
 }  // namespace

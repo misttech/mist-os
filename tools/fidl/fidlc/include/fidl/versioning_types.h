@@ -20,26 +20,40 @@ namespace fidl {
 
 // A platform represents a group of FIDL libraries that are versioned together.
 // Usually all the library names begin with a common prefix, the platform name.
+// Libraries that don't use versioning belong to an anonymous platform.
 class Platform final {
  public:
-  // Returns a platform if `str` is a valid platform identifier.
+  // Creates an anonymous platform.
+  static Platform Anonymous() { return Platform(std::nullopt); }
+  // Creates a named platform. Returns null if `str` is not a valid name.
   static std::optional<Platform> Parse(std::string str);
 
-  const std::string& name() const { return name_; }
+  // Returns true if this is an anonymous platform.
+  bool is_anonymous() const { return !name_.has_value(); }
+  // Returns the platform's name. Panics if this is an anonymous platform.
+  const std::string& name() const {
+    ZX_ASSERT_MSG(name_.has_value(), "Platform::name() must not be called on anonymous platforms");
+    return *name_;
+  }
 
-  constexpr bool operator==(const Platform& rhs) const { return name_ == rhs.name_; }
-  constexpr bool operator!=(const Platform& rhs) const { return name_ != rhs.name_; }
+  // Note that anonymous platforms are always unequal, like NaN.
+  constexpr bool operator==(const Platform& rhs) const {
+    return name_.has_value() && rhs.name_.has_value() && *name_ == *rhs.name_;
+  }
+  constexpr bool operator!=(const Platform& rhs) const { return !(*this == rhs); }
 
   struct Compare {
     bool operator()(const Platform& lhs, const Platform& rhs) const {
-      return lhs.name_ < rhs.name_;
+      ZX_ASSERT_MSG(lhs.name_.has_value() && rhs.name_.has_value(),
+                    "Platform::Compare must not be used with anonymous platforms");
+      return *lhs.name_ < *rhs.name_;
     }
   };
 
  private:
-  explicit Platform(std::string name) : name_(std::move(name)) {}
+  explicit Platform(std::optional<std::string> name) : name_(std::move(name)) {}
 
-  std::string name_;
+  std::optional<std::string> name_;
 };
 
 // A version represents a particular state of a platform.
@@ -336,8 +350,8 @@ class VersionSelection final {
  public:
   VersionSelection() = default;
 
-  // Inserts a platform version. Returns true on success, and false if a version
-  // was already inserted for this platform.
+  // Inserts a platform version. Must not be an anonymous platform. Returns true
+  // on success, and false if a version was already inserted for this platform.
   bool Insert(Platform platform, Version version);
 
   // Returns the version for the given platform. Defaults to HEAD if no version

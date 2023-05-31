@@ -8,6 +8,7 @@
 /// Mac:    Medium Access Control \
 /// Sta:    Station \
 /// Addr:   Address
+@available(added=HEAD)
 library fuchsia.wlan.phyimpl;
 
 using fuchsia.wlan.common;

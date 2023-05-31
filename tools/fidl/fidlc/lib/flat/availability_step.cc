@@ -105,7 +105,7 @@ void AvailabilityStep::CompileAvailability(Element* element) {
   std::optional<Version> default_added;
   if (element->kind == Element::Kind::kLibrary) {
     ZX_ASSERT(element == library());
-    library()->platform = GetDefaultPlatform();
+    library()->platform = Platform::Anonymous();
     default_added = Version::Head();
   }
   bool valid = element->availability.Init({.added = default_added});

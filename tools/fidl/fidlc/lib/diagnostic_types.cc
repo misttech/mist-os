@@ -255,7 +255,10 @@ std::string Display(const flat::Type* t) { return NameFlatType(t); }
 
 std::string Display(const flat::Name& n) { return n.full_name(); }
 
-std::string Display(const Platform& p) { return p.name(); }
+std::string Display(const Platform& p) {
+  ZX_ASSERT_MSG(!p.is_anonymous(), "diagnostics should not refer to anonymous platforms");
+  return p.name();
+}
 
 std::string Display(const Version& v) { return v.ToString(); }
 

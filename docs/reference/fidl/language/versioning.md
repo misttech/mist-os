@@ -46,11 +46,9 @@ to 2^63-1 (inclusive), or one of the special versions `HEAD` and `LEGACY`. The
 `HEAD` version is used for the latest unstable changes. The `LEGACY` version is
 like `HEAD`, but it also includes [legacy elements](#legacy).
 
-All FIDL libraries are versioned. There is no need to support "unversioned
-libraries" because they would behave identically to libraries added at `HEAD`.
-The defaults are designed so that you can ignore versioning if you aren't using
-it: a library with no `@available` attribute is implicitly added at `HEAD`, and
-fidlc compiles libraries at `HEAD` by default.
+If a FIDL library doesn't have any `@available` attributes, it is unversioned.
+The behavior of an unversioned library is similar to a library annotated with
+`@available(added=HEAD)`, except it belongs to a unique, unnnameable platorm.
 
 ## Command line
 
