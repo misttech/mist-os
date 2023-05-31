@@ -12,7 +12,6 @@ bool AllowMultiplexingController(std::string_view class_name) {
       "block",
       "nand",
       "skip-block",
-      "network",
   });
   return classes_that_include_controller.find(class_name) != classes_that_include_controller.end();
 }
