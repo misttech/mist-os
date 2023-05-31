@@ -106,7 +106,7 @@ impl IntegrationTestCmd {
 
         // Copy the staged changes to the users's test root.
         dir_create_if_absent(&test_root)?;
-        dir_copy(tmp_dir.path().to_str().unwrap(), &test_root)?;
+        dir_copy(tmp_dir.path(), &test_root)?;
         Ok(())
     }
 }
