@@ -148,6 +148,8 @@ tables_generator_tests_*.txt
 /third_party/ubpf/src
 !/third_party/github.com/google/cppdap
 /third_party/github.com/google/cppdap/src
+!/third_party/pyjson5
+/third_party/pyjson5/src
 
 /tmp/
 /vendor/
