@@ -8,7 +8,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_time as ftime,
     fuchsia_fs::{file, OpenFlags},
     fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, Time},
@@ -18,7 +18,7 @@ use {
 };
 
 lazy_static! {
-    static ref TIME_MAINTENANCE_CAPABILITY_NAME: CapabilityName = "fuchsia.time.Maintenance".into();
+    static ref TIME_MAINTENANCE_CAPABILITY_NAME: Name = "fuchsia.time.Maintenance".parse().unwrap();
 }
 
 /// An implementation of the `fuchsia.time.Maintenance` protocol, which

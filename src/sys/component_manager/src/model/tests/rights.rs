@@ -103,7 +103,7 @@ impl Hook for MockFrameworkDirectoryHost {
         } = &event.payload
         {
             let mut capability_provider = capability_provider.lock().await;
-            if source_name.str() == "foo_data" {
+            if source_name.as_str() == "foo_data" {
                 let test_dir_proxy =
                     fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
                         .expect("failed to clone test dir");
@@ -123,8 +123,8 @@ async fn framework_directory_rights() {
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Framework,
-                    source_name: "foo_data".into(),
-                    target_name: "foo_data".into(),
+                    source_name: "foo_data".parse().unwrap(),
+                    target_name: "foo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: None,
                     subdir: Some("foo".into()),
@@ -140,7 +140,7 @@ async fn framework_directory_rights() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
-                    source_name: "foo_data".into(),
+                    source_name: "foo_data".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -174,8 +174,8 @@ async fn framework_directory_incompatible_rights() {
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Framework,
-                    source_name: "foo_data".into(),
-                    target_name: "foo_data".into(),
+                    source_name: "foo_data".parse().unwrap(),
+                    target_name: "foo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: None,
                     subdir: Some("foo".into()),
@@ -191,7 +191,7 @@ async fn framework_directory_incompatible_rights() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
-                    source_name: "foo_data".into(),
+                    source_name: "foo_data".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                     rights: fio::X_STAR_DIR,
                     subdir: None,

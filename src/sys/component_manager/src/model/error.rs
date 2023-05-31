@@ -16,7 +16,7 @@ use {
     },
     clonable_error::ClonableError,
     cm_moniker::{InstancedExtendedMoniker, InstancedRelativeMoniker},
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     std::path::PathBuf,
@@ -639,7 +639,7 @@ pub enum StartActionError {
     #[error("Couldn't start `{moniker}` because the runner `{runner}` couldn't resolve: {err}")]
     ResolveRunnerError {
         moniker: AbsoluteMoniker,
-        runner: CapabilityName,
+        runner: Name,
         #[source]
         err: Box<RouteAndOpenCapabilityError>,
     },

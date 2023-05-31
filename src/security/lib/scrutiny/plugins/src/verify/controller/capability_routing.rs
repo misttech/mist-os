@@ -38,7 +38,9 @@ impl From<VerifyRouteResult> for ResultBySeverity {
         match verify_route_result.error {
             None => OkResult {
                 using_node: verify_route_result.using_node,
-                capability: verify_route_result.capability,
+                capability: verify_route_result
+                    .capability
+                    .expect("successful route should have a capability"),
                 route: verify_route_result.route,
             }
             .into(),

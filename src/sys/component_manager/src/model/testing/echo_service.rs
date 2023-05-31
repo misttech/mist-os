@@ -9,8 +9,8 @@ use {
         model::hooks::*,
     },
     async_trait::async_trait,
-    cm_rust::*,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream},
@@ -20,14 +20,13 @@ use {
     lazy_static::lazy_static,
     routing::capability_source::InternalCapability,
     std::{
-        convert::TryInto,
         path::PathBuf,
         sync::{Arc, Weak},
     },
 };
 
 lazy_static! {
-    pub static ref ECHO_CAPABILITY: CapabilityName = "builtin.Echo".try_into().unwrap();
+    pub static ref ECHO_CAPABILITY: Name = "builtin.Echo".parse().unwrap();
 }
 
 struct EchoCapabilityProvider;

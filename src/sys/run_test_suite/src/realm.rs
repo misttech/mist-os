@@ -108,7 +108,7 @@ fn validate_and_get_offers(
     }
 
     let exposes_realm_protocol =
-        manifest.exposes.iter().any(|e| e.target_name() == fcomponent::RealmMarker::PROTOCOL_NAME);
+        manifest.exposes.iter().any(|e| *e.target_name() == fcomponent::RealmMarker::PROTOCOL_NAME);
     if !exposes_realm_protocol {
         return Err(RealmValidationError::RealmProtocol);
     }
@@ -129,7 +129,7 @@ fn validate_and_get_offers(
                 ..
             }) = &offer
             {
-                if (target_name == CAPABILITY_REQUESTED_EVENT || target_name == DIR_READY_EVENT)
+                if (*target_name == CAPABILITY_REQUESTED_EVENT || *target_name == DIR_READY_EVENT)
                     && source == &cm_rust::OfferSource::Parent
                     && scope
                         .as_ref()
@@ -141,9 +141,9 @@ fn validate_and_get_offers(
                         })
                         .unwrap_or(false)
                 {
-                    directory_ready = directory_ready || target_name == DIR_READY_EVENT;
+                    directory_ready = directory_ready || *target_name == DIR_READY_EVENT;
                     capability_requested =
-                        capability_requested || target_name == CAPABILITY_REQUESTED_EVENT;
+                        capability_requested || *target_name == CAPABILITY_REQUESTED_EVENT;
                 }
             }
             offers.push(offer.native_into_fidl());
@@ -229,9 +229,9 @@ mod test {
         offers.iter().for_each(|o| {
             assert_eq!(o.target(), &cm_rust::OfferTarget::Collection("echo_test_coll".to_string()))
         });
-        assert!(offers.iter().any(|o| o.target_name() == CAPABILITY_REQUESTED_EVENT));
-        assert!(offers.iter().any(|o| o.target_name() == DIR_READY_EVENT));
-        assert!(offers.iter().any(|o| o.target_name() == "fidl.examples.routing.echo.Echo"));
+        assert!(offers.iter().any(|o| *o.target_name() == CAPABILITY_REQUESTED_EVENT));
+        assert!(offers.iter().any(|o| *o.target_name() == DIR_READY_EVENT));
+        assert!(offers.iter().any(|o| *o.target_name() == "fidl.examples.routing.echo.Echo"));
 
         let realm = parse_provided_realm(
             &lifecycle_controller,
@@ -252,8 +252,8 @@ mod test {
                 &cm_rust::OfferTarget::Collection("hermetic_test_coll".to_string())
             )
         });
-        assert!(offers.iter().any(|o| o.target_name() == CAPABILITY_REQUESTED_EVENT));
-        assert!(offers.iter().any(|o| o.target_name() == DIR_READY_EVENT));
+        assert!(offers.iter().any(|o| *o.target_name() == CAPABILITY_REQUESTED_EVENT));
+        assert!(offers.iter().any(|o| *o.target_name() == DIR_READY_EVENT));
     }
 
     #[fuchsia::test]

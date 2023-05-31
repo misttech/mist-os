@@ -19,7 +19,6 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::CapabilityName,
     cm_task_scope::TaskScope,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
@@ -36,8 +35,6 @@ use {
 // Event source (supporting event streams)
 #[derive(Clone)]
 pub struct EventSource {
-    pub name: CapabilityName,
-
     /// A shared reference to the event registry used to subscribe and dispatch events.
     registry: Weak<EventRegistry>,
 
@@ -51,7 +48,6 @@ pub struct EventSource {
 
 impl EventSource {
     pub async fn new(
-        name: CapabilityName,
         subscriber: ExtendedMoniker,
         model: Weak<Model>,
         registry: Weak<EventRegistry>,
@@ -68,7 +64,7 @@ impl EventSource {
                 }
             }
         };
-        Ok(Self { name, subscriber, registry, stream_provider })
+        Ok(Self { subscriber, registry, stream_provider })
     }
 
     /// Subscribes to events provided in the `events` vector.

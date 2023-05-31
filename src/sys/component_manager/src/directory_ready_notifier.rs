@@ -13,9 +13,9 @@ use {
     ::routing::{event::EventFilter, rights::Rights},
     async_trait::async_trait,
     cm_rust::{
-        CapabilityName, CapabilityPath, ComponentDecl, ExposeDecl, ExposeDirectoryDecl,
-        ExposeSource, ExposeTarget,
+        CapabilityPath, ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget,
     },
+    cm_types::Name,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
     futures::stream::StreamExt,
@@ -190,7 +190,7 @@ impl DirectoryReadyNotifier {
         outgoing_dir_result: Result<&fio::DirectoryProxy, &ModelError>,
         rights: Rights,
         source_path: &CapabilityPath,
-        target_name: &CapabilityName,
+        target_name: &Name,
     ) -> Option<Event> {
         let target_name = target_name.to_string();
 
@@ -439,7 +439,7 @@ mod tests {
                 Ok(&proxy),
                 Rights::from(fio::R_STAR_DIR),
                 &CapabilityPath::try_from("/foo").unwrap(),
-                &CapabilityName::from("foo"),
+                &"foo".parse().unwrap(),
             )
             .await
             .unwrap();

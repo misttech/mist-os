@@ -20,9 +20,8 @@ use {
         Never, RouteInfo,
     },
     async_trait::async_trait,
-    cm_rust::{
-        CapabilityName, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, OfferServiceDecl,
-    },
+    cm_rust::{ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, OfferServiceDecl},
+    cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
     moniker::{ChildMoniker, ChildMonikerBase},
@@ -49,7 +48,7 @@ pub(super) struct CollectionAggregateServiceProvider<C: ComponentInstanceInterfa
     pub collections: Vec<String>,
 
     /// Name of the capability as exposed by children in the collection.
-    pub capability_name: CapabilityName,
+    pub capability_name: Name,
 
     pub sources: S,
     pub visitor: V,

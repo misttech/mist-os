@@ -83,8 +83,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .offer(OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::static_child("b".to_string()),
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             source_instance_filter: None,
                             renamed_instances: None,
@@ -92,17 +92,17 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         }))
                         .offer(OfferDecl::Protocol(OfferProtocolDecl {
                             source: OfferSource::static_child("b".to_string()),
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.provider_availability.clone(),
                         }))
                         .offer(OfferDecl::Directory(OfferDirectoryDecl {
                             source: OfferSource::static_child("b".to_string()),
-                            source_name: "dir".try_into().unwrap(),
+                            source_name: "dir".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
-                            target_name: "dir".try_into().unwrap(),
+                            target_name: "dir".parse().unwrap(),
                             rights: Some(fio::R_STAR_DIR),
                             subdir: None,
                             dependency_type: DependencyType::Strong,
@@ -115,8 +115,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .build(),
                         )
                         .storage(StorageDecl {
-                            name: "cache".into(),
-                            backing_dir: "data".try_into().unwrap(),
+                            name: "cache".parse().unwrap(),
+                            backing_dir: "data".parse().unwrap(),
                             source: StorageDirectorySource::Self_,
                             subdir: Some(PathBuf::from("cache")),
                             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -124,20 +124,20 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .offer(OfferDecl::Storage(OfferStorageDecl {
                             source: OfferSource::Self_,
                             target: OfferTarget::static_child("c".to_string()),
-                            source_name: "cache".into(),
-                            target_name: "cache".into(),
+                            source_name: "cache".parse().unwrap(),
+                            target_name: "cache".parse().unwrap(),
                             availability: test_case.provider_availability.clone(),
                         }))
                         .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                             source: OfferSource::Parent,
-                            source_name: "started".into(),
+                            source_name: "started".parse().unwrap(),
                             scope: None,
                             filter: None,
                             target: OfferTarget::Child(ChildRef {
                                 name: "c".into(),
                                 collection: None,
                             }),
-                            target_name: CapabilityName::from("started"),
+                            target_name: "started".parse().unwrap(),
                             availability: test_case.provider_availability.clone(),
                         }))
                         .add_lazy_child("b")
@@ -148,21 +148,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .service(ServiceDecl {
-                            name: "fuchsia.examples.EchoService".into(),
-                            source_path: Some("/svc/foo.service".try_into().unwrap()),
+                            name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            source_path: Some("/svc/foo.service".parse().unwrap()),
                         })
                         .expose(ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
                         .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
@@ -174,8 +174,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         )
                         .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: ExposeSource::Self_,
-                            source_name: "dir".into(),
-                            target_name: "dir".into(),
+                            source_name: "dir".parse().unwrap(),
+                            target_name: "dir".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
@@ -188,36 +188,36 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .use_(UseDecl::Service(UseServiceDecl {
                             source: UseSource::Parent,
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_path: "/svc/fuchsia.examples.EchoService".try_into().unwrap(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_path: "/svc/fuchsia.examples.Echo".try_into().unwrap(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Parent,
-                            source_name: "dir".try_into().unwrap(),
-                            target_path: "/dir".try_into().unwrap(),
+                            source_name: "dir".parse().unwrap(),
+                            target_path: "/dir".parse().unwrap(),
                             rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Storage(UseStorageDecl {
-                            source_name: "cache".into(),
-                            target_path: "/storage".try_into().unwrap(),
+                            source_name: "cache".parse().unwrap(),
+                            target_path: "/storage".parse().unwrap(),
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Parent,
-                            source_name: "started".into(),
-                            target_path: "/event/stream".try_into().unwrap(),
+                            source_name: "started".parse().unwrap(),
+                            target_path: "/event/stream".parse().unwrap(),
                             scope: None,
                             filter: None,
                             availability: test_case.use_availability.clone(),
@@ -227,7 +227,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
             ];
             let mut builder = T::new("a", components);
             builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-                name: "started".into(),
+                name: "started".parse().unwrap(),
             })]);
             let model = builder.build().await;
             model
@@ -236,22 +236,22 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 .expect("failed to create file");
             for check_use in vec![
                 CheckUse::Service {
-                    path: "/svc/fuchsia.examples.EchoService".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                     instance: ServiceInstance::Named("default".to_owned()),
                     member: "echo".to_owned(),
                     expected_res: ExpectedResult::Ok,
                 },
                 CheckUse::Protocol {
-                    path: "/svc/fuchsia.examples.Echo".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
                 },
                 CheckUse::Directory {
-                    path: "/dir".try_into().unwrap(),
+                    path: "/dir".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Ok,
                 },
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -261,9 +261,9 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 },
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
-                    path: "/event/stream".try_into().unwrap(),
+                    path: "/event/stream".parse().unwrap(),
                     scope: vec![ComponentEventRoute { component: "/".to_string(), scope: None }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             ] {
                 model.check_use(vec!["c"].try_into().unwrap(), check_use).await;
@@ -316,8 +316,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .offer(OfferDecl::Service(OfferServiceDecl {
                             source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             source_instance_filter: None,
                             renamed_instances: None,
@@ -325,17 +325,17 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         }))
                         .offer(OfferDecl::Protocol(OfferProtocolDecl {
                             source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.offer_availability.clone(),
                         }))
                         .offer(OfferDecl::Directory(OfferDirectoryDecl {
                             source: test_case.source.clone(),
-                            source_name: "dir".try_into().unwrap(),
+                            source_name: "dir".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
-                            target_name: "dir".try_into().unwrap(),
+                            target_name: "dir".parse().unwrap(),
                             rights: Some(fio::Operations::CONNECT),
                             subdir: None,
                             dependency_type: DependencyType::Strong,
@@ -347,15 +347,15 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .as_ref()
                                 .map(Clone::clone)
                                 .unwrap_or(test_case.source.clone()),
-                            source_name: "data".into(),
-                            target_name: "data".into(),
+                            source_name: "data".parse().unwrap(),
+                            target_name: "data".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             availability: test_case.offer_availability.clone(),
                         }))
                         .storage(StorageDecl {
-                            name: "data".into(),
+                            name: "data".parse().unwrap(),
                             source: StorageDirectorySource::Child("b".to_string()),
-                            backing_dir: "dir".into(),
+                            backing_dir: "dir".parse().unwrap(),
                             subdir: None,
                             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                         })
@@ -367,21 +367,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .service(ServiceDecl {
-                            name: "fuchsia.examples.EchoService".into(),
-                            source_path: Some("/svc/foo.service".try_into().unwrap()),
+                            name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            source_path: Some("/svc/foo.service".parse().unwrap()),
                         })
                         .expose(ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
                         .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
@@ -393,8 +393,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         )
                         .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: ExposeSource::Self_,
-                            source_name: "dir".into(),
-                            target_name: "dir".into(),
+                            source_name: "dir".parse().unwrap(),
+                            target_name: "dir".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
@@ -407,30 +407,30 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .use_(UseDecl::Service(UseServiceDecl {
                             source: UseSource::Parent,
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_path: "/svc/fuchsia.examples.EchoService".try_into().unwrap(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_path: "/svc/fuchsia.examples.Echo".try_into().unwrap(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Parent,
-                            source_name: "dir".try_into().unwrap(),
-                            target_path: "/dir".try_into().unwrap(),
+                            source_name: "dir".parse().unwrap(),
+                            target_path: "/dir".parse().unwrap(),
                             rights: fio::Operations::CONNECT,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Storage(UseStorageDecl {
-                            source_name: "data".try_into().unwrap(),
-                            target_path: "/data".try_into().unwrap(),
+                            source_name: "data".parse().unwrap(),
+                            target_path: "/data".parse().unwrap(),
                             availability: test_case.use_availability.clone(),
                         }))
                         .build(),
@@ -439,22 +439,22 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
             let model = T::new("a", components).build().await;
             for check_use in vec![
                 CheckUse::Service {
-                    path: "/svc/fuchsia.examples.EchoService".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                     instance: ServiceInstance::Named("default".to_owned()),
                     member: "echo".to_owned(),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
                 CheckUse::Protocol {
-                    path: "/svc/fuchsia.examples.Echo".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
                 CheckUse::Directory {
-                    path: "/dir".try_into().unwrap(),
+                    path: "/dir".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
                 CheckUse::Storage {
-                    path: "/data".try_into().unwrap(),
+                    path: "/data".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
@@ -485,7 +485,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .use_(UseDecl::Service(UseServiceDecl {
                             source: UseSource::Child("b".to_owned()),
-                            source_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target_path: CapabilityPath::try_from(
                                 "/svc/fuchsia.examples.EchoService_a",
                             )
@@ -495,14 +495,14 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Child("b".to_owned()),
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_path: "/svc/fuchsia.examples.Echo_a".try_into().unwrap(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Child("b".to_owned()),
-                            source_name: "dir".try_into().unwrap(),
+                            source_name: "dir".parse().unwrap(),
                             target_path: CapabilityPath::try_from("/dir_a").unwrap(),
                             rights: fio::R_STAR_DIR,
                             subdir: None,
@@ -516,21 +516,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .service(ServiceDecl {
-                            name: "fuchsia.examples.EchoService".into(),
-                            source_path: Some("/svc/foo.service".try_into().unwrap()),
+                            name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            source_path: Some("/svc/foo.service".parse().unwrap()),
                         })
                         .expose(ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: test_case.provider_availability.clone(),
                         }))
                         .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: test_case.provider_availability.clone(),
                         }))
@@ -542,8 +542,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         )
                         .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: ExposeSource::Self_,
-                            source_name: "dir".into(),
-                            target_name: "dir".into(),
+                            source_name: "dir".parse().unwrap(),
+                            target_name: "dir".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
@@ -562,17 +562,17 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 .expect("failed to create file");
             for check_use in vec![
                 CheckUse::Service {
-                    path: "/svc/fuchsia.examples.EchoService_a".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.EchoService_a".parse().unwrap(),
                     instance: ServiceInstance::Named("default".to_owned()),
                     member: "echo".to_owned(),
                     expected_res: ExpectedResult::Ok,
                 },
                 CheckUse::Protocol {
-                    path: "/svc/fuchsia.examples.Echo_a".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
                 },
                 CheckUse::Directory {
-                    path: "/dir_a".try_into().unwrap(),
+                    path: "/dir_a".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -630,7 +630,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .use_(UseDecl::Service(UseServiceDecl {
                             source: UseSource::Child("b".to_owned()),
-                            source_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target_path: CapabilityPath::try_from(
                                 "/svc/fuchsia.examples.EchoService_a",
                             )
@@ -640,14 +640,14 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Child("b".to_owned()),
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_path: "/svc/fuchsia.examples.Echo_a".try_into().unwrap(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Child("b".to_owned()),
-                            source_name: "dir".try_into().unwrap(),
+                            source_name: "dir".parse().unwrap(),
                             target_path: CapabilityPath::try_from("/dir_a").unwrap(),
                             rights: fio::R_STAR_DIR,
                             subdir: None,
@@ -661,21 +661,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .service(ServiceDecl {
-                            name: "fuchsia.examples.EchoService".into(),
-                            source_path: Some("/svc/foo.service".try_into().unwrap()),
+                            name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            source_path: Some("/svc/foo.service".parse().unwrap()),
                         })
                         .expose(ExposeDecl::Service(ExposeServiceDecl {
                             source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.EchoService".into(),
-                            target_name: "fuchsia.examples.EchoService".into(),
+                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
+                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: test_case.expose_availability.clone(),
                         }))
                         .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.Echo".into(),
-                            target_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: test_case.expose_availability.clone(),
                         }))
@@ -687,8 +687,8 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         )
                         .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: test_case.source.clone(),
-                            source_name: "dir".into(),
-                            target_name: "dir".into(),
+                            source_name: "dir".parse().unwrap(),
+                            target_name: "dir".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
@@ -707,17 +707,17 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 .expect("failed to create file");
             for check_use in vec![
                 CheckUse::Service {
-                    path: "/svc/fuchsia.examples.EchoService_a".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.EchoService_a".parse().unwrap(),
                     instance: ServiceInstance::Named("default".to_owned()),
                     member: "echo".to_owned(),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
                 CheckUse::Protocol {
-                    path: "/svc/fuchsia.examples.Echo_a".try_into().unwrap(),
+                    path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
                 CheckUse::Directory {
-                    path: "/dir_a".try_into().unwrap(),
+                    path: "/dir_a".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },

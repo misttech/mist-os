@@ -66,10 +66,8 @@ use {
         environment::{DebugRegistry, RunnerRegistry},
     },
     anyhow::{format_err, Context as _, Error},
-    cm_rust::{
-        Availability, CapabilityName, CapabilityPath, RunnerRegistration, UseEventStreamDecl,
-        UseSource,
-    },
+    cm_rust::{Availability, CapabilityPath, RunnerRegistration, UseEventStreamDecl, UseSource},
+    cm_types::Name,
     elf_runner::{
         crash_info::CrashRecords,
         vdso_vmo::{get_direct_vdso_vmo, get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
@@ -100,7 +98,7 @@ pub struct BuiltinEnvironmentBuilder {
     // TODO(60804): Make component manager's namespace injectable here.
     runtime_config: Option<RuntimeConfig>,
     bootfs_svc: Option<BootfsSvc>,
-    runners: Vec<(CapabilityName, Arc<dyn BuiltinRunnerFactory>)>,
+    runners: Vec<(Name, Arc<dyn BuiltinRunnerFactory>)>,
     resolvers: ResolverRegistry,
     utc_clock: Option<Arc<Clock>>,
     add_environment_resolvers: bool,
@@ -172,14 +170,10 @@ impl BuiltinEnvironmentBuilder {
             self.utc_clock.clone(),
             self.crash_records.clone(),
         ));
-        Ok(self.add_runner("elf".into(), runner))
+        Ok(self.add_runner("elf".parse().unwrap(), runner))
     }
 
-    pub fn add_runner(
-        mut self,
-        name: CapabilityName,
-        runner: Arc<dyn BuiltinRunnerFactory>,
-    ) -> Self {
+    pub fn add_runner(mut self, name: Name, runner: Arc<dyn BuiltinRunnerFactory>) -> Self {
         // We don't wrap these in a BuiltinRunner immediately because that requires the
         // RuntimeConfig, which may be provided after this or may fall back to the default.
         self.runners.push((name, runner));
@@ -247,8 +241,10 @@ impl BuiltinEnvironmentBuilder {
 
         let realm_builder_resolver = match runtime_config.realm_builder_resolver_and_runner {
             fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::Namespace => {
-                self.runners
-                    .push((REALM_BUILDER_RUNNER_NAME.into(), Arc::new(RealmBuilderRunner::new()?)));
+                self.runners.push((
+                    REALM_BUILDER_RUNNER_NAME.parse().unwrap(),
+                    Arc::new(RealmBuilderRunner::new()?),
+                ));
                 Some(register_realm_builder_resolver(&mut self.resolvers)?)
             }
             fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::None => None,
@@ -951,7 +947,7 @@ impl BuiltinEnvironment {
                             .subscribe(vec![
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
-                                        source_name: CapabilityName::from(EventType::Started),
+                                        source_name: EventType::Started.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: CapabilityPath::from_str(
@@ -964,7 +960,7 @@ impl BuiltinEnvironment {
                                 },
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
-                                        source_name: CapabilityName::from(EventType::Stopped),
+                                        source_name: EventType::Stopped.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: CapabilityPath::from_str(
@@ -977,7 +973,7 @@ impl BuiltinEnvironment {
                                 },
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
-                                        source_name: CapabilityName::from(EventType::Destroyed),
+                                        source_name: EventType::Destroyed.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: CapabilityPath::from_str(
@@ -990,7 +986,7 @@ impl BuiltinEnvironment {
                                 },
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
-                                        source_name: CapabilityName::from(EventType::Discovered),
+                                        source_name: EventType::Discovered.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: CapabilityPath::from_str(
@@ -1003,7 +999,7 @@ impl BuiltinEnvironment {
                                 },
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
-                                        source_name: CapabilityName::from(EventType::Resolved),
+                                        source_name: EventType::Resolved.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: CapabilityPath::from_str(
@@ -1016,7 +1012,7 @@ impl BuiltinEnvironment {
                                 },
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
-                                        source_name: CapabilityName::from(EventType::Unresolved),
+                                        source_name: EventType::Unresolved.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: CapabilityPath::from_str(

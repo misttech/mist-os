@@ -88,7 +88,7 @@ impl PkgDirectory {
             component,
         } = source
         {
-            if source_name.str() != "pkg" {
+            if source_name.as_str() != "pkg" {
                 return Ok(());
             }
 

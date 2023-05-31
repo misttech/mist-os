@@ -5,13 +5,13 @@
 use {
     crate::builtin::capability::BuiltinCapability,
     ::routing::capability_source::InternalCapability, anyhow::Error, async_trait::async_trait,
-    cm_rust::CapabilityName, fidl::endpoints::ProtocolMarker, fidl_fuchsia_boot as fuchsia_boot,
+    cm_types::Name, fidl::endpoints::ProtocolMarker, fidl_fuchsia_boot as fuchsia_boot,
     fuchsia_zircon::Channel, futures::prelude::*, lazy_static::lazy_static, parking_lot::Mutex,
     std::sync::Arc,
 };
 
 lazy_static! {
-    static ref SVC_STASH_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.SvcStashProvider".into();
+    static ref SVC_STASH_CAPABILITY_NAME: Name = "fuchsia.boot.SvcStashProvider".parse().unwrap();
 }
 
 pub struct SvcStashCapability {

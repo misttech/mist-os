@@ -123,31 +123,31 @@ mod tests {
                     }],
                     uses: vec![UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.foo.bar".into(),
+                        source_name: "fuchsia.foo.bar".parse().unwrap(),
                         target_path: "/svc/fuchsia.foo.bar".try_into().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     })],
                     exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "fuchsia.foo.bar".into(),
+                        source_name: "fuchsia.foo.bar".parse().unwrap(),
                         target: ExposeTarget::Parent,
-                        target_name: "fuchsia.foo.bar".into(),
+                        target_name: "fuchsia.foo.bar".parse().unwrap(),
                         availability: Availability::Required,
                     })],
                     offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "fuchsia.foo.bar".into(),
+                        source_name: "fuchsia.foo.bar".parse().unwrap(),
                         target: OfferTarget::Child(ChildRef {
                             name: "my_bar".into(),
                             collection: None,
                         }),
-                        target_name: "fuchsia.foo.bar".into(),
+                        target_name: "fuchsia.foo.bar".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     })],
                     capabilities: vec![CapabilityDecl::Protocol(ProtocolDecl {
-                        name: "fuchsia.foo.bar".into(),
+                        name: "fuchsia.foo.bar".parse().unwrap(),
                         source_path: Some("/svc/fuchsia.foo.bar".try_into().unwrap()),
                     })],
                     ..ComponentDecl::default()
@@ -182,7 +182,7 @@ mod tests {
                         capability,
                         UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
-                            source_name: "fuchsia.foo.bar".into(),
+                            source_name: "fuchsia.foo.bar".parse().unwrap(),
                             target_path: "/svc/fuchsia.foo.bar".try_into().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: Availability::Required
@@ -196,12 +196,12 @@ mod tests {
                         capability,
                         OfferDecl::Protocol(OfferProtocolDecl {
                             source: OfferSource::Self_,
-                            source_name: "fuchsia.foo.bar".into(),
+                            source_name: "fuchsia.foo.bar".parse().unwrap(),
                             target: OfferTarget::Child(ChildRef {
                                 name: "my_bar".into(),
                                 collection: None,
                             }),
-                            target_name: "fuchsia.foo.bar".into(),
+                            target_name: "fuchsia.foo.bar".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: Availability::Required
                         })
@@ -214,9 +214,9 @@ mod tests {
                         capability,
                         ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
-                            source_name: "fuchsia.foo.bar".into(),
+                            source_name: "fuchsia.foo.bar".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            target_name: "fuchsia.foo.bar".into(),
+                            target_name: "fuchsia.foo.bar".parse().unwrap(),
                             availability: Availability::Required
                         })
                     );
@@ -227,7 +227,7 @@ mod tests {
                     assert_eq!(
                         capability,
                         CapabilityDecl::Protocol(ProtocolDecl {
-                            name: "fuchsia.foo.bar".into(),
+                            name: "fuchsia.foo.bar".parse().unwrap(),
                             source_path: Some("/svc/fuchsia.foo.bar".try_into().unwrap()),
                         })
                     );

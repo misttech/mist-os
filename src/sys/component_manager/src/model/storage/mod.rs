@@ -572,14 +572,14 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
-                        name: "data".into(),
+                        name: "data".parse().unwrap(),
                         source_path: Some("/data".try_into().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "data".try_into().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
@@ -663,14 +663,14 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
-                        name: "data".into(),
+                        name: "data".parse().unwrap(),
                         source_path: Some("/data".try_into().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "data".try_into().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
@@ -787,14 +787,14 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
-                        name: "data".into(),
+                        name: "data".parse().unwrap(),
                         source_path: Some("/data".try_into().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "data".try_into().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
@@ -922,14 +922,14 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
-                        name: "data".into(),
+                        name: "data".parse().unwrap(),
                         source_path: Some("/data".try_into().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "data".try_into().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,

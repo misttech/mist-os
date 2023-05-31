@@ -192,7 +192,7 @@ pub async fn load_driver(
         Some(r) => r,
         None => return Ok(None),
     };
-    if runner.str() != "driver" {
+    if runner.as_str() != "driver" {
         return Ok(None);
     }
 

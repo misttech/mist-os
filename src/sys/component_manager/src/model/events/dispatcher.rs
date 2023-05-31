@@ -230,7 +230,7 @@ mod tests {
             EventPayload::CapabilityRouted {
                 source: CapabilitySource::Builtin {
                     capability: InternalCapability::Protocol(
-                        "fuchsia.sys2.MyAwesomeProtocol".try_into().unwrap(),
+                        "fuchsia.sys2.MyAwesomeProtocol".parse().unwrap(),
                     ),
                     top_instance: Weak::new(),
                 },

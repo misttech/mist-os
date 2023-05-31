@@ -16,7 +16,6 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::sync::{Arc, Weak},
 };
@@ -58,13 +57,8 @@ impl EventSourceFactory {
     }
 
     /// Creates a `EventSource` for the given `subscriber`.
-    pub async fn create(
-        &self,
-        subscriber: AbsoluteMoniker,
-        name: CapabilityName,
-    ) -> Result<EventSource, ModelError> {
+    async fn create(&self, subscriber: AbsoluteMoniker) -> Result<EventSource, ModelError> {
         EventSource::new(
-            name,
             ExtendedMoniker::ComponentInstance(subscriber),
             self.model.clone(),
             self.event_registry.clone(),
@@ -75,7 +69,6 @@ impl EventSourceFactory {
 
     pub async fn create_for_above_root(&self) -> Result<EventSource, ModelError> {
         EventSource::new(
-            CapabilityName::from(""),
             ExtendedMoniker::ComponentManager,
             self.model.clone(),
             self.event_registry.clone(),
@@ -93,8 +86,8 @@ impl EventSourceFactory {
         capability: Option<Box<dyn CapabilityProvider>>,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         match capability_decl {
-            InternalCapability::EventStream(name) => {
-                let event_source = self.create(target_moniker, name.clone()).await?;
+            InternalCapability::EventStream(_) => {
+                let event_source = self.create(target_moniker).await?;
                 return Ok(Some(Box::new(event_source)));
             }
             _ => {}

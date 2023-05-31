@@ -24,7 +24,8 @@ use {
         event::EventFilter, mapper::NoopRouteMapper, route_event_stream,
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, ChildRef, EventScope, UseDecl, UseEventStreamDecl},
+    cm_rust::{ChildRef, EventScope, UseDecl, UseEventStreamDecl},
+    cm_types::Name,
     flyweights::FlyStr,
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
@@ -38,7 +39,7 @@ pub type EventSubscription = ::routing::event::EventSubscription<UseEventStreamD
 
 #[derive(Debug)]
 pub struct RoutedEvent {
-    pub source_name: CapabilityName,
+    pub source_name: Name,
     pub scopes: Vec<EventDispatcherScope>,
     pub route: Vec<ComponentEventRoute>,
 }
@@ -58,7 +59,7 @@ impl RequestedEventState {
 #[derive(Debug)]
 pub struct RouteEventsResult {
     /// Maps from source name to a mode and set of scope monikers.
-    mapping: HashMap<CapabilityName, RequestedEventState>,
+    mapping: HashMap<Name, RequestedEventState>,
 }
 
 impl RouteEventsResult {
@@ -68,7 +69,7 @@ impl RouteEventsResult {
 
     fn insert(
         &mut self,
-        source_name: CapabilityName,
+        source_name: Name,
         scope: EventDispatcherScope,
         route: Vec<ComponentEventRoute>,
     ) {
@@ -79,7 +80,7 @@ impl RouteEventsResult {
         }
     }
 
-    pub fn contains_event(&self, event_name: &CapabilityName) -> bool {
+    pub fn contains_event(&self, event_name: &Name) -> bool {
         self.mapping.contains_key(event_name)
     }
 
@@ -98,7 +99,7 @@ impl RouteEventsResult {
 /// Subscribes to events from multiple tasks and sends events to all of them.
 pub struct EventRegistry {
     model: Weak<Model>,
-    dispatcher_map: Arc<Mutex<HashMap<CapabilityName, Vec<Weak<EventDispatcher>>>>>,
+    dispatcher_map: Arc<Mutex<HashMap<Name, Vec<Weak<EventDispatcher>>>>>,
     event_synthesizer: EventSynthesizer,
 }
 
@@ -205,14 +206,13 @@ impl EventRegistry {
     pub async fn subscribe_with_routed_events(
         &self,
         subscriber: &WeakExtendedInstance,
-        mut events: Vec<RoutedEvent>,
+        events: Vec<RoutedEvent>,
     ) -> Result<EventStream, ModelError> {
         // TODO(fxbug.dev/48510): get rid of this channel and use FIDL directly.
         let mut event_stream = EventStream::new();
 
         let mut dispatcher_map = self.dispatcher_map.lock().await;
-        for event in &mut events {
-            event.source_name = CapabilityName::from(event.source_name.str());
+        for event in &events {
             let dispatchers = dispatcher_map.entry(event.source_name.clone()).or_insert(vec![]);
             let dispatcher = event_stream.create_dispatcher(
                 subscriber.extended_moniker(),
@@ -329,7 +329,7 @@ impl EventRegistry {
     async fn route_single_event(
         event_decl: UseEventStreamDecl,
         component: &Arc<ComponentInstance>,
-    ) -> Result<(CapabilityName, ExtendedMoniker, Vec<ComponentEventRoute>), ModelError> {
+    ) -> Result<(Name, ExtendedMoniker, Vec<ComponentEventRoute>), ModelError> {
         let mut components = vec![];
         let mut route = vec![];
         let route_source = route_event_stream(
@@ -341,7 +341,7 @@ impl EventRegistry {
         .await?;
         // Handle scope in "use" clause
 
-        let mut search_name: CapabilityName = event_decl.source_name;
+        let mut search_name: Name = event_decl.source_name;
         if let Some(moniker) = component.child_moniker() {
             route.push(ComponentEventRoute {
                 component: ChildRef {

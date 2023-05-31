@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
@@ -16,7 +16,7 @@ use {
 };
 
 lazy_static! {
-    static ref VMEX_RESOURCE_CAPABILITY_NAME: CapabilityName = "fuchsia.kernel.VmexResource".into();
+    static ref VMEX_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.kernel.VmexResource".parse().unwrap();
 }
 
 /// An implementation of fuchsia.kernel.VmexResource protocol.

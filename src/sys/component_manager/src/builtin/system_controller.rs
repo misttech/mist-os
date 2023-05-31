@@ -14,8 +14,8 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::{format_err, Context as _, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
@@ -33,8 +33,8 @@ use {
 };
 
 lazy_static! {
-    pub static ref SYSTEM_CONTROLLER_CAPABILITY_NAME: CapabilityName =
-        "fuchsia.sys2.SystemController".into();
+    pub static ref SYSTEM_CONTROLLER_CAPABILITY_NAME: Name =
+        "fuchsia.sys2.SystemController".parse().unwrap();
 }
 
 #[derive(Clone)]

@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::Error,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_async::DurationExt as _,
     fuchsia_zircon::{self as zx, Resource},
@@ -17,7 +17,7 @@ use {
 };
 
 lazy_static! {
-    static ref KERNEL_STATS_CAPABILITY_NAME: CapabilityName = "fuchsia.kernel.Stats".into();
+    static ref KERNEL_STATS_CAPABILITY_NAME: Name = "fuchsia.kernel.Stats".parse().unwrap();
 }
 
 /// An implementation of the `fuchsia.kernel.Stats` protocol.

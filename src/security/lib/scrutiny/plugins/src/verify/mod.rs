@@ -21,7 +21,8 @@ use {
     cm_fidl_analyzer::{
         node_path::NodePath, route::CapabilityRouteError, serde_ext::ErrorWithMessage,
     },
-    cm_rust::{CapabilityName, CapabilityTypeName},
+    cm_rust::CapabilityTypeName,
+    cm_types::Name,
     routing::mapper::RouteSegment,
     scrutiny::prelude::*,
     serde::{Deserialize, Serialize},
@@ -88,7 +89,7 @@ pub struct ResultsBySeverity {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ErrorResult {
     pub using_node: NodePath,
-    pub capability: CapabilityName,
+    pub capability: Option<Name>,
     pub error: ErrorWithMessage<CapabilityRouteError>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub route: Vec<RouteSegment>,
@@ -109,7 +110,7 @@ impl PartialEq for ErrorResult {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct WarningResult {
     pub using_node: NodePath,
-    pub capability: CapabilityName,
+    pub capability: Option<Name>,
     pub warning: ErrorWithMessage<CapabilityRouteError>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub route: Vec<RouteSegment>,
@@ -130,7 +131,7 @@ impl PartialEq for WarningResult {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct OkResult {
     pub using_node: NodePath,
-    pub capability: CapabilityName,
+    pub capability: Name,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub route: Vec<RouteSegment>,
 }
@@ -152,10 +153,10 @@ mod tests {
         anyhow::Result,
         cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
         cm_rust::{
-            Availability, CapabilityDecl, CapabilityName, CapabilityPath, ChildDecl, ComponentDecl,
-            DependencyType, DirectoryDecl, FidlIntoNative, NativeIntoFidl, OfferDecl,
-            OfferDirectoryDecl, OfferProtocolDecl, OfferSource, OfferTarget, ProgramDecl, UseDecl,
-            UseDirectoryDecl, UseProtocolDecl, UseSource,
+            Availability, CapabilityDecl, CapabilityPath, ChildDecl, ComponentDecl, DependencyType,
+            DirectoryDecl, FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDirectoryDecl,
+            OfferProtocolDecl, OfferSource, OfferTarget, ProgramDecl, UseDecl, UseDirectoryDecl,
+            UseProtocolDecl, UseSource,
         },
         fidl::persist,
         fidl_fuchsia_component_decl as fdecl,
@@ -213,7 +214,7 @@ mod tests {
         children: Vec<ChildDecl>,
     ) -> ComponentDecl {
         let mut program = ProgramDecl::default();
-        program.runner = Some("elf".into());
+        program.runner = Some("elf".parse().unwrap());
         ComponentDecl {
             program: Some(program),
             uses,
@@ -230,7 +231,7 @@ mod tests {
 
     fn new_use_directory_decl(
         source: UseSource,
-        source_name: CapabilityName,
+        source_name: Name,
         rights: fio::Operations,
     ) -> UseDirectoryDecl {
         UseDirectoryDecl {
@@ -246,9 +247,9 @@ mod tests {
 
     fn new_offer_directory_decl(
         source: OfferSource,
-        source_name: CapabilityName,
+        source_name: Name,
         target: OfferTarget,
-        target_name: CapabilityName,
+        target_name: Name,
         rights: Option<fio::Operations>,
     ) -> OfferDirectoryDecl {
         OfferDirectoryDecl {
@@ -263,11 +264,11 @@ mod tests {
         }
     }
 
-    fn new_directory_decl(name: CapabilityName, rights: fio::Operations) -> DirectoryDecl {
+    fn new_directory_decl(name: Name, rights: fio::Operations) -> DirectoryDecl {
         DirectoryDecl { name, source_path: None, rights }
     }
 
-    fn new_use_protocol_decl(source: UseSource, source_name: CapabilityName) -> UseProtocolDecl {
+    fn new_use_protocol_decl(source: UseSource, source_name: Name) -> UseProtocolDecl {
         UseProtocolDecl {
             source,
             source_name,
@@ -279,9 +280,9 @@ mod tests {
 
     fn new_offer_protocol_decl(
         source: OfferSource,
-        source_name: CapabilityName,
+        source_name: Name,
         target: OfferTarget,
-        target_name: CapabilityName,
+        target_name: Name,
     ) -> OfferProtocolDecl {
         OfferProtocolDecl {
             source,
@@ -423,11 +424,11 @@ mod tests {
         let child_name = "child".to_string();
         let missing_child_name = "missing_child".to_string();
 
-        let good_dir_name = CapabilityName::from("good_dir");
-        let bad_dir_name = CapabilityName::from("bad_dir");
+        let good_dir_name: Name = "good_dir".parse().unwrap();
+        let bad_dir_name: Name = "bad_dir".parse().unwrap();
         let offer_rights = fio::Operations::CONNECT;
 
-        let protocol_name = CapabilityName::from("protocol");
+        let protocol_name: Name = "protocol".parse().unwrap();
 
         let root_offer_good_dir = new_offer_directory_decl(
             OfferSource::Self_,

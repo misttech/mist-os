@@ -31,7 +31,7 @@ pub fn find_driver_components(far_reader: &mut FarReader) -> Result<Vec<(Compone
 
 pub fn is_driver_component(component: &ComponentDecl) -> bool {
     if let Some(ProgramDecl { runner: Some(runner), .. }) = &component.program {
-        runner == "driver"
+        *runner == "driver"
     } else {
         false
     }

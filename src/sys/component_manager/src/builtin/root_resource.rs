@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::Error,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_boot as fboot,
     fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
@@ -16,7 +16,7 @@ use {
 };
 
 lazy_static! {
-    static ref ROOT_RESOURCE_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.RootResource".into();
+    static ref ROOT_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.boot.RootResource".parse().unwrap();
 }
 
 /// An implementation of the `fuchsia.boot.RootResource` protocol.

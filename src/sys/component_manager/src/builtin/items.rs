@@ -6,7 +6,7 @@ use {
     crate::builtin::capability::BuiltinCapability,
     anyhow::{anyhow, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     core::mem::size_of,
     fidl_fuchsia_boot as fboot,
     fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::BootloaderFile},
@@ -18,7 +18,7 @@ use {
 };
 
 lazy_static! {
-    static ref ITEMS_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.Items".into();
+    static ref ITEMS_CAPABILITY_NAME: Name = "fuchsia.boot.Items".parse().unwrap();
 }
 
 pub struct Items {

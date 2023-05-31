@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::Error,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_boot as fboot,
     fuchsia_zircon::{self as zx, DebugLog, DebugLogOpts, HandleBased, Resource},
     futures::prelude::*,
@@ -16,8 +16,8 @@ use {
 };
 
 lazy_static! {
-    static ref READ_ONLY_LOG_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.ReadOnlyLog".into();
-    static ref WRITE_ONLY_LOG_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.WriteOnlyLog".into();
+    static ref READ_ONLY_LOG_CAPABILITY_NAME: Name = "fuchsia.boot.ReadOnlyLog".parse().unwrap();
+    static ref WRITE_ONLY_LOG_CAPABILITY_NAME: Name = "fuchsia.boot.WriteOnlyLog".parse().unwrap();
 }
 
 /// An implementation of the `fuchsia.boot.ReadOnlyLog` protocol.

@@ -4,13 +4,14 @@
 
 use {
     crate::{error::EventsRoutingError, walk_state::WalkStateUnit},
-    cm_rust::{CapabilityName, DictionaryValue},
+    cm_rust::DictionaryValue,
+    cm_types::Name,
     maplit::btreemap,
     std::collections::BTreeMap,
 };
 
 #[derive(Debug, Clone)]
-pub struct EventSubscription<NameType = CapabilityName>
+pub struct EventSubscription<NameType = Name>
 where
     NameType: Clone,
 {

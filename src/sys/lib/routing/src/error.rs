@@ -5,7 +5,8 @@
 use {
     crate::{component_id_index::ComponentIdIndexError, policy::PolicyError, rights::Rights},
     clonable_error::ClonableError,
-    cm_rust::{CapabilityName, CapabilityTypeName},
+    cm_rust::CapabilityTypeName,
+    cm_types::Name,
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     thiserror::Error,
@@ -137,7 +138,7 @@ pub enum RoutingError {
     UseFromEnvironmentNotFound {
         moniker: AbsoluteMoniker,
         capability_type: String,
-        capability_name: CapabilityName,
+        capability_name: Name,
     },
 
     #[error(
@@ -149,14 +150,14 @@ pub enum RoutingError {
     UseFromRootEnvironmentNotAllowed {
         moniker: AbsoluteMoniker,
         capability_type: String,
-        capability_name: CapabilityName,
+        capability_name: Name,
     },
 
     #[error("`{}` was not offered to `{}` by parent.", capability_name, moniker)]
     EnvironmentFromParentNotFound {
         moniker: AbsoluteMoniker,
         capability_type: String,
-        capability_name: CapabilityName,
+        capability_name: Name,
     },
 
     #[error(
@@ -169,14 +170,14 @@ pub enum RoutingError {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
         capability_type: String,
-        capability_name: CapabilityName,
+        capability_name: Name,
     },
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     EnvironmentFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
-        capability_name: CapabilityName,
+        capability_name: Name,
         capability_type: String,
     },
 
@@ -194,11 +195,7 @@ pub enum RoutingError {
     },
 
     #[error("`{}` does not have collection `#{}`.", moniker, collection)]
-    OfferFromCollectionNotFound {
-        collection: String,
-        moniker: AbsoluteMoniker,
-        capability: CapabilityName,
-    },
+    OfferFromCollectionNotFound { collection: String, moniker: AbsoluteMoniker, capability: Name },
 
     #[error(
         "`{}` was not exposed to `{}` from child `#{}`.",
@@ -243,11 +240,7 @@ pub enum RoutingError {
     },
 
     #[error("`{}` does not have collection `#{}`.", moniker, collection)]
-    ExposeFromCollectionNotFound {
-        collection: String,
-        moniker: AbsoluteMoniker,
-        capability: CapabilityName,
-    },
+    ExposeFromCollectionNotFound { collection: String, moniker: AbsoluteMoniker, capability: Name },
 
     #[error(
         "`{}` was not exposed to `{}` from child `#{}`.",
@@ -289,7 +282,7 @@ pub enum RoutingError {
     UnexpectedChildInAggregate {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
-        capability: CapabilityName,
+        capability: Name,
     },
 
     #[error("Routing a capability from an unsupported source type: {}.", source_type)]

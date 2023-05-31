@@ -14,18 +14,19 @@ use {
     async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::{
-        Availability, CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, ChildRef,
-        ComponentDecl, DependencyType, EventScope, EventStreamDecl, ExposeDecl,
-        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource,
-        ExposeTarget, NameMapping, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl,
-        OfferProtocolDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferTarget,
-        ProgramDecl, ProtocolDecl, RegistrationSource, RunnerDecl, RunnerRegistration, ServiceDecl,
-        UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        Availability, CapabilityDecl, CapabilityPath, CapabilityTypeName, ChildRef, ComponentDecl,
+        DependencyType, EventScope, EventStreamDecl, ExposeDecl, ExposeDirectoryDecl,
+        ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, ExposeTarget,
+        NameMapping, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
+        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferTarget, ProgramDecl, ProtocolDecl,
+        RegistrationSource, RunnerDecl, RunnerRegistration, ServiceDecl, UseDecl, UseDirectoryDecl,
+        UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
     },
     cm_rust_testing::{
         ChildDeclBuilder, ComponentDeclBuilder, DirectoryDeclBuilder, EnvironmentDeclBuilder,
         ProtocolDeclBuilder, TEST_RUNNER_NAME,
     },
+    cm_types::Name,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
@@ -56,12 +57,12 @@ use {
 
 /// Construct a capability path for the hippo service.
 pub fn default_service_capability() -> CapabilityPath {
-    "/svc/hippo".try_into().unwrap()
+    "/svc/hippo".parse().unwrap()
 }
 
 /// Construct a capability path for the hippo directory.
 pub fn default_directory_capability() -> CapabilityPath {
-    "/data/hippo".try_into().unwrap()
+    "/data/hippo".parse().unwrap()
 }
 
 /// Returns an empty component decl for an executable component.
@@ -74,7 +75,7 @@ pub fn default_component_decl() -> ComponentDecl {
 pub fn component_decl_with_test_runner() -> ComponentDecl {
     ComponentDecl {
         program: Some(ProgramDecl {
-            runner: Some(TEST_RUNNER_NAME.into()),
+            runner: Some(TEST_RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
         ..Default::default()
@@ -85,14 +86,14 @@ pub fn component_decl_with_test_runner() -> ComponentDecl {
 pub fn component_decl_with_exposed_binder() -> ComponentDecl {
     ComponentDecl {
         program: Some(ProgramDecl {
-            runner: Some(TEST_RUNNER_NAME.into()),
+            runner: Some(TEST_RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
         exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Framework,
-            source_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
+            source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
+            target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
             availability: cm_rust::Availability::Required,
         })],
         ..Default::default()
@@ -164,7 +165,7 @@ pub enum CheckUse {
     EventStream {
         path: CapabilityPath,
         scope: Vec<ComponentEventRoute>,
-        name: CapabilityName,
+        name: Name,
         expected_res: ExpectedResult,
     },
 }
@@ -414,8 +415,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("file").path("/svc/file").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -424,16 +425,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "file".into(),
-                        target_name: "device".into(),
+                        source_name: "file".parse().unwrap(),
+                        target_name: "device".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -446,7 +447,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "bar_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -455,14 +456,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "bar_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "device".into(),
+                        source_name: "device".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/device").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -486,9 +487,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 },
             )
             .await;
-        model
-            .check_open_file(vec!["b"].try_into().unwrap(), "/svc/device".try_into().unwrap())
-            .await;
+        model.check_open_file(vec!["b"].try_into().unwrap(), "/svc/device".parse().unwrap()).await;
     }
 
     ///   a
@@ -506,7 +505,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "bar_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -515,7 +514,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "bar_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -530,8 +529,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -539,8 +538,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -570,7 +569,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .protocol(ProtocolDeclBuilder::new("hippo").build())
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Self_,
-                    source_name: "hippo".into(),
+                    source_name: "hippo".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -608,7 +607,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "baz_data".into(),
+                        source_name: "baz_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -617,7 +616,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "baz_svc".into(),
+                        source_name: "baz_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -630,8 +629,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("c".to_string()),
-                        source_name: "bar_data".into(),
-                        target_name: "baz_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
+                        target_name: "baz_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -639,8 +638,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("c".to_string()),
-                        source_name: "bar_svc".into(),
-                        target_name: "baz_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
+                        target_name: "baz_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -654,8 +653,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -663,8 +662,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -707,8 +706,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -717,8 +716,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -731,8 +730,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
-                        source_name: "bar_data".into(),
-                        target_name: "baz_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
+                        target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -741,8 +740,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "bar_svc".into(),
-                        target_name: "baz_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
+                        target_name: "baz_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -755,7 +754,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "baz_data".into(),
+                        source_name: "baz_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -764,7 +763,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "baz_svc".into(),
+                        source_name: "baz_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -806,8 +805,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "builtin.Echo".into(),
-                        target_name: "builtin.Echo".into(),
+                        source_name: "builtin.Echo".parse().unwrap(),
+                        target_name: "builtin.Echo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -820,8 +819,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "builtin.Echo".into(),
-                        target_name: "builtin.Echo".into(),
+                        source_name: "builtin.Echo".parse().unwrap(),
+                        target_name: "builtin.Echo".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -834,7 +833,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "builtin.Echo".into(),
+                        source_name: "builtin.Echo".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -845,7 +844,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::Protocol(ProtocolDecl {
-            name: "builtin.Echo".into(),
+            name: "builtin.Echo".parse().unwrap(),
             source_path: None,
         })]);
         let model = builder.build().await;
@@ -878,8 +877,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "bar_data".into(),
-                        target_name: "foobar_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
+                        target_name: "foobar_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -888,8 +887,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "bar_svc".into(),
-                        target_name: "foobar_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
+                        target_name: "foobar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -903,7 +902,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "foobar_data".into(),
+                        source_name: "foobar_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -912,7 +911,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "foobar_svc".into(),
+                        source_name: "foobar_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -926,8 +925,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -935,8 +934,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -975,8 +974,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".into(),
-                        target_name: "baz_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
+                        target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -985,8 +984,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_svc".into(),
-                        target_name: "baz_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
+                        target_name: "baz_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1002,8 +1001,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1011,8 +1010,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1023,7 +1022,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "baz_data".into(),
+                        source_name: "baz_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1032,7 +1031,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "baz_svc".into(),
+                        source_name: "baz_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1075,8 +1074,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "baz_data".into(),
-                        target_name: "foobar_data".into(),
+                        source_name: "baz_data".parse().unwrap(),
+                        target_name: "foobar_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1085,8 +1084,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "baz_svc".into(),
-                        target_name: "foobar_svc".into(),
+                        source_name: "baz_svc".parse().unwrap(),
+                        target_name: "foobar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1100,8 +1099,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("d".to_string()),
-                        source_name: "bar_data".into(),
-                        target_name: "baz_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
+                        target_name: "baz_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1109,8 +1108,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("d".to_string()),
-                        source_name: "bar_svc".into(),
-                        target_name: "baz_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
+                        target_name: "baz_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1122,7 +1121,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "foobar_data".into(),
+                        source_name: "foobar_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1131,7 +1130,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "foobar_svc".into(),
+                        source_name: "foobar_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1145,8 +1144,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1154,8 +1153,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1200,16 +1199,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "foo_from_a_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "foo_from_a_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "foo_from_d_data".into(),
-                        target_name: "foo_from_d_data".into(),
+                        source_name: "foo_from_d_data".parse().unwrap(),
+                        target_name: "foo_from_d_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1225,8 +1224,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new_empty_component()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "foo_from_d_data".into(),
-                        target_name: "foo_from_d_data".into(),
+                        source_name: "foo_from_d_data".parse().unwrap(),
+                        target_name: "foo_from_d_data".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1235,16 +1234,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "foo_from_a_svc".into(),
-                        target_name: "foo_from_a_svc".into(),
+                        source_name: "foo_from_a_svc".parse().unwrap(),
+                        target_name: "foo_from_a_svc".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("d".to_string()),
-                        source_name: "foo_from_d_data".into(),
-                        target_name: "foo_from_d_data".into(),
+                        source_name: "foo_from_d_data".parse().unwrap(),
+                        target_name: "foo_from_d_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1259,8 +1258,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new_empty_component()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
-                        source_name: "foo_from_d_data".into(),
-                        target_name: "foo_from_d_data".into(),
+                        source_name: "foo_from_d_data".parse().unwrap(),
+                        target_name: "foo_from_d_data".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1269,8 +1268,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("g".to_string()),
-                        source_name: "foo_from_h_svc".into(),
-                        target_name: "foo_from_h_svc".into(),
+                        source_name: "foo_from_h_svc".parse().unwrap(),
+                        target_name: "foo_from_h_svc".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1285,8 +1284,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .directory(DirectoryDeclBuilder::new("foo_data").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "foo_from_d_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "foo_from_d_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1299,7 +1298,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "foo_from_d_data".into(),
+                        source_name: "foo_from_d_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1308,7 +1307,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "foo_from_a_svc".into(),
+                        source_name: "foo_from_a_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1320,7 +1319,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "foo_from_d_data".into(),
+                        source_name: "foo_from_d_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1329,7 +1328,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "foo_from_h_svc".into(),
+                        source_name: "foo_from_h_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1341,8 +1340,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new_empty_component()
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("h".to_string()),
-                        source_name: "foo_from_h_svc".into(),
-                        target_name: "foo_from_h_svc".into(),
+                        source_name: "foo_from_h_svc".parse().unwrap(),
+                        target_name: "foo_from_h_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1355,8 +1354,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "foo_from_h_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "foo_from_h_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1408,7 +1407,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
-                    source_name: "foo_data".into(),
+                    source_name: "foo_data".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -1417,7 +1416,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 }))
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
-                    source_name: "foo_svc".into(),
+                    source_name: "foo_svc".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1470,8 +1469,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1480,8 +1479,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1494,7 +1493,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "bar_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1503,7 +1502,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "bar_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1559,7 +1558,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1568,7 +1567,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1608,9 +1607,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new_empty_component()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::static_child("b".to_string()),
-                        target_name: "hippo_data".into(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1618,9 +1617,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         source: OfferSource::static_child("b".to_string()),
-                        target_name: "hippo_svc".into(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1635,7 +1634,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1644,7 +1643,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1687,9 +1686,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "b",
                 ComponentDeclBuilder::new_empty_component()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::Parent,
-                        target_name: "hippo_data".into(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1697,9 +1696,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         source: OfferSource::Parent,
-                        target_name: "hippo_svc".into(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1712,7 +1711,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1721,7 +1720,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1763,7 +1762,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1772,7 +1771,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1786,18 +1785,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .directory(DirectoryDeclBuilder::new("hippo_data").build())
                     .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "hippo_data".into(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
                         availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "hippo_svc".into(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1830,14 +1829,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// b: exposes "foo" to parent from self
     pub async fn test_route_protocol_from_expose(&self) {
         let expose_decl = ExposeProtocolDecl {
-            source: ExposeSource::Child("b".into()),
-            source_name: "foo".into(),
-            target_name: "foo".into(),
+            source: ExposeSource::Child("b".parse().unwrap()),
+            source_name: "foo".parse().unwrap(),
+            target_name: "foo".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
-        let expected_protocol_decl =
-            ProtocolDecl { name: "foo".into(), source_path: Some("/svc/foo".parse().unwrap()) };
+        let expected_protocol_decl = ProtocolDecl {
+            name: "foo".parse().unwrap(),
+            source_path: Some("/svc/foo".parse().unwrap()),
+        };
 
         let components = vec![
             (
@@ -1852,8 +1853,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1894,8 +1895,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_data".into(),
-                        target_name: "baz_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
+                        target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1904,8 +1905,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "bar_svc".into(),
-                        target_name: "baz_svc".into(),
+                        source_name: "bar_svc".parse().unwrap(),
+                        target_name: "baz_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1921,8 +1922,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Framework,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -1930,8 +1931,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "bar_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Framework,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1942,7 +1943,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "baz_data".into(),
+                        source_name: "baz_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1951,7 +1952,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "baz_svc".into(),
+                        source_name: "baz_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1993,9 +1994,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .directory(DirectoryDeclBuilder::new("hippo_data").build())
                     .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::Self_,
-                        target_name: "hippo_data".into(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -2003,9 +2004,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         source: OfferSource::Self_,
-                        target_name: "hippo_svc".into(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2018,7 +2019,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -2027,7 +2028,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2063,24 +2064,26 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate protocol should fail
     pub async fn test_route_aggregate_protocol_fails(&self) {
-        let expected_protocol_decl =
-            ProtocolDecl { name: "foo".into(), source_path: Some("/svc/foo".parse().unwrap()) };
+        let expected_protocol_decl = ProtocolDecl {
+            name: "foo".parse().unwrap(),
+            source_path: Some("/svc/foo".parse().unwrap()),
+        };
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("b".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("b".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2095,8 +2098,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2108,8 +2111,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2121,7 +2124,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2137,7 +2140,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             route_capability(
                 RouteRequest::UseProtocol(UseProtocolDecl {
                     source: UseSource::Parent,
-                    source_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2160,16 +2163,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate service with non-conflicting filters should succeed.
     pub async fn test_route_aggregate_service(&self) {
-        let expected_service_decl =
-            ServiceDecl { name: "foo".into(), source_path: Some("/svc/foo".parse().unwrap()) };
+        let expected_service_decl = ServiceDecl {
+            name: "foo".parse().unwrap(),
+            source_path: Some("/svc/foo".parse().unwrap()),
+        };
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("b".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("b".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
                             "instance_0".to_string(),
@@ -2179,9 +2184,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
                             "instance_2".to_string(),
@@ -2200,8 +2205,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2213,8 +2218,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2226,7 +2231,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Service(UseServiceDecl {
                         source: UseSource::Parent,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2242,7 +2247,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let source = route_capability(
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,
-                source_name: "foo".into(),
+                source_name: "foo".parse().unwrap(),
                 target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2279,25 +2284,27 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate service without specifying a source_instance_filter should fail.
     pub async fn test_route_aggregate_service_without_filter_fails(&self) {
-        let expected_service_decl =
-            ServiceDecl { name: "foo".into(), source_path: Some("/svc/foo".parse().unwrap()) };
+        let expected_service_decl = ServiceDecl {
+            name: "foo".parse().unwrap(),
+            source_path: Some("/svc/foo".parse().unwrap()),
+        };
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("b".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("b".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: None,
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: None,
                         renamed_instances: None,
@@ -2313,8 +2320,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2326,8 +2333,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2339,7 +2346,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Service(UseServiceDecl {
                         source: UseSource::Parent,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2355,7 +2362,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             route_capability(
                 RouteRequest::UseService(UseServiceDecl {
                     source: UseSource::Parent,
-                    source_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2378,16 +2385,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate service with conflicting source_instance_filters should fail.
     pub async fn test_route_aggregate_service_with_conflicting_filter_fails(&self) {
-        let expected_service_decl =
-            ServiceDecl { name: "foo".into(), source_path: Some("/svc/foo".parse().unwrap()) };
+        let expected_service_decl = ServiceDecl {
+            name: "foo".parse().unwrap(),
+            source_path: Some("/svc/foo".parse().unwrap()),
+        };
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("b".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("b".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
                             "default".to_string(),
@@ -2397,9 +2406,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
                             "default".to_string(),
@@ -2418,8 +2427,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2431,8 +2440,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2444,7 +2453,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Service(UseServiceDecl {
                         source: UseSource::Parent,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2460,7 +2469,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             route_capability(
                 RouteRequest::UseService(UseServiceDecl {
                     source: UseSource::Parent,
-                    source_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2491,8 +2500,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "foo_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: Some(PathBuf::from("s1/s2")),
@@ -2507,8 +2516,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
-                        source_name: "foo_data".into(),
-                        target_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "foo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: Some(PathBuf::from("s3")),
@@ -2523,7 +2532,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: Some(PathBuf::from("s4")),
@@ -2565,9 +2574,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
-                        source_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
-                        target_name: "foo_data".into(),
+                        target_name: "foo_data".parse().unwrap(),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: Some(PathBuf::from("s3")),
                         dependency_type: DependencyType::Strong,
@@ -2583,9 +2592,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .directory(DirectoryDeclBuilder::new("foo_data").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
-                        target_name: "foo_data".into(),
+                        target_name: "foo_data".parse().unwrap(),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: Some(PathBuf::from("s1/s2")),
                         availability: cm_rust::Availability::Required,
@@ -2597,7 +2606,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -2641,8 +2650,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("b".to_string()),
-                        source_name: "foo_data".into(),
-                        target_name: "hippo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: None,
                         subdir: Some(PathBuf::from("s3")),
@@ -2656,8 +2665,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("c".to_string()),
-                        source_name: "foo_data".into(),
-                        target_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "foo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: None,
                         subdir: Some(PathBuf::from("s1/s2")),
@@ -2672,8 +2681,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .directory(DirectoryDeclBuilder::new("foo_data").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "foo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "foo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -2691,7 +2700,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 AbsoluteMoniker::root(),
                 CheckUse::Directory {
-                    path: "/hippo_data".try_into().unwrap(),
+                    path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("inner"),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -2707,8 +2716,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("c".to_string()),
-                        source_name: "hippo_data".into(),
-                        target_name: "hippo_bar_data".into(),
+                        source_name: "hippo_data".parse().unwrap(),
+                        target_name: "hippo_bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -2716,8 +2725,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("c".to_string()),
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_bar_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2731,8 +2740,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "hippo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -2740,8 +2749,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2753,7 +2762,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Directory {
-                    path: "/hippo_bar_data".try_into().unwrap(),
+                    path: "/hippo_bar_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -2763,7 +2772,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/hippo_bar_svc".try_into().unwrap(),
+                    path: "/hippo_bar_svc".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
                 },
             )
@@ -2772,7 +2781,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Directory {
-                    path: "/hippo_data".try_into().unwrap(),
+                    path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -2782,7 +2791,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/hippo_svc".try_into().unwrap(),
+                    path: "/hippo_svc".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
                 },
             )
@@ -2800,8 +2809,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("foo_svc").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "hippo_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -2809,8 +2818,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "foo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -2826,7 +2835,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Directory {
-                    path: "/hippo_data".try_into().unwrap(),
+                    path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
@@ -2836,7 +2845,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/hippo_svc".try_into().unwrap(),
+                    path: "/hippo_svc".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
@@ -2845,7 +2854,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Directory {
-                    path: "/hippo_data".try_into().unwrap(),
+                    path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -2855,7 +2864,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use_exposed_dir(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/hippo_svc".try_into().unwrap(),
+                    path: "/hippo_svc".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
                 },
             )
@@ -2873,7 +2882,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
-                    source_name: "invalid".into(),
+                    source_name: "invalid".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/valid").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2908,9 +2917,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source_name: "invalid".into(),
+                        source_name: "invalid".parse().unwrap(),
                         source: OfferSource::Parent,
-                        target_name: "valid".into(),
+                        target_name: "valid".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2923,7 +2932,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "valid".into(),
+                        source_name: "valid".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/valid").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2970,14 +2979,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             name: "c".to_string(),
                             collection: None,
                         }),
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: None,
                         filter: None,
                         target: OfferTarget::Child(ChildRef {
                             name: "f".to_string(),
                             collection: None,
                         }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
@@ -2989,13 +2998,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::EventStream(ExposeEventStreamDecl {
                         source: ExposeSource::Framework,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "e".to_string(),
                             collection: None,
                         })]),
                         target: ExposeTarget::Parent,
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                     }))
                     .add_lazy_child("d")
                     .add_lazy_child("e")
@@ -3008,7 +3017,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3020,7 +3029,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -3037,7 +3046,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         },
                         ComponentEventRoute { component: "b".to_string(), scope: None },
                     ],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3059,38 +3068,38 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "b".into(),
                             collection: None,
                         })]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "c".into(),
                             collection: None,
                         })]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "d".into(),
                             collection: None,
                         })]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
@@ -3103,7 +3112,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3116,7 +3125,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3129,7 +3138,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3141,7 +3150,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -3155,7 +3164,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3169,7 +3178,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component: "/".to_string(),
                         scope: Some(vec!["d".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3184,7 +3193,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component: "/".to_string(),
                         scope: Some(vec!["c".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3201,7 +3210,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ComponentDeclBuilder::new()
                 .use_(UseDecl::EventStream(UseEventStreamDecl {
                     source: UseSource::Parent,
-                    source_name: "started".into(),
+                    source_name: "started".parse().unwrap(),
                     target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                     scope: None,
                     filter: None,
@@ -3212,7 +3221,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -3223,7 +3232,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     expected_res: ExpectedResult::Ok,
                     path: CapabilityPath::from_str("/event/stream").unwrap(),
                     scope: vec![],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3244,26 +3253,26 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![
                             EventScope::Child(ChildRef { name: "b".into(), collection: None }),
                             EventScope::Child(ChildRef { name: "c".into(), collection: None }),
                         ]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![
                             EventScope::Child(ChildRef { name: "b".into(), collection: None }),
                             EventScope::Child(ChildRef { name: "c".into(), collection: None }),
                         ]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
@@ -3275,7 +3284,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3288,7 +3297,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3296,14 +3305,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "e".into(),
                             collection: None,
                         })]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("d")
@@ -3315,7 +3324,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -3328,7 +3337,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -3342,7 +3351,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string(), "c".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3356,7 +3365,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string(), "c".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3376,7 +3385,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             scope: Some(vec!["e".to_string()]),
                         },
                     ],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -3394,8 +3403,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "capability_requested".into(),
-                        target_name: "capability_requested_on_a".into(),
+                        source_name: "capability_requested".parse().unwrap(),
+                        target_name: "capability_requested_on_a".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         filter: None,
                         scope: None,
@@ -3409,7 +3418,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "capability_requested_on_a".into(),
+                        source_name: "capability_requested_on_a".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
                             .unwrap(),
                         filter: None,
@@ -3422,7 +3431,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "capability_requested".into(),
+            name: "capability_requested".parse().unwrap(),
         })]);
         let model = builder.build().await;
 
@@ -3433,7 +3442,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     expected_res: ExpectedResult::Ok,
                     path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream").unwrap(),
                     scope: vec![ComponentEventRoute { component: "/".to_string(), scope: None }],
-                    name: "capability_requested_on_a".into(),
+                    name: "capability_requested_on_a".parse().unwrap(),
                 },
             )
             .await;
@@ -3453,8 +3462,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3468,7 +3477,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3479,7 +3488,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
-                source_name: CapabilityName::from("hippo_svc"),
+                source_name: "hippo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -3512,8 +3521,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .directory(DirectoryDeclBuilder::new("foo_data").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo_data".into(),
-                        target_name: "bar_data".into(),
+                        source_name: "foo_data".parse().unwrap(),
+                        target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
@@ -3528,7 +3537,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
-                        source_name: "bar_data".into(),
+                        source_name: "bar_data".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -3542,7 +3551,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
-                source_name: CapabilityName::from("foo_data"),
+                source_name: "foo_data".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Directory,
             },
@@ -3574,8 +3583,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3588,8 +3597,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3597,7 +3606,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3610,7 +3619,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3625,7 +3634,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
-                source_name: CapabilityName::from("hippo_svc"),
+                source_name: "hippo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -3671,8 +3680,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3685,16 +3694,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
-                        source_name: "hippo_svc".into(),
-                        target_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
+                        target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3709,7 +3718,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3721,7 +3730,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
-                        source_name: "hippo_svc".into(),
+                        source_name: "hippo_svc".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3737,7 +3746,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
-                source_name: CapabilityName::from("hippo_svc"),
+                source_name: "hippo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -3778,7 +3787,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
-                    source_name: "foo_svc".into(),
+                    source_name: "foo_svc".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                     availability: Availability::Required,
                 }))
@@ -3792,7 +3801,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: CapabilityName::from("foo_svc"),
+                source_name: "foo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -3837,15 +3846,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_allowed".into(),
-                                    target_name: "svc_allowed".into(),
+                                    source_name: "svc_allowed".parse().unwrap(),
+                                    target_name: "svc_allowed".parse().unwrap(),
                                     source: RegistrationSource::Self_,
                                 },
                             ))
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_not_allowed".into(),
-                                    target_name: "svc_not_allowed".into(),
+                                    source_name: "svc_not_allowed".parse().unwrap(),
+                                    target_name: "svc_not_allowed".parse().unwrap(),
                                     source: RegistrationSource::Self_,
                                 },
                             )),
@@ -3866,7 +3875,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_allowed".into(),
+                        source_name: "svc_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3878,7 +3887,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_not_allowed".into(),
+                        source_name: "svc_not_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3895,7 +3904,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("svc_allowed"),
+                source_name: "svc_allowed".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "env_a".to_string(),
@@ -3954,15 +3963,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_allowed".into(),
-                                    target_name: "svc_allowed".into(),
+                                    source_name: "svc_allowed".parse().unwrap(),
+                                    target_name: "svc_allowed".parse().unwrap(),
                                     source: RegistrationSource::Self_,
                                 },
                             ))
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_not_allowed".into(),
-                                    target_name: "svc_not_allowed".into(),
+                                    source_name: "svc_not_allowed".parse().unwrap(),
+                                    target_name: "svc_not_allowed".parse().unwrap(),
                                     source: RegistrationSource::Self_,
                                 },
                             )),
@@ -3977,7 +3986,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_allowed".into(),
+                        source_name: "svc_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3989,7 +3998,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_not_allowed".into(),
+                        source_name: "svc_not_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4006,7 +4015,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("svc_allowed"),
+                source_name: "svc_allowed".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "env_b".to_string(),
@@ -4050,15 +4059,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     pub async fn test_use_protocol_component_provided_debug_capability_policy_from_child(&self) {
         let expose_decl_svc_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "svc_allowed".into(),
-            target_name: "svc_allowed".into(),
+            source_name: "svc_allowed".parse().unwrap(),
+            target_name: "svc_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "svc_not_allowed".into(),
-            target_name: "svc_not_allowed".into(),
+            source_name: "svc_not_allowed".parse().unwrap(),
+            target_name: "svc_not_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
@@ -4073,15 +4082,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_allowed".into(),
-                                    target_name: "svc_allowed".into(),
+                                    source_name: "svc_allowed".parse().unwrap(),
+                                    target_name: "svc_allowed".parse().unwrap(),
                                     source: RegistrationSource::Child("d".to_string()),
                                 },
                             ))
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_not_allowed".into(),
-                                    target_name: "svc_not_allowed".into(),
+                                    source_name: "svc_not_allowed".parse().unwrap(),
+                                    target_name: "svc_not_allowed".parse().unwrap(),
                                     source: RegistrationSource::Child("d".to_string()),
                                 },
                             )),
@@ -4097,7 +4106,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_allowed".into(),
+                        source_name: "svc_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4118,7 +4127,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_not_allowed".into(),
+                        source_name: "svc_not_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4135,7 +4144,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("svc_allowed"),
+                source_name: "svc_allowed".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "env_b".to_string(),
@@ -4184,15 +4193,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     ) {
         let expose_decl_svc_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "svc_allowed".into(),
-            target_name: "svc_allowed".into(),
+            source_name: "svc_allowed".parse().unwrap(),
+            target_name: "svc_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "svc_not_allowed".into(),
-            target_name: "svc_not_allowed".into(),
+            source_name: "svc_not_allowed".parse().unwrap(),
+            target_name: "svc_not_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
@@ -4207,15 +4216,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_allowed".into(),
-                                    target_name: "svc_allowed".into(),
+                                    source_name: "svc_allowed".parse().unwrap(),
+                                    target_name: "svc_allowed".parse().unwrap(),
                                     source: RegistrationSource::Child("d".to_string()),
                                 },
                             ))
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_not_allowed".into(),
-                                    target_name: "svc_not_allowed".into(),
+                                    source_name: "svc_not_allowed".parse().unwrap(),
+                                    target_name: "svc_not_allowed".parse().unwrap(),
                                     source: RegistrationSource::Child("d".to_string()),
                                 },
                             )),
@@ -4230,14 +4239,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_allowed".into(),
+                        source_name: "svc_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_not_allowed".into(),
+                        source_name: "svc_not_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo_not_allowed").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4247,20 +4256,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "d",
                 ComponentDeclBuilder::new()
                     .expose(cm_rust::ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Child("e".into()),
-                        source_name: "svc_allowed".into(),
-                        target_name: "svc_allowed".into(),
+                        source: ExposeSource::Child("e".parse().unwrap()),
+                        source_name: "svc_allowed".parse().unwrap(),
+                        target_name: "svc_allowed".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .expose(cm_rust::ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Child("e".into()),
-                        source_name: "svc_not_allowed".into(),
-                        target_name: "svc_not_allowed".into(),
+                        source: ExposeSource::Child("e".parse().unwrap()),
+                        source_name: "svc_not_allowed".parse().unwrap(),
+                        target_name: "svc_not_allowed".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("e".into())
+                    .add_lazy_child("e")
                     .build(),
             ),
             (
@@ -4283,7 +4292,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("svc_allowed"),
+                source_name: "svc_allowed".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "env_b".to_string(),
@@ -4306,7 +4315,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/svc/hippo_not_allowed".try_into().unwrap(),
+                    path: "/svc/hippo_not_allowed".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx::Status::ACCESS_DENIED),
                 },
             )
@@ -4328,15 +4337,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     pub async fn test_use_protocol_component_provided_wildcard_debug_capability_policy(&self) {
         let expose_decl_svc_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "svc_allowed".into(),
-            target_name: "svc_allowed".into(),
+            source_name: "svc_allowed".parse().unwrap(),
+            target_name: "svc_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "svc_not_allowed".into(),
-            target_name: "svc_not_allowed".into(),
+            source_name: "svc_not_allowed".parse().unwrap(),
+            target_name: "svc_not_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         };
@@ -4348,17 +4357,17 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .add_child(ChildDeclBuilder::new_lazy_child("c"))
                     .add_child(ChildDeclBuilder::new_lazy_child("d"))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".into()),
-                        source_name: "svc_allowed".into(),
-                        target_name: "svc_allowed".into(),
+                        source: OfferSource::static_child("d".parse().unwrap()),
+                        source_name: "svc_allowed".parse().unwrap(),
+                        target_name: "svc_allowed".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("d".into()),
-                        source_name: "svc_not_allowed".into(),
-                        target_name: "svc_not_allowed".into(),
+                        source: OfferSource::static_child("d".parse().unwrap()),
+                        source_name: "svc_not_allowed".parse().unwrap(),
+                        target_name: "svc_not_allowed".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -4374,15 +4383,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_allowed".into(),
-                                    target_name: "svc_allowed".into(),
+                                    source_name: "svc_allowed".parse().unwrap(),
+                                    target_name: "svc_allowed".parse().unwrap(),
                                     source: RegistrationSource::Parent,
                                 },
                             ))
                             .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                                 cm_rust::DebugProtocolRegistration {
-                                    source_name: "svc_not_allowed".into(),
-                                    target_name: "svc_not_allowed".into(),
+                                    source_name: "svc_not_allowed".parse().unwrap(),
+                                    target_name: "svc_not_allowed".parse().unwrap(),
                                     source: RegistrationSource::Parent,
                                 },
                             )),
@@ -4405,14 +4414,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_not_allowed".into(),
+                        source_name: "svc_not_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo_not_allowed").unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
-                        source_name: "svc_allowed".into(),
+                        source_name: "svc_allowed".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4429,7 +4438,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("svc_allowed"),
+                source_name: "svc_allowed".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "env_c".to_string(),
@@ -4442,7 +4451,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use(
                 vec!["b", "c", "e"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/svc/hippo".try_into().unwrap(),
+                    path: "/svc/hippo".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
                 },
             )
@@ -4452,7 +4461,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .check_use(
                 vec!["b", "c", "e"].try_into().unwrap(),
                 CheckUse::Protocol {
-                    path: "/svc/hippo_not_allowed".try_into().unwrap(),
+                    path: "/svc/hippo_not_allowed".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx::Status::ACCESS_DENIED),
                 },
             )
@@ -4469,7 +4478,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -4479,16 +4488,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        name: "foo".parse().unwrap(),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .add_lazy_child("b")
                     .build(),
@@ -4539,7 +4548,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Child("b".to_string()),
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -4555,13 +4564,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .service(ServiceDecl {
-                        name: "foo".into(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        name: "foo".parse().unwrap(),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -4613,7 +4622,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -4622,11 +4631,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
@@ -4640,14 +4649,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        name: "foo".parse().unwrap(),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -4699,7 +4708,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -4710,11 +4719,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: source_instance_filter,
                         renamed_instances: renamed_instances,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
@@ -4728,14 +4737,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        name: "foo".parse().unwrap(),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -4792,7 +4801,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -4812,11 +4821,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
+                        source: OfferSource::static_child("c".parse().unwrap()),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: source_instance_filter,
                         renamed_instances: renamed_instances,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
@@ -4830,14 +4839,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        name: "foo".parse().unwrap(),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -4901,14 +4910,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Self_,
-                                target_name: "hobbit".into(),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -4922,7 +4931,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -4970,12 +4979,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .add_lazy_child("b")
                     .offer(OfferDecl::Runner(OfferRunnerDecl {
                         source: OfferSource::Self_,
-                        source_name: "elf".into(),
+                        source_name: "elf".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        target_name: "dwarf".into(),
+                        target_name: "dwarf".parse().unwrap(),
                     }))
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -4989,9 +4998,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "dwarf".into(),
+                                source_name: "dwarf".parse().unwrap(),
                                 source: RegistrationSource::Parent,
-                                target_name: "hobbit".into(),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
@@ -5006,7 +5015,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &c_component,
             &mut NoopRouteMapper,
         )
@@ -5055,9 +5064,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "dwarf".into(),
-                                source: RegistrationSource::Child("b".into()),
-                                target_name: "hobbit".into(),
+                                source_name: "dwarf".parse().unwrap(),
+                                source: RegistrationSource::Child("b".parse().unwrap()),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
@@ -5068,12 +5077,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                         source: ExposeSource::Self_,
-                        source_name: "elf".into(),
+                        source_name: "elf".parse().unwrap(),
                         target: ExposeTarget::Parent,
-                        target_name: "dwarf".into(),
+                        target_name: "dwarf".parse().unwrap(),
                     }))
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -5087,7 +5096,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let c_component =
             model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &c_component,
             &mut NoopRouteMapper,
         )
@@ -5138,14 +5147,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Self_,
-                                target_name: "hobbit".into(),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -5171,7 +5180,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &c_component,
             &mut NoopRouteMapper,
         )
@@ -5219,14 +5228,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Self_,
-                                target_name: "dwarf".into(),
+                                target_name: "dwarf".parse().unwrap(),
                             })
                             .build(),
                     )
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -5238,7 +5247,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -5275,9 +5284,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Parent,
-                                target_name: "hobbit".into(),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
@@ -5288,7 +5297,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
-            name: "elf".into(),
+            name: "elf".parse().unwrap(),
             source_path: None,
         })]);
         builder.register_mock_builtin_runner("elf");
@@ -5297,7 +5306,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -5330,7 +5339,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
-            name: "elf".into(),
+            name: "elf".parse().unwrap(),
             source_path: None,
         })]);
         builder.register_mock_builtin_runner("elf");
@@ -5339,7 +5348,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let a_component =
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
         let source = route_capability(
-            RouteRequest::Runner("elf".into()),
+            RouteRequest::Runner("elf".parse().unwrap()),
             &a_component,
             &mut NoopRouteMapper,
         )
@@ -5382,9 +5391,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Parent,
-                                target_name: "hobbit".into(),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
@@ -5400,7 +5409,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -5426,7 +5435,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
-            name: "hobbit".into(),
+            name: "hobbit".parse().unwrap(),
             source_path: None,
         })]);
         let model = builder.build().await;
@@ -5434,7 +5443,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let a_component =
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
         let route_result = route_capability(
-            RouteRequest::Runner("hobbit".into()),
+            RouteRequest::Runner("hobbit".parse().unwrap()),
             &a_component,
             &mut NoopRouteMapper,
         )

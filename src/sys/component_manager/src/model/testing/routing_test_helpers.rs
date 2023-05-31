@@ -27,7 +27,7 @@ use {
     async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::*,
-    cm_types::Url,
+    cm_types::{Name, Url},
     fidl::{
         self,
         endpoints::{self, create_proxy, ClientEnd, Proxy, ServerEnd},
@@ -74,8 +74,8 @@ pub struct RoutingTestBuilder {
     blockers: Vec<(&'static str, (oneshot::Sender<()>, oneshot::Receiver<()>))>,
     additional_hooks: Vec<HooksRegistration>,
     outgoing_paths: HashMap<String, HashMap<CapabilityPath, Arc<dyn DirectoryEntry>>>,
-    builtin_runners: HashMap<CapabilityName, Arc<dyn BuiltinRunnerFactory>>,
-    mock_builtin_runners: HashSet<CapabilityName>,
+    builtin_runners: HashMap<Name, Arc<dyn BuiltinRunnerFactory>>,
+    mock_builtin_runners: HashSet<Name>,
     namespace_capabilities: Vec<CapabilityDecl>,
     builtin_capabilities: Vec<CapabilityDecl>,
     component_id_index_path: Option<String>,
@@ -127,7 +127,7 @@ impl RoutingTestBuilder {
     /// Add the given runner as a "builtin runner", registered in the root's environment
     /// under the given name.
     pub fn add_builtin_runner(mut self, name: &str, runner: Arc<dyn BuiltinRunnerFactory>) -> Self {
-        self.builtin_runners.insert(name.into(), runner);
+        self.builtin_runners.insert(name.parse().unwrap(), runner);
         self
     }
 
@@ -192,7 +192,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilder {
     }
 
     fn register_mock_builtin_runner(&mut self, runner: &str) {
-        self.mock_builtin_runners.insert(runner.into());
+        self.mock_builtin_runners.insert(runner.parse().unwrap());
     }
 
     fn add_capability_policy(
@@ -284,7 +284,7 @@ impl RoutingTest {
 
         // Add the `test_runner` capability as a built-in.
         builder.builtin_capabilities.push(CapabilityDecl::Runner(RunnerDecl {
-            name: TEST_RUNNER_NAME.into(),
+            name: TEST_RUNNER_NAME.parse().unwrap(),
             source_path: None,
         }));
 
@@ -309,7 +309,7 @@ impl RoutingTest {
             .set_inspector(inspector)
             .set_runtime_config(config)
             .add_resolver("test".to_string(), Box::new(mock_resolver))
-            .add_runner(TEST_RUNNER_NAME.into(), mock_runner.clone());
+            .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone());
         for name in builder.mock_builtin_runners.clone() {
             env_builder = env_builder.add_runner(name, mock_runner.clone())
         }

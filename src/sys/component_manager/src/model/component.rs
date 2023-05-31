@@ -46,10 +46,11 @@ use {
     cm_moniker::{IncarnationId, InstancedAbsoluteMoniker, InstancedChildMoniker},
     cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
     cm_rust::{
-        self, CapabilityName, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative,
-        NativeIntoFidl, OfferDeclCommon, UseDecl,
+        self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
+        OfferDeclCommon, UseDecl,
     },
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     config_encoder::ConfigFields,
     fidl::endpoints::{self, Proxy, ServerEnd},
@@ -88,7 +89,7 @@ pub type WeakExtendedInstance = WeakExtendedInstanceInterface<ComponentInstance>
 pub enum StartReason {
     /// Indicates that the target is starting the component because it wishes to access
     /// the capability at path.
-    AccessCapability { target: AbsoluteMoniker, name: CapabilityName },
+    AccessCapability { target: AbsoluteMoniker, name: Name },
     /// Indicates that the component is starting because it is in a single-run collection.
     SingleRun,
     /// Indicates that the component was explicitly started for debugging purposes.
@@ -2386,7 +2387,7 @@ pub mod tests {
                     EventType::DebugStarted.into(),
                 ]
                 .into_iter()
-                .map(|event: CapabilityName| {
+                .map(|event: Name| {
                     EventSubscription::new(UseEventStreamDecl {
                         source_name: event,
                         source: UseSource::Parent,
@@ -2599,25 +2600,27 @@ pub mod tests {
         let example_offer = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::static_child("a".to_string()),
             target: OfferTarget::static_child("b".to_string()),
-            source_name: "foo".into(),
-            target_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
+            target_name: "foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             rights: None,
             subdir: None,
             availability: Availability::Required,
         });
-        let example_capability =
-            ProtocolDecl { name: "bar".into(), source_path: Some("/svc/bar".try_into().unwrap()) };
+        let example_capability = ProtocolDecl {
+            name: "bar".parse().unwrap(),
+            source_path: Some("/svc/bar".try_into().unwrap()),
+        };
         let example_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             target: ExposeTarget::Parent,
-            source_name: "bar".into(),
-            target_name: "bar".into(),
+            source_name: "bar".parse().unwrap(),
+            target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
         let example_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "baz".into(),
+            source_name: "baz".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/baz").expect("parsing"),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -2694,8 +2697,8 @@ pub mod tests {
         let example_offer = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::static_child("a".to_string()),
             target: OfferTarget::static_child("b".to_string()),
-            source_name: "foo".into(),
-            target_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
+            target_name: "foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             rights: None,
             subdir: None,
@@ -2771,8 +2774,8 @@ pub mod tests {
                 name: "b".into(),
                 collection: Some("coll_1".into()),
             }),
-            source_name: "dyn_offer_source_name".into(),
-            target_name: "dyn_offer_target_name".into(),
+            source_name: "dyn_offer_source_name".parse().unwrap(),
+            target_name: "dyn_offer_target_name".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -2881,8 +2884,8 @@ pub mod tests {
                 name: "b".into(),
                 collection: Some("coll_1".into()),
             }),
-            source_name: "dyn_offer2_source_name".into(),
-            target_name: "dyn_offer2_target_name".into(),
+            source_name: "dyn_offer2_source_name".parse().unwrap(),
+            target_name: "dyn_offer2_target_name".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -2928,11 +2931,11 @@ pub mod tests {
     async fn creating_dynamic_child_with_offer_cycle_fails() {
         let example_offer = OfferDecl::Service(OfferServiceDecl {
             source: OfferSource::Collection("coll".to_string()),
-            source_name: "foo".try_into().unwrap(),
+            source_name: "foo".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,
             target: OfferTarget::static_child("static_child".to_string()),
-            target_name: "foo".try_into().unwrap(),
+            target_name: "foo".parse().unwrap(),
             availability: Availability::Required,
         });
 
@@ -2982,11 +2985,11 @@ pub mod tests {
     async fn creating_cycle_between_collections_fails() {
         let static_collection_offer = OfferDecl::Service(OfferServiceDecl {
             source: OfferSource::Collection("coll1".to_string()),
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,
             target: OfferTarget::Collection("coll2".to_string()),
-            target_name: "foo".into(),
+            target_name: "foo".parse().unwrap(),
             availability: Availability::Required,
         });
 
@@ -3288,12 +3291,12 @@ pub mod tests {
             .expect("failed to validate/convert dynamic offers"),
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
-                source_name: "fuchsia.example.Echo".into(),
+                source_name: "fuchsia.example.Echo".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
                     collection: Some("col".into()),
                 }),
-                target_name: "fuchsia.example.Echo".into(),
+                target_name: "fuchsia.example.Echo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             }),],
@@ -3313,12 +3316,12 @@ pub mod tests {
             .expect("failed to validate/convert dynamic offers"),
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Void,
-                source_name: "fuchsia.example.Echo".into(),
+                source_name: "fuchsia.example.Echo".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
                     collection: Some("col".into()),
                 }),
-                target_name: "fuchsia.example.Echo".into(),
+                target_name: "fuchsia.example.Echo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Optional,
             }),],
@@ -3347,12 +3350,12 @@ pub mod tests {
                         name: "doesnt-exist".into(),
                         collection: Some("col".into()),
                     }),
-                    source_name: "fuchsia.example.Echo".into(),
+                    source_name: "fuchsia.example.Echo".parse().unwrap(),
                     target: OfferTarget::Child(ChildRef {
                         name: "foo".into(),
                         collection: Some("col".into()),
                     }),
-                    target_name: "fuchsia.example.Echo".into(),
+                    target_name: "fuchsia.example.Echo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Optional,
                 })

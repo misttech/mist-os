@@ -81,7 +81,7 @@ impl ComponentDeclBuilder {
     pub fn add_program(mut self, runner: &str) -> Self {
         assert!(self.result.program.is_none(), "tried to add program twice");
         self.result.program = Some(cm_rust::ProgramDecl {
-            runner: Some(runner.into()),
+            runner: Some(runner.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         });
         self
@@ -110,7 +110,7 @@ impl ComponentDeclBuilder {
         let use_ = cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
             dependency_type: cm_rust::DependencyType::Strong,
             source: cm_rust::UseSource::Framework,
-            source_name: "fuchsia.component.Realm".into(),
+            source_name: "fuchsia.component.Realm".parse().unwrap(),
             target_path: cm_rust::CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
             availability: cm_rust::Availability::Required,
         });
@@ -388,7 +388,7 @@ impl ProtocolDeclBuilder {
     /// Creates a new builder.
     pub fn new(name: &str) -> Self {
         Self(cm_rust::ProtocolDecl {
-            name: name.into(),
+            name: name.parse().unwrap(),
             source_path: Some(format!("/svc/foo").parse().unwrap()),
         })
     }
@@ -419,7 +419,7 @@ impl ServiceDeclBuilder {
     /// Creates a new builder.
     pub fn new(name: &str) -> Self {
         Self(cm_rust::ServiceDecl {
-            name: name.into(),
+            name: name.parse().unwrap(),
             source_path: Some(format!("/svc/foo.service").parse().unwrap()),
         })
     }
@@ -450,7 +450,7 @@ impl DirectoryDeclBuilder {
     /// Creates a new builder.
     pub fn new(name: &str) -> Self {
         Self(cm_rust::DirectoryDecl {
-            name: name.into(),
+            name: name.parse().unwrap(),
             source_path: Some(format!("/data/foo").parse().unwrap()),
             rights: fio::R_STAR_DIR,
         })

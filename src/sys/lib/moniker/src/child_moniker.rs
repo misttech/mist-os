@@ -60,10 +60,10 @@ impl ChildMoniker {
     where
         S: AsRef<str> + Into<String>,
     {
-        let name = LongName::try_new(name)?;
+        let name = LongName::new(name)?;
         let collection = match collection {
             Some(coll) => {
-                let coll_name = Name::try_new(coll)?;
+                let coll_name = Name::new(coll)?;
                 Some(coll_name)
             }
             None => None,

@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::Error,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource, ResourceInfo},
@@ -17,7 +17,7 @@ use {
 };
 
 lazy_static! {
-    static ref IRQ_RESOURCE_CAPABILITY_NAME: CapabilityName = "fuchsia.kernel.IrqResource".into();
+    static ref IRQ_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.kernel.IrqResource".parse().unwrap();
 }
 
 /// An implementation of fuchsia.kernel.IrqResource protocol.

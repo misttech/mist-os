@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::Error,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource, ResourceInfo},
@@ -17,8 +17,8 @@ use {
 };
 
 lazy_static! {
-    static ref IOPORT_RESOURCE_CAPABILITY_NAME: CapabilityName =
-        "fuchsia.kernel.IoportResource".into();
+    static ref IOPORT_RESOURCE_CAPABILITY_NAME: Name =
+        "fuchsia.kernel.IoportResource".parse().unwrap();
 }
 
 /// An implementation of fuchsia.kernel.IoportResource protocol.

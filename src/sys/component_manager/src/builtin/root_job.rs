@@ -5,24 +5,24 @@
 use {
     crate::builtin::capability::BuiltinCapability,
     ::routing::capability_source::InternalCapability, anyhow::Error, async_trait::async_trait,
-    cm_rust::CapabilityName, fidl_fuchsia_kernel as fkernel, fuchsia_runtime::job_default,
+    cm_types::Name, fidl_fuchsia_kernel as fkernel, fuchsia_runtime::job_default,
     fuchsia_zircon as zx, futures::prelude::*, lazy_static::lazy_static, std::sync::Arc,
 };
 
 lazy_static! {
-    pub static ref ROOT_JOB_CAPABILITY_NAME: CapabilityName = "fuchsia.kernel.RootJob".into();
-    pub static ref ROOT_JOB_FOR_INSPECT_CAPABILITY_NAME: CapabilityName =
-        "fuchsia.kernel.RootJobForInspect".into();
+    pub static ref ROOT_JOB_CAPABILITY_NAME: Name = "fuchsia.kernel.RootJob".parse().unwrap();
+    pub static ref ROOT_JOB_FOR_INSPECT_CAPABILITY_NAME: Name =
+        "fuchsia.kernel.RootJobForInspect".parse().unwrap();
 }
 
 /// An implementation of the `fuchsia.kernel.RootJob` protocol.
 pub struct RootJob {
-    capability_name: &'static CapabilityName,
+    capability_name: &'static Name,
     rights: zx::Rights,
 }
 
 impl RootJob {
-    pub fn new(capability_name: &'static CapabilityName, rights: zx::Rights) -> Arc<Self> {
+    pub fn new(capability_name: &'static Name, rights: zx::Rights) -> Arc<Self> {
         Arc::new(Self { capability_name, rights })
     }
 }

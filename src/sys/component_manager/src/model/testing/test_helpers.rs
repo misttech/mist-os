@@ -19,10 +19,10 @@ use {
     ::routing::config::RuntimeConfig,
     anyhow::{Context, Error},
     cm_rust::{
-        Availability, CapabilityDecl, CapabilityName, CapabilityPath, ChildDecl, ComponentDecl,
-        ConfigValuesData, EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl,
-        UseSource,
+        Availability, CapabilityDecl, CapabilityPath, ChildDecl, ComponentDecl, ConfigValuesData,
+        EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
     },
+    cm_types::Name,
     cm_types::Url,
     diagnostics_message::MonikerWithUrl,
     fidl::{endpoints, prelude::*},
@@ -370,12 +370,12 @@ impl TestEnvironmentBuilder {
         self.runtime_config.root_component_url =
             Some(Url::new(format!("test:///{}", self.root_component)).unwrap());
         self.runtime_config.builtin_capabilities.push(CapabilityDecl::Runner(RunnerDecl {
-            name: TEST_RUNNER_NAME.into(),
+            name: TEST_RUNNER_NAME.parse().unwrap(),
             source_path: None,
         }));
-        self.runtime_config
-            .builtin_capabilities
-            .push(CapabilityDecl::EventStream(EventStreamDecl { name: "started".into() }));
+        self.runtime_config.builtin_capabilities.push(CapabilityDecl::EventStream(
+            EventStreamDecl { name: "started".parse().unwrap() },
+        ));
         self.runtime_config.component_id_index_path = self.component_id_index_path;
         self.runtime_config.enable_introspection = true;
 
@@ -383,7 +383,7 @@ impl TestEnvironmentBuilder {
         let builtin_environment = Arc::new(Mutex::new(
             BuiltinEnvironmentBuilder::new()
                 .add_resolver("test".to_string(), mock_resolver.clone())
-                .add_runner(TEST_RUNNER_NAME.into(), mock_runner.clone())
+                .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone())
                 .set_runtime_config(self.runtime_config)
                 .build()
                 .await
@@ -562,7 +562,7 @@ pub fn get_message_logged_to_socket(socket: zx::Socket) -> Option<String> {
 /// Create a new event stream for the provided environment.
 pub async fn new_event_stream(
     builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
-    events: Vec<CapabilityName>,
+    events: Vec<Name>,
 ) -> (EventSource, EventStream) {
     let mut event_source = builtin_environment
         .as_ref()

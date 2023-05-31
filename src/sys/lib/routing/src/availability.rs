@@ -200,16 +200,15 @@ mod tests {
     use {
         super::*,
         cm_rust::{DependencyType, ExposeDecl, ExposeTarget, OfferDecl, OfferTarget},
-        std::convert::TryInto,
         test_case::test_case,
     };
 
     fn new_offer(availability: Availability) -> OfferDecl {
         OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
-            source_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("echo".to_string()),
-            target_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            target_name: "fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::WeakForMigration,
             availability,
         })
@@ -218,9 +217,9 @@ mod tests {
     fn new_void_offer() -> OfferDecl {
         OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Void,
-            source_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("echo".to_string()),
-            target_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            target_name: "fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::WeakForMigration,
             availability: Availability::Optional,
         })
@@ -278,9 +277,9 @@ mod tests {
     fn new_expose(availability: Availability) -> ExposeDecl {
         ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            target_name: "fuchsia.examples.Echo".parse().unwrap(),
             availability,
         })
     }
@@ -288,9 +287,9 @@ mod tests {
     fn new_void_expose() -> ExposeDecl {
         ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Void,
-            source_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            target_name: "fuchsia.examples.Echo".parse().unwrap(),
             availability: Availability::Optional,
         })
     }

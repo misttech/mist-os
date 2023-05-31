@@ -146,7 +146,7 @@ impl Resolver for RemoteResolver {
             } else {
                 "".into()
             },
-            self.registration.resolver.str()
+            self.registration.resolver.as_str()
         );
         let resolved_url = component.url.ok_or(ResolverError::RemoteInvalidData)?;
         let context_to_resolve_children = component.resolution_context.map(Into::into);

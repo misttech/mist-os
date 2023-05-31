@@ -33,11 +33,11 @@ use {
         RegistrationDecl, RouteInfo,
     },
     cm_rust::{
-        name_mappings_to_map, CapabilityDecl, CapabilityDeclCommon, CapabilityName, ExposeDecl,
-        ExposeDeclCommon, ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl,
-        OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl,
-        UseDeclCommon, UseSource,
+        name_mappings_to_map, CapabilityDecl, CapabilityDeclCommon, ExposeDecl, ExposeDeclCommon,
+        ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource,
+        OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl, UseDeclCommon, UseSource,
     },
+    cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
     moniker::{AbsoluteMoniker, ChildMoniker, ChildMonikerBase},
@@ -286,8 +286,10 @@ where
                     ));
                 }
             }
+            // "_unused" is a placeholder value required by fold(). Since `offers` is guaranteed to
+            // be nonempty, it will always be overwritten by the actual source name.
             let (source_name, offer_service_decls) = offers.iter().fold(
-                ("".into(), Vec::<OfferServiceDecl>::new()),
+                ("_unused".parse().unwrap(), Vec::<OfferServiceDecl>::new()),
                 |(_, mut decls), o| {
                     if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
                         decls.push(offer_service_decl);
@@ -492,7 +494,7 @@ pub trait Sources: Clone + Send + Sync {
     /// [`RoutingError::UnsupportedRouteSource`] if unsupported.
     fn framework_source<M>(
         &self,
-        name: CapabilityName,
+        name: Name,
         mapper: &mut M,
     ) -> Result<InternalCapability, RoutingError>
     where
@@ -518,7 +520,7 @@ pub trait Sources: Clone + Send + Sync {
     /// Returns [`RoutingError::UnsupportedRouteSource`] if namespace capabilities are unsupported.
     fn find_namespace_source<V, M>(
         &self,
-        name: &CapabilityName,
+        name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -532,7 +534,7 @@ pub trait Sources: Clone + Send + Sync {
     /// Returns [`RoutingError::UnsupportedRouteSource`] if built-in capabilities are unsupported.
     fn find_builtin_source<V, M>(
         &self,
-        name: &CapabilityName,
+        name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -548,7 +550,7 @@ pub trait Sources: Clone + Send + Sync {
     /// Returns [`RoutingError::UnsupportedRouteSource`] if component capabilities are unsupported.
     fn find_component_source<V, M>(
         &self,
-        name: &CapabilityName,
+        name: &Name,
         abs_moniker: &AbsoluteMoniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
@@ -570,7 +572,7 @@ where
         + Into<InternalCapability>
         + Clone,
 {
-    framework: Option<fn(CapabilityName) -> InternalCapability>,
+    framework: Option<fn(Name) -> InternalCapability>,
     builtin: bool,
     capability: bool,
     collection: bool,
@@ -601,7 +603,7 @@ impl<
     }
 
     /// Allows framework capability source types (`from: "framework"` in `CML`).
-    pub fn framework(self, builder: fn(CapabilityName) -> InternalCapability) -> Self {
+    pub fn framework(self, builder: fn(Name) -> InternalCapability) -> Self {
         Self { framework: Some(builder), ..self }
     }
 
@@ -649,7 +651,7 @@ where
 
     fn framework_source<M>(
         &self,
-        name: CapabilityName,
+        name: Name,
         mapper: &mut M,
     ) -> Result<InternalCapability, RoutingError>
     where
@@ -686,7 +688,7 @@ where
 
     fn find_namespace_source<V, M>(
         &self,
-        name: &CapabilityName,
+        name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -715,7 +717,7 @@ where
 
     fn find_builtin_source<V, M>(
         &self,
-        name: &CapabilityName,
+        name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -744,7 +746,7 @@ where
 
     fn find_component_source<V, M>(
         &self,
-        name: &CapabilityName,
+        name: &Name,
         abs_moniker: &AbsoluteMoniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
@@ -1630,7 +1632,7 @@ pub trait CapabilityVisitor {
 }
 
 pub fn find_matching_offers<'a, O>(
-    source_name: &CapabilityName,
+    source_name: &Name,
     child_moniker: &ChildMoniker,
     offers: &'a Vec<OfferDecl>,
 ) -> Option<RouteBundle<O>>
@@ -1653,7 +1655,7 @@ where
 }
 
 pub fn find_matching_exposes<'a, E>(
-    source_name: &CapabilityName,
+    source_name: &Name,
     exposes: &'a Vec<ExposeDecl>,
 ) -> Option<RouteBundle<E>>
 where
@@ -1677,7 +1679,7 @@ where
 pub trait ErrorNotFoundFromParent {
     fn error_not_found_from_parent(
         decl_site_moniker: AbsoluteMoniker,
-        capability_name: CapabilityName,
+        capability_name: Name,
     ) -> RoutingError;
 }
 
@@ -1686,7 +1688,7 @@ pub trait ErrorNotFoundInChild {
     fn error_not_found_in_child(
         decl_site_moniker: AbsoluteMoniker,
         child_moniker: ChildMoniker,
-        capability_name: CapabilityName,
+        capability_name: Name,
     ) -> RoutingError;
 }
 
@@ -1768,9 +1770,9 @@ mod tests {
             .into_iter()
             .map(|i| OfferServiceDecl {
                 source: OfferSource::Parent,
-                source_name: format!("foo_source_{}", i).into(),
+                source_name: format!("foo_source_{}", i).parse().unwrap(),
                 target: OfferTarget::Collection("coll".into()),
-                target_name: "foo_target".into(),
+                target_name: "foo_target".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability: Availability::Required,
@@ -1778,9 +1780,9 @@ mod tests {
             .collect();
         let collection_offer = OfferServiceDecl {
             source: OfferSource::Collection("coll".into()),
-            source_name: "foo_source".into(),
+            source_name: "foo_source".parse().unwrap(),
             target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
-            target_name: "foo_target".into(),
+            target_name: "foo_target".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,
             availability: Availability::Required,
@@ -1809,17 +1811,17 @@ mod tests {
             .into_iter()
             .map(|i| ExposeServiceDecl {
                 source: ExposeSource::Child("source".into()),
-                source_name: format!("foo_source_{}", i).into(),
+                source_name: format!("foo_source_{}", i).parse().unwrap(),
                 target: ExposeTarget::Parent,
-                target_name: "foo_target".into(),
+                target_name: "foo_target".parse().unwrap(),
                 availability: Availability::Required,
             })
             .collect();
         let collection_expose = ExposeServiceDecl {
             source: ExposeSource::Collection("coll".into()),
-            source_name: "foo_source".into(),
+            source_name: "foo_source".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo_target".into(),
+            target_name: "foo_target".parse().unwrap(),
             availability: Availability::Required,
         };
         assert_matches!(

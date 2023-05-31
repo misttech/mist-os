@@ -69,13 +69,13 @@ impl DriverTestRealmBuilder for RealmBuilder {
     async fn driver_test_realm_add_expose<S: ServiceMarker>(&self) -> Result<&Self> {
         let mut decl = self.get_component_decl(COMPONENT_NAME).await?;
         decl.capabilities.push(cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {
-            name: S::SERVICE_NAME.into(),
+            name: S::SERVICE_NAME.parse().expect("service name is not a valid capability name"),
             source_path: Some(("/svc/".to_owned() + S::SERVICE_NAME).parse().unwrap()),
         }));
         decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
             source: cm_rust::ExposeSource::Self_,
-            source_name: S::SERVICE_NAME.into(),
-            target_name: S::SERVICE_NAME.into(),
+            source_name: S::SERVICE_NAME.parse().unwrap(),
+            target_name: S::SERVICE_NAME.parse().unwrap(),
             target: cm_rust::ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         }));
@@ -97,8 +97,8 @@ impl DriverTestRealmBuilder for RealmBuilder {
         let mut decl = self.get_component_decl(COMPONENT_NAME).await?;
         decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
             source: cm_rust::OfferSource::Parent,
-            source_name: P::PROTOCOL_NAME.into(),
-            target_name: P::PROTOCOL_NAME.into(),
+            source_name: P::PROTOCOL_NAME.parse().unwrap(),
+            target_name: P::PROTOCOL_NAME.parse().unwrap(),
             target: cm_rust::OfferTarget::Collection("realm_builder".to_string()),
             dependency_type: cm_rust::DependencyType::Strong,
             availability: cm_rust::Availability::Required,

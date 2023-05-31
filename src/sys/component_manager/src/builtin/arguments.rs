@@ -6,7 +6,7 @@ use {
     crate::builtin::capability::BuiltinCapability,
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl::endpoints::{ControlHandle as _, Responder as _},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
     fuchsia_fs::{file, file::ReadError, node::OpenError, OpenFlags},
@@ -24,7 +24,7 @@ use {
 };
 
 lazy_static! {
-    static ref BOOT_ARGS_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.Arguments".into();
+    static ref BOOT_ARGS_CAPABILITY_NAME: Name = "fuchsia.boot.Arguments".parse().unwrap();
 }
 
 const BOOT_CONFIG_FILE: &str = "/boot/config/additional_boot_args";

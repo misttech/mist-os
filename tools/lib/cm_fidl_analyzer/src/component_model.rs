@@ -659,7 +659,7 @@ impl ComponentModelForAnalyzer {
                 Ok(()) => {
                     results.push(VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: capability.clone(),
+                        capability: Some(capability.clone()),
                         error: None,
                         route,
                     });
@@ -667,7 +667,7 @@ impl ComponentModelForAnalyzer {
                 Err(err) => {
                     results.push(VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: capability.clone(),
+                        capability: Some(capability.clone()),
                         error: Some(err),
                         route,
                     });
@@ -680,7 +680,7 @@ impl ComponentModelForAnalyzer {
             )) => return vec![],
             Err(err) => results.push(VerifyRouteResult {
                 using_node: target.node_path(),
-                capability: capability.clone(),
+                capability: Some(capability.clone()),
                 error: Some(err.into()),
                 route,
             }),
@@ -853,7 +853,7 @@ impl ComponentModelForAnalyzer {
                     for route in routes.into_iter() {
                         results.push(VerifyRouteResult {
                             using_node: target.node_path(),
-                            capability: capability.clone(),
+                            capability: Some(capability.clone()),
                             error: None,
                             route,
                         });
@@ -863,7 +863,7 @@ impl ComponentModelForAnalyzer {
                     for route in routes.into_iter() {
                         results.push(VerifyRouteResult {
                             using_node: target.node_path(),
-                            capability: capability.clone(),
+                            capability: Some(capability.clone()),
                             error: Some(err.clone()),
                             route,
                         });
@@ -874,7 +874,7 @@ impl ComponentModelForAnalyzer {
                 for route in routes.into_iter() {
                     results.push(VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: capability.clone(),
+                        capability: Some(capability.clone()),
                         error: Some(err.clone()),
                         route,
                     });
@@ -899,7 +899,7 @@ impl ComponentModelForAnalyzer {
                     result.map_err(|e| e.into()).and_then(|s| self.check_use_source(&s)).err();
                 Some(VerifyRouteResult {
                     using_node: target.node_path(),
-                    capability: expose_decl.target_name().clone(),
+                    capability: Some(expose_decl.target_name().clone()),
                     error,
                     route,
                 })
@@ -922,13 +922,13 @@ impl ComponentModelForAnalyzer {
                 match result {
                     Ok(_source) => Some(VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: runner.clone(),
+                        capability: Some(runner.clone()),
                         error: None,
                         route,
                     }),
                     Err(err) => Some(VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: runner.clone(),
+                        capability: Some(runner.clone()),
                         error: Some(err.into()),
                         route,
                     }),
@@ -957,13 +957,13 @@ impl ComponentModelForAnalyzer {
                 match route_result {
                     Ok(_source) => VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: resolver.resolver,
+                        capability: Some(resolver.resolver),
                         error: None,
                         route,
                     },
                     Err(err) => VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: resolver.resolver,
+                        capability: Some(resolver.resolver),
                         error: Some(err.into()),
                         route,
                     },
@@ -975,14 +975,14 @@ impl ComponentModelForAnalyzer {
                         let route = vec![RouteSegment::ProvideAsBuiltin { capability: decl }];
                         VerifyRouteResult {
                             using_node: target.node_path(),
-                            capability: resolver.resolver,
+                            capability: Some(resolver.resolver),
                             error: None,
                             route,
                         }
                     }
                     Err(err) => VerifyRouteResult {
                         using_node: target.node_path(),
-                        capability: resolver.resolver,
+                        capability: Some(resolver.resolver),
                         error: Some(err),
                         route: vec![],
                     },
@@ -990,13 +990,13 @@ impl ComponentModelForAnalyzer {
             }
             Ok(None) => VerifyRouteResult {
                 using_node: target.node_path(),
-                capability: "".into(),
+                capability: None,
                 error: Some(AnalyzerModelError::MissingResolverForScheme(scheme.to_string())),
                 route: vec![],
             },
             Err(err) => VerifyRouteResult {
                 using_node: target.node_path(),
-                capability: "".into(),
+                capability: None,
                 error: Some(AnalyzerModelError::from(err)),
                 route: vec![],
             },
@@ -1201,11 +1201,11 @@ mod tests {
         anyhow::Result,
         cm_moniker::InstancedAbsoluteMoniker,
         cm_rust::{
-            Availability, CapabilityName, CapabilityPath, ComponentDecl, DependencyType,
-            RegistrationSource, ResolverRegistration, RunnerRegistration, UseProtocolDecl,
-            UseSource, UseStorageDecl,
+            Availability, CapabilityPath, ComponentDecl, DependencyType, RegistrationSource,
+            ResolverRegistration, RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
         },
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder},
+        cm_types::Name,
         config_encoder::ConfigFields,
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal,
@@ -1403,7 +1403,7 @@ mod tests {
         let _ = ComponentModelForAnalyzer::route_capability_sync(
             RouteRequest::UseProtocol(UseProtocolDecl {
                 source: UseSource::Parent,
-                source_name: "bar_svc".into(),
+                source_name: "bar_svc".parse().unwrap(),
                 target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1442,7 +1442,7 @@ mod tests {
         // If no panic, discard the result.
         let _ = ComponentModelForAnalyzer::route_storage_and_backing_directory_sync(
             UseStorageDecl {
-                source_name: "cache".into(),
+                source_name: "cache".parse().unwrap(),
                 target_path: "/storage".try_into().unwrap(),
                 availability: Availability::Required,
             },
@@ -1457,12 +1457,12 @@ mod tests {
     fn environment_inherits() -> Result<()> {
         let child_env_name = "child_env";
         let child_runner_registration = RunnerRegistration {
-            source_name: "child_env_runner".into(),
+            source_name: "child_env_runner".parse().unwrap(),
             source: RegistrationSource::Self_,
-            target_name: "child_env_runner".into(),
+            target_name: "child_env_runner".parse().unwrap(),
         };
         let child_resolver_registration = ResolverRegistration {
-            resolver: "child_env_resolver".into(),
+            resolver: "child_env_resolver".parse().unwrap(),
             source: RegistrationSource::Self_,
             scheme: "child_resolver_scheme".into(),
         };
@@ -1492,7 +1492,7 @@ mod tests {
         let mut config = RuntimeConfig::default();
         config.builtin_boot_resolver = component_internal::BuiltinBootResolver::Boot;
 
-        let builtin_runner_name = CapabilityName::from("builtin_runner");
+        let builtin_runner_name: Name = "builtin_runner".parse().unwrap();
         let builtin_runner_registration = RunnerRegistration {
             source_name: builtin_runner_name.clone(),
             source: RegistrationSource::Self_,
@@ -1547,9 +1547,8 @@ mod tests {
         }
         assert_eq!(child_resolver_registration, child_resolver);
 
-        let get_builtin_runner_result = child_instance
-            .environment()
-            .get_registered_runner(&CapabilityName::from(builtin_runner_name))?;
+        let get_builtin_runner_result =
+            child_instance.environment().get_registered_runner(&builtin_runner_name)?;
         assert!(get_builtin_runner_result.is_some());
         let (builtin_runner_registrar, _builtin_runner) = get_builtin_runner_result.unwrap();
         match builtin_runner_registrar {

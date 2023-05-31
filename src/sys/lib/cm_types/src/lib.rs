@@ -122,7 +122,7 @@ impl<const N: usize> BoundedName<N> {
     /// fails validation. The string must be non-empty, no more than `N`
     /// characters in length, and consist of one or more of the
     /// following characters: `a-z`, `0-9`, `_`, `.`, `-`.
-    pub fn try_new(name: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
+    pub fn new(name: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
         Self::validate(name.as_ref())?;
         Ok(Self(FlyStr::new(name)))
     }
@@ -183,7 +183,7 @@ impl<const N: usize> FromStr for BoundedName<N> {
     type Err = ParseError;
 
     fn from_str(name: &str) -> Result<Self, Self::Err> {
-        Self::try_new(name)
+        Self::new(name)
     }
 }
 

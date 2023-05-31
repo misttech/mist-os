@@ -160,10 +160,9 @@ mod tests {
         },
         ::routing::component_instance::ComponentInstanceInterface,
         cm_rust::{
-            Availability, CapabilityName, CapabilityPath, DependencyType, ExposeDecl,
-            ExposeDirectoryDecl, ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl,
-            ExposeSource, ExposeTarget, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseSource,
-            UseStorageDecl,
+            Availability, CapabilityPath, DependencyType, ExposeDecl, ExposeDirectoryDecl,
+            ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, ExposeTarget,
+            UseDecl, UseDirectoryDecl, UseProtocolDecl, UseSource, UseStorageDecl,
         },
         fidl::endpoints::{ClientEnd, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -181,7 +180,7 @@ mod tests {
         let routing_factory = mocks::proxy_routing_factory(mocks::DeclType::Use);
         let decl = ComponentDecl {
             uses: vec![UseDecl::Storage(UseStorageDecl {
-                source_name: "data".into(),
+                source_name: "data".parse().unwrap(),
                 target_path: "/data".try_into().unwrap(),
                 availability: Availability::Required,
             })],
@@ -231,7 +230,7 @@ mod tests {
             uses: vec![
                 UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
-                    source_name: "baz-dir".into(),
+                    source_name: "baz-dir".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/in/data/hippo").unwrap(),
                     rights: fio::Operations::CONNECT,
                     subdir: None,
@@ -240,18 +239,18 @@ mod tests {
                 }),
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
-                    source_name: "baz-svc".into(),
+                    source_name: "baz-svc".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/in/svc/hippo").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".into(),
+                    source_name: "data".parse().unwrap(),
                     target_path: "/in/data/persistent".try_into().unwrap(),
                     availability: Availability::Required,
                 }),
                 UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".into(),
+                    source_name: "cache".parse().unwrap(),
                     target_path: "/in/data/cache".try_into().unwrap(),
                     availability: Availability::Required,
                 }),
@@ -308,8 +307,8 @@ mod tests {
             exposes: vec![
                 ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
-                    source_name: "baz-dir".into(),
-                    target_name: "hippo-dir".into(),
+                    source_name: "baz-dir".parse().unwrap(),
+                    target_name: "hippo-dir".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     rights: Some(fio::Operations::CONNECT),
                     subdir: None,
@@ -317,8 +316,8 @@ mod tests {
                 }),
                 ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
-                    source_name: "foo-dir".into(),
-                    target_name: "bar-dir".into(),
+                    source_name: "foo-dir".parse().unwrap(),
+                    target_name: "bar-dir".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     rights: Some(fio::Operations::CONNECT),
                     subdir: None,
@@ -326,31 +325,31 @@ mod tests {
                 }),
                 ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
-                    source_name: "baz-proto".into(),
-                    target_name: "hippo-proto".into(),
+                    source_name: "baz-proto".parse().unwrap(),
+                    target_name: "hippo-proto".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }),
                 // Aggregated service from two declarations.
                 ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
-                    source_name: "foo-svc".into(),
-                    target_name: "whale-svc".into(),
+                    source_name: "foo-svc".parse().unwrap(),
+                    target_name: "whale-svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }),
                 ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
-                    source_name: "bar-svc".into(),
-                    target_name: "whale-svc".into(),
+                    source_name: "bar-svc".parse().unwrap(),
+                    target_name: "whale-svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }),
                 ExposeDecl::Runner(ExposeRunnerDecl {
                     source: ExposeSource::Self_,
-                    source_name: CapabilityName::from("elf"),
+                    source_name: "elf".parse().unwrap(),
                     target: ExposeTarget::Parent,
-                    target_name: CapabilityName::from("elf"),
+                    target_name: "elf".parse().unwrap(),
                 }),
             ],
             ..default_component_decl()

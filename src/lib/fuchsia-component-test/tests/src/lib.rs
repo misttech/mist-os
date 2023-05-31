@@ -650,20 +650,20 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
         persistent_storage: None,
     });
     echo_client_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-        name: "fidl.examples.routing.echo.Echo".into(),
+        name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
         source_path: Some("/svc/fidl.examples.routing.echo.Echo".try_into().unwrap()),
     }));
     echo_client_decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
         source: cm_rust::OfferSource::Self_,
-        source_name: "fidl.examples.routing.echo.Echo".into(),
+        source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
         target: cm_rust::OfferTarget::Collection(collection_name.clone()),
-        target_name: "fidl.examples.routing.echo.Echo".into(),
+        target_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,
     }));
     echo_client_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
         source: cm_rust::UseSource::Framework,
-        source_name: "fuchsia.component.Realm".into(),
+        source_name: "fuchsia.component.Realm".parse().unwrap(),
         target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,
@@ -1585,9 +1585,9 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
                 cm_rust::ComponentDecl {
                     exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                         source: cm_rust::ExposeSource::Child("does-not-exist".to_string()),
-                        source_name: "fuchsia.examples.Echo".into(),
+                        source_name: "fuchsia.examples.Echo".parse().unwrap(),
                         target: cm_rust::ExposeTarget::Parent,
-                        target_name: "fuchsia.examples.Echo".into(),
+                        target_name: "fuchsia.examples.Echo".parse().unwrap(),
                         availability: cm_rust::Availability::Required,
                     })],
                     ..cm_rust::ComponentDecl::default()
@@ -1603,9 +1603,9 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
             .replace_realm_decl(cm_rust::ComponentDecl {
                 exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Child("does-not-exist".to_string()),
-                    source_name: "fuchsia.examples.Echo".into(),
+                    source_name: "fuchsia.examples.Echo".parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
-                    target_name: "fuchsia.examples.Echo".into(),
+                    target_name: "fuchsia.examples.Echo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()
@@ -1619,9 +1619,9 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
     let mut realm_decl = builder.get_realm_decl().await?;
     realm_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
         source: cm_rust::ExposeSource::Child("b".to_string()),
-        source_name: "fuchsia.examples.Echo".into(),
+        source_name: "fuchsia.examples.Echo".parse().unwrap(),
         target: cm_rust::ExposeTarget::Parent,
-        target_name: "fuchsia.examples.Echo".into(),
+        target_name: "fuchsia.examples.Echo".parse().unwrap(),
         availability: cm_rust::Availability::Required,
     }));
     assert_matches!(builder.replace_realm_decl(realm_decl).await, Ok(()));

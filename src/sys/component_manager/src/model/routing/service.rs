@@ -14,8 +14,9 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
+    cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
     fidl_fuchsia_io as fio,
@@ -579,7 +580,7 @@ pub struct CollectionServiceRoute {
     pub collections: Vec<FlyStr>,
 
     /// Name of the service exposed from the collection.
-    pub service_name: CapabilityName,
+    pub service_name: Name,
 }
 
 impl CollectionServiceRoute {
@@ -786,7 +787,13 @@ impl CollectionServiceDirectory {
         .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
         .await?;
         let dirents = fuchsia_fs::directory::readdir(&proxy).await.map_err(|e| {
-            error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&"".into()), e);
+            error!(
+                "Error reading entries from service directory for component '{}', \
+                capability name '{}'. Error: {}",
+                target.abs_moniker.clone(),
+                source.source_name().map(Name::as_str).unwrap_or("<no capability>"),
+                e
+            );
             ModelError::open_directory_error(target.abs_moniker.clone(), moniker.to_string())
         })?;
         let rng = &mut rand::thread_rng();
@@ -1050,7 +1057,7 @@ mod tests {
         ) -> Result<CapabilitySource, RoutingError> {
             Ok(CapabilitySource::Component {
                 capability: ComponentCapability::Service(ServiceDecl {
-                    name: "my.service.Service".into(),
+                    name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".try_into().unwrap()),
                 }),
                 component: self
@@ -1100,22 +1107,22 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Framework,
-                        source_name: "fuchsia.component.Realm".into(),
+                        source_name: "fuchsia.component.Realm".parse().unwrap(),
                         target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Collection("coll1".to_string()),
-                        source_name: "my.service.Service".into(),
-                        target_name: "my.service.Service".into(),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Collection("coll2".to_string()),
-                        source_name: "my.service.Service".into(),
-                        target_name: "my.service.Service".into(),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -1128,13 +1135,13 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "my.service.Service".into(),
-                        target_name: "my.service.Service".into(),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "my.service.Service".into(),
+                        name: "my.service.Service".parse().unwrap(),
                         source_path: Some("/svc/my.service.Service".try_into().unwrap()),
                     })
                     .build(),
@@ -1144,13 +1151,13 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "my.service.Service".into(),
-                        target_name: "my.service.Service".into(),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "my.service.Service".into(),
+                        name: "my.service.Service".parse().unwrap(),
                         source_path: Some("/svc/my.service.Service".try_into().unwrap()),
                     })
                     .build(),
@@ -1160,13 +1167,13 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "my.service.Service".into(),
-                        target_name: "my.service.Service".into(),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "my.service.Service".into(),
+                        name: "my.service.Service".parse().unwrap(),
                         source_path: Some("/svc/my.service.Service".try_into().unwrap()),
                     })
                     .build(),
@@ -1276,7 +1283,7 @@ mod tests {
         let route = CollectionServiceRoute {
             source_moniker: AbsoluteMoniker::root(),
             collections: vec!["coll1".into(), "coll2".into()],
-            service_name: "my.service.Service".into(),
+            service_name: "my.service.Service".parse().unwrap(),
         };
 
         let dir =
@@ -1504,7 +1511,7 @@ mod tests {
         let route = CollectionServiceRoute {
             source_moniker: AbsoluteMoniker::root(),
             collections: vec!["coll1".into()],
-            service_name: "my.service.Service".into(),
+            service_name: "my.service.Service".parse().unwrap(),
         };
 
         let dir =
@@ -1588,7 +1595,7 @@ mod tests {
         let route = CollectionServiceRoute {
             source_moniker: AbsoluteMoniker::root(),
             collections: vec!["coll1".into(), "coll2".into()],
-            service_name: "my.service.Service".into(),
+            service_name: "my.service.Service".parse().unwrap(),
         };
 
         let dir =

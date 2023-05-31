@@ -107,8 +107,9 @@ pub mod tests {
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
-        cm_rust::{Availability, CapabilityName, CapabilityPath, UseEventStreamDecl, UseSource},
+        cm_rust::{Availability, CapabilityPath, UseEventStreamDecl, UseSource},
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
+        cm_types::Name,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         std::str::FromStr,
@@ -216,7 +217,7 @@ pub mod tests {
             .subscribe(
                 events
                     .into_iter()
-                    .map(|event: CapabilityName| EventSubscription {
+                    .map(|event: Name| EventSubscription {
                         event_name: UseEventStreamDecl {
                             source_name: event,
                             source: UseSource::Parent,

@@ -176,8 +176,8 @@ mod tests {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceId,
@@ -185,8 +185,8 @@ mod tests {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("consumer".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("consumer")
@@ -196,7 +196,7 @@ mod tests {
                 "consumer",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
                         target_path: "/storage".try_into().unwrap(),
                         availability: Availability::Required,
                     }))

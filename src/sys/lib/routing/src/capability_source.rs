@@ -12,14 +12,15 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{
-        CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, DirectoryDecl,
-        EventStreamDecl, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl,
-        ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDecl, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, RegistrationSource,
-        ResolverDecl, RunnerDecl, ServiceDecl, StorageDecl, UseDecl, UseDirectoryDecl,
-        UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
+        CapabilityDecl, CapabilityPath, CapabilityTypeName, DirectoryDecl, EventStreamDecl,
+        ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+        ExposeServiceDecl, ExposeSource, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl,
+        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
+        OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl,
+        StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        UseStorageDecl,
     },
+    cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
     moniker::ChildMoniker,
@@ -94,7 +95,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         }
     }
 
-    pub fn source_name(&self) -> Option<&CapabilityName> {
+    pub fn source_name(&self) -> Option<&Name> {
         match self {
             Self::Component { capability, .. } => capability.source_name(),
             Self::Framework { capability, .. } => Some(capability.source_name()),
@@ -243,13 +244,13 @@ impl<C> fmt::Debug for Box<dyn OfferAggregateCapabilityProvider<C>> {
 /// namespace.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InternalCapability {
-    Service(CapabilityName),
-    Protocol(CapabilityName),
-    Directory(CapabilityName),
-    Runner(CapabilityName),
-    EventStream(CapabilityName),
-    Resolver(CapabilityName),
-    Storage(CapabilityName),
+    Service(Name),
+    Protocol(Name),
+    Directory(Name),
+    Runner(Name),
+    EventStream(Name),
+    Resolver(Name),
+    Storage(Name),
 }
 
 impl InternalCapability {
@@ -276,7 +277,7 @@ impl InternalCapability {
         }
     }
 
-    pub fn source_name(&self) -> &CapabilityName {
+    pub fn source_name(&self) -> &Name {
         match self {
             InternalCapability::Service(name) => &name,
             InternalCapability::Protocol(name) => &name,
@@ -289,7 +290,7 @@ impl InternalCapability {
     }
 
     /// Returns true if this is a protocol with name that matches `name`.
-    pub fn matches_protocol(&self, name: &CapabilityName) -> bool {
+    pub fn matches_protocol(&self, name: &Name) -> bool {
         match self {
             Self::Protocol(source_name) => source_name == name,
             _ => false,
@@ -439,7 +440,7 @@ impl ComponentCapability {
     }
 
     /// Return the name of the capability, if this is a capability declaration.
-    pub fn source_name(&self) -> Option<&CapabilityName> {
+    pub fn source_name(&self) -> Option<&Name> {
         match self {
             ComponentCapability::Storage(storage) => Some(&storage.name),
             ComponentCapability::Protocol(protocol) => Some(&protocol.name),
@@ -481,7 +482,7 @@ impl ComponentCapability {
         }
     }
 
-    pub fn source_capability_name(&self) -> Option<&CapabilityName> {
+    pub fn source_capability_name(&self) -> Option<&Name> {
         match self {
             ComponentCapability::Offer(OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Capability(name),
@@ -516,9 +517,9 @@ impl fmt::Display for ComponentCapability {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EnvironmentCapability {
-    Runner { source_name: CapabilityName, source: RegistrationSource },
-    Resolver { source_name: CapabilityName, source: RegistrationSource },
-    Debug { source_name: CapabilityName, source: RegistrationSource },
+    Runner { source_name: Name, source: RegistrationSource },
+    Resolver { source_name: Name, source: RegistrationSource },
+    Debug { source_name: Name, source: RegistrationSource },
 }
 
 impl EnvironmentCapability {
@@ -535,7 +536,7 @@ impl EnvironmentCapability {
 /// of multiple instances of a capability.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AggregateCapability {
-    Service(CapabilityName),
+    Service(Name),
 }
 
 impl AggregateCapability {
@@ -551,7 +552,7 @@ impl AggregateCapability {
         }
     }
 
-    pub fn source_name(&self) -> &CapabilityName {
+    pub fn source_name(&self) -> &Name {
         match self {
             AggregateCapability::Service(name) => &name,
         }
@@ -583,9 +584,9 @@ mod tests {
     #[test]
     fn capability_type_name() {
         let storage_capability = ComponentCapability::Storage(StorageDecl {
-            name: "foo".into(),
+            name: "foo".parse().unwrap(),
             source: StorageDirectorySource::Parent,
-            backing_dir: "bar".into(),
+            backing_dir: "bar".parse().unwrap(),
             subdir: None,
             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
         });

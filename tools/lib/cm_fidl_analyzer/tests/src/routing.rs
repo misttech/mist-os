@@ -14,11 +14,11 @@ use {
         route::VerifyRouteResult,
     },
     cm_rust::{
-        Availability, CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, ChildRef,
-        ComponentDecl, DependencyType, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl,
-        ExposeProtocolDecl, ExposeResolverDecl, ExposeServiceDecl, ExposeSource, ExposeTarget,
-        OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl,
-        OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl,
+        Availability, CapabilityDecl, CapabilityPath, CapabilityTypeName, ChildRef, ComponentDecl,
+        DependencyType, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl,
+        ExposeResolverDecl, ExposeServiceDecl, ExposeSource, ExposeTarget, OfferDecl,
+        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource,
+        OfferStorageDecl, OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl,
         ResolverRegistration, RunnerDecl, RunnerRegistration, ServiceDecl, StorageDecl,
         StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl,
         UseServiceDecl, UseSource, UseStorageDecl,
@@ -143,7 +143,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
     }
 
     fn register_mock_builtin_runner(&mut self, runner: &str) {
-        let runner_name = CapabilityName::from(runner);
+        let runner_name: cm_types::Name = runner.parse().unwrap();
         self.builtin_runner_registrations.push(RunnerRegistration {
             source_name: runner_name.clone(),
             target_name: runner_name,
@@ -572,7 +572,7 @@ mod tests {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -582,15 +582,15 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         source_path: Some("/svc/foo".try_into().unwrap()),
                     })
                     .add_lazy_child("b")
@@ -623,7 +623,7 @@ mod tests {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -633,15 +633,15 @@ mod tests {
                 ComponentDeclBuilder::new_empty_component()
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Self_,
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         source_path: Some("/svc/foo".try_into().unwrap()),
                     })
                     .add_lazy_child("b")
@@ -674,7 +674,7 @@ mod tests {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Child("b".to_string()),
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -690,13 +690,13 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .service(ServiceDecl {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         source_path: Some("/svc/foo".try_into().unwrap()),
                     })
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -729,7 +729,7 @@ mod tests {
         let use_decl = UseServiceDecl {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/foo").unwrap(),
             availability: Availability::Required,
         };
@@ -739,10 +739,10 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".into()),
-                        source_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
-                        target_name: "foo".into(),
+                        target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
@@ -756,13 +756,13 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         source_path: Some("/svc/foo".try_into().unwrap()),
                     })
                     .build(),
@@ -804,14 +804,14 @@ mod tests {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Self_,
-                                target_name: "hobbit".into(),
+                                target_name: "hobbit".parse().unwrap(),
                             })
                             .build(),
                     )
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -871,7 +871,7 @@ mod tests {
                             name: "c".to_string(),
                             collection: None,
                         }),
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: None,
                         filter: None,
                         target: OfferTarget::Child(ChildRef {
@@ -890,7 +890,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::EventStream(ExposeEventStreamDecl {
                         source: ExposeSource::Framework,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "e".to_string(),
                             collection: None,
@@ -910,7 +910,7 @@ mod tests {
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
                         filter: None,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         availability: Availability::Required,
@@ -921,7 +921,7 @@ mod tests {
 
         let mut builder = RoutingTestBuilderForAnalyzer::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -938,7 +938,7 @@ mod tests {
                         },
                         ComponentEventRoute { component: "b".to_string(), scope: None },
                     ],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -958,7 +958,7 @@ mod tests {
                 .use_(UseDecl::EventStream(UseEventStreamDecl {
                     source: UseSource::Parent,
                     filter: None,
-                    source_name: "started".into(),
+                    source_name: "started".parse().unwrap(),
                     target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                     scope: None,
                     availability: Availability::Required,
@@ -968,7 +968,7 @@ mod tests {
 
         let mut builder = RoutingTestBuilderForAnalyzer::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -979,7 +979,7 @@ mod tests {
                     expected_res: ExpectedResult::Ok,
                     path: CapabilityPath::from_str("/event/stream").unwrap(),
                     scope: vec![],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -1001,26 +1001,26 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![
                             EventScope::Child(ChildRef { name: "b".into(), collection: None }),
                             EventScope::Child(ChildRef { name: "c".into(), collection: None }),
                         ]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![
                             EventScope::Child(ChildRef { name: "b".into(), collection: None }),
                             EventScope::Child(ChildRef { name: "c".into(), collection: None }),
                         ]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
@@ -1033,7 +1033,7 @@ mod tests {
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
                         filter: None,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         availability: Availability::Required,
@@ -1046,21 +1046,21 @@ mod tests {
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
                         filter: None,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         scope: Some(vec![EventScope::Child(ChildRef {
                             name: "e".into(),
                             collection: None,
                         })]),
                         filter: None,
                         target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
-                        target_name: CapabilityName::from("started"),
+                        target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("d")
@@ -1072,7 +1072,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/event/stream").unwrap(),
                         scope: None,
                         filter: None,
@@ -1085,7 +1085,7 @@ mod tests {
 
         let mut builder = RoutingTestBuilderForAnalyzer::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".into(),
+            name: "started".parse().unwrap(),
         })]);
 
         let model = builder.build().await;
@@ -1099,7 +1099,7 @@ mod tests {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string(), "c".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -1113,7 +1113,7 @@ mod tests {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string(), "c".to_string()]),
                     }],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -1133,7 +1133,7 @@ mod tests {
                             scope: Some(vec!["e".to_string()]),
                         },
                     ],
-                    name: "started".into(),
+                    name: "started".parse().unwrap(),
                 },
             )
             .await;
@@ -1158,14 +1158,14 @@ mod tests {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_runner(RunnerRegistration {
-                                source_name: "elf".into(),
+                                source_name: "elf".parse().unwrap(),
                                 source: RegistrationSource::Self_,
-                                target_name: "dwarf".into(),
+                                target_name: "dwarf".parse().unwrap(),
                             })
                             .build(),
                     )
                     .runner(RunnerDecl {
-                        name: "elf".into(),
+                        name: "elf".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .build(),
@@ -1194,7 +1194,7 @@ mod tests {
             }))
                 if moniker == *b_component.abs_moniker() &&
                 capability_type == "runner" &&
-                capability_name == CapabilityName::from("hobbit")
+                capability_name == "hobbit"
         );
     }
 
@@ -1219,13 +1219,13 @@ mod tests {
                             .name("env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_resolver(ResolverRegistration {
-                                resolver: "base".into(),
+                                resolver: "base".parse().unwrap(),
                                 source: RegistrationSource::Self_,
                                 scheme: "base".into(),
                             }),
                     )
                     .resolver(ResolverDecl {
-                        name: "base".into(),
+                        name: "base".parse().unwrap(),
                         source_path: Some(
                             "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
                         ),
@@ -1243,7 +1243,7 @@ mod tests {
         let result = test.model.check_resolver(&b_component);
         assert!(result.error.is_none());
         assert_eq!(result.using_node, NodePath::absolute_from_vec(vec!["b"]));
-        assert_eq!(result.capability, "base");
+        assert_eq!(result.capability, Some("base".parse().unwrap()));
     }
 
     ///   a
@@ -1271,13 +1271,13 @@ mod tests {
                             .name("b_env")
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .add_resolver(ResolverRegistration {
-                                resolver: "base".into(),
+                                resolver: "base".parse().unwrap(),
                                 source: RegistrationSource::Self_,
                                 scheme: "base".into(),
                             }),
                     )
                     .resolver(ResolverDecl {
-                        name: "base".into(),
+                        name: "base".parse().unwrap(),
                         source_path: Some(
                             "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
                         ),
@@ -1366,15 +1366,15 @@ mod tests {
     async fn map_route_use_from_parent() {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "bar_svc".into(),
+            source_name: "bar_svc".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Self_,
-            source_name: "foo_svc".into(),
-            target_name: "bar_svc".into(),
+            source_name: "foo_svc".parse().unwrap(),
+            target_name: "bar_svc".parse().unwrap(),
             target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1425,15 +1425,15 @@ mod tests {
     async fn map_route_use_from_child() {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("b".to_string()),
-            source_name: "bar_svc".into(),
+            source_name: "bar_svc".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "foo_svc".into(),
-            target_name: "bar_svc".into(),
+            source_name: "foo_svc".parse().unwrap(),
+            target_name: "bar_svc".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         });
@@ -1477,7 +1477,7 @@ mod tests {
     async fn map_route_use_from_self() {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Self_,
-            source_name: "hippo".into(),
+            source_name: "hippo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1525,7 +1525,7 @@ mod tests {
     async fn map_route_use_from_niece() {
         let use_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
-            source_name: "foobar_data".into(),
+            source_name: "foobar_data".parse().unwrap(),
             target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
             rights: fio::R_STAR_DIR,
             subdir: None,
@@ -1534,8 +1534,8 @@ mod tests {
         });
         let a_offer_decl = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::static_child("b".to_string()),
-            source_name: "baz_data".into(),
-            target_name: "foobar_data".into(),
+            source_name: "baz_data".parse().unwrap(),
+            target_name: "foobar_data".parse().unwrap(),
             target: OfferTarget::static_child("c".to_string()),
             rights: Some(fio::R_STAR_DIR),
             subdir: None,
@@ -1544,8 +1544,8 @@ mod tests {
         });
         let b_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Child("d".to_string()),
-            source_name: "bar_data".into(),
-            target_name: "baz_data".into(),
+            source_name: "bar_data".parse().unwrap(),
+            target_name: "baz_data".parse().unwrap(),
             target: ExposeTarget::Parent,
             rights: Some(fio::R_STAR_DIR),
             subdir: None,
@@ -1553,8 +1553,8 @@ mod tests {
         });
         let d_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Self_,
-            source_name: "foo_data".into(),
-            target_name: "bar_data".into(),
+            source_name: "foo_data".parse().unwrap(),
+            target_name: "bar_data".parse().unwrap(),
             target: ExposeTarget::Parent,
             rights: Some(fio::R_STAR_DIR),
             subdir: None,
@@ -1633,12 +1633,12 @@ mod tests {
     #[fuchsia::test]
     async fn map_route_for_program_runner() {
         let runner_reg = RunnerRegistration {
-            source_name: "elf".into(),
+            source_name: "elf".parse().unwrap(),
             source: RegistrationSource::Self_,
-            target_name: "hobbit".into(),
+            target_name: "hobbit".parse().unwrap(),
         };
         let runner_decl = RunnerDecl {
-            name: "elf".into(),
+            name: "elf".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
         };
         let components = vec![
@@ -1706,8 +1706,8 @@ mod tests {
         let directory_decl =
             DirectoryDeclBuilder::new("data").path("/data").rights(fio::RW_STAR_DIR).build();
         let storage_decl = StorageDecl {
-            name: "cache".into(),
-            backing_dir: "data".try_into().unwrap(),
+            name: "cache".parse().unwrap(),
+            backing_dir: "data".parse().unwrap(),
             source: StorageDirectorySource::Self_,
             subdir: None,
             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -1715,12 +1715,12 @@ mod tests {
         let offer_storage_decl = OfferDecl::Storage(OfferStorageDecl {
             source: OfferSource::Self_,
             target: OfferTarget::static_child("b".to_string()),
-            source_name: "cache".into(),
-            target_name: "cache".into(),
+            source_name: "cache".parse().unwrap(),
+            target_name: "cache".parse().unwrap(),
             availability: Availability::Required,
         });
         let use_storage_decl = UseDecl::Storage(UseStorageDecl {
-            source_name: "cache".into(),
+            source_name: "cache".parse().unwrap(),
             target_path: "/storage".try_into().unwrap(),
             availability: Availability::Required,
         });
@@ -1793,15 +1793,15 @@ mod tests {
     async fn route_map_use_from_framework_and_builtin() {
         let offer_realm_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Framework,
-            source_name: "fuchsia.component.Realm".try_into().unwrap(),
-            target_name: "fuchsia.component.Realm".try_into().unwrap(),
+            source_name: "fuchsia.component.Realm".parse().unwrap(),
+            target_name: "fuchsia.component.Realm".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_realm_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "fuchsia.component.Realm".try_into().unwrap(),
+            source_name: "fuchsia.component.Realm".parse().unwrap(),
             target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1809,21 +1809,21 @@ mod tests {
 
         let offer_event_source_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
-            source_name: "fuchsia.sys2.EventSource".try_into().unwrap(),
-            target_name: "fuchsia.sys2.EventSource".try_into().unwrap(),
+            source_name: "fuchsia.sys2.EventSource".parse().unwrap(),
+            target_name: "fuchsia.sys2.EventSource".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_event_source_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "fuchsia.sys2.EventSource".try_into().unwrap(),
+            source_name: "fuchsia.sys2.EventSource".parse().unwrap(),
             target_path: "/svc/fuchsia.sys2.EventSource".try_into().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let event_source_decl = CapabilityDecl::Protocol(ProtocolDecl {
-            name: "fuchsia.sys2.EventSource".into(),
+            name: "fuchsia.sys2.EventSource".parse().unwrap(),
             source_path: None,
         });
 
@@ -1867,7 +1867,9 @@ mod tests {
                     moniker: AbsoluteMoniker::root(),
                     capability: offer_realm_decl
                 },
-                RouteSegment::ProvideFromFramework { capability: "fuchsia.component.Realm".into() }
+                RouteSegment::ProvideFromFramework {
+                    capability: "fuchsia.component.Realm".parse().unwrap()
+                }
             ]
         );
 
@@ -1906,15 +1908,15 @@ mod tests {
     async fn route_map_offer_from_component_manager_namespace() {
         let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
-            source_name: "foo_svc".into(),
-            target_name: "bar_svc".into(),
+            source_name: "foo_svc".parse().unwrap(),
+            target_name: "bar_svc".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "bar_svc".into(),
+            source_name: "bar_svc".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1969,18 +1971,18 @@ mod tests {
         let c_url = make_test_url("c");
 
         let registration_decl = ResolverRegistration {
-            resolver: "base".into(),
+            resolver: "base".parse().unwrap(),
             source: RegistrationSource::Child("c".to_string()),
             scheme: "base".into(),
         };
         let expose_decl = ExposeDecl::Resolver(ExposeResolverDecl {
             source: ExposeSource::Self_,
-            source_name: "base".into(),
+            source_name: "base".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "base".into(),
+            target_name: "base".parse().unwrap(),
         });
         let resolver_decl = ResolverDecl {
-            name: "base".into(),
+            name: "base".parse().unwrap(),
             source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
         };
 
@@ -2016,7 +2018,7 @@ mod tests {
         let route_map = test.model.check_resolver(&b_component);
 
         assert_eq!(route_map.using_node, NodePath::absolute_from_vec(vec!["b"]));
-        assert_eq!(route_map.capability, "base");
+        assert_eq!(route_map.capability, Some("base".parse().unwrap()));
         assert!(route_map.error.is_none());
         assert_eq!(
             route_map.route,
@@ -2053,12 +2055,12 @@ mod tests {
         let c_url = "base://c/".to_string();
 
         let registration_decl = ResolverRegistration {
-            resolver: "base".into(),
+            resolver: "base".parse().unwrap(),
             source: RegistrationSource::Self_,
             scheme: "base".into(),
         };
         let resolver_decl = ResolverDecl {
-            name: "base".into(),
+            name: "base".parse().unwrap(),
             source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
         };
         let components = vec![
@@ -2092,7 +2094,7 @@ mod tests {
         let route_map = test.model.check_resolver(&c_component);
 
         assert_eq!(route_map.using_node, NodePath::absolute_from_vec(vec!["b", "c"]));
-        assert_eq!(route_map.capability, "base");
+        assert_eq!(route_map.capability, Some("base".parse().unwrap()));
         assert!(route_map.error.is_none());
         assert_eq!(
             route_map.route,
@@ -2121,7 +2123,7 @@ mod tests {
         let b_url = format!("{}://b/", BOOT_SCHEME);
 
         let boot_resolver_decl = CapabilityDecl::Resolver(ResolverDecl {
-            name: BOOT_RESOLVER_NAME.into(),
+            name: BOOT_RESOLVER_NAME.parse().unwrap(),
             source_path: Some("/builtin/source/path".parse().unwrap()),
         });
 
@@ -2145,7 +2147,7 @@ mod tests {
         let route_map = test.model.check_resolver(&b_component);
 
         assert_eq!(route_map.using_node, NodePath::absolute_from_vec(vec!["b"]));
-        assert_eq!(route_map.capability, BOOT_RESOLVER_NAME);
+        assert_eq!(route_map.capability, Some(BOOT_RESOLVER_NAME.parse().unwrap()));
         assert!(route_map.error.is_none());
         assert_eq!(
             route_map.route,
@@ -2166,12 +2168,12 @@ mod tests {
         let b_url = format!("{}{}", a_url, b_relative);
 
         let resolver_registration = ResolverRegistration {
-            resolver: "test".into(),
+            resolver: "test".parse().unwrap(),
             source: RegistrationSource::Self_,
             scheme: "test".into(),
         };
         let resolver_decl = ResolverDecl {
-            name: "test".into(),
+            name: "test".parse().unwrap(),
             source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
         };
         let components = vec![
@@ -2199,7 +2201,7 @@ mod tests {
         let route_map = test.model.check_resolver(&b_component);
 
         assert_eq!(route_map.using_node, NodePath::absolute_from_vec(vec!["b"]));
-        assert_eq!(route_map.capability, "test");
+        assert_eq!(route_map.capability, Some("test".parse().unwrap()));
         assert!(route_map.error.is_none());
         assert_eq!(
             route_map.route,
@@ -2221,7 +2223,7 @@ mod tests {
     #[fuchsia::test]
     async fn route_map_program_runner_from_builtin_environment() {
         let elf_runner_decl = CapabilityDecl::Runner(RunnerDecl {
-            name: "elf".into(),
+            name: "elf".parse().unwrap(),
             source_path: Some("/builtin/source/path".parse().unwrap()),
         });
         let component_decl = ComponentDeclBuilder::new_empty_component().add_program("elf").build();
@@ -2274,26 +2276,26 @@ mod tests {
         let b_url = "base://b/".to_string();
 
         let resolver_registration_decl = ResolverRegistration {
-            resolver: "base_resolver".into(),
+            resolver: "base_resolver".parse().unwrap(),
             source: RegistrationSource::Self_,
             scheme: "base".into(),
         };
         let runner_registration_decl = RunnerRegistration {
-            source_name: "hobbit".into(),
+            source_name: "hobbit".parse().unwrap(),
             source: RegistrationSource::Self_,
-            target_name: "dwarf".into(),
+            target_name: "dwarf".parse().unwrap(),
         };
         let resolver_decl = ResolverDecl {
-            name: "base_resolver".into(),
+            name: "base_resolver".parse().unwrap(),
             source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
         };
         let runner_decl = RunnerDecl {
-            name: "hobbit".into(),
+            name: "hobbit".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
         };
         let use_directory_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
-            source_name: "bar_data".into(),
+            source_name: "bar_data".parse().unwrap(),
             target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
             rights: fio::R_STAR_DIR,
             subdir: None,
@@ -2302,8 +2304,8 @@ mod tests {
         });
         let offer_directory_decl = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::Self_,
-            source_name: "foo_data".into(),
-            target_name: "bar_data".into(),
+            source_name: "foo_data".parse().unwrap(),
+            target_name: "bar_data".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             rights: Some(fio::R_STAR_DIR),
             subdir: None,
@@ -2313,14 +2315,14 @@ mod tests {
         let directory_decl = DirectoryDeclBuilder::new("foo_data").build();
         let expose_protocol_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("c".to_string()),
-            source_name: "bad_protocol".into(),
-            target_name: "bad_protocol".into(),
+            source_name: "bad_protocol".parse().unwrap(),
+            target_name: "bad_protocol".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         });
         let use_event_decl = UseDecl::EventStream(UseEventStreamDecl {
             source: UseSource::Parent,
-            source_name: "started_on_a".into(),
+            source_name: "started_on_a".parse().unwrap(),
             target_path: "/started".try_into().unwrap(),
             filter: None,
             scope: None,
@@ -2381,7 +2383,7 @@ mod tests {
             directories,
             &vec![VerifyRouteResult {
                 using_node: NodePath::absolute_from_vec(vec!["b"]),
-                capability: "bar_data".into(),
+                capability: Some("bar_data".parse().unwrap()),
                 error: None,
                 route: vec![
                     RouteSegment::UseBy {
@@ -2405,7 +2407,7 @@ mod tests {
             runners,
             &vec![VerifyRouteResult {
                 using_node: NodePath::absolute_from_vec(vec!["b"]),
-                capability: "dwarf".into(),
+                capability: Some("dwarf".parse().unwrap()),
                 error: None,
                 route: vec![
                     RouteSegment::RegisterBy {
@@ -2426,7 +2428,7 @@ mod tests {
             resolvers,
             &vec![VerifyRouteResult {
                 using_node: NodePath::absolute_from_vec(vec!["b"]),
-                capability: "base_resolver".into(),
+                capability: Some("base_resolver".parse().unwrap()),
                 error: None,
                 route: vec![
                     RouteSegment::RegisterBy {
@@ -2447,7 +2449,7 @@ mod tests {
             protocols,
             &vec![VerifyRouteResult {
                 using_node: NodePath::absolute_from_vec(vec!["b"]),
-                capability: "bad_protocol".into(),
+                capability: Some("bad_protocol".parse().unwrap()),
                 error: Some(AnalyzerModelError::RoutingError(
                     RoutingError::ExposeFromChildInstanceNotFound {
                         capability_id: "bad_protocol".to_string(),
@@ -2476,15 +2478,15 @@ mod tests {
 
         let use_protocol_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "fuchsia.examples.Echo".into(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/fuchsia.examples.Echo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Optional,
         });
         let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Void,
-            source_name: "fuchsia.examples.Echo".into(),
-            target_name: "fuchsia.examples.Echo".into(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            target_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
             availability: Availability::Optional,
@@ -2534,8 +2536,8 @@ mod tests {
 
         let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child("c".to_string()),
-            source_name: "fuchsia.examples.Echo".into(),
-            target_name: "fuchsia.examples.Echo".into(),
+            source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            target_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -2568,7 +2570,7 @@ mod tests {
             protocols,
             &vec![VerifyRouteResult {
                 using_node: NodePath::absolute_from_vec(vec![]),
-                capability: "fuchsia.examples.Echo".into(),
+                capability: Some("fuchsia.examples.Echo".parse().unwrap()),
                 error: Some(AnalyzerModelError::RoutingError(
                     RoutingError::OfferFromChildInstanceNotFound {
                         capability_id: "fuchsia.examples.Echo".to_string(),

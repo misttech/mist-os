@@ -14,8 +14,9 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, CapabilityPath, ProtocolDecl},
+    cm_rust::{CapabilityPath, ProtocolDecl},
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     lazy_static::lazy_static,
@@ -29,7 +30,7 @@ use {
 };
 
 lazy_static! {
-    pub static ref BINDER_SERVICE: CapabilityName = "fuchsia.component.Binder".into();
+    pub static ref BINDER_SERVICE: Name = "fuchsia.component.Binder".parse().unwrap();
     pub static ref BINDER_CAPABILITY: ComponentCapability =
         ComponentCapability::Protocol(ProtocolDecl {
             name: BINDER_SERVICE.clone(),
@@ -188,7 +189,7 @@ mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::{self, CapabilityName, ComponentDecl},
+        cm_rust::{self, ComponentDecl},
         cm_rust_testing::*,
         cm_task_scope::TaskScope,
         fidl::{client::Client, handle::AsyncChannel},
@@ -210,10 +211,7 @@ mod tests {
             BinderCapabilityTestFixture { builtin_environment }
         }
 
-        async fn new_event_stream(
-            &self,
-            events: Vec<CapabilityName>,
-        ) -> (EventSource, EventStream) {
+        async fn new_event_stream(&self, events: Vec<Name>) -> (EventSource, EventStream) {
             new_event_stream(self.builtin_environment.clone(), events).await
         }
 

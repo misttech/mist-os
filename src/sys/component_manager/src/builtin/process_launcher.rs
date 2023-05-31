@@ -12,8 +12,8 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     elf_runner::process_launcher::ProcessLauncher,
     fidl::endpoints::ServerEnd,
@@ -27,8 +27,8 @@ use {
 };
 
 lazy_static! {
-    pub static ref PROCESS_LAUNCHER_CAPABILITY_NAME: CapabilityName =
-        "fuchsia.process.Launcher".into();
+    pub static ref PROCESS_LAUNCHER_CAPABILITY_NAME: Name =
+        "fuchsia.process.Launcher".parse().unwrap();
 }
 
 pub struct ProcessLauncherSvc();

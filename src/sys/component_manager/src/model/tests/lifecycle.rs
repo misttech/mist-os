@@ -22,10 +22,11 @@ use {
     assert_matches::assert_matches,
     async_trait::async_trait,
     cm_rust::{
-        Availability, CapabilityName, CapabilityPath, ComponentDecl, RegistrationSource,
-        RunnerDecl, RunnerRegistration, UseEventStreamDecl, UseSource,
+        Availability, CapabilityPath, ComponentDecl, RegistrationSource, RunnerDecl,
+        RunnerRegistration, UseEventStreamDecl, UseSource,
     },
     cm_rust_testing::*,
+    cm_types::Name,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_sys2 as fsys,
@@ -335,7 +336,7 @@ async fn bind_eager_children_reentrant() {
                             .build(),
                     )
                     .runner(RunnerDecl {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
                     })
                     .add_environment(
@@ -343,9 +344,9 @@ async fn bind_eager_children_reentrant() {
                             .extends(fdecl::EnvironmentExtends::Realm)
                             .name("env")
                             .add_runner(RunnerRegistration {
-                                source_name: "foo".into(),
+                                source_name: "foo".parse().unwrap(),
                                 source: RegistrationSource::Self_,
-                                target_name: "foo".into(),
+                                target_name: "foo".parse().unwrap(),
                             })
                             .build(),
                     )
@@ -426,7 +427,7 @@ async fn bind_action_sequence() {
         .subscribe(
             events
                 .into_iter()
-                .map(|event: CapabilityName| EventSubscription {
+                .map(|event: Name| EventSubscription {
                     event_name: UseEventStreamDecl {
                         source_name: event,
                         source: UseSource::Parent,
@@ -549,8 +550,8 @@ async fn on_terminate_stop_triggers_reboot() {
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
-                    source_name: REBOOT_PROTOCOL.into(),
-                    target_name: REBOOT_PROTOCOL.into(),
+                    source_name: REBOOT_PROTOCOL.parse().unwrap(),
+                    target_name: REBOOT_PROTOCOL.parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -610,8 +611,8 @@ async fn on_terminate_exit_triggers_reboot() {
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
-                    source_name: REBOOT_PROTOCOL.into(),
-                    target_name: REBOOT_PROTOCOL.into(),
+                    source_name: REBOOT_PROTOCOL.parse().unwrap(),
+                    target_name: REBOOT_PROTOCOL.parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -667,8 +668,8 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
-                    source_name: REBOOT_PROTOCOL.into(),
-                    target_name: REBOOT_PROTOCOL.into(),
+                    source_name: REBOOT_PROTOCOL.parse().unwrap(),
+                    target_name: REBOOT_PROTOCOL.parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -723,8 +724,8 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
-                    source_name: REBOOT_PROTOCOL.into(),
-                    target_name: REBOOT_PROTOCOL.into(),
+                    source_name: REBOOT_PROTOCOL.parse().unwrap(),
+                    target_name: REBOOT_PROTOCOL.parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -774,8 +775,8 @@ async fn on_terminate_with_failed_reboot_panics() {
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
-                    source_name: REBOOT_PROTOCOL.into(),
-                    target_name: REBOOT_PROTOCOL.into(),
+                    source_name: REBOOT_PROTOCOL.parse().unwrap(),
+                    target_name: REBOOT_PROTOCOL.parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))

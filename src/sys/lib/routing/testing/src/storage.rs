@@ -42,16 +42,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "tmp".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "tmp".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
                         subdir: Some(PathBuf::from("cache")),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -62,8 +62,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -80,7 +80,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     ),
@@ -115,14 +115,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -133,8 +133,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -145,7 +145,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     ),
@@ -180,14 +180,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: Some(PathBuf::from("cache")),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -198,8 +198,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -210,7 +210,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     ),
@@ -245,14 +245,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -263,8 +263,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -275,7 +275,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
@@ -308,8 +308,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "data".try_into().unwrap(),
-                        target_name: "minfs".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
@@ -325,14 +325,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -343,8 +343,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -355,7 +355,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -391,11 +391,11 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "data".try_into().unwrap(),
-                        target_name: "minfs".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some("subdir_1".into()),
+                        subdir: Some("subdir_1".parse().unwrap()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -408,16 +408,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
-                        subdir: Some("subdir_2".into()),
+                        subdir: Some("subdir_2".parse().unwrap()),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .build(),
@@ -426,8 +426,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -439,7 +439,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -480,8 +480,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "data".try_into().unwrap(),
-                        target_name: "minfs".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
@@ -497,16 +497,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
-                        subdir: Some("bar".try_into().unwrap()),
+                        subdir: Some("bar".parse().unwrap()),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .build(),
@@ -515,8 +515,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -527,7 +527,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -564,14 +564,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "data-root".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "data-root".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -584,8 +584,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Parent,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
@@ -595,8 +595,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -607,7 +607,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["b:0", "c:0"]).unwrap(),
                     ),
@@ -633,8 +633,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Child("b".to_string()),
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -642,8 +642,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
@@ -660,9 +660,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "minfs".try_into().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
@@ -674,8 +674,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -686,7 +686,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -713,17 +713,17 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Child("b".to_string()),
-                        subdir: Some("subdir_2".into()),
+                        subdir: Some("subdir_2".parse().unwrap()),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
@@ -740,12 +740,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "minfs".try_into().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some("subdir_1".into()),
+                        subdir: Some("subdir_1".parse().unwrap()),
                         availability: cm_rust::Availability::Required,
                     }))
                     .build(),
@@ -754,8 +754,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -767,7 +767,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -802,15 +802,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Child("b".to_string()),
                         subdir: Some(PathBuf::from("data")),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Child("b".to_string()),
                         subdir: Some(PathBuf::from("cache")),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -818,15 +818,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
@@ -843,9 +843,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
-                        target_name: "minfs".try_into().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
@@ -859,25 +859,25 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Parent,
                         target: OfferTarget::static_child("d".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Parent,
                         target: OfferTarget::static_child("d".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/cache".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("d")
@@ -887,13 +887,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "d",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/cache".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -904,7 +904,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -918,7 +918,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/cache".try_into().unwrap(),
+                    path: "/cache".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
@@ -932,7 +932,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["c", "d"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0", "d:0"]).unwrap(),
                     ),
@@ -946,7 +946,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["c", "d"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/cache".try_into().unwrap(),
+                    path: "/cache".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["c:0", "d:0"]).unwrap(),
                     ),
@@ -980,14 +980,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -998,8 +998,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -1010,7 +1010,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
@@ -1039,8 +1039,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "data".try_into().unwrap(),
-                        target_name: "data".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
@@ -1054,8 +1054,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -1066,7 +1066,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
@@ -1096,8 +1096,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -1108,8 +1108,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -1120,7 +1120,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
@@ -1153,8 +1153,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "data".try_into().unwrap(),
-                        target_name: "minfs".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
@@ -1170,14 +1170,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "minfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "minfs".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -1188,8 +1188,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -1200,7 +1200,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
@@ -1226,16 +1226,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Storage(OfferStorageDecl {
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "tmp".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "tmp".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
                         subdir: Some(PathBuf::from("cache")),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -1246,8 +1246,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -1261,7 +1261,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
-                source_name: CapabilityName::from("cache"),
+                source_name: "cache".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Storage,
             },
@@ -1273,7 +1273,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     ),
@@ -1319,14 +1319,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .storage(StorageDecl {
-                        name: "cache".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "cache".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -1337,15 +1337,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Parent,
                         target: OfferTarget::static_child("c".to_string()),
-                        source_name: "cache".into(),
-                        target_name: "cache".into(),
+                        source_name: "cache".parse().unwrap(),
+                        target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .add_lazy_child("c")
@@ -1355,8 +1355,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "cache".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -1373,7 +1373,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     ),
@@ -1391,7 +1391,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(storage_relation.clone()),
                     from_cm_namespace: false,
                     storage_subdir: None,

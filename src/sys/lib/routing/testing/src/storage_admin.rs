@@ -46,8 +46,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -55,14 +55,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Capability("data".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: OfferSource::Capability("data".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -75,8 +75,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -86,7 +86,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -133,8 +133,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some(PathBuf::from("foo")),
@@ -148,16 +148,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .storage(StorageDecl {
-                        name: "storage".into(),
-                        backing_dir: "data".try_into().unwrap(),
+                        name: "storage".parse().unwrap(),
+                        backing_dir: "data".parse().unwrap(),
                         source: StorageDirectorySource::Parent,
                         subdir: Some(PathBuf::from("bar")),
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Capability("storage".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: OfferSource::Capability("storage".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -170,7 +170,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -212,8 +212,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -227,7 +227,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -245,8 +245,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -254,14 +254,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Capability("data".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: ExposeSource::Capability("data".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -272,8 +272,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "d",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -312,8 +312,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -321,13 +321,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Capability("data".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: UseSource::Capability("data".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -340,8 +340,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -383,8 +383,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     )
                     .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -392,13 +392,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Capability("unrelated.protocol".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: UseSource::Capability("unrelated.protocol".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -411,8 +411,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -453,16 +453,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     )
                     .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Capability("unrelated.protocol".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: OfferSource::Capability("unrelated.protocol".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -475,7 +475,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -518,8 +518,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -533,7 +533,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -551,8 +551,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -561,14 +561,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Capability("unrelated.protocol".into()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: ExposeSource::Capability("unrelated.protocol".parse().unwrap()),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -579,8 +579,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "d",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -621,8 +621,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     )
                     .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -630,13 +630,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Capability("unrelated.protocol".into()),
-                        source_name: "unrelated.protocol".into(),
+                        source: UseSource::Capability("unrelated.protocol".parse().unwrap()),
+                        source_name: "unrelated.protocol".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -649,8 +649,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -689,16 +689,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Capability("data".into()),
-                        source_name: "unrelated.protocol".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: OfferSource::Capability("data".parse().unwrap()),
+                        source_name: "unrelated.protocol".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -711,7 +711,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -753,8 +753,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -768,7 +768,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.sys2.StorageAdmin")
                             .unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -786,8 +786,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .build(),
                     )
                     .storage(StorageDecl {
-                        name: "data".into(),
-                        backing_dir: "tmpfs".try_into().unwrap(),
+                        name: "data".parse().unwrap(),
+                        backing_dir: "tmpfs".parse().unwrap(),
                         source: StorageDirectorySource::Self_,
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -795,14 +795,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
-                        source_name: "data".into(),
-                        target_name: "data".into(),
+                        source_name: "data".parse().unwrap(),
+                        target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Capability("data".into()),
-                        source_name: "unrelated.protocol".into(),
-                        target_name: "fuchsia.sys2.StorageAdmin".into(),
+                        source: ExposeSource::Capability("data".parse().unwrap()),
+                        source_name: "unrelated.protocol".parse().unwrap(),
+                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -813,8 +813,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "d",
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".into(),
-                        target_path: "/storage".try_into().unwrap(),
+                        source_name: "data".parse().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),

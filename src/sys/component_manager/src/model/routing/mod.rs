@@ -314,7 +314,7 @@ pub async fn report_routing_failure(
 pub fn aggregate_exposes(exposes: &Vec<ExposeDecl>) -> BTreeMap<&str, Vec<&ExposeDecl>> {
     let mut out: BTreeMap<&str, Vec<&ExposeDecl>> = BTreeMap::new();
     for expose in exposes {
-        out.entry(expose.target_name().str()).or_insert(vec![]).push(expose);
+        out.entry(expose.target_name().as_str()).or_insert(vec![]).push(expose);
     }
     out
 }

@@ -61,7 +61,7 @@ pub(crate) fn check_name(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    let conversion_ctor = |s: &String| Name::try_new(s).map(|_| ());
+    let conversion_ctor = |s: &String| Name::new(s).map(|_| ());
     check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 
@@ -71,7 +71,7 @@ pub(crate) fn check_dynamic_name(
     keyword: &str,
     errors: &mut Vec<Error>,
 ) -> bool {
-    let conversion_ctor = |s: &String| LongName::try_new(s).map(|_| ());
+    let conversion_ctor = |s: &String| LongName::new(s).map(|_| ());
     check_identifier(conversion_ctor, prop, decl_type, keyword, errors)
 }
 

@@ -183,10 +183,11 @@ mod tests {
         },
         ::routing::{config::RuntimeConfig, environment::DebugRegistration},
         assert_matches::assert_matches,
-        cm_rust::{CapabilityName, RegistrationSource, RunnerRegistration},
+        cm_rust::{RegistrationSource, RunnerRegistration},
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
         },
+        cm_types::Name,
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
@@ -228,17 +229,17 @@ mod tests {
                 .stop_timeout(1234)
                 .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                     cm_rust::DebugProtocolRegistration {
-                        source_name: "source_name".into(),
-                        target_name: "target_name".into(),
+                        source_name: "source_name".parse().unwrap(),
+                        target_name: "target_name".parse().unwrap(),
                         source: RegistrationSource::Parent,
                     },
                 ))
                 .build(),
         );
-        let expected_debug_capability: HashMap<CapabilityName, DebugRegistration> = hashmap! {
-            "target_name".into() =>
+        let expected_debug_capability: HashMap<Name, DebugRegistration> = hashmap! {
+            "target_name".parse().unwrap() =>
             DebugRegistration {
-                source_name: "source_name".into(),
+                source_name: "source_name".parse().unwrap(),
                 source: RegistrationSource::Parent,
             }
         };
@@ -251,20 +252,20 @@ mod tests {
     async fn test_inherit_root() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".into(),
-            target_name: "test".into(),
+            source_name: "test-src".parse().unwrap(),
+            target_name: "test".parse().unwrap(),
         };
-        let runners: HashMap<cm_rust::CapabilityName, RunnerRegistration> = hashmap! {
-            "test".into() => runner_reg.clone()
+        let runners: HashMap<Name, RunnerRegistration> = hashmap! {
+            "test".parse().unwrap() => runner_reg.clone()
         };
 
         let debug_reg = DebugRegistration {
-            source_name: "source_name".into(),
+            source_name: "source_name".parse().unwrap(),
             source: RegistrationSource::Self_,
         };
 
-        let debug_capabilities: HashMap<cm_rust::CapabilityName, DebugRegistration> = hashmap! {
-            "target_name".into() => debug_reg.clone()
+        let debug_capabilities: HashMap<Name, DebugRegistration> = hashmap! {
+            "target_name".parse().unwrap() => debug_reg.clone()
         };
         let debug_registry = DebugRegistry { debug_capabilities };
 
@@ -317,14 +318,20 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".into()).unwrap();
+            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::AboveRoot(_), r)) if r == runner_reg);
-        assert_matches!(component.environment.get_registered_runner(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         let debug_capability =
-            component.environment.get_debug_capability(&"target_name".into()).unwrap();
+            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::AboveRoot(_), None, d)) if d == debug_reg);
-        assert_matches!(component.environment.get_debug_capability(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         Ok(())
     }
@@ -335,15 +342,15 @@ mod tests {
     async fn test_inherit_parent() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".into(),
-            target_name: "test".into(),
+            source_name: "test-src".parse().unwrap(),
+            target_name: "test".parse().unwrap(),
         };
-        let runners: HashMap<CapabilityName, RunnerRegistration> = hashmap! {
-            "test".into() => runner_reg.clone()
+        let runners: HashMap<Name, RunnerRegistration> = hashmap! {
+            "test".parse().unwrap() => runner_reg.clone()
         };
 
         let debug_reg = DebugRegistration {
-            source_name: "source_name".into(),
+            source_name: "source_name".parse().unwrap(),
             source: RegistrationSource::Parent,
         };
 
@@ -358,13 +365,13 @@ mod tests {
                         .extends(fdecl::EnvironmentExtends::Realm)
                         .add_runner(RunnerRegistration {
                             source: RegistrationSource::Parent,
-                            source_name: "test-src".into(),
-                            target_name: "test".into(),
+                            source_name: "test-src".parse().unwrap(),
+                            target_name: "test".parse().unwrap(),
                         })
                         .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                             cm_rust::DebugProtocolRegistration {
-                                source_name: "source_name".into(),
-                                target_name: "target_name".into(),
+                                source_name: "source_name".parse().unwrap(),
+                                target_name: "target_name".parse().unwrap(),
                                 source: RegistrationSource::Parent,
                             },
                         )),
@@ -407,16 +414,22 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".into()).unwrap();
+            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::Component(c), r))
             if r == runner_reg && c.abs_moniker == AbsoluteMoniker::root());
-        assert_matches!(component.environment.get_registered_runner(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         let debug_capability =
-            component.environment.get_debug_capability(&"target_name".into()).unwrap();
+            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::Component(c), Some(_), d))
             if d == debug_reg && c.abs_moniker == AbsoluteMoniker::root());
-        assert_matches!(component.environment.get_debug_capability(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         Ok(())
     }
@@ -427,15 +440,15 @@ mod tests {
     async fn test_inherit_in_collection() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".into(),
-            target_name: "test".into(),
+            source_name: "test-src".parse().unwrap(),
+            target_name: "test".parse().unwrap(),
         };
-        let runners: HashMap<CapabilityName, RunnerRegistration> = hashmap! {
-            "test".into() => runner_reg.clone()
+        let runners: HashMap<Name, RunnerRegistration> = hashmap! {
+            "test".parse().unwrap() => runner_reg.clone()
         };
 
         let debug_reg = DebugRegistration {
-            source_name: "source_name".into(),
+            source_name: "source_name".parse().unwrap(),
             source: RegistrationSource::Parent,
         };
 
@@ -450,13 +463,13 @@ mod tests {
                         .extends(fdecl::EnvironmentExtends::Realm)
                         .add_runner(RunnerRegistration {
                             source: RegistrationSource::Parent,
-                            source_name: "test-src".into(),
-                            target_name: "test".into(),
+                            source_name: "test-src".parse().unwrap(),
+                            target_name: "test".parse().unwrap(),
                         })
                         .add_debug_registration(cm_rust::DebugRegistration::Protocol(
                             cm_rust::DebugProtocolRegistration {
-                                source_name: "source_name".into(),
-                                target_name: "target_name".into(),
+                                source_name: "source_name".parse().unwrap(),
+                                target_name: "target_name".parse().unwrap(),
                                 source: RegistrationSource::Parent,
                             },
                         )),
@@ -516,16 +529,22 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".into()).unwrap();
+            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::Component(c), r))
             if r == runner_reg && c.abs_moniker == AbsoluteMoniker::root());
-        assert_matches!(component.environment.get_registered_runner(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         let debug_capability =
-            component.environment.get_debug_capability(&"target_name".into()).unwrap();
+            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::Component(c), Some(n), d))
             if d == debug_reg && n == "env_a" && c.abs_moniker == AbsoluteMoniker::root());
-        assert_matches!(component.environment.get_debug_capability(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         Ok(())
     }
@@ -537,20 +556,20 @@ mod tests {
     async fn test_auto_inheritance() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".into(),
-            target_name: "test".into(),
+            source_name: "test-src".parse().unwrap(),
+            target_name: "test".parse().unwrap(),
         };
-        let runners: HashMap<CapabilityName, RunnerRegistration> = hashmap! {
-            "test".into() => runner_reg.clone()
+        let runners: HashMap<Name, RunnerRegistration> = hashmap! {
+            "test".parse().unwrap() => runner_reg.clone()
         };
 
         let debug_reg = DebugRegistration {
-            source_name: "source_name".into(),
+            source_name: "source_name".parse().unwrap(),
             source: RegistrationSource::Parent,
         };
 
-        let debug_capabilities: HashMap<CapabilityName, DebugRegistration> = hashmap! {
-            "target_name".into() => debug_reg.clone()
+        let debug_capabilities: HashMap<Name, DebugRegistration> = hashmap! {
+            "target_name".parse().unwrap() => debug_reg.clone()
         };
         let debug_registry = DebugRegistry { debug_capabilities };
 
@@ -599,14 +618,20 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".into()).unwrap();
+            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::AboveRoot(_), r)) if r == runner_reg);
-        assert_matches!(component.environment.get_registered_runner(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         let debug_capability =
-            component.environment.get_debug_capability(&"target_name".into()).unwrap();
+            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::AboveRoot(_), None, d)) if d == debug_reg);
-        assert_matches!(component.environment.get_debug_capability(&"foo".into()), Ok(None));
+        assert_matches!(
+            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            Ok(None)
+        );
 
         Ok(())
     }

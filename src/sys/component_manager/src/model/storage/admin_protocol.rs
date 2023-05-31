@@ -26,8 +26,9 @@ use {
     anyhow::{format_err, Context, Error},
     async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
-    cm_rust::{CapabilityName, ExposeDecl, OfferDecl, StorageDecl, UseDecl},
+    cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::{endpoints::ServerEnd, prelude::*},
     fidl_fuchsia_component as fcomponent,
@@ -55,8 +56,8 @@ use {
 };
 
 lazy_static! {
-    pub static ref STORAGE_ADMIN_PROTOCOL_NAME: CapabilityName =
-        fsys::StorageAdminMarker::PROTOCOL_NAME.into();
+    pub static ref STORAGE_ADMIN_PROTOCOL_NAME: Name =
+        fsys::StorageAdminMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
 struct StorageAdminProtocolProvider {
@@ -231,7 +232,8 @@ impl StorageAdmin {
             | ComponentCapability::Use(UseDecl::Protocol(_)) => (),
             _ => return Ok(None),
         }
-        if source_capability.source_name() != Some(&fsys::StorageAdminMarker::PROTOCOL_NAME.into())
+        if source_capability.source_name()
+            != Some(&fsys::StorageAdminMarker::PROTOCOL_NAME.parse().unwrap())
         {
             return Ok(None);
         }

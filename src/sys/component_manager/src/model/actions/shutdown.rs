@@ -10,12 +10,13 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{
-        CapabilityDecl, CapabilityName, ChildRef, CollectionDecl, DependencyType, EnvironmentDecl,
-        ExposeDecl, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl,
-        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
-        RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseDecl,
-        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        CapabilityDecl, ChildRef, CollectionDecl, DependencyType, EnvironmentDecl, ExposeDecl,
+        OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
+        OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon,
+        RegistrationSource, StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventStreamDecl,
+        UseProtocolDecl, UseServiceDecl, UseSource,
     },
+    cm_types::Name,
     flyweights::FlyStr,
     futures::future::select_all,
     moniker::{ChildMoniker, ChildMonikerBase},
@@ -664,7 +665,7 @@ fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<Co
 ///
 /// The return value will have at most one entry in it, but it is returned in a
 /// Vec for consistency with the other `find_*` methods.
-fn find_storage_source(instance: &impl Component, name: &CapabilityName) -> Vec<ComponentRef> {
+fn find_storage_source(instance: &impl Component, name: &Name) -> Vec<ComponentRef> {
     let decl = instance.capabilities().into_iter().find_map(|decl| match decl {
         CapabilityDecl::Storage(decl) if &decl.name == name => Some(decl),
         _ => None,
@@ -808,10 +809,10 @@ mod tests {
             },
         },
         cm_rust::{
-            Availability, CapabilityName, CapabilityPath, ChildDecl, ComponentDecl, DependencyType,
-            ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl,
-            OfferProtocolDecl, OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget,
-            ProtocolDecl, StorageDecl, StorageDirectorySource, UseDecl, UseSource,
+            Availability, CapabilityPath, ChildDecl, ComponentDecl, DependencyType, ExposeDecl,
+            ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl,
+            OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl,
+            StorageDecl, StorageDirectorySource, UseDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -892,8 +893,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
-                source_name: "serviceSelf".into(),
-                target_name: "serviceSelf".into(),
+                source_name: "serviceSelf".parse().unwrap(),
+                target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -924,8 +925,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
-                source_name: "serviceSelf".into(),
-                target_name: "serviceSelf".into(),
+                source_name: "serviceSelf".parse().unwrap(),
+                target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: weak_dep,
                 availability: Availability::Required,
@@ -955,8 +956,8 @@ mod tests {
         let decl = ComponentDecl {
             exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
                 target: ExposeTarget::Parent,
-                source_name: "serviceFromChild".into(),
-                target_name: "serviceFromChild".into(),
+                source_name: "serviceFromChild".parse().unwrap(),
+                target_name: "serviceFromChild".parse().unwrap(),
                 source: ExposeSource::Child("childA".to_string()),
                 availability: cm_rust::Availability::Required,
             })],
@@ -1002,16 +1003,16 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
-                    source_name: "serviceParent".into(),
-                    target_name: "serviceParent".into(),
+                    source_name: "serviceParent".parse().unwrap(),
+                    target_name: "serviceParent".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBOffer".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBOffer".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1038,8 +1039,8 @@ mod tests {
                 .name("env")
                 .add_runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Parent,
-                    source_name: "foo".into(),
-                    target_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
@@ -1066,8 +1067,8 @@ mod tests {
                 .name("env")
                 .add_runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Self_,
-                    source_name: "foo".into(),
-                    target_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
@@ -1094,8 +1095,8 @@ mod tests {
                 .name("env")
                 .add_runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
-                    source_name: "foo".into(),
-                    target_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
@@ -1122,8 +1123,8 @@ mod tests {
                 .name("env")
                 .add_runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
-                    source_name: "foo".into(),
-                    target_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             collections: vec![CollectionDeclBuilder::new().name("coll").environment("env").build()],
@@ -1175,16 +1176,16 @@ mod tests {
                     .name("env")
                     .add_runner(cm_rust::RunnerRegistration {
                         source: RegistrationSource::Child("childA".to_string()),
-                        source_name: "foo".into(),
-                        target_name: "foo".into(),
+                        source_name: "foo".parse().unwrap(),
+                        target_name: "foo".parse().unwrap(),
                     })
                     .build(),
                 EnvironmentDeclBuilder::new()
                     .name("env2")
                     .add_runner(cm_rust::RunnerRegistration {
                         source: RegistrationSource::Child("childB".to_string()),
-                        source_name: "bar".into(),
-                        target_name: "bar".into(),
+                        source_name: "bar".parse().unwrap(),
+                        target_name: "bar".parse().unwrap(),
                     })
                     .build(),
             ],
@@ -1216,8 +1217,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::static_child("childB".to_string()),
-                source_name: "childBOffer".into(),
-                target_name: "serviceSibling".into(),
+                source_name: "childBOffer".parse().unwrap(),
+                target_name: "serviceSibling".parse().unwrap(),
                 target: OfferTarget::static_child("childC".to_string()),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1226,8 +1227,8 @@ mod tests {
                 .name("env")
                 .add_runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".into()),
-                    source_name: "foo".into(),
-                    target_name: "foo".into(),
+                    source_name: "foo".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
@@ -1260,7 +1261,7 @@ mod tests {
                 .name("resolver_env")
                 .add_resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Parent,
-                    resolver: "foo".into(),
+                    resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .build()],
@@ -1288,7 +1289,7 @@ mod tests {
                 .name("resolver_env")
                 .add_resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
-                    resolver: "foo".into(),
+                    resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .build()],
@@ -1319,7 +1320,7 @@ mod tests {
                     .name("env1")
                     .add_resolver(cm_rust::ResolverRegistration {
                         source: RegistrationSource::Child("childA".to_string()),
-                        resolver: "foo".into(),
+                        resolver: "foo".parse().unwrap(),
                         scheme: "httweeeeees".into(),
                     })
                     .build(),
@@ -1327,7 +1328,7 @@ mod tests {
                     .name("env2")
                     .add_resolver(cm_rust::ResolverRegistration {
                         source: RegistrationSource::Child("childB".to_string()),
-                        resolver: "bar".into(),
+                        resolver: "bar".parse().unwrap(),
                         scheme: "httweeeeee".into(),
                     })
                     .build(),
@@ -1362,13 +1363,13 @@ mod tests {
                 .name("multi_env")
                 .add_resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
-                    resolver: "foo".into(),
+                    resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .add_runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childB".to_string()),
-                    source_name: "bar".into(),
-                    target_name: "bar".into(),
+                    source_name: "bar".parse().unwrap(),
+                    target_name: "bar".parse().unwrap(),
                 })
                 .build()],
             children: vec![
@@ -1401,7 +1402,7 @@ mod tests {
                 .name("resolver_env")
                 .add_resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
-                    resolver: "foo".into(),
+                    resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .build()],
@@ -1453,8 +1454,8 @@ mod tests {
             .offer(OfferDecl::Directory(OfferDirectoryDecl {
                 source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
                 target: OfferTarget::Collection("coll".to_string()),
-                source_name: "some_dir".into(),
-                target_name: "some_dir".into(),
+                source_name: "some_dir".parse().unwrap(),
+                target_name: "some_dir".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 rights: None,
                 subdir: None,
@@ -1480,8 +1481,8 @@ mod tests {
                         name: "dyn2".into(),
                         collection: Some("coll".into()),
                     }),
-                    source_name: "test.protocol".into(),
-                    target_name: "test.protocol".into(),
+                    source_name: "test.protocol".parse().unwrap(),
+                    target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
@@ -1494,8 +1495,8 @@ mod tests {
                         name: "dyn3".into(),
                         collection: Some("coll".into()),
                     }),
-                    source_name: "test.protocol".into(),
-                    target_name: "test.protocol".into(),
+                    source_name: "test.protocol".parse().unwrap(),
+                    target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
@@ -1551,8 +1552,8 @@ mod tests {
                         name: "dyn1".into(),
                         collection: Some("coll2".into()),
                     }),
-                    source_name: "test.protocol".into(),
-                    target_name: "test.protocol".into(),
+                    source_name: "test.protocol".parse().unwrap(),
+                    target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
@@ -1565,8 +1566,8 @@ mod tests {
                         name: "dyn1".into(),
                         collection: Some("coll1".into()),
                     }),
-                    source_name: "test.protocol".into(),
-                    target_name: "test.protocol".into(),
+                    source_name: "test.protocol".parse().unwrap(),
+                    target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
@@ -1605,8 +1606,8 @@ mod tests {
                     name: "dyn1".into(),
                     collection: Some("coll".into()),
                 }),
-                source_name: "test.protocol".into(),
-                target_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
+                target_name: "test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
@@ -1640,8 +1641,8 @@ mod tests {
                     name: "dyn1".into(),
                     collection: Some("coll".into()),
                 }),
-                source_name: "test.protocol".into(),
-                target_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
+                target_name: "test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
@@ -1680,8 +1681,8 @@ mod tests {
                     name: "dyn1".into(),
                     collection: Some("coll".into()),
                 }),
-                source_name: "test.protocol".into(),
-                target_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
+                target_name: "test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
@@ -1727,16 +1728,16 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
-                    source_name: "serviceSelf".into(),
-                    target_name: "serviceSelf".into(),
+                    source_name: "serviceSelf".parse().unwrap(),
+                    target_name: "serviceSelf".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: weak_dep.clone(),
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBOffer".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBOffer".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: weak_dep.clone(),
                     availability: Availability::Required,
@@ -1778,24 +1779,24 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
-                    source_name: "serviceSelf".into(),
-                    target_name: "serviceSelf".into(),
+                    source_name: "serviceSelf".parse().unwrap(),
+                    target_name: "serviceSelf".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBOffer".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBOffer".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBOtherOffer".into(),
-                    target_name: "serviceOtherSibling".into(),
+                    source_name: "childBOtherOffer".parse().unwrap(),
+                    target_name: "serviceOtherSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1845,16 +1846,16 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBOffer".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBOffer".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBToC".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBToC".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1911,24 +1912,24 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
-                    source_name: "childBOffer".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBOffer".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBToC".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBToC".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childC".to_string()),
-                    source_name: "childCToA".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childCToA".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: weak_dep,
                     availability: Availability::Required,
@@ -1983,16 +1984,16 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
-                    source_name: "childBOffer".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBOffer".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childB".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBToC".into(),
-                    target_name: "serviceSibling".into(),
+                    source_name: "childBToC".parse().unwrap(),
+                    target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2072,40 +2073,40 @@ mod tests {
             offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
-                    source_name: "childAService".into(),
-                    target_name: "childAService".into(),
+                    source_name: "childAService".parse().unwrap(),
+                    target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childB".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
-                    source_name: "childAService".into(),
-                    target_name: "childAService".into(),
+                    source_name: "childAService".parse().unwrap(),
+                    target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
-                    source_name: "childBService".into(),
-                    target_name: "childBService".into(),
+                    source_name: "childBService".parse().unwrap(),
+                    target_name: "childBService".parse().unwrap(),
                     target: OfferTarget::static_child("childD".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childC".to_string()),
-                    source_name: "childAService".into(),
-                    target_name: "childAService".into(),
+                    source_name: "childAService".parse().unwrap(),
+                    target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childD".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childC".to_string()),
-                    source_name: "childAService".into(),
-                    target_name: "childAService".into(),
+                    source_name: "childAService".parse().unwrap(),
+                    target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childE".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2154,8 +2155,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::static_child("childA".to_string()),
-                source_name: "childBOffer".into(),
-                target_name: "serviceSibling".into(),
+                source_name: "childBOffer".parse().unwrap(),
+                target_name: "serviceSibling".parse().unwrap(),
                 target: OfferTarget::static_child("childB".to_string()),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2185,7 +2186,7 @@ mod tests {
                 persistent_storage: Some(false),
             }],
             children: vec![ChildDecl {
-                name: "static_child".into(),
+                name: "static_child".parse().unwrap(),
                 url: "fuchsia-pkg://imaginary".to_string(),
                 startup: fdecl::StartupMode::Lazy,
                 on_terminate: None,
@@ -2194,12 +2195,12 @@ mod tests {
             }],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection("coll".to_string()),
-                source_name: "service_capability".into(),
+                source_name: "service_capability".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "static_child".into(),
                     collection: None,
                 }),
-                target_name: "service_capbility".into(),
+                target_name: "service_capbility".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability: Availability::Required,
@@ -2236,7 +2237,7 @@ mod tests {
                 persistent_storage: Some(false),
             }],
             children: vec![ChildDecl {
-                name: "static_child".into(),
+                name: "static_child".parse().unwrap(),
                 url: "fuchsia-pkg://imaginary".to_string(),
                 startup: fdecl::StartupMode::Lazy,
                 on_terminate: None,
@@ -2245,12 +2246,12 @@ mod tests {
             }],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection("coll".to_string()),
-                source_name: "service_capability".into(),
+                source_name: "service_capability".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "static_child".into(),
                     collection: None,
                 }),
-                target_name: "service_capbility".into(),
+                target_name: "service_capbility".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability: Availability::Required,
@@ -2307,9 +2308,9 @@ mod tests {
             ],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection(c1_name.clone()),
-                source_name: cap_name.clone().into(),
+                source_name: cap_name.clone().parse().unwrap(),
                 target: OfferTarget::Collection(c2_name.clone()),
-                target_name: cap_name.clone().into(),
+                target_name: cap_name.clone().parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability: Availability::Required,
@@ -2369,8 +2370,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::static_child("childB".to_string()),
-                source_name: "childBOffer".into(),
-                target_name: "serviceSibling".into(),
+                source_name: "childBOffer".parse().unwrap(),
+                target_name: "serviceSibling".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2393,8 +2394,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
-                source_name: "serviceSelf".into(),
-                target_name: "serviceSelf".into(),
+                source_name: "serviceSelf".parse().unwrap(),
+                target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Weak,
                 availability: Availability::Required,
@@ -2409,7 +2410,7 @@ mod tests {
             }],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
                 target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2431,8 +2432,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
-                source_name: "serviceSelf".into(),
-                target_name: "serviceSelf".into(),
+                source_name: "serviceSelf".parse().unwrap(),
+                target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Weak,
                 availability: Availability::Required,
@@ -2457,7 +2458,7 @@ mod tests {
             ],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
                 target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2483,16 +2484,16 @@ mod tests {
         let decl = ComponentDecl {
             capabilities: vec![
                 CapabilityDecl::Storage(StorageDecl {
-                    name: "cdata".into(),
+                    name: "cdata".parse().unwrap(),
                     source: StorageDirectorySource::Child("childB".to_string()),
-                    backing_dir: "directory".into(),
+                    backing_dir: "directory".parse().unwrap(),
                     subdir: None,
                     storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                 }),
                 CapabilityDecl::Storage(StorageDecl {
-                    name: "pdata".into(),
+                    name: "pdata".parse().unwrap(),
                     source: StorageDirectorySource::Parent,
-                    backing_dir: "directory".into(),
+                    backing_dir: "directory".parse().unwrap(),
                     subdir: None,
                     storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                 }),
@@ -2500,15 +2501,15 @@ mod tests {
             offers: vec![
                 OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
-                    source_name: "cdata".into(),
-                    target_name: "cdata".into(),
+                    source_name: "cdata".parse().unwrap(),
+                    target_name: "cdata".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     availability: Availability::Required,
                 }),
                 OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
-                    source_name: "pdata".into(),
-                    target_name: "pdata".into(),
+                    source_name: "pdata".parse().unwrap(),
+                    target_name: "pdata".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     availability: Availability::Required,
                 }),
@@ -2533,7 +2534,7 @@ mod tests {
             ],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
                 target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2556,8 +2557,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
-                source_name: "serviceSelf".into(),
-                target_name: "serviceSelf".into(),
+                source_name: "serviceSelf".parse().unwrap(),
+                target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2572,7 +2573,7 @@ mod tests {
             }],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".into(),
+                source_name: "test.protocol".parse().unwrap(),
                 target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
                 dependency_type: DependencyType::Weak,
                 availability: Availability::Required,
@@ -2594,8 +2595,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
-                source_name: "serviceSelf".into(),
-                target_name: "serviceSelf".into(),
+                source_name: "serviceSelf".parse().unwrap(),
+                target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Weak,
                 availability: Availability::Required,
@@ -2621,14 +2622,14 @@ mod tests {
             uses: vec![
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Child("childA".to_string()),
-                    source_name: "test.protocol".into(),
+                    source_name: "test.protocol".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Child("childB".to_string()),
-                    source_name: "test.protocol2".into(),
+                    source_name: "test.protocol2".parse().unwrap(),
                     target_path: CapabilityPath::try_from("/svc/test.protocol2").unwrap(),
                     dependency_type: DependencyType::Weak,
                     availability: Availability::Required,
@@ -2669,8 +2670,8 @@ mod tests {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Resolver(OfferResolverDecl {
                 source: OfferSource::static_child("childA".to_string()),
-                source_name: CapabilityName::try_from("resolver").unwrap(),
-                target_name: CapabilityName::try_from("resolver").unwrap(),
+                source_name: "resolver".parse().unwrap(),
+                target_name: "resolver".parse().unwrap(),
                 target: OfferTarget::static_child("childB".to_string()),
             })],
             children: vec![child_a.clone(), child_b.clone()],
@@ -2890,9 +2891,9 @@ mod tests {
                     .add_lazy_child("c")
                     .offer(cm_rust::OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Child(ChildRef { name: "c".into(), collection: None }),
-                        source_name: "static_offer_source".into(),
+                        source_name: "static_offer_source".parse().unwrap(),
                         target: OfferTarget::Collection("coll".to_string()),
-                        target_name: "static_offer_target".into(),
+                        target_name: "static_offer_target".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3191,16 +3192,16 @@ mod tests {
                     .add_eager_child("e")
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3212,7 +3213,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3223,13 +3224,13 @@ mod tests {
                 "d",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceD".into(),
+                        name: "serviceD".parse().unwrap(),
                         source_path: Some("/svc/serviceD".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3240,7 +3241,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3340,24 +3341,24 @@ mod tests {
                     .add_eager_child("f")
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("e".to_string()),
-                        source_name: "serviceE".into(),
-                        target_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
+                        target_name: "serviceE".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3369,7 +3370,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3380,13 +3381,13 @@ mod tests {
                 "d",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceD".into(),
+                        name: "serviceD".parse().unwrap(),
                         source_path: Some("/svc/serviceD".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3396,20 +3397,20 @@ mod tests {
                 "e",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceE".into(),
+                        name: "serviceE".parse().unwrap(),
                         source_path: Some("/svc/serviceE".parse().unwrap()),
                     })
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceE".into(),
-                        target_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
+                        target_name: "serviceE".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3420,7 +3421,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceE").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3549,32 +3550,32 @@ mod tests {
                     .add_eager_child("f")
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("e".to_string()),
-                        source_name: "serviceE".into(),
-                        target_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
+                        target_name: "serviceE".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3586,7 +3587,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3597,13 +3598,13 @@ mod tests {
                 "d",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceD".into(),
+                        name: "serviceD".parse().unwrap(),
                         source_path: Some("/svc/serviceD".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceD".into(),
-                        target_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
+                        target_name: "serviceD".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3613,20 +3614,20 @@ mod tests {
                 "e",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceE".into(),
+                        name: "serviceE".parse().unwrap(),
                         source_path: Some("/svc/serviceE".parse().unwrap()),
                     })
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceE").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceE".into(),
-                        target_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
+                        target_name: "serviceE".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3637,14 +3638,14 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceE".into(),
+                        source_name: "serviceE".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceE").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceD".into(),
+                        source_name: "serviceD".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3763,8 +3764,8 @@ mod tests {
                     .add_eager_child("d")
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
-                        source_name: "serviceC".into(),
-                        target_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
+                        target_name: "serviceC".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3775,13 +3776,13 @@ mod tests {
                 "c",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceC".into(),
+                        name: "serviceC".parse().unwrap(),
                         source_path: Some("/svc/serviceC".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceC".into(),
-                        target_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
+                        target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3792,7 +3793,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3863,7 +3864,7 @@ mod tests {
                     .add_eager_child("c")
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3874,13 +3875,13 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceC".into(),
+                        name: "serviceC".parse().unwrap(),
                         source_path: Some("/svc/serviceC".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceC".into(),
-                        target_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
+                        target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -3947,16 +3948,16 @@ mod tests {
                     .add_eager_child("c")
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "serviceB".into(),
+                        source_name: "serviceB".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceB").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
-                        source_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        target_name: "serviceB".into(),
+                        target_name: "serviceB".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3966,19 +3967,19 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceB".into(),
+                        name: "serviceB".parse().unwrap(),
                         source_path: Some("/svc/serviceB".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceB".into(),
-                        target_name: "serviceB".into(),
+                        source_name: "serviceB".parse().unwrap(),
+                        target_name: "serviceB".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
-                        source_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3989,13 +3990,13 @@ mod tests {
                 "c",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceC".into(),
+                        name: "serviceC".parse().unwrap(),
                         source_path: Some("/svc/serviceC".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceC".into(),
-                        target_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
+                        target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
@@ -4061,7 +4062,7 @@ mod tests {
                     .add_eager_child("c")
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
-                        source_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
                         target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
                         dependency_type: DependencyType::Weak,
                         availability: Availability::Required,
@@ -4072,13 +4073,13 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .protocol(ProtocolDecl {
-                        name: "serviceC".into(),
+                        name: "serviceC".parse().unwrap(),
                         source_path: Some("/svc/serviceC".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
-                        source_name: "serviceC".into(),
-                        target_name: "serviceC".into(),
+                        source_name: "serviceC".parse().unwrap(),
+                        target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))

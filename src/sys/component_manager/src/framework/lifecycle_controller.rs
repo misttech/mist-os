@@ -12,8 +12,9 @@ use {
         model::Model,
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, FidlIntoNative},
+    cm_rust::FidlIntoNative,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -29,8 +30,8 @@ use {
 };
 
 lazy_static! {
-    pub static ref LIFECYCLE_CONTROLLER_CAPABILITY_NAME: CapabilityName =
-        fsys::LifecycleControllerMarker::PROTOCOL_NAME.into();
+    pub static ref LIFECYCLE_CONTROLLER_CAPABILITY_NAME: Name =
+        fsys::LifecycleControllerMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
 #[derive(Clone)]

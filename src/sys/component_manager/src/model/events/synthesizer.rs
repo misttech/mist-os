@@ -12,8 +12,8 @@ use {
     },
     ::routing::event::EventFilter,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     futures::{channel::mpsc, future::join_all, stream, SinkExt, StreamExt},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
     std::{
@@ -54,7 +54,7 @@ pub struct EventSynthesizer {
     model: Weak<Model>,
 
     /// Maps an event name to the provider for synthesis
-    providers: HashMap<CapabilityName, Arc<dyn EventSynthesisProvider>>,
+    providers: HashMap<Name, Arc<dyn EventSynthesisProvider>>,
 }
 
 impl EventSynthesizer {
@@ -69,7 +69,7 @@ impl EventSynthesizer {
         event: EventType,
         provider: Arc<dyn EventSynthesisProvider>,
     ) {
-        self.providers.insert(event.to_string().into(), provider);
+        self.providers.insert(event.into(), provider);
     }
 
     /// Spawns a synthesis task for the requested `events`. Resulting events will be sent on the
@@ -77,7 +77,7 @@ impl EventSynthesizer {
     pub async fn spawn_synthesis(
         &self,
         sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
-        events: HashMap<CapabilityName, Vec<EventDispatcherScope>>,
+        events: HashMap<Name, Vec<EventDispatcherScope>>,
         scope: &TaskScope,
     ) {
         SynthesisTask::new(&self, sender, events).spawn(scope).await
@@ -110,7 +110,7 @@ impl SynthesisTask {
     pub fn new(
         synthesizer: &EventSynthesizer,
         sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
-        mut events: HashMap<CapabilityName, Vec<EventDispatcherScope>>,
+        mut events: HashMap<Name, Vec<EventDispatcherScope>>,
     ) -> Self {
         let event_infos = synthesizer
             .providers
@@ -419,8 +419,8 @@ mod tests {
     fn expose_diagnostics_decl() -> ExposeDecl {
         ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Self_,
-            source_name: "diagnostics".into(),
-            target_name: "diagnostics".into(),
+            source_name: "diagnostics".parse().unwrap(),
+            target_name: "diagnostics".parse().unwrap(),
             target: ExposeTarget::Framework,
             rights: Some(fio::Operations::CONNECT),
             subdir: None,

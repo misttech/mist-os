@@ -191,7 +191,7 @@ pub fn validate_component(
             .runner
             .as_ref()
             .ok_or(ValidationError::RunnerMissing)?
-            .str();
+            .as_str();
         if !SUPPORTED_RUNNERS.contains(&runner) {
             return Err(ValidationError::UnsupportedRunner(runner.to_owned()));
         }

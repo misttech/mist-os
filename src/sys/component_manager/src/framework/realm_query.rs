@@ -16,8 +16,9 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, NativeIntoFidl},
+    cm_rust::NativeIntoFidl,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::{
         endpoints::{ClientEnd, ServerEnd},
@@ -45,8 +46,8 @@ use {
 };
 
 lazy_static! {
-    pub static ref REALM_QUERY_CAPABILITY_NAME: CapabilityName =
-        fsys::RealmQueryMarker::PROTOCOL_NAME.into();
+    pub static ref REALM_QUERY_CAPABILITY_NAME: Name =
+        fsys::RealmQueryMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
 // Number of bytes the header of a vector occupies in a fidl message.
@@ -599,7 +600,11 @@ async fn connect_to_storage_admin(
         match &mut *state {
             InstanceState::Resolved(r) => r
                 .decl()
-                .find_storage_source(&CapabilityName::from(storage_name))
+                .find_storage_source(
+                    &storage_name
+                        .parse()
+                        .map_err(|_| fsys::ConnectToStorageAdminError::BadCapability)?,
+                )
                 .ok_or(fsys::ConnectToStorageAdminError::StorageNotFound)?
                 .clone(),
             _ => return Err(fsys::ConnectToStorageAdminError::InstanceNotResolved),
@@ -846,7 +851,7 @@ mod tests {
 
             let use_decl = UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Framework,
-                source_name: use_name.into(),
+                source_name: use_name.parse().unwrap(),
                 target_path: CapabilityPath::try_from(capability_path.as_str()).unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -854,9 +859,9 @@ mod tests {
 
             let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
                 source: ExposeSource::Self_,
-                source_name: expose_name.clone().into(),
+                source_name: expose_name.parse().unwrap(),
                 target: ExposeTarget::Parent,
-                target_name: expose_name.into(),
+                target_name: expose_name.parse().unwrap(),
                 availability: Availability::Required,
             });
 
@@ -904,7 +909,7 @@ mod tests {
 
         for use_ in uses {
             let use_ = use_.fidl_into_native();
-            assert!(use_.source_name().str().starts_with("use_"));
+            assert!(use_.source_name().as_str().starts_with("use_"));
             assert!(use_.path().unwrap().to_string().starts_with("/svc/capability_"));
         }
 
@@ -912,7 +917,7 @@ mod tests {
 
         for expose in exposes {
             let expose = expose.fidl_into_native();
-            assert!(expose.source_name().str().starts_with("expose_"));
+            assert!(expose.source_name().as_str().starts_with("expose_"));
         }
     }
 
@@ -980,7 +985,7 @@ mod tests {
     async fn open_test() {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -988,9 +993,9 @@ mod tests {
 
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "bar".into(),
+            source_name: "bar".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "bar".into(),
+            target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
@@ -1132,7 +1137,7 @@ mod tests {
     async fn construct_namespace_test() {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "foo".into(),
+            source_name: "foo".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1198,9 +1203,9 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .add_lazy_child("a")
                     .storage(StorageDecl {
-                        name: "data".into(),
+                        name: "data".parse().unwrap(),
                         source: StorageDirectorySource::Child("a".to_string()),
-                        backing_dir: "fs".into(),
+                        backing_dir: "fs".parse().unwrap(),
                         subdir: Some("persistent".into()),
                         storage_id:
                             fidl_fuchsia_component_decl::StorageId::StaticInstanceIdOrMoniker,
@@ -1211,7 +1216,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
-                        name: "fs".into(),
+                        name: "fs".parse().unwrap(),
                         source_path: Some(CapabilityPath {
                             basename: "data".into(),
                             dirname: "/fs".into(),
@@ -1219,8 +1224,8 @@ mod tests {
                         rights: fio::Operations::all(),
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "fs".into(),
-                        target_name: "fs".into(),
+                        source_name: "fs".parse().unwrap(),
+                        target_name: "fs".parse().unwrap(),
                         subdir: None,
                         source: ExposeSource::Self_,
                         target: ExposeTarget::Parent,

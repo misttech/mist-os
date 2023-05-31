@@ -314,7 +314,7 @@ fn use_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
 
     quote! {
         impl SourceName for #struct_ident {
-            fn source_name(&self) -> &CapabilityName {
+            fn source_name(&self) -> &Name {
                 &self.source_name
             }
         }
@@ -345,13 +345,13 @@ fn offer_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
 
     quote! {
         impl SourceName for #struct_ident {
-            fn source_name(&self) -> &CapabilityName {
+            fn source_name(&self) -> &Name {
                 &self.source_name
             }
         }
 
         impl OfferDeclCommon for #struct_ident {
-            fn target_name(&self) -> &CapabilityName {
+            fn target_name(&self) -> &Name {
                 &self.target_name
             }
 
@@ -385,13 +385,13 @@ fn offer_decl_common_derive_no_availability_impl(input: syn::DeriveInput) -> Tok
 
     quote! {
         impl SourceName for #struct_ident {
-            fn source_name(&self) -> &CapabilityName {
+            fn source_name(&self) -> &Name {
                 &self.source_name
             }
         }
 
         impl OfferDeclCommon for #struct_ident {
-            fn target_name(&self) -> &CapabilityName {
+            fn target_name(&self) -> &Name {
                 &self.target_name
             }
 
@@ -427,13 +427,13 @@ fn expose_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
 
     quote! {
         impl SourceName for #struct_ident {
-            fn source_name(&self) -> &CapabilityName {
+            fn source_name(&self) -> &Name {
                 &self.source_name
             }
         }
 
         impl ExposeDeclCommon for #struct_ident {
-            fn target_name(&self) -> &CapabilityName {
+            fn target_name(&self) -> &Name {
                 &self.target_name
             }
 
@@ -469,13 +469,13 @@ fn expose_decl_common_availability_always_required_derive_impl(
 
     quote! {
         impl SourceName for #struct_ident {
-            fn source_name(&self) -> &CapabilityName {
+            fn source_name(&self) -> &Name {
                 &self.source_name
             }
         }
 
         impl ExposeDeclCommon for #struct_ident {
-            fn target_name(&self) -> &CapabilityName {
+            fn target_name(&self) -> &Name {
                 &self.target_name
             }
 
@@ -511,7 +511,7 @@ fn capability_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
 
     quote! {
         impl CapabilityDeclCommon for #struct_ident {
-            fn name(&self) -> &CapabilityName {
+            fn name(&self) -> &Name {
                 &self.name
             }
         }

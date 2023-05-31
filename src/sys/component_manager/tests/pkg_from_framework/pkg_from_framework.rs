@@ -100,9 +100,9 @@ async fn expose_pkg_from_framework() {
             cm_rust::ComponentDecl {
                 exposes: vec![cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
                     source: cm_rust::ExposeSource::Framework,
-                    source_name: "pkg".into(),
+                    source_name: "pkg".parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
-                    target_name: "config".into(),
+                    target_name: "config".parse().unwrap(),
                     rights: Some(fio::R_STAR_DIR),
                     subdir: Some("data".into()),
                     availability: cm_rust::Availability::Required,
@@ -147,7 +147,7 @@ async fn use_pkg_from_framework() {
     let mut config_reader_decl = builder.get_component_decl(&config_reader).await.unwrap();
     config_reader_decl.uses.push(cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
         source: cm_rust::UseSource::Framework,
-        source_name: "pkg".into(),
+        source_name: "pkg".parse().unwrap(),
         target_path: "/config".try_into().unwrap(),
         rights: fio::R_STAR_DIR,
         subdir: Some("data".into()),

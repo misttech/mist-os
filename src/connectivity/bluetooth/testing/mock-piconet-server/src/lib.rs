@@ -47,9 +47,9 @@ fn protocol_name_from_capability(capability: &ftest::Capability) -> Result<Strin
 fn expose_decl(name: &str, id: bt_types::PeerId, capability_name: &str) -> ExposeDecl {
     ExposeDecl::Protocol(ExposeProtocolDecl {
         source: ExposeSource::Child(name.to_string()),
-        source_name: capability_name.into(),
+        source_name: capability_name.parse().unwrap(),
         target: ExposeTarget::Parent,
-        target_name: capability_path_for_peer_id(id, capability_name).into(),
+        target_name: capability_path_for_peer_id(id, capability_name).parse().unwrap(),
         availability: cm_rust::Availability::Required,
     })
 }
@@ -879,10 +879,11 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, CapabilityName, CapabilityPath, DependencyType, ExposeDecl,
-            ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl,
-            OfferSource, OfferTarget, UseDecl, UseProtocolDecl, UseSource,
+            Availability, CapabilityPath, DependencyType, ExposeDecl, ExposeProtocolDecl,
+            ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl, OfferSource, OfferTarget,
+            UseDecl, UseProtocolDecl, UseSource,
         },
+        cm_types::Name,
         fidl_fuchsia_component_test as fctest,
         fuchsia_component_test::error::Error as RealmBuilderError,
     };
@@ -1003,9 +1004,9 @@ mod tests {
             .expect("piconet member had no decl");
         let expose_profile_decl = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: profile_capability_name.clone().into(),
+            source_name: profile_capability_name.clone().parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: profile_capability_name.clone().into(),
+            target_name: profile_capability_name.clone().parse().unwrap(),
             availability: cm_rust::Availability::Required,
         };
         let expose_decl = ExposeDecl::Protocol(expose_profile_decl.clone());
@@ -1014,14 +1015,14 @@ mod tests {
         // Root should have an expose declaration for `Profile` at the custom path.
         {
             let bt_rfcomm_name = super::bt_rfcomm_moniker_for_member(&member_spec.name);
-            let custom_profile_capability_name = CapabilityName::from(
-                super::capability_path_for_mock::<bredr::ProfileMarker>(&member_spec),
-            );
+            let custom_profile_capability_name =
+                Name::new(super::capability_path_for_mock::<bredr::ProfileMarker>(&member_spec))
+                    .unwrap();
             let custom_expose_profile_decl = ExposeProtocolDecl {
                 source: ExposeSource::Child(bt_rfcomm_name),
-                source_name: profile_capability_name.into(),
+                source_name: profile_capability_name.parse().unwrap(),
                 target: ExposeTarget::Parent,
-                target_name: custom_profile_capability_name.into(),
+                target_name: custom_profile_capability_name,
                 availability: cm_rust::Availability::Required,
             };
             let root_expose_decl = ExposeDecl::Protocol(custom_expose_profile_decl);
@@ -1039,9 +1040,9 @@ mod tests {
             .get_component_decl(member_spec.name.clone())
             .await
             .expect("piconet member had no decl");
-        let profile_capability_name = CapabilityName::from(super::capability_path_for_mock::<
-            bredr::ProfileMarker,
-        >(&member_spec));
+        let profile_capability_name =
+            Name::new(super::capability_path_for_mock::<bredr::ProfileMarker>(&member_spec))
+                .unwrap();
         let mut expose_proto_decl = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone(),
@@ -1083,7 +1084,7 @@ mod tests {
             .expect("piconet member had no decl");
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
+            source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.parse().unwrap(),
             target_path: CapabilityPath {
                 dirname: "/svc".into(),
                 basename: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
@@ -1095,7 +1096,7 @@ mod tests {
 
         // Check that the root offers ProfileTest to the piconet member from
         // the Mock Piconet Server
-        let profile_test_name = CapabilityName::from(bredr::ProfileTestMarker::PROTOCOL_NAME);
+        let profile_test_name = Name::new(bredr::ProfileTestMarker::PROTOCOL_NAME).unwrap();
         let root = builder.get_realm_decl().await.expect("failed to get root");
         let offer_profile_test = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(super::mock_piconet_server_moniker().to_string()),
@@ -1135,7 +1136,7 @@ mod tests {
         // validate routes
 
         // Profile is exposed by interposer
-        let profile_capability_name = CapabilityName::from(bredr::ProfileMarker::PROTOCOL_NAME);
+        let profile_capability_name = Name::new(bredr::ProfileMarker::PROTOCOL_NAME).unwrap();
         let profile_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone(),
@@ -1151,7 +1152,7 @@ mod tests {
         assert!(interposer.exposes.contains(&profile_expose));
 
         // ProfileTest is used by interposer
-        let profile_test_name = CapabilityName::from(bredr::ProfileTestMarker::PROTOCOL_NAME);
+        let profile_test_name = Name::new(bredr::ProfileTestMarker::PROTOCOL_NAME).unwrap();
         let profile_test_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: profile_test_name.clone(),
@@ -1188,7 +1189,7 @@ mod tests {
         assert!(root.offers.contains(&profile_test_offer));
 
         // LogSink is offered by test root to interposer and profile.
-        let log_capability_name = CapabilityName::from(LogSinkMarker::PROTOCOL_NAME);
+        let log_capability_name = Name::new(LogSinkMarker::PROTOCOL_NAME).unwrap();
         let log_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
             source_name: log_capability_name.clone(),
@@ -1228,7 +1229,7 @@ mod tests {
         assert_realm_contains(&test_harness.builder, &bt_rfcomm_name).await;
 
         // validate routes
-        let profile_capability_name = CapabilityName::from(bredr::ProfileMarker::PROTOCOL_NAME);
+        let profile_capability_name = Name::new(bredr::ProfileMarker::PROTOCOL_NAME).unwrap();
 
         // `Profile` is offered by root to bt-rfcomm from interposer.
         let profile_offer1 = OfferDecl::Protocol(OfferProtocolDecl {
@@ -1287,25 +1288,29 @@ mod tests {
         // `Foo` is exposed by the profile to parent.
         let fake_capability_expose1 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name.to_string()),
-            source_name: fake_cap1.clone().into(),
+            source_name: fake_cap1.clone().parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap1).into(),
+            target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap1)
+                .parse()
+                .unwrap(),
             availability: cm_rust::Availability::Required,
         });
         // `Bar` is exposed by the profile to parent.
         let fake_capability_expose2 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name.to_string()),
-            source_name: fake_cap2.clone().into(),
+            source_name: fake_cap2.clone().parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap2).into(),
+            target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap2)
+                .parse()
+                .unwrap(),
             availability: cm_rust::Availability::Required,
         });
         // `Cat` is used by the profile and exposed from above the test root.
         let fake_capability_offer3 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
-            source_name: fake_cap3.clone().into(),
+            source_name: fake_cap3.clone().parse().unwrap(),
             target: OfferTarget::static_child(profile_name.to_string()),
-            target_name: fake_cap3.into(),
+            target_name: fake_cap3.parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1354,16 +1359,20 @@ mod tests {
         // Validate that `fake_cap` is exposed by both profiles, and is OK.
         let profile1_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name1.to_string()),
-            source_name: fake_cap.clone().into(),
+            source_name: fake_cap.clone().parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: capability_path_for_peer_id(profile_member1.peer_id(), &fake_cap).into(),
+            target_name: capability_path_for_peer_id(profile_member1.peer_id(), &fake_cap)
+                .parse()
+                .unwrap(),
             availability: cm_rust::Availability::Required,
         });
         let profile2_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name2.to_string()),
-            source_name: fake_cap.clone().into(),
+            source_name: fake_cap.clone().parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: capability_path_for_peer_id(profile_member2.peer_id(), &fake_cap).into(),
+            target_name: capability_path_for_peer_id(profile_member2.peer_id(), &fake_cap)
+                .parse()
+                .unwrap(),
             availability: cm_rust::Availability::Required,
         });
 

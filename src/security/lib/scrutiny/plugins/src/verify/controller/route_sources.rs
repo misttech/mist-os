@@ -14,9 +14,10 @@ use {
         route::VerifyRouteResult,
     },
     cm_rust::{
-        CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, ComponentDecl,
-        ExposeDecl, OfferDecl, UseDecl,
+        CapabilityDecl, CapabilityPath, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl,
+        UseDecl,
     },
+    cm_types::Name,
     routing::{component_instance::ComponentInstanceInterface, mapper::RouteSegment},
     scrutiny::model::{controller::DataController, model::DataModel},
     serde::{Deserialize, Serialize},
@@ -86,7 +87,7 @@ pub struct UseSpec {
     pub path: Option<CapabilityPath>,
     /// Target capability name, if any.
     #[serde(rename = "use_name")]
-    pub name: Option<CapabilityName>,
+    pub name: Option<Name>,
 }
 
 /// Match a `UseDecl` to a `UseSpec` when types match and spec'd `name` and/or
@@ -135,7 +136,7 @@ pub struct SourceDeclSpec {
     pub path_prefix: Option<CapabilityPath>,
     /// Name designated in capability declaration, if any.
     #[serde(rename = "source_name")]
-    pub name: Option<CapabilityName>,
+    pub name: Option<Name>,
 }
 
 /// Match a `CapabilityDecl` to a `SourceDeclSpec`. Only the `name` is matched because matching
@@ -672,7 +673,7 @@ mod tests {
             }
             .matches(
                 &UseStorageDecl {
-                    source_name: "name".into(),
+                    source_name: "name".parse().unwrap(),
                     target_path: CapabilityPath::from_str("/path").unwrap(),
                     availability: Availability::Required,
                 }
@@ -686,11 +687,11 @@ mod tests {
             UseSpec {
                 type_name: CapabilityTypeName::Storage,
                 path: None,
-                name: Some("name".into()),
+                name: Some("name".parse().unwrap()),
             }
             .matches(
                 &UseStorageDecl {
-                    source_name: "name".into(),
+                    source_name: "name".parse().unwrap(),
                     target_path: CapabilityPath::from_str("/path").unwrap(),
                     availability: Availability::Required,
                 }
@@ -801,10 +802,10 @@ mod tests {
         let data_model = data_model.unwrap_or(fake_data_model());
         let components = hashmap! {
             root_url.clone() => (ComponentDecl{
-                program: Some(ProgramDecl{ runner: Some("some_runner".into()), ..ProgramDecl::default()}),
+                program: Some(ProgramDecl{ runner: Some("some_runner".parse().unwrap()), ..ProgramDecl::default()}),
                 capabilities: vec![
                     DirectoryDecl{
-                        name: "root_dir".into(),
+                        name: "root_dir".parse().unwrap(),
                         source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                         rights: fio::Operations::CONNECT,
                     }.into(),
@@ -812,9 +813,9 @@ mod tests {
                 offers: vec![
                     OfferDirectoryDecl{
                         source: OfferSource::static_child("one_dir_provider".to_string()),
-                        source_name: "exposed_by_provider".into(),
+                        source_name: "exposed_by_provider".parse().unwrap(),
                         target: OfferTarget::static_child("two_dir_user".to_string()),
-                        target_name: "routed_from_provider".into(),
+                        target_name: "routed_from_provider".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: Some(PathBuf::from_str("root_subdir").unwrap()),
@@ -822,9 +823,9 @@ mod tests {
                     }.into(),
                     OfferDirectoryDecl{
                         source: OfferSource::Self_,
-                        source_name: "root_dir".into(),
+                        source_name: "root_dir".parse().unwrap(),
                         target: OfferTarget::static_child("two_dir_user".to_string()),
-                        target_name: "routed_from_root".into(),
+                        target_name: "routed_from_root".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: Some(PathBuf::from_str("root_subdir").unwrap()),
@@ -855,7 +856,7 @@ mod tests {
                 uses: vec![
                     UseDirectoryDecl{
                         source: UseSource::Parent,
-                        source_name: "routed_from_provider".into(),
+                        source_name: "routed_from_provider".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/data/from/provider").unwrap(),
                         rights: fio::Operations::CONNECT,
                         subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
@@ -864,7 +865,7 @@ mod tests {
                     }.into(),
                     UseDirectoryDecl{
                         source: UseSource::Parent,
-                        source_name: "routed_from_root".into(),
+                        source_name: "routed_from_root".parse().unwrap(),
                         target_path: CapabilityPath::from_str("/data/from/root").unwrap(),
                         rights: fio::Operations::CONNECT,
                         subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
@@ -875,10 +876,10 @@ mod tests {
                 ..ComponentDecl::default()
             }, None),
             one_dir_provider_url => (ComponentDecl{
-                program: Some(ProgramDecl{ runner: Some("some_runner".into()), ..ProgramDecl::default()}),
+                program: Some(ProgramDecl{ runner: Some("some_runner".parse().unwrap()), ..ProgramDecl::default()}),
                 capabilities: vec![
                     DirectoryDecl{
-                        name: "provider_dir".into(),
+                        name: "provider_dir".parse().unwrap(),
                         source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                         rights: fio::Operations::CONNECT,
                     }.into(),
@@ -886,9 +887,9 @@ mod tests {
                 exposes: vec![
                     ExposeDirectoryDecl{
                         source: ExposeSource::Self_,
-                        source_name: "provider_dir".into(),
+                        source_name: "provider_dir".parse().unwrap(),
                         target: ExposeTarget::Parent,
-                        target_name: "exposed_by_provider".into(),
+                        target_name: "exposed_by_provider".parse().unwrap(),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: Some(PathBuf::from_str("provider_subdir").unwrap()),
                         availability: cm_rust::Availability::Required,
@@ -1103,7 +1104,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1270,7 +1271,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1288,7 +1289,7 @@ mod tests {
                         result: Ok(Source {
                             node_path: config.component_routes[0].routes_to_verify[0].source.node_path.clone(),
                             capability: DirectoryDecl{
-                                name: "provider_dir".into(),
+                                name: "provider_dir".parse().unwrap(),
                                 source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                                 rights: fio::Operations::CONNECT,
                             }.into(),
@@ -1344,7 +1345,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1361,7 +1362,7 @@ mod tests {
                             result: Ok(Source {
                                 node_path: config.component_routes[0].routes_to_verify[0].source.node_path.clone(),
                                 capability: DirectoryDecl{
-                                    name: "provider_dir".into(),
+                                    name: "provider_dir".parse().unwrap(),
                                     source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
@@ -1406,7 +1407,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("root_dir".into()),
+                                name: Some("root_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1431,7 +1432,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1448,7 +1449,7 @@ mod tests {
                             result: Ok(Source {
                                 node_path: config.component_routes[0].routes_to_verify[0].source.node_path.clone(),
                                 capability: DirectoryDecl{
-                                    name: "root_dir".into(),
+                                    name: "root_dir".parse().unwrap(),
                                     source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
@@ -1459,7 +1460,7 @@ mod tests {
                             result: Ok(Source {
                                 node_path: config.component_routes[0].routes_to_verify[1].source.node_path.clone(),
                                 capability: DirectoryDecl{
-                                    name: "provider_dir".into(),
+                                    name: "provider_dir".parse().unwrap(),
                                     source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
@@ -1512,7 +1513,7 @@ mod tests {
                                         )
                                         .unwrap(),
                                     ),
-                                    name: Some("root_dir".into()),
+                                    name: Some("root_dir".parse().unwrap()),
                                 },
                             },
                         },
@@ -1538,7 +1539,7 @@ mod tests {
                                         )
                                         .unwrap(),
                                     ),
-                                    name: Some("provider_dir".into()),
+                                    name: Some("provider_dir".parse().unwrap()),
                                 },
                             },
                         },
@@ -1557,7 +1558,7 @@ mod tests {
                             result: Ok(Source {
                                 node_path: config.component_routes[1].routes_to_verify[0].source.node_path.clone(),
                                 capability: DirectoryDecl{
-                                    name: "root_dir".into(),
+                                    name: "root_dir".parse().unwrap(),
                                     source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
@@ -1568,7 +1569,7 @@ mod tests {
                             result: Ok(Source {
                                 node_path: config.component_routes[1].routes_to_verify[1].source.node_path.clone(),
                                 capability: DirectoryDecl{
-                                    name: "provider_dir".into(),
+                                    name: "provider_dir".parse().unwrap(),
                                     source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
@@ -1599,7 +1600,7 @@ mod tests {
                         path: None,
                         // This is the source name of the route, but
                         // directory uses are matched by target path.
-                        name: Some(source_name.into()),
+                        name: Some(source_name.parse().unwrap()),
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1651,7 +1652,7 @@ mod tests {
                         path: Some(CapabilityPath::from_str(&target_path).unwrap()),
                         // This is the source name of the route, but
                         // directory uses are matched by target path.
-                        name: Some(source_name.into()),
+                        name: Some(source_name.parse().unwrap()),
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1799,7 +1800,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1817,7 +1818,7 @@ mod tests {
                                 path_prefix: Some(
                                     CapabilityPath::from_str("/data/to/user").unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1873,7 +1874,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1927,7 +1928,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1973,7 +1974,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("root_dir".into()),
+                                name: Some("root_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -1998,7 +1999,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -2058,7 +2059,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("root_dir".into()),
+                                name: Some("root_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -2083,7 +2084,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -2143,7 +2144,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("root_dir".into()),
+                                name: Some("root_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -2168,7 +2169,7 @@ mod tests {
                                     )
                                     .unwrap(),
                                 ),
-                                name: Some("provider_dir".into()),
+                                name: Some("provider_dir".parse().unwrap()),
                             },
                         },
                     },
@@ -2187,7 +2188,7 @@ mod tests {
                                 moniker: vec!["two_dir_user"].try_into().unwrap(),
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
-                                    source_name: "routed_from_root".into(),
+                                    source_name: "routed_from_root".parse().unwrap(),
                                     target_path: CapabilityPath::from_str("/data/from/root").unwrap(),
                                     rights: fio::Operations::CONNECT,
                                     subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
@@ -2202,7 +2203,7 @@ mod tests {
                                 moniker: vec!["two_dir_user"].try_into().unwrap(),
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
-                                    source_name: "routed_from_provider".into(),
+                                    source_name: "routed_from_provider".parse().unwrap(),
                                     target_path: CapabilityPath::from_str("/data/from/provider").unwrap(),
                                     rights: fio::Operations::CONNECT,
                                     subdir: Some(PathBuf::from_str("user_subdir").unwrap()),

@@ -7,7 +7,7 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::Error,
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource, ResourceInfo},
@@ -17,7 +17,7 @@ use {
 };
 
 lazy_static! {
-    static ref MMIO_RESOURCE_CAPABILITY_NAME: CapabilityName = "fuchsia.kernel.MmioResource".into();
+    static ref MMIO_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.kernel.MmioResource".parse().unwrap();
 }
 
 /// An implementation of fuchsia.kernel.MmioResource protocol.

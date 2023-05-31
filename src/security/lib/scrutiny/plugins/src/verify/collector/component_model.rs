@@ -181,8 +181,8 @@ impl V2ComponentModelDataCollector {
         let mut runners = Vec::new();
         // Always register the ELF runner.
         runners.push(RunnerRegistration {
-            source_name: ELF_RUNNER_NAME.into(),
-            target_name: ELF_RUNNER_NAME.into(),
+            source_name: ELF_RUNNER_NAME.parse().unwrap(),
+            target_name: ELF_RUNNER_NAME.parse().unwrap(),
             source: RegistrationSource::Self_,
         });
         // Register the RealmBuilder runner if needed.
@@ -190,8 +190,8 @@ impl V2ComponentModelDataCollector {
             == component_internal::RealmBuilderResolverAndRunner::Namespace
         {
             runners.push(RunnerRegistration {
-                source_name: REALM_BUILDER_RUNNER_NAME.into(),
-                target_name: REALM_BUILDER_RUNNER_NAME.into(),
+                source_name: REALM_BUILDER_RUNNER_NAME.parse().unwrap(),
+                target_name: REALM_BUILDER_RUNNER_NAME.parse().unwrap(),
                 source: RegistrationSource::Self_,
             });
         }

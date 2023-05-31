@@ -135,14 +135,14 @@ async fn add_component_resolver(
     // Add resolver decl
     let mut child_decl = builder.get_component_decl(&child).await.unwrap();
     child_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
-        name: component_resolver.name().try_into().unwrap(),
+        name: component_resolver.name().parse().unwrap(),
         source_path: Some("/svc/fuchsia.component.resolution.Resolver".try_into().unwrap()),
     }));
     child_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
         source: cm_rust::ExposeSource::Self_,
-        source_name: component_resolver.name().try_into().unwrap(),
+        source_name: component_resolver.name().parse().unwrap(),
         target: cm_rust::ExposeTarget::Parent,
-        target_name: component_resolver.name().try_into().unwrap(),
+        target_name: component_resolver.name().parse().unwrap(),
     }));
     builder.replace_component_decl(&child, child_decl).await.unwrap();
     // Add resolver to the test realm
@@ -152,7 +152,7 @@ async fn add_component_resolver(
         extends: fdecl::EnvironmentExtends::Realm,
         runners: vec![],
         resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: component_resolver.name().try_into().unwrap(),
+            resolver: component_resolver.name().parse().unwrap(),
             source: cm_rust::RegistrationSource::Child(component_resolver.name()),
             // The component resolver is associated with the scheme indicating the abi_revision it returns.
             // (e.g component url "absent:xxx" is resolved by scheme "absent", served by

@@ -10,7 +10,6 @@ use {
     fuchsia_component::server as fserver,
     fuchsia_component_test::new::{ChildOptions, LocalComponentHandles, RealmBuilder},
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
-    std::convert::TryInto,
 };
 
 const CAST_URL: &'static str = "cast:00000000";
@@ -30,15 +29,15 @@ async fn resolve_cast_url() {
     let mut cast_resolver_decl = builder.get_component_decl(&cast_resolver).await.unwrap();
     cast_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(
         cm_rust::ResolverDecl {
-            name: "cast_resolver".try_into().unwrap(),
-            source_path: Some("/svc/fuchsia.component.resolution.Resolver".try_into().unwrap()),
+            name: "cast_resolver".parse().unwrap(),
+            source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
         },
     ));
     cast_resolver_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
         source: cm_rust::ExposeSource::Self_,
-        source_name: "cast_resolver".try_into().unwrap(),
+        source_name: "cast_resolver".parse().unwrap(),
         target: cm_rust::ExposeTarget::Parent,
-        target_name: "cast_resolver".try_into().unwrap(),
+        target_name: "cast_resolver".parse().unwrap(),
     }));
     builder.replace_component_decl(&cast_resolver, cast_resolver_decl).await.unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
@@ -47,7 +46,7 @@ async fn resolve_cast_url() {
         extends: fdecl::EnvironmentExtends::Realm,
         runners: vec![],
         resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: "cast_resolver".try_into().unwrap(),
+            resolver: "cast_resolver".parse().unwrap(),
             source: cm_rust::RegistrationSource::Child("cast_resolver".to_string()),
             scheme: "cast".to_string(),
         }],

@@ -22,6 +22,7 @@ use {
         convert::TryInto,
         ops::{Deref, DerefMut},
         path::PathBuf,
+        str::FromStr,
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
@@ -41,16 +42,16 @@ lazy_static! {
     pub static ref BINDER_EXPOSE_DECL: cm_rust::ExposeDecl =
         cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
             source: cm_rust::ExposeSource::Framework,
-            source_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
+            source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
             target: cm_rust::ExposeTarget::Parent,
-            target_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
+            target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
             // TODO(fxbug.dev/107231): Support optional exposes.
             availability: cm_rust::Availability::Required,
         },);
 
-    static ref PROTOCOLS_ROUTED_TO_ALL: [cm_rust::CapabilityName; 2] = [
-        cm_rust::CapabilityName::from(LogSinkMarker::PROTOCOL_NAME),
-        cm_rust::CapabilityName::from(InspectSinkMarker::PROTOCOL_NAME),
+    static ref PROTOCOLS_ROUTED_TO_ALL: [cm_types::Name; 2] = [
+        cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
+        cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
     ];
 }
 
@@ -803,7 +804,7 @@ impl Realm {
 fn new_decl_with_program_entries(entries: Vec<(String, String)>) -> cm_rust::ComponentDecl {
     cm_rust::ComponentDecl {
         program: Some(cm_rust::ProgramDecl {
-            runner: Some(runner::RUNNER_NAME.try_into().unwrap()),
+            runner: Some(runner::RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary {
                 entries: Some(
                     entries
@@ -1313,9 +1314,7 @@ fn into_dependency_type(type_: &Option<fcdecl::DependencyType>) -> cm_rust::Depe
 }
 
 /// Attempts to produce the target name from the set of "name" and "as" fields from a capability.
-fn try_into_source_name(
-    name: &Option<String>,
-) -> Result<cm_rust::CapabilityName, RealmBuilderError> {
+fn try_into_source_name(name: &Option<String>) -> Result<cm_types::Name, RealmBuilderError> {
     Ok(name
         .as_ref()
         .ok_or_else(|| {
@@ -1323,19 +1322,27 @@ fn try_into_source_name(
                 "Required field `name` is empty."
             ))
         })?
-        .as_str()
-        .into())
+        .parse()
+        .map_err(|_| {
+            RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
+                "Field `name` is not a valid name."
+            ))
+        })?)
 }
 
 /// Attempts to produce the target name from the set of "name" and "as" fields from a capability.
 fn try_into_target_name(
     name: &Option<String>,
     as_: &Option<String>,
-) -> Result<cm_rust::CapabilityName, RealmBuilderError> {
+) -> Result<cm_types::Name, RealmBuilderError> {
     let name = name.as_ref().ok_or_else(|| {
         RealmBuilderError::CapabilityInvalid(anyhow::format_err!("Required field `name` is empty."))
     })?;
-    Ok(as_.as_ref().unwrap_or(name).clone().into())
+    Ok(as_.as_ref().unwrap_or(name).clone().parse().map_err(|_| {
+        RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
+            "Field `name` is not a valid name."
+        ))
+    })?)
 }
 
 /// Attempts to produce a valid CapabilityPath from the "path" field from a capability
@@ -1750,7 +1757,7 @@ fn validate_program_modifications(
     new_decl: &cm_rust::ComponentDecl,
 ) -> Result<(), RealmBuilderError> {
     if old_decl.program.as_ref().and_then(|p| p.runner.as_ref())
-        == Some(&runner::RUNNER_NAME.into())
+        == Some(&runner::RUNNER_NAME.parse().unwrap())
     {
         let new_decl_program = match new_decl.program.as_ref() {
             Some(program) => program.clone(),
@@ -2027,7 +2034,7 @@ mod tests {
         }
 
         fn add_recursive_automatic_decls(&mut self) {
-            let create_offer_decl = |child_name: &str, protocol: cm_rust::CapabilityName| {
+            let create_offer_decl = |child_name: &str, protocol: cm_types::Name| {
                 cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
@@ -2301,8 +2308,8 @@ mod tests {
             decl: cm_rust::ComponentDecl {
                 offers: vec![cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
-                    source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                    target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                    source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                    target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
 
                     // This doesn't exist
@@ -2331,8 +2338,8 @@ mod tests {
                             name: "a".into(),
                             collection: None,
                         }),
-                        source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                        target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                        source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2342,8 +2349,8 @@ mod tests {
                             name: "a".into(),
                             collection: None,
                         }),
-                        source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                        target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2353,8 +2360,8 @@ mod tests {
                             name: "b".into(),
                             collection: None,
                         }),
-                        source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                        target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                        source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2364,8 +2371,8 @@ mod tests {
                             name: "b".into(),
                             collection: None,
                         }),
-                        source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                        target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2392,8 +2399,8 @@ mod tests {
                                     name: "b_child_static".into(),
                                     collection: None,
                                 }),
-                                source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                                target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                                source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                                target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                                 dependency_type: cm_rust::DependencyType::Strong,
                                 availability: cm_rust::Availability::Required,
                             }),
@@ -2403,8 +2410,8 @@ mod tests {
                                     name: "b_child_static".into(),
                                     collection: None,
                                 }),
-                                source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                                target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                                source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                                target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                                 dependency_type: cm_rust::DependencyType::Strong,
                                 availability: cm_rust::Availability::Required,
                             }),
@@ -2414,8 +2421,8 @@ mod tests {
                                     name: "b_child_dynamic".into(),
                                     collection: None,
                                 }),
-                                source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                                target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                                source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                                target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                                 dependency_type: cm_rust::DependencyType::Strong,
                                 availability: cm_rust::Availability::Required,
                             }),
@@ -2425,8 +2432,8 @@ mod tests {
                                     name: "b_child_dynamic".into(),
                                     collection: None,
                                 }),
-                                source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                                target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                                source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                                target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                                 dependency_type: cm_rust::DependencyType::Strong,
                                 availability: cm_rust::Availability::Required,
                             }),
@@ -2612,7 +2619,7 @@ mod tests {
                     name: "new-env".to_string(),
                     extends: fcdecl::EnvironmentExtends::None,
                     resolvers: vec![cm_rust::ResolverRegistration {
-                        resolver: "test".try_into().unwrap(),
+                        resolver: "test".parse().unwrap(),
                         source: cm_rust::RegistrationSource::Parent,
                         scheme: "test".to_string(),
                     }],
@@ -2942,8 +2949,8 @@ mod tests {
                             name: "realm_with_child".into(),
                             collection: None,
                         }),
-                        source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                        target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                        source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2953,8 +2960,8 @@ mod tests {
                             name: "realm_with_child".into(),
                             collection: None,
                         }),
-                        source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                        target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2986,12 +2993,12 @@ mod tests {
     async fn add_child_from_decl() {
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: Some("hippo".try_into().unwrap()),
+                runner: Some("hippo".parse().unwrap()),
                 info: fdata::Dictionary::default(),
             }),
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
-                source_name: "example.Hippo".into(),
+                source_name: "example.Hippo".parse().unwrap(),
                 target_path: "/svc/example.Hippo".try_into().unwrap(),
                 dependency_type: cm_rust::DependencyType::Strong,
                 availability: cm_rust::Availability::Required,
@@ -3075,12 +3082,12 @@ mod tests {
     async fn add_route_does_not_mutate_children_added_from_decl() {
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: Some("hippo".try_into().unwrap()),
+                runner: Some("hippo".parse().unwrap()),
                 info: fdata::Dictionary::default(),
             }),
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
-                source_name: "example.Hippo".into(),
+                source_name: "example.Hippo".parse().unwrap(),
                 target_path: "/svc/non-default-path".try_into().unwrap(),
                 dependency_type: cm_rust::DependencyType::Strong,
                 availability: cm_rust::Availability::Required,
@@ -3128,7 +3135,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
                         fdata::DictionaryEntry {
@@ -3298,17 +3305,17 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".into(),
+                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "fuchsia.examples.Elephant".into(),
+                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
                     cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".into(),
+                        source_name: "config-data".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "config-data".into(),
+                        target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some(PathBuf::from("component")),
@@ -3316,43 +3323,43 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".into(),
+                        source_name: "temp".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "data".into(),
+                        target_name: "data".parse().unwrap(),
                         availability: cm_rust::Availability::Required,
                     }),
                     cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".into(),
+                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "fuchsia.examples.Orca".into(),
+                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
                         availability: cm_rust::Availability::Required,
                     }),
                     cm_rust::OfferDecl::EventStream(cm_rust::OfferEventStreamDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "started".into(),
+                        source_name: "started".parse().unwrap(),
                         filter: None,
                         scope: None,
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "started_event".into(),
+                        target_name: "started_event".parse().unwrap(),
                         availability: cm_rust::Availability::Required,
                     }),
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::static_child("a".to_string()),
-                        source_name: "fuchsia.examples.Echo".into(),
+                        source_name: "fuchsia.examples.Echo".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("b".to_string()),
-                        target_name: "fuchsia.examples.Echo".into(),
+                        target_name: "fuchsia.examples.Echo".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
                 ],
                 exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Child("a".to_owned()),
-                    source_name: "fuchsia.examples.Echo".into(),
+                    source_name: "fuchsia.examples.Echo".parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
-                    target_name: "fuchsia.examples.Echo".into(),
+                    target_name: "fuchsia.examples.Echo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()
@@ -3420,7 +3427,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let b_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
                         fdata::DictionaryEntry {
@@ -3438,14 +3445,14 @@ mod tests {
             uses: vec![
                 cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                     source: cm_rust::UseSource::Parent,
-                    source_name: "fuchsia.examples.Elephant".into(),
+                    source_name: "fuchsia.examples.Elephant".parse().unwrap(),
                     target_path: "/svc/fuchsia.examples.Elephant".try_into().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Optional,
                 }),
                 cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
                     source: cm_rust::UseSource::Parent,
-                    source_name: "config-data".into(),
+                    source_name: "config-data".parse().unwrap(),
                     target_path: "/config-data".try_into().unwrap(),
                     rights: fio::RW_STAR_DIR,
                     subdir: None,
@@ -3453,13 +3460,13 @@ mod tests {
                     availability: cm_rust::Availability::Optional,
                 }),
                 cm_rust::UseDecl::Storage(cm_rust::UseStorageDecl {
-                    source_name: "data".into(),
+                    source_name: "data".parse().unwrap(),
                     target_path: "/data".try_into().unwrap(),
                     availability: cm_rust::Availability::Optional,
                 }),
                 cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
                     source: cm_rust::UseSource::Parent,
-                    source_name: "fuchsia.examples.Orca".into(),
+                    source_name: "fuchsia.examples.Orca".parse().unwrap(),
                     target_path: "/svc/fuchsia.examples.Orca".try_into().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Optional,
@@ -3480,25 +3487,25 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".into(),
+                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "fuchsia.examples.Elephant".into(),
+                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".into(),
+                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("b".to_string()),
-                        target_name: "fuchsia.examples.Elephant".into(),
+                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".into(),
+                        source_name: "config-data".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "config-data".into(),
+                        target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some(PathBuf::from("component")),
@@ -3506,9 +3513,9 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".into(),
+                        source_name: "config-data".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("b".to_string()),
-                        target_name: "config-data".into(),
+                        target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some(PathBuf::from("component")),
@@ -3516,32 +3523,32 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".into(),
+                        source_name: "temp".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "data".into(),
+                        target_name: "data".parse().unwrap(),
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".into(),
+                        source_name: "temp".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("b".to_string()),
-                        target_name: "data".into(),
+                        target_name: "data".parse().unwrap(),
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".into(),
+                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "fuchsia.examples.Orca".into(),
+                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
                         availability: cm_rust::Availability::Optional,
                     }),
                     cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".into(),
+                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("b".to_string()),
-                        target_name: "fuchsia.examples.Orca".into(),
+                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
                         availability: cm_rust::Availability::Optional,
@@ -3618,17 +3625,17 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".into(),
+                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "fuchsia.examples.Elephant".into(),
+                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::SameAsTarget,
                     }),
                     cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".into(),
+                        source_name: "config-data".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "config-data".into(),
+                        target_name: "config-data".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some(PathBuf::from("component")),
@@ -3636,16 +3643,16 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".into(),
+                        source_name: "temp".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "data".into(),
+                        target_name: "data".parse().unwrap(),
                         availability: cm_rust::Availability::SameAsTarget,
                     }),
                     cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".into(),
+                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
-                        target_name: "fuchsia.examples.Orca".into(),
+                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
                         source_instance_filter: None,
                         renamed_instances: None,
                         availability: cm_rust::Availability::SameAsTarget,
@@ -3752,12 +3759,12 @@ mod tests {
                             name: "a".into(),
                             collection: None,
                         }),
-                        source_name: "fuchsia.examples.Hippo".into(),
+                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "b".into(),
                             collection: None,
                         }),
-                        target_name: "fuchsia.examples.Hippo".into(),
+                        target_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3766,12 +3773,12 @@ mod tests {
                             name: "a".into(),
                             collection: None,
                         }),
-                        source_name: "fuchsia.examples.Hippo".into(),
+                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "c".into(),
                             collection: None,
                         }),
-                        target_name: "fuchsia.examples.Hippo".into(),
+                        target_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3784,7 +3791,7 @@ mod tests {
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         program: Some(cm_rust::ProgramDecl {
-                            runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                            runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                             info: fdata::Dictionary {
                                 entries: Some(vec![
                                     fdata::DictionaryEntry {
@@ -3805,7 +3812,7 @@ mod tests {
                         }),
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
                             cm_rust::ProtocolDecl {
-                                name: "fuchsia.examples.Hippo".into(),
+                                name: "fuchsia.examples.Hippo".parse().unwrap(),
                                 source_path: Some(cm_rust::CapabilityPath {
                                     dirname: "/svc".into(),
                                     basename: "fuchsia.examples.Hippo".into(),
@@ -3814,9 +3821,9 @@ mod tests {
                         )],
                         exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                             source: cm_rust::ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Hippo".into(),
+                            source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                             target: cm_rust::ExposeTarget::Parent,
-                            target_name: "fuchsia.examples.Hippo".into(),
+                            target_name: "fuchsia.examples.Hippo".parse().unwrap(),
                             availability: cm_rust::Availability::Required,
                         })],
                         ..cm_rust::ComponentDecl::default()
@@ -3974,12 +3981,12 @@ mod tests {
                             name: "a".into(),
                             collection: None,
                         }),
-                        source_name: "fuchsia.examples.Echo".into(),
+                        source_name: "fuchsia.examples.Echo".parse().unwrap(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "b".into(),
                             collection: None,
                         }),
-                        target_name: "fuchsia.examples.Echo".into(),
+                        target_name: "fuchsia.examples.Echo".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3988,12 +3995,12 @@ mod tests {
                             name: "c".into(),
                             collection: None,
                         }),
-                        source_name: "fuchsia.examples.RandonNumberGenerator".into(),
+                        source_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "a".into(),
                             collection: None,
                         }),
-                        target_name: "fuchsia.examples.RandonNumberGenerator".into(),
+                        target_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -4006,7 +4013,7 @@ mod tests {
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         program: Some(cm_rust::ProgramDecl {
-                            runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                            runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                             info: fdata::Dictionary {
                                 entries: Some(vec![
                                     fdata::DictionaryEntry {
@@ -4027,7 +4034,7 @@ mod tests {
                         }),
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
                             cm_rust::ProtocolDecl {
-                                name: "fuchsia.examples.Echo".into(),
+                                name: "fuchsia.examples.Echo".parse().unwrap(),
                                 source_path: Some(cm_rust::CapabilityPath {
                                     dirname: "/svc".into(),
                                     basename: "fuchsia.examples.Echo".into(),
@@ -4036,7 +4043,7 @@ mod tests {
                         )],
                         uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                             source: cm_rust::UseSource::Parent,
-                            source_name: "fuchsia.examples.RandonNumberGenerator".into(),
+                            source_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
                             target_path: cm_rust::CapabilityPath {
                                 dirname: "/svc".into(),
                                 basename: "fuchsia.examples.RandonNumberGenerator".into(),
@@ -4046,9 +4053,9 @@ mod tests {
                         })],
                         exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                             source: cm_rust::ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".into(),
+                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: cm_rust::ExposeTarget::Parent,
-                            target_name: "fuchsia.examples.Echo".into(),
+                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             availability: cm_rust::Availability::Required,
                         })],
                         ..cm_rust::ComponentDecl::default()
@@ -4122,7 +4129,7 @@ mod tests {
             a_decl,
             cm_rust::ComponentDecl {
                 program: Some(cm_rust::ProgramDecl {
-                    runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                    runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                     info: fdata::Dictionary {
                         entries: Some(vec![
                             fdata::DictionaryEntry {
@@ -4191,7 +4198,7 @@ mod tests {
             .fidl_into_native();
         a_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
             source: cm_rust::UseSource::Parent,
-            source_name: "example.Hippo".into(),
+            source_name: "example.Hippo".parse().unwrap(),
             target_path: "/svc/example.Hippo".try_into().unwrap(),
             dependency_type: cm_rust::DependencyType::Strong,
             availability: cm_rust::Availability::Required,
@@ -4217,41 +4224,35 @@ mod tests {
 
     #[test_case(vec![
         create_valid_capability()],
-        fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "unknown".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "unknown".into(),
             collection: None
         }),
         vec![],
         ftest::RealmBuilderError::NoSuchSource ; "no_such_source")]
     #[test_case(vec![
         create_valid_capability()],
-        fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
             collection: None
         }),
         vec![
-            fcdecl::Ref::Child(fcdecl::ChildRef {
-                name: "unknown".into(),
+            fcdecl::Ref::Child(fcdecl::ChildRef { name: "unknown".into(),
                 collection: None
             }),
         ],
         ftest::RealmBuilderError::NoSuchTarget ; "no_such_target")]
     #[test_case(vec![
         create_valid_capability()],
-        fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
             collection: None
         }),
         vec![
-            fcdecl::Ref::Child(fcdecl::ChildRef {
-                name: "a".into(),
+            fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
                 collection: None
             }),
         ],
         ftest::RealmBuilderError::SourceAndTargetMatch ; "source_and_target_match")]
     #[test_case(vec![],
-        fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
             collection: None
         }),
         vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
@@ -4306,7 +4307,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let b_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
                         fdata::DictionaryEntry {
@@ -4528,7 +4529,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let read_only_dir_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: Some(crate::runner::RUNNER_NAME.try_into().unwrap()),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![fdata::DictionaryEntry {
                         key: runner::LOCAL_COMPONENT_ID_KEY.to_string(),
@@ -4538,15 +4539,15 @@ mod tests {
                 },
             }),
             capabilities: vec![cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
-                name: "data".into(),
+                name: "data".parse().unwrap(),
                 source_path: Some("/data".try_into().unwrap()),
                 rights: fio::R_STAR_DIR,
             })],
             exposes: vec![cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
                 source: cm_rust::ExposeSource::Self_,
-                source_name: "data".into(),
+                source_name: "data".parse().unwrap(),
                 target: cm_rust::ExposeTarget::Parent,
-                target_name: "data".into(),
+                target_name: "data".parse().unwrap(),
                 rights: Some(fio::R_STAR_DIR),
                 subdir: None,
                 availability: cm_rust::Availability::Required,
@@ -4568,12 +4569,12 @@ mod tests {
                         name: "read-only-directory-0".into(),
                         collection: None,
                     }),
-                    source_name: "data".into(),
+                    source_name: "data".parse().unwrap(),
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                         name: "a".into(),
                         collection: None,
                     }),
-                    target_name: "data".into(),
+                    target_name: "data".parse().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     rights: Some(fio::R_STAR_DIR),
                     subdir: None,

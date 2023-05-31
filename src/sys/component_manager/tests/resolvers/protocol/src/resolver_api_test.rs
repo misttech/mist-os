@@ -56,12 +56,12 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
     let mut resolver_decl = builder.get_component_decl(RESOLVER_NAME).await?;
     resolver_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
         source: cm_rust::ExposeSource::Self_,
-        source_name: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),
+        source_name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
         target: cm_rust::ExposeTarget::Parent,
-        target_name: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),
+        target_name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
     }));
     resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
-        name: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),
+        name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
         source_path: Some(cm_rust::CapabilityPath {
             dirname: "/svc".into(),
             basename: "fuchsia.component.resolution.Resolver".into(),
@@ -79,7 +79,7 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
         name: String::from(ENVIRONMENT_NAME),
         extends: fcdecl::EnvironmentExtends::Realm,
         resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),
+            resolver: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
             source: cm_rust::RegistrationSource::Child(String::from(RESOLVER_NAME)),
             scheme: String::from(RESOLVER_SCHEME),
         }],

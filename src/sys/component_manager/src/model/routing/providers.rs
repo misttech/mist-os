@@ -13,8 +13,9 @@ use {
     ::routing::path::PathBufExt,
     async_trait::async_trait,
     clonable_error::ClonableError,
-    cm_rust::{self, CapabilityName, CapabilityPath},
+    cm_rust::{self, CapabilityPath},
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -29,7 +30,7 @@ use {
 pub struct DefaultComponentCapabilityProvider {
     pub target: WeakComponentInstance,
     pub source: WeakComponentInstance,
-    pub name: CapabilityName,
+    pub name: Name,
     pub path: CapabilityPath,
 }
 

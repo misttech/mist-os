@@ -14,8 +14,9 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, ExposeDecl, SourceName, UseDecl},
+    cm_rust::{ExposeDecl, SourceName, UseDecl},
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
@@ -34,8 +35,8 @@ use {
 };
 
 lazy_static! {
-    pub static ref ROUTE_VALIDATOR_CAPABILITY_NAME: CapabilityName =
-        fsys::RouteValidatorMarker::PROTOCOL_NAME.into();
+    pub static ref ROUTE_VALIDATOR_CAPABILITY_NAME: Name =
+        fsys::RouteValidatorMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
 /// Serves the fuchsia.sys2.RouteValidator protocol.
@@ -176,7 +177,7 @@ impl RouteValidator {
         if targets.is_empty() {
             let use_requests = resolved.decl().uses.iter().map(|use_| {
                 let target = fsys::RouteTarget {
-                    name: use_.source_name().str().into(),
+                    name: use_.source_name().as_str().into(),
                     decl_type: fsys::DeclType::Use,
                 };
                 let request = routing::request_for_namespace_capability_use(use_.clone())
@@ -218,7 +219,7 @@ impl RouteValidator {
                             .uses
                             .iter()
                             .filter_map(|u| {
-                                if !u.source_name().str().contains(&target.name) {
+                                if !u.source_name().as_str().contains(&target.name) {
                                     return None;
                                 }
                                 // This could be a fuzzy match so update the capability name.
@@ -503,7 +504,7 @@ mod tests {
     async fn validate() {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "fuchsia.component.Realm".into(),
+            source_name: "fuchsia.component.Realm".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -511,7 +512,7 @@ mod tests {
 
         let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
-            source_name: "foo.bar".into(),
+            source_name: "foo.bar".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -519,22 +520,22 @@ mod tests {
 
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
-            source_name: "foo.bar".into(),
+            source_name: "foo.bar".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo.bar".into(),
+            target_name: "foo.bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "foo.bar".into(),
+            source_name: "foo.bar".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo.bar".into(),
+            target_name: "foo.bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let capability_decl = ProtocolDecl {
-            name: "foo.bar".into(),
+            name: "foo.bar".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
         };
 
@@ -649,7 +650,7 @@ mod tests {
     async fn validate_error() {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
-            source_name: "a".into(),
+            source_name: "a".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/a").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -657,7 +658,7 @@ mod tests {
 
         let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("bad_child".to_string()),
-            source_name: "b".into(),
+            source_name: "b".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/b").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -665,17 +666,17 @@ mod tests {
 
         let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
-            source_name: "c".into(),
+            source_name: "c".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "c".into(),
+            target_name: "c".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("bad_child".to_string()),
-            source_name: "d".into(),
+            source_name: "d".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "d".into(),
+            target_name: "d".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
@@ -780,7 +781,7 @@ mod tests {
     async fn route() {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "fuchsia.component.Realm".into(),
+            source_name: "fuchsia.component.Realm".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -788,7 +789,7 @@ mod tests {
 
         let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".into()),
-            source_name: "biz.buz".into(),
+            source_name: "biz.buz".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -796,22 +797,22 @@ mod tests {
 
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
-            source_name: "biz.buz".into(),
+            source_name: "biz.buz".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo.bar".into(),
+            target_name: "foo.bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "biz.buz".into(),
+            source_name: "biz.buz".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "biz.buz".into(),
+            target_name: "biz.buz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let capability_decl = ProtocolDecl {
-            name: "biz.buz".into(),
+            name: "biz.buz".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
         };
 
@@ -851,10 +852,13 @@ mod tests {
 
         // Validate the root
         let targets = &[
-            fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Use },
-            fsys::RouteTarget { name: "foo.bar".into(), decl_type: fsys::DeclType::Expose },
+            fsys::RouteTarget { name: "biz.buz".parse().unwrap(), decl_type: fsys::DeclType::Use },
             fsys::RouteTarget {
-                name: "fuchsia.component.Realm".into(),
+                name: "foo.bar".parse().unwrap(),
+                decl_type: fsys::DeclType::Expose,
+            },
+            fsys::RouteTarget {
+                name: "fuchsia.component.Realm".parse().unwrap(),
                 decl_type: fsys::DeclType::Use,
             },
         ];
@@ -899,8 +903,10 @@ mod tests {
         );
 
         // Validate `my_child`
-        let targets =
-            &[fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Expose }];
+        let targets = &[fsys::RouteTarget {
+            name: "biz.buz".parse().unwrap(),
+            decl_type: fsys::DeclType::Expose,
+        }];
         let mut results = validator.route("./my_child", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 1);
@@ -922,7 +928,7 @@ mod tests {
     async fn route_all() {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "foo.bar".into(),
+            source_name: "foo.bar".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -930,22 +936,22 @@ mod tests {
 
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
-            source_name: "qax.qux".into(),
+            source_name: "qax.qux".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo.buz".into(),
+            target_name: "foo.buz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "qax.qux".into(),
+            source_name: "qax.qux".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "qax.qux".into(),
+            target_name: "qax.qux".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let capability_decl = ProtocolDecl {
-            name: "qax.qux".into(),
+            name: "qax.qux".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/qax.qux").unwrap()),
         };
 
@@ -1016,21 +1022,21 @@ mod tests {
     async fn route_fuzzy() {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "foo.bar".into(),
+            source_name: "foo.bar".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_from_framework_decl2 = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "foo.buz".into(),
+            source_name: "foo.buz".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo.buz").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_from_framework_decl3 = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
-            source_name: "no.match".into(),
+            source_name: "no.match".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/no.match").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1038,36 +1044,36 @@ mod tests {
 
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
-            source_name: "qax.qux".into(),
+            source_name: "qax.qux".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo.buz".into(),
+            target_name: "foo.buz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
         let expose_from_child_decl2 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
-            source_name: "qax.qux".into(),
+            source_name: "qax.qux".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "foo.biz".into(),
+            target_name: "foo.biz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
         let expose_from_child_decl3 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Framework,
-            source_name: "no.match".into(),
+            source_name: "no.match".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "no.match".into(),
+            target_name: "no.match".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: "qax.qux".into(),
+            source_name: "qax.qux".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "qax.qux".into(),
+            target_name: "qax.qux".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let capability_decl = ProtocolDecl {
-            name: "qax.qux".into(),
+            name: "qax.qux".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/qax.qux").unwrap()),
         };
 
@@ -1109,7 +1115,8 @@ mod tests {
         model.start().await;
 
         // Validate the root
-        let targets = &[fsys::RouteTarget { name: "foo.".into(), decl_type: fsys::DeclType::Any }];
+        let targets =
+            &[fsys::RouteTarget { name: "foo.".parse().unwrap(), decl_type: fsys::DeclType::Any }];
         let mut results = validator.route(".", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 4);
@@ -1167,29 +1174,29 @@ mod tests {
     async fn route_service() {
         let offer_from_collection_decl = OfferDecl::Service(OfferServiceDecl {
             source: OfferSource::Collection("coll".into()),
-            source_name: "my_service".into(),
+            source_name: "my_service".parse().unwrap(),
             target: OfferTarget::static_child("target".into()),
-            target_name: "my_service".into(),
+            target_name: "my_service".parse().unwrap(),
             availability: Availability::Required,
             source_instance_filter: None,
             renamed_instances: None,
         });
         let expose_from_self_decl = ExposeDecl::Service(ExposeServiceDecl {
             source: ExposeSource::Self_,
-            source_name: "my_service".into(),
+            source_name: "my_service".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "my_service".into(),
+            target_name: "my_service".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
         let use_decl = UseDecl::Service(UseServiceDecl {
             source: UseSource::Parent,
-            source_name: "my_service".into(),
+            source_name: "my_service".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let capability_decl = ServiceDecl {
-            name: "my_service".into(),
+            name: "my_service".parse().unwrap(),
             source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
         };
 
@@ -1240,7 +1247,7 @@ mod tests {
         model.start().await;
 
         // Create two children in the collection, each exposing `my_service` with two instances.
-        let collection_ref = fdecl::CollectionRef { name: "coll".into() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".parse().unwrap() };
         for name in &["child_a", "child_b"] {
             realm_proxy
                 .create_child(
@@ -1284,8 +1291,10 @@ mod tests {
                 .unwrap();
         }
 
-        let targets =
-            &[fsys::RouteTarget { name: "my_service".into(), decl_type: fsys::DeclType::Use }];
+        let targets = &[fsys::RouteTarget {
+            name: "my_service".parse().unwrap(),
+            decl_type: fsys::DeclType::Use,
+        }];
         let mut results = validator.route("./target", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 1);
@@ -1336,7 +1345,7 @@ mod tests {
     async fn route_error() {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
-            source_name: "a".into(),
+            source_name: "a".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/a").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1344,7 +1353,7 @@ mod tests {
 
         let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("bad_child".to_string()),
-            source_name: "b".into(),
+            source_name: "b".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/b").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1352,17 +1361,17 @@ mod tests {
 
         let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
-            source_name: "c".into(),
+            source_name: "c".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "c".into(),
+            target_name: "c".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
         let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("bad_child".to_string()),
-            source_name: "d".into(),
+            source_name: "d".parse().unwrap(),
             target: ExposeTarget::Parent,
-            target_name: "d".into(),
+            target_name: "d".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
 
@@ -1400,10 +1409,10 @@ mod tests {
         assert!(instance.is_none());
 
         let targets = &[
-            fsys::RouteTarget { name: "a".into(), decl_type: fsys::DeclType::Use },
-            fsys::RouteTarget { name: "b".into(), decl_type: fsys::DeclType::Use },
-            fsys::RouteTarget { name: "c".into(), decl_type: fsys::DeclType::Expose },
-            fsys::RouteTarget { name: "d".into(), decl_type: fsys::DeclType::Expose },
+            fsys::RouteTarget { name: "a".parse().unwrap(), decl_type: fsys::DeclType::Use },
+            fsys::RouteTarget { name: "b".parse().unwrap(), decl_type: fsys::DeclType::Use },
+            fsys::RouteTarget { name: "c".parse().unwrap(), decl_type: fsys::DeclType::Expose },
+            fsys::RouteTarget { name: "d".parse().unwrap(), decl_type: fsys::DeclType::Expose },
         ];
         let mut results = validator.route(".", targets).await.unwrap().unwrap();
         assert_eq!(results.len(), 4);

@@ -642,7 +642,7 @@ pub mod test {
     async fn test_logger_at_root_of_entry() {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "logsink".into(),
+            source_name: "logsink".parse().unwrap(),
             target_path: CapabilityPath::try_from("/fuchsia.logger.LogSink").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -669,7 +669,7 @@ pub mod test {
     async fn test_logger_at_subdir_of_entry() {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "logsink".into(),
+            source_name: "logsink".parse().unwrap(),
             target_path: CapabilityPath::try_from("/arbitrary-dir/fuchsia.logger.LogSink").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -695,7 +695,7 @@ pub mod test {
     async fn test_multiple_namespace_entries() {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "logsink".into(),
+            source_name: "logsink".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/fuchsia.logger.LogSink").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -735,7 +735,7 @@ pub mod test {
     async fn test_no_connect_on_empty_namespace() {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "logsink".into(),
+            source_name: "logsink".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/fuchsia.logger.LogSink").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -758,7 +758,7 @@ pub mod test {
     async fn test_logsink_dir_not_in_namespace() {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "logsink".into(),
+            source_name: "logsink".parse().unwrap(),
             target_path: CapabilityPath::try_from("/svc/fuchsia.logger.LogSink").unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,

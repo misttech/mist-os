@@ -5,7 +5,7 @@
 use {
     crate::policy::allowlist_entry_matches,
     anyhow::{format_err, Context, Error},
-    cm_rust::{CapabilityName, CapabilityTypeName, FidlIntoNative},
+    cm_rust::{CapabilityTypeName, FidlIntoNative},
     cm_types::{symmetrical_enums, Name, ParseError, Url},
     fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl,
@@ -171,12 +171,12 @@ impl AllowlistEntryBuilder {
 
     pub fn any_descendant_in_collection(mut self, collection: &str) -> AllowlistEntry {
         self.parts
-            .push(AllowlistMatcher::AnyDescendantInCollection(Name::try_new(collection).unwrap()));
+            .push(AllowlistMatcher::AnyDescendantInCollection(Name::new(collection).unwrap()));
         self.build()
     }
 
     pub fn any_child_in_collection(mut self, collection: &str) -> Self {
-        self.parts.push(AllowlistMatcher::AnyChildInCollection(Name::try_new(collection).unwrap()));
+        self.parts.push(AllowlistMatcher::AnyChildInCollection(Name::new(collection).unwrap()));
         self
     }
 
@@ -213,7 +213,7 @@ pub struct SecurityPolicy {
 /// This defines all portions of the allowlist that do not support globbing.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct DebugCapabilityKey {
-    pub source_name: CapabilityName,
+    pub source_name: Name,
     pub source: CapabilityAllowlistSource,
     pub capability: CapabilityTypeName,
     pub env_name: String,
@@ -361,7 +361,7 @@ impl AbiRevisionPolicy {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct CapabilityAllowlistKey {
     pub source_moniker: ExtendedMoniker,
-    pub source_name: CapabilityName,
+    pub source_name: Name,
     pub source: CapabilityAllowlistSource,
     pub capability: CapabilityTypeName,
 }
@@ -475,7 +475,7 @@ fn parse_allowlist_entry(input: &str) -> Result<AllowlistEntry, AllowlistEntryPa
             "*" => AllowlistMatcher::AnyChild,
             name => {
                 if let Some(collection_name) = name.strip_suffix(":**") {
-                    let collection_name = Name::try_new(collection_name).map_err(|e| {
+                    let collection_name = Name::new(collection_name).map_err(|e| {
                         AllowlistEntryParseError::InvalidCollectionName(
                             collection_name.to_string(),
                             e,
@@ -483,7 +483,7 @@ fn parse_allowlist_entry(input: &str) -> Result<AllowlistEntry, AllowlistEntryPa
                     })?;
                     AllowlistMatcher::AnyDescendantInCollection(collection_name)
                 } else if let Some(collection_name) = name.strip_suffix(":*") {
-                    let collection_name = Name::try_new(collection_name).map_err(|e| {
+                    let collection_name = Name::new(collection_name).map_err(|e| {
                         AllowlistEntryParseError::InvalidCollectionName(
                             collection_name.to_string(),
                             e,
@@ -609,7 +609,9 @@ fn parse_capability_policy(
                         .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
                 let source_name = if let Some(source_name) = e.source_name {
-                    Ok(source_name.into())
+                    Ok(source_name
+                        .parse()
+                        .map_err(|_| Error::new(PolicyConfigError::InvalidSourceCapability))?)
                 } else {
                     Err(PolicyConfigError::EmptyCapabilitySourceName)
                 }?;
@@ -678,7 +680,9 @@ fn parse_debug_capability_policy(
                         .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
                 let source_name = if let Some(source_name) = e.source_name.as_ref() {
-                    Ok(source_name.into())
+                    Ok(source_name
+                        .parse()
+                        .map_err(|_| Error::new(PolicyConfigError::InvalidSourceCapability))?)
                 } else {
                     Err(PolicyConfigError::EmptyCapabilitySourceName)
                 }?;
@@ -975,7 +979,7 @@ mod tests {
                     capability_policy: HashMap::from_iter(vec![
                         (CapabilityAllowlistKey {
                             source_moniker: ExtendedMoniker::ComponentManager,
-                            source_name: CapabilityName::from("fuchsia.boot.RootResource"),
+                            source_name: "fuchsia.boot.RootResource".parse().unwrap(),
                             source: CapabilityAllowlistSource::Self_,
                             capability: CapabilityTypeName::Protocol,
                         },
@@ -989,7 +993,7 @@ mod tests {
                     debug_capability_policy: HashMap::from_iter(vec![
                         (
                             DebugCapabilityKey {
-                                source_name: CapabilityName::from("fuchsia.foo.bar"),
+                                source_name: "fuchsia.foo.bar".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "bar_env1".to_string(),
@@ -1003,7 +1007,7 @@ mod tests {
                         ),
                         (
                             DebugCapabilityKey {
-                                source_name: CapabilityName::from("fuchsia.foo.bar"),
+                                source_name: "fuchsia.foo.bar".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "foo_env1".to_string(),
@@ -1017,7 +1021,7 @@ mod tests {
                         ),
                         (
                             DebugCapabilityKey {
-                                source_name: CapabilityName::from("fuchsia.foo.baz"),
+                                source_name: "fuchsia.foo.baz".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "foo_env2".to_string(),
@@ -1031,7 +1035,7 @@ mod tests {
                         ),
                         (
                             DebugCapabilityKey {
-                                source_name: CapabilityName::from("fuchsia.foo.baz"),
+                                source_name: "fuchsia.foo.baz".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "root_env".to_string(),
@@ -1053,18 +1057,18 @@ mod tests {
                 num_threads: 24,
                 namespace_capabilities: vec![
                     cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-                        name: "foo_svc".into(),
+                        name: "foo_svc".parse().unwrap(),
                         source_path: Some("/svc/foo".parse().unwrap()),
                     }),
                     cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
-                        name: "bar_dir".into(),
+                        name: "bar_dir".parse().unwrap(),
                         source_path: Some("/bar".parse().unwrap()),
                         rights: fio::Operations::CONNECT,
                     }),
                 ],
                 builtin_capabilities: vec![
                     cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-                        name: "foo_protocol".into(),
+                        name: "foo_protocol".parse().unwrap(),
                         source_path: None,
                     }),
                 ],

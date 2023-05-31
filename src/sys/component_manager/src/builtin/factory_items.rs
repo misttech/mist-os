@@ -6,7 +6,7 @@ use {
     crate::builtin::capability::BuiltinCapability,
     anyhow::{anyhow, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_boot as fboot,
     fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::StorageBootfsFactory},
     fuchsia_zircon::{self as zx, HandleBased},
@@ -17,7 +17,7 @@ use {
 };
 
 lazy_static! {
-    static ref FACTORY_ITEMS_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.FactoryItems".into();
+    static ref FACTORY_ITEMS_CAPABILITY_NAME: Name = "fuchsia.boot.FactoryItems".parse().unwrap();
 
     // The default rights for an immutable VMO. For details see
     // https://fuchsia.dev/fuchsia-src/reference/syscalls/vmo_create#description.

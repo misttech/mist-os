@@ -6,9 +6,7 @@ use {
     anyhow::Error,
     assert_matches::assert_matches,
     cm_moniker::InstancedAbsoluteMoniker,
-    cm_rust::{
-        CapabilityName, CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource,
-    },
+    cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource},
     fidl_fuchsia_component_decl as fdecl,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     routing::{
@@ -77,7 +75,7 @@ where
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap(),
                 ),
-                source_name: CapabilityName::from("fuchsia.component.Realm"),
+                source_name: "fuchsia.component.Realm".parse().unwrap(),
                 source: CapabilityAllowlistSource::Framework,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -90,9 +88,7 @@ where
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySource::<C>::Framework {
-            capability: InternalCapability::Protocol(CapabilityName::from(
-                "fuchsia.component.Realm",
-            )),
+            capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
             component: component.as_weak(),
         };
         let valid_path_0 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
@@ -125,7 +121,7 @@ where
         config_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: CapabilityName::from("fuchsia.boot.RootResource"),
+                source_name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -139,7 +135,7 @@ where
 
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.boot.RootResource".into(),
+                name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
             }),
             top_instance: Weak::new(),
@@ -181,7 +177,7 @@ where
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
                 ),
-                source_name: CapabilityName::from("fuchsia.foo.FooBar"),
+                source_name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -196,7 +192,7 @@ where
 
         let protocol_capability = CapabilitySource::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.foo.FooBar".into(),
+                name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
             }),
             component: component.as_weak(),
@@ -233,7 +229,7 @@ where
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
                 ),
-                source_name: CapabilityName::from("cache"),
+                source_name: "cache".parse().unwrap(),
                 source: CapabilityAllowlistSource::Capability,
                 capability: CapabilityTypeName::Storage,
             },
@@ -248,8 +244,8 @@ where
 
         let protocol_capability = CapabilitySource::<C>::Capability {
             source_capability: ComponentCapability::Storage(StorageDecl {
-                backing_dir: "/cache".into(),
-                name: "cache".into(),
+                backing_dir: "cache".parse().unwrap(),
+                name: "cache".parse().unwrap(),
                 source: StorageDirectorySource::Parent,
                 subdir: None,
                 storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
@@ -285,7 +281,7 @@ where
         let mut config_builder = CapabilityAllowlistConfigBuilder::new();
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "foo_env".to_string(),
@@ -295,7 +291,7 @@ where
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "bootstrap_env".to_string(),
@@ -308,7 +304,7 @@ where
 
         let protocol_capability = CapabilitySource::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "debug_service1".into(),
+                name: "debug_service1".parse().unwrap(),
                 source_path: Some("/svc/debug_service1".parse().unwrap()),
             }),
             component: component.as_weak(),
@@ -373,7 +369,7 @@ where
         let mut config_builder = CapabilityAllowlistConfigBuilder::new();
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "bar_env".to_string(),
@@ -383,7 +379,7 @@ where
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "foo_env".to_string(),
@@ -393,7 +389,7 @@ where
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "baz_env".to_string(),
@@ -440,7 +436,7 @@ where
             let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
-                    name: "debug_service1".into(),
+                    name: "debug_service1".parse().unwrap(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
                 }),
                 component: component.as_weak(),
@@ -462,7 +458,7 @@ where
             let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
-                    name: "debug_service1".into(),
+                    name: "debug_service1".parse().unwrap(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
                 }),
                 component: component.as_weak(),
@@ -491,7 +487,7 @@ where
         let mut config_builder = CapabilityAllowlistConfigBuilder::new();
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "bar_env".to_string(),
@@ -504,7 +500,7 @@ where
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "foo_env".to_string(),
@@ -514,7 +510,7 @@ where
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
-                source_name: CapabilityName::from("debug_service1"),
+                source_name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
                 env_name: "baz_env".to_string(),
@@ -568,7 +564,7 @@ where
             let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
-                    name: "debug_service1".into(),
+                    name: "debug_service1".parse().unwrap(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
                 }),
                 component: component.as_weak(),
@@ -590,7 +586,7 @@ where
             let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
-                    name: "debug_service1".into(),
+                    name: "debug_service1".parse().unwrap(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
                 }),
                 component: component.as_weak(),
@@ -617,7 +613,7 @@ where
         config_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: CapabilityName::from("test"),
+                source_name: "test".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Directory,
             },
@@ -629,7 +625,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
 
         let dir_capability = CapabilitySource::<C>::Builtin {
-            capability: InternalCapability::Directory(CapabilityName::from("test")),
+            capability: InternalCapability::Directory("test".parse().unwrap()),
             top_instance: Weak::new(),
         };
         let valid_path_0 = AbsoluteMoniker::try_from(vec!["root"]).unwrap();
@@ -665,7 +661,7 @@ where
         config_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: CapabilityName::from("fuchsia.boot.RootResource"),
+                source_name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -677,7 +673,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.boot.RootResource".into(),
+                name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
             }),
             top_instance: Weak::new(),
@@ -722,7 +718,7 @@ where
         config_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: CapabilityName::from("fuchsia.boot.RootResource"),
+                source_name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -734,7 +730,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.boot.RootResource".into(),
+                name: "fuchsia.boot.RootResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
             }),
             top_instance: Weak::new(),

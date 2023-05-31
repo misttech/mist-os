@@ -5,14 +5,14 @@
 use {
     crate::builtin::capability::BuiltinCapability,
     ::routing::capability_source::InternalCapability, anyhow::Error, async_trait::async_trait,
-    cm_rust::CapabilityName, elf_runner::crash_info::CrashRecords,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    futures::TryStreamExt, lazy_static::lazy_static, std::sync::Arc,
+    cm_types::Name, elf_runner::crash_info::CrashRecords, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx, futures::TryStreamExt,
+    lazy_static::lazy_static, std::sync::Arc,
 };
 
 lazy_static! {
-    static ref CRASH_RECORDS_CAPABILITY_NAME: CapabilityName =
-        "fuchsia.sys2.CrashIntrospect".into();
+    static ref CRASH_RECORDS_CAPABILITY_NAME: Name =
+        "fuchsia.sys2.CrashIntrospect".parse().unwrap();
 }
 
 pub struct CrashIntrospectSvc(CrashRecords);

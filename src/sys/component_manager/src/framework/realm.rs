@@ -16,8 +16,9 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     cm_fidl_validator,
-    cm_rust::{CapabilityName, FidlIntoNative},
+    cm_rust::FidlIntoNative,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -35,7 +36,7 @@ use {
 
 lazy_static! {
     // Path for SDK clients.
-    pub static ref SDK_REALM_SERVICE: CapabilityName = "fuchsia.component.Realm".into();
+    pub static ref SDK_REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
 }
 
 // The `fuchsia.sys2.Realm` is currently being migrated to the `fuchsia.component`
@@ -394,8 +395,8 @@ mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{
-            self, CapabilityName, CapabilityPath, ComponentDecl, ExposeDecl, ExposeProtocolDecl,
-            ExposeSource, ExposeTarget,
+            self, CapabilityPath, ComponentDecl, ExposeDecl, ExposeProtocolDecl, ExposeSource,
+            ExposeTarget,
         },
         cm_rust_testing::*,
         fidl::endpoints,
@@ -476,10 +477,7 @@ mod tests {
             self.builtin_environment = None;
         }
 
-        async fn new_event_stream(
-            &self,
-            events: Vec<CapabilityName>,
-        ) -> (EventSource, EventStream) {
+        async fn new_event_stream(&self, events: Vec<Name>) -> (EventSource, EventStream) {
             new_event_stream(
                 self.builtin_environment.as_ref().expect("builtin_environment is none").clone(),
                 events,
@@ -1206,8 +1204,8 @@ mod tests {
                         .protocol(ProtocolDeclBuilder::new("foo").path("/svc/foo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
-                            source_name: "foo".into(),
-                            target_name: "hippo".into(),
+                            source_name: "foo".parse().unwrap(),
+                            target_name: "hippo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
@@ -1271,8 +1269,8 @@ mod tests {
                         .protocol(ProtocolDeclBuilder::new("foo").path("/svc/foo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
-                            source_name: "foo".into(),
-                            target_name: "hippo".into(),
+                            source_name: "foo".parse().unwrap(),
+                            target_name: "hippo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))

@@ -29,6 +29,7 @@ rustc_library("routing_test_helpers") {
     "//src/sys/lib/cm_moniker",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_rust/testing",
+    "//src/sys/lib/cm_types",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/moniker",
     "//src/sys/lib/routing",

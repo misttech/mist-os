@@ -6,7 +6,7 @@ use {
     crate::builtin::capability::BuiltinCapability,
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    cm_rust::CapabilityName,
+    cm_types::Name,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
@@ -16,8 +16,8 @@ use {
 };
 
 lazy_static! {
-    static ref ENERGY_INFO_RESOURCE_CAPABILITY_NAME: CapabilityName =
-        "fuchsia.kernel.EnergyInfoResource".into();
+    static ref ENERGY_INFO_RESOURCE_CAPABILITY_NAME: Name =
+        "fuchsia.kernel.EnergyInfoResource".parse().unwrap();
 }
 
 /// An implementation of fuchsia.kernel.EnergyInfoResource protocol.

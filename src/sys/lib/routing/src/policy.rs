@@ -230,7 +230,7 @@ impl GlobalPolicyChecker {
                         policy_key.source_name, policy_key.source_moniker, target_moniker
                     );
                     Err(PolicyError::capability_use_disallowed(
-                        policy_key.source_name.str(),
+                        policy_key.source_name.as_str(),
                         &policy_key.source_moniker,
                         &target_moniker,
                     ))
@@ -279,7 +279,7 @@ impl GlobalPolicyChecker {
             debug_key.source_name, source_moniker, target_moniker
         );
         Err(PolicyError::debug_capability_use_disallowed(
-            debug_key.source_name.str(),
+            debug_key.source_name.as_str(),
             &source_moniker,
             &env_moniker,
             env_name,

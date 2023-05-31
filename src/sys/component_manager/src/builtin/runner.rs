@@ -14,8 +14,8 @@ use {
     },
     async_trait::async_trait,
     cm_runner::Runner,
-    cm_rust::CapabilityName,
     cm_task_scope::TaskScope,
+    cm_types::Name,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -35,14 +35,14 @@ pub trait BuiltinRunnerFactory: Send + Sync {
 
 /// Provides a hook for routing built-in runners to realms.
 pub struct BuiltinRunner {
-    name: CapabilityName,
+    name: Name,
     runner: Arc<dyn BuiltinRunnerFactory>,
     config: Weak<RuntimeConfig>,
 }
 
 impl BuiltinRunner {
     pub fn new(
-        name: CapabilityName,
+        name: Name,
         runner: Arc<dyn BuiltinRunnerFactory>,
         config: Weak<RuntimeConfig>,
     ) -> Self {
@@ -168,7 +168,7 @@ mod tests {
                 url,
                 EventPayload::CapabilityRouted {
                     source: CapabilitySource::Builtin {
-                        capability: InternalCapability::Runner("elf".into()),
+                        capability: InternalCapability::Runner("elf".parse().unwrap()),
                         top_instance: Weak::new(),
                     },
                     capability_provider: provider_result.clone(),
@@ -207,8 +207,11 @@ mod tests {
             ..Default::default()
         });
         let runner = Arc::new(MockRunner::new());
-        let builtin_runner =
-            Arc::new(BuiltinRunner::new("elf".into(), runner.clone(), Arc::downgrade(&config)));
+        let builtin_runner = Arc::new(BuiltinRunner::new(
+            "elf".parse().unwrap(),
+            runner.clone(),
+            Arc::downgrade(&config),
+        ));
 
         let hooks = Hooks::new();
         hooks.install(builtin_runner.hooks()).await;
@@ -297,7 +300,7 @@ mod tests {
         // Set up the system.
         let universe = RoutingTestBuilder::new("a", components)
             .set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
-                name: "my_runner".into(),
+                name: "my_runner".parse().unwrap(),
                 source_path: None,
             })])
             .add_builtin_runner("my_runner", mock_runner.clone())
@@ -337,7 +340,7 @@ mod tests {
         // Set up the system.
         let universe = RoutingTestBuilder::new("a", components)
             .set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
-                name: "elf".into(),
+                name: "elf".parse().unwrap(),
                 source_path: None,
             })])
             .add_builtin_runner("elf", mock_runner.clone())

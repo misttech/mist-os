@@ -9,9 +9,8 @@ use {
         },
         error::ComponentInstanceError,
     },
-    cm_rust::{
-        CapabilityName, RegistrationDeclCommon, RegistrationSource, RunnerRegistration, SourceName,
-    },
+    cm_rust::{RegistrationDeclCommon, RegistrationSource, RunnerRegistration, SourceName},
+    cm_types::Name,
     fidl_fuchsia_component_decl as fdecl,
     std::{collections::HashMap, sync::Arc},
     url::Url,
@@ -29,7 +28,7 @@ where
     /// runner was registered to. Returns `None` if there was no match.
     fn get_registered_runner(
         &self,
-        name: &CapabilityName,
+        name: &Name,
     ) -> Result<Option<(ExtendedInstanceInterface<C>, RunnerRegistration)>, ComponentInstanceError>
     {
         let parent = self.parent().upgrade()?;
@@ -56,7 +55,7 @@ where
     /// environment that registered the capability. Returns `None` if there was no match.
     fn get_debug_capability(
         &self,
-        name: &CapabilityName,
+        name: &Name,
     ) -> Result<
         Option<(ExtendedInstanceInterface<C>, Option<String>, DebugRegistration)>,
         ComponentInstanceError,
@@ -120,7 +119,7 @@ impl From<fdecl::EnvironmentExtends> for EnvironmentExtends {
 /// [`RunnerRegistration`]: fidl_fuchsia_sys2::RunnerRegistration
 #[derive(Clone, Debug)]
 pub struct RunnerRegistry {
-    runners: HashMap<CapabilityName, RunnerRegistration>,
+    runners: HashMap<Name, RunnerRegistration>,
 }
 
 impl RunnerRegistry {
@@ -128,7 +127,7 @@ impl RunnerRegistry {
         Self { runners: HashMap::new() }
     }
 
-    pub fn new(runners: HashMap<CapabilityName, RunnerRegistration>) -> Self {
+    pub fn new(runners: HashMap<Name, RunnerRegistration>) -> Self {
         Self { runners }
     }
 
@@ -139,7 +138,7 @@ impl RunnerRegistry {
         }
         Self { runners }
     }
-    pub fn get_runner(&self, name: &CapabilityName) -> Option<&RunnerRegistration> {
+    pub fn get_runner(&self, name: &Name) -> Option<&RunnerRegistration> {
         self.runners.get(name)
     }
 }
@@ -147,18 +146,18 @@ impl RunnerRegistry {
 /// The set of debug capabilities available in this environment.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct DebugRegistry {
-    pub debug_capabilities: HashMap<CapabilityName, DebugRegistration>,
+    pub debug_capabilities: HashMap<Name, DebugRegistration>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugRegistration {
     pub source: RegistrationSource,
-    pub source_name: CapabilityName,
+    pub source_name: Name,
 }
 
 impl SourceName for DebugRegistration {
-    fn source_name(&self) -> &CapabilityName {
+    fn source_name(&self) -> &Name {
         &self.source_name
     }
 }
@@ -189,7 +188,7 @@ impl From<Vec<cm_rust::DebugRegistration>> for DebugRegistry {
 }
 
 impl DebugRegistry {
-    pub fn get_capability(&self, name: &CapabilityName) -> Option<&DebugRegistration> {
+    pub fn get_capability(&self, name: &Name) -> Option<&DebugRegistration> {
         self.debug_capabilities.get(name)
     }
 }

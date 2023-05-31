@@ -4,7 +4,7 @@
 
 use {
     crate::{component_model::AnalyzerModelError, node_path::NodePath},
-    cm_rust::CapabilityName,
+    cm_types::Name,
     routing::mapper::RouteSegment,
     serde::{Deserialize, Serialize},
     thiserror::Error,
@@ -14,7 +14,7 @@ use {
 #[derive(Clone, Debug, PartialEq)]
 pub struct VerifyRouteResult {
     pub using_node: NodePath,
-    pub capability: CapabilityName,
+    pub capability: Option<Name>,
     pub error: Option<AnalyzerModelError>,
     pub route: Vec<RouteSegment>,
 }

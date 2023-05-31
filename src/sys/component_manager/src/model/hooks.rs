@@ -12,7 +12,8 @@ use {
     },
     anyhow::format_err,
     async_trait::async_trait,
-    cm_rust::{CapabilityName, ComponentDecl},
+    cm_rust::ComponentDecl,
+    cm_types::Name,
     cm_util::io::clone_dir,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -45,11 +46,11 @@ macro_rules! events {
             )*
         }
 
-        impl From<EventType> for CapabilityName {
-            fn from(event_type: EventType) -> CapabilityName {
+        impl From<EventType> for Name {
+            fn from(event_type: EventType) -> Name {
                 match event_type {
                     $(
-                        EventType::$name => CapabilityName::from(stringify!($string_name)),
+                        EventType::$name => stringify!($string_name).parse().unwrap(),
                     )*
                 }
             }

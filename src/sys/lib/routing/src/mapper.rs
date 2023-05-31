@@ -5,9 +5,10 @@
 use {
     crate::RegistrationDecl,
     cm_rust::{
-        CapabilityDecl, CapabilityName, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon,
-        SourceName, UseDecl, UseDeclCommon,
+        CapabilityDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, SourceName,
+        UseDecl, UseDeclCommon,
     },
+    cm_types::Name,
     moniker::AbsoluteMoniker,
 };
 
@@ -38,7 +39,7 @@ pub enum RouteSegment {
     RegisterBy { moniker: AbsoluteMoniker, capability: RegistrationDecl },
 
     /// This is a framework capability served by component manager.
-    ProvideFromFramework { capability: CapabilityName },
+    ProvideFromFramework { capability: Name },
 
     /// This is a builtin capability served by component manager.
     ProvideAsBuiltin { capability: CapabilityDecl },
@@ -158,7 +159,7 @@ impl DebugRouteMapper for RouteMapper {
             .push(RouteSegment::DeclareBy { moniker: abs_moniker, capability: capability_decl })
     }
 
-    fn add_framework_capability(&mut self, capability_name: CapabilityName) {
+    fn add_framework_capability(&mut self, capability_name: Name) {
         self.route.push(RouteSegment::ProvideFromFramework { capability: capability_name })
     }
 
@@ -204,7 +205,7 @@ pub trait DebugRouteMapper: Send + Sync + Clone {
     }
 
     #[allow(unused_variables)]
-    fn add_framework_capability(&mut self, capability_name: CapabilityName) {}
+    fn add_framework_capability(&mut self, capability_name: Name) {}
 
     #[allow(unused_variables)]
     fn add_builtin_capability(&mut self, capability_decl: CapabilityDecl) {}

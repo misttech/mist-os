@@ -99,7 +99,7 @@ impl EnvironmentForAnalyzer {
                 assert!(
                     resolver_registry
                         .register(&ResolverRegistration {
-                            resolver: BOOT_RESOLVER_NAME.into(),
+                            resolver: BOOT_RESOLVER_NAME.parse().unwrap(),
                             source: RegistrationSource::Self_,
                             scheme: BOOT_SCHEME.to_string(),
                         })
@@ -116,7 +116,7 @@ impl EnvironmentForAnalyzer {
                 assert!(
                     resolver_registry
                         .register(&ResolverRegistration {
-                            resolver: REALM_BUILDER_RESOLVER_NAME.into(),
+                            resolver: REALM_BUILDER_RESOLVER_NAME.parse().unwrap(),
                             source: RegistrationSource::Self_,
                             scheme: REALM_BUILDER_SCHEME.to_string(),
                         })

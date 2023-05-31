@@ -132,7 +132,9 @@ pub async fn verify(
             // Add the failure to the route segments.
             let error = format!(
                 "❌ ERROR: {}\n    Moniker: {}\n    Capability: {}",
-                error.error.message, error.using_node, error.capability
+                error.error.message,
+                error.using_node,
+                error.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into())
             );
             context.push(error);
 
@@ -159,7 +161,9 @@ pub async fn verify(
             // Add the warning to the route segments.
             let warning = format!(
                 "⚠️ WARNING: {}\n    Moniker: {}\n    Capability: {}",
-                warning.warning.message, warning.using_node, warning.capability
+                warning.warning.message,
+                warning.using_node,
+                warning.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into())
             );
             context.push(warning);
 

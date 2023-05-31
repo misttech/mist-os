@@ -21,7 +21,7 @@ async fn list_collectors(query_proxy: &RealmQueryProxy) -> anyhow::Result<Vec<St
         .into_iter()
         .filter_map(|rs| match rs {
             RouteSegment::DeclareBy { moniker, capability: CapabilityDecl::Protocol(protocol) }
-                if protocol.name() == COLLECTOR_CAPABILITY =>
+                if *protocol.name() == COLLECTOR_CAPABILITY =>
             {
                 Some(moniker.to_string())
             }
