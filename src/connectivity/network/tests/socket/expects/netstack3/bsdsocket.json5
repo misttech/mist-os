@@ -71,6 +71,7 @@
                 "ReadAfterShutdownTests/ReadAfterShutdownTest.Success/IPv*_Stream_Self_SHUT_WR_*BlockingRead_NoPendingData",
 
                 // ICMP sockets.
+                "NetSocket/IcmpSocketTest.GetSockoptSoProtocol/*",
                 "NetSocket/IcmpSocketTest.PayloadIdentIgnored/*",
             ],
         },

@@ -8,7 +8,7 @@ use std::{
     convert::TryInto as _,
     fmt::Debug,
     marker::PhantomData,
-    num::{NonZeroU16, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
+    num::{NonZeroU16, NonZeroU64, NonZeroU8,  TryFromIntError},
     ops::ControlFlow,
     sync::Arc,
 };
@@ -31,7 +31,7 @@ use netstack3_core::{
     data_structures::id_map_collection::{IdMapCollection, IdMapCollectionKey},
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, SocketError},
-    ip::{icmp, socket::IpSockSendError, IpExt},
+    ip::{icmp, IpExt},
     socket::datagram::{
         ConnectListenerError, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
         SetMulticastMembershipError, ShutdownType, SockCreationError,
@@ -40,16 +40,7 @@ use netstack3_core::{
     transport::udp,
     BufferNonSyncContext, NonSyncContext, SyncCtx,
 };
-use nonzero_ext::nonzero;
-use packet::{Buf, BufferMut, SerializeError};
-use packet_formats::{
-    error::ParseError,
-    icmp::{
-        IcmpEchoReply, IcmpEchoRequest, IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketBuilder,
-        IcmpParseArgs, IcmpUnusedCode,
-    },
-};
-use thiserror::Error;
+use packet::{Buf, BufferMut};
 use tracing::{error, trace, warn};
 
 use crate::bindings::{
@@ -74,7 +65,6 @@ use super::{
 #[derive(Debug)]
 pub(crate) enum DatagramProtocol {
     Udp,
-    IcmpEcho,
 }
 
 /// A minimal abstraction over transport protocols that allows bindings-side state to be stored.
@@ -770,538 +760,6 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
     }
 }
 
-// NB: the POSIX API for ICMP sockets operates on ICMP packets in both directions. In other words,
-// the calling process is expected to send complete ICMP packets and will likewise receive complete
-// ICMP packets on reads - header and all. Note that outbound ICMP packets are parsed and validated
-// before being sent on the wire.
-#[derive(Debug)]
-pub enum IcmpEcho {}
-
-// TODO(https://fxbug.dev/47321): this uninhabited type is a stand-in; the real type needs to be
-// defined in the Core.
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum IcmpListenerId {}
-
-impl IdMapCollectionKey for IcmpListenerId {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
-
-    fn get_variant(&self) -> usize {
-        match *self {}
-    }
-
-    fn get_id(&self) -> usize {
-        match *self {}
-    }
-}
-
-impl<I: Ip> Transport<I> for IcmpEcho {
-    const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
-    type UnboundId = icmp::IcmpUnboundId<I>;
-    type ConnId = icmp::IcmpConnId<I>;
-    type ListenerId = IcmpListenerId;
-}
-
-pub(crate) struct IcmpRemoteIdentifier;
-
-impl Into<u16> for IcmpRemoteIdentifier {
-    fn into(self) -> u16 {
-        // TODO(https://fxbug.dev/47321): unclear that this is the right thing to do. This is only
-        // used in the implementation of getpeername, we should test to see what this does on
-        // Linux.
-        0
-    }
-}
-
-impl OptionFromU16 for IcmpRemoteIdentifier {
-    fn from_u16(_: u16) -> Option<Self> {
-        // TODO(https://fxbug.dev/47321): unclear that this is the right thing to do. This is only
-        // used in the implementation of connect, we should test to see what this does on Linux. We
-        // may need to store the value so that we can spit it back out in getpeername.
-        Some(Self)
-    }
-}
-
-#[derive(Error, Debug)]
-pub(crate) enum IcmpSendError {
-    #[error(transparent)]
-    IpSock(#[from] IpSockSendError),
-    #[error(transparent)]
-    ParseError(#[from] ParseError),
-}
-
-impl IntoErrno for IcmpSendError {
-    fn into_errno(self) -> fposix::Errno {
-        match self {
-            Self::IpSock(e) => e.into_errno(),
-            Self::ParseError(e) => match e {
-                ParseError::NotSupported
-                | ParseError::NotExpected
-                | ParseError::Checksum
-                | ParseError::Format => fposix::Errno::Einval,
-            },
-        }
-    }
-}
-
-/// An extension trait that allows generic access to IP-specific ICMP functionality in the Core.
-pub(crate) trait IcmpEchoIpExt: IcmpIpExt {
-    fn new_icmp_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-    ) -> icmp::IcmpUnboundId<Self>;
-
-    fn remove_icmp_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        unbound: icmp::IcmpUnboundId<Self>,
-    );
-
-    fn new_icmp_connection<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        unbound: icmp::IcmpUnboundId<Self>,
-        remote_addr: SpecifiedAddr<Self::Addr>,
-    ) -> Result<icmp::IcmpConnId<Self>, icmp::IcmpSockCreationError>;
-
-    fn send_icmp_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        conn: icmp::IcmpConnId<Self>,
-        seq: u16,
-        body: B,
-    ) -> Result<(), (B, IcmpSendError)>;
-
-    fn send_conn<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        conn: icmp::IcmpConnId<Self>,
-        mut body: B,
-    ) -> Result<(), (B, IcmpSendError)>
-    where
-        IcmpEchoRequest: for<'a> IcmpMessage<Self, &'a [u8]>,
-    {
-        use net_types::Witness as _;
-
-        let (src_ip, _id, dst_ip, IcmpRemoteIdentifier {}) =
-            IcmpEcho::get_conn_info(sync_ctx, ctx, conn);
-        let (src_ip, _) = src_ip.into_addr_zone();
-        let (dst_ip, _) = dst_ip.into_addr_zone();
-        let packet = {
-            // This cruft (putting this logic inside a block, assigning to the
-            // temporary variable `res` rather than inlining this expression
-            // inside of the match argument, and manually dropping `res`) is
-            // required because, without it, the borrow checker believes that
-            // `body` is still borrowed by the `Result` returned from
-            // `parse_with` when it is moved in `return Err((body,
-            // err.into()))`.
-            //
-            // Storing first into `res` allows us to explicitly drop it before
-            // moving `body`, which satisfies the borrow checker. We do this
-            // inside of a block because if we instead did it at the top level
-            // of the function, `res` would live until the end of the function,
-            // and would conflict with `body` being moved into
-            // `send_icmp_echo_request`. This way, `res` only lives until the
-            // end of this block.
-            let res = body.parse_with::<_, IcmpPacket<Self, _, IcmpEchoRequest>>(
-                IcmpParseArgs::new(src_ip.get(), dst_ip.get()),
-            );
-            match res {
-                Ok(packet) => packet,
-                Err(err) => {
-                    std::mem::drop(res);
-                    return Err((body, err.into()));
-                }
-            }
-        };
-        let message = packet.message();
-        let seq = message.seq();
-        // Drop the packet so we can reuse `body`, which now holds the ICMP
-        // packet's body. This is fragile; we should perhaps expose a mutable
-        // getter instead.
-        std::mem::drop(packet);
-        Self::send_icmp_echo_request(sync_ctx, ctx, conn, seq, body)
-    }
-}
-
-impl IcmpEchoIpExt for Ipv4 {
-    fn new_icmp_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-    ) -> icmp::IcmpUnboundId<Self> {
-        icmp::create_icmpv4_unbound(sync_ctx)
-    }
-
-    fn remove_icmp_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        unbound: icmp::IcmpUnboundId<Self>,
-    ) {
-        icmp::remove_icmpv4_unbound(sync_ctx, unbound)
-    }
-
-    fn new_icmp_connection<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        unbound: icmp::IcmpUnboundId<Ipv4>,
-        remote_addr: SpecifiedAddr<Self::Addr>,
-    ) -> Result<icmp::IcmpConnId<Self>, icmp::IcmpSockCreationError> {
-        icmp::connect_icmpv4(sync_ctx, ctx, unbound, None, remote_addr, 0)
-    }
-
-    fn send_icmp_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        conn: icmp::IcmpConnId<Self>,
-        seq: u16,
-        body: B,
-    ) -> Result<(), (B, IcmpSendError)> {
-        icmp::send_icmpv4_echo_request(sync_ctx, ctx, conn, seq, body)
-            .map_err(|(body, err)| (body, err.into()))
-    }
-}
-
-impl IcmpEchoIpExt for Ipv6 {
-    fn new_icmp_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-    ) -> icmp::IcmpUnboundId<Self> {
-        icmp::create_icmpv6_unbound(sync_ctx)
-    }
-
-    fn remove_icmp_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        unbound: icmp::IcmpUnboundId<Self>,
-    ) {
-        icmp::remove_icmpv6_unbound(sync_ctx, unbound)
-    }
-
-    fn new_icmp_connection<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        unbound: icmp::IcmpUnboundId<Ipv6>,
-        remote_addr: SpecifiedAddr<Self::Addr>,
-    ) -> Result<icmp::IcmpConnId<Self>, icmp::IcmpSockCreationError> {
-        icmp::connect_icmpv6(sync_ctx, ctx, unbound, None, remote_addr, 0)
-    }
-
-    fn send_icmp_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        conn: icmp::IcmpConnId<Self>,
-        seq: u16,
-        body: B,
-    ) -> Result<(), (B, IcmpSendError)> {
-        icmp::send_icmpv6_echo_request(sync_ctx, ctx, conn, seq, body)
-            .map_err(|(body, err)| (body, err.into()))
-    }
-}
-
-impl OptionFromU16 for u16 {
-    fn from_u16(t: u16) -> Option<Self> {
-        Some(t)
-    }
-}
-
-impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
-    type CreateConnError = icmp::IcmpSockCreationError;
-    type CreateListenerError = icmp::IcmpSockCreationError;
-    type ConnectListenerError = icmp::IcmpSockCreationError;
-    type ReconnectConnError = icmp::IcmpSockCreationError;
-    type SetSocketDeviceError = LocalAddressError;
-    type SetMulticastMembershipError = LocalAddressError;
-    type LocalIdentifier = u16;
-    type RemoteIdentifier = IcmpRemoteIdentifier;
-
-    fn create_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-    ) -> Self::UnboundId {
-        I::new_icmp_unbound(sync_ctx)
-    }
-
-    fn connect_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        id: Self::UnboundId,
-        remote_addr: ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>,
-        remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, Self::CreateConnError> {
-        let IcmpRemoteIdentifier {} = remote_id;
-        // TODO(https://fxbug.dev/105494): Handle scoped addresses correctly.
-        let (remote_ip, _zone): (_, Option<_>) = remote_addr.into_addr_zone();
-        I::new_icmp_connection(sync_ctx, ctx, id, remote_ip)
-    }
-
-    fn listen_on_unbound<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::UnboundId,
-        _addr: Option<ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>>,
-        _stream_id: Option<Self::LocalIdentifier>,
-    ) -> Result<Self::ListenerId, Self::CreateListenerError> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn connect_listener<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ListenerId,
-        _remote_ip: ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>,
-        _remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, Self::ConnectListenerError> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn disconnect_connected<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ConnId,
-    ) -> Self::ListenerId {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn shutdown<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &NonSyncCtx,
-        _id: Self::ConnId,
-        _which: ShutdownType,
-    ) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_shutdown<C: NonSyncContext>(
-        _sync_ctx: &SyncCtx<C>,
-        _ctx: &C,
-        _id: Self::ConnId,
-    ) -> Option<ShutdownType> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn reconnect_conn<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ConnId,
-        _remote_ip: ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>,
-        _remote_id: Self::RemoteIdentifier,
-    ) -> Result<(), Self::ConnectListenerError> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_conn_info<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ConnId,
-    ) -> (
-        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx>>,
-        Self::LocalIdentifier,
-        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx>>,
-        Self::RemoteIdentifier,
-    ) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_listener_info<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx>>>, Self::LocalIdentifier) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn remove_conn<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ConnId,
-    ) -> (
-        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx>>,
-        Self::LocalIdentifier,
-        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx>>,
-        Self::RemoteIdentifier,
-    ) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn remove_listener<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx>>>, Self::LocalIdentifier) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn remove_unbound<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        id: Self::UnboundId,
-    ) {
-        I::remove_icmp_unbound(sync_ctx, id)
-    }
-
-    fn set_socket_device<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: SocketId<I, Self>,
-        _device: Option<&DeviceId<NonSyncCtx>>,
-    ) -> Result<(), Self::SetSocketDeviceError> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_bound_device<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &NonSyncCtx,
-        _id: SocketId<I, Self>,
-    ) -> Option<WeakDeviceId<NonSyncCtx>> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn set_reuse_port<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: Self::UnboundId,
-        _reuse_port: bool,
-    ) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_reuse_port<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &NonSyncCtx,
-        _id: SocketId<I, Self>,
-    ) -> bool {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn set_multicast_membership<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: SocketId<I, Self>,
-        _multicast_group: MulticastAddr<I::Addr>,
-        _interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<NonSyncCtx>>,
-        _want_membership: bool,
-    ) -> Result<(), Self::SetMulticastMembershipError> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn set_unicast_hop_limit<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: SocketId<I, Self>,
-        _hop_limit: Option<NonZeroU8>,
-    ) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn set_multicast_hop_limit<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _id: SocketId<I, Self>,
-        _hop_limit: Option<NonZeroU8>,
-    ) {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_unicast_hop_limit<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &NonSyncCtx,
-        _id: SocketId<I, Self>,
-    ) -> NonZeroU8 {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn get_multicast_hop_limit<NonSyncCtx: NonSyncContext>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &NonSyncCtx,
-        _id: SocketId<I, Self>,
-    ) -> NonZeroU8 {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-}
-
-impl<I: IcmpEchoIpExt, B: BufferMut> BufferTransportState<I, B> for IcmpEcho
-where
-    IcmpEchoRequest: for<'a> IcmpMessage<I, &'a [u8]>,
-{
-    type SendConnError = IcmpSendError;
-    type SendConnToError = IcmpSendError;
-    type SendListenerError = IcmpSendError;
-
-    fn send_conn<NonSyncCtx: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        ctx: &mut NonSyncCtx,
-        conn: Self::ConnId,
-        body: B,
-    ) -> Result<(), (B, Self::SendConnError)> {
-        I::send_conn(sync_ctx, ctx, conn, body)
-    }
-
-    fn send_conn_to<NonSyncCtx: BufferNonSyncContext<B>>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _conn: Self::ConnId,
-        _body: B,
-        _remote: (ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>, Self::RemoteIdentifier),
-    ) -> Result<(), (B, Self::SendConnToError)> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-
-    fn send_listener<NonSyncCtx: BufferNonSyncContext<B>>(
-        _sync_ctx: &SyncCtx<NonSyncCtx>,
-        _ctx: &mut NonSyncCtx,
-        _listener: Self::ListenerId,
-        _remote_ip: ZonedAddr<I::Addr, DeviceId<NonSyncCtx>>,
-        _remote_id: Self::RemoteIdentifier,
-        _body: B,
-    ) -> Result<(), (B, Self::SendListenerError)> {
-        todo!("https://fxbug.dev/47321: needs Core implementation")
-    }
-}
-
-impl<I: icmp::IcmpIpExt> icmp::IcmpContext<I> for SocketCollection<I, IcmpEcho> {
-    fn receive_icmp_error(&mut self, conn: icmp::IcmpConnId<I>, seq_num: u16, err: I::ErrorCode) {
-        let Self { conns, listeners: _ } = self;
-        let conn_data = conns.get(&conn).unwrap();
-        // NB: Logging at error as a means of failing tests that provoke this condition.
-        error!("unimplemented receive_icmp_error {:?} seq={} on {:?}", err, seq_num, conn_data)
-    }
-}
-
-impl<I: icmp::IcmpIpExt, B: BufferMut> icmp::BufferIcmpContext<I, B>
-    for SocketCollection<I, IcmpEcho>
-where
-    IcmpEchoReply: for<'a> IcmpMessage<I, &'a [u8], Code = IcmpUnusedCode>,
-{
-    fn receive_icmp_echo_reply(
-        &mut self,
-        conn: icmp::IcmpConnId<I>,
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
-        id: u16,
-        seq_num: u16,
-        data: B,
-    ) {
-        use packet::Serializer as _;
-
-        match data
-            .encapsulate(IcmpPacketBuilder::<I, _, _>::new(
-                src_ip,
-                dst_ip,
-                IcmpUnusedCode,
-                IcmpEchoReply::new(id, seq_num),
-            ))
-            .serialize_vec_outer()
-        {
-            Ok(body) => {
-                let Self { conns, listeners: _ } = self;
-                let available = conns.get(&conn).unwrap();
-                available.lock().receive(IntoAvailableMessage(src_ip, id, body.as_ref()))
-            }
-            Err((err, serializer)) => {
-                let _: packet::serialize::Nested<B, IcmpPacketBuilder<_, _, _>> = serializer;
-                match err {
-                    SerializeError::Alloc(never) => match never {},
-                    SerializeError::SizeLimitExceeded => {
-                        panic!("MTU constraint exceeded but not provided")
-                    }
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 struct AvailableMessage<I: Ip, T> {
@@ -1408,10 +866,7 @@ impl<'a, I: Ip, T: Transport<I>> From<&'a SocketState<I, T>> for SocketId<I, T> 
 }
 
 pub(crate) trait SocketWorkerDispatcher:
-    RequestHandlerDispatcher<Ipv4, Udp>
-    + RequestHandlerDispatcher<Ipv6, Udp>
-    + RequestHandlerDispatcher<Ipv4, IcmpEcho>
-    + RequestHandlerDispatcher<Ipv6, IcmpEcho>
+    RequestHandlerDispatcher<Ipv4, Udp> + RequestHandlerDispatcher<Ipv6, Udp>
 {
 }
 
@@ -1419,8 +874,6 @@ impl<T> SocketWorkerDispatcher for T
 where
     T: RequestHandlerDispatcher<Ipv4, Udp>,
     T: RequestHandlerDispatcher<Ipv6, Udp>,
-    T: RequestHandlerDispatcher<Ipv4, IcmpEcho>,
-    T: RequestHandlerDispatcher<Ipv6, IcmpEcho>,
 {
 }
 
@@ -1448,22 +901,10 @@ pub(super) fn spawn_worker(
                 events,
             ))
         }
-        (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            fasync::Task::spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv4, IcmpEcho>::new,
-                properties,
-                events,
-            ))
-        }
-        (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            fasync::Task::spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv6, IcmpEcho>::new,
-                properties,
-                events,
-            ))
-        }
+        (
+            fposix_socket::Domain::Ipv4 | fposix_socket::Domain::Ipv6,
+            fposix_socket::DatagramSocketProtocol::IcmpEcho,
+        ) => return Err(fposix::Errno::Enoprotoopt),
     }
     .detach();
     Ok(())
@@ -2199,7 +1640,6 @@ where
         };
         let protocol = match <T as Transport<I>>::PROTOCOL {
             DatagramProtocol::Udp => fposix_socket::DatagramSocketProtocol::Udp,
-            DatagramProtocol::IcmpEcho => fposix_socket::DatagramSocketProtocol::IcmpEcho,
         };
 
         Ok((domain, protocol))
@@ -2674,24 +2114,6 @@ mod tests {
                     )
                     .await
                 }
-
-                #[fasync::run_singlethreaded(test)]
-                $(#[$icmp_attributes])*
-                async fn icmp_echo_v4() {
-                    $test_fn::<fnet::Ipv4SocketAddress, IcmpEcho>(
-                        fposix_socket::DatagramSocketProtocol::IcmpEcho,
-                    )
-                    .await
-                }
-
-                #[fasync::run_singlethreaded(test)]
-                $(#[$icmp_attributes])*
-                async fn icmp_echo_v6() {
-                    $test_fn::<fnet::Ipv6SocketAddress, IcmpEcho>(
-                        fposix_socket::DatagramSocketProtocol::IcmpEcho,
-                    )
-                    .await
-                }
             }
         };
         ($test_fn:ident) => {
@@ -2717,7 +2139,7 @@ mod tests {
                 assert_eq!(res, Err(fposix::Errno::Econnrefused));
             }
             fposix_socket::DatagramSocketProtocol::IcmpEcho => {
-                assert_eq!(res, Ok(()));
+                todo!("https://fxbug.dev/125482: implement ICMP sockets")
             }
         };
 
@@ -3060,24 +2482,6 @@ mod tests {
             .await
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn icmp_echo_v4_socket_describe() {
-        socket_describe(
-            fposix_socket::Domain::Ipv4,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho,
-        )
-        .await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn icmp_echo_v6_socket_describe() {
-        socket_describe(
-            fposix_socket::Domain::Ipv6,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho,
-        )
-        .await
-    }
-
     async fn socket_get_info(
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
@@ -3112,24 +2516,6 @@ mod tests {
     async fn udp_v6_socket_get_info() {
         socket_get_info(fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp)
             .await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn icmp_echo_v4_socket_get_info() {
-        socket_get_info(
-            fposix_socket::Domain::Ipv4,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho,
-        )
-        .await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn icmp_echo_v6_socket_get_info() {
-        socket_get_info(
-            fposix_socket::Domain::Ipv6,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho,
-        )
-        .await
     }
 
     fn socket_clone(
