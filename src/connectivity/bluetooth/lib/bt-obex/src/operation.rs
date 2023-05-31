@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bitflags::bitflags;
 use core::fmt::Debug;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
 use std::cmp::PartialEq;
@@ -24,6 +25,17 @@ pub const MAX_PACKET_SIZE: usize = std::u16::MAX as usize;
 /// The minimum size of the OBEX maximum packet length is 255 bytes.
 /// Defined in OBEX 1.5. Section 3.4.1.4.
 pub const MIN_MAX_PACKET_SIZE: usize = 255;
+
+bitflags! {
+    /// The flags used in a SetPath operation.
+    /// Defined in OBEX 1.5 Section 3.4.6.1.
+    pub struct SetPathFlags: u8 {
+        /// Backup a directory level before applying (e.g. `../` on some systems).
+        const BACKUP = 0b0000_0001;
+        /// Don't create a folder if it does not exist. Return an Error instead.
+        const DONT_CREATE = 0b0000_0010;
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
@@ -72,11 +84,10 @@ impl OpCode {
     /// Returns 0 if the Operation is not expected to contain any data.
     /// See OBEX 1.5 Section 3.4 for more details on the specifics of the Operations.
     fn request_data_length(&self) -> usize {
-        // TODO(fxbug.dev/125306): Update for each Operation that is implemented (e.g. SetPath).
         match &self {
-            Self::Connect => 4, // OBEX Version (1) + flags (1) + Max Packet Length (2)
-            Self::SetPath => todo!("Update when SetPath support is added"),
-            _ => 0, // All other operations don't require any additional data
+            Self::Connect => 4, // OBEX Version (1) + Flags (1) + Max Packet Length (2)
+            Self::SetPath => 2, // Flags (1) + Constants (1)
+            _ => 0,             // All other operation requests don't require additional data
         }
     }
 
@@ -85,11 +96,9 @@ impl OpCode {
     /// Returns 0 if the Operation is not expected to contain any data.
     /// See OBEX 1.5 Section 3.4 for more details on the specifics of the Operations.
     pub fn response_data_length(&self) -> usize {
-        // TODO(fxbug.dev/125306): Update for each Operation that is implemented (e.g. SetPath).
         match &self {
             Self::Connect => 4, // OBEX Version (1) + flags (1) + Max Packet Length (2)
-            Self::SetPath => todo!("Update when SetPath support is added"),
-            _ => 0, // All other operations don't require any additional data
+            _ => 0,             // All other operation responses don't require additional data
         }
     }
 }
@@ -275,8 +284,8 @@ impl RequestPacket {
         Self::new(OpCode::Disconnect, vec![], headers)
     }
 
-    pub fn new_get(headers: HeaderSet) -> Result<Self, PacketError> {
-        Ok(Self::new(OpCode::Get, vec![], headers))
+    pub fn new_get(headers: HeaderSet) -> Self {
+        Self::new(OpCode::Get, vec![], headers)
     }
 
     pub fn new_get_final() -> Self {
@@ -289,6 +298,21 @@ impl RequestPacket {
 
     pub fn new_put_final(headers: HeaderSet) -> Self {
         Self::new(OpCode::PutFinal, vec![], headers)
+    }
+
+    pub fn new_set_path(flags: SetPathFlags, headers: HeaderSet) -> Result<Self, Error> {
+        // The Name header is mandatory in almost all cases. All other headers are optional.
+        // It is only considered optional when the request is to back up one level.
+        // See Section 3.4.6.3.
+        if !headers.contains_header(&HeaderIdentifier::Name)
+            && !flags.contains(SetPathFlags::BACKUP)
+        {
+            return Err(Error::operation(OpCode::SetPath, "name is required"));
+        }
+        // The request contains optional data - Flags & Constants. Constants are currently reserved
+        // and are set to 0. See Section 3.4.6.2.
+        let data = vec![flags.bits(), 0];
+        Ok(Self::new(OpCode::SetPath, data, headers))
     }
 }
 
@@ -460,7 +484,7 @@ impl<'a> GetOperation<'a> {
     /// Makes a GET request with the final bit unset using the provided `headers`.
     /// Returns the headers included in the peer response.
     async fn do_get(&mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
-        let request = RequestPacket::new_get(headers)?;
+        let request = RequestPacket::new_get(headers);
         trace!("Making outgoing GET request: {request:?}");
         self.transport.send(request)?;
         trace!("Successfully made GET request");
@@ -706,6 +730,28 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn construct_setpath() {
+        // A request with all flags enabled & Name header is valid.
+        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let _request = RequestPacket::new_set_path(SetPathFlags::all(), headers.clone())
+            .expect("valid set path args");
+
+        // A request with no flags enabled & Name header is valid.
+        let _request = RequestPacket::new_set_path(SetPathFlags::empty(), headers)
+            .expect("valid set path args");
+
+        // A request to back up a level doesn't require a Name header.
+        let _request = RequestPacket::new_set_path(SetPathFlags::BACKUP, HeaderSet::new())
+            .expect("valid set path args");
+
+        // Otherwise, a request without a Name header is an Error.
+        assert_matches!(
+            RequestPacket::new_set_path(SetPathFlags::DONT_CREATE, HeaderSet::new()),
+            Err(Error::OperationError { .. })
+        );
+    }
+
+    #[fuchsia::test]
     fn encode_request_packet_success() {
         let headers = HeaderSet::from_headers(vec![Header::Permissions(2)]).unwrap();
         let request = RequestPacket::new(OpCode::Abort, vec![], headers);
@@ -806,6 +852,66 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn encode_setpath_request_success() {
+        let headers = HeaderSet::from_headers(vec![Header::Name("bar".into())]).unwrap();
+        let request = RequestPacket::new_set_path(SetPathFlags::all(), headers).unwrap();
+        assert_eq!(request.encoded_len(), 16);
+        let mut buf = vec![0; request.encoded_len()];
+        request.encode(&mut buf[..]).expect("can encode request");
+        let expected = [
+            0x85, // OpCode = SETPATH
+            0x00, 0x10, // Packet length = 16
+            0x03, 0x00, // Flags = 3 (Backup & Don't create), Constants = 0
+            0x01, 0x00, 0x0b, 0x00, 0x62, 0x00, 0x61, 0x00, 0x72, 0x00,
+            0x00, // Name Header = "bar"
+        ];
+        assert_eq!(buf, expected);
+    }
+
+    #[fuchsia::test]
+    fn decode_setpath_request_success() {
+        let request_buf = [
+            0x85, // OpCode = SETPATH
+            0x00, 0x0e, // Packet length = 14
+            0x02, 0x00, // Flags = 2 (Don't create), Constants = 0
+            0x01, 0x00, 0x09, 0x00, 0x61, 0x00, 0x72, 0x00, 0x00, // Name Header = "ar"
+        ];
+        let decoded = RequestPacket::decode(&request_buf[..]).expect("valid request");
+        let expected_headers = HeaderSet::from_headers(vec![Header::Name("ar".into())]).unwrap();
+        let expected = RequestPacket::new(OpCode::SetPath, vec![0x02, 0x00], expected_headers);
+        assert_eq!(decoded, expected);
+    }
+
+    #[fuchsia::test]
+    fn decode_invalid_setpath_request_error() {
+        let missing_data = [
+            0x85, // OpCode = SetPath
+            0x00,
+            0x03, // Total Length = 3 bytes (Only prefix, missing data, optional headers)
+        ];
+        let decoded = RequestPacket::decode(&missing_data[..]);
+        assert_matches!(decoded, Err(PacketError::BufferTooSmall));
+
+        let invalid_data = [
+            0x85, // OpCode = Connect
+            0x00, 0x04, // Total Length = 4 bytes (Prefix, no optional headers, invalid data)
+            0x02, // Data is missing `constants` (should be 2 bytes total)
+        ];
+        let decoded = RequestPacket::decode(&invalid_data[..]);
+        assert_matches!(decoded, Err(PacketError::BufferTooSmall));
+
+        // Any additional data will be treated as part of the optional Headers, and so this will
+        // fail.
+        let invalid_data_too_long = [
+            0x85, // OpCode = SetPath
+            0x00, 0x08, // Total Length = 8 bytes (Prefix, no optional headers, invalid data)
+            0x10, 0x00, 0x00, 0xff, 0x01, // Data should only be 2 bytes
+        ];
+        let decoded = RequestPacket::decode(&invalid_data_too_long[..]);
+        assert_matches!(decoded, Err(_));
+    }
+
+    #[fuchsia::test]
     fn encode_response_packet_success() {
         let headers = HeaderSet::from_headers(vec![Header::DestName("foo".into())]).unwrap();
         let response = ResponsePacket::new(ResponseCode::Gone, vec![], headers);
@@ -888,6 +994,18 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn encode_setpath_response_packet_success() {
+        let setpath_response = ResponsePacket::new(ResponseCode::Ok, vec![], HeaderSet::new());
+        assert_eq!(setpath_response.encoded_len(), 3);
+        let mut buf = vec![0; setpath_response.encoded_len()];
+        setpath_response.encode(&mut buf[..]).expect("can encode response");
+        let expected_buf = [
+            0xa0, 0x00, 0x03, // Response = Ok, Total Length = 3 (no data, headers)
+        ];
+        assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
     fn expect_response_code() {
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
         assert_matches!(response.clone().expect_code(OpCode::Get, ResponseCode::Ok), Ok(_));
@@ -924,6 +1042,30 @@ mod tests {
         let expected =
             ResponsePacket::new(ResponseCode::Ok, vec![0x10, 0x00, 0x12, 0x34], expected_headers);
         assert_eq!(decoded, expected);
+    }
+
+    #[fuchsia::test]
+    fn decode_setpath_response_packet_success() {
+        let setpath_response = [
+            0xc3, 0x00, 0x08, // ResponseCode = Forbidden, Total length = 8
+            0xcf, 0x00, 0x00, 0x00, 0x02, // CreatorId = 2.
+        ];
+        let decoded = ResponsePacket::decode(&setpath_response[..], OpCode::SetPath)
+            .expect("can decode valid response");
+        let expected_headers = HeaderSet::from_headers(vec![Header::CreatorId(2)]).unwrap();
+        let expected = ResponsePacket::new(ResponseCode::Forbidden, vec![], expected_headers);
+        assert_eq!(decoded, expected);
+    }
+
+    #[fuchsia::test]
+    fn decode_setpath_response_packet_additional_data_error() {
+        let setpath_response = [
+            0xc3, 0x00, 0x0b, // ResponseCode = Forbidden, Total length = 11
+            0xaa, 0xbb, 0xcc, // Additional data is not supported in SetPath response.
+            0xcf, 0x00, 0x00, 0x00, 0x03, // CreatorId = 3.
+        ];
+        let decoded = ResponsePacket::decode(&setpath_response[..], OpCode::SetPath);
+        assert_matches!(decoded, Err(_));
     }
 
     #[track_caller]

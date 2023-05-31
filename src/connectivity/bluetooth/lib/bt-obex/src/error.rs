@@ -27,6 +27,8 @@ pub enum Error {
     PeerRejected { operation: OpCode, response: ResponseCode },
     #[error("Invalid {:?} response from peer: {:?}", .operation, .msg)]
     PeerResponse { operation: OpCode, msg: String },
+    #[error("{:?} is not implemented", .operation)]
+    NotImplemented { operation: OpCode },
 }
 
 impl Error {
@@ -40,6 +42,10 @@ impl Error {
 
     pub fn operation(operation: OpCode, msg: impl Into<String>) -> Self {
         Self::OperationError { operation, msg: msg.into() }
+    }
+
+    pub fn not_implemented(operation: OpCode) -> Self {
+        Self::NotImplemented { operation }
     }
 }
 

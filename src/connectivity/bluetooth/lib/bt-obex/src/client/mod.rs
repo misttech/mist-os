@@ -8,7 +8,7 @@ use tracing::trace;
 use crate::error::Error;
 use crate::header::HeaderSet;
 use crate::operation::{
-    GetOperation, OpCode, PutOperation, RequestPacket, ResponseCode, ResponsePacket,
+    GetOperation, OpCode, PutOperation, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags,
     MAX_PACKET_SIZE, MIN_MAX_PACKET_SIZE,
 };
 use crate::transport::ObexTransportManager;
@@ -122,6 +122,8 @@ impl ObexClient {
         Ok(GetOperation::new(headers, transport))
     }
 
+    /// Initializes a PUT Operation to write data to the remote OBEX Server.
+    /// Returns a `PutOperation` on success, Error if the new operation couldn't be started.
     pub fn put(&mut self) -> Result<PutOperation<'_>, Error> {
         // A PUT can only be initiated after the OBEX session is connected.
         if !self.connected {
@@ -131,6 +133,39 @@ impl ObexClient {
         // Only one operation can be active at a time.
         let transport = self.transport.try_new_operation()?;
         Ok(PutOperation::new(transport))
+    }
+
+    /// Initializes a SETPATH Operation to set the current folder on the remote OBEX Server.
+    /// Returns the Headers associated with the response on success.
+    /// Returns `Error::NotImplemented` if the remote server does not support SETPATH.
+    /// Returns Error for all other errors.
+    pub async fn set_path(
+        &mut self,
+        flags: SetPathFlags,
+        headers: HeaderSet,
+    ) -> Result<HeaderSet, Error> {
+        let opcode = OpCode::SetPath;
+        // A SETPATH can only be initiated after the OBEX session is connected.
+        if !self.connected {
+            return Err(Error::operation(opcode, "session not connected"));
+        }
+        let request = RequestPacket::new_set_path(flags, headers)?;
+        let response = {
+            let mut transport = self.transport.try_new_operation()?;
+            trace!("Making outgoing SETPATH request: {request:?}");
+            transport.send(request)?;
+            trace!("Successfully made SETPATH request");
+            transport.receive_response(opcode).await?
+        };
+
+        // Per OBEX Section 3.4.6, the server may respond with BadRequest or Forbidden if it does
+        // not support the operation.
+        if *response.code() == ResponseCode::BadRequest
+            || *response.code() == ResponseCode::Forbidden
+        {
+            return Err(Error::not_implemented(opcode));
+        }
+        response.expect_code(opcode, ResponseCode::Ok).map(Into::into)
     }
 }
 
@@ -172,7 +207,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn obex_client_connect_success() {
+    fn client_connect_success() {
         let mut exec = fasync::TestExecutor::new();
         let (mut client, mut remote) = new_obex_client(false);
 
@@ -245,7 +280,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn obex_disconnect_success() {
+    fn disconnect_success() {
         let mut exec = fasync::TestExecutor::new();
         let (client, mut remote) = new_obex_client(true);
 
@@ -268,7 +303,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn obex_disconnect_before_connect_error() {
+    async fn disconnect_before_connect_error() {
         let (client, _remote) = new_obex_client(false);
 
         let headers = HeaderSet::from_header(Header::Description("finished".into())).unwrap();
@@ -277,7 +312,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn obex_disconnect_error_response_error() {
+    fn disconnect_error_response_error() {
         let mut exec = fasync::TestExecutor::new();
         let (client, mut remote) = new_obex_client(true);
 
@@ -299,5 +334,76 @@ mod tests {
         let disconnect_result =
             exec.run_until_stalled(&mut disconnect_fut).expect("received response");
         assert_matches!(disconnect_result, Err(Error::PeerRejected { .. }));
+    }
+
+    #[fuchsia::test]
+    fn setpath_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut client, mut remote) = new_obex_client(true);
+
+        let headers = HeaderSet::from_header(Header::Name("myfolder".into())).unwrap();
+        let setpath_fut = client.set_path(SetPathFlags::empty(), headers);
+        pin_mut!(setpath_fut);
+        exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
+
+        // Expect the SetPath request on the remote. The typical response is a positive `Ok`.
+        let response_headers =
+            HeaderSet::from_header(Header::Description("updated current folder".into())).unwrap();
+        let response = ResponsePacket::new(ResponseCode::Ok, vec![], response_headers.clone());
+        let expectation = |request: RequestPacket| {
+            assert_eq!(*request.code(), OpCode::SetPath);
+            assert_eq!(request.data(), &[0, 0]);
+        };
+        expect_request_and_reply(&mut exec, &mut remote, expectation, response);
+
+        let setpath_result = exec
+            .run_until_stalled(&mut setpath_fut)
+            .expect("received response")
+            .expect("response is ok");
+        assert_eq!(setpath_result, response_headers);
+    }
+
+    #[fuchsia::test]
+    fn setpath_error_response_is_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut client, mut remote) = new_obex_client(true);
+
+        // Peer doesn't support SetPath.
+        {
+            let setpath_fut = client.set_path(SetPathFlags::BACKUP, HeaderSet::new());
+            pin_mut!(setpath_fut);
+            exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
+
+            // Expect the SetPath request on the remote - peer doesn't support SetPath.
+            let response_headers =
+                HeaderSet::from_header(Header::Description("not implemented".into())).unwrap();
+            let response = ResponsePacket::new(ResponseCode::BadRequest, vec![], response_headers);
+            expect_request_and_reply(
+                &mut exec,
+                &mut remote,
+                expect_code(OpCode::SetPath),
+                response,
+            );
+
+            let setpath_result =
+                exec.run_until_stalled(&mut setpath_fut).expect("received response");
+            assert_matches!(setpath_result, Err(Error::NotImplemented { .. }));
+        }
+
+        // Peer rejects SetPath.
+        let headers = HeaderSet::from_header(Header::Name("file".into())).unwrap();
+        let setpath_fut = client.set_path(SetPathFlags::DONT_CREATE, headers);
+        pin_mut!(setpath_fut);
+        exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
+
+        // Expect the SetPath request on the remote - peer responds with error.
+        let response_headers =
+            HeaderSet::from_header(Header::Description("not implemented".into())).unwrap();
+        let response =
+            ResponsePacket::new(ResponseCode::InternalServerError, vec![], response_headers);
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::SetPath), response);
+
+        let setpath_result = exec.run_until_stalled(&mut setpath_fut).expect("received response");
+        assert_matches!(setpath_result, Err(Error::PeerRejected { .. }));
     }
 }
