@@ -8,6 +8,12 @@ using fuchsia.net;
 /// The maximum number of rules.
 const MAX_RULES uint32 = 128;
 
+/// The possible errors that result from enabling/disabling filtering on an
+/// interface.
+type EnableDisableInterfaceError = strict enum {
+    NOT_FOUND = 1;
+};
+
 /// A protocol for filtering TCP/IP traffic and Network Address Translation.
 // TODO(https://fxbug.dev/91503): Modernize/upgrade filter/NAT APIs.
 @discoverable
@@ -21,9 +27,7 @@ protocol Filter {
     /// * error Reports `NOT_FOUND` if `id` is not a valid interface.
     EnableInterface(struct {
         id fuchsia.net.InterfaceId;
-    }) -> () error strict enum {
-        NOT_FOUND = 1;
-    };
+    }) -> () error EnableDisableInterfaceError;
 
     /// Disable the filter on a specific interface.
     ///
@@ -34,9 +38,7 @@ protocol Filter {
     /// * error Reports `NOT_FOUND` if `id` is not a valid interface.
     DisableInterface(struct {
         id fuchsia.net.InterfaceId;
-    }) -> () error strict enum {
-        NOT_FOUND = 1;
-    };
+    }) -> () error EnableDisableInterfaceError;
 
     /// GetRules gets the current rules. They do not include NAT or RDR rules.
     /// (use GetNatRules or GetRdrRules instead).

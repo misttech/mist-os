@@ -73,7 +73,7 @@ func New(s *stack.Stack) *Filter {
 func (f *Filter) enableInterface(id tcpip.NICID) filter.FilterEnableInterfaceResult {
 	name := f.stack.FindNICNameFromID(id)
 	if name == "" {
-		return filter.FilterEnableInterfaceResultWithErr(filter.FilterEnableInterfaceErrorNotFound)
+		return filter.FilterEnableInterfaceResultWithErr(filter.EnableDisableInterfaceErrorNotFound)
 	}
 	f.filterDisabledNICMatcher.mu.Lock()
 	defer f.filterDisabledNICMatcher.mu.Unlock()
@@ -84,7 +84,7 @@ func (f *Filter) enableInterface(id tcpip.NICID) filter.FilterEnableInterfaceRes
 func (f *Filter) disableInterface(id tcpip.NICID) filter.FilterDisableInterfaceResult {
 	name := f.stack.FindNICNameFromID(id)
 	if name == "" {
-		return filter.FilterDisableInterfaceResultWithErr(filter.FilterDisableInterfaceErrorNotFound)
+		return filter.FilterDisableInterfaceResultWithErr(filter.EnableDisableInterfaceErrorNotFound)
 	}
 	f.filterDisabledNICMatcher.mu.Lock()
 	defer f.filterDisabledNICMatcher.mu.Unlock()

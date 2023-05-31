@@ -38,8 +38,7 @@ macro_rules! impl_trait {
     };
 }
 
-impl_trait!(FilterEnableInterfaceError);
-impl_trait!(FilterDisableInterfaceError);
+impl_trait!(EnableDisableInterfaceError);
 impl_trait!(FilterUpdateRulesError);
 impl_trait!(FilterUpdateNatRulesError);
 impl_trait!(FilterUpdateRdrRulesError);
