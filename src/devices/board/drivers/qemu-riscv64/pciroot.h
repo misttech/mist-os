@@ -28,10 +28,14 @@ class QemuRiscv64Pciroot : public PcirootBase {
   ~QemuRiscv64Pciroot() override = default;
 
  private:
-  Context context_;
   QemuRiscv64Pciroot(PciRootHost* root_host, QemuRiscv64Pciroot::Context context,
                      zx_device_t* parent, const char* name)
       : PcirootBase(root_host, parent, name), context_(std::move(context)), iommu_(parent) {}
+  zx::result<> CreateInterrupts();
+
+  Context context_;
+  std::vector<pci_legacy_irq_t> interrupts_;
+  std::vector<pci_irq_routing_entry_t> irq_routing_entries_;
   ddk::IommuProtocolClient iommu_;
 };
 

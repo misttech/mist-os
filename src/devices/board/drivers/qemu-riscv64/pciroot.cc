@@ -32,7 +32,12 @@ namespace fpci = fuchsia_hardware_pci::wire;
 namespace board_qemu_riscv64 {
 
 namespace {
-// Values per the `virt_memmap` MemMapEntry in qemu/hw/riscv/virt.c
+
+// PCIE IRQs are [32, 35] from qemu/hw/riscv/virt.h.
+constexpr uint8_t kVirtPcieIrqBase = 0x20;
+constexpr uint8_t kVirtPcieIrqCount = 0x4;
+
+// Values per the `virt_memmap` MemMapEntry in qemu/hw/riscv/virt.c.
 constexpr ralloc_region_t kVirtPcieEcam = {.base = 0x3000'0000, .size = 0x1000'0000};
 constexpr ralloc_region_t kVirtPcieMmio = {.base = 0x4000'0000, .size = 0x4000'0000};
 constexpr ralloc_region_t kVirtPciePio = {.base = 0x300'0000, .size = 0x10000};
@@ -49,19 +54,6 @@ constexpr McfgAllocation kVirtPcieMcfg = {
 };
 }  // namespace
 
-zx::result<> QemuRiscv64Pciroot::Create(PciRootHost* root_host, QemuRiscv64Pciroot::Context ctx,
-                                        zx_device_t* parent, const char* name) {
-  auto pciroot = std::unique_ptr<QemuRiscv64Pciroot>(
-      new QemuRiscv64Pciroot(root_host, std::move(ctx), parent, name));
-  zx_status_t status =
-      pciroot->DdkAdd(ddk::DeviceAddArgs(name).set_inspect_vmo(pciroot->inspect().DuplicateVmo()));
-  if (status == ZX_OK) {
-    [[maybe_unused]] auto ptr = pciroot.release();
-  }
-
-  return zx::make_result(status);
-}
-
 zx_status_t QemuRiscv64Pciroot::PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) {
   return iommu_.GetBti(/*iommu_index=*/index, /*bti_id=*/bdf, /*out_handle=*/bti);
 }
@@ -70,7 +62,10 @@ zx_status_t QemuRiscv64Pciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* i
   info->start_bus_num = kVirtPcieMcfg.start_bus_number;
   info->end_bus_num = kVirtPcieMcfg.end_bus_number;
   info->segment_group = kVirtPcieMcfg.pci_segment;
-  info->legacy_irqs_count = 0;
+  info->legacy_irqs_list = interrupts_.data();
+  info->legacy_irqs_count = interrupts_.size();
+  info->irq_routing_list = irq_routing_entries_.data();
+  info->irq_routing_count = irq_routing_entries_.size();
   info->acpi_bdfs_count = 0;
   strncpy(info->name, kPcirootName, sizeof(kPcirootName));
 
@@ -83,15 +78,34 @@ zx_status_t QemuRiscv64Pciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* i
   return ZX_OK;
 }
 
+zx::result<> QemuRiscv64Pciroot::Create(PciRootHost* root_host, QemuRiscv64Pciroot::Context ctx,
+                                        zx_device_t* parent, const char* name) {
+  auto pciroot = std::unique_ptr<QemuRiscv64Pciroot>(
+      new QemuRiscv64Pciroot(root_host, std::move(ctx), parent, name));
+  if (auto result = pciroot->CreateInterrupts(); result.is_error()) {
+    return result.take_error();
+  }
+
+  zx_status_t status =
+      pciroot->DdkAdd(ddk::DeviceAddArgs(name).set_inspect_vmo(pciroot->inspect().DuplicateVmo()));
+  if (status == ZX_OK) {
+    [[maybe_unused]] auto ptr = pciroot.release();
+  }
+
+  return zx::make_result(status);
+}
+
 zx::result<> QemuRiscv64::PcirootInit() {
+  zx::unowned_resource root_resource(get_root_resource());
+
   pci_root_host_.mcfgs().push_back(kVirtPcieMcfg);
   pci_root_host_.Io().AddRegion(kVirtPciePio);
   pci_root_host_.Mmio64().AddRegion(kVirtPcieMmio);
 
   QemuRiscv64Pciroot::Context context{};
-  zx_status_t status = zx::vmo::create_physical(
-      *zx::unowned_resource(get_root_resource()), /*paddr=*/kVirtPcieEcam.base,
-      /*size=*/kVirtPcieEcam.size, /*result=*/&context.ecam);
+  zx_status_t status =
+      zx::vmo::create_physical(/*resource=*/*root_resource, /*paddr=*/kVirtPcieEcam.base,
+                               /*size=*/kVirtPcieEcam.size, /*result=*/&context.ecam);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate ecam vmo for [%#lx, %#lx): %s", kVirtPcieEcam.base,
            kVirtPcieEcam.base + kVirtPcieEcam.size, zx_status_get_string(status));
@@ -99,6 +113,38 @@ zx::result<> QemuRiscv64::PcirootInit() {
   }
 
   return QemuRiscv64Pciroot::Create(&pci_root_host_, std::move(context), parent(), kPcirootName);
+}
+
+zx::result<> QemuRiscv64Pciroot::CreateInterrupts() {
+  zx::unowned_resource root_resource(get_root_resource());
+
+  for (uint32_t vector_offset = 0; vector_offset < kVirtPcieIrqCount; vector_offset++) {
+    zx::interrupt interrupt;
+    zx_status_t status = zx::interrupt::create(/*resource=*/*root_resource,
+                                               /*vector=*/kVirtPcieIrqBase + vector_offset,
+                                               /*options=*/0, /*result=*/&interrupt);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    interrupts_.push_back(pci_legacy_irq_t{
+        .interrupt = interrupt.release(),
+        .vector = kVirtPcieIrqBase + vector_offset,
+    });
+
+    // All QEMU devices are plugged into the root port and use a pre-defined pin swizzle.
+    for (uint8_t device_id = 0; device_id < DEVICES_PER_BUS; device_id++) {
+      pci_irq_routing_entry_t entry = {.port_device_id = PCI_IRQ_ROUTING_NO_PARENT,
+                                       .port_function_id = PCI_IRQ_ROUTING_NO_PARENT,
+                                       .device_id = device_id};
+      for (uint32_t pin = 0; pin < PINS_PER_FUNCTION; pin++) {
+        entry.pins[pin] = kVirtPcieIrqBase + ((pin + device_id) % PINS_PER_FUNCTION);
+      }
+      irq_routing_entries_.push_back(entry);
+    }
+  }
+
+  return zx::ok();
 }
 
 }  // namespace board_qemu_riscv64
