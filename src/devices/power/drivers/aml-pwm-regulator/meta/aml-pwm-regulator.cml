@@ -18,7 +18,9 @@
     capabilities: [
         { service: "fuchsia.hardware.vreg.Service" },
     ],
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.pwm.Service" },
+    ],
     expose: [
         {
             service: "fuchsia.hardware.vreg.Service",

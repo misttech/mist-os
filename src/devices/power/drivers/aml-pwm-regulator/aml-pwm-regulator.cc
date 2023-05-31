@@ -25,14 +25,24 @@ void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
   }
 
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {
-      false, period_ns_,
-      static_cast<float>((num_steps_ - 1 - request->step) * 100.0 / ((num_steps_ - 1) * 1.0)),
-      reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  auto status = pwm_.SetConfig(&cfg);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Unable to configure PWM. %d", status);
-    completer.ReplyError(status);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      .polarity = false,
+      .period_ns = period_ns_,
+      .duty_cycle =
+          static_cast<float>((num_steps_ - 1 - request->step) * 100.0 / ((num_steps_ - 1) * 1.0)),
+      .mode_config =
+          fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on)),
+  };
+
+  auto result = pwm_proto_client_->SetConfig(cfg);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Unable to configure PWM. %s", result.status_string());
+    completer.ReplyError(result.status());
+    return;
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Unable to configure PWM. %s", zx_status_get_string(result->error_value()));
+    completer.ReplyError(result->error_value());
     return;
   }
   current_step_ = request->step;
@@ -102,22 +112,29 @@ zx_status_t AmlPwmRegulator::Create(void* ctx, zx_device_t* parent) {
     uint32_t idx = pwm_vreg.pwm_index();
     char name[20];
     snprintf(name, sizeof(name), "pwm-%u", idx);
-    ddk::PwmProtocolClient pwm;
-    if (auto status = ddk::PwmProtocolClient::CreateFromDevice(parent, name, &pwm);
-        status != ZX_OK) {
-      zxlogf(ERROR, "Failed to create PWM protocol client for %s: %s", name,
-             zx_status_get_string(status));
-      return ZX_ERR_INTERNAL;
-    }
-    auto status = pwm.Enable();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Unable to enable PWM %u, %d", idx, status);
-      return status;
+
+    zx::result client_end =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, name);
+    if (client_end.is_error()) {
+      zxlogf(ERROR, "Unable to connect to fidl protocol - status: %s", client_end.status_string());
+      return client_end.status_value();
     }
 
+    fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client(std::move(client_end.value()));
+
+    auto result = pwm_proto_client->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Unable to enable PWM %u, %s", idx, result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Unable to enable PWM %u, %s", idx,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
     fbl::AllocChecker ac;
-    std::unique_ptr<AmlPwmRegulator> device(new (&ac)
-                                                AmlPwmRegulator(parent, pwm_vreg, std::move(pwm)));
+    std::unique_ptr<AmlPwmRegulator> device(
+        new (&ac) AmlPwmRegulator(parent, pwm_vreg, std::move(pwm_proto_client)));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -138,11 +155,11 @@ zx_status_t AmlPwmRegulator::Create(void* ctx, zx_device_t* parent) {
 
     device->outgoing_server_end_ = std::move(endpoints->server);
 
-    status = device->DdkAdd(ddk::DeviceAddArgs(name)
-                                .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                                .set_props(props)
-                                .set_fidl_service_offers(offers)
-                                .set_outgoing_dir(endpoints->client.TakeChannel()));
+    zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs(name)
+                                            .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                                            .set_props(props)
+                                            .set_fidl_service_offers(offers)
+                                            .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
       zxlogf(ERROR, "DdkAdd failed, status = %d", status);
     }
