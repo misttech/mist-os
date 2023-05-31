@@ -7,6 +7,7 @@
 #include <fstream>
 #include <map>
 #include <string>
+#include <filesystem>
 
 #include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
@@ -59,13 +60,7 @@ class LocalSchemaProvider : public IRemoteSchemaDocumentProvider {
 
   const SchemaDocument* GetRemoteDocument(const char* uri, SizeType length) override {
     std::string input(uri, length);
-    std::string file_name;
-    re2::RE2 pattern("^(file:)?([^/#:]+)$");
-    if (!re2::RE2::PartialMatch(input, pattern, nullptr, &file_name)) {
-      fprintf(stderr, "Error: could not find schema %s.\n", input.c_str());
-      has_errors_ = true;
-      return nullptr;
-    }
+    std::string file_name(std::filesystem::path(input).filename());
     if (documents_[file_name]) {
       return documents_[file_name].get();
     }
