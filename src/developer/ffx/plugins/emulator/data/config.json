@@ -5,7 +5,7 @@
         },
         "device": "",
         "engine": "femu",
-        "gpu": "auto",
+        "gpu": "swiftshader_indirect",
         "instance_dir": "$DATA/emu/instances",
         "kvm_path": "/dev/kvm",
         "name": "fuchsia-emulator",

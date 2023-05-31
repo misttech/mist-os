@@ -320,7 +320,7 @@ mod tests {
         // Get a default configuration, and verify we know what those values are.
         let emu_config = EmulatorConfiguration::default();
         assert_eq!(emu_config.host.acceleration, AccelerationMode::None);
-        assert_eq!(emu_config.host.gpu, GpuType::Auto);
+        assert_eq!(emu_config.host.gpu, GpuType::SwiftshaderIndirect);
         assert_eq!(emu_config.host.log, PathBuf::from(""));
         assert_eq!(emu_config.host.networking, NetworkingMode::Auto);
         assert_eq!(emu_config.runtime.console, ConsoleType::None);
@@ -334,7 +334,7 @@ mod tests {
         // Apply the test data, which should change everything in the config.
         let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::Hyper);
-        assert_eq!(opts.host.gpu, GpuType::Host);
+        assert_eq!(opts.host.gpu, GpuType::HostExperimental);
         assert_eq!(opts.host.log, PathBuf::from("/path/to/log"));
         assert_eq!(opts.host.networking, NetworkingMode::Tap);
         assert_eq!(opts.runtime.console, ConsoleType::Console);
@@ -409,13 +409,13 @@ mod tests {
 
         assert_eq!(cmd.device().await.unwrap(), Some(String::from("")));
         assert_eq!(cmd.engine().await.unwrap(), "femu");
-        assert_eq!(cmd.gpu().await.unwrap(), "auto");
+        assert_eq!(cmd.gpu().await.unwrap(), "swiftshader_indirect");
         assert_eq!(cmd.startup_timeout().await.unwrap(), 60);
 
         let result = apply_command_line_options(emu_config.clone(), &cmd).await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
-        assert_eq!(opts.host.gpu, GpuType::Auto);
+        assert_eq!(opts.host.gpu, GpuType::SwiftshaderIndirect);
 
         query(EMU_DEFAULT_DEVICE).level(Some(ConfigLevel::User)).set(json!("my_device")).await?;
         query(EMU_DEFAULT_ENGINE).level(Some(ConfigLevel::User)).set(json!("qemu")).await?;
@@ -430,7 +430,7 @@ mod tests {
         let result = apply_command_line_options(emu_config.clone(), &cmd).await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
-        assert_eq!(opts.host.gpu, GpuType::Host);
+        assert_eq!(opts.host.gpu, GpuType::HostExperimental);
 
         cmd.gpu = Some(String::from("swiftshader_indirect"));
 

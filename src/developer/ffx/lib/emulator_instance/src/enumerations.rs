@@ -143,27 +143,34 @@ display_impl!(EngineType);
 
 /// Selector for which type of graphics acceleration to enable for the emulator.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
 pub enum GpuType {
     /// Let the emulator choose between hardware or software graphics
     /// acceleration based on your computer setup.
-    Auto,
+    ///
+    /// For experimental use only; not officially supported by the Fuchsia
+    /// emulator team.
+    #[serde(rename = "auto")]
+    AutoExperimental,
 
     /// Use the GPU on your computer for hardware acceleration. This option
     /// typically provides the highest graphics quality and performance for the
     /// emulator. However, if your graphics drivers have issues rendering
     /// OpenGL, you might need to use the swiftshader_indirect option.
-    Host,
+    ///
+    /// For experimental use only; not officially supported by the Fuchsia
+    /// emulator team.
+    #[serde(rename = "host")]
+    HostExperimental,
 
     /// Use a Quick Boot-compatible variant of SwiftShader to render graphics
-    /// using software acceleration. This option is a good alternative to host
-    /// mode if your computer can't use hardware acceleration.
+    /// using software acceleration.
+    #[serde(rename = "swiftshader_indirect")]
     SwiftshaderIndirect,
 }
 
 impl Default for GpuType {
     fn default() -> Self {
-        GpuType::Auto
+        GpuType::SwiftshaderIndirect
     }
 }
 

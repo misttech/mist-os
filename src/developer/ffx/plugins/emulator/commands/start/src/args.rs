@@ -87,12 +87,14 @@ pub struct StartCommand {
     #[ffx_config_default(key = "emu.engine", default = "femu")]
     pub engine: Option<String>,
 
-    /// GPU acceleration mode. Allowed values are "host", "swiftshader_indirect", or "auto".
-    /// Default is "auto". Note: this is unused when using the "qemu" engine type. See
+    /// GPU acceleration mode. Allowed values are "swiftshader_indirect", "host", or "auto".
+    /// Default is "swiftshader_indirect". "host" and "auto" are for experimental use only and are
+    /// not officially supported by the Fuchsia emulator team; graphics artifacts, test failures and
+    /// emulator crashes may occur. Note: this is unused when using the "qemu" engine type. See
     /// https://developer.android.com/studio/run/emulator-acceleration#command-gpu for details on
     /// the available options. This can be overridden by running `ffx config set emu.gpu <type>`.
     #[argh(option)]
-    #[ffx_config_default(key = "emu.gpu", default = "auto")]
+    #[ffx_config_default(key = "emu.gpu", default = "swiftshader_indirect")]
     pub gpu: Option<String>,
 
     /// run the emulator without a GUI. The guest system may still initialize graphics drivers,
