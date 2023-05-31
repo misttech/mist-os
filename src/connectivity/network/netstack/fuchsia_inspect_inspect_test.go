@@ -37,9 +37,9 @@ import (
 	"gvisor.dev/gvisor/pkg/waiter"
 )
 
-const (
-	ipv4Addr = tcpip.Address("\xc0\xa8\x01\x01")
-	ipv6Addr = tcpip.Address("\x00\x0a\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01")
+var (
+	ipv4Addr = util.Parse("192.168.1.0")
+	ipv6Addr = util.Parse("a::1")
 )
 
 type inspectNodeExpectation struct {
@@ -1022,7 +1022,7 @@ func TestRouteInfoInspectImpl(t *testing.T) {
 			route: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: header.IPv4EmptySubnet,
-					Gateway:     "\x01\x02\x03\x04",
+					Gateway:     util.Parse("1.2.3.4"),
 					NIC:         1,
 				},
 				Metric:                42,
@@ -1045,7 +1045,7 @@ func TestRouteInfoInspectImpl(t *testing.T) {
 			route: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: header.IPv6EmptySubnet,
-					Gateway:     "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+					Gateway:     util.Parse("fe80::1"),
 					NIC:         2,
 				},
 				Metric:                0,

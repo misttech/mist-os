@@ -34,8 +34,9 @@ const (
 )
 
 var (
-	subnet1           = newSubnet(util.Parse("abcd:1234::"), tcpip.AddressMask(util.Parse("ffff:ffff::")))
-	subnet2           = newSubnet(util.Parse("abcd:1236::"), tcpip.AddressMask(util.Parse("ffff:ffff::")))
+	mask              = util.Parse("ffff:ffff::")
+	subnet1           = newSubnet(util.Parse("abcd:1234::"), tcpip.MaskFromBytes(mask.AsSlice()))
+	subnet2           = newSubnet(util.Parse("abcd:1236::"), tcpip.MaskFromBytes(mask.AsSlice()))
 	testProtocolAddr1 = tcpip.ProtocolAddress{
 		Protocol: ipv6.ProtocolNumber,
 		AddressWithPrefix: tcpip.AddressWithPrefix{
@@ -457,22 +458,22 @@ func TestLinkDown(t *testing.T) {
 	}
 
 	addr1NIC1 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+		Addr: util.Parse("fe80::1"),
 		Port: 53,
 		NIC:  ifs1.nicid,
 	}
 	addr1NIC2 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+		Addr: util.Parse("fe80::1"),
 		Port: 53,
 		NIC:  ifs2.nicid,
 	}
 	addr2NIC1 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02",
+		Addr: util.Parse("fe80::2"),
 		Port: 53,
 		NIC:  ifs1.nicid,
 	}
 	addr3NIC2 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03",
+		Addr: util.Parse("fe80::3"),
 		Port: 53,
 		NIC:  ifs2.nicid,
 	}
@@ -554,7 +555,7 @@ var dnsServerTcpIpFullAddressOpts = []cmp.Option{
 			return left < right
 		}
 		if left, right := left.Addr, right.Addr; left != right {
-			return left < right
+			return string(left.AsSlice()) < string(right.AsSlice())
 		}
 		if left, right := left.Port, right.Port; left != right {
 			return left < right
@@ -585,22 +586,22 @@ func TestRecursiveDNSServers(t *testing.T) {
 	}
 
 	addr1NIC1 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+		Addr: util.Parse("fe80::1"),
 		Port: 53,
 		NIC:  ifs1.nicid,
 	}
 	addr1NIC2 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+		Addr: util.Parse("fe80::1"),
 		Port: 53,
 		NIC:  ifs2.nicid,
 	}
 	addr2NIC1 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02",
+		Addr: util.Parse("fe80::2"),
 		Port: 53,
 		NIC:  ifs1.nicid,
 	}
 	addr3NIC2 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03",
+		Addr: util.Parse("fe80::3"),
 		Port: 53,
 		NIC:  ifs2.nicid,
 	}
@@ -678,17 +679,17 @@ func TestRecursiveDNSServersWithInfiniteLifetime(t *testing.T) {
 	}
 
 	addr1 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+		Addr: util.Parse("fe80::1"),
 		Port: 53,
 		NIC:  ifs.nicid,
 	}
 	addr2 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02",
+		Addr: util.Parse("fe80::2"),
 		Port: 53,
 		NIC:  ifs.nicid,
 	}
 	addr3 := tcpip.FullAddress{
-		Addr: "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03",
+		Addr: util.Parse("fe80::3"),
 		Port: 53,
 		NIC:  ifs.nicid,
 	}

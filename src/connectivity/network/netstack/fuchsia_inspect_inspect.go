@@ -702,7 +702,7 @@ type dhcpInfoInspectImpl struct {
 
 func (impl *dhcpInfoInspectImpl) ReadData() inspect.Object {
 	addrString := func(addr tcpip.Address) string {
-		if addr == "" {
+		if addr.Len() == 0 {
 			return "[none]"
 		}
 		return addr.String()
@@ -714,7 +714,7 @@ func (impl *dhcpInfoInspectImpl) ReadData() inspect.Object {
 		return addr.String()
 	}
 	maskString := func(mask tcpip.AddressMask) string {
-		if mask.String() == "" {
+		if mask.Len() == 0 {
 			return "[none]"
 		}
 		return mask.String()
@@ -986,11 +986,11 @@ func (impl *socketInfoInspectImpl) ReadData() inspect.Object {
 		transString = "UNKNOWN"
 	}
 
-	localAddress := net.IP(common.ID.LocalAddress)
+	localAddress := net.IP(common.ID.LocalAddress.AsSlice())
 	if len(localAddress) == 0 {
 		localAddress = zeroAddress
 	}
-	remoteAddress := net.IP(common.ID.RemoteAddress)
+	remoteAddress := net.IP(common.ID.RemoteAddress.AsSlice())
 	if len(remoteAddress) == 0 {
 		remoteAddress = zeroAddress
 	}

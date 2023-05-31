@@ -49,12 +49,15 @@ import (
 )
 
 const (
-	testTopoPath         string        = "/fake/ethernet/device"
-	testV4Address        tcpip.Address = "\xc0\xa8\x2a\x10"
-	testV6Address        tcpip.Address = "\xc0\xa8\x2a\x10\xc0\xa8\x2a\x10\xc0\xa8\x2a\x10\xc0\xa8\x2a\x10"
-	testLinkLocalV6Addr1 tcpip.Address = "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-	testLinkLocalV6Addr2 tcpip.Address = "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02"
-	dadResolutionTimeout               = dadRetransmitTimer*dadTransmits + time.Second
+	testTopoPath         string = "/fake/ethernet/device"
+	dadResolutionTimeout        = dadRetransmitTimer*dadTransmits + time.Second
+)
+
+var (
+	testV4Address        = util.Parse("192.168.42.16")
+	testV6Address        = util.Parse("200a::1")
+	testLinkLocalV6Addr1 = util.Parse("fe80::1")
+	testLinkLocalV6Addr2 = util.Parse("fe80::2")
 )
 
 func TestMain(m *testing.M) {
@@ -92,7 +95,7 @@ func TestDelRouteErrors(t *testing.T) {
 
 	rt := tcpip.Route{
 		Destination: header.IPv4EmptySubnet,
-		Gateway:     "\x01\x02\x03\x04",
+		Gateway:     util.Parse("1.2.3.4"),
 		NIC:         ifs.nicid,
 	}
 
@@ -552,12 +555,12 @@ func TestTCPEndpointMapConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	address := tcpip.Address([]byte{1, 2, 3, 4})
+	address := tcpip.AddrFrom4([4]byte{1, 2, 3, 4})
 	destination := tcpip.FullAddress{
 		Addr: address,
 		Port: 1,
 	}
-	source := tcpip.Address([]byte{5, 6, 7, 8})
+	source := tcpip.AddrFrom4([4]byte{5, 6, 7, 8})
 	protocolAddress := tcpip.ProtocolAddress{
 		Protocol:          ipv4.ProtocolNumber,
 		AddressWithPrefix: source.WithPrefix(),
@@ -926,7 +929,7 @@ func TestIpv6LinkLocalOnLinkRouteOnUp(t *testing.T) {
 
 func TestOnLinkV6Route(t *testing.T) {
 	subAddr := util.Parse("abcd:1234::")
-	subMask := tcpip.AddressMask(util.Parse("ffff:ffff::"))
+	subMask := util.ParseMask("ffff:ffff::")
 	subnet, err := tcpip.NewSubnet(subAddr, subMask)
 	if err != nil {
 		t.Fatalf("NewSubnet(%s, %s): %s", subAddr, subMask, err)
@@ -1042,8 +1045,8 @@ func getInterfaceAddresses(
 
 func compareInterfaceAddresses(t *testing.T, got, want []tcpip.AddressWithPrefix) {
 	t.Helper()
-	sort.Slice(got, func(i, j int) bool { return got[i].Address < got[j].Address })
-	sort.Slice(want, func(i, j int) bool { return want[i].Address < want[j].Address })
+	sort.Slice(got, func(i, j int) bool { return string(got[i].Address.AsSlice()) < string(got[j].Address.AsSlice()) })
+	sort.Slice(want, func(i, j int) bool { return string(want[i].Address.AsSlice()) < string(want[j].Address.AsSlice()) })
 	if diff := cmp.Diff(got, want); diff != "" {
 		t.Errorf("Interface addresses mismatch (-want +got):\n%s", diff)
 	}
@@ -1091,14 +1094,14 @@ func TestListInterfaceAddresses(t *testing.T) {
 	wantAddrs := getInterfaceAddresses(t, ni, ifState.nicid)
 
 	testAddresses := []tcpip.AddressWithPrefix{
-		{"\x01\x01\x01\x01", 32},
-		{"\x02\x02\x02\x02", 24},
-		{"\x03\x03\x03\x03", 16},
-		{"\x04\x04\x04\x04", 8},
-		{"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01", 128},
-		{"\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02", 64},
-		{"\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03", 32},
-		{"\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04", 8},
+		{util.Parse("1.1.1.1"), 32},
+		{util.Parse("2.2.2.2"), 24},
+		{util.Parse("3.3.3.3"), 16},
+		{util.Parse("4.4.4.4"), 8},
+		{util.Parse("101:101:101:101:101:101:101:101"), 128},
+		{util.Parse("202:202:202:202:202:202:202:202"), 64},
+		{util.Parse("303:303:303:303:303:303:303:303"), 32},
+		{util.Parse("404:404:404:404:404:404:404:404"), 8},
 	}
 
 	t.Run("Add", func(t *testing.T) {
@@ -1176,11 +1179,11 @@ func TestAddRouteParameterValidation(t *testing.T) {
 	addr := tcpip.ProtocolAddress{
 		Protocol: ipv4.ProtocolNumber,
 		AddressWithPrefix: tcpip.AddressWithPrefix{
-			Address:   tcpip.Address("\xf0\xf0\xf0\xf0"),
+			Address:   util.Parse("240.240.240.240"),
 			PrefixLen: 24,
 		},
 	}
-	subnetLocalAddress := tcpip.Address("\xf0\xf0\xf0\xf1")
+	subnetLocalAddress := util.Parse("240.240.240.241")
 	ifState := addNoopEndpoint(t, ns, "")
 	t.Cleanup(ifState.RemoveByUser)
 
@@ -1244,10 +1247,10 @@ func TestDHCPAcquired(t *testing.T) {
 	ifState := addNoopEndpoint(t, ns, "")
 	t.Cleanup(ifState.RemoveByUser)
 
-	addressBytes := []byte(testV4Address)
+	addressBytes := testV4Address.AsSlice()
 	nextAddress := func() tcpip.Address {
 		addressBytes[len(addressBytes)-1]++
-		return tcpip.Address(addressBytes)
+		return tcpip.AddrFromSlice(addressBytes)
 	}
 
 	serverAddress := nextAddress()
@@ -1258,14 +1261,14 @@ func TestDHCPAcquired(t *testing.T) {
 		t.Fatalf("%s is not a multicast address", multicastAddress)
 	}
 
-	defaultMask := net.IP(testV4Address).DefaultMask()
+	defaultMask := net.IP(testV4Address.AsSlice()).DefaultMask()
 	prefixLen, _ := defaultMask.Size()
 
-	destination1, err := tcpip.NewSubnet(util.Parse("192.168.42.0"), tcpip.AddressMask(util.Parse("255.255.255.0")))
+	destination1, err := tcpip.NewSubnet(util.Parse("192.168.42.0"), util.ParseMask("255.255.255.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	destination2, err := tcpip.NewSubnet(util.Parse("0.0.0.0"), tcpip.AddressMask(util.Parse("0.0.0.0")))
+	destination2, err := tcpip.NewSubnet(util.Parse("0.0.0.0"), util.ParseMask("0.0.0.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1314,9 +1317,9 @@ func TestDHCPAcquired(t *testing.T) {
 					router2Address,
 					header.IPv4Any,
 					header.IPv4Broadcast,
-					tcpip.Address(multicastAddress),
+					tcpip.AddrFromSlice(multicastAddress.To4()),
 				},
-				SubnetMask: tcpip.AddressMask(defaultMask),
+				SubnetMask: tcpip.MaskFromBytes(defaultMask),
 				DNS: []tcpip.Address{
 					router1Address,
 					router2Address,
@@ -1467,7 +1470,7 @@ func TestInFlightPacketsConsumeUDPSendBuffer(t *testing.T) {
 	addr := tcpip.ProtocolAddress{
 		Protocol: ipv4.ProtocolNumber,
 		AddressWithPrefix: tcpip.AddressWithPrefix{
-			Address:   tcpip.Address("\xf0\xf0\xf0\xf0"),
+			Address:   util.Parse("240.240.240.240"),
 			PrefixLen: 24,
 		},
 	}

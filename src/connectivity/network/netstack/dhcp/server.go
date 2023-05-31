@@ -149,7 +149,7 @@ func newEPConnServer(ctx context.Context, stack *stack.Stack, addrs []tcpip.Addr
 // NewServer creates a new DHCP server and begins serving.
 // The server continues serving until ctx is done.
 func NewServer(ctx context.Context, c conn, addrs []tcpip.Address, cfg Config, testServerOptions testServerOptions) (*Server, error) {
-	if cfg.ServerAddress == "" {
+	if cfg.ServerAddress.Len() == 0 {
 		return nil, fmt.Errorf("dhcp: server requires explicit server address")
 	}
 	s := &Server{
@@ -158,7 +158,7 @@ func NewServer(ctx context.Context, c conn, addrs []tcpip.Address, cfg Config, t
 		cfg:     cfg,
 		cfgopts: cfg.encode(),
 		broadcast: tcpip.FullAddress{
-			Addr: "\xff\xff\xff\xff",
+			Addr: header.IPv4Broadcast,
 			Port: ClientPort,
 		},
 
@@ -320,7 +320,7 @@ func (s *Server) handleDiscover(hreq hdr, opts options) {
 	// DHCPOFFER
 	opts = options{
 		{optDHCPMsgType, []byte{byte(dhcpOFFER)}},
-		{optDHCPServer, []byte(s.cfg.ServerAddress)},
+		{optDHCPServer, s.cfg.ServerAddress.AsSlice()},
 	}
 	opts = append(opts, s.cfgopts...)
 
@@ -329,7 +329,7 @@ func (s *Server) handleDiscover(hreq hdr, opts options) {
 		h.init()
 		h.setOp(opReply)
 		copy(h.xidbytes(), hreq.xidbytes())
-		copy(h.yiaddr(), lease.addr)
+		copy(h.yiaddr(), lease.addr.AsSlice())
 		copy(h.chaddr(), hreq.chaddr())
 		h.setOptions(opts)
 		s.conn.Write(h, &s.broadcast)
@@ -359,7 +359,7 @@ func (s *Server) nack(hreq hdr) {
 	// DHCPNACK
 	opts := options([]option{
 		{optDHCPMsgType, []byte{byte(dhcpNAK)}},
-		{optDHCPServer, []byte(s.cfg.ServerAddress)},
+		{optDHCPServer, s.cfg.ServerAddress.AsSlice()},
 	})
 	if s.testServerOptions.omitServerIdentifierWhenNotRequired {
 		// We have to filter all of opts here rather than simply not including
@@ -390,7 +390,7 @@ func (s *Server) handleRequest(hreq hdr, opts options) {
 		s.nack(hreq)
 		return
 	}
-	if reqcfg.ServerAddress != s.cfg.ServerAddress && tcpip.Address(hreq.ciaddr()) == header.IPv4Any {
+	if reqcfg.ServerAddress != s.cfg.ServerAddress && tcpip.AddrFrom4Slice(hreq.ciaddr()) == header.IPv4Any {
 		// This request is for a different DHCP server. Ignore it.
 		return
 	}
@@ -417,7 +417,7 @@ func (s *Server) handleRequest(hreq hdr, opts options) {
 	// DHCPACK
 	opts = []option{
 		{optDHCPMsgType, []byte{byte(dhcpACK)}},
-		{optDHCPServer, []byte(s.cfg.ServerAddress)},
+		{optDHCPServer, s.cfg.ServerAddress.AsSlice()},
 	}
 	opts = append(opts, s.cfgopts...)
 
@@ -432,16 +432,13 @@ func (s *Server) handleRequest(hreq hdr, opts options) {
 	h.init()
 	h.setOp(opReply)
 	copy(h.xidbytes(), hreq.xidbytes())
-	copy(h.yiaddr(), lease.addr)
+	copy(h.yiaddr(), lease.addr.AsSlice())
 	copy(h.chaddr(), hreq.chaddr())
 	h.setOptions(opts)
 	addr := s.broadcast
 	if !hreq.broadcast() {
-		for _, b := range hreq.ciaddr() {
-			if b != 0 {
-				addr.Addr = tcpip.Address(hreq.ciaddr())
-				break
-			}
+		if ciaddr := tcpip.AddrFrom4Slice(hreq.ciaddr()); ciaddr != header.IPv4Any {
+			addr.Addr = ciaddr
 		}
 	}
 	s.conn.Write(h, &addr)

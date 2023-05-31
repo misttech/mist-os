@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/filter"
@@ -40,7 +41,7 @@ func TestGetAndUpdateRules(t *testing.T) {
 			Action:       filter.ActionDrop,
 			Direction:    filter.DirectionIncoming,
 			Proto:        filter.SocketProtocolTcp,
-			SrcSubnet:    &net.Subnet{Addr: fidlconv.ToNetIpAddress("\x0a\x00\x00\x00"), PrefixLen: 8},
+			SrcSubnet:    &net.Subnet{Addr: fidlconv.ToNetIpAddress(util.Parse("10.0.0.0")), PrefixLen: 8},
 			SrcPortRange: filter.PortRange{Start: 100, End: 100},
 			Log:          true,
 		},
@@ -50,7 +51,7 @@ func TestGetAndUpdateRules(t *testing.T) {
 			Action:       filter.ActionPass,
 			Direction:    filter.DirectionIncoming,
 			Proto:        filter.SocketProtocolTcp,
-			SrcSubnet:    &net.Subnet{Addr: fidlconv.ToNetIpAddress("\x0b\x00\x00\x00"), PrefixLen: 8},
+			SrcSubnet:    &net.Subnet{Addr: fidlconv.ToNetIpAddress(util.Parse("11.0.0.0")), PrefixLen: 8},
 			SrcPortRange: filter.PortRange{Start: 100, End: 100},
 			Log:          true,
 		},

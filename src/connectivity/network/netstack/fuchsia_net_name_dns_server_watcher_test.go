@@ -17,6 +17,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/name"
@@ -26,10 +27,10 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip"
 )
 
-const (
-	defaultServerIpv4 tcpip.Address = "\x08\x08\x08\x08"
-	altServerIpv4     tcpip.Address = "\x08\x08\x04\x04"
-	defaultServerIpv6 tcpip.Address = "\x20\x01\x48\x60\x48\x60\x00\x00\x00\x00\x00\x00\x00\x00\x88\x88"
+var (
+	defaultServerIpv4 = util.Parse("8.8.8.8")
+	altServerIpv4     = util.Parse("8.8.4.4")
+	defaultServerIpv6 = util.Parse("2001:4860:4860::8888")
 )
 
 var (

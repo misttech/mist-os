@@ -72,19 +72,7 @@ func TestToFIDLIPAddressEmptyInvalid(t *testing.T) {
 		}
 	}()
 
-	from := tcpip.Address("")
-	ToNetIpAddress(from)
-	t.Errorf("Expected to fail on invalid address length")
-}
-
-func TestToFIDLIPAddressInvalidLength(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("Expected to fail on invalid address length")
-		}
-	}()
-
-	from := tcpip.Address("\x00\x00")
+	var from tcpip.Address
 	ToNetIpAddress(from)
 	t.Errorf("Expected to fail on invalid address length")
 }
@@ -112,22 +100,23 @@ func TestToTCPIPSubnet(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating tcpip.Subnet: %v", err)
 		}
-		expected, err := tcpip.NewSubnet(tcpip.Address(ipNet.IP), tcpip.AddressMask(ipNet.Mask))
+		expected, err := tcpip.NewSubnet(tcpip.AddrFromSlice(ipNet.IP), tcpip.MaskFromBytes(ipNet.Mask))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if to != expected {
-			t.Errorf("Expected:\n {%v, %v}\nActual: {%v, %v}",
-				[]byte(expected.ID()), []byte(expected.Mask()),
-				[]byte(to.ID()), []byte(to.Mask()))
+			t.Errorf("got = %s, want = %s", to, expected)
 		}
 	}
 }
 
 func TestForwardingEntryAndTcpipRouteConversions(t *testing.T) {
-	const gateway = "efghijklmnopqrst"
+	var (
+		gateway = tcpip.AddrFromSlice([]byte("efghijklmnopqrst"))
+		nextHop = ToNetIpAddress(gateway)
+	)
 
-	destination, err := tcpip.NewSubnet("\xab\xcd\x00\x00", "\xff\xff\xe0\x00")
+	destination, err := tcpip.NewSubnet(util.Parse("171.205.0.0"), util.ParseMask("255.255.224.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +135,7 @@ func TestForwardingEntryAndTcpipRouteConversions(t *testing.T) {
 		},
 		{
 			dest: func(fe *stack.ForwardingEntry) {
-				nextHop := ToNetIpAddress(gateway)
+				nextHop := nextHop
 				fe.NextHop = &nextHop
 			},
 			want: tcpip.Route{
@@ -157,7 +146,7 @@ func TestForwardingEntryAndTcpipRouteConversions(t *testing.T) {
 		{
 			dest: func(fe *stack.ForwardingEntry) {
 				fe.DeviceId = 789
-				nextHop := ToNetIpAddress(gateway)
+				nextHop := nextHop
 				fe.NextHop = &nextHop
 			},
 			want: tcpip.Route{
@@ -194,7 +183,7 @@ func TestToNetSocketAddress(t *testing.T) {
 		{
 			name: "IPv4",
 			fullAddr: tcpip.FullAddress{
-				Addr: "\xC0\xA8\x00\x01",
+				Addr: util.Parse("192.168.0.1"),
 				Port: 8080,
 			},
 			sockAddr: func() fnet.SocketAddress {
@@ -211,7 +200,7 @@ func TestToNetSocketAddress(t *testing.T) {
 		{
 			name: "IPv6 Global without NIC",
 			fullAddr: tcpip.FullAddress{
-				Addr: "\x20\x01\x48\x60\x48\x60\x00\x00\x00\x00\x00\x00\x00\x00\x88\x88",
+				Addr: util.Parse("2001:4860:4860::8888"),
 				Port: 8080,
 			},
 			sockAddr: func() fnet.SocketAddress {
@@ -228,7 +217,7 @@ func TestToNetSocketAddress(t *testing.T) {
 		{
 			name: "IPv6 Global with NIC",
 			fullAddr: tcpip.FullAddress{
-				Addr: "\x20\x01\x48\x60\x48\x60\x00\x00\x00\x00\x00\x00\x00\x00\x88\x88",
+				Addr: util.Parse("2001:4860:4860::8888"),
 				Port: 8080,
 				NIC:  2,
 			},
@@ -246,7 +235,7 @@ func TestToNetSocketAddress(t *testing.T) {
 		{
 			name: "IPv6 LinkLocal Unicast with NIC",
 			fullAddr: tcpip.FullAddress{
-				Addr: "\xfe\x80\x48\x60\x48\x60\x00\x00\x00\x00\x00\x00\x00\x00\x88\x88",
+				Addr: util.Parse("fe80:4860:4860::8888"),
 				Port: 8080,
 				NIC:  2,
 			},
@@ -265,7 +254,7 @@ func TestToNetSocketAddress(t *testing.T) {
 		{
 			name: "IPv6 LinkLocal Multicast with NIC",
 			fullAddr: tcpip.FullAddress{
-				Addr: "\xff\x02\x48\x60\x48\x60\x00\x00\x00\x00\x00\x00\x00\x00\x88\x88",
+				Addr: util.Parse("ff02:4860:4860::8888"),
 				Port: 8080,
 				NIC:  2,
 			},
@@ -301,22 +290,22 @@ func TestBytesToAddressDroppingUnspecified(t *testing.T) {
 		{
 			name:  "IPv4",
 			bytes: []uint8{192, 0, 2, 1},
-			addr:  tcpip.Address("\xC0\x00\x02\x01"),
+			addr:  util.Parse("192.0.2.1"),
 		},
 		{
 			name:  "IPv4 Unspecified",
 			bytes: []uint8{0, 0, 0, 0},
-			addr:  tcpip.Address(""),
+			addr:  tcpip.Address{},
 		},
 		{
 			name:  "IPv6",
 			bytes: []uint8{0x20, 0x01, 0xdb, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-			addr:  tcpip.Address("\x20\x01\xdb\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"),
+			addr:  util.Parse("2001:db80::1"),
 		},
 		{
 			name:  "IPv6 Unspecified",
 			bytes: []uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			addr:  tcpip.Address(""),
+			addr:  tcpip.Address{},
 		},
 	}
 
@@ -366,9 +355,9 @@ func TestToInstalledRoute(t *testing.T) {
 			extendedRoute: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
-						tcpip.Address(subnetV4Hex),
-						tcpip.AddressMask(maskV4Hex)),
-					Gateway: tcpip.Address(gatewayV4Hex),
+						tcpip.AddrFromSlice([]byte(subnetV4Hex)),
+						tcpip.MaskFromBytes([]byte(maskV4Hex))),
+					Gateway: tcpip.AddrFromSlice([]byte(gatewayV4Hex)),
 					NIC:     interfaceId,
 				},
 				Metric:                metric,
@@ -412,8 +401,8 @@ func TestToInstalledRoute(t *testing.T) {
 			extendedRoute: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
-						tcpip.Address(subnetV4Hex),
-						tcpip.AddressMask(maskV4Hex)),
+						tcpip.AddrFromSlice([]byte(subnetV4Hex)),
+						tcpip.MaskFromBytes([]byte(maskV4Hex))),
 					NIC: interfaceId,
 				},
 				Metric:                metric,
@@ -455,9 +444,9 @@ func TestToInstalledRoute(t *testing.T) {
 			extendedRoute: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
-						tcpip.Address(subnetV4Hex),
-						tcpip.AddressMask(maskV4Hex)),
-					Gateway: tcpip.Address(gatewayV4Hex),
+						tcpip.AddrFromSlice([]byte(subnetV4Hex)),
+						tcpip.MaskFromBytes([]byte(maskV4Hex))),
+					Gateway: tcpip.AddrFromSlice([]byte(gatewayV4Hex)),
 					NIC:     interfaceId,
 				},
 				Metric:                metric,
@@ -503,9 +492,9 @@ func TestToInstalledRoute(t *testing.T) {
 			extendedRoute: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
-						tcpip.Address(subnetV6Hex),
-						tcpip.AddressMask(maskV6Hex)),
-					Gateway: tcpip.Address(gatewayV6Hex),
+						tcpip.AddrFromSlice([]byte(subnetV6Hex)),
+						tcpip.MaskFromBytes([]byte(maskV6Hex))),
+					Gateway: tcpip.AddrFromSlice([]byte(gatewayV6Hex)),
 					NIC:     interfaceId,
 				},
 				Metric:                metric,
@@ -549,8 +538,8 @@ func TestToInstalledRoute(t *testing.T) {
 			extendedRoute: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
-						tcpip.Address(subnetV6Hex),
-						tcpip.AddressMask(maskV6Hex)),
+						tcpip.AddrFromSlice([]byte(subnetV6Hex)),
+						tcpip.MaskFromBytes([]byte(maskV6Hex))),
 					NIC: interfaceId,
 				},
 				Metric:                metric,
@@ -592,9 +581,9 @@ func TestToInstalledRoute(t *testing.T) {
 			extendedRoute: routes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
-						tcpip.Address(subnetV6Hex),
-						tcpip.AddressMask(maskV6Hex)),
-					Gateway: tcpip.Address(gatewayV6Hex),
+						tcpip.AddrFromSlice([]byte(subnetV6Hex)),
+						tcpip.MaskFromBytes([]byte(maskV6Hex))),
+					Gateway: tcpip.AddrFromSlice([]byte(gatewayV6Hex)),
 					NIC:     interfaceId,
 				},
 				Metric:                metric,

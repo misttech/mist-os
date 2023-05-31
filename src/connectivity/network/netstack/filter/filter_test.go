@@ -26,6 +26,11 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
 )
 
+func maskAsAddr(s tcpip.Subnet) tcpip.Address {
+	mask := s.Mask()
+	return tcpip.AddrFromSlice(mask.AsSlice())
+}
+
 func TestFilterUpdates(t *testing.T) {
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(TCPSourcePortMatcher{}),
@@ -44,7 +49,7 @@ func TestFilterUpdates(t *testing.T) {
 		PrefixLen: ipv4Addr1Prefix,
 	}
 	ipv4TCPIPSubnet1 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv4Addr1Bytes[:]),
+		Address:   tcpip.AddrFrom4(ipv4Addr1Bytes),
 		PrefixLen: ipv4Addr1Prefix,
 	}.Subnet()
 
@@ -55,7 +60,7 @@ func TestFilterUpdates(t *testing.T) {
 		PrefixLen: ipv4Addr2Prefix,
 	}
 	ipv4TCPIPSubnet2 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv4Addr2Bytes[:]),
+		Address:   tcpip.AddrFrom4(ipv4Addr2Bytes),
 		PrefixLen: ipv4Addr2Prefix,
 	}.Subnet()
 
@@ -66,7 +71,7 @@ func TestFilterUpdates(t *testing.T) {
 		PrefixLen: ipv6Addr1Prefix,
 	}
 	ipv6TCPIPSubnet1 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv6Addr1Bytes[:]),
+		Address:   tcpip.AddrFrom16(ipv6Addr1Bytes),
 		PrefixLen: ipv6Addr1Prefix,
 	}.Subnet()
 
@@ -77,7 +82,7 @@ func TestFilterUpdates(t *testing.T) {
 		PrefixLen: ipv6Addr2Prefix,
 	}
 	ipv6TCPIPSubnet2 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv6Addr2Bytes[:]),
+		Address:   tcpip.AddrFrom16(ipv6Addr2Bytes),
 		PrefixLen: ipv6Addr2Prefix,
 	}.Subnet()
 
@@ -369,7 +374,7 @@ func TestFilterUpdates(t *testing.T) {
 								Protocol:      tcp.ProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv4TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv4TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv4TCPIPSubnet1),
 								SrcInvert:     false,
 							},
 							Target: &stack.AcceptTarget{},
@@ -379,7 +384,7 @@ func TestFilterUpdates(t *testing.T) {
 								Protocol:      icmp.ProtocolNumber4,
 								CheckProtocol: true,
 								Dst:           ipv4TCPIPSubnet2.ID(),
-								DstMask:       tcpip.Address(ipv4TCPIPSubnet2.Mask()),
+								DstMask:       maskAsAddr(ipv4TCPIPSubnet2),
 								DstInvert:     true,
 							},
 							Target: &stack.DropTarget{},
@@ -399,10 +404,10 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Filter: stack.IPHeaderFilter{
 								Src:       ipv4TCPIPSubnet1.ID(),
-								SrcMask:   tcpip.Address(ipv4TCPIPSubnet1.Mask()),
+								SrcMask:   maskAsAddr(ipv4TCPIPSubnet1),
 								SrcInvert: false,
 								Dst:       ipv4TCPIPSubnet2.ID(),
-								DstMask:   tcpip.Address(ipv4TCPIPSubnet2.Mask()),
+								DstMask:   maskAsAddr(ipv4TCPIPSubnet2),
 								DstInvert: true,
 							},
 							Target: &stack.DropTarget{},
@@ -439,10 +444,10 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Filter: stack.IPHeaderFilter{
 								Src:       ipv6TCPIPSubnet1.ID(),
-								SrcMask:   tcpip.Address(ipv6TCPIPSubnet1.Mask()),
+								SrcMask:   maskAsAddr(ipv6TCPIPSubnet1),
 								SrcInvert: true,
 								Dst:       ipv6TCPIPSubnet2.ID(),
-								DstMask:   tcpip.Address(ipv6TCPIPSubnet2.Mask()),
+								DstMask:   maskAsAddr(ipv6TCPIPSubnet2),
 								DstInvert: false,
 							},
 							Target: &stack.AcceptTarget{},
@@ -464,7 +469,7 @@ func TestFilterUpdates(t *testing.T) {
 								Protocol:      udp.ProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv6TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv6TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv6TCPIPSubnet1),
 								SrcInvert:     true,
 							},
 							Matchers: nil,
@@ -475,7 +480,7 @@ func TestFilterUpdates(t *testing.T) {
 								Protocol:      icmp.ProtocolNumber6,
 								CheckProtocol: true,
 								Dst:           ipv6TCPIPSubnet2.ID(),
-								DstMask:       tcpip.Address(ipv6TCPIPSubnet2.Mask()),
+								DstMask:       maskAsAddr(ipv6TCPIPSubnet2),
 								DstInvert:     false,
 							},
 							Target: &stack.AcceptTarget{},
@@ -783,7 +788,7 @@ func TestNATUpdates(t *testing.T) {
 		PrefixLen: ipv4Addr1Prefix,
 	}
 	ipv4TCPIPSubnet1 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv4Addr1Bytes[:]),
+		Address:   tcpip.AddrFrom4(ipv4Addr1Bytes),
 		PrefixLen: ipv4Addr1Prefix,
 	}.Subnet()
 
@@ -794,7 +799,7 @@ func TestNATUpdates(t *testing.T) {
 		PrefixLen: ipv4Addr2Prefix,
 	}
 	ipv4TCPIPSubnet2 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv4Addr2Bytes[:]),
+		Address:   tcpip.AddrFrom4(ipv4Addr2Bytes),
 		PrefixLen: ipv4Addr2Prefix,
 	}.Subnet()
 
@@ -805,7 +810,7 @@ func TestNATUpdates(t *testing.T) {
 		PrefixLen: ipv6Addr1Prefix,
 	}
 	ipv6TCPIPSubnet1 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv6Addr1Bytes[:]),
+		Address:   tcpip.AddrFrom16(ipv6Addr1Bytes),
 		PrefixLen: ipv6Addr1Prefix,
 	}.Subnet()
 
@@ -816,7 +821,7 @@ func TestNATUpdates(t *testing.T) {
 		PrefixLen: ipv6Addr2Prefix,
 	}
 	ipv6TCPIPSubnet2 := tcpip.AddressWithPrefix{
-		Address:   tcpip.Address(ipv6Addr2Bytes[:]),
+		Address:   tcpip.AddrFrom16(ipv6Addr2Bytes),
 		PrefixLen: ipv6Addr2Prefix,
 	}.Subnet()
 
@@ -928,7 +933,7 @@ func TestNATUpdates(t *testing.T) {
 								Protocol:        header.TCPProtocolNumber,
 								CheckProtocol:   true,
 								Src:             ipv4TCPIPSubnet1.ID(),
-								SrcMask:         tcpip.Address(ipv4TCPIPSubnet1.Mask()),
+								SrcMask:         maskAsAddr(ipv4TCPIPSubnet1),
 								SrcInvert:       false,
 								OutputInterface: nicName,
 							},
@@ -939,7 +944,7 @@ func TestNATUpdates(t *testing.T) {
 								Protocol:      header.UDPProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv4TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv4TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv4TCPIPSubnet1),
 								SrcInvert:     false,
 							},
 							Target: &stack.MasqueradeTarget{NetworkProtocol: header.IPv4ProtocolNumber},
@@ -949,7 +954,7 @@ func TestNATUpdates(t *testing.T) {
 								Protocol:      header.ICMPv4ProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv4TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv4TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv4TCPIPSubnet1),
 								SrcInvert:     false,
 							},
 							Target: &stack.MasqueradeTarget{NetworkProtocol: header.IPv4ProtocolNumber},
@@ -957,7 +962,7 @@ func TestNATUpdates(t *testing.T) {
 						{
 							Filter: stack.IPHeaderFilter{
 								Src:       ipv4TCPIPSubnet2.ID(),
-								SrcMask:   tcpip.Address(ipv4TCPIPSubnet2.Mask()),
+								SrcMask:   maskAsAddr(ipv4TCPIPSubnet2),
 								SrcInvert: false,
 							},
 							Target: &stack.MasqueradeTarget{NetworkProtocol: header.IPv4ProtocolNumber},
@@ -996,7 +1001,7 @@ func TestNATUpdates(t *testing.T) {
 								Protocol:      header.TCPProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv6TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv6TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv6TCPIPSubnet1),
 								SrcInvert:     false,
 							},
 							Target: &stack.MasqueradeTarget{NetworkProtocol: header.IPv6ProtocolNumber},
@@ -1006,7 +1011,7 @@ func TestNATUpdates(t *testing.T) {
 								Protocol:      header.UDPProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv6TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv6TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv6TCPIPSubnet1),
 								SrcInvert:     false,
 							},
 							Target: &stack.MasqueradeTarget{NetworkProtocol: header.IPv6ProtocolNumber},
@@ -1016,7 +1021,7 @@ func TestNATUpdates(t *testing.T) {
 								Protocol:      header.ICMPv6ProtocolNumber,
 								CheckProtocol: true,
 								Src:           ipv6TCPIPSubnet1.ID(),
-								SrcMask:       tcpip.Address(ipv6TCPIPSubnet1.Mask()),
+								SrcMask:       maskAsAddr(ipv6TCPIPSubnet1),
 								SrcInvert:     false,
 							},
 							Target: &stack.MasqueradeTarget{NetworkProtocol: header.IPv6ProtocolNumber},
@@ -1024,7 +1029,7 @@ func TestNATUpdates(t *testing.T) {
 						{
 							Filter: stack.IPHeaderFilter{
 								Src:             ipv6TCPIPSubnet2.ID(),
-								SrcMask:         tcpip.Address(ipv6TCPIPSubnet2.Mask()),
+								SrcMask:         maskAsAddr(ipv6TCPIPSubnet2),
 								SrcInvert:       false,
 								OutputInterface: nicName,
 							},

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
@@ -19,18 +20,21 @@ import (
 const preludeOffset = 8
 
 const (
-	ipv4Loopback       tcpip.Address = "\x7f\x00\x00\x01"
-	ipv6Loopback       tcpip.Address = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-	ipv6LinkLocal      tcpip.Address = "\xfe\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-	testPort           uint16        = 42
-	testIpTtl          uint8         = 43
-	testIpv6Hoplimit   uint8         = 44
-	testNICID          tcpip.NICID   = 45
-	testIpTos          uint8         = 46
-	testIpv6Tclass     uint32        = 47
-	testTimestampNanos int64         = 48
-	testPayloadSize    int           = 49
-	invalidIpTtl       uint8         = 0
+	testPort           uint16      = 42
+	testIpTtl          uint8       = 43
+	testIpv6Hoplimit   uint8       = 44
+	testNICID          tcpip.NICID = 45
+	testIpTos          uint8       = 46
+	testIpv6Tclass     uint32      = 47
+	testTimestampNanos int64       = 48
+	testPayloadSize    int         = 49
+	invalidIpTtl       uint8       = 0
+)
+
+var (
+	ipv4Loopback  = util.Parse("127.0.0.1")
+	ipv6Loopback  = util.Parse("::1")
+	ipv6LinkLocal = util.Parse("fe80::1")
 )
 
 func TestSerializeThenDeserializeSendMsgMeta(t *testing.T) {
@@ -123,14 +127,12 @@ func TestSerializeThenDeserializeSendMsgMetaWithUnspecifiedAddrs(t *testing.T) {
 			buf := make([]byte, TxUdpPreludeSize())
 			addr := tcpip.FullAddress{
 				Port: testPort,
-				Addr: tcpip.Address(""),
 			}
 			cmsgSet := tcpip.SendableControlMessages{}
 			if netProto == header.IPv6ProtocolNumber {
 				cmsgSet.HasIPv6PacketInfo = true
 				cmsgSet.IPv6PacketInfo = tcpip.IPv6PacketInfo{
-					Addr: tcpip.Address(""),
-					NIC:  testNICID,
+					NIC: testNICID,
 				}
 			}
 
@@ -377,7 +379,6 @@ func TestSerializeThenDeserializeRecvMsgMetaWithUnspecifiedAddrs(t *testing.T) {
 			readResult := tcpip.ReadResult{
 				RemoteAddr: tcpip.FullAddress{
 					Port: testPort,
-					Addr: tcpip.Address(""),
 				},
 				ControlMessages: tcpip.ReceivableControlMessages{},
 			}
@@ -385,8 +386,7 @@ func TestSerializeThenDeserializeRecvMsgMetaWithUnspecifiedAddrs(t *testing.T) {
 			if netProto == header.IPv6ProtocolNumber {
 				readResult.ControlMessages.HasIPv6PacketInfo = true
 				readResult.ControlMessages.IPv6PacketInfo = tcpip.IPv6PacketInfo{
-					Addr: tcpip.Address(""),
-					NIC:  testNICID,
+					NIC: testNICID,
 				}
 			}
 

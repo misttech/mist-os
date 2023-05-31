@@ -416,8 +416,8 @@ func (c *Client) Run(ctx context.Context) (rtn tcpip.AddressWithPrefix) {
 								&info,
 								options{
 									{optDHCPMsgType, []byte{byte(dhcpDECLINE)}},
-									{optReqIPAddr, []byte(addr)},
-									{optDHCPServer, []byte(info.Config.ServerAddress)},
+									{optReqIPAddr, addr.AsSlice()},
+									{optDHCPServer, info.Config.ServerAddress.AsSlice()},
 								},
 								tcpip.FullAddress{
 									NIC:  info.NICID,
@@ -562,7 +562,7 @@ func (c *Client) cleanup(info *Info, nicName string, release bool) tcpip.Address
 				info,
 				options{
 					{optDHCPMsgType, []byte{byte(dhcpRELEASE)}},
-					{optDHCPServer, []byte(info.Config.ServerAddress)},
+					{optDHCPServer, info.Config.ServerAddress.AsSlice()},
 				},
 				tcpip.FullAddress{
 					Addr: info.Config.ServerAddress,
@@ -681,8 +681,8 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 		discOpts := append(options{
 			{optDHCPMsgType, []byte{byte(dhcpDISCOVER)}},
 		}, commonOpts...)
-		if len(requestedAddr.Address) != 0 {
-			discOpts = append(discOpts, option{optReqIPAddr, []byte(requestedAddr.Address)})
+		if requestedAddr.Address.Len() != 0 {
+			discOpts = append(discOpts, option{optReqIPAddr, requestedAddr.Address.AsSlice()})
 		}
 
 	retransmitDiscover:
@@ -739,15 +739,15 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 					continue
 				}
 
-				if len(cfg.SubnetMask) == 0 {
-					cfg.SubnetMask = tcpip.AddressMask(net.IP(result.yiaddr).DefaultMask())
+				if cfg.SubnetMask.Len() == 0 {
+					cfg.SubnetMask = tcpip.MaskFromBytes(net.IP(result.yiaddr.AsSlice()).DefaultMask())
 				}
 
 				// We do not perform sophisticated offer selection and instead merely
 				// select the first valid offer we receive.
 				info.Config = cfg
 
-				prefixLen, _ := net.IPMask(info.Config.SubnetMask).Size()
+				prefixLen, _ := net.IPMask(info.Config.SubnetMask.AsSlice()).Size()
 				requestedAddr = tcpip.AddressWithPrefix{
 					Address:   result.yiaddr,
 					PrefixLen: prefixLen,
@@ -777,8 +777,8 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 	if info.State == initSelecting {
 		reqOpts = append(reqOpts,
 			options{
-				{optDHCPServer, []byte(info.Config.ServerAddress)},
-				{optReqIPAddr, []byte(requestedAddr.Address)},
+				{optDHCPServer, info.Config.ServerAddress.AsSlice()},
+				{optReqIPAddr, requestedAddr.Address.AsSlice()},
 			}...)
 	}
 
@@ -849,7 +849,7 @@ retransmitRequest:
 					c.stats.RecvAckOptsDecodeErrors.Increment()
 					return Config{}, fmt.Errorf("%s decode: %w", result.typ, err)
 				}
-				prefixLen, _ := net.IPMask(cfg.SubnetMask).Size()
+				prefixLen, _ := net.IPMask(cfg.SubnetMask.AsSlice()).Size()
 				if addr := (tcpip.AddressWithPrefix{
 					Address:   result.yiaddr,
 					PrefixLen: prefixLen,
@@ -915,7 +915,7 @@ func (c *Client) send(
 		dhcpPayload.setBroadcast()
 	}
 	if ciaddr {
-		ciaddr := info.Assigned.Address
+		ciaddr := info.Assigned.Address.AsSlice()
 		if n, l := copy(dhcpPayload.ciaddr(), ciaddr), len(ciaddr); n != l {
 			panic(fmt.Sprintf("failed to copy ciaddr bytes, want=%d got=%d", l, n))
 		}
@@ -1034,7 +1034,7 @@ func (c *Client) recv(
 			NeedRemoteAddr:     true,
 			NeedLinkPacketInfo: true,
 		})
-		senderAddr := tcpip.LinkAddress(res.RemoteAddr.Addr)
+		senderAddr := tcpip.LinkAddress(res.RemoteAddr.Addr.AsSlice())
 		if _, ok := err.(*tcpip.ErrWouldBlock); ok {
 			select {
 			case <-read:
@@ -1195,7 +1195,7 @@ func (c *Client) recv(
 
 			return recvResult{
 				source:  ip.SourceAddress(),
-				yiaddr:  tcpip.Address(h.yiaddr()),
+				yiaddr:  tcpip.AddrFrom4Slice(h.yiaddr()),
 				options: opts,
 				typ:     typ,
 			}, false, nil

@@ -176,7 +176,7 @@ func (*stubEndpoint) AddHeader(stack.PacketBufferPtr) {}
 
 func (e *stubEndpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	i := 0
-	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
+	for _, pkt := range pkts.AsSlice() {
 		select {
 		case e.c <- pkt:
 			pkt.IncRef()
@@ -519,14 +519,14 @@ func TestBridge(t *testing.T) {
 			ep1, ep2 := makePipe(linkAddr1, linkAddr2)
 			ep3, ep4 := makePipe(linkAddr3, linkAddr4)
 			ep5, ep6 := makePipe(linkAddr5, linkAddr6)
-			s1addr := tcpip.Address(bytes.Repeat([]byte{1}, testCase.addressSize))
+			s1addr := tcpip.AddrFromSlice(bytes.Repeat([]byte{1}, testCase.addressSize))
 			s1subnet := util.PointSubnet(s1addr)
 			s1, err := makeStackWithEndpoint(s1NICID, ep1, testCase.protocolFactory, testCase.protocolNumber, s1addr)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			baddr := tcpip.Address(bytes.Repeat([]byte{2}, testCase.addressSize))
+			baddr := tcpip.AddrFromSlice(bytes.Repeat([]byte{2}, testCase.addressSize))
 			bsubnet := util.PointSubnet(baddr)
 			sb, b, bridgeNICID := makeStackWithBridgedEndpoints(t, testCase.protocolFactory, testCase.protocolNumber, baddr, ep5, ep2, ep3)
 
@@ -538,7 +538,7 @@ func TestBridge(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			s2addr := tcpip.Address(bytes.Repeat([]byte{3}, testCase.addressSize))
+			s2addr := tcpip.AddrFromSlice(bytes.Repeat([]byte{3}, testCase.addressSize))
 			s2subnet := util.PointSubnet(s2addr)
 			s2, err := makeStackWithEndpoint(s2NICID, ep4, testCase.protocolFactory, testCase.protocolNumber, s2addr)
 			if err != nil {
@@ -786,7 +786,7 @@ type endpoint struct {
 }
 
 func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
-	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
+	for _, pkt := range pkts.AsSlice() {
 		if fn := e.onWritePacket; fn != nil {
 			fn(pkt)
 		}

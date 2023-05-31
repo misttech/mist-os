@@ -39,7 +39,7 @@ func createRoute(nicid tcpip.NICID, subnet string, gateway string) tcpip.Route {
 	if err != nil {
 		panic(err)
 	}
-	sn, err := tcpip.NewSubnet(tcpip.Address(s.IP), tcpip.AddressMask(s.Mask))
+	sn, err := tcpip.NewSubnet(ipToAddress(s.IP), tcpip.MaskFromBytes(s.Mask))
 	if err != nil {
 		panic(err)
 	}
@@ -70,10 +70,13 @@ func ipStringToAddress(ipStr string) tcpip.Address {
 }
 
 func ipToAddress(ip net.IP) tcpip.Address {
-	if v4 := ip.To4(); v4 != nil {
-		return tcpip.Address(v4)
+	if ip == nil {
+		return tcpip.Address{}
 	}
-	return tcpip.Address(ip)
+	if v4 := ip.To4(); v4 != nil {
+		return tcpip.AddrFrom4Slice(v4)
+	}
+	return tcpip.AddrFrom16Slice(ip)
 }
 
 func TestExtendedRouteMatch(t *testing.T) {

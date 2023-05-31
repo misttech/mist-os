@@ -41,7 +41,7 @@ var _ stack.NUDDispatcher = (*nudDispatcher)(nil)
 
 func (d *nudDispatcher) log(verb string, nicID tcpip.NICID, entry stack.NeighborEntry) {
 	family := func() string {
-		switch l := len(entry.Addr); l {
+		switch l := entry.Addr.Len(); l {
 		case header.IPv4AddressSize:
 			return "v4"
 		case header.IPv6AddressSize:
@@ -56,7 +56,7 @@ func (d *nudDispatcher) log(verb string, nicID tcpip.NICID, entry stack.Neighbor
 			if route.NIC != nicID {
 				continue
 			}
-			if len(route.Destination.ID()) != len(entry.Addr) {
+			if id := route.Destination.ID(); id.Len() != entry.Addr.Len() {
 				continue
 			}
 			if route.Destination.Prefix() == 0 {
@@ -64,7 +64,7 @@ func (d *nudDispatcher) log(verb string, nicID tcpip.NICID, entry stack.Neighbor
 					defaultGateway = true
 				}
 			} else if route.Destination.Contains(entry.Addr) {
-				if len(route.Gateway) == 0 {
+				if route.Gateway.Len() == 0 {
 					onLink = true
 				}
 			}

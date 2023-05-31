@@ -1182,7 +1182,8 @@ func (ndp *ndpState) generateSLAACAddr(prefix tcpip.Subnet, state *slaacPrefixSt
 	}
 
 	var generatedAddr tcpip.AddressWithPrefix
-	addrBytes := []byte(prefix.ID())
+	prefixID := prefix.ID()
+	addrBytes := prefixID.AsSlice()
 
 	for i := 0; ; i++ {
 		// If we were unable to generate an address after the maximum SLAAC address
@@ -1224,7 +1225,7 @@ func (ndp *ndpState) generateSLAACAddr(prefix tcpip.Subnet, state *slaacPrefixSt
 		}
 
 		generatedAddr = tcpip.AddressWithPrefix{
-			Address:   tcpip.Address(addrBytes),
+			Address:   tcpip.AddrFrom16Slice(addrBytes),
 			PrefixLen: validPrefixLenForAutoGen,
 		}
 
@@ -1625,7 +1626,7 @@ func (ndp *ndpState) refreshSLAACPrefixLifetimes(prefix tcpip.Subnet, prefixStat
 	// If each temporay address has already been regenerated, no new temporary
 	// address is generated. To ensure continuation of temporary SLAAC addresses,
 	// we manually try to regenerate an address here.
-	if len(regenForAddr) != 0 || allAddressesRegenerated {
+	if regenForAddr.BitLen() != 0 || allAddressesRegenerated {
 		// Reset the generation attempts counter as we are starting the generation
 		// of a new address for the SLAAC prefix.
 		if state, ok := prefixState.tempAddrs[regenForAddr]; ndp.generateTempSLAACAddr(prefix, prefixState, true /* resetGenAttempts */) && ok {

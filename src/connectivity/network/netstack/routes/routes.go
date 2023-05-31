@@ -311,7 +311,7 @@ func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool
 	for _, er := range oldTable {
 		if er.Route.Destination == route.Destination && er.Route.NIC == route.NIC {
 			// Match any route if Gateway is empty.
-			if (len(route.Gateway) == 0 ||
+			if (route.Gateway.Len() == 0 ||
 				er.Route.Gateway == route.Gateway) && (!onlyDeleteIfDynamic || er.Dynamic) {
 				routesDeleted = append(routesDeleted, er)
 				continue
@@ -477,7 +477,7 @@ func Less(ei, ej *ExtendedRoute) bool {
 
 	// Loopback routes before non-loopback ones.
 	// (as a workaround for github.com/google/gvisor/issues/1169).
-	if riIsLoop, rjIsLoop := net.IP(riDest).IsLoopback(), net.IP(rjDest).IsLoopback(); riIsLoop != rjIsLoop {
+	if riIsLoop, rjIsLoop := net.IP(riDest.AsSlice()).IsLoopback(), net.IP(rjDest.AsSlice()).IsLoopback(); riIsLoop != rjIsLoop {
 		return riIsLoop
 	}
 
@@ -487,7 +487,7 @@ func Less(ei, ej *ExtendedRoute) bool {
 	}
 
 	// IPv4 before IPv6 (arbitrary choice).
-	if riLen, rjLen := len(riDest), len(rjDest); riLen != rjLen {
+	if riLen, rjLen := riDest.Len(), rjDest.Len(); riLen != rjLen {
 		return riLen == header.IPv4AddressSize
 	}
 
@@ -497,7 +497,7 @@ func Less(ei, ej *ExtendedRoute) bool {
 	}
 
 	// On-link wins.
-	if riOnLink, rjOnLink := len(ri.Gateway) == 0, len(rj.Gateway) == 0; riOnLink != rjOnLink {
+	if riOnLink, rjOnLink := ri.Gateway.Len() == 0, rj.Gateway.Len() == 0; riOnLink != rjOnLink {
 		return riOnLink
 	}
 
@@ -514,9 +514,11 @@ func Less(ei, ej *ExtendedRoute) bool {
 	// Everything that matters is the same. At this point we still need a
 	// deterministic way to tie-break. First go by destination IPs (lower wins),
 	// finally use the NIC.
-	for i := 0; i < len(riDest); i++ {
-		if riDest[i] != rjDest[i] {
-			return riDest[i] < rjDest[i]
+	riDestAsSlice := riDest.AsSlice()
+	rjDestAsSlice := rjDest.AsSlice()
+	for i := 0; i < riDest.Len(); i++ {
+		if riDestAsSlice[i] != rjDestAsSlice[i] {
+			return riDestAsSlice[i] < rjDestAsSlice[i]
 		}
 	}
 

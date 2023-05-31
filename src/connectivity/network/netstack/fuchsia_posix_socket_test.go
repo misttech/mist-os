@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/udp_serde"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/faketime"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -41,7 +42,7 @@ func TestDatagramSocketWithBlockingEndpoint(t *testing.T) {
 			addr := tcpip.ProtocolAddress{
 				Protocol: ipv4.ProtocolNumber,
 				AddressWithPrefix: tcpip.AddressWithPrefix{
-					Address:   tcpip.Address("\xf0\xf0\xf0\xf0"),
+					Address:   util.Parse("240.240.240.240"),
 					PrefixLen: 24,
 				},
 			}

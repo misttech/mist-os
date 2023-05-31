@@ -64,17 +64,17 @@ func (cfg *Config) decode(opts []option) error {
 		case optRebindingTime:
 			cfg.RebindTime = Seconds(binary.BigEndian.Uint32(b))
 		case optSubnetMask:
-			cfg.SubnetMask = tcpip.AddressMask(b)
+			cfg.SubnetMask = tcpip.MaskFromBytes(b)
 		case optDHCPServer:
-			cfg.ServerAddress = tcpip.Address(b)
+			cfg.ServerAddress = tcpip.AddrFromSlice(b)
 		case optRouter:
 			for len(b) != 0 {
-				cfg.Router = append(cfg.Router, tcpip.Address(b[:4]))
+				cfg.Router = append(cfg.Router, tcpip.AddrFrom4Slice(b[:4]))
 				b = b[4:]
 			}
 		case optDomainNameServer:
 			for len(b) != 0 {
-				cfg.DNS = append(cfg.DNS, tcpip.Address(b[:4]))
+				cfg.DNS = append(cfg.DNS, tcpip.AddrFrom4Slice(b[:4]))
 				b = b[4:]
 			}
 		}
@@ -83,23 +83,23 @@ func (cfg *Config) decode(opts []option) error {
 }
 
 func (cfg Config) encode() (opts []option) {
-	if cfg.ServerAddress != "" {
-		opts = append(opts, option{optDHCPServer, []byte(cfg.ServerAddress)})
+	if cfg.ServerAddress.Len() != 0 {
+		opts = append(opts, option{optDHCPServer, cfg.ServerAddress.AsSlice()})
 	}
-	if cfg.SubnetMask != "" {
-		opts = append(opts, option{optSubnetMask, []byte(cfg.SubnetMask)})
+	if cfg.SubnetMask.Len() != 0 {
+		opts = append(opts, option{optSubnetMask, cfg.SubnetMask.AsSlice()})
 	}
 	if len(cfg.Router) > 0 {
 		router := make([]byte, 0, 4*len(cfg.Router))
 		for _, addr := range cfg.Router {
-			router = append(router, addr...)
+			router = append(router, addr.AsSlice()...)
 		}
 		opts = append(opts, option{optRouter, router})
 	}
 	if len(cfg.DNS) > 0 {
 		dns := make([]byte, 0, 4*len(cfg.DNS))
 		for _, addr := range cfg.DNS {
-			dns = append(dns, addr...)
+			dns = append(dns, addr.AsSlice()...)
 		}
 		opts = append(opts, option{optDomainNameServer, dns})
 	}
@@ -296,10 +296,10 @@ func (h hdr) String() string {
 		&buf,
 		"type=%s;ciaddr=%s;yiaddr=%s;siaddr=%s;giaddr=%s;chaddr=%x",
 		msgType,
-		tcpip.Address(h.ciaddr()),
-		tcpip.Address(h.yiaddr()),
-		tcpip.Address(h.siaddr()),
-		tcpip.Address(h.giaddr()),
+		tcpip.AddrFrom4Slice(h.ciaddr()),
+		tcpip.AddrFrom4Slice(h.yiaddr()),
+		tcpip.AddrFrom4Slice(h.siaddr()),
+		tcpip.AddrFrom4Slice(h.giaddr()),
 		h.chaddr(),
 	); err != nil {
 		panic(err)

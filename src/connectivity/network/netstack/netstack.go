@@ -48,9 +48,6 @@ const (
 
 	lowPriorityRoute routes.Metric = 99999
 
-	ipv4Loopback tcpip.Address = "\x7f\x00\x00\x01"
-	ipv6Loopback tcpip.Address = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-
 	dhcpAcquisition    = 60 * zxtime.Second
 	dhcpBackoff        = 1 * zxtime.Second
 	dhcpRetransmission = 4 * zxtime.Second
@@ -63,6 +60,11 @@ const (
 	// A large enough value was chosen through experimentation to handle sudden
 	// bursts of traffic.
 	qdiscTxDepthMultiplier = 20
+)
+
+var (
+	ipv4Loopback = tcpip.AddrFrom4([4]byte{127, 0, 0, 1})
+	ipv6Loopback = tcpip.AddrFrom16([16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
 )
 
 func ipv6LinkLocalOnLinkRoute(nicID tcpip.NICID) tcpip.Route {
@@ -335,8 +337,8 @@ func onLinkV6Route(nicID tcpip.NICID, dest tcpip.Subnet) tcpip.Route {
 }
 
 func addressWithPrefixRoute(nicid tcpip.NICID, addr tcpip.AddressWithPrefix) tcpip.Route {
-	mask := net.CIDRMask(addr.PrefixLen, len(addr.Address)*8)
-	destination, err := tcpip.NewSubnet(tcpip.Address(net.IP(addr.Address).Mask(mask)), tcpip.AddressMask(mask))
+	mask := net.CIDRMask(addr.PrefixLen, addr.Address.BitLen())
+	destination, err := tcpip.NewSubnet(tcpip.AddrFromSlice(net.IP(addr.Address.AsSlice()).Mask(mask)), tcpip.MaskFromBytes(mask))
 	if err != nil {
 		panic(err)
 	}
@@ -804,7 +806,7 @@ func (ifs *ifState) dhcpAcquired(ctx context.Context, lost, acquired tcpip.Addre
 				for _, router := range config.Router {
 					// Reject non-unicast addresses to avoid an explosion of traffic in
 					// case of misconfiguration.
-					if ip := net.IP(router); !ip.IsLinkLocalUnicast() && !ip.IsGlobalUnicast() {
+					if ip := net.IP(router.AsSlice()); !ip.IsLinkLocalUnicast() && !ip.IsGlobalUnicast() {
 						_ = syslog.Warnf("NIC %s: DHCP specified non-unicast router %s, skipping", name, ip)
 						continue
 					}
@@ -1183,7 +1185,7 @@ func (ns *Netstack) addLoopback() error {
 		return fmt.Errorf("error setting NDP configurations to NIC ID %d: %s", nicid, err)
 	}
 
-	ipv4LoopbackPrefix := tcpip.AddressMask(net.IP(ipv4Loopback).DefaultMask()).Prefix()
+	ipv4LoopbackPrefix := tcpip.MaskFromBytes(net.IP(ipv4Loopback.AsSlice()).DefaultMask()).Prefix()
 	ipv4LoopbackProtocolAddress := tcpip.ProtocolAddress{
 		Protocol: ipv4.ProtocolNumber,
 		AddressWithPrefix: tcpip.AddressWithPrefix{

@@ -198,6 +198,11 @@ func isPortRangeValid(p filter.PortRange) bool {
 	return isPortRangeAny(p) || (1 <= p.Start && p.Start <= p.End)
 }
 
+func maskForSubnet(subnet tcpip.Subnet) tcpip.Address {
+	mask := subnet.Mask()
+	return tcpip.AddrFromSlice(mask.AsSlice())
+}
+
 func (f *Filter) parseRules(rules []filter.Rule) (v4Table stack.Table, v6Table stack.Table, ok bool) {
 	type ipType int
 	const (
@@ -227,9 +232,9 @@ func (f *Filter) parseRules(rules []filter.Rule) (v4Table stack.Table, v6Table s
 			ipHdrFilter.SrcInvert = r.SrcSubnetInvertMatch
 			subnet := fidlconv.ToTCPIPSubnet(*src)
 			ipHdrFilter.Src = subnet.ID()
-			ipHdrFilter.SrcMask = tcpip.Address(subnet.Mask())
+			ipHdrFilter.SrcMask = maskForSubnet(subnet)
 
-			switch l := len(ipHdrFilter.Src); l {
+			switch ipHdrFilter.Src.Len() {
 			case header.IPv4AddressSize:
 				ipTypeValue = ipv4Only
 			case header.IPv6AddressSize:
@@ -243,10 +248,10 @@ func (f *Filter) parseRules(rules []filter.Rule) (v4Table stack.Table, v6Table s
 			ipHdrFilter.DstInvert = r.DstSubnetInvertMatch
 			subnet := fidlconv.ToTCPIPSubnet(*dst)
 			ipHdrFilter.Dst = subnet.ID()
-			ipHdrFilter.DstMask = tcpip.Address(subnet.Mask())
+			ipHdrFilter.DstMask = maskForSubnet(subnet)
 
 			var dstIpType ipType
-			switch l := len(ipHdrFilter.Dst); l {
+			switch ipHdrFilter.Dst.Len() {
 			case header.IPv4AddressSize:
 				dstIpType = ipv4Only
 			case header.IPv6AddressSize:
@@ -425,9 +430,9 @@ func (f *Filter) parseNATRules(natRules []filter.Nat) (v4Table stack.Table, v6Ta
 		{
 			subnet := fidlconv.ToTCPIPSubnet(r.SrcSubnet)
 			ipHdrFilter.Src = subnet.ID()
-			ipHdrFilter.SrcMask = tcpip.Address(subnet.Mask())
+			ipHdrFilter.SrcMask = maskForSubnet(subnet)
 
-			switch l := len(ipHdrFilter.Src); l {
+			switch l := ipHdrFilter.Src.Len(); l {
 			case header.IPv4AddressSize:
 				ipTypeValue = ipv4Only
 				netProto = header.IPv4ProtocolNumber

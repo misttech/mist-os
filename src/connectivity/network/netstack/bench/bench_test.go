@@ -82,7 +82,7 @@ func BenchmarkWritePacket(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			addr := tcpip.Address(bytes.Repeat([]byte{1}, header.IPv4AddressSize))
+			addr := tcpip.AddrFrom4Slice(bytes.Repeat([]byte{1}, header.IPv4AddressSize))
 			subnet := util.PointSubnet(addr)
 			stk.SetRouteTable([]tcpip.Route{
 				{

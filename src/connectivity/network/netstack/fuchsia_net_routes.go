@@ -49,7 +49,7 @@ type getWatcherImpl struct {
 
 func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnetRoutes.StateResolveResult, error) {
 	const unspecifiedNIC = tcpip.NICID(0)
-	const unspecifiedLocalAddress = tcpip.Address("")
+	var unspecifiedLocalAddress tcpip.Address
 
 	remote, proto := fidlconv.ToTCPIPAddressAndProtocolNumber(destination)
 	netProtoName := strings.TrimPrefix(networkProtocolToString(proto), "IP")
@@ -101,7 +101,7 @@ func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnet
 					node.SetInterfaceId(uint64(nicID))
 
 					var response fnetRoutes.StateResolveResponse
-					if len(route.NextHop) != 0 {
+					if route.NextHop.Len() != 0 {
 						node.SetAddress(fidlconv.ToNetIpAddress(route.NextHop))
 						response.Result.SetGateway(node)
 					} else {
@@ -712,7 +712,7 @@ func intoLogString(e eventUnion) string {
 									if r.Route.Action.Forward.NextHop == nil {
 										return "nil"
 									} else {
-										return tcpip.Address(
+										return tcpip.AddrFrom4Slice(
 											r.Route.Action.Forward.NextHop.Addr[:]).String()
 									}
 								}())
@@ -751,7 +751,7 @@ func intoLogString(e eventUnion) string {
 									if r.Route.Action.Forward.NextHop == nil {
 										return "nil"
 									} else {
-										return tcpip.Address(
+										return tcpip.AddrFrom16Slice(
 											r.Route.Action.Forward.NextHop.Addr[:]).String()
 									}
 								}())

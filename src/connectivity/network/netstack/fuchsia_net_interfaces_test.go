@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"syscall/zx"
 	"testing"
 	"time"
@@ -259,14 +258,14 @@ func TestInterfacesWatcher(t *testing.T) {
 		{
 			Protocol: header.IPv4ProtocolNumber,
 			AddressWithPrefix: tcpip.AddressWithPrefix{
-				Address:   tcpip.Address(net.IPv4(1, 2, 3, 4).To4()),
+				Address:   util.Parse("1.2.3.4"),
 				PrefixLen: 16,
 			},
 		},
 		{
 			Protocol: header.IPv6ProtocolNumber,
 			AddressWithPrefix: tcpip.AddressWithPrefix{
-				Address:   tcpip.Address(util.Parse("abcd::1")),
+				Address:   util.Parse("abcd::1"),
 				PrefixLen: 64,
 			},
 		},
@@ -298,7 +297,7 @@ func TestInterfacesWatcher(t *testing.T) {
 
 	// Add a default route.
 	blockingWatcher.blockingWatch(t, ch)
-	r := defaultV4Route(ifs.nicid, "\x01\x02\x03\x05")
+	r := defaultV4Route(ifs.nicid, util.Parse("1.2.3.5"))
 	if err := ns.AddRoute(r, metricNotSet, false); err != nil {
 		t.Fatalf("failed to add default route: %s", err)
 	}
@@ -320,7 +319,7 @@ func TestInterfacesWatcher(t *testing.T) {
 	// DHCP Acquired on the interface.
 	blockingWatcher.blockingWatch(t, ch)
 	addr := fnet.Ipv4Address{Addr: [4]uint8{192, 168, 0, 4}}
-	acquiredAddr := tcpip.AddressWithPrefix{Address: tcpip.Address(addr.Addr[:]), PrefixLen: 24}
+	acquiredAddr := tcpip.AddressWithPrefix{Address: tcpip.AddrFrom4Slice(addr.Addr[:]), PrefixLen: 24}
 	leaseLength := dhcp.Seconds(10)
 	initUpdatedAt := zxtime.Monotonic(42)
 	ifs.dhcpAcquired(context.Background(), tcpip.AddressWithPrefix{}, acquiredAddr, dhcp.Config{UpdatedAt: initUpdatedAt, LeaseLength: leaseLength})

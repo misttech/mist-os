@@ -17,6 +17,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"github.com/google/go-cmp/cmp"
 	"gvisor.dev/gvisor/pkg/bufferv2"
@@ -32,8 +33,7 @@ import (
 )
 
 const (
-	testNICID  = tcpip.NICID(1)
-	serverAddr = tcpip.Address("\xc0\xa8\x03\x01")
+	testNICID = tcpip.NICID(1)
 
 	linkAddr1 = tcpip.LinkAddress("\x52\x11\x22\x33\x44\x52")
 	linkAddr2 = tcpip.LinkAddress("\x52\x11\x22\x33\x44\x53")
@@ -45,15 +45,16 @@ const (
 )
 
 var (
-	defaultClientAddrs = []tcpip.Address{"\xc0\xa8\x03\x02", "\xc0\xa8\x03\x03"}
+	serverAddr         = util.Parse("192.168.3.1")
+	defaultClientAddrs = []tcpip.Address{util.Parse("192.168.3.2"), util.Parse("192.168.3.3")}
 	defaultServerCfg   = Config{
 		ServerAddress: serverAddr,
-		SubnetMask:    "\xff\xff\xff\x00",
+		SubnetMask:    util.ParseMask("255.255.255.0"),
 		Router: []tcpip.Address{
-			"\xc0\xa8\x03\xF0",
+			util.Parse("192.168.3.240"),
 		},
 		DNS: []tcpip.Address{
-			"\x08\x08\x08\x08", "\x08\x08\x04\x04",
+			util.Parse("8.8.8.8"), util.Parse("8.8.4.4"),
 		},
 		LeaseLength: defaultLeaseLength,
 	}
@@ -179,7 +180,7 @@ func (e *endpoint) writePacket(pkt stack.PacketBufferPtr) tcpip.Error {
 
 func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	i := 0
-	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
+	for _, pkt := range pkts.AsSlice() {
 		if err := e.writePacket(pkt); err != nil {
 			return i, err
 		}
@@ -1698,7 +1699,7 @@ func TestStateTransition(t *testing.T) {
 				}
 
 				info.Acquired = tcpip.AddressWithPrefix{
-					Address:   "\xc0\xa8\x03\x02",
+					Address:   util.Parse("192.168.3.2"),
 					PrefixLen: 24,
 				}
 				return Config{
@@ -1810,7 +1811,7 @@ func TestStateTransitionAfterLeaseExpirationWithNoResponse(t *testing.T) {
 	// in init selecting state after lease expiration.
 	firstAcquisition := true
 	acquiredAddr := tcpip.AddressWithPrefix{
-		Address:   "\xc0\xa8\x03\x02",
+		Address:   util.Parse("192.168.3.2"),
 		PrefixLen: 24,
 	}
 	c.acquire = func(ctx context.Context, _ *Client, _ string, info *Info) (Config, error) {
@@ -2088,20 +2089,20 @@ func TestTwoServers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if _, err := newEPConnServer(ctx, serverStack, []tcpip.Address{"\xc0\xa8\x03\x02"}, Config{
-		ServerAddress: "\xc0\xa8\x03\x01",
-		SubnetMask:    "\xff\xff\xff\x00",
-		Router:        []tcpip.Address{"\xc0\xa8\x03\xF0"},
-		DNS:           []tcpip.Address{"\x08\x08\x08\x08"},
+	if _, err := newEPConnServer(ctx, serverStack, []tcpip.Address{util.Parse("192.168.3.2")}, Config{
+		ServerAddress: util.Parse("192.168.3.1"),
+		SubnetMask:    util.ParseMask("255.255.255.0"),
+		Router:        []tcpip.Address{util.Parse("192.168.3.240")},
+		DNS:           []tcpip.Address{util.Parse("8.8.8.8")},
 		LeaseLength:   Seconds(30 * 60),
 	}, testServerOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newEPConnServer(ctx, serverStack, []tcpip.Address{"\xc0\xa8\x04\x02"}, Config{
-		ServerAddress: "\xc0\xa8\x04\x01",
-		SubnetMask:    "\xff\xff\xff\x00",
-		Router:        []tcpip.Address{"\xc0\xa8\x03\xF0"},
-		DNS:           []tcpip.Address{"\x08\x08\x08\x08"},
+	if _, err := newEPConnServer(ctx, serverStack, []tcpip.Address{util.Parse("192.168.4.2")}, Config{
+		ServerAddress: util.Parse("192.168.4.1"),
+		SubnetMask:    util.ParseMask("255.255.255.0"),
+		Router:        []tcpip.Address{util.Parse("192.168.3.240")},
+		DNS:           []tcpip.Address{util.Parse("8.8.8.8")},
 		LeaseLength:   Seconds(30 * 60),
 	}, testServerOptions{}); err != nil {
 		t.Fatal(err)
@@ -2209,14 +2210,14 @@ func TestClientRestartIPHeader(t *testing.T) {
 			if typ == dhcpREQUEST {
 				expected.Options = append(expected.Options, option{
 					optDHCPServer,
-					[]byte(serverAddr),
+					serverAddr.AsSlice(),
 				})
 			}
 			// Only the very first DISCOVER doesn't request a specific address.
 			if i != 0 {
 				expected.Options = append(expected.Options, option{
 					optReqIPAddr,
-					[]byte(defaultClientAddrs[0]),
+					defaultClientAddrs[0].AsSlice(),
 				})
 			}
 		case dhcpRELEASE:
@@ -2224,7 +2225,7 @@ func TestClientRestartIPHeader(t *testing.T) {
 			expected.Addresses.Destination = serverAddr
 			expected.Options = append(expected.Options, option{
 				optDHCPServer,
-				[]byte(serverAddr),
+				serverAddr.AsSlice(),
 			})
 		default:
 			t.Fatalf("unhandled client message type %s", typ)
@@ -2297,8 +2298,8 @@ func TestDecline(t *testing.T) {
 
 	wantOpts := options{
 		{optDHCPMsgType, []byte{byte(dhcpDECLINE)}},
-		{optReqIPAddr, []byte(defaultClientAddrs[0])},
-		{optDHCPServer, []byte(serverAddr)},
+		{optReqIPAddr, defaultClientAddrs[0].AsSlice()},
+		{optDHCPServer, serverAddr.AsSlice()},
 	}
 
 	seenDecline := false
@@ -2533,7 +2534,7 @@ func TestClientUpdateInfo(t *testing.T) {
 	if cfg.UpdatedAt != offeredAt {
 		t.Errorf("cfg.UpdatedAt=%s, want=%s", cfg.UpdatedAt, offeredAt)
 	}
-	if diff := cmp.Diff(cfg, info.Config, cmp.AllowUnexported(time.Time{})); diff != "" {
+	if diff := cmp.Diff(cfg, info.Config, cmp.AllowUnexported(time.Time{}, tcpip.Address{}, tcpip.AddressMask{})); diff != "" {
 		t.Errorf("-want +got: %s", diff)
 	}
 	if info.Assigned != acquired {

@@ -39,9 +39,9 @@ func ToTCPIPNetProto(v net.IpVersion) (tcpip.NetworkProtocolNumber, bool) {
 func ToTCPIPAddressAndProtocolNumber(addr net.IpAddress) (tcpip.Address, tcpip.NetworkProtocolNumber) {
 	switch tag := addr.Which(); tag {
 	case net.IpAddressIpv4:
-		return tcpip.Address(addr.Ipv4.Addr[:]), ipv4.ProtocolNumber
+		return tcpip.AddrFrom4(addr.Ipv4.Addr), ipv4.ProtocolNumber
 	case net.IpAddressIpv6:
-		return tcpip.Address(addr.Ipv6.Addr[:]), ipv6.ProtocolNumber
+		return tcpip.AddrFrom16(addr.Ipv6.Addr), ipv6.ProtocolNumber
 	default:
 		panic(fmt.Sprintf("invalid fuchsia.net/IpAddress tag %d", tag))
 	}
@@ -53,14 +53,14 @@ func ToTCPIPAddress(addr net.IpAddress) tcpip.Address {
 }
 
 func ToNetIpAddress(addr tcpip.Address) net.IpAddress {
-	switch l := len(addr); l {
+	switch l := addr.Len(); l {
 	case header.IPv4AddressSize:
 		var v4 net.Ipv4Address
-		copy(v4.Addr[:], addr)
+		copy(v4.Addr[:], addr.AsSlice())
 		return net.IpAddressWithIpv4(v4)
 	case header.IPv6AddressSize:
 		var v6 net.Ipv6Address
-		copy(v6.Addr[:], addr)
+		copy(v6.Addr[:], addr.AsSlice())
 		return net.IpAddressWithIpv6(v6)
 	default:
 		panic(fmt.Sprintf("invalid IP address length = %d: %x", l, addr))
@@ -89,17 +89,17 @@ func ToTCPIPLinkAddress(mac net.MacAddress) tcpip.LinkAddress {
 
 func ToNetSocketAddress(addr tcpip.FullAddress) net.SocketAddress {
 	var out net.SocketAddress
-	switch l := len(addr.Addr); l {
+	switch l := addr.Addr.Len(); l {
 	case header.IPv4AddressSize:
 		var v4 net.Ipv4Address
-		copy(v4.Addr[:], addr.Addr)
+		copy(v4.Addr[:], addr.Addr.AsSlice())
 		out.SetIpv4(net.Ipv4SocketAddress{
 			Address: v4,
 			Port:    addr.Port,
 		})
 	case header.IPv6AddressSize:
 		var v6 net.Ipv6Address
-		copy(v6.Addr[:], addr.Addr)
+		copy(v6.Addr[:], addr.Addr.AsSlice())
 
 		// Zone information should only be included for non-global addresses as the same
 		// address may be used across different zones. Note, there is only a single globally
@@ -138,19 +138,19 @@ func ToNetSocketAddressWithProto(protocol tcpip.NetworkProtocolNumber, addr tcpi
 		out := net.Ipv4SocketAddress{
 			Port: addr.Port,
 		}
-		copy(out.Address.Addr[:], addr.Addr)
+		copy(out.Address.Addr[:], addr.Addr.AsSlice())
 		return net.SocketAddressWithIpv4(out)
 	case ipv6.ProtocolNumber:
 		out := net.Ipv6SocketAddress{
 			Port: addr.Port,
 		}
-		if len(addr.Addr) == header.IPv4AddressSize {
+		if addr.Addr.Len() == header.IPv4AddressSize {
 			// Copy address in v4-mapped format.
-			copy(out.Address.Addr[header.IPv6AddressSize-header.IPv4AddressSize:], addr.Addr)
+			copy(out.Address.Addr[header.IPv6AddressSize-header.IPv4AddressSize:], addr.Addr.AsSlice())
 			out.Address.Addr[header.IPv6AddressSize-header.IPv4AddressSize-1] = 0xff
 			out.Address.Addr[header.IPv6AddressSize-header.IPv4AddressSize-2] = 0xff
 		} else {
-			copy(out.Address.Addr[:], addr.Addr)
+			copy(out.Address.Addr[:], addr.Addr.AsSlice())
 			if isLinkLocal(out.Address) {
 				out.ZoneIndex = uint64(addr.NIC)
 			}
@@ -196,7 +196,7 @@ func TCPIPRouteToForwardingEntry(route tcpip.Route) stack.ForwardingEntry {
 		},
 		DeviceId: uint64(route.NIC),
 	}
-	if len(route.Gateway) != 0 {
+	if route.Gateway.Len() != 0 {
 		nextHop := ToNetIpAddress(route.Gateway)
 		forwardingEntry.NextHop = &nextHop
 	}
@@ -251,10 +251,10 @@ func ToTCPIPMonotonicTime(zxtime zx.Time) tcpip.MonotonicTime {
 func BytesToAddressDroppingUnspecified(b []uint8) tcpip.Address {
 	for _, e := range b {
 		if e != 0 {
-			return tcpip.Address(b)
+			return tcpip.AddrFromSlice(b)
 		}
 	}
-	return ""
+	return tcpip.Address{}
 }
 
 func ToTCPIPFullAddress(addr net.SocketAddress) tcpip.FullAddress {
@@ -351,7 +351,7 @@ func ToInstalledRoute(route routes.ExtendedRoute) InstalledRoute {
 		target := fnetRoutes.RouteTargetV4{
 			OutboundInterface: uint64(route.Route.NIC),
 		}
-		if len(route.Route.Gateway) != 0 {
+		if route.Route.Gateway.Len() != 0 {
 			gateway := ToNetIpAddress(route.Route.Gateway)
 			if gateway.Which() != net.IpAddressIpv4 {
 				panic(fmt.Sprintf(
@@ -384,7 +384,7 @@ func ToInstalledRoute(route routes.ExtendedRoute) InstalledRoute {
 		target := fnetRoutes.RouteTargetV6{
 			OutboundInterface: uint64(route.Route.NIC),
 		}
-		if len(route.Route.Gateway) != 0 {
+		if route.Route.Gateway.Len() != 0 {
 			gateway := ToNetIpAddress(route.Route.Gateway)
 			if gateway.Which() != net.IpAddressIpv6 {
 				panic(fmt.Sprintf(

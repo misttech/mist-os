@@ -500,7 +500,7 @@ func (ep *endpointWithMutators) Bind(_ fidl.Context, sockaddr fnet.SocketAddress
 
 func (ep *endpoint) toTCPIPFullAddress(address fnet.SocketAddress) (tcpip.FullAddress, tcpip.Error) {
 	addr := fidlconv.ToTCPIPFullAddress(address)
-	if l := len(addr.Addr); l > 0 {
+	if l := addr.Addr.Len(); l > 0 {
 		addressSupported := func() bool {
 			switch ep.netProto {
 			case ipv4.ProtocolNumber:
@@ -1000,8 +1000,8 @@ func (ep *endpoint) GetIpMulticastInterface(fidl.Context) (socket.BaseNetworkSoc
 		return socket.BaseNetworkSocketGetIpMulticastInterfaceResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	var addr fnet.Ipv4Address
-	if len(v.InterfaceAddr) == header.IPv4AddressSize {
-		copy(addr.Addr[:], v.InterfaceAddr)
+	if v.InterfaceAddr.Len() == header.IPv4AddressSize {
+		copy(addr.Addr[:], v.InterfaceAddr.AsSlice())
 	}
 	return socket.BaseNetworkSocketGetIpMulticastInterfaceResultWithResponse(
 		socket.BaseNetworkSocketGetIpMulticastInterfaceResponse{
@@ -2918,7 +2918,7 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 		}
 	} else {
 		addr = fidlconv.ToTCPIPFullAddress(req.To)
-		if s.endpoint.netProto == ipv4.ProtocolNumber && len(addr.Addr) == header.IPv6AddressSize {
+		if s.endpoint.netProto == ipv4.ProtocolNumber && addr.Addr.Len() == header.IPv6AddressSize {
 			return socket.DatagramSocketSendMsgPreflightResultWithErr(tcpipErrorToCode(&tcpip.ErrAddressFamilyNotSupported{})), nil
 		}
 	}
@@ -3295,7 +3295,7 @@ func (s *networkDatagramSocket) sendMsg(addr *fnet.SocketAddress, data []uint8, 
 	var to *tcpip.FullAddress
 	if addr != nil {
 		fullAddr = fidlconv.ToTCPIPFullAddress(*addr)
-		if s.endpoint.netProto == ipv4.ProtocolNumber && len(fullAddr.Addr) == header.IPv6AddressSize {
+		if s.endpoint.netProto == ipv4.ProtocolNumber && fullAddr.Addr.Len() == header.IPv6AddressSize {
 			return 0, &tcpip.ErrAddressFamilyNotSupported{}
 		}
 		to = &fullAddr
@@ -4536,7 +4536,7 @@ func (sp *providerImpl) GetInterfaceAddresses(fidl.Context) ([]socket.InterfaceA
 			}
 			ax, ay := x.AddressWithPrefix, y.AddressWithPrefix
 			if ax.Address != ay.Address {
-				return ax.Address < ay.Address
+				return string(ax.Address.AsSlice()) < string(ay.Address.AsSlice())
 			}
 			return ax.PrefixLen < ay.PrefixLen
 		})
@@ -4846,7 +4846,7 @@ func (s *packetSocketImpl) RecvMsg(_ fidl.Context, wantPacketInfo bool, dataLen 
 			PacketInfo: packetsocket.PacketInfo{
 				Protocol:    uint16(res.LinkPacketInfo.Protocol),
 				InterfaceId: uint64(res.RemoteAddr.NIC),
-				Addr:        tcpipLinkAddressToFidlHWAddr(tcpip.LinkAddress(res.RemoteAddr.Addr)),
+				Addr:        tcpipLinkAddressToFidlHWAddr(res.RemoteAddr.LinkAddr),
 			},
 			PacketType:    tcpipPacketTypeToFidl(res.LinkPacketInfo.PktType),
 			InterfaceType: packetsocket.HardwareTypeEthernet,
@@ -4874,7 +4874,7 @@ func (s *packetSocketImpl) SendMsg(_ fidl.Context, addr *packetsocket.PacketInfo
 			return packetsocket.SocketSendMsgResultWithErr(posix.ErrnoEinval), nil
 		case packetsocket.HardwareAddressNone:
 		case packetsocket.HardwareAddressEui48:
-			fullAddr.Addr = tcpip.Address(fidlconv.ToTCPIPLinkAddress(addr.Addr.Eui48))
+			fullAddr.LinkAddr = fidlconv.ToTCPIPLinkAddress(addr.Addr.Eui48)
 		default:
 			panic(fmt.Sprintf("unhandled %[1]T variant = %[1]d; %#[2]v", w, addr.Addr))
 		}

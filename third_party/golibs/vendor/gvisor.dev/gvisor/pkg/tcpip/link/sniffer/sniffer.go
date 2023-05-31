@@ -163,7 +163,7 @@ func (e *endpoint) dumpPacket(dir Direction, protocol tcpip.NetworkProtocolNumbe
 // higher-level protocols to write packets; it just logs the packet and
 // forwards the request to the lower endpoint.
 func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
-	for pkt := pkts.Front(); pkt != nil; pkt = pkt.Next() {
+	for _, pkt := range pkts.AsSlice() {
 		e.dumpPacket(DirectionSend, pkt.NetworkProtocolNumber, pkt)
 	}
 	return e.Endpoint.WritePackets(pkts)
@@ -173,8 +173,8 @@ func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) 
 func LogPacket(prefix string, dir Direction, protocol tcpip.NetworkProtocolNumber, pkt stack.PacketBufferPtr) {
 	// Figure out the network layer info.
 	var transProto uint8
-	src := tcpip.Address("unknown")
-	dst := tcpip.Address("unknown")
+	var src tcpip.Address
+	var dst tcpip.Address
 	var size uint16
 	var id uint32
 	var fragmentOffset uint16
@@ -232,8 +232,8 @@ func LogPacket(prefix string, dir Direction, protocol tcpip.NetworkProtocolNumbe
 			"%s%s arp %s (%s) -> %s (%s) valid:%t",
 			prefix,
 			directionPrefix,
-			tcpip.Address(arp.ProtocolAddressSender()), tcpip.LinkAddress(arp.HardwareAddressSender()),
-			tcpip.Address(arp.ProtocolAddressTarget()), tcpip.LinkAddress(arp.HardwareAddressTarget()),
+			tcpip.AddrFromSlice(arp.ProtocolAddressSender()), tcpip.LinkAddress(arp.HardwareAddressSender()),
+			tcpip.AddrFromSlice(arp.ProtocolAddressTarget()), tcpip.LinkAddress(arp.HardwareAddressTarget()),
 			arp.IsValid(),
 		)
 		return

@@ -132,8 +132,8 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 	}{
 		{
 			name:        "IPv4",
-			subnet:      tcpip.Address(util.Parse("192.168.0.0")),
-			subnet_mask: tcpip.AddressMask(util.Parse("255.255.255.0")),
+			subnet:      util.Parse("192.168.0.0"),
+			subnet_mask: util.ParseMask("255.255.255.0"),
 			req: &getWatcherV4Request{
 				req:     watcher_v4_req,
 				options: fnetRoutes.WatcherOptionsV4{},
@@ -145,8 +145,8 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 		},
 		{
 			name:        "IPv6",
-			subnet:      tcpip.Address(util.Parse("fe80::")),
-			subnet_mask: tcpip.AddressMask(util.Parse("ffff:ffff:ffff:ffff::")),
+			subnet:      util.Parse("fe80::"),
+			subnet_mask: util.ParseMask("ffff:ffff:ffff:ffff::"),
 			req: &getWatcherV6Request{
 				req:     watcher_v6_req,
 				options: fnetRoutes.WatcherOptionsV6{},

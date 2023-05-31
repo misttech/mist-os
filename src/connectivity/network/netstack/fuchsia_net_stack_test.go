@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/name"
@@ -19,28 +20,34 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
 )
 
 func TestValidateIPAddressMask(t *testing.T) {
+	var (
+		addr1 = util.Parse("10.11.224.0")
+		addr2 = util.Parse("10.11.255.0")
+	)
+
 	for _, tc := range []struct {
 		addr      tcpip.Address
 		prefixLen uint8
 		want      bool
 	}{
-		{addr: "\x0a\x0b\xe0\x00", prefixLen: 32, want: true},
-		{addr: "\x0a\x0b\xe0\x00", prefixLen: 20, want: true},
-		{addr: "\x0a\x0b\xe0\x00", prefixLen: 19, want: true},
-		{addr: "\x0a\x0b\xe0\x00", prefixLen: 18, want: false},
+		{addr: addr1, prefixLen: 32, want: true},
+		{addr: addr1, prefixLen: 20, want: true},
+		{addr: addr1, prefixLen: 19, want: true},
+		{addr: addr1, prefixLen: 18, want: false},
 
-		{addr: "\x0a\x0b\xef\x00", prefixLen: 25, want: true},
-		{addr: "\x0a\x0b\xef\x00", prefixLen: 24, want: true},
-		{addr: "\x0a\x0b\xef\x00", prefixLen: 23, want: false},
+		{addr: addr2, prefixLen: 25, want: true},
+		{addr: addr2, prefixLen: 24, want: true},
+		{addr: addr2, prefixLen: 23, want: false},
 
-		{addr: "\x00\x00\x00\x00", prefixLen: 0, want: true},
-		{addr: "\x00\x00\x00\x00", prefixLen: 32, want: true},
-		{addr: "\x00\x00\x00\x00", prefixLen: 33, want: false},
+		{addr: header.IPv4Any, prefixLen: 0, want: true},
+		{addr: header.IPv4Any, prefixLen: 32, want: true},
+		{addr: header.IPv4Any, prefixLen: 33, want: false},
 	} {
 		addr := fidlconv.ToNetIpAddress(tc.addr)
 		if got := validateSubnet(net.Subnet{Addr: addr, PrefixLen: tc.prefixLen}); got != tc.want {
@@ -88,19 +95,19 @@ func TestFuchsiaNetStack(t *testing.T) {
 		}
 
 		nonexistentSubnet := net.Subnet{
-			Addr:      fidlconv.ToNetIpAddress("\xaa\x0b\xe0\x00"),
+			Addr:      fidlconv.ToNetIpAddress(util.Parse("170.11.224.0")),
 			PrefixLen: 19,
 		}
 		badMaskSubnet := net.Subnet{
-			Addr:      fidlconv.ToNetIpAddress("\xc0\xa8\x11\x01"),
+			Addr:      fidlconv.ToNetIpAddress(util.Parse("192.168.17.1")),
 			PrefixLen: 19,
 		}
 		localSubnet := net.Subnet{
-			Addr:      fidlconv.ToNetIpAddress("\xc0\xa8\x20\x00"),
+			Addr:      fidlconv.ToNetIpAddress(util.Parse("192.168.32.0")),
 			PrefixLen: 19,
 		}
 		defaultSubnet := net.Subnet{
-			Addr:      fidlconv.ToNetIpAddress("\x00\x00\x00\x00"),
+			Addr:      fidlconv.ToNetIpAddress(header.IPv4Any),
 			PrefixLen: 0,
 		}
 
@@ -114,7 +121,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		}
 		wantLocalRoute := localRoute
 		wantLocalRoute.Metric = uint32(defaultInterfaceMetric)
-		nextHop := fidlconv.ToNetIpAddress("\xc0\xa8\x20\x01")
+		nextHop := fidlconv.ToNetIpAddress(util.Parse("192.168.32.1"))
 		defaultRoute := stack.ForwardingEntry{
 			Subnet:   defaultSubnet,
 			NextHop:  &nextHop,

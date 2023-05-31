@@ -355,7 +355,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 	}
 
 	var reason admin.AddressRemovalReason
-	if protocolAddr.AddressWithPrefix.PrefixLen > 8*len(protocolAddr.AddressWithPrefix.Address) {
+	if protocolAddr.AddressWithPrefix.PrefixLen > protocolAddr.AddressWithPrefix.Address.BitLen() {
 		reason = admin.AddressRemovalReasonInvalid
 	} else if ok, status := ifs.addAddress(protocolAddr, properties); !ok {
 		reason = status

@@ -279,26 +279,26 @@ type TransportEndpointInfo struct {
 // Preconditon: the parent endpoint mu must be held while calling this method.
 func (t *TransportEndpointInfo) AddrNetProtoLocked(addr tcpip.FullAddress, v6only bool) (tcpip.FullAddress, tcpip.NetworkProtocolNumber, tcpip.Error) {
 	netProto := t.NetProto
-	switch len(addr.Addr) {
-	case header.IPv4AddressSize:
+	switch addr.Addr.BitLen() {
+	case header.IPv4AddressSizeBits:
 		netProto = header.IPv4ProtocolNumber
-	case header.IPv6AddressSize:
+	case header.IPv6AddressSizeBits:
 		if header.IsV4MappedAddress(addr.Addr) {
 			netProto = header.IPv4ProtocolNumber
-			addr.Addr = addr.Addr[header.IPv6AddressSize-header.IPv4AddressSize:]
+			addr.Addr = tcpip.AddrFrom4Slice(addr.Addr.AsSlice()[header.IPv6AddressSize-header.IPv4AddressSize:])
 			if addr.Addr == header.IPv4Any {
-				addr.Addr = ""
+				addr.Addr = tcpip.Address{}
 			}
 		}
 	}
 
-	switch len(t.ID.LocalAddress) {
-	case header.IPv4AddressSize:
-		if len(addr.Addr) == header.IPv6AddressSize {
+	switch t.ID.LocalAddress.BitLen() {
+	case header.IPv4AddressSizeBits:
+		if addr.Addr.BitLen() == header.IPv6AddressSizeBits {
 			return tcpip.FullAddress{}, 0, &tcpip.ErrInvalidEndpointState{}
 		}
-	case header.IPv6AddressSize:
-		if len(addr.Addr) == header.IPv4AddressSize {
+	case header.IPv6AddressSizeBits:
+		if addr.Addr.BitLen() == header.IPv4AddressSizeBits {
 			return tcpip.FullAddress{}, 0, &tcpip.ErrNetworkUnreachable{}
 		}
 	}
@@ -1167,7 +1167,7 @@ func (s *Stack) GetMainNICAddress(id tcpip.NICID, protocol tcpip.NetworkProtocol
 }
 
 func (s *Stack) getAddressEP(nic *nic, localAddr, remoteAddr tcpip.Address, netProto tcpip.NetworkProtocolNumber) AssignableAddressEndpoint {
-	if len(localAddr) == 0 {
+	if localAddr.BitLen() == 0 {
 		return nic.primaryEndpoint(netProto, remoteAddr)
 	}
 	return nic.findEndpoint(netProto, localAddr, CanBePrimaryEndpoint)
@@ -1186,8 +1186,8 @@ func (s *Stack) NewRouteForMulticast(nicID tcpip.NICID, remoteAddr tcpip.Address
 		return nil
 	}
 
-	if addressEndpoint := s.getAddressEP(nic, "" /* localAddr */, remoteAddr, netProto); addressEndpoint != nil {
-		return constructAndValidateRoute(netProto, addressEndpoint, nic, nic, "" /* gateway */, "" /* localAddr */, remoteAddr, s.handleLocal, false /* multicastLoop */)
+	if addressEndpoint := s.getAddressEP(nic, tcpip.Address{} /* localAddr */, remoteAddr, netProto); addressEndpoint != nil {
+		return constructAndValidateRoute(netProto, addressEndpoint, nic, nic, tcpip.Address{} /* gateway */, tcpip.Address{} /* localAddr */, remoteAddr, s.handleLocal, false /* multicastLoop */)
 	}
 	return nil
 }
@@ -1250,7 +1250,7 @@ func (s *Stack) findLocalRouteFromNICRLocked(localAddressNIC *nic, localAddr, re
 //
 // +checklocksread:s.mu
 func (s *Stack) findLocalRouteRLocked(localAddressNICID tcpip.NICID, localAddr, remoteAddr tcpip.Address, netProto tcpip.NetworkProtocolNumber) *Route {
-	if len(localAddr) == 0 {
+	if localAddr.BitLen() == 0 {
 		localAddr = remoteAddr
 	}
 
@@ -1324,7 +1324,7 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 			if addressEndpoint := s.getAddressEP(nic, localAddr, remoteAddr, netProto); addressEndpoint != nil {
 				return makeRoute(
 					netProto,
-					"", /* gateway */
+					tcpip.Address{}, /* gateway */
 					localAddr,
 					remoteAddr,
 					nic, /* outboundNIC */
@@ -1351,7 +1351,7 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 		defer s.routeMu.RUnlock()
 
 		for _, route := range s.routeTable {
-			if len(remoteAddr) != 0 && !route.Destination.Contains(remoteAddr) {
+			if remoteAddr.BitLen() != 0 && !route.Destination.Contains(remoteAddr) {
 				continue
 			}
 
@@ -1381,7 +1381,7 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 			// requirement to do this from any RFC but simply a choice made to better
 			// follow a strong host model which the netstack follows at the time of
 			// writing.
-			if onlyGlobalAddresses && chosenRoute == (tcpip.Route{}) && isNICForwarding(nic, netProto) {
+			if onlyGlobalAddresses && chosenRoute.Equal(tcpip.Route{}) && isNICForwarding(nic, netProto) {
 				chosenRoute = route
 			}
 		}
@@ -1391,7 +1391,7 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 		return r, nil
 	}
 
-	if chosenRoute != (tcpip.Route{}) {
+	if !chosenRoute.Equal(tcpip.Route{}) {
 		// At this point we know the stack has forwarding enabled since chosenRoute is
 		// only set when forwarding is enabled.
 		nic, ok := s.nics[chosenRoute.NIC]
