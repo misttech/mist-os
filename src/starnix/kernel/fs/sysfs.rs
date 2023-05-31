@@ -40,6 +40,12 @@ impl SysFs {
             SysFsDirectory::new(kernel.device_registry.write().root_kobject()),
             mode!(IFDIR, 0o755),
         );
+        kernel
+            .device_registry
+            .write()
+            .root_kobject()
+            .get_or_create_child(b"system", KType::Bus)
+            .get_or_create_child(b"cpu", KType::Class);
 
         dir.build_root();
         fs
@@ -91,6 +97,11 @@ impl FsNodeOps for SysFsDirectory {
             Some(child_kobject) => match child_kobject.ktype() {
                 KType::Device { .. } => Ok(node.fs().create_node(
                     DeviceDirectory::new(child_kobject),
+                    mode!(IFDIR, 0o755),
+                    FsCred::root(),
+                )),
+                KType::Class if name == b"cpu" => Ok(node.fs().create_node(
+                    ClassDirectory::new(),
                     mode!(IFDIR, 0o755),
                     FsCred::root(),
                 )),
@@ -163,6 +174,47 @@ impl FsNodeOps for DeviceDirectory {
             b"uevent" => Ok(node.fs().create_node(
                 UEventFsNode::new(self.kobject.clone()),
                 mode!(IFREG, 0o644),
+                FsCred::root(),
+            )),
+            _ => error!(ENOENT),
+        }
+    }
+}
+
+struct ClassDirectory {}
+
+impl ClassDirectory {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl FsNodeOps for ClassDirectory {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        // TODO(fxbug.dev/121327): A workaround before binding FsNodeOps to each kobject.
+        Ok(VecDirectory::new_file(vec![VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"online".to_vec(),
+            inode: None,
+        }]))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<Arc<FsNode>, Errno> {
+        match name {
+            b"online" => Ok(node.fs().create_node(
+                BytesFile::new_node(format!("{}\n", 1).into_bytes()),
+                mode!(IFREG, 0o444),
                 FsCred::root(),
             )),
             _ => error!(ENOENT),
