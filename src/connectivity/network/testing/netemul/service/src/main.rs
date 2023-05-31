@@ -2102,7 +2102,7 @@ mod tests {
             .expect("failed to create proxy");
         let () = counter
             .open_in_namespace(
-                &format!("{}/{}/device_controller", DEVFS_PATH, TEST_DEVICE_NAME),
+                &format!("{}/{}", DEVFS_PATH, TEST_DEVICE_NAME),
                 fio::OpenFlags::RIGHT_READABLE,
                 server_end.into_channel(),
             )
