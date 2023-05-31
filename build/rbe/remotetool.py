@@ -258,9 +258,15 @@ class RemoteTool(object):
             f'--service={service}',
             f'--instance={instance}',
         ]
-        use_adc = self.config.get("use_application_default_credentials", None)
-        if use_adc:
-            auto_args.append(f"--use_application_default_credentials={use_adc}")
+
+        # Infra builds use GCE credentials instead of ADC.
+        gce_creds = os.environ.get("RBE_use_gce_credentials", None)
+        if gce_creds:
+            auto_args.append(f'--use_gce_credentials={gce_creds}')
+        else:
+            use_adc = self.config.get("use_application_default_credentials", None)
+            if use_adc:
+                auto_args.append(f"--use_application_default_credentials={use_adc}")
 
         command = [
             str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
