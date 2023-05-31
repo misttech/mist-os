@@ -198,8 +198,7 @@ zx_status_t Endpoint::ControlRequestStatusPhase(UsbRequestState* state) {
       std::holds_alternative<Request>(*state->context->request)
           ? std::get<Request>(*state->context->request).request()->setup.bm_request_type
           : std::get<usb::FidlRequest>(*state->context->request)
-                .request()
-                .information()
+                ->information()
                 ->control()
                 ->setup()
                 ->bm_request_type();
@@ -246,8 +245,7 @@ zx_status_t Endpoint::ControlRequestDataPhase(UsbRequestState* state) {
               std::holds_alternative<Request>(*state->context->request)
                   ? std::get<Request>(*state->context->request).request()->setup.bm_request_type
                   : std::get<usb::FidlRequest>(*state->context->request)
-                        .request()
-                        .information()
+                        ->information()
                         ->control()
                         ->setup()
                         ->bm_request_type();
@@ -286,16 +284,14 @@ void Endpoint::ControlRequestSetupPhase(UsbRequestState* state) {
       std::holds_alternative<Request>(*state->context->request)
           ? std::get<Request>(*state->context->request).request()->setup.bm_request_type
           : std::get<usb::FidlRequest>(*state->context->request)
-                .request()
-                .information()
+                ->information()
                 ->control()
                 ->setup()
                 ->bm_request_type();
   const auto& setup = std::holds_alternative<Request>(*state->context->request)
                           ? std::get<Request>(*state->context->request).request()->setup
                           : ToBanjo(*std::get<usb::FidlRequest>(*state->context->request)
-                                         .request()
-                                         .information()
+                                         ->information()
                                          ->control()
                                          ->setup());
   memcpy(&state->setup->ptr, &setup, sizeof(setup));
@@ -371,8 +367,7 @@ void Endpoint::NormalRequestQueue(usb_endpoint::RequestVariant request) {
     auto status = WaitForIsochronousReady(
         std::holds_alternative<usb::FidlRequest>(*pending_transfer.context->request)
             ? *std::get<usb::FidlRequest>(*pending_transfer.context->request)
-                   .request()
-                   .information()
+                   ->information()
                    ->isochronous()
                    ->frame_id()
             : std::get<Request>(*pending_transfer.context->request).request()->header.frame);
@@ -561,8 +556,7 @@ zx_status_t Endpoint::ContinueNormalTransaction(UsbRequestState* state) {
           }
           auto frame_id = std::holds_alternative<usb::FidlRequest>(*state->context->request)
                               ? *std::get<usb::FidlRequest>(*state->context->request)
-                                     .request()
-                                     .information()
+                                     ->information()
                                      ->isochronous()
                                      ->frame_id()
                               : std::get<Request>(*state->context->request).request()->header.frame;

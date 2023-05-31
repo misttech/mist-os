@@ -91,7 +91,7 @@ class FidlRequest {
     return *this;
   }
 
-  FidlRequest& add_vmo_id(uint32_t vmo_id, size_t size = 0, size_t offset = 0) {
+  FidlRequest& add_vmo_id(uint64_t vmo_id, size_t size = 0, size_t offset = 0) {
     if (!request_.data().has_value()) {
       request_.data().emplace();
     }

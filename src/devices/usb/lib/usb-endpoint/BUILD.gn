@@ -11,9 +11,23 @@ config("includes") {
   include_dirs = [ "include" ]
 }
 
-source_set("usb-endpoint") {
-  public = [ "include/usb-endpoint/usb-endpoint.h" ]
-  sources = [ "usb-endpoint.cc" ]
+source_set("usb-endpoint-client") {
+  public = [ "include/usb-endpoint/usb-endpoint-client.h" ]
+  sources = [ "usb-endpoint-client.cc" ]
+  public_deps = [
+    "//src/devices/lib/driver",
+    "//src/devices/usb/lib/usb:usb-fidl",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+  public_configs = [ ":includes" ]
+}
+
+source_set("usb-endpoint-server") {
+  public = [ "include/usb-endpoint/usb-endpoint-server.h" ]
+  sources = [ "usb-endpoint-server.cc" ]
   public_deps = [
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb:usb",
@@ -26,10 +40,10 @@ source_set("usb-endpoint") {
   public_configs = [ ":includes" ]
 }
 
-source_set("fake-usb-endpoint") {
+source_set("fake-usb-endpoint-server") {
   testonly = true
-  public = [ "testing/fake-usb-endpoint.h" ]
-  sources = [ "testing/fake-usb-endpoint.h" ]
+  public = [ "testing/fake-usb-endpoint-server.h" ]
+  sources = [ "testing/fake-usb-endpoint-server.h" ]
   public_deps = [
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",

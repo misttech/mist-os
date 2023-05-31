@@ -28,7 +28,7 @@
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/dwc2/usb_dwc_regs.h"
-#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint.h"
+#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint-server.h"
 
 namespace dwc2 {
 

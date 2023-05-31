@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_H_
-#define SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_H_
+#ifndef SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_SERVER_H_
+#define SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_SERVER_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -77,7 +77,7 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
                      std::make_move_iterator(request.req().end()));
 
     // Reply if there is a completion saved for it already.
-    if (!completions_.empty()) {
+    while (!completions_.empty()) {
       RequestComplete(completions_.front().first, completions_.front().second);
       completions_.pop();
     }
@@ -86,12 +86,22 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   void CancelAll(CancelAllCompleter::Sync& completer) override { completer.Reply(fit::ok()); }
   // RegisterVmos: succeeds without checking anything.
   void RegisterVmos(RegisterVmosRequest& request, RegisterVmosCompleter::Sync& completer) override {
-    completer.Reply({{}, {}});
+    std::vector<fuchsia_hardware_usb_endpoint::VmoHandle> ret;
+    for (const auto& vmo_id : request.vmo_ids()) {
+      zx::vmo vmo;
+      auto status = zx::vmo::create(*vmo_id.size(), 0, &vmo);
+      if (status != ZX_OK) {
+        continue;
+      }
+      ret.emplace_back(std::move(
+          fuchsia_hardware_usb_endpoint::VmoHandle().id(*vmo_id.id()).vmo(std::move(vmo))));
+    }
+    completer.Reply(std::move(ret));
   }
   // UnregisterVmos: succeeds without checking anything.
   void UnregisterVmos(UnregisterVmosRequest& request,
                       UnregisterVmosCompleter::Sync& completer) override {
-    completer.Reply({{}});
+    completer.Reply({{}, {}});
   }
 
   // ExpectGetInfo
@@ -122,8 +132,10 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
 // have to override the ConnectToEndpoint and write a new ExpectConnectToEndpoint method to
 // accommodate device_id.
 //
-// It provides connections to several FakeEndpoints as requested.
-template <typename ProtocolType>
+// It provides connections to several FakeEndpoints as requested. FakeEndpointType must be
+// FakeEndpoint or an inherited class of FakeEndpoint, defaulting to FakeEndpoint if not
+// specified.
+template <typename ProtocolType, typename FakeEndpointType = FakeEndpoint>
 class FakeUsbFidlProvider : public fidl::Server<ProtocolType> {
  public:
   explicit FakeUsbFidlProvider(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -133,7 +145,7 @@ class FakeUsbFidlProvider : public fidl::Server<ProtocolType> {
     expected_connect_to_endpoint_.push(ep_addr);
   }
 
-  FakeEndpoint& fake_endpoint(uint8_t ep_addr) { return fake_endpoints_[ep_addr]; }
+  FakeEndpointType& fake_endpoint(uint8_t ep_addr) { return fake_endpoints_[ep_addr]; }
 
  private:
   void ConnectToEndpoint(
@@ -154,9 +166,9 @@ class FakeUsbFidlProvider : public fidl::Server<ProtocolType> {
 
   std::queue<uint8_t> expected_connect_to_endpoint_;
 
-  std::map<uint8_t, FakeEndpoint> fake_endpoints_;
+  std::map<uint8_t, FakeEndpointType> fake_endpoints_;
 };
 
 }  // namespace fake_usb_endpoint
 
-#endif  // SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_H_
+#endif  // SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_SERVER_H_

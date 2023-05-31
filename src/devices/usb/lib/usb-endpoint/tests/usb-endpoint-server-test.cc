@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "usb-endpoint/usb-endpoint.h"
+#include "usb-endpoint/usb-endpoint-server.h"
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fake-bti/bti.h>
@@ -42,7 +42,7 @@ class FakeEndpoint : public usb_endpoint::UsbEndpoint {
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
-class UsbEndpointTest : public zxtest::Test {
+class UsbEndpointServerTest : public zxtest::Test {
  public:
   void SetUp() override {
     client_loop_.StartThread("client-loop");
@@ -83,7 +83,7 @@ class UsbEndpointTest : public zxtest::Test {
   EventHandler event_handler_;
 };
 
-TEST_F(UsbEndpointTest, RegisterVmosTest) {
+TEST_F(UsbEndpointServerTest, RegisterVmosTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   sync_completion_t wait;
@@ -111,7 +111,7 @@ TEST_F(UsbEndpointTest, RegisterVmosTest) {
   EXPECT_EQ((*iters->at(0).begin()).second, 32);
 }
 
-TEST_F(UsbEndpointTest, RegisterMultipleVmosTest) {
+TEST_F(UsbEndpointServerTest, RegisterMultipleVmosTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(5).size(16)));
@@ -148,7 +148,7 @@ TEST_F(UsbEndpointTest, RegisterMultipleVmosTest) {
   EXPECT_EQ((*iters->at(1).begin()).second, 16);
 }
 
-TEST_F(UsbEndpointTest, UnregisterVmosTest) {
+TEST_F(UsbEndpointServerTest, UnregisterVmosTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   sync_completion_t wait;
@@ -189,7 +189,7 @@ TEST_F(UsbEndpointTest, UnregisterVmosTest) {
   VerifyRegisteredVmos(0);
 }
 
-TEST_F(UsbEndpointTest, UnboundTest) {
+TEST_F(UsbEndpointServerTest, UnboundTest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   vmo_info.emplace_back(std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(32)));
   sync_completion_t wait;
@@ -209,7 +209,7 @@ TEST_F(UsbEndpointTest, UnboundTest) {
   VerifyRegisteredVmos(0);
 }
 
-TEST_F(UsbEndpointTest, RequestCompleteFidlTest) {
+TEST_F(UsbEndpointServerTest, RequestCompleteFidlTest) {
   ep_->RequestComplete(
       ZX_OK, 0,
       usb::FidlRequest(std::move(fuchsia_hardware_usb_request::Request().defer_completion(false))));
@@ -227,7 +227,7 @@ TEST_F(UsbEndpointTest, RequestCompleteFidlTest) {
   sync_completion_reset(&event_handler_.received_on_completion_);
 }
 
-TEST_F(UsbEndpointTest, RequestCompleteDeferredFidlTest) {
+TEST_F(UsbEndpointServerTest, RequestCompleteDeferredFidlTest) {
   ep_->RequestComplete(
       ZX_OK, 5,
       usb::FidlRequest(std::move(fuchsia_hardware_usb_request::Request().defer_completion(true))));
@@ -259,7 +259,7 @@ TEST_F(UsbEndpointTest, RequestCompleteDeferredFidlTest) {
   sync_completion_reset(&event_handler_.received_on_completion_);
 }
 
-TEST_F(UsbEndpointTest, RequestCompleteBanjoTest) {
+TEST_F(UsbEndpointServerTest, RequestCompleteBanjoTest) {
   constexpr size_t kBaseReqSize = sizeof(usb_request_t);
   constexpr size_t kFirstLayerReqSize = usb::Request<void>::RequestSize(kBaseReqSize);
 

@@ -12,12 +12,18 @@ group("tests") {
 
 test("usb-endpoint-test-bin") {
   output_name = "usb-endpoint-test"
-  sources = [ "usb-endpoint-test.cc" ]
+  sources = [
+    "usb-endpoint-client-test.cc",
+    "usb-endpoint-server-test.cc",
+  ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.usb:fuchsia.hardware.usb_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
-    "//src/devices/usb/lib/usb-endpoint",
+    "//src/devices/usb/lib/usb-endpoint:fake-usb-endpoint-server",
+    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client",
+    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]

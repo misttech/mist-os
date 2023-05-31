@@ -61,7 +61,7 @@ TEST(RequestFidlTest, UnpinTest) {
   EXPECT_OK(fidl_request.Unpin());
   EXPECT_OK(fake_bti_get_pinned_vmos(fake_bti.get(), nullptr, 0, &actual));
   EXPECT_EQ(actual, 0);
-  EXPECT_BYTES_EQ((*fidl_request.request().data())[1].buffer()->data()->data(), expected_vals,
+  EXPECT_BYTES_EQ((*fidl_request->data())[1].buffer()->data()->data(), expected_vals,
                   sizeof(expected_vals));
 }
 

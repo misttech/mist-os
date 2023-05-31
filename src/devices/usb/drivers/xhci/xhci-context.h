@@ -19,7 +19,7 @@
 #include "lib/fpromise/promise.h"
 #include "src/devices/usb/drivers/xhci/registers.h"
 #include "src/devices/usb/drivers/xhci/xhci-hub.h"
-#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint.h"
+#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint-server.h"
 
 namespace usb_xhci {
 struct TRBContext;

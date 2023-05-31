@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_H_
-#define SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_H_
+#ifndef SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_SERVER_H_
+#define SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_SERVER_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 
@@ -65,4 +65,4 @@ class UsbEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint>
 
 }  // namespace usb_endpoint
 
-#endif  // SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_H_
+#endif  // SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_SERVER_H_

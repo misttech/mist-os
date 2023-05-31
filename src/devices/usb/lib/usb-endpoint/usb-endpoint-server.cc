@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint.h"
+#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint-server.h"
 
 #include <lib/fit/defer.h>
 
@@ -36,7 +36,7 @@ zx::result<std::vector<ddk::PhysIter>> UsbEndpoint::get_iter(RequestVariant& req
   } else {
     const auto& fidl_request = std::get<usb::FidlRequest>(req);
     size_t i = 0;
-    for (const auto& d : *fidl_request.request().data()) {
+    for (const auto& d : *fidl_request->data()) {
       switch (d.buffer()->Which()) {
         case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
           iters.push_back(phys_iter(registered_vmos_.at(d.buffer()->vmo_id().value()).phys_list,
@@ -160,7 +160,7 @@ void UsbEndpoint::RequestComplete(zx_status_t status, size_t actual, RequestVari
   }
   auto& req = std::get<usb::FidlRequest>(request);
 
-  auto defer_completion = *req.request().defer_completion();
+  auto defer_completion = *req->defer_completion();
   completions_.emplace_back(std::move(fuchsia_hardware_usb_endpoint::Completion()
                                           .request(req.take_request())
                                           .status(status)
