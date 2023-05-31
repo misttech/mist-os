@@ -50,8 +50,8 @@ use crate::{
                 SlaacContext,
             },
             state::{
-                AddrConfig, DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                Ipv4DeviceConfiguration, Ipv6AddressFlags, Ipv6AddressState,
+                DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
+                Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
             DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext,
@@ -107,10 +107,10 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
                 } = &mut *state;
 
                 match config {
-                    AddrConfig::Slaac(config) => {
+                    Ipv6AddrConfig::Slaac(config) => {
                         cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
                     }
-                    AddrConfig::Manual => {}
+                    Ipv6AddrConfig::Manual(_manual_config) => {}
                 }
             })
         })
@@ -139,12 +139,12 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
                          }| {
                             let addr_sub = addr_id.addr_sub();
                             match config {
-                                AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
+                                Ipv6AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
                                     addr_sub,
                                     config: *config,
                                     deprecated: *deprecated,
                                 }),
-                                AddrConfig::Manual => None,
+                                Ipv6AddrConfig::Manual(_manual_config) => None,
                             }
                         },
                     )
@@ -167,7 +167,7 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
             ctx,
             device_id,
             add_addr_sub.to_witness(),
-            AddrConfig::Slaac(slaac_config),
+            Ipv6AddrConfig::Slaac(slaac_config),
             config,
         )
         .map(|entry| {
@@ -183,7 +183,7 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
                     addr_sub,
                     config: assert_matches::assert_matches!(
                         config,
-                        AddrConfig::Slaac(c) => c
+                        Ipv6AddrConfig::Slaac(c) => c
                     ),
                     deprecated,
                 },
@@ -210,8 +210,8 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
         .map(|(addr_sub, config)| {
             assert_eq!(&addr_sub.addr(), addr);
             match config {
-                AddrConfig::Slaac(s) => (addr_sub, s),
-                AddrConfig::Manual => {
+                Ipv6AddrConfig::Slaac(s) => (addr_sub, s),
+                Ipv6AddrConfig::Manual(_manual_config) => {
                     unreachable!(
                         "address {} on device {} should have been a SLAAC address; config = {:?}",
                         addr_sub, *device_id, config

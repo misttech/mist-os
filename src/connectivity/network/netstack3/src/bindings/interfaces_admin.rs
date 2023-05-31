@@ -53,13 +53,14 @@ use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr};
 use netstack3_core::{
     device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
     ip::device::{
+        state::{AddrSubnetAndManualConfigEither, Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
     },
 };
 
 use crate::bindings::{
     devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
-    DeviceIdExt as _, Netstack,
+    DeviceIdExt as _, Netstack, StackTime,
 };
 
 pub(crate) fn serve(
@@ -1013,12 +1014,7 @@ fn add_address(
     let initial_properties =
         params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
     let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);
-    if valid_lifetime_end != INFINITE_NANOS {
-        tracing::warn!(
-            "TODO(https://fxbug.dev/105630): ignoring valid_lifetime_end: {:?}",
-            valid_lifetime_end
-        );
-    }
+
     match initial_properties
         .preferred_lifetime_info
         .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS))
@@ -1035,6 +1031,21 @@ fn add_address(
             }
         }
     }
+
+    let valid_until = if valid_lifetime_end == INFINITE_NANOS {
+        Lifetime::Infinite
+    } else {
+        Lifetime::Finite(StackTime(fasync::Time::from_nanos(valid_lifetime_end)))
+    };
+
+    let addr_subnet_either = match addr_subnet_either {
+        AddrSubnetEither::V4(addr_subnet) => {
+            AddrSubnetAndManualConfigEither::V4(addr_subnet, Ipv4AddrConfig { valid_until })
+        }
+        AddrSubnetEither::V6(addr_subnet) => {
+            AddrSubnetAndManualConfigEither::V6(addr_subnet, Ipv6AddrManualConfig { valid_until })
+        }
+    };
 
     let locked_ctx = ctx.clone();
     let core_id =
@@ -1084,7 +1095,7 @@ fn add_address(
 /// A worker for `fuchsia.net.interfaces.admin/AddressStateProvider`.
 async fn run_address_state_provider(
     ctx: Ctx,
-    addr_subnet_either: AddrSubnetEither,
+    addr_subnet_and_config: AddrSubnetAndManualConfigEither<StackTime>,
     add_subnet_route: bool,
     id: BindingId,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
@@ -1096,6 +1107,7 @@ async fn run_address_state_provider(
         fnet_interfaces_admin::AddressRemovalReason,
     >,
 ) {
+    let addr_subnet_either = addr_subnet_and_config.addr_subnet_either();
     let (address, subnet) = addr_subnet_either.addr_subnet();
     struct StateInCore {
         address: bool,
@@ -1110,7 +1122,12 @@ async fn run_address_state_provider(
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
-        netstack3_core::add_ip_addr_subnet(sync_ctx, non_sync_ctx, &device_id, addr_subnet_either)
+        netstack3_core::add_ip_addr_subnet(
+            sync_ctx,
+            non_sync_ctx,
+            &device_id,
+            addr_subnet_and_config,
+        )
     };
     let state_to_remove_from_core = match add_to_core_result {
         Err(netstack3_core::error::ExistsError) => {

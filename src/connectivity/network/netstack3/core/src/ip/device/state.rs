@@ -5,12 +5,15 @@
 //! State for an IP device.
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, num::NonZeroU8, time::Duration};
+use core::{fmt::Debug, hash::Hash, num::NonZeroU8, time::Duration};
 
 use derivative::Derivative;
 use lock_order::lock::{LockFor, RwLockFor};
 use net_types::{
-    ip::{AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{
+        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr,
+        Ipv6, Ipv6Addr,
+    },
     SpecifiedAddr, UnicastAddr, Witness,
 };
 use nonzero_ext::nonzero;
@@ -20,6 +23,7 @@ use crate::{
     ip::{
         device::{
             route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
+            IpDeviceIpExt,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
     },
@@ -64,23 +68,23 @@ pub(crate) trait IpDeviceStateIpExt: Ip {
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
-    type AssignedAddress<I: Instant> = AddrSubnet<Ipv4Addr>;
+    type AssignedAddress<I: Instant> = Ipv4AddressEntry<I>;
     type GmpState<I: Instant> = IgmpGroupState<I>;
 
     fn assigned_addr<I: Instant>(
         addr: &Self::AssignedAddress<I>,
     ) -> Option<AddrSubnet<Self::Addr>> {
-        Some(addr.clone())
+        Some(*addr.addr_sub())
     }
 }
 
-impl IpAddressId<Ipv4Addr> for StrongRc<AddrSubnet<Ipv4Addr>> {
+impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
     fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
-        AddrSubnet::addr(&*self)
+        self.addr_sub.addr()
     }
 
     fn addr_sub(&self) -> AddrSubnet<Ipv4Addr> {
-        **self
+        self.addr_sub
     }
 }
 
@@ -115,9 +119,9 @@ pub trait AssignedAddress<A: IpAddress> {
     fn addr(&self) -> SpecifiedAddr<A>;
 }
 
-impl AssignedAddress<Ipv4Addr> for AddrSubnet<Ipv4Addr> {
+impl<I: Instant> AssignedAddress<Ipv4Addr> for Ipv4AddressEntry<I> {
     fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
-        self.addr()
+        self.addr_sub().addr()
     }
 }
 
@@ -672,8 +676,8 @@ pub(crate) enum Ipv6DadState {
 }
 
 /// Configuration for a temporary IPv6 address assigned via SLAAC.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct TemporarySlaacConfig<Instant> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TemporarySlaacConfig<Instant> {
     /// The time at which the address is no longer valid.
     pub(crate) valid_until: Instant,
     /// The per-address DESYNC_FACTOR specified in RFC 8981 Section 3.4.
@@ -687,15 +691,51 @@ pub(crate) struct TemporarySlaacConfig<Instant> {
 }
 
 /// A lifetime that may be forever/infinite.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Lifetime<I> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Lifetime<I> {
+    /// A finite lifetime.
     Finite(I),
+    /// An infinite lifetime.
     Infinite,
 }
 
+/// The configuration for an IPv4 address.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Ipv4AddrConfig<Instant> {
+    /// The lifetime for which the address is valid.
+    pub valid_until: Lifetime<Instant>,
+}
+
+impl<I> Default for Ipv4AddrConfig<I> {
+    fn default() -> Self {
+        Self { valid_until: Lifetime::Infinite }
+    }
+}
+
+/// Data associated with an IPv4 address on an interface.
+#[derive(Debug)]
+pub(crate) struct Ipv4AddressEntry<Instant> {
+    pub(crate) addr_sub: AddrSubnet<Ipv4Addr>,
+    pub(crate) config: Ipv4AddrConfig<Instant>,
+}
+
+impl<Instant> Ipv4AddressEntry<Instant> {
+    pub(crate) fn new(addr_sub: AddrSubnet<Ipv4Addr>, config: Ipv4AddrConfig<Instant>) -> Self {
+        Self { addr_sub, config }
+    }
+
+    pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv4Addr> {
+        &self.addr_sub
+    }
+
+    pub(crate) fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
+        self.addr_sub.addr()
+    }
+}
+
 /// Configuration for an IPv6 address assigned via SLAAC.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SlaacConfig<Instant> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SlaacConfig<Instant> {
     /// The address is static.
     Static {
         /// The lifetime of the address.
@@ -708,16 +748,35 @@ pub(crate) enum SlaacConfig<Instant> {
 }
 
 /// The configuration for an IPv6 address.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AddrConfig<Instant> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Ipv6AddrConfig<Instant> {
     /// Configured by stateless address autoconfiguration.
     Slaac(SlaacConfig<Instant>),
 
     /// Manually configured.
-    Manual,
+    Manual(Ipv6AddrManualConfig<Instant>),
 }
 
-impl<Instant> AddrConfig<Instant> {
+impl<Instant> Default for Ipv6AddrConfig<Instant> {
+    fn default() -> Self {
+        Self::Manual(Default::default())
+    }
+}
+
+/// The configuration for a manually-assigned IPv6 address.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Ipv6AddrManualConfig<Instant> {
+    /// The lifetime for which the address is valid.
+    pub valid_until: Lifetime<Instant>,
+}
+
+impl<Instant> Default for Ipv6AddrManualConfig<Instant> {
+    fn default() -> Self {
+        Self { valid_until: Lifetime::Infinite }
+    }
+}
+
+impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// The configuration for a link-local address configured via SLAAC.
     ///
     /// Per [RFC 4862 Section 5.3]: "A link-local address has an infinite preferred and valid
@@ -726,6 +785,84 @@ impl<Instant> AddrConfig<Instant> {
     /// [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
     pub(crate) const SLAAC_LINK_LOCAL: Self =
         Self::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite });
+
+    /// The lifetime for which the address is valid.
+    pub fn valid_until(&self) -> Lifetime<Instant> {
+        match self {
+            Ipv6AddrConfig::Slaac(slaac_config) => match slaac_config {
+                SlaacConfig::Static { valid_until } => *valid_until,
+                SlaacConfig::Temporary(TemporarySlaacConfig {
+                    valid_until,
+                    desync_factor: _,
+                    creation_time: _,
+                    dad_counter: _,
+                }) => Lifetime::Finite(*valid_until),
+            },
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => *valid_until,
+        }
+    }
+}
+
+/// An AddrSubnet together with configuration specified for it when adding it
+/// to the stack.
+#[derive(Debug)]
+pub enum AddrSubnetAndManualConfigEither<Instant> {
+    /// Variant for an Ipv4 AddrSubnet.
+    V4(AddrSubnet<Ipv4Addr>, Ipv4AddrConfig<Instant>),
+    /// Variant for an Ipv6 AddrSubnet.
+    V6(AddrSubnet<Ipv6Addr>, Ipv6AddrManualConfig<Instant>),
+}
+
+impl<Instant> AddrSubnetAndManualConfigEither<Instant> {
+    /// Constructs an `AddrSubnetAndManualConfigEither`.
+    pub(crate) fn new<I: Ip + IpDeviceIpExt>(
+        addr_subnet: AddrSubnet<I::Addr>,
+        config: I::ManualAddressConfig<Instant>,
+    ) -> Self {
+        #[derive(GenericOverIp)]
+        struct AddrSubnetAndConfig<I: Ip + IpDeviceIpExt, Instant> {
+            addr_subnet: AddrSubnet<I::Addr>,
+            config: I::ManualAddressConfig<Instant>,
+        }
+
+        let IpInvariant(result) = I::map_ip(
+            AddrSubnetAndConfig { addr_subnet, config },
+            |AddrSubnetAndConfig { addr_subnet, config }| {
+                IpInvariant(AddrSubnetAndManualConfigEither::V4(addr_subnet, config))
+            },
+            |AddrSubnetAndConfig { addr_subnet, config }| {
+                IpInvariant(AddrSubnetAndManualConfigEither::V6(addr_subnet, config))
+            },
+        );
+        result
+    }
+
+    /// Extracts the `AddrSubnetEither`.
+    pub fn addr_subnet_either(&self) -> AddrSubnetEither {
+        match self {
+            Self::V4(addr_subnet, _) => AddrSubnetEither::V4(*addr_subnet),
+            Self::V6(addr_subnet, _) => AddrSubnetEither::V6(*addr_subnet),
+        }
+    }
+}
+
+impl<Instant> From<AddrSubnetEither> for AddrSubnetAndManualConfigEither<Instant> {
+    fn from(value: AddrSubnetEither) -> Self {
+        match value {
+            AddrSubnetEither::V4(addr_subnet) => {
+                AddrSubnetAndManualConfigEither::new::<Ipv4>(addr_subnet, Default::default())
+            }
+            AddrSubnetEither::V6(addr_subnet) => {
+                AddrSubnetAndManualConfigEither::new::<Ipv6>(addr_subnet, Default::default())
+            }
+        }
+    }
+}
+
+impl<Instant, I: IpAddress> From<AddrSubnet<I>> for AddrSubnetAndManualConfigEither<Instant> {
+    fn from(value: AddrSubnet<I>) -> Self {
+        AddrSubnetEither::from(value).into()
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -737,7 +874,7 @@ pub(crate) struct Ipv6AddressFlags {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Ipv6AddressState<Instant> {
     pub(crate) flags: Ipv6AddressFlags,
-    pub(crate) config: AddrConfig<Instant>,
+    pub(crate) config: Ipv6AddrConfig<Instant>,
 }
 
 /// Data associated with an IPv6 address on an interface.
@@ -753,7 +890,7 @@ impl<Instant> Ipv6AddressEntry<Instant> {
     pub(crate) fn new(
         addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
         dad_state: Ipv6DadState,
-        config: AddrConfig<Instant>,
+        config: Ipv6AddrConfig<Instant>,
     ) -> Self {
         let assigned = match dad_state {
             Ipv6DadState::Assigned => true,
@@ -808,23 +945,36 @@ mod tests {
 
     use crate::{context::testutil::FakeInstant, error::ExistsError};
 
-    #[test]
-    fn test_add_addr_ipv4() {
+    use test_case::test_case;
+
+    #[test_case(Lifetime::Infinite ; "with infinite valid_until")]
+    #[test_case(Lifetime::Finite(FakeInstant::from(Duration::from_secs(1))); "with finite valid_until")]
+    fn test_add_addr_ipv4(valid_until: Lifetime<FakeInstant>) {
         const ADDRESS: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
         const PREFIX_LEN: u8 = 8;
 
         let mut ipv4 = IpDeviceAddresses::<FakeInstant, Ipv4>::default();
 
-        let _: StrongRc<_> = ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap()).unwrap();
+        let _: StrongRc<_> = ipv4
+            .add(Ipv4AddressEntry::new(
+                AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
+                Ipv4AddrConfig { valid_until },
+            ))
+            .unwrap();
         // Adding the same address with different prefix should fail.
         assert_eq!(
-            ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap()).unwrap_err(),
+            ipv4.add(Ipv4AddressEntry::new(
+                AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
+                Ipv4AddrConfig { valid_until },
+            ))
+            .unwrap_err(),
             ExistsError
         );
     }
 
-    #[test]
-    fn test_add_addr_ipv6() {
+    #[test_case(Lifetime::Infinite ; "with infinite valid_until")]
+    #[test_case(Lifetime::Finite(FakeInstant::from(Duration::from_secs(1))); "with finite valid_until")]
+    fn test_add_addr_ipv6(valid_until: Lifetime<FakeInstant>) {
         const ADDRESS: Ipv6Addr =
             Ipv6Addr::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6]);
         const PREFIX_LEN: u8 = 8;
@@ -835,7 +985,7 @@ mod tests {
             .add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
                 Ipv6DadState::Tentative { dad_transmits_remaining: None },
-                AddrConfig::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite }),
+                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }),
             ))
             .unwrap();
         // Adding the same address with different prefix and configuration
@@ -844,7 +994,7 @@ mod tests {
             ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 Ipv6DadState::Assigned,
-                AddrConfig::Manual,
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }),
             ))
             .unwrap_err(),
             ExistsError,

@@ -452,7 +452,9 @@ pub(crate) fn get_counter_val(ctx: &FakeNonSyncCtx, key: &str) -> usize {
 
 /// An extension trait for `Ip` providing test-related functionality.
 #[cfg(test)]
-pub(crate) trait TestIpExt: crate::ip::IpExt + crate::ip::IpLayerIpExt {
+pub(crate) trait TestIpExt:
+    crate::ip::IpExt + crate::ip::IpLayerIpExt + crate::ip::device::IpDeviceIpExt
+{
     /// Either [`FAKE_CONFIG_V4`] or [`FAKE_CONFIG_V6`].
     const FAKE_CONFIG: FakeEventDispatcherConfig<Self::Addr>;
 
@@ -943,21 +945,21 @@ pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNon
 #[derive(Debug, Eq, PartialEq, Hash)]
 #[allow(missing_docs)]
 pub enum DispatchedEvent {
-    IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
-    IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
+    IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>),
+    IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>),
     IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
     IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
 }
 
-impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>
-    for IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I>
+impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>
+    for IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I, FakeInstant>
 {
     fn from(
-        e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>,
-    ) -> IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I> {
+        e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>,
+    ) -> IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I, FakeInstant> {
         match e {
-            IpDeviceEvent::AddressAdded { device, addr, state } => {
-                IpDeviceEvent::AddressAdded { device: device.downgrade(), addr, state }
+            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
+                IpDeviceEvent::AddressAdded { device: device.downgrade(), addr, state, valid_until }
             }
             IpDeviceEvent::AddressRemoved { device, addr, reason } => {
                 IpDeviceEvent::AddressRemoved { device: device.downgrade(), addr, reason }
@@ -972,14 +974,14 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>
     }
 }
 
-impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for DispatchedEvent {
-    fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) -> DispatchedEvent {
+impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>> for DispatchedEvent {
+    fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>) -> DispatchedEvent {
         DispatchedEvent::IpDeviceIpv4(e.into())
     }
 }
 
-impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
-    fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) -> DispatchedEvent {
+impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>> for DispatchedEvent {
+    fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>) -> DispatchedEvent {
         DispatchedEvent::IpDeviceIpv6(e.into())
     }
 }
@@ -1037,15 +1039,15 @@ impl EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSyncC
     }
 }
 
-impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) {
+impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>> for FakeNonSyncCtx {
+    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>) {
         let Self(this) = self;
         this.on_event(DispatchedEvent::from(event))
     }
 }
 
-impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) {
+impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>> for FakeNonSyncCtx {
+    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>) {
         let Self(this) = self;
         this.on_event(DispatchedEvent::from(event))
     }

@@ -3490,7 +3490,8 @@ mod tests {
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
             device::state::{
-                AddrConfig, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry, Ipv6DadState,
+                IpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry,
+                Ipv6AddrConfig, Ipv6AddressEntry, Ipv6DadState,
             },
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::{
@@ -3862,7 +3863,10 @@ mod tests {
                 let _addr_id = device_state
                     .addrs
                     .write()
-                    .add(AddrSubnet::new(addr, prefix).unwrap())
+                    .add(Ipv4AddressEntry::new(
+                        AddrSubnet::new(addr, prefix).unwrap(),
+                        Ipv4AddrConfig::default(),
+                    ))
                     .expect("failed to add address");
             }
             device_state
@@ -3886,7 +3890,7 @@ mod tests {
                     .add(Ipv6AddressEntry::new(
                         AddrSubnet::new(addr, prefix).unwrap(),
                         Ipv6DadState::Assigned,
-                        AddrConfig::Manual,
+                        Ipv6AddrConfig::default(),
                     ))
                     .expect("failed to add address");
             }

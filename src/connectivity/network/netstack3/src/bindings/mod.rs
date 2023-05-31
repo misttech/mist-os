@@ -80,9 +80,10 @@ use netstack3_core::{
     handle_timer,
     ip::{
         device::{
-            slaac::SlaacConfiguration, state::Ipv6DeviceConfiguration, IpDeviceConfigurationUpdate,
-            IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-            RemovedReason,
+            slaac::SlaacConfiguration,
+            state::{Ipv6DeviceConfiguration, Lifetime},
+            IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate, RemovedReason,
         },
         icmp,
         types::RawMetric,
@@ -452,18 +453,23 @@ where
     }
 }
 
-impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I>>
+impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, StackTime>>
     for BindingsNonSyncCtxImpl
 {
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I>) {
+    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, StackTime>) {
         match event {
-            IpDeviceEvent::AddressAdded { device, addr, state } => {
+            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
+                let valid_until = match valid_until {
+                    Lifetime::Infinite => zx::Time::INFINITE,
+                    Lifetime::Finite(StackTime(time)) => time.into_zx(),
+                };
+
                 self.notify_interface_update(
                     &device,
                     InterfaceUpdate::AddressAdded {
                         addr: addr.into(),
                         assignment_state: state,
-                        valid_until: zx::Time::INFINITE,
+                        valid_until,
                     },
                 );
                 self.notify_address_update(&device, addr.addr().into(), state);

@@ -45,11 +45,11 @@ use crate::{
             router_solicitation::{RsHandler, RsTimerId},
             slaac::{SlaacConfiguration, SlaacHandler, SlaacTimerId},
             state::{
-                AddrConfig, DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration,
-                IpDeviceFlags, IpDeviceState, IpDeviceStateIpExt, Ipv4DeviceConfiguration,
-                Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddressFlags,
-                Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-                Ipv6DeviceState,
+                DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
+                IpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+                Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
+                Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
+                Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Lifetime,
             },
         },
         gmp::{
@@ -244,7 +244,8 @@ pub(crate) trait IpDeviceIpExt: IpDeviceStateIpExt {
     type Configuration: AsRef<IpDeviceConfiguration>;
     type Timer<DeviceId>;
     type AssignedWitness: Witness<Self::Addr> + Copy + PartialEq + Debug;
-    type AddressConfig<I>;
+    type AddressConfig<I>: Default;
+    type ManualAddressConfig<I>: Default;
     type AddressState<I>;
 }
 
@@ -253,7 +254,8 @@ impl IpDeviceIpExt for Ipv4 {
     type Configuration = Ipv4DeviceConfiguration;
     type Timer<DeviceId> = Ipv4DeviceTimerId<DeviceId>;
     type AssignedWitness = SpecifiedAddr<Ipv4Addr>;
-    type AddressConfig<I> = ();
+    type AddressConfig<I> = Ipv4AddrConfig<I>;
+    type ManualAddressConfig<I> = Ipv4AddrConfig<I>;
     type AddressState<I> = ();
 }
 
@@ -262,7 +264,8 @@ impl IpDeviceIpExt for Ipv6 {
     type Configuration = Ipv6DeviceConfiguration;
     type Timer<DeviceId> = Ipv6DeviceTimerId<DeviceId>;
     type AssignedWitness = UnicastAddr<Ipv6Addr>;
-    type AddressConfig<I> = AddrConfig<I>;
+    type AddressConfig<I> = Ipv6AddrConfig<I>;
+    type ManualAddressConfig<I> = Ipv6AddrManualConfig<I>;
     type AddressState<I> = Ipv6AddressState<I>;
 }
 
@@ -300,7 +303,7 @@ impl From<DelIpv6AddrReason> for RemovedReason {
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 /// Events emitted from IP devices.
-pub enum IpDeviceEvent<DeviceId, I: Ip> {
+pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
     /// Address was assigned.
     AddressAdded {
         /// The device.
@@ -309,6 +312,8 @@ pub enum IpDeviceEvent<DeviceId, I: Ip> {
         addr: AddrSubnet<I::Addr>,
         /// Initial address state.
         state: IpAddressState,
+        /// The lifetime for which the address is valid.
+        valid_until: Lifetime<Instant>,
     },
     /// Address was unassigned.
     AddressRemoved {
@@ -337,8 +342,11 @@ pub enum IpDeviceEvent<DeviceId, I: Ip> {
     },
 }
 
-impl<DeviceId, C: EventContext<IpDeviceEvent<DeviceId, Ipv6>>> EventContext<DadEvent<DeviceId>>
-    for C
+impl<
+        DeviceId,
+        C: InstantContext
+            + EventContext<IpDeviceEvent<DeviceId, Ipv6, <C as InstantContext>::Instant>>,
+    > EventContext<DadEvent<DeviceId>> for C
 {
     fn on_event(&mut self, event: DadEvent<DeviceId>) {
         match event {
@@ -405,7 +413,7 @@ impl<C: DualStackDeviceNonSyncContext, SC: DualStackDeviceContext<C>> DualStackD
 pub(crate) trait IpDeviceNonSyncContext<I: IpDeviceIpExt, DeviceId>:
     RngContext
     + TimerContext<I::Timer<DeviceId>>
-    + EventContext<IpDeviceEvent<DeviceId, I>>
+    + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantContext>::Instant>>
     + CounterContext
 {
 }
@@ -414,7 +422,7 @@ impl<
         I: IpDeviceIpExt,
         C: RngContext
             + TimerContext<I::Timer<DeviceId>>
-            + EventContext<IpDeviceEvent<DeviceId, I>>
+            + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantContext>::Instant>>
             + CounterContext,
     > IpDeviceNonSyncContext<I, DeviceId> for C
 {
@@ -1106,7 +1114,7 @@ fn enable_ipv6_device_with_config<
             ctx,
             device_id,
             link_local_addr_sub,
-            AddrConfig::SLAAC_LINK_LOCAL,
+            Ipv6AddrConfig::SLAAC_LINK_LOCAL,
             config,
         ) {
             Ok(_) => {}
@@ -1167,7 +1175,7 @@ fn disable_ipv6_device_with_config<
         })
         .into_iter()
         .for_each(|(addr_id, config)| {
-            if config == AddrConfig::SLAAC_LINK_LOCAL {
+            if config == Ipv6AddrConfig::SLAAC_LINK_LOCAL {
                 del_ipv6_addr_with_reason_with_config(
                     sync_ctx,
                     ctx,
@@ -1415,6 +1423,7 @@ pub(crate) fn add_ipv4_addr_subnet<
     ctx: &mut C,
     device_id: &SC::DeviceId,
     addr_sub: AddrSubnet<Ipv4Addr>,
+    addr_config: Ipv4AddrConfig<C::Instant>,
 ) -> Result<(), ExistsError> {
     sync_ctx.with_ip_device_configuration(device_id, |_config, mut sync_ctx| {
         let address_state = match sync_ctx
@@ -1424,12 +1433,15 @@ pub(crate) fn add_ipv4_addr_subnet<
             false => IpAddressState::Unavailable,
         };
 
-        sync_ctx.add_ip_address(device_id, addr_sub, ()).map(|id| {
+        let Ipv4AddrConfig { valid_until } = addr_config;
+
+        sync_ctx.add_ip_address(device_id, addr_sub, addr_config).map(|id| {
             assert_eq!(id.addr(), addr_sub.addr());
             ctx.on_event(IpDeviceEvent::AddressAdded {
                 device: device_id.clone(),
                 addr: addr_sub,
                 state: address_state,
+                valid_until,
             })
         })
     })
@@ -1449,7 +1461,7 @@ pub(crate) fn add_ipv6_addr_subnet<
     ctx: &mut C,
     device_id: &SC::DeviceId,
     addr_sub: AddrSubnet<Ipv6Addr>,
-    addr_config: AddrConfig<C::Instant>,
+    addr_config: Ipv6AddrManualConfig<C::Instant>,
 ) -> Result<(), ExistsError> {
     sync_ctx.with_ipv6_device_configuration(device_id, |config, mut sync_ctx| {
         add_ipv6_addr_subnet_with_config(
@@ -1457,7 +1469,7 @@ pub(crate) fn add_ipv6_addr_subnet<
             ctx,
             device_id,
             addr_sub,
-            addr_config,
+            Ipv6AddrConfig::Manual(addr_config),
             config,
         )
         .map(|_address_id| ())
@@ -1472,7 +1484,7 @@ fn add_ipv6_addr_subnet_with_config<
     ctx: &mut C,
     device_id: &SC::DeviceId,
     addr_sub: AddrSubnet<Ipv6Addr>,
-    addr_config: AddrConfig<C::Instant>,
+    addr_config: Ipv6AddrConfig<C::Instant>,
     // Not used but required to make sure that the caller is currently holding a
     // a reference to the IP device's IP configuration as a way to prove that
     // caller has synchronized this operation with other accesses to the IP
@@ -1496,6 +1508,7 @@ fn add_ipv6_addr_subnet_with_config<
         device: device_id.clone(),
         addr: addr_sub.to_witness(),
         state,
+        valid_until: addr_config.valid_until(),
     });
 
     if ip_enabled {
@@ -1518,7 +1531,8 @@ pub(crate) fn del_ipv4_addr<
     addr: &SpecifiedAddr<Ipv4Addr>,
 ) -> Result<(), NotFoundError> {
     let addr_id = sync_ctx.get_address_id(device_id, *addr)?;
-    let (addr_sub, ()) = sync_ctx.remove_ip_address(device_id, addr_id);
+    let (addr_sub, config) = sync_ctx.remove_ip_address(device_id, addr_id);
+    let _: Ipv4AddrConfig<_> = config;
     ctx.on_event(IpDeviceEvent::AddressRemoved {
         device: device_id.clone(),
         addr: addr_sub.addr(),
@@ -1542,7 +1556,8 @@ fn del_ipv6_addr_with_config<
     addr: DelIpv6Addr<SC::AddressId>,
     reason: RemovedReason,
     _config: &Ipv6DeviceConfiguration,
-) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, AddrConfig<C::Instant>), NotFoundError> {
+) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, Ipv6AddrConfig<C::Instant>), NotFoundError>
+{
     let addr_id = match addr {
         DelIpv6Addr::SpecifiedAddr(addr) => sync_ctx.get_address_id(device_id, addr)?,
         DelIpv6Addr::AddressId(id) => id,
@@ -1591,10 +1606,10 @@ fn del_ipv6_addr_with_reason_with_config<
 ) -> Result<(), NotFoundError> {
     del_ipv6_addr_with_config(sync_ctx, ctx, device_id, addr, reason.into(), config).map(
         |(addr_sub, config)| match config {
-            AddrConfig::Slaac(s) => {
+            Ipv6AddrConfig::Slaac(s) => {
                 SlaacHandler::on_address_removed(sync_ctx, ctx, device_id, addr_sub, s, reason)
             }
-            AddrConfig::Manual => (),
+            Ipv6AddrConfig::Manual(_manual_config) => (),
         },
     )
 }
@@ -2156,7 +2171,7 @@ mod tests {
     use crate::{
         device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
         ip::{
-            device::testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt,
+            device::{state::Lifetime, testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt},
             gmp::GmpDelayedReportTimerId,
         },
         testutil::{
@@ -2214,6 +2229,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             ipv4_addr_subnet.clone(),
+            Ipv4AddrConfig::default(),
         )
         .expect("failed to add IPv4 Address");
         assert_eq!(
@@ -2222,6 +2238,7 @@ mod tests {
                 device: weak_device_id.clone(),
                 addr: ipv4_addr_subnet.clone(),
                 state: IpAddressState::Unavailable,
+                valid_until: Lifetime::Infinite,
             })]
         );
 
@@ -2376,6 +2393,7 @@ mod tests {
                     device: weak_device_id.clone(),
                     addr: ll_addr.to_witness(),
                     state: IpAddressState::Tentative,
+                    valid_until: Lifetime::Infinite,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                     device: weak_device_id.clone(),
@@ -2426,7 +2444,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             ll_addr.to_witness(),
-            AddrConfig::Manual,
+            Ipv6AddrManualConfig::default(),
         )
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
@@ -2445,6 +2463,7 @@ mod tests {
                 device: weak_device_id.clone(),
                 addr: ll_addr.to_witness(),
                 state: IpAddressState::Unavailable,
+                valid_until: Lifetime::Infinite,
             })]
         );
 
@@ -2564,6 +2583,7 @@ mod tests {
                     device: weak_device_id.clone(),
                     addr: ll_addr.to_witness(),
                     state: IpAddressState::Tentative,
+                    valid_until: Lifetime::Infinite,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                     device: weak_device_id.clone(),
@@ -2578,7 +2598,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             assigned_addr,
-            AddrConfig::Manual,
+            Ipv6AddrManualConfig::default(),
         )
         .expect("add succeeds");
 
@@ -2588,6 +2608,7 @@ mod tests {
                 device: weak_device_id.clone(),
                 addr: assigned_addr.to_witness(),
                 state: IpAddressState::Tentative,
+                valid_until: Lifetime::Infinite,
             }),]
         );
 

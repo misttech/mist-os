@@ -3095,8 +3095,8 @@ mod tests {
         },
         ip::{
             device::{
-                IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv6DeviceConfigurationUpdate,
-                RemovedReason,
+                state::AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate, IpDeviceEvent,
+                Ipv6DeviceConfigurationUpdate, RemovedReason,
             },
             testutil::is_in_ip_multicast,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Metric, RawMetric},
@@ -4833,9 +4833,10 @@ mod tests {
             sync_ctx,
             non_sync_ctx,
             &loopback_id,
-            AddrSubnet::from_witness(I::LOOPBACK_ADDRESS, I::LOOPBACK_SUBNET.prefix())
-                .unwrap()
-                .into(),
+            AddrSubnetAndManualConfigEither::new::<I>(
+                AddrSubnet::from_witness(I::LOOPBACK_ADDRESS, I::LOOPBACK_SUBNET.prefix()).unwrap(),
+                Default::default(),
+            ),
         )
         .unwrap();
         assert_eq!(device_ids.len(), Device::Loopback.index());

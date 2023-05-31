@@ -896,7 +896,8 @@ pub(crate) mod testutil {
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
             device::state::{
-                AddrConfig, AssignedAddress as _, IpDeviceState, Ipv6AddressEntry, Ipv6DadState,
+                AssignedAddress as _, IpDeviceState, Ipv4AddrConfig, Ipv4AddressEntry,
+                Ipv6AddrConfig, Ipv6AddressEntry, Ipv6DadState,
             },
             forwarding::{testutil::FakeIpForwardingCtx, ForwardingTable},
             testutil::FakeIpDeviceIdCtx,
@@ -1276,7 +1277,10 @@ pub(crate) mod testutil {
                                 let _addr_id = device_state
                                     .addrs
                                     .write()
-                                    .add(AddrSubnet::new(ip.get(), 32).unwrap())
+                                    .add(Ipv4AddressEntry::new(
+                                        AddrSubnet::new(ip.get(), 32).unwrap(),
+                                        Ipv4AddrConfig::default(),
+                                    ))
                                     .expect("add address");
                             },
                             |(device_state, ip)| {
@@ -1286,7 +1290,7 @@ pub(crate) mod testutil {
                                     .add(Ipv6AddressEntry::new(
                                         AddrSubnet::new(ip.get(), 128).unwrap(),
                                         Ipv6DadState::Assigned,
-                                        AddrConfig::Manual,
+                                        Ipv6AddrConfig::default(),
                                     ))
                                     .expect("add address");
                             },
@@ -1524,7 +1528,7 @@ mod tests {
                     DeviceId = DeviceId<FakeNonSyncCtx>,
                 >,
         FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeNonSyncCtx>>>
-            + EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>,
+            + EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>,
     {
         let cfg = I::FAKE_CONFIG;
         let proto = I::ICMP_IP_PROTO;

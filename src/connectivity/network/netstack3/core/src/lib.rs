@@ -55,10 +55,15 @@ use packet::{Buf, BufferMut, EmptyBuf};
 use tracing::trace;
 
 use crate::{
-    context::{CounterContext, EventContext, RngContext, TimerContext, TracingContext},
+    context::{
+        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
+    },
     device::{DeviceId, DeviceLayerState, DeviceLayerTimerId},
     ip::{
-        device::{DualStackDeviceHandler, Ipv4DeviceTimerId, Ipv6DeviceTimerId},
+        device::{
+            state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler, Ipv4DeviceTimerId,
+            Ipv6DeviceTimerId,
+        },
         icmp::{BufferIcmpContext, IcmpContext},
         IpLayerTimerId, Ipv4State, Ipv6State,
     },
@@ -208,15 +213,14 @@ pub trait BufferNonSyncContext<B: BufferMut>:
 impl<B: BufferMut, C: NonSyncContext + BufferNonSyncContextInner<B>> BufferNonSyncContext<B> for C {}
 
 /// The non-synchronized context for the stack.
-pub trait NonSyncContext:
-    CounterContext
+pub trait NonSyncContext: CounterContext
     + device::DeviceLayerEventDispatcher
     + BufferNonSyncContextInner<Buf<Vec<u8>>>
     + BufferNonSyncContextInner<EmptyBuf>
     + RngContext
     + TimerContext<TimerId<Self>>
-    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4>>
-    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6>>
+    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantContext>::Instant>>
+    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantContext>::Instant>>
     + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
     + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
     + transport::udp::NonSyncContext<Ipv4>
@@ -236,9 +240,11 @@ impl<
             + BufferNonSyncContextInner<EmptyBuf>
             + RngContext
             + TimerContext<TimerId<Self>>
-            + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4>>
-            + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6>>
-            + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
+            + EventContext<
+                ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantContext>::Instant>,
+            > + EventContext<
+                ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantContext>::Instant>,
+            > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
             + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
             + transport::udp::NonSyncContext<Ipv4>
             + transport::udp::NonSyncContext<Ipv6>
@@ -443,12 +449,9 @@ pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-    addr_sub: AddrSubnetEither,
+    addr_sub: impl Into<AddrSubnetAndManualConfigEither<NonSyncCtx::Instant>>,
 ) -> Result<(), error::ExistsError> {
-    map_addr_version!(
-        addr_sub: AddrSubnetEither;
-        crate::device::add_ip_addr_subnet(&sync_ctx, ctx, device, addr_sub)
-    )
+    crate::device::add_ip_addr_subnet(&sync_ctx, ctx, device, addr_sub.into())
 }
 
 /// Delete an IP address on a device.
@@ -500,17 +503,21 @@ pub fn del_route<NonSyncCtx: NonSyncContext>(
 
 #[cfg(test)]
 mod tests {
+    use core::time::Duration;
+
     use ip_test_macro::ip_test;
     use net_declare::{net_subnet_v4, net_subnet_v6};
     use net_types::{
-        ip::{Ip, Ipv4, Ipv6},
+        ip::{AddrSubnet, Ip, Ipv4, Ipv6},
         Witness,
     };
     use test_case::test_case;
 
     use super::*;
     use crate::{
+        context::testutil::FakeInstant,
         ip::{
+            device::state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
             forwarding::AddRouteError,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric},
         },
@@ -519,7 +526,9 @@ mod tests {
         },
     };
 
-    fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
+    fn test_add_remove_ip_addresses<I: Ip + TestIpExt>(
+        addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
+    ) {
         let config = I::FAKE_CONFIG;
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let device = crate::device::add_ethernet_device(
@@ -531,9 +540,9 @@ mod tests {
         .into();
         crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
 
-        let ip: IpAddr = I::get_other_ip_address(1).get().into();
+        let ip = I::get_other_ip_address(1).get();
         let prefix = config.subnet.prefix();
-        let addr_subnet = AddrSubnetEither::new(ip, prefix).unwrap();
+        let addr_subnet = AddrSubnetEither::new(ip.into(), prefix).unwrap();
 
         // IP doesn't exist initially.
         assert_eq!(
@@ -542,7 +551,21 @@ mod tests {
         );
 
         // Add IP (OK).
-        let () = add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap();
+        if let Some(addr_config) = addr_config {
+            add_ip_addr_subnet(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device,
+                AddrSubnetAndManualConfigEither::new::<I>(
+                    AddrSubnet::new(ip, prefix).unwrap(),
+                    addr_config,
+                ),
+            )
+            .unwrap();
+        } else {
+            let () =
+                add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap();
+        }
         assert_eq!(
             get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             Some(addr_subnet)
@@ -559,7 +582,7 @@ mod tests {
         );
 
         // Add IP with different subnet (already exists).
-        let wrong_addr_subnet = AddrSubnetEither::new(ip, prefix - 1).unwrap();
+        let wrong_addr_subnet = AddrSubnetEither::new(ip.into(), prefix - 1).unwrap();
         assert_eq!(
             add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, wrong_addr_subnet)
                 .unwrap_err(),
@@ -570,7 +593,7 @@ mod tests {
             Some(addr_subnet)
         );
 
-        let ip = SpecifiedAddr::new(ip).unwrap();
+        let ip: SpecifiedAddr<IpAddr> = SpecifiedAddr::new(ip.into()).unwrap();
         // Del IP (ok).
         let () = del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap();
         assert_eq!(
@@ -589,14 +612,20 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_add_remove_ipv4_addresses() {
-        test_add_remove_ip_addresses::<Ipv4>();
+    #[test_case(None; "with no AddressConfig specified")]
+    #[test_case(Some(Ipv4AddrConfig {
+        valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)))
+    }); "with AddressConfig specified")]
+    fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant>>) {
+        test_add_remove_ip_addresses::<Ipv4>(addr_config);
     }
 
-    #[test]
-    fn test_add_remove_ipv6_addresses() {
-        test_add_remove_ip_addresses::<Ipv6>();
+    #[test_case(None; "with no AddressConfig specified")]
+    #[test_case(Some(Ipv6AddrManualConfig {
+        valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)))
+    }); "with AddressConfig specified")]
+    fn test_add_remove_ipv6_addresses(addr_config: Option<Ipv6AddrManualConfig<FakeInstant>>) {
+        test_add_remove_ip_addresses::<Ipv6>(addr_config);
     }
 
     struct AddGatewayRouteTestCase {

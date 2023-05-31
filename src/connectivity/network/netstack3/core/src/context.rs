@@ -335,7 +335,7 @@ pub mod testutil {
     };
 
     /// A fake implementation of `Instant` for use in testing.
-    #[derive(Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+    #[derive(Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     pub struct FakeInstant {
         // A FakeInstant is just an offset from some arbitrary epoch.
         offset: Duration,

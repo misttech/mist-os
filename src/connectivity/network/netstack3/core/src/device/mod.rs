@@ -30,9 +30,7 @@ use lock_order::{
 };
 use net_types::{
     ethernet::Mac,
-    ip::{
-        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
-    },
+    ip::{AddrSubnet, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use nonzero_ext::nonzero;
@@ -65,10 +63,10 @@ use crate::{
             integration::SyncCtxWithIpDeviceConfiguration,
             nud::{BufferNudHandler, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
             state::{
-                AddrConfig, AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags,
-                Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv6AddressEntry,
-                Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration,
-                Ipv6DeviceConfigurationAndFlags,
+                AddrSubnetAndManualConfigEither, AssignedAddress as _, DualStackIpDeviceState,
+                IpDeviceFlags, Ipv4AddressEntry, Ipv4DeviceConfiguration,
+                Ipv4DeviceConfigurationAndFlags, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState,
+                Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
             },
             BufferIpDeviceContext, DelIpv6Addr, DualStackDeviceContext, DualStackDeviceStateRef,
             IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
@@ -544,7 +542,7 @@ impl<
 impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressIdContext<Ipv4>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    type AddressId = StrongRc<AddrSubnet<Ipv4Addr>>;
+    type AddressId = StrongRc<Ipv4AddressEntry<NonSyncCtx::Instant>>;
 }
 
 impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressContext<Ipv4, NonSyncCtx>
@@ -580,10 +578,12 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
         &mut self,
         device_id: &Self::DeviceId,
         addr: AddrSubnet<Ipv4Addr>,
-        (): <Ipv4 as IpDeviceIpExt>::AddressConfig<NonSyncCtx::Instant>,
+        config: <Ipv4 as IpDeviceIpExt>::AddressConfig<NonSyncCtx::Instant>,
     ) -> Result<Self::AddressId, ExistsError> {
         with_ip_device_state(self, device_id, |mut state| {
-            state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>().add(addr)
+            state
+                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+                .add(Ipv4AddressEntry::new(addr, config))
         })
     }
 
@@ -599,7 +599,8 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        (PrimaryRc::unwrap(primary), ())
+        let Ipv4AddressEntry { addr_sub, config } = PrimaryRc::unwrap(primary);
+        (addr_sub, config)
     }
 
     fn get_address_id(
@@ -2040,26 +2041,27 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
 ///
 /// For IPv6, this function also joins the solicited-node multicast group and
 /// begins performing Duplicate Address Detection (DAD).
-pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext, A: IpAddress>(
+pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-    addr_sub: AddrSubnet<A>,
+    addr_sub_and_config: impl Into<AddrSubnetAndManualConfigEither<NonSyncCtx::Instant>>,
 ) -> Result<(), ExistsError> {
-    trace!("add_ip_addr_subnet: adding addr {:?} to device {:?}", addr_sub, device);
+    let addr_sub_and_config = addr_sub_and_config.into();
+    trace!(
+        "add_ip_addr_subnet: adding addr_sub_and_config {:?} to device {:?}",
+        addr_sub_and_config,
+        device
+    );
     let mut sync_ctx = Locked::new(sync_ctx);
 
-    match addr_sub.into() {
-        AddrSubnetEither::V4(addr_sub) => {
-            crate::ip::device::add_ipv4_addr_subnet(&mut sync_ctx, ctx, device, addr_sub)
+    match addr_sub_and_config {
+        AddrSubnetAndManualConfigEither::V4(addr_sub, config) => {
+            crate::ip::device::add_ipv4_addr_subnet(&mut sync_ctx, ctx, device, addr_sub, config)
         }
-        AddrSubnetEither::V6(addr_sub) => crate::ip::device::add_ipv6_addr_subnet(
-            &mut sync_ctx,
-            ctx,
-            device,
-            addr_sub,
-            AddrConfig::Manual,
-        ),
+        AddrSubnetAndManualConfigEither::V6(addr_sub, config) => {
+            crate::ip::device::add_ipv6_addr_subnet(&mut sync_ctx, ctx, device, addr_sub, config)
+        }
     }
 }
 

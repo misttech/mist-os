@@ -1835,6 +1835,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
     async fn add_address(
         address: &mut fnet::Subnet,
+        valid_until: zx::Time,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         id: u64,
         interface_state: &fidl_fuchsia_net_interfaces::StateProxy,
@@ -1845,16 +1846,35 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         control
             .add_address(
                 address,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                    initial_properties: Some(
+                        fidl_fuchsia_net_interfaces_admin::AddressProperties {
+                            valid_lifetime_end: (valid_until != zx::Time::INFINITE)
+                                .then(|| valid_until.into_nanos()),
+                            ..Default::default()
+                        },
+                    ),
+                    ..Default::default()
+                },
                 server_end,
             )
             .expect("failed to add_address");
         interfaces::wait_for_addresses(&interface_state, id, |addresses| {
             addresses
                 .iter()
-                .any(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                    addr == *address
-                })
+                .any(
+                    |&fidl_fuchsia_net_interfaces_ext::Address {
+                         addr,
+                         valid_until: got_valid_until,
+                     }| {
+                        if addr == *address {
+                            assert_eq!(zx::Time::from_nanos(got_valid_until), valid_until);
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
                 .then(|| ())
         })
         .await
@@ -1864,9 +1884,42 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
     let addresses = [fidl_subnet!("1.1.1.1/32"), fidl_subnet!("3ffe::1/128")];
     for mut address in addresses {
-        // Add an address and explicitly remove it.
-        let _address_state_provider =
-            add_address(&mut address, &interface.control(), id, &interface_state).await;
+        // Add an address with infinite valid_until and explicitly remove it.
+        let _address_state_provider = add_address(
+            &mut address,
+            zx::Time::INFINITE,
+            &interface.control(),
+            id,
+            &interface_state,
+        )
+        .await;
+        let did_remove = interface
+            .control()
+            .remove_address(&mut address)
+            .await
+            .expect("failed to send remove address request")
+            .expect("failed to remove address");
+        assert!(did_remove);
+        interfaces::wait_for_addresses(&interface_state, id, |addresses| {
+            addresses
+                .iter()
+                .all(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                    addr != address
+                })
+                .then(|| ())
+        })
+        .await
+        .expect("wait for address absence");
+
+        // Add an address with finite valid_until and explicitly remove it.
+        let _address_state_provider = add_address(
+            &mut address,
+            zx::Time::from_nanos(1234),
+            &interface.control(),
+            id,
+            &interface_state,
+        )
+        .await;
         let did_remove = interface
             .control()
             .remove_address(&mut address)
@@ -1887,8 +1940,14 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
         // Add an address and drop the AddressStateProvider handle, verifying
         // the address was removed.
-        let address_state_provider =
-            add_address(&mut address, &interface.control(), id, &interface_state).await;
+        let address_state_provider = add_address(
+            &mut address,
+            zx::Time::INFINITE,
+            &interface.control(),
+            id,
+            &interface_state,
+        )
+        .await;
         std::mem::drop(address_state_provider);
         interfaces::wait_for_addresses(&interface_state, id, |addresses| {
             addresses

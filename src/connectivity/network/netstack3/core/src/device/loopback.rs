@@ -621,7 +621,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use lock_order::{Locked, Unlocked};
-    use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6};
+    use net_types::ip::{AddrSubnet, AddrSubnetEither, Ip, Ipv4, Ipv6};
     use packet::ParseBuffer;
 
     use crate::{
@@ -691,7 +691,12 @@ mod tests {
         assert_eq!(get_addrs(), []);
 
         assert_eq!(
-            crate::device::add_ip_addr_subnet(sync_ctx, &mut non_sync_ctx, &device, addr),
+            crate::device::add_ip_addr_subnet(
+                sync_ctx,
+                &mut non_sync_ctx,
+                &device,
+                AddrSubnetEither::from(addr)
+            ),
             Ok(())
         );
         let addr = addr.addr();
