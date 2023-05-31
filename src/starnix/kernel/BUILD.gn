@@ -10,7 +10,7 @@ import("//src/starnix/kernel/starnix.gni")
 
 declare_args() {
   # Whether or not to enable 'in-thread' exception handling for restricted mode.
-  starnix_restricted_in_thread_exceptions = false
+  starnix_restricted_in_thread_exceptions = true
 
   # Whether or not logging is disabled globally.
   starnix_disable_logging = false

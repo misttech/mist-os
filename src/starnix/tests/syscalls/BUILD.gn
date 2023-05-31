@@ -58,6 +58,7 @@ test("syscalls_test_bin") {
     "custom_artifact_test.cc",
     "epoll_test.cc",
     "extended_pstate_initial_state.cc",
+    "fault_test.cc",
     "fcntl_test.cc",
     "fs_test.cc",
     "fuse_test.cc",
