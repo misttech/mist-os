@@ -62,9 +62,8 @@ zx_status_t WaitForDevice(int dirfd, int event, const char* name, void* cookie) 
     return ZX_OK;
   }
   fdio_cpp::UnownedFdioCaller caller(dirfd);
-  std::string controller_path = std::string(name) + "/device_controller";
   zx::result client_end =
-      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
+      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), name);
   if (client_end.is_error()) {
     return client_end.error_value();
   }
