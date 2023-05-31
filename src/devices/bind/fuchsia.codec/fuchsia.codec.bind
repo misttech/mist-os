@@ -4,6 +4,6 @@
 
 library fuchsia.codec;
 
-extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 6,
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  SERVICE = 23,
 };

@@ -108,12 +108,13 @@ const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
 };
 
 const std::vector<fdf::BindRule> kCodecRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, kCodecVid),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, kCodecDid),
 };
 const std::vector<fdf::NodeProperty> kCodecProps = std::vector{
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
 };
 
@@ -281,7 +282,6 @@ zx_status_t Astro::AudioInit() {
       return result->error_value();
     }
 #endif
-
   }
 #endif
   // Add TDM OUT to the codec.

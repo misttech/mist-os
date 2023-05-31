@@ -34,7 +34,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.codec.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CODEC_INSTANCE": "1"
                 }
             }
@@ -47,7 +47,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.codec.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CODEC_INSTANCE": "2"
                 }
             }
@@ -60,7 +60,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.codec.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_CODEC_INSTANCE": "3"
                 }
             }

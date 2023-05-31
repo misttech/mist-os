@@ -54,14 +54,15 @@ const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
 };
 
 const std::vector<fdf::BindRule> kOutCodecRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                             bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
                             bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS58XX),
 };
 const std::vector<fdf::NodeProperty> kOutCodecProps = std::vector{
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
 };
 

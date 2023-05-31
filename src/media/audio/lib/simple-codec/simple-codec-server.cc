@@ -45,6 +45,35 @@ zx_status_t SimpleCodecServer::CreateAndAddToDdkInternal() {
   if (!info.unique_id.empty()) {
     simple_codec_.CreateString("unique_id", info.unique_id, &inspect_);
   }
+
+  async_dispatcher_t* dispatcher =
+      fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  fuchsia_hardware_audio::CodecService::InstanceHandler handler({
+      .codec =
+          [this](fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
+            this->CodecConnect(server_end.TakeChannel());
+          },
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_audio::CodecService>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+  result = outgoing_->Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+  std::array offers = {
+      fuchsia_hardware_audio::CodecService::Name,
+  };
+
   if (driver_ids_.instance_count != 0) {
     if (info.unique_id.empty()) {
       simple_codec_.CreateString("unique_id", std::to_string(driver_ids_.instance_count),
@@ -57,6 +86,9 @@ zx_status_t SimpleCodecServer::CreateAndAddToDdkInternal() {
     };
     return DdkAdd(ddk::DeviceAddArgs(info.product_name.c_str())
                       .set_props(props)
+                      .set_proto_id(ZX_PROTOCOL_CODEC)
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel())
                       .set_inspect_vmo(inspect_.DuplicateVmo())
                       .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
   }
@@ -66,6 +98,9 @@ zx_status_t SimpleCodecServer::CreateAndAddToDdkInternal() {
   };
   return DdkAdd(ddk::DeviceAddArgs(info.product_name.c_str())
                     .set_props(props)
+                    .set_proto_id(ZX_PROTOCOL_CODEC)
+                    .set_fidl_service_offers(offers)
+                    .set_outgoing_dir(endpoints->client.TakeChannel())
                     .set_inspect_vmo(inspect_.DuplicateVmo())
                     .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
 }

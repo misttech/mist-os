@@ -23,7 +23,7 @@ using DeviceType = ddk::Device<NelsonBrownoutProtection>;
 
 class CodecClientAgl {
  public:
-  zx_status_t Init(ddk::CodecProtocolClient codec_proto);
+  zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end);
   zx_status_t SetAgl(bool enable);
 
  private:
@@ -51,7 +51,7 @@ class NelsonBrownoutProtection : public DeviceType {
   void DdkRelease() { delete this; }
 
  private:
-  zx_status_t Init(ddk::CodecProtocolClient codec);
+  zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end);
 
   int Thread();
 

@@ -21,6 +21,7 @@
         { service: "fuchsia.hardware.mailbox.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.clock.Service" },
+        { service: "fuchsia.hardware.audio.CodecService" },
     ],
     expose: [
         {

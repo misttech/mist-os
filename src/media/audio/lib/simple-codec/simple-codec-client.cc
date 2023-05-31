@@ -7,31 +7,12 @@
 #include <lib/simple-codec/simple-codec-client.h>
 #include <zircon/threads.h>
 
+#include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
 
 namespace audio {
 
 SimpleCodecClient::~SimpleCodecClient() { Unbind(); }
-
-zx_status_t SimpleCodecClient::SetProtocol(ddk::CodecProtocolClient proto_client) {
-  Unbind();
-  proto_client_ = proto_client;
-  if (!proto_client_.is_valid()) {
-    return ZX_ERR_NO_RESOURCES;
-  }
-  zx::channel channel_remote;
-  fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local;
-  auto status = zx::channel::create(0, &channel_local.channel(), &channel_remote);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = proto_client_.Connect(std::move(channel_remote));
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  return SetCodec(std::move(channel_local));
-}
 
 zx_status_t SimpleCodecClient::SetCodec(
     fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local) {

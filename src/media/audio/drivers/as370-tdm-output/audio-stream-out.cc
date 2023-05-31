@@ -116,7 +116,13 @@ zx_status_t As370AudioStreamOut::InitPdev() {
   }
 
   // TODO(113005): Remove all codec controlling from this driver by converting it into a DAI driver.
-  status = codec_.SetProtocol(ddk::CodecProtocolClient(parent(), "codec"));
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_audio::CodecService::Codec>("codec");
+  if (codec_client_end.is_error()) {
+    zxlogf(ERROR, "fuchsia.hardware.audio.codec/Device not found");
+    return codec_client_end.status_value();
+  }
+  status = codec_.SetCodec(std::move(*codec_client_end));
   if (status != ZX_OK) {
     zxlogf(ERROR, "could not set codec protocol %s", zx_status_get_string(status));
     return ZX_ERR_NO_RESOURCES;

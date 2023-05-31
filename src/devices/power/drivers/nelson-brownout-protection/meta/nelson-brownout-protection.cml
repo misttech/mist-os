@@ -17,5 +17,6 @@
     },
     use: [
         { service: "fuchsia.hardware.power.sensor.Service" },
+        { service: "fuchsia.hardware.audio.CodecService" },
     ],
 }

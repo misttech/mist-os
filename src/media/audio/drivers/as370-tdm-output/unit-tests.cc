@@ -70,11 +70,16 @@ class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, d
   shared_dma_protocol_t proto_;
 };
 
-class FakeCodecDevice : public ddk::CodecProtocol<FakeCodecDevice, ddk::base_protocol>,
-                        public fidl::WireServer<fuchsia_hardware_audio::Codec> {
+class FakeCodecDevice : public fidl::WireServer<fuchsia_hardware_audio::Codec> {
  public:
-  FakeCodecDevice() : proto_({&codec_protocol_ops_, this}) {
-    ASSERT_OK(loop_.StartThread("Fake codec thread"));
+  FakeCodecDevice() { ASSERT_OK(loop_.StartThread("Fake codec thread")); }
+  fuchsia_hardware_audio::CodecService::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_audio::CodecService::InstanceHandler({
+        .codec =
+            [this](fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
+              this->CodecConnect(server_end.TakeChannel());
+            },
+    });
   }
 
   zx_status_t CodecConnect(zx::channel channel) {
@@ -105,10 +110,7 @@ class FakeCodecDevice : public ddk::CodecProtocol<FakeCodecDevice, ddk::base_pro
     request->protocol.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  const codec_protocol_t* GetProto() const { return &proto_; }
-
  private:
-  codec_protocol_t proto_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
@@ -149,6 +151,7 @@ class FakeMmio {
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
   FakeClockDevice clock_server;
+  FakeCodecDevice codec_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -162,14 +165,21 @@ struct As370TdmOutputTest : public zxtest::Test {
     ASSERT_OK(pdev_endpoints);
     zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(clock_endpoints);
+    zx::result codec_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(codec_endpoints);
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
     incoming_.SyncCall(
         [config = std::move(config), pdev_server = std::move(pdev_endpoints->server),
+         codec_server = std::move(codec_endpoints->server),
          clock_server = std::move(clock_endpoints->server)](IncomingNamespace* infra) mutable {
           infra->pdev_server.SetConfig(std::move(config));
           ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
               infra->pdev_server.GetInstanceHandler()));
           ASSERT_OK(infra->outgoing.Serve(std::move(pdev_server)));
+
+          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_audio::CodecService>(
+              infra->codec_server.GetInstanceHandler()));
+          ASSERT_OK(infra->outgoing.Serve(std::move(codec_server)));
           ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_clock::Service>(
               infra->clock_server.GetInstanceHandler()));
           ASSERT_OK(infra->outgoing.Serve(std::move(clock_server)));
@@ -177,13 +187,13 @@ struct As370TdmOutputTest : public zxtest::Test {
     ASSERT_NO_FATAL_FAILURE();
     fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                                  std::move(pdev_endpoints->client), "pdev");
+    fake_parent_->AddFidlService(fuchsia_hardware_audio::CodecService::Name,
+                                 std::move(codec_endpoints->client), "codec");
     fake_parent_->AddFidlService(fuchsia_hardware_clock::Service::Name,
                                  std::move(clock_endpoints->client), "clock");
 
     fake_parent_->AddProtocol(ZX_PROTOCOL_SHARED_DMA, dma_.GetProto()->ops, dma_.GetProto()->ctx,
                               "dma");
-    fake_parent_->AddProtocol(ZX_PROTOCOL_CODEC, codec_.GetProto()->ops, codec_.GetProto()->ctx,
-                              "codec");
   }
 
   void TearDown() override {}

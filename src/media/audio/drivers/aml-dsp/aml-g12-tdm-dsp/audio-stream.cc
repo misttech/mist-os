@@ -182,7 +182,13 @@ zx_status_t AmlG12TdmDspStream::InitPDev() {
     codecs_.push_back(std::make_unique<SimpleCodecClient>());
     char fragment_name[32] = {};
     snprintf(fragment_name, 32, "codec-%02lu", i + 1);
-    status = codecs_[i]->SetProtocol(ddk::CodecProtocolClient(parent(), fragment_name));
+    zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_audio::CodecService::Codec>(fragment_name);
+    if (codec_client_end.is_error()) {
+      zxlogf(ERROR, "fuchsia.hardware.audio.codec/Device not found");
+      return codec_client_end.status_value();
+    }
+    status = codecs_[i]->SetCodec(std::move(*codec_client_end));
     if (status != ZX_OK) {
       zxlogf(ERROR, "could set protocol - %s - %d", fragment_name, status);
       return status;

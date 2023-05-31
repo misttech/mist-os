@@ -6,7 +6,6 @@
 #define SRC_MEDIA_AUDIO_LIB_SIMPLE_CODEC_INCLUDE_LIB_SIMPLE_CODEC_SIMPLE_CODEC_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
-#include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/wire/client.h>
@@ -42,9 +41,8 @@ class SimpleCodecClient {
   ~SimpleCodecClient();
 
   // Convenience methods not part of the audio codec protocol.
-  // Initialize the client using the DDK codec protocol object. Other methods must not be called
-  // until after SetProtocol() has been called and returned ZX_OK.
-  zx_status_t SetProtocol(ddk::CodecProtocolClient proto_client);
+  // Initialize the client using the fidl codec client. Other methods must not be called
+  // until after SetCodec() has been called and returned ZX_OK.
   zx_status_t SetCodec(fidl::ClientEnd<fuchsia_hardware_audio::Codec> channel_local);
 
   // Sync C++ methods to communicate with codecs, for descriptions see
@@ -66,9 +64,6 @@ class SimpleCodecClient {
   zx::result<GainFormat> GetGainFormat();
   zx::result<GainState> GetGainState();
   void SetGainState(GainState state);
-
- protected:
-  ddk::CodecProtocolClient proto_client_;
 
  private:
   template <class T>

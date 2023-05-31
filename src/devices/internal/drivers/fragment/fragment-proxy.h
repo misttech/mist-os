@@ -32,7 +32,6 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::ClockProtocol<FragmentProxy>,
                       public ddk::EthBoardProtocol<FragmentProxy>,
                       public ddk::GpioProtocol<FragmentProxy>,
-                      public ddk::CodecProtocol<FragmentProxy>,
                       public ddk::DaiProtocol<FragmentProxy>,
                       public ddk::PDevProtocol<FragmentProxy>,
                       public ddk::PowerProtocol<FragmentProxy>,
@@ -111,7 +110,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection);
   zx_status_t SysmemUnregisterSecureMem();
 
-  zx_status_t CodecConnect(zx::channel chan);
   zx_status_t DaiConnect(zx::channel chan);
 
  private:

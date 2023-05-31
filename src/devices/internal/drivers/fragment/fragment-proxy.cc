@@ -40,9 +40,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
   proto->ctx = this;
 
   switch (proto_id) {
-    case ZX_PROTOCOL_CODEC:
-      proto->ops = &codec_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_DAI:
       proto->ops = &dai_protocol_ops_;
       return ZX_OK;
@@ -123,21 +120,6 @@ fail:
     }
   }
   return status;
-}
-
-zx_status_t FragmentProxy::CodecConnect(zx::channel chan) {
-  CodecProxyRequest req = {};
-  CodecProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CODEC;
-  req.op = CodecOp::GET_CHANNEL;
-  zx_handle_t handle = chan.release();
-
-  auto status =
-      Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), &handle, 1, nullptr, 0, nullptr);
-  if (status != ZX_OK) {
-    return status;
-  }
-  return ZX_OK;
 }
 
 zx_status_t FragmentProxy::DaiConnect(zx::channel chan) {

@@ -24,7 +24,14 @@ namespace signal_fidl = ::fuchsia::hardware::audio::signalprocessing;
 class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalProcessing {
  public:
   FakeCodec(zx_device_t* parent) : SimpleCodecServer(parent) {}
-  codec_protocol_t GetProto() { return {&this->codec_protocol_ops_, this}; }
+  fuchsia_hardware_audio::CodecService::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_audio::CodecService::InstanceHandler({
+        .codec =
+            [this](fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
+              this->CodecConnect(server_end.TakeChannel());
+            },
+    });
+  }
 
   zx_status_t Shutdown() override { return ZX_OK; }
 
@@ -117,8 +124,9 @@ class FakePowerSensor : public fidl::WireServer<fuchsia_hardware_power_sensor::D
 namespace {
 struct IncomingNamespace {
   FakePowerSensor power_sensor;
-  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+  component::OutgoingDirectory power_outgoing{async_get_default_dispatcher()};
   fidl::ServerBindingGroup<fuchsia_hardware_power_sensor::Device> bindings;
+  component::OutgoingDirectory codec_outgoing{async_get_default_dispatcher()};
 };
 }  // namespace
 
@@ -142,25 +150,32 @@ TEST(NelsonBrownoutProtectionTest, Test) {
         .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(interrupt_dup));
   }
 
-  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(outgoing_endpoints);
+  zx::result power_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(power_endpoints);
+  zx::result codec_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(codec_endpoints);
 
   ASSERT_OK(loop.StartThread("incoming-ns-thread"));
 
-  incoming.SyncCall([server =
-                         std::move(outgoing_endpoints->server)](IncomingNamespace* ns) mutable {
+  incoming.SyncCall([power_server = std::move(power_endpoints->server),
+                     codec_server = std::move(codec_endpoints->server),
+                     &codec](IncomingNamespace* ns) mutable {
     fuchsia_hardware_power_sensor::Service::InstanceHandler handler({
         .device = ns->bindings.CreateHandler(&ns->power_sensor, async_get_default_dispatcher(),
                                              fidl::kIgnoreBindingClosure),
     });
-    ASSERT_OK(ns->outgoing.AddService<fuchsia_hardware_power_sensor::Service>(std::move(handler)));
-    ASSERT_OK(ns->outgoing.Serve(std::move(server)));
+    ASSERT_OK(
+        ns->power_outgoing.AddService<fuchsia_hardware_power_sensor::Service>(std::move(handler)));
+    ASSERT_OK(ns->power_outgoing.Serve(std::move(power_server)));
+    ASSERT_OK(ns->codec_outgoing.AddService<fuchsia_hardware_audio::CodecService>(
+        std::move(codec->GetInstanceHandler())));
+    ASSERT_OK(ns->codec_outgoing.Serve(std::move(codec_server)));
   });
   fake_parent->AddFidlService(fuchsia_hardware_power_sensor::Service::Name,
-                              std::move(outgoing_endpoints->client), "power-sensor");
+                              std::move(power_endpoints->client), "power-sensor");
+  fake_parent->AddFidlService(fuchsia_hardware_audio::CodecService::Name,
+                              std::move(codec_endpoints->client), "codec");
 
-  fake_parent->AddProtocol(ZX_PROTOCOL_CODEC, codec->GetProto().ops, codec->GetProto().ctx,
-                           "codec");
   fake_parent->AddProtocol(ZX_PROTOCOL_GPIO, alert_gpio.GetProto()->ops, alert_gpio.GetProto()->ctx,
                            "alert-gpio");
   ASSERT_OK(NelsonBrownoutProtection::Create(nullptr, fake_parent.get()));

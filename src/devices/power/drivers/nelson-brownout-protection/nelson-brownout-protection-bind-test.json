@@ -7,7 +7,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.TAS58xx",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.codec.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE",
                     "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI"
                 }
             }

@@ -114,7 +114,8 @@ zx_status_t Nelson::PowerInit() {
                               bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_10),
   };
   const ddk::BindRule kCodecRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
@@ -130,7 +131,8 @@ zx_status_t Nelson::PowerInit() {
   };
 
   const device_bind_prop_t kCodecProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
   const device_bind_prop_t kPowerSensorProperties[] = {

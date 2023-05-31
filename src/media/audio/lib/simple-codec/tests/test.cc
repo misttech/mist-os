@@ -607,7 +607,6 @@ TEST_F(SimpleCodecTest, MultipleClients) {
   }
 }
 
-
 TEST_F(SimpleCodecTest, CloseChannel) {
   auto fake_parent = MockDevice::FakeRootParent();
 

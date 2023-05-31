@@ -25,19 +25,8 @@ constexpr float kVoltageUpwardThreshold = 11.5f;
 
 namespace brownout_protection {
 
-zx_status_t CodecClientAgl::Init(ddk::CodecProtocolClient codec_proto) {
-  zx::result codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-  if (!codec_endpoints.is_ok()) {
-    zxlogf(ERROR, "Failed to create codec endpoints: %s", codec_endpoints.status_string());
-    return codec_endpoints.status_value();
-  }
-  fidl::WireSyncClient codec{std::move(codec_endpoints->client)};
-
-  zx_status_t status = codec_proto.Connect(codec_endpoints->server.TakeChannel());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to codec driver: %s", zx_status_get_string(status));
-    return status;
-  }
+zx_status_t CodecClientAgl::Init(fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end) {
+  fidl::WireSyncClient codec{std::move(codec_client_end)};
 
   zx::result signal_endpoints =
       fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
@@ -86,10 +75,11 @@ zx_status_t CodecClientAgl::SetAgl(bool enable) {
 }
 
 zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent) {
-  ddk::CodecProtocolClient codec(parent, "codec");
-  if (!codec.is_valid()) {
-    zxlogf(ERROR, "No codec fragment");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_audio::CodecService::Codec>(parent, "codec");
+  if (codec_client_end.is_error()) {
+    zxlogf(ERROR, "No codec fragment: %s", zx_status_get_string(codec_client_end.status_value()));
+    return codec_client_end.status_value();
   }
 
   zx::result client =
@@ -122,7 +112,7 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent) {
 
   auto dev = std::make_unique<NelsonBrownoutProtection>(parent, std::move(power_sensor_client),
                                                         std::move(alert_interrupt));
-  if ((status = dev->Init(codec)) != ZX_OK) {
+  if ((status = dev->Init(std::move(*codec_client_end))) != ZX_OK) {
     return status;
   }
 
@@ -135,8 +125,9 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t NelsonBrownoutProtection::Init(ddk::CodecProtocolClient codec) {
-  zx_status_t status = codec_.Init(codec);
+zx_status_t NelsonBrownoutProtection::Init(
+    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end) {
+  zx_status_t status = codec_.Init(std::move(codec_client_end));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to connect to codec driver: %s", zx_status_get_string(status));
     return status;

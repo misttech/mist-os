@@ -16,5 +16,6 @@
     },
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.audio.CodecService" },
     ],
 }

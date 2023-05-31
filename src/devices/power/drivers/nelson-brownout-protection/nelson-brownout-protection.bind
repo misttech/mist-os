@@ -11,7 +11,7 @@ using fuchsia.gpio;
 using fuchsia.hardware.power.sensor;
 
 primary node "codec" {
-  fuchsia.BIND_PROTOCOL == fuchsia.codec.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE;
 }
 
 node "power-sensor" {

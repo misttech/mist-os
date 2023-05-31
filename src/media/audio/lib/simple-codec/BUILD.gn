@@ -18,10 +18,11 @@ zx_library("simple-codec") {
     "simple-codec-server.cc",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.audio:fuchsia.hardware.audio_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/fidl/fuchsia.hardware.audio.signalprocessing:fuchsia.hardware.audio.signalprocessing_hlcpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",

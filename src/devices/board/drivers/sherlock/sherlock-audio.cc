@@ -123,7 +123,8 @@ zx_status_t Sherlock::AudioInit() {
   // Add a spec for the woofer, left tweeter, and right tweeter in that order.
   for (size_t i = 0; i < 3; i++) {
     auto codec_rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
         fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                                 bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
         fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
@@ -131,7 +132,8 @@ zx_status_t Sherlock::AudioInit() {
         fdf::MakeAcceptBindRule(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
     };
     auto codec_props = std::vector{
-        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                          bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
         fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
     };
     sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
@@ -394,7 +396,6 @@ zx_status_t Sherlock::AudioInit() {
         return result->error_value();
       }
     }
-
   }
 #endif
 

@@ -6,7 +6,7 @@
 #define SRC_MEDIA_AUDIO_LIB_SIMPLE_CODEC_INCLUDE_LIB_SIMPLE_CODEC_SIMPLE_CODEC_SERVER_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
-#include <fuchsia/hardware/audio/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/simple-codec/simple-codec-server-internal.h>
@@ -29,7 +29,6 @@ using SimpleCodecServerDeviceType =
 // This class provides an implementation of the audio codec protocol to be subclassed by codec
 // drivers. The subclass must implement all the virtual methods and use Create() for construction.
 class SimpleCodecServer : public SimpleCodecServerDeviceType,
-                          public ddk::CodecProtocol<SimpleCodecServer, ddk::base_protocol>,
                           public SimpleCodecServerInternal<SimpleCodecServer> {
  public:
   // Create
@@ -143,6 +142,8 @@ class SimpleCodecServer : public SimpleCodecServerDeviceType,
   zx_status_t CreateAndAddToDdkInternal();
 
   DriverIds driver_ids_;
+
+  std::optional<component::OutgoingDirectory> outgoing_;
 
   inspect::Inspector inspect_;
   inspect::Node simple_codec_;
