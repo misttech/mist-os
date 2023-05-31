@@ -187,6 +187,10 @@ struct ramdisk_client {
     return block_interface_.borrow();
   }
 
+  fidl::UnownedClientEnd<fuchsia_device::Controller> block_controller_interface() const {
+    return block_controller_.borrow();
+  }
+
   const fbl::String& path() const { return path_; }
 
   ~ramdisk_client() { Destroy(); }
@@ -365,6 +369,11 @@ zx_status_t ramdisk_create_at_from_vmo_with_params(int dev_root_fd, zx_handle_t 
 __EXPORT
 zx_handle_t ramdisk_get_block_interface(const ramdisk_client_t* client) {
   return client->block_interface().channel()->get();
+}
+
+__EXPORT
+zx_handle_t ramdisk_get_block_controller_interface(const ramdisk_client_t* client) {
+  return client->block_controller_interface().channel()->get();
 }
 
 __EXPORT

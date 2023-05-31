@@ -210,9 +210,8 @@ fpromise::result<storage::RamDisk, std::string> LaunchFvm(zx::vmo& fvm_vmo) {
   }
   auto ramdisk = std::move(ramdisk_or.value());
 
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   fidl::UnownedClientEnd<fuchsia_device::Controller> device(
-      ramdisk_get_block_interface(ramdisk.client()));
+      ramdisk_get_block_controller_interface(ramdisk.client()));
   auto fvm_bind_result = BindFvm(device);
   if (fvm_bind_result.is_error()) {
     return fpromise::error("Failed to bind FVM to ramdisk. Error: " +

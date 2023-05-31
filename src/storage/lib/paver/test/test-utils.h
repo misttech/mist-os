@@ -51,6 +51,11 @@ class BlockDevice {
         ramdisk_get_block_interface(client_));
   }
 
+  fidl::UnownedClientEnd<fuchsia_device::Controller> block_controller_interface() const {
+    return fidl::UnownedClientEnd<fuchsia_device::Controller>(
+        ramdisk_get_block_controller_interface(client_));
+  }
+
   // Block count and block size of this device.
   uint64_t block_count() const { return block_count_; }
   uint32_t block_size() const { return block_size_; }

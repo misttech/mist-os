@@ -65,6 +65,11 @@ zx_status_t ramdisk_create_at_from_vmo_with_params(int dev_root_fd, zx_handle_t 
 // Does not transfer ownership of the handle.
 zx_handle_t ramdisk_get_block_interface(const ramdisk_client_t* client);
 
+// Returns the handle to the fuchsia.device/Controller interface of the block device.
+//
+// Does not transfer ownership of the handle.
+zx_handle_t ramdisk_get_block_controller_interface(const ramdisk_client_t* client);
+
 // Returns the path to the full block device interface of the ramdisk.
 const char* ramdisk_get_path(const ramdisk_client_t* client);
 
