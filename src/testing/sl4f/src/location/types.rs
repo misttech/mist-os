@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_location_position::{Position, PositionExtras};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 #[derive(Serialize)]
 #[serde(remote = "Position")]
@@ -14,16 +14,21 @@ struct PositionDef {
     pub extras: PositionExtras,
 }
 
-// TODO(fxbug.dev/59274): Do not use Serde remote for FIDL tables.
 #[derive(Serialize)]
-#[serde(remote = "PositionExtras")]
 struct PositionExtrasDef {
     pub accuracy_meters: Option<f64>,
     pub altitude_meters: Option<f64>,
-    // This field is needed to match the FIDL-generated struct exactly. It
-    // should be removed once we are no longer using Serde remote.
-    #[serde(skip)]
-    __non_exhaustive: (),
+}
+
+impl PositionExtrasDef {
+    // We implement this manually instead of using #[serde(remote = "PositionExtras")]
+    // to uphold FIDL's guarantee that adding table fields is source compatible.
+    fn serialize<S: Serializer>(
+        &PositionExtras { accuracy_meters, altitude_meters, .. }: &PositionExtras,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        Self { accuracy_meters, altitude_meters }.serialize(serializer)
+    }
 }
 
 #[derive(Serialize)]
