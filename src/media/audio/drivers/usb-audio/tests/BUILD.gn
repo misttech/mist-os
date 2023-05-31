@@ -11,9 +11,13 @@ executable("usb-audio-test-bin") {
   sources = [ "usb-audio-test.cc" ]
   deps = [
     "../:shared",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb-endpoint:fake-usb-endpoint-server",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 

@@ -10,6 +10,7 @@
 #include <lib/zx/vmar.h>
 #include <string.h>
 #include <zircon/process.h>
+#include <zircon/threads.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
@@ -42,7 +43,8 @@ UsbAudioStream::UsbAudioStream(UsbAudioDevice* parent, std::unique_ptr<UsbAudioS
       parent_(*parent),
       ifc_(std::move(ifc)),
       create_time_(zx::clock::get_monotonic().get()),
-      loop_(&kAsyncLoopConfigNeverAttachToThread) {
+      loop_(&kAsyncLoopConfigNeverAttachToThread),
+      dispatcher_loop_(&kAsyncLoopConfigNeverAttachToThread) {
   snprintf(log_prefix_, sizeof(log_prefix_), "UsbAud %04hx:%04hx %s-%03d", parent_.vid(),
            parent_.pid(), is_input() ? "input" : "output", ifc_->term_link());
   loop_.StartThread("usb-audio-stream-loop");
@@ -105,15 +107,6 @@ UsbAudioStream::UsbAudioStream(UsbAudioDevice* parent, std::unique_ptr<UsbAudioS
   }
 }
 
-UsbAudioStream::~UsbAudioStream() {
-  // We destructing.  All of our requests should be sitting in the free list.
-  ZX_DEBUG_ASSERT(allocated_req_cnt_ == free_req_cnt_);
-
-  while (!list_is_empty(&free_req_)) {
-    usb_request_release(usb_req_list_remove_head(&free_req_, parent_.parent_req_size()));
-  }
-}
-
 fbl::RefPtr<UsbAudioStream> UsbAudioStream::Create(UsbAudioDevice* parent,
                                                    std::unique_ptr<UsbAudioStreamInterface> ifc) {
   ZX_DEBUG_ASSERT(parent != nullptr);
@@ -132,38 +125,11 @@ fbl::RefPtr<UsbAudioStream> UsbAudioStream::Create(UsbAudioDevice* parent,
 }
 
 zx_status_t UsbAudioStream::Bind() {
-  // TODO(johngro): Do this differently when we have the ability to queue io
-  // transactions to a USB isochronous endpoint and can have the bus driver
-  // DMA directly from the ring buffer we have set up with our user.
-  {
-    fbl::AutoLock req_lock(&req_lock_);
-
-    list_initialize(&free_req_);
-    free_req_cnt_ = 0;
-    allocated_req_cnt_ = 0;
-
-    uint64_t req_size = parent_.parent_req_size() + sizeof(usb_req_internal_t);
-    for (uint32_t i = 0; i < MAX_OUTSTANDING_REQ; ++i) {
-      usb_request_t* req;
-      zx_status_t status = usb_request_alloc(&req, ifc_->max_req_size(), ifc_->ep_addr(), req_size);
-      if (status != ZX_OK) {
-        LOG(ERROR, "Failed to allocate usb request %u/%u (size %u): %d", i + 1, MAX_OUTSTANDING_REQ,
-            ifc_->max_req_size(), status);
-        return status;
-      }
-
-      status = usb_req_list_add_head(&free_req_, req, parent_.parent_req_size());
-      ZX_DEBUG_ASSERT(status == ZX_OK);
-      ++free_req_cnt_;
-      ++allocated_req_cnt_;
-    }
-  }
-
   char name[64];
   snprintf(name, sizeof(name), "usb-audio-%s-%03d", is_input() ? "input" : "output",
            ifc_->term_link());
 
-  zx_status_t status =
+  auto status =
       UsbAudioStreamBase::DdkAdd(ddk::DeviceAddArgs(name).set_inspect_vmo(inspect_.DuplicateVmo()));
   if (status == ZX_OK) {
     // If bind/setup has succeeded, then the devmgr now holds a reference to us.
@@ -174,17 +140,22 @@ zx_status_t UsbAudioStream::Bind() {
         status);
   }
 
+  thrd_t tmp_thrd;
+  dispatcher_loop_.StartThread("usb-audio-stream-dispatcher-loop", &tmp_thrd);
+  // TODO(johngro) : See fxbug.dev/30888.  Eliminate this as soon as we have a more
+  // official way of meeting real-time latency requirements.
+  constexpr char role_name[] = "fuchsia.devices.usb.audio";
+  const size_t role_name_size = strlen(role_name);
+  status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(tmp_thrd), role_name,
+                                      role_name_size);
   if (status != ZX_OK) {
-    LOG(ERROR, "Failed to retrieve profile, status %d", status);
-    return status;
+    zxlogf(WARNING,
+           "Failed to apply role \"%s\" to the USB audio callback thread.  Service will be best "
+           "effort.\n",
+           role_name);
   }
 
   return status;
-}
-
-void UsbAudioStream::RequestCompleteCallback(void* ctx, usb_request_t* request) {
-  ZX_DEBUG_ASSERT(ctx != nullptr);
-  reinterpret_cast<UsbAudioStream*>(ctx)->RequestComplete(request);
 }
 
 void UsbAudioStream::ComputePersistentUniqueId() {
@@ -303,6 +274,7 @@ void UsbAudioStream::DdkUnbind(ddk::UnbindTxn txn) {
     shutting_down_ = true;
     rb_vmo_fetched_ = false;
   }
+  dispatcher_loop_.Shutdown();
   // We stop the loop so we can safely deactivate channels via RAII via DdkRelease.
   loop_.Shutdown();
 
@@ -856,7 +828,7 @@ void UsbAudioStream::Start(StartCompleter::Sync& completer) {
   }
 
   // We are idle, all of our usb requests should be sitting in the free list.
-  ZX_DEBUG_ASSERT(allocated_req_cnt_ == free_req_cnt_);
+  ZX_DEBUG_ASSERT(ep_.RequestsFull());
 
   // Activate the format.
   zx_status_t status = ifc_->ActivateFormat(selected_format_ndx_, selected_frame_rate_);
@@ -875,15 +847,16 @@ void UsbAudioStream::Start(StartCompleter::Sync& completer) {
   ring_buffer_offset_ = 0;
   ring_buffer_pos_ = 0;
 
-  // Schedule the frame number which the first transaction will go out on.
-  usb_frame_num_ = usb_get_current_frame(&parent_.usb_proto());
-
   // Flag ourselves as being in the starting state, then queue up all of our
   // transactions.
   ring_buffer_state_ = RingBufferState::STARTING;
   state_.Set("starting");
-  while (!list_is_empty(&free_req_))
-    QueueRequestLocked();
+  status = StartRequests();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not start Request Thread %d", status);
+    completer.Close(status);
+    return;
+  }
 
   start_completer_.emplace(completer.ToAsync());
 }
@@ -916,7 +889,7 @@ void UsbAudioStream::Stop(StopCompleter::Sync& completer) {
   stop_completer_.emplace(completer.ToAsync());
 }
 
-void UsbAudioStream::RequestComplete(usb_request_t* req) {
+void UsbAudioStream::RequestComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
   enum class Action {
     NONE,
     SIGNAL_STARTED,
@@ -932,34 +905,11 @@ void UsbAudioStream::RequestComplete(usb_request_t* req) {
   uint64_t complete_time = zx::clock::get_monotonic().get();
   Action when_finished = Action::NONE;
 
-  // TODO(johngro) : See fxbug.dev/30888.  Eliminate this as soon as we have a more
-  // official way of meeting real-time latency requirements.  Also, the fact
-  // that this boosting gets done after the first transaction completes
-  // degrades the quality of the startup time estimate (if the system is under
-  // high load when the system starts up).  As a general issue, there are
-  // better ways of refining this estimate than bumping the thread prio before
-  // the first transaction gets queued.  Therefor, we just have a poor
-  // estimate for now and will need to live with the consequences.
-  if (!req_complete_prio_bumped_) {
-    const char* role_name = "fuchsia.devices.usb.audio";
-    const size_t role_name_size = strlen(role_name);
-    const zx_status_t status =
-        device_set_profile_by_role(this->zxdev(), zx_thread_self(), role_name, role_name_size);
-    if (status != ZX_OK) {
-      zxlogf(WARNING,
-             "Failed to apply role \"%s\" to the USB audio callback thread.  Service will be best "
-             "effort.\n",
-             role_name);
-    }
-    req_complete_prio_bumped_ = true;
-  }
-
   {
     fbl::AutoLock req_lock(&req_lock_);
 
     // Cache the status and length of this usb request.
-    zx_status_t req_status = req->response.status;
-    uint32_t req_length = static_cast<uint32_t>(req->header.length);
+    zx_status_t req_status = *completion.status();
 
     // Complete the usb request.  This will return the transaction to the free
     // list and (in the case of an input stream) copy the payload to the
@@ -967,7 +917,7 @@ void UsbAudioStream::RequestComplete(usb_request_t* req) {
     //
     // TODO(johngro): copying the payload out of the ring buffer is an
     // operation which goes away when we get to the zero copy world.
-    CompleteRequestLocked(req);
+    auto req_length = CompleteRequestLocked(std::move(completion));
 
     // Did the transaction fail because the device was unplugged?  If so,
     // enter the stopping state and close the connections to our clients.
@@ -992,13 +942,13 @@ void UsbAudioStream::RequestComplete(usb_request_t* req) {
 
     switch (ring_buffer_state_) {
       case RingBufferState::STOPPING:
-        if (free_req_cnt_ == allocated_req_cnt_) {
+        if (ep_.RequestsFull()) {
           when_finished = Action::SIGNAL_STOPPED;
         }
         break;
 
       case RingBufferState::STOPPING_AFTER_UNPLUG:
-        if (free_req_cnt_ == allocated_req_cnt_) {
+        if (ep_.RequestsFull()) {
           when_finished = Action::HANDLE_UNPLUG;
         }
         break;
@@ -1007,9 +957,14 @@ void UsbAudioStream::RequestComplete(usb_request_t* req) {
         when_finished = Action::SIGNAL_STARTED;
         [[fallthrough]];
 
-      case RingBufferState::STARTED:
-        QueueRequestLocked();
-        break;
+      case RingBufferState::STARTED: {
+        auto status = QueueRequestLocked();
+        if (status != ZX_OK) {
+          // QueueRequestLocked may fail if FIDL connection has dropped.
+          LOG(ERROR, "QueueRequestLocked failed %d", status);
+          when_finished = Action::SIGNAL_STOPPED;
+        }
+      } break;
 
       case RingBufferState::STOPPED:
       default:
@@ -1087,63 +1042,89 @@ void UsbAudioStream::RequestComplete(usb_request_t* req) {
   }
 }
 
-void UsbAudioStream::QueueRequestLocked() {
-  ZX_DEBUG_ASSERT((ring_buffer_state_ == RingBufferState::STARTING) ||
-                  (ring_buffer_state_ == RingBufferState::STARTED));
-  ZX_DEBUG_ASSERT(!list_is_empty(&free_req_));
-
-  // Figure out how much we want to send or receive this time (short or long
-  // packet)
-  uint32_t todo = bytes_per_packet_;
-  fractional_bpp_acc_ += fractional_bpp_inc_;
-  if (fractional_bpp_acc_ >= iso_packet_rate_) {
-    fractional_bpp_acc_ -= iso_packet_rate_;
-    todo += frame_size_;
-    ZX_DEBUG_ASSERT(fractional_bpp_acc_ < iso_packet_rate_);
+zx_status_t UsbAudioStream::StartRequests() {
+  auto client = DdkConnectFidlProtocol<fuchsia_hardware_usb::UsbService::Device>(parent_.parent());
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol");
+    return client.error_value();
+  }
+  auto status = ep_.Init(ifc_->ep_addr(), *client, dispatcher_loop_.dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not init endpoint %d", status);
+    return status;
   }
 
-  // Grab a free usb request.
-  auto req = usb_req_list_remove_head(&free_req_, parent_.parent_req_size());
-  ZX_DEBUG_ASSERT(req != nullptr);
-  ZX_DEBUG_ASSERT(free_req_cnt_ > 0);
-  --free_req_cnt_;
-
-  // If this is an output stream, copy our data into the usb request.
-  // TODO(johngro): eliminate this when we can get to a zero-copy world.
-  if (!is_input()) {
-    uint32_t avail = ring_buffer_size_ - ring_buffer_offset_;
-    ZX_DEBUG_ASSERT(ring_buffer_offset_ < ring_buffer_size_);
-    ZX_DEBUG_ASSERT((avail % frame_size_) == 0);
-    uint32_t amt = std::min(avail, todo);
-
-    const uint8_t* src = reinterpret_cast<uint8_t*>(ring_buffer_virt_) + ring_buffer_offset_;
-    // Not security-critical -- we're copying to a ring buffer that's moving based off of time
-    // anyways. If we don't copy enough data we'll just keep playing the same sample in a loop.
-    ssize_t copied = usb_request_copy_to(req, src, amt, 0);
-    if (amt == avail) {
-      ring_buffer_offset_ = todo - amt;
-      if (ring_buffer_offset_ > 0) {
-        copied = usb_request_copy_to(req, ring_buffer_virt_, ring_buffer_offset_, amt);
-      }
-    } else {
-      ring_buffer_offset_ += amt;
-    }
+  auto actual = ep_.AddRequests(MAX_OUTSTANDING_REQ, ifc_->max_req_size(),
+                                fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+  if (actual == 0) {
+    zxlogf(ERROR, "Could not add any requests!");
+    return ZX_ERR_INTERNAL;
+  }
+  if (actual != MAX_OUTSTANDING_REQ) {
+    zxlogf(WARNING, "Wanted %d requests, got %zu requests", MAX_OUTSTANDING_REQ, actual);
   }
 
-  // Schedule this packet to be sent out on the next frame.
-  req->header.frame = ++usb_frame_num_;
-  req->header.length = todo;
-  usb_request_complete_callback_t complete = {
-      .callback = UsbAudioStream::RequestCompleteCallback,
-      .ctx = this,
-  };
-  usb_requests_sent_.Add(1);
-  usb_requests_outstanding_.Add(1);
-  usb_request_queue(&parent_.usb_proto(), req, &complete);
+  // Schedule the frame number which the first transaction will go out on.
+  usb_frame_num_ = usb_get_current_frame(&parent_.usb_proto());
+
+  status = QueueRequestLocked();
+  if (status != ZX_OK) {
+    LOG(ERROR, "QueueRequestLocked failed %d", status);
+    return status;
+  }
+
+  return ZX_OK;
 }
 
-void UsbAudioStream::CompleteRequestLocked(usb_request_t* req) {
-  ZX_DEBUG_ASSERT(req);
+zx_status_t UsbAudioStream::QueueRequestLocked() {
+  ZX_DEBUG_ASSERT((ring_buffer_state_ == RingBufferState::STARTING) ||
+                  (ring_buffer_state_ == RingBufferState::STARTED));
+
+  std::vector<fuchsia_hardware_usb_request::Request> request;
+  while (auto req = ep_.GetRequest()) {
+    // Figure out how much we want to send or receive this time (short or long
+    // packet)
+    uint32_t todo = bytes_per_packet_;
+    fractional_bpp_acc_ += fractional_bpp_inc_;
+    if (fractional_bpp_acc_ >= iso_packet_rate_) {
+      fractional_bpp_acc_ -= iso_packet_rate_;
+      todo += frame_size_;
+      ZX_DEBUG_ASSERT(fractional_bpp_acc_ < iso_packet_rate_);
+    }
+
+    // If this is an output stream, copy our data into the usb request.
+    // TODO(johngro): eliminate this when we can get to a zero-copy world.
+    if (!is_input()) {
+      req->clear_buffers();
+
+      RingBufferCopy(*req, true, todo);
+      ring_buffer_offset_ = (ring_buffer_offset_ + todo) % ring_buffer_size_;
+
+      req->CacheFlush(ep_.GetMapped);
+    } else {
+      req->reset_buffers(ep_.GetMapped);
+      req->CacheFlushInvalidate(ep_.GetMapped);
+    }
+
+    // Schedule this packet to be sent out on the next frame.
+    (*req)->information()->isochronous()->frame_id(++usb_frame_num_);
+
+    request.emplace_back(req->take_request());
+  }
+
+  usb_requests_sent_.Add(request.size());
+  usb_requests_outstanding_.Add(request.size());
+  auto result = ep_->QueueRequests(std::move(request));
+  if (result.is_error()) {
+    zxlogf(ERROR, "QueueRequests failed %s", result.error_value().FormatDescription().c_str());
+    return result.error_value().status();
+  }
+  return ZX_OK;
+}
+
+size_t UsbAudioStream::CompleteRequestLocked(fuchsia_hardware_usb_endpoint::Completion completion) {
+  auto request = ::usb::FidlRequest(std::move(*completion.request()));
+  auto req_length = request.length();
 
   // If we are an input stream, copy the payload into the ring buffer.
   if (is_input()) {
@@ -1153,22 +1134,17 @@ void UsbAudioStream::CompleteRequestLocked(usb_request_t* req) {
     // issue; but if they're running faster than the nominal sampling rate,
     // the client will be seeing older and older data as time goes on, and
     // the audio will fall further and further behind realtime.
-    uint32_t todo = static_cast<uint32_t>(req->response.actual);
-
+    uint32_t todo = *completion.transfer_size();
     uint32_t avail = ring_buffer_size_ - ring_buffer_offset_;
     ZX_DEBUG_ASSERT(ring_buffer_offset_ < ring_buffer_size_);
     ZX_DEBUG_ASSERT((avail % frame_size_) == 0);
 
-    uint32_t amt = std::min(avail, todo);
-    uint8_t* dst = reinterpret_cast<uint8_t*>(ring_buffer_virt_) + ring_buffer_offset_;
-
-    if (req->response.status == ZX_OK) {
-      [[maybe_unused]] ssize_t size = usb_request_copy_from(req, dst, amt, 0);
-      if (amt < todo) {
-        [[maybe_unused]] ssize_t size =
-            usb_request_copy_from(req, ring_buffer_virt_, todo - amt, amt);
-      }
+    if (completion.status() == ZX_OK) {
+      RingBufferCopy(request, false, todo);
     } else {
+      uint32_t amt = std::min(avail, todo);
+      uint8_t* dst = reinterpret_cast<uint8_t*>(ring_buffer_virt_) + ring_buffer_offset_;
+
       // TODO(johngro): filling with zeros is only the proper thing to do
       // for signed formats.  USB does support unsigned 8-bit audio; if
       // that is our format, we should fill with 0x80 instead in order to
@@ -1184,23 +1160,22 @@ void UsbAudioStream::CompleteRequestLocked(usb_request_t* req) {
   // It's reasonable if it's exactly what we requested, or if we're dealing
   // with an async input, or if we got an error.  (If there's an error,
   // reporting the length mismatch is probably superfluous.)
-  const bool actual_length_reasonable = (req->response.actual == req->header.length) ||
+  const bool actual_length_reasonable = (completion.transfer_size() == request.length()) ||
                                         (is_async() && is_input()) ||
-                                        (req->response.status != ZX_OK);
+                                        (completion.status() != ZX_OK);
 
   // If not reasonable, log a warning.
   if (!actual_length_reasonable) {
     // Rate limit warnings to no more than one every 3 seconds.
     if (zx::clock::get_monotonic() >= allow_length_warnings_) {
       allow_length_warnings_ = zx::deadline_after(zx::sec(3));
-      zxlogf(WARNING, "%s: Audio transfer mismatch; asked for %u bytes, actual %u bytes",
-             parent_.log_prefix(), static_cast<uint32_t>(req->header.length),
-             static_cast<uint32_t>(req->response.actual));
+      zxlogf(WARNING, "%s: Audio transfer mismatch; asked for %lu bytes, actual %lu bytes",
+             parent_.log_prefix(), request.length(), *completion.transfer_size());
     }
   }
 
   // Update the ring buffer position.
-  ring_buffer_pos_ += static_cast<uint32_t>(req->response.actual);
+  ring_buffer_pos_ += *completion.transfer_size();
   if (ring_buffer_pos_ >= ring_buffer_size_) {
     ring_buffer_pos_ -= ring_buffer_size_;
     ZX_DEBUG_ASSERT(ring_buffer_pos_ < ring_buffer_size_);
@@ -1213,10 +1188,8 @@ void UsbAudioStream::CompleteRequestLocked(usb_request_t* req) {
   }
 
   // Return the transaction to the free list.
-  zx_status_t status = usb_req_list_add_head(&free_req_, req, parent_.parent_req_size());
-  ZX_DEBUG_ASSERT(status == ZX_OK);
-  ++free_req_cnt_;
-  ZX_DEBUG_ASSERT(free_req_cnt_ <= allocated_req_cnt_);
+  ep_.PutRequest(std::move(request));
+  return req_length;
 }
 
 void UsbAudioStream::DeactivateStreamChannelLocked(StreamChannel* channel) {
@@ -1242,6 +1215,45 @@ void UsbAudioStream::DeactivateRingBufferChannelLocked(const Channel* channel) {
   }
 
   rb_channel_.reset();
+}
+
+void UsbAudioStream::RingBufferCopy(::usb::FidlRequest& req, bool copy_to, uint32_t todo) {
+  uint32_t avail = ring_buffer_size_ - ring_buffer_offset_;
+  ZX_DEBUG_ASSERT(ring_buffer_offset_ < ring_buffer_size_);
+  ZX_DEBUG_ASSERT((avail % frame_size_) == 0);
+  uint32_t amt = std::min(avail, todo);
+
+  uint8_t* ptr = reinterpret_cast<uint8_t*>(ring_buffer_virt_) + ring_buffer_offset_;
+
+  uint64_t vmo_size = ifc_->max_req_size();
+  size_t cp_size = std::min(vmo_size, static_cast<uint64_t>(amt));
+  auto actual = copy_to ? req.CopyTo(0, ptr, cp_size, ep_.GetMapped)
+                        : req.CopyFrom(0, ptr, cp_size, ep_.GetMapped);
+  size_t total = 0;
+  for (uint32_t i = 0; i < actual.size(); i++) {
+    total += actual[i];
+    if (copy_to) {
+      req->data()->at(i).size(actual[i]);
+    }
+  }
+  if (total != cp_size) {
+    zxlogf(WARNING, "Wanted to copy %zu bytes, but actually copied %zu bytes", cp_size, total);
+  }
+  if (amt < todo) {
+    cp_size = std::min(vmo_size - amt, static_cast<uint64_t>(todo - amt));
+    actual = copy_to ? req.CopyTo(amt, ring_buffer_virt_, cp_size, ep_.GetMapped)
+                     : req.CopyFrom(amt, ring_buffer_virt_, cp_size, ep_.GetMapped);
+    total = 0;
+    for (uint32_t i = 0; i < actual.size(); i++) {
+      total += actual[i];
+      if (copy_to) {
+        req->data()->at(i).size(*req->data()->at(i).size() + actual[i]);
+      }
+    }
+    if (total != cp_size) {
+      zxlogf(WARNING, "Wanted to copy %zu bytes, but actually copied %zu bytes", cp_size, total);
+    }
+  }
 }
 
 }  // namespace usb

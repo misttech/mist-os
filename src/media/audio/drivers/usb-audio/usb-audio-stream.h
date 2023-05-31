@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_USB_AUDIO_USB_AUDIO_STREAM_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -14,6 +15,7 @@
 #include <zircon/listnode.h>
 
 #include <memory>
+#include <queue>
 
 #include <audio-proto/audio-proto.h>
 #include <ddktl/device-internal.h>
@@ -24,6 +26,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
+#include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/usb.h>
 
 #include "debug-logging.h"
@@ -196,7 +199,7 @@ class UsbAudioStream : public UsbAudioStreamBase,
   };
 
   UsbAudioStream(UsbAudioDevice* parent, std::unique_ptr<UsbAudioStreamInterface> ifc);
-  virtual ~UsbAudioStream();
+  virtual ~UsbAudioStream() = default;
 
   void ComputePersistentUniqueId();
 
@@ -256,13 +259,17 @@ class UsbAudioStream : public UsbAudioStreamBase,
   zx_status_t ProcessRingBufferChannel(Channel* channel);
   void DeactivateRingBufferChannelLocked(const Channel* channel) __TA_REQUIRES(lock_);
 
-  void RequestComplete(usb_request_t* req);
-  void QueueRequestLocked() __TA_REQUIRES(req_lock_);
-  void CompleteRequestLocked(usb_request_t* req) __TA_REQUIRES(req_lock_);
-
-  static void RequestCompleteCallback(void* ctx, usb_request_t* request);
+  void RequestComplete(fuchsia_hardware_usb_endpoint::Completion completion);
+  zx_status_t QueueRequestLocked() __TA_REQUIRES(req_lock_);
+  // Returns the length of the request completed
+  size_t CompleteRequestLocked(fuchsia_hardware_usb_endpoint::Completion completion)
+      __TA_REQUIRES(req_lock_);
 
   bool is_async() const;
+
+  zx_status_t StartRequests() __TA_REQUIRES(req_lock_);
+  void RingBufferCopy(::usb::FidlRequest& req, bool copy_to, uint32_t todo)
+      __TA_REQUIRES(req_lock_);
 
   UsbAudioDevice& parent_;
   const std::unique_ptr<UsbAudioStreamInterface> ifc_;
@@ -310,17 +317,12 @@ class UsbAudioStream : public UsbAudioStreamBase,
   // but WatchDelayInfo can't just call completer.ToAsync and immediately let it drop.
   std::optional<WatchDelayInfoCompleter::Async> delay_completer_;
 
-  list_node_t free_req_ __TA_GUARDED(req_lock_);
-  uint32_t free_req_cnt_ __TA_GUARDED(req_lock_);
-  uint32_t allocated_req_cnt_;
   const zx_time_t create_time_;
-
-  // TODO(johngro) : See MG-940.  eliminate this ASAP
-  bool req_complete_prio_bumped_ = false;
 
   // |shutting_down_| is a boolean indicating whether |loop_| is about to be shut down.
   bool shutting_down_ __TA_GUARDED(lock_) = false;
   async::Loop loop_;
+  async::Loop dispatcher_loop_;
 
   inspect::Inspector inspect_;
   inspect::Node root_;
@@ -345,6 +347,9 @@ class UsbAudioStream : public UsbAudioStreamBase,
   inspect::UintArray supported_bits_per_slot_;
   inspect::UintArray supported_bits_per_sample_;
   inspect::StringArray supported_sample_formats_;
+
+  usb_endpoint::UsbEndpoint<UsbAudioStream> ep_{::usb::EndpointType::ISOCHRONOUS, this,
+                                                std::mem_fn(&UsbAudioStream::RequestComplete)};
 };
 
 }  // namespace usb
