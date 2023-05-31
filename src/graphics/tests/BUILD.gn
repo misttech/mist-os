@@ -35,6 +35,7 @@ group("hw_tests") {
     "benchmark",
     "vkvalidation",
     "//src/lib/vulkan/tests:image-pipe-swapchain-tests",
+    "//third_party/Vulkan-Tools/cube",
   ]
 }
 
