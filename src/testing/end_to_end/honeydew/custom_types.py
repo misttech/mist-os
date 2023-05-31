@@ -4,8 +4,10 @@
 # found in the LICENSE file.
 """Custom data types."""
 
+from __future__ import annotations
 import enum
-from typing import NamedTuple
+import ipaddress
+from typing import NamedTuple, Optional, Union
 
 
 class LEVEL(enum.Enum):
@@ -13,6 +15,73 @@ class LEVEL(enum.Enum):
     INFO = enum.auto()
     WARNING = enum.auto()
     ERROR = enum.auto()
+
+
+class IpPort(NamedTuple):
+    """Tuple that contains an IP Address and Port
+
+    Args:
+        ip: Ip Address
+        port: Port Number
+        scope: Optional IPv6 Scope
+    """
+    ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    port: int
+    scope: Optional[str]
+
+    def __str__(self):
+        host = f"{self.ip}"
+        if type(self.ip) is ipaddress.IPv6Address:
+            if self.scope:
+                host = f'{host}%{self.scope}'
+            host = f'[{host}]'
+
+        return f"{host}:{self.port}"
+
+    @staticmethod
+    def parse(target_name: str) -> IpPort:
+        """Checks if the given string is an IPAddress Port or not
+
+      Args:
+        target_name: the name of the target to test. This is of format
+                     {ipv4_address}:{port}, or [{ipv6_address}]:{port},
+                     or {ipv6_address}:{port}
+
+
+      Returns:
+        A valid IpPort if the str is one. Otherwise None
+
+      Raises:
+        ValueError
+      """
+        try:
+            # If we have something of form 192.168.1.1:8888 ==> ['192.168.1.1', '8888']
+            # If we have something of form [::1]:8888 ==> ['[::1]', '8888']
+            arr = target_name.rsplit(":", 1)
+            if len(arr) != 2:
+                raise ValueError(
+                    f"Value: {target_name} was not a valid IpPort (needs IP Address and Port)"
+                )
+            addr_part = arr[0]
+            port_part = arr[1]
+            # Remove [] that might be surrounding an IPv6 address
+            addr_part = addr_part.replace("[", "").replace("]", "")
+            # TODO: Remove manual scope parsing once Python migrated to > 3.8
+            # In Python 3.8 IpV6 addresses cannot have a scope in them.
+            # If one exists, parse it and store seperately
+            scope = None
+            addr_array = addr_part.rsplit("%", 1)
+            if len(addr_array) > 1:
+                scope = addr_array[1]
+            addr = ipaddress.ip_address(addr_array[0])
+            port = int(port_part)
+            if port < 1:
+                raise ValueError(
+                    f"For IpPort: {target_name}, port number: {port} was not a positive integer)"
+                )
+            return IpPort(addr, int(port_part), scope)
+        except ValueError as e:
+            raise e
 
 
 class TargetSshAddress(NamedTuple):

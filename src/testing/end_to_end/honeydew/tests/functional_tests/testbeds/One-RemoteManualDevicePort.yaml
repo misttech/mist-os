@@ -1,0 +1,10 @@
+TestBeds:
+  - Name: Testbed-One-RemoteManualDevicePort
+    Controllers:
+      FuchsiaDevice:
+        - name: fuchsia-ac67-842f-27de
+          ssh_private_key: ~/.ssh/fuchsia_ed25519
+          # This is of format
+          # {ipv4_address}:{port}, or [{ipv6_address}]:{port},
+          # or {ipv6_address}:{port}
+          device_ip_port: "[::1]:8022"

@@ -5,8 +5,8 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("init_test") {
-    main_source = "init_test.py"
+  python_host_test("custom_types_test") {
+    main_source = "custom_types_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//third_party/parameterized",
@@ -18,12 +18,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":init_test($host_toolchain)",
-    "affordances_tests:tests",
-    "custom_types_tests:tests",
-    "device_class_tests:tests",
-    "transports_tests:tests",
-    "utility_tests:tests",
-  ]
+  public_deps = [ ":custom_types_test($host_toolchain)" ]
 }

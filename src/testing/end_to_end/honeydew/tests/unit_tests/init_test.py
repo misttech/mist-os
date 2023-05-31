@@ -5,6 +5,7 @@
 """Unit tests for honeydew.__init__.py."""
 
 import os
+import subprocess
 from typing import Any, Dict, Set, Type
 import unittest
 from unittest import mock
@@ -17,7 +18,10 @@ from honeydew.device_classes.fuchsia_controller import x64 as fc_x64
 from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.device_classes.sl4f import x64 as sl4f_x64
+from honeydew import custom_types
+from honeydew import errors
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.transports.ffx import FFX
 from parameterized import parameterized
 
 
@@ -192,6 +196,192 @@ class InitTests(unittest.TestCase):
         mock_get_device_class.assert_called()
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
+
+    @mock.patch("honeydew.ffx_transport.FFX", autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "start_server",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class",
+        return_value=sl4f_generic_fuchsia_device.GenericFuchsiaDevice,
+        autospec=True)
+    def test_create_device_using_device_ip_port(
+            self, mock_get_device_class, mock_ssh_check_connection,
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx) -> None:
+        """Test case for honeydew.create_device() where it returns a device
+        from an IpPort."""
+        device_name = "fuchsia-1234"
+        device_ip_port = "[::1]:8088"
+
+        mock_ffx.return_value = mock_ffx
+        mock_ffx.get_target_name.return_value = device_name
+        mock_ffx.get_target_information.side_effect = subprocess.TimeoutExpired(
+            cmd="foo", timeout=10)
+
+        self.assertIsInstance(
+            honeydew.create_device(
+                device_name=device_name,
+                ssh_private_key="/tmp/pkey",
+                device_ip_port=device_ip_port),
+            sl4f_generic_fuchsia_device.GenericFuchsiaDevice)
+
+        mock_ffx.add_target.assert_called_once()
+        mock_ffx.get_target_name.assert_called()
+        mock_ffx.check_connection.assert_called()
+
+        mock_get_device_class.assert_called()
+        mock_ssh_check_connection.assert_called()
+        mock_sl4f_start_server.assert_called()
+        mock_sl4f_check_connection.assert_called()
+
+    @mock.patch("honeydew.ffx_transport.FFX", autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "start_server",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class",
+        return_value=sl4f_generic_fuchsia_device.GenericFuchsiaDevice,
+        autospec=True)
+    def test_create_device_using_device_ip_port_throws_on_add_error(
+            self, mock_get_device_class, mock_ssh_check_connection,
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx) -> None:
+        """Test case for honeydew.create_device() where it raises an error due
+        to an exception in add_target."""
+        device_name = "fuchsia-1234"
+        device_ip_port = "[::1]:8022"
+
+        mock_ffx.return_value = mock_ffx
+        mock_ffx.add_target.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="ffx target add [::1]:8022 ")
+
+        mock_ffx.get_target_information.side_effect = subprocess.TimeoutExpired(
+            cmd="foo", timeout=10)
+
+        with self.assertRaises(errors.FfxCommandError):
+            honeydew.create_device(
+                device_name=device_name,
+                ssh_private_key="/tmp/pkey",
+                device_ip_port=device_ip_port)
+
+        mock_ffx.get_target_information.assert_called_once()
+        mock_ffx.add_target.assert_called_once()
+        mock_ffx.get_target_name.assert_not_called()
+
+        mock_get_device_class.assert_not_called()
+        mock_ssh_check_connection.assert_not_called()
+        mock_sl4f_start_server.assert_not_called()
+        mock_sl4f_check_connection.assert_not_called()
+
+    @mock.patch("honeydew.ffx_transport.FFX", autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "start_server",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class",
+        return_value=sl4f_generic_fuchsia_device.GenericFuchsiaDevice,
+        autospec=True)
+    def test_create_device_using_device_ip_port_throws_on_differnt_target_names(
+            self, mock_get_device_class, mock_ssh_check_connection,
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx) -> None:
+        """Test case for honeydew.create_device() where it raises an exception
+        because the returned target name is different from the given one."""
+
+        device_name = "fuchsia-1234"
+        device_ip_port = "[::1]:8022"
+
+        mock_ffx.return_value = mock_ffx
+        mock_ffx.get_target_name.return_value = "not-a-fuchsia-name"
+        mock_ffx.get_target_information.side_effect = subprocess.TimeoutExpired(
+            cmd="foo", timeout=10)
+
+        with self.assertRaises(errors.FfxCommandError):
+            honeydew.create_device(
+                device_name=device_name,
+                ssh_private_key="/tmp/pkey",
+                device_ip_port=device_ip_port)
+
+        mock_ffx.get_target_information.assert_called_once()
+        mock_ffx.add_target.assert_called_once()
+        mock_ffx.get_target_name.assert_called_once()
+
+        mock_get_device_class.assert_not_called()
+        mock_ssh_check_connection.assert_not_called()
+        mock_sl4f_start_server.assert_not_called()
+        mock_sl4f_check_connection.assert_not_called()
+
+    @mock.patch("honeydew.ffx_transport.FFX", autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
+        "start_server",
+        autospec=True)
+    @mock.patch.object(
+        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class",
+        return_value=sl4f_generic_fuchsia_device.GenericFuchsiaDevice,
+        autospec=True)
+    def test_create_device_using_device_ip_port_skips_add_on_existing_target(
+            self, mock_get_device_class, mock_ssh_check_connection,
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx) -> None:
+        """Test case for honeydew.create_device() where it skips adding the
+        target since it is already registered."""
+
+        device_name = "fuchsia-1234"
+        device_ip_port = "[::1]:8022"
+
+        mock_ffx.return_value = mock_ffx
+        mock_ffx.get_target_name.return_value = "fuchsia-1234"
+        mock_ffx.get_target_information.return_value = {}
+
+        honeydew.create_device(
+            device_name=device_name,
+            ssh_private_key="/tmp/pkey",
+            device_ip_port=device_ip_port)
+
+        mock_ffx.get_target_information.assert_called_once()
+        mock_ffx.add_target.assert_not_called()
+        mock_ffx.get_target_name.assert_called_once()
+        mock_get_device_class.assert_called_once()
+        mock_ssh_check_connection.assert_called_once()
+        mock_sl4f_start_server.assert_called_once()
+        mock_sl4f_check_connection.assert_called_once()
 
     @mock.patch(
         "honeydew._get_device_class",

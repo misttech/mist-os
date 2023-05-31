@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, List
 
 import honeydew
+from honeydew import custom_types
 from honeydew import transports
 from honeydew.interfaces.device_classes import \
     fuchsia_device as fuchsia_device_interface
@@ -52,7 +53,8 @@ def create(
                 device_name=device_config["name"],
                 ssh_private_key=device_config.get("ssh_private_key"),
                 ssh_user=device_config.get("ssh_user"),
-                transport=device_config.get("transport")))
+                transport=device_config.get("transport"),
+                device_ip_port=device_config.get("device_ip_port")))
     return fuchsia_devices
 
 
@@ -122,7 +124,7 @@ def _get_fuchsia_device_info(
 
 
 # TODO(fxbug.dev/123746): Remove this after fxbug.dev/123746 is fixed.
-def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
+def _get_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     """Parse, validate and update the mobly configuration associated with
     FuchsiaDevice controller.
 
@@ -134,6 +136,7 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
 
     Raises:
         RuntimeError: If any required information is missing.
+        ValueError:   If the transport is invalid, or the device_ip_port is invalid
     """
     _LOGGER.debug(
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
@@ -147,6 +150,7 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
     #       nodename: botanist-target-qemu
     #       serial_socket: ''
     #       ssh_key: private_key
+    #       device_ip_port: IpPort
     device_config: Dict[str, Any] = {
         "ssh_user": config.get("ssh_user"),
     }
@@ -162,6 +166,15 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         device_config["ssh_private_key"] = config["ssh_private_key"]
     elif config.get("nodename"):
         device_config["ssh_private_key"] = config["ssh_key"]
+
+    if config.get("device_ip_port"):
+        try:
+            device_config["device_ip_port"] = custom_types.IpPort.parse(
+                config["device_ip_port"])
+        except Exception as err:  # pylint: disable=broad-except
+            raise ValueError(
+                f"Invalid value for 'device_ip_port': {config['device_ip_port']} "
+            ) from err
 
     if config.get("transport"):
         transport: str = config["transport"]

@@ -12,6 +12,16 @@ Assumptions:
 * FFX CLI is present on the host and is included in `$PATH` environmental
   variable.
 
+* This tool was built to be run locally. Remote workflows (i.e. where the Target
+  and Host are not colocated) are in limited support, and have the following
+  assumptions:
+    * You use a tool like `fssh tunnel` or `funnel` to forward the Target from
+      your local machine to the remote machine over a SSH tunnel
+    * Only one device is currently supported over the SSH tunnel.
+    * If the device reboots during the test, it may be necessary to re-run
+      the `fssh tunnel` command manually again in order to re-establish the
+      appropriate port forwards.
+
 ## Usage
 
 ### Device object creation
@@ -32,6 +42,7 @@ Assumptions:
 #   * "fuchsia-54b2-038b-6e90" is a x64 device whose implementation is present in HoneyDew. Hence returning honeydew.device_classes.x64.X64 object.
 #   * "fuchsia-d88c-79a3-aa1d" is Google's 1p device whose implementation is not present in HoneyDew. Hence returning a generic_fuchsia_device.GenericFuchsiaDevice object.
 #   * "fuchsia-emulator" is an emulator device whose implementation is not present in HoneyDew. Hence returning a generic_fuchsia_device.GenericFuchsiaDevice object.
+#   * "[::1]:8022" is a fuchsia device whose SSH port is proxied via SSH from a local machine to a remote workstation.
 
 >>> fd_1p = honeydew.create_device("fuchsia-ac67-847a-2e50", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
@@ -56,6 +67,19 @@ INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia
 
 >>> type(emu)
 honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
+
+>>> fd_remote = honeydew.create_device("fuchsia-d88c-796c-e57e", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"), device_ip_port=custom_types.IpPort.parse("[::1]:8022"))
+
+INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>}'
+INFO:honeydew:Didn't find any matching device class implementation for 'fuchsia-d88c-796c-e57e'. So returning 'GenericFuchsiaDevice'
+INFO:honeydew.transports.ssh:Waiting for fuchsia-d88c-796c-e57e to allow ssh connection...
+Warning: Permanently added '[::1]:8022' (ED25519) to the list of known hosts.
+INFO:honeydew.transports.ssh:fuchsia-d88c-796c-e57e is available via ssh.
+INFO:honeydew.transports.sl4f:Starting SL4F server on fuchsia-d88c-796c-e57e...
+
+>>> type(fd_remote)
+<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>
+
 ```
 
 ### Access the static properties

@@ -404,3 +404,100 @@ class FfxCliTests(unittest.TestCase):
             self.ffx_obj.run(cmd=_INPUT_ARGS["run_cmd"])
 
         mock_subprocess_check_output.assert_called()
+
+    @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
+    def test_add_target(self, mock_subprocess_check_output):
+        """Test case for ffx_cli.add_target()."""
+        ip_port = custom_types.IpPort.parse("127.0.0.1:8082")
+        ffx.FFX.add_target(target_ip_port=ip_port)
+
+        mock_subprocess_check_output.assert_called_once()
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label":
+                        "CalledProcessError",
+                    "side_effect":
+                        subprocess.CalledProcessError(
+                            returncode=1, cmd="ffx target add 127.0.0.1:8082"),
+                    "expected":
+                        errors.FfxCommandError,
+                },),
+            (
+                {
+                    "label":
+                        "TimeoutExpired",
+                    "side_effect":
+                        subprocess.TimeoutExpired(
+                            timeout=10, cmd="ffx target add 127.0.0.1:8082"),
+                    "expected":
+                        subprocess.TimeoutExpired,
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
+    def test_add_target_exception(
+            self, parameterized_dict, mock_subprocess_check_output) -> None:
+        """Verify ffx_cli.add_target raise exception in failure cases."""
+        ip_port = custom_types.IpPort.parse("127.0.0.1:8082")
+        mock_subprocess_check_output.side_effect = parameterized_dict[
+            "side_effect"]
+
+        expected = parameterized_dict["expected"]
+
+        with self.assertRaises(expected):
+            ffx.FFX.add_target(target_ip_port=ip_port)
+
+        mock_subprocess_check_output.assert_called_once()
+
+    @mock.patch.object(
+        ffx.FFX,
+        "get_target_information",
+        return_value=_MOCK_ARGS["ffx_target_show_json"],
+        autospec=True)
+    def test_get_target_name(self, mock_ffx_get_target_information) -> None:
+        """Verify get_target_name returns the name of the fuchsia device."""
+        ip_port = custom_types.IpPort.parse(
+            f'[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}')
+        self.ffx_obj = ffx.FFX(target=str(ip_port))
+
+        self.assertEqual(self.ffx_obj.get_target_name(), "fuchsia-emulator")
+
+        mock_ffx_get_target_information.assert_called()
+
+    @parameterized.expand(
+        [
+            ({
+                "label": "empty_output",
+                "side_effect": b"[]"
+            },),
+            (
+                {
+                    "label":
+                        "CalledProcessError",
+                    "side_effect":
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd=
+                            f'ffx -t "[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}" target show'
+                        )
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    @mock.patch.object(
+        ffx.FFX,
+        "get_target_information",
+        return_value=_MOCK_ARGS["ffx_target_show_output"],
+        autospec=True)
+    def test_get_target_name_exception(
+            self, parameterized_dict, mock_ffx_get_target_information) -> None:
+        """Verify get_target_ssh_address raise exception in failure cases."""
+        mock_ffx_get_target_information.side_effect = parameterized_dict[
+            "side_effect"]
+
+        with self.assertRaises(errors.FfxCommandError):
+            self.ffx_obj.get_target_name()
+
+        mock_ffx_get_target_information.assert_called_once()

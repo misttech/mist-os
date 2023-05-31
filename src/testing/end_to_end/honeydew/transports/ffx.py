@@ -15,6 +15,7 @@ from honeydew import custom_types
 from honeydew import errors
 
 _FFX_CMDS: Dict[str, List[str]] = {
+    "TARGET_ADD": ["target", "add"],
     "TARGET_SHOW": ["target", "show", "--json"],
     "TARGET_SSH_ADDRESS": ["target", "get-ssh-address"],
     "TARGET_LIST": ["--machine", "json", "target", "list"],
@@ -98,6 +99,36 @@ class FFX:
     def __init__(self, target: str) -> None:
         self._target: str = target
 
+    @staticmethod
+    def add_target(
+            target_ip_port: custom_types.IpPort,
+            timeout: float = _TIMEOUTS["FFX_CLI"]):
+        """Adds a target to the ffx collection
+
+        Args:
+            target: Target IpPort.
+
+        Returns:
+            True for success, False otherwise
+
+        Raises:
+            subprocess.TimeoutExpired: In case of timeout
+            errors.FfxCommandError: In case of failure.
+        """
+        cmd: List[str] = FFX._generate_ffx_cmd(
+            target=None, cmd=_FFX_CMDS["TARGET_ADD"])
+        cmd.append(str(target_ip_port))
+        try:
+            _LOGGER.debug("Executing command `%s`", " ".join(cmd))
+            output: str = subprocess.check_output(
+                cmd, stderr=subprocess.STDOUT, timeout=timeout).decode()
+            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), output)
+        except subprocess.TimeoutExpired as err:
+            _LOGGER.debug(err, exc_info=True)
+            raise
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+
     def check_connection(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> None:
         """Checks the FFX connection from host to Fuchsia device.
 
@@ -168,6 +199,51 @@ class FFX:
             return ffx_target_list_info
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+
+    def get_target_name(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
+        """Returns the target name.
+
+        Args:
+            timeout: Timeout to wait for the ffx command to return.
+
+        Returns:
+            Target name.
+
+        Raises:
+            errors.FfxCommandError: In case of failure.
+        """
+        # {
+        #    "title": "Target",
+        #    "label": "target",
+        #    "description": "",
+        #    "child": [
+        #      {
+        #        "title": "Name",
+        #        "label": "name",
+        #        "description": "Target name.",
+        #        "value": "fuchsia-201f-3b5a-1c1b"
+        #      },
+        #      {
+        #        "title": "SSH Address",
+        #        "label": "ssh_address",
+        #        "description": "Interface address",
+        #        "value": "::1:8022"
+        #      }
+        #    ]
+        #  },
+
+        try:
+            ffx_target_show_info: List[Dict[str,
+                                            Any]] = self.get_target_information(
+                                                timeout)
+            target_entry: Dict[str, Any] = self._get_label_entry(
+                ffx_target_show_info, label_value="target")
+            name_entry: Dict[str, Any] = self._get_label_entry(
+                target_entry["child"], label_value="name")
+            return name_entry["value"]
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FfxCommandError(
+                f"Failed to get the target name of {self._target}") from err
 
     def get_target_ssh_address(
             self,
@@ -297,7 +373,7 @@ class FFX:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
-        ffx_cmd: List[str] = self._generate_ffx_cmd(cmd=cmd)
+        ffx_cmd: List[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             output: str = subprocess.check_output(
@@ -313,7 +389,8 @@ class FFX:
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
     # List all private methods in alphabetical order
-    def _generate_ffx_args(self) -> List[str]:
+    @staticmethod
+    def _generate_ffx_args(target: Optional[str]) -> List[str]:
         """Generates all the arguments that need to be used with FFX command.
 
         Returns:
@@ -322,7 +399,8 @@ class FFX:
         ffx_args: List[str] = []
 
         # Do not change this sequence
-        ffx_args.extend(["-t", f"{self._target}"])
+        if target:
+            ffx_args.extend(["-t", f"{target}"])
 
         # To run FFX in isolation mode
         if _ISOLATE_DIR:
@@ -340,7 +418,8 @@ class FFX:
 
         return ffx_args
 
-    def _generate_ffx_cmd(self, cmd: List[str]) -> List[str]:
+    @staticmethod
+    def _generate_ffx_cmd(cmd: List[str], target: Optional[str]) -> List[str]:
         """Generates the FFX command that need to be passed
         subprocess.check_output.
 
@@ -350,7 +429,7 @@ class FFX:
         Returns:
             FFX command to be run as list of string.
         """
-        ffx_args: List[str] = self._generate_ffx_args()
+        ffx_args: List[str] = FFX._generate_ffx_args(target)
         return ["ffx"] + ffx_args + cmd
 
     def _get_label_entry(self, data: List[Dict[str, Any]],

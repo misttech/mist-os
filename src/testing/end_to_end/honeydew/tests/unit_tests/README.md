@@ -33,4 +33,6 @@
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:sl4f_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/utility_tests:http_utils_test --host --output
+
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/custom_types_tests:custom_types_test --host --output
     ```
