@@ -504,6 +504,11 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
   fbl::Array<const display_config_t*> display_configs(new const display_config_t*[count], count);
   uint32_t display_count = 0;
 
+  // The applied configuration's stamp.
+  //
+  // Populated from `controller_stamp_` while the mutex is held.
+  config_stamp_t applied_config_stamp = {};
+
   {
     fbl::AutoLock lock(mtx());
     bool switching_client = (is_vc != vc_applied_ || client_id != applied_client_id_);
@@ -541,7 +546,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 
     // Now we can guarantee that this configuration will be applied to display
     // controller. Thus increment the controller ApplyConfiguration() counter.
-    controller_stamp_.value++;
+    ++controller_stamp_.value;
+    applied_config_stamp = controller_stamp_;
 
     for (int i = 0; i < count; i++) {
       auto* config = configs[i];
@@ -551,12 +557,12 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
       }
 
       auto& config_image_queue = display->config_image_queue;
-      config_image_queue.push({.config_stamp = controller_stamp_, .images = {}});
+      config_image_queue.push({.config_stamp = applied_config_stamp, .images = {}});
 
       display->switching_client = switching_client;
       display->pending_layer_change = config->apply_layer_change();
       if (display->pending_layer_change) {
-        display->pending_layer_change_controller_config_stamp = controller_stamp_;
+        display->pending_layer_change_controller_config_stamp = applied_config_stamp;
       }
       display->layer_count = config->current_layer_count();
       display->delayed_apply = false;
@@ -578,7 +584,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
         // Set the image controller config stamp so vsync knows what config the
         // image was used at.
         AssertMtxAliasHeld(image->mtx());
-        image->set_latest_controller_config_stamp(controller_stamp_);
+        image->set_latest_controller_config_stamp(applied_config_stamp);
         image->StartPresent();
 
         // It's possible that the image's layer was moved between displays. The logic around
@@ -613,7 +619,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
     }
   }
 
-  dc_.ApplyConfiguration(display_configs.get(), display_count, &controller_stamp_);
+  dc_.ApplyConfiguration(display_configs.get(), display_count, &applied_config_stamp);
 }
 
 void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
