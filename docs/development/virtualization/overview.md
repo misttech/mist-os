@@ -356,7 +356,7 @@ For more information on how to launch and use virtualization on Fuchsia, see
 [code.vmm]:
     https://cs.opensource.google/fuchsia/fuchsia/+/main:src/virtualization/bin/vmm/
 [code.zircon_loader]:
-    https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/public/zircon/boot/image.h;l=177;drc=9fcf7ef29730fa8ecc2f1cdbe025bb3ab9741a90
+    https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/zbi/kernel.fidl;l=9-67;drc=14ae4735d15e85d0e2016acb1355102aad4dada1
 
 [image.mmio_bell]: images/mmio_bell_trap.png
 [image.mmio_sync]: images/mmio_sync_trap.png
