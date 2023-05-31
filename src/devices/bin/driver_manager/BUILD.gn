@@ -367,10 +367,28 @@ fuchsia_component("component") {
   deps = [ ":driver_manager" ]
 }
 
+# List of shared libraries used by drivers.
+group("driver_shared_libraries") {
+  deps = [
+    "//sdk/lib/fdio",
+    "//sdk/lib/svc",
+    "//sdk/lib/syslog/cpp:backend_fuchsia_globals",
+    "//src/devices/bin/driver_host:driver",
+    "//src/devices/bin/driver_runtime",
+    "//src/security/lib/tee/tee-client-api",
+    "//third_party/boringssl:crypto-shared",
+    "//third_party/boringssl:ssl-shared",
+    "//zircon/system/ulib/async-default",
+    "//zircon/system/ulib/syslog",
+    "//zircon/system/ulib/trace-engine",
+  ]
+}
+
 fuchsia_package("dfv1_package") {
   package_name = "driver_manager"
   deps = [
     ":component",
+    ":driver_shared_libraries",
     "//src/devices/bin/driver_host",
     "//src/devices/internal/drivers/fragment",
     "//src/devices/internal/drivers/fragment:fragment.proxy",
@@ -379,5 +397,8 @@ fuchsia_package("dfv1_package") {
 
 fuchsia_package("dfv2_package") {
   package_name = "driver_manager"
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    ":driver_shared_libraries",
+  ]
 }

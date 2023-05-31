@@ -222,13 +222,13 @@ int RunDfv1(driver_manager_config::Config dm_config,
 
   fbl::unique_fd lib_fd;
   {
-    zx_status_t status = fdio_open_fd("/boot/lib/",
+    zx_status_t status = fdio_open_fd("/pkg/lib/",
                                       static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
                                                             fio::wire::OpenFlags::kRightReadable |
                                                             fio::wire::OpenFlags::kRightExecutable),
                                       lib_fd.reset_and_get_address());
     if (status != ZX_OK) {
-      LOGF(ERROR, "Failed to open /boot/lib/ : %s", zx_status_get_string(status));
+      LOGF(ERROR, "Failed to open /pkg/lib/ : %s", zx_status_get_string(status));
       return status;
     }
   }

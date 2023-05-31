@@ -76,9 +76,9 @@ int RunDfv2(driver_manager_config::Config config,
   constexpr uint32_t kOpenFlags = static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
                                                         fio::wire::OpenFlags::kRightReadable |
                                                         fio::wire::OpenFlags::kRightExecutable);
-  if (zx_status_t status = fdio_open_fd("/boot/lib/", kOpenFlags, lib_fd.reset_and_get_address());
+  if (zx_status_t status = fdio_open_fd("/pkg/lib/", kOpenFlags, lib_fd.reset_and_get_address());
       status != ZX_OK) {
-    LOGF(ERROR, "Failed to open /boot/lib/ : %s", zx_status_get_string(status));
+    LOGF(ERROR, "Failed to open /pkg/lib/ : %s", zx_status_get_string(status));
     return status;
   }
   // The loader needs its own thread because DriverManager makes synchronous calls to the
