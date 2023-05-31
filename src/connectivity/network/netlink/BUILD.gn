@@ -12,6 +12,7 @@ rustc_library("netlink") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//src/connectivity/lib/net-types",
     "//src/lib/fidl/rust/fidl",

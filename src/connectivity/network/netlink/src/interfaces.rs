@@ -6,16 +6,22 @@
 //! RTM_LINK and RTM_ADDR Netlink messages based on events received from
 //! Netstack's interface watcher.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
+};
 
 use anyhow::anyhow;
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 use futures::{pin_mut, StreamExt as _, TryStreamExt as _};
 use netlink_packet_route::{
-    LinkHeader, LinkMessage, AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID,
-    IFF_LOOPBACK, IFF_RUNNING, IFF_UP,
+    AddressHeader, AddressMessage, LinkHeader, LinkMessage, AF_INET, AF_INET6, AF_UNSPEC,
+    ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT, IFF_LOOPBACK,
+    IFF_RUNNING, IFF_UP,
 };
+use netlink_packet_utils::nla::Nla;
 use tracing::debug;
 
 use crate::NETLINK_LOG_TAG;
@@ -349,12 +355,125 @@ impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
     }
 }
 
+#[allow(unused)]
+/// A wrapper type for the netlink_packet_route `AddressMessage` to enable conversions
+/// from [`fnet_interfaces_ext::Properties`] and implement hashing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NetlinkAddressMessage(AddressMessage);
+
+impl Hash for NetlinkAddressMessage {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let NetlinkAddressMessage(message) = self;
+
+        message.header.family.hash(state);
+        message.header.prefix_len.hash(state);
+        message.header.flags.hash(state);
+        message.header.scope.hash(state);
+        message.header.index.hash(state);
+
+        message.nlas.iter().for_each(|nla| {
+            let mut buffer = vec![0u8; nla.value_len() as usize];
+            nla.emit_value(&mut buffer);
+            buffer.hash(state);
+        });
+    }
+}
+
+#[allow(unused)]
+// NetlinkAddressMessage conversion related errors.
+#[derive(Debug, PartialEq)]
+enum NetlinkAddressMessageConversionError {
+    // Interface id could not be downcasted to fit into the expected u32.
+    InvalidInterfaceId(u64),
+}
+
+#[allow(unused)]
+// Implement conversions from `Properties` to `Vec<NetlinkAddressMessage>`
+// which is fallible iff, the interface has an id greater than u32.
+fn interface_properties_to_address_messages(
+    fnet_interfaces_ext::Properties {
+        id,
+        name,
+        addresses,
+        device_class: _,
+        online: _,
+        has_default_ipv4_route: _,
+        has_default_ipv6_route: _,
+    }: fnet_interfaces_ext::Properties,
+) -> Result<HashSet<NetlinkAddressMessage>, NetlinkAddressMessageConversionError> {
+    {
+        // We expect interface ids to safely fit in the range of the u32 values.
+        let id: u32 = match id.get().try_into() {
+            Err(std::num::TryFromIntError { .. }) => {
+                return Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(id.into()))
+            }
+            Ok(id) => id,
+        };
+
+        let address_messages = addresses
+            .into_iter()
+            .map(|fnet_interfaces_ext::Address { addr: subnet, valid_until: _ }| {
+                let mut addr_header = AddressHeader::default();
+
+                let (family, addr) = match subnet.addr {
+                    fnet::IpAddress::Ipv4(ip_addr) => (AF_INET, ip_addr.addr.to_vec()),
+                    fnet::IpAddress::Ipv6(ip_addr) => (AF_INET6, ip_addr.addr.to_vec()),
+                };
+
+                // The possible constants below are in the range of u8-accepted values, so they can
+                // be safely casted to a u8.
+                addr_header.family = family.try_into().expect("should fit into u8");
+                addr_header.prefix_len = subnet.prefix_len;
+                // In the header, flags are stored as u8, and in the NLAs, flags are stored as u32,
+                // requiring casting. There are several possible flags, such as
+                // IFA_F_NOPREFIXROUTE that do not fit into a u8, and are expected to be lost in
+                // the header. This NLA is present in netlink_packet_route but is not shown on the
+                // rtnetlink man page.
+                // TODO(https://issuetracker.google.com/284980862): Determine proper mapping from
+                // Netstack properties to address flags.
+                let flags = IFA_F_PERMANENT;
+                addr_header.flags = flags as u8;
+                addr_header.index = id;
+
+                // The NLA order follows the list that attributes are listed on the
+                // rtnetlink man page.
+                // The following fields are used in the options in the NLA, but they do
+                // not have any corresponding values in `fnet_interfaces_ext::Properties` or
+                // `fnet_interfaces_ext::Address`.
+                //
+                // IFA_LOCAL
+                // IFA_BROADCAST
+                // IFA_ANYCAST
+                // IFA_CACHEINFO
+                //
+                // IFA_MULTICAST is documented via the netlink_packet_route crate but is not
+                // present on the rtnetlink page.
+                let nlas = vec![
+                    netlink_packet_route::address::nlas::Nla::Address(addr),
+                    netlink_packet_route::address::nlas::Nla::Label(name.clone()),
+                    netlink_packet_route::address::nlas::Nla::Flags(flags.into()),
+                ];
+
+                let mut addr_message = AddressMessage::default();
+                addr_message.header = addr_header;
+                addr_message.nlas = nlas;
+                NetlinkAddressMessage(addr_message)
+            })
+            .collect();
+
+        Ok(address_messages)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_hardware_network;
+    use fidl_fuchsia_net as fnet;
     use fuchsia_async::{self as fasync};
+    use net_declare::fidl_ip;
+    use netlink_packet_route::{AddressHeader, AddressMessage, AF_INET, AF_INET6};
     use std::num::NonZeroU64;
     use test_case::test_case;
     const ETHERNET: fnet_interfaces::DeviceClass =
@@ -367,22 +486,39 @@ mod tests {
         fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Ppp);
     const LOOPBACK: fnet_interfaces::DeviceClass =
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
+    const TEST_V4_ADDR: fnet::Subnet = fnet::Subnet { addr: fidl_ip!("192.0.2.0"), prefix_len: 24 };
+    const TEST_V6_ADDR: fnet::Subnet =
+        fnet::Subnet { addr: fidl_ip!("2001:db8::0"), prefix_len: 32 };
 
-    fn create_no_address_interface(
+    fn create_interface(
         id: u64,
         name: String,
         device_class: fnet_interfaces::DeviceClass,
         online: bool,
+        addresses: Vec<fnet_interfaces_ext::Address>,
     ) -> fnet_interfaces_ext::Properties {
         fnet_interfaces_ext::Properties {
             id: NonZeroU64::new(id).unwrap(),
             name,
             device_class,
             online,
-            addresses: vec![],
+            addresses,
             has_default_ipv4_route: false,
             has_default_ipv6_route: false,
         }
+    }
+
+    fn create_interface_with_addresses(
+        id: u64,
+        name: String,
+        device_class: fnet_interfaces::DeviceClass,
+        online: bool,
+    ) -> fnet_interfaces_ext::Properties {
+        let addresses = vec![
+            fnet_interfaces_ext::Address { addr: TEST_V4_ADDR, valid_until: Default::default() },
+            fnet_interfaces_ext::Address { addr: TEST_V6_ADDR, valid_until: Default::default() },
+        ];
+        create_interface(id, name, device_class, online, addresses)
     }
 
     fn create_netlink_link_message(
@@ -420,13 +556,53 @@ mod tests {
         ]
     }
 
+    fn create_default_address_messages(
+        interface_id: u64,
+        interface_name: String,
+        flags: u32,
+    ) -> HashSet<NetlinkAddressMessage> {
+        let interface_id = interface_id.try_into().expect("should fit into u32");
+        HashSet::from_iter([
+            create_address_message(interface_id, TEST_V4_ADDR, interface_name.clone(), flags),
+            create_address_message(interface_id, TEST_V6_ADDR, interface_name, flags),
+        ])
+    }
+
+    fn create_address_message(
+        interface_id: u32,
+        subnet: fnet::Subnet,
+        interface_name: String,
+        flags: u32,
+    ) -> NetlinkAddressMessage {
+        let mut addr_header = AddressHeader::default();
+        let (family, addr) = match subnet.addr {
+            fnet::IpAddress::Ipv4(ip_addr) => (AF_INET, ip_addr.addr.to_vec()),
+            fnet::IpAddress::Ipv6(ip_addr) => (AF_INET6, ip_addr.addr.to_vec()),
+        };
+        addr_header.family = family as u8;
+        addr_header.prefix_len = subnet.prefix_len;
+        addr_header.flags = flags.try_into().expect("should fit into u8");
+        addr_header.index = interface_id;
+
+        let nlas = vec![
+            netlink_packet_route::address::nlas::Nla::Address(addr),
+            netlink_packet_route::address::nlas::Nla::Label(interface_name),
+            netlink_packet_route::address::nlas::Nla::Flags(flags.into()),
+        ];
+
+        let mut addr_message = AddressMessage::default();
+        addr_message.header = addr_header;
+        addr_message.nlas = nlas;
+        NetlinkAddressMessage(addr_message)
+    }
+
     #[fuchsia::test]
     fn test_handle_interface_watcher_event() {
         let mut interface_properties: HashMap<u64, fnet_interfaces_ext::Properties> =
             HashMap::new();
 
-        let mut interface1 = create_no_address_interface(1, "test".into(), ETHERNET, true);
-        let interface2 = create_no_address_interface(2, "lo".into(), LOOPBACK, true);
+        let mut interface1 = create_interface(1, "test".into(), ETHERNET, true, vec![]);
+        let interface2 = create_interface(2, "lo".into(), LOOPBACK, true, vec![]);
 
         let interface1_add_event = fnet_interfaces::Event::Added(interface1.clone().into());
         assert_matches!(
@@ -811,7 +987,7 @@ mod tests {
         let interface_name: String = "test".into();
 
         let interface =
-            create_no_address_interface(interface_id, interface_name.clone(), device_class, online);
+            create_interface(interface_id, interface_name.clone(), device_class, online, vec![]);
         let actual: NetlinkLinkMessage = interface.try_into().unwrap();
 
         let link_layer_type = device_class_to_link_type(device_class);
@@ -821,16 +997,35 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_oversized_interface_id_interface_conversion() {
+    fn test_oversized_interface_id_link_address_conversion() {
         let invalid_interface_id = (u32::MAX as u64) + 1;
         let interface =
-            create_no_address_interface(invalid_interface_id, "test".into(), ETHERNET, true);
+            create_interface(invalid_interface_id, "test".into(), ETHERNET, true, vec![]);
 
-        let actual: Result<NetlinkLinkMessage, NetlinkLinkMessageConversionError> =
-            interface.try_into();
+        let actual_link_message: Result<NetlinkLinkMessage, NetlinkLinkMessageConversionError> =
+            interface.clone().try_into();
         assert_eq!(
-            actual,
+            actual_link_message,
             Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(invalid_interface_id))
         );
+
+        assert_eq!(
+            interface_properties_to_address_messages(interface),
+            Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(invalid_interface_id))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_interface_to_address_conversion() {
+        let interface_name: String = "test".into();
+        let interface_id = 1;
+
+        let interface =
+            create_interface_with_addresses(interface_id, interface_name.clone(), ETHERNET, true);
+        let actual = interface_properties_to_address_messages(interface).unwrap();
+
+        let expected =
+            create_default_address_messages(interface_id, interface_name, IFA_F_PERMANENT);
+        assert_eq!(actual, expected);
     }
 }
