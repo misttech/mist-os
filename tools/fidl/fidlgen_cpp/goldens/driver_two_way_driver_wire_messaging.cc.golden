@@ -166,4 +166,8 @@ void ::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>::
   ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
 }
 
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
 #pragma clang diagnostic pop

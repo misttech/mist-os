@@ -75,11 +75,12 @@ void Dispatch(void* impl, ::fidl::IncomingHeaderAndMessage& msg,
   }
 }
 
-::fidl::OneWayStatus WeakEventSenderInner::SendEvent(::fidl::OutgoingMessage& message) const {
+::fidl::OneWayStatus WeakEventSenderInner::SendEvent(::fidl::OutgoingMessage& message,
+                                                     WriteOptions options) const {
   auto matchers = MatchVariant{
       [&](const std::shared_ptr<AsyncServerBinding>& binding) {
         message.set_txid(0);
-        message.Write(binding->transport());
+        message.Write(binding->transport(), std::move(options));
         if (!message.ok()) {
           HandleSendError(message.error());
           return fidl::OneWayStatus{message.error()};

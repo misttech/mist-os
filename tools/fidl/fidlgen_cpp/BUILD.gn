@@ -29,6 +29,7 @@ if (is_host) {
       "driver/fragment_method_unownedresult.tmpl",
       "driver/fragment_protocol_caller.tmpl",
       "driver/fragment_protocol_client_impl.tmpl",
+      "driver/fragment_protocol_event_sender.tmpl",
       "file_common_types_header.tmpl",
       "file_common_types_source.tmpl",
       "file_hlcpp_conversion.tmpl",

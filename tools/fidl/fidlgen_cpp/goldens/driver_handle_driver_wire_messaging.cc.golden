@@ -49,6 +49,10 @@ void fdf::WireServer<::test_driverhandle::DriverProtocol>::dispatch_message(
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
 namespace test_driverhandle {
 
 [[maybe_unused]] constexpr uint64_t kHandlesInProtocol_SendHandles_Ordinal = 8904504160365833729lu;
@@ -172,6 +176,10 @@ void fdf::WireServer<::test_driverhandle::HandlesInProtocol>::dispatch_message(
 void ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>::_InitHeader() {
   ::fidl::InitTxnHeader(&header, 0, ::test_driverhandle::kHandlesInProtocol_SendHandles_Ordinal, ::test_driverhandle::kHandlesInProtocol_SendHandles_DynamicFlags);
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 

@@ -37,6 +37,7 @@ do not support them in the bindings. */}}
 
 {{- range (call .ProtocolsForTransport "Driver") }}
   {{ template "Protocol:WireMessagingSource" . }}
+  {{ template "Protocol:EventSender:driver/WireMessagingSource" . }}
 {{ end }}
 #pragma clang diagnostic pop
 {{ end }}{{/* if not SingleComponentLibraryName */}}

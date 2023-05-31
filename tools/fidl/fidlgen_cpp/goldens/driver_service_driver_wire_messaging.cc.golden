@@ -49,4 +49,8 @@ void fdf::WireServer<::test_driverservice::SomeDriverProtocol>::dispatch_message
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
 #pragma clang diagnostic pop

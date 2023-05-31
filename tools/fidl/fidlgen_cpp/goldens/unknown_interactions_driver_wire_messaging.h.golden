@@ -10759,9 +10759,30 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_unknowninteractions::Unkno
 
 #endif  // __Fuchsia__
 
+
+    }  // namespace fidl
+
+#ifdef __Fuchsia__
+template<>
+class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::UnknownInteractionsDriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
+ public:
+  using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
+
+};
+
+template<>
+class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::UnknownInteractionsDriverProtocol>
+    : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireBufferEventSender<::test_unknowninteractions::UnknownInteractionsDriverProtocol>> {
+ public:
+  using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
+
+};
+
+#endif  // __Fuchsia__
+
     
 #ifdef __Fuchsia__
-}  // namespace fidl
+
 
 
 template<>
@@ -10876,13 +10897,34 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_unknowninteractions::Unkno
   
   // Allocates 16 bytes of request buffer on the stack. Response is heap-allocated.
   ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr> StrictTwoWayTableErr();
-};namespace fidl {
+};
+
+#endif  // __Fuchsia__
+
+
+    
+
+#ifdef __Fuchsia__
+template<>
+class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
+ public:
+  using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
+
+};
+
+template<>
+class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>
+    : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireBufferEventSender<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>> {
+ public:
+  using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
+
+};
 
 #endif  // __Fuchsia__
 
     
 #ifdef __Fuchsia__
-}  // namespace fidl
+
 
 
 template<>
@@ -10990,12 +11032,33 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_unknowninteractions::Unkno
   
   // Allocates 16 bytes of request buffer on the stack. Response is heap-allocated.
   ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr> StrictTwoWayTableErr();
-};namespace fidl {
+};
+
+#endif  // __Fuchsia__
+
+
+    
+
+#ifdef __Fuchsia__
+template<>
+class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
+ public:
+  using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
+
+};
+
+template<>
+class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>
+    : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireBufferEventSender<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>> {
+ public:
+  using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
+
+};
 
 #endif  // __Fuchsia__
 
 
   #pragma clang diagnostic pop
 
-  }  // namespace fidl
+  
 

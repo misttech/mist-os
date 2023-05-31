@@ -6,6 +6,7 @@
 #define LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_
 
 #include <lib/fidl/cpp/wire/sync_call.h>
+#include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/transport.h>
 
 namespace fdf {
@@ -52,8 +53,12 @@ struct SyncEndpointBufferVeneer {
 // |FidlProtocol| should be the protocol marker.
 //
 // It must not outlive the borrowed endpoint.
-template <typename FidlProtocol>
+template <template <typename FidlProtocol> class SyncImpl, typename FidlProtocol>
 class SyncEndpointVeneer final {
+ private:
+  using CallerAllocatingImpl =
+      typename ::fidl::internal::CallerAllocatingImpl<SyncImpl, FidlProtocol>::Type;
+
  public:
   explicit SyncEndpointVeneer(fidl::internal::AnyUnownedTransport transport)
       : transport_(std::move(transport)) {}
@@ -62,13 +67,30 @@ class SyncEndpointVeneer final {
   // the provided |arena| to allocate buffers necessary for each call.
   // The requests and responses (if applicable) will live on the arena.
   auto buffer(const fdf::Arena& arena) {
-    return SyncEndpointBufferVeneer<fidl::internal::WireSyncBufferClientImpl<FidlProtocol>>(
-        transport_, arena);
+    return SyncEndpointBufferVeneer<CallerAllocatingImpl>(transport_, arena);
   }
 
  private:
   fidl::internal::AnyUnownedTransport transport_;
 };
+
+template <template <typename FidlProtocol> class SyncImpl, typename FidlProtocol>
+class WeakEventSenderVeneer final {
+ public:
+  explicit WeakEventSenderVeneer(fidl::internal::WeakServerBindingRef binding)
+      : binding_(std::move(binding)) {}
+
+  // Returns a veneer object which exposes the caller-allocating API, using
+  // the provided |arena| to allocate buffers necessary for each event.
+  // See documentation on |SyncEndpointVeneer::buffer| for detailed behavior.
+  auto buffer(const fdf::Arena& arena) const {
+    return fidl::internal::Arrow<SyncImpl<FidlProtocol>>(binding_, arena);
+  }
+
+ private:
+  fidl::internal::WeakServerBindingRef binding_;
+};
+
 }  // namespace internal
 
 // |fdf::WireSyncClient| owns a client endpoint and exposes synchronous FIDL
@@ -190,9 +212,9 @@ WireSyncClient(ClientEnd<FidlProtocol>) -> WireSyncClient<FidlProtocol>;
 //     fdf::WireCall(client_end).buffer(arena)->Method(args...);
 //
 template <typename FidlProtocol>
-fdf::internal::SyncEndpointVeneer<FidlProtocol> WireCall(
+fdf::internal::SyncEndpointVeneer<fidl::internal::WireSyncClientImpl, FidlProtocol> WireCall(
     const ClientEnd<FidlProtocol>& client_end) {
-  return fdf::internal::SyncEndpointVeneer<FidlProtocol>(
+  return fdf::internal::SyncEndpointVeneer<fidl::internal::WireSyncClientImpl, FidlProtocol>(
       fidl::internal::MakeAnyUnownedTransport(client_end.borrow().handle()));
 }
 
@@ -203,10 +225,61 @@ fdf::internal::SyncEndpointVeneer<FidlProtocol> WireCall(
 //     fdf::WireCall(client_end).buffer(arena)->Method(args...);
 //
 template <typename FidlProtocol>
-fdf::internal::SyncEndpointVeneer<FidlProtocol> WireCall(
+fdf::internal::SyncEndpointVeneer<fidl::internal::WireSyncClientImpl, FidlProtocol> WireCall(
     const UnownedClientEnd<FidlProtocol>& client_end) {
-  return fdf::internal::SyncEndpointVeneer<FidlProtocol>(
+  return fdf::internal::SyncEndpointVeneer<fidl::internal::WireSyncClientImpl, FidlProtocol>(
       fidl::internal::MakeAnyUnownedTransport(client_end.handle()));
+}
+
+// Return an interface for sending FIDL events containing wire domain objects
+// over the endpoint managed by |binding_ref|. Call it like:
+//
+//     fdf::WireSendEvent(server_binding_ref)->FooEvent(args...);
+//
+template <typename FidlProtocol>
+fdf::internal::WeakEventSenderVeneer<fidl::internal::WireWeakBufferEventSender, FidlProtocol>
+WireSendEvent(const ServerBindingRef<FidlProtocol>& binding_ref) {
+  return fdf::internal::WeakEventSenderVeneer<fidl::internal::WireWeakBufferEventSender,
+                                              FidlProtocol>(fidl::internal::BorrowBinding(
+      static_cast<const fidl::internal::ServerBindingRefBase&>(binding_ref)));
+}
+
+// Return an interface for sending FIDL events containing wire domain objects
+// over the endpoint managed by |binding|. Call it like:
+//
+//     fdf::ServerBinding<SomeProtocol> server_binding_{...};
+//     fdf::WireSendEvent(server_binding_)->FooEvent(args...);
+//
+template <typename FidlProtocol>
+fdf::internal::WeakEventSenderVeneer<fidl::internal::WireWeakBufferEventSender, FidlProtocol>
+WireSendEvent(const ServerBinding<FidlProtocol>& binding) {
+  return fdf::internal::WeakEventSenderVeneer<fidl::internal::WireWeakBufferEventSender,
+                                              FidlProtocol>(fidl::internal::BorrowBinding(
+      static_cast<const fidl::internal::ServerBindingBase<FidlProtocol>&>(binding)));
+}
+
+// Return an interface for sending FIDL events containing wire domain objects
+// over |server_end|. Call it like:
+//
+//     fdf::WireSendEvent(server_end)->FooEvent(args...);
+//
+template <typename FidlProtocol>
+internal::SyncEndpointVeneer<fidl::internal::WireEventSender, FidlProtocol> WireSendEvent(
+    const ServerEnd<FidlProtocol>& server_end) {
+  return internal::SyncEndpointVeneer<fidl::internal::WireEventSender, FidlProtocol>(
+      fidl::internal::MakeAnyUnownedTransport(server_end.channel()));
+}
+
+// Return an interface for sending FIDL events containing wire domain objects
+// over |server_end|. Call it like:
+//
+//     fdf::WireSendEvent(server_end)->FooEvent(args...);
+//
+template <typename FidlProtocol>
+internal::SyncEndpointVeneer<fidl::internal::WireEventSender, FidlProtocol> WireSendEvent(
+    UnownedServerEnd<FidlProtocol> server_end) {
+  return internal::SyncEndpointVeneer<fidl::internal::WireEventSender, FidlProtocol>(
+      fidl::internal::MakeAnyUnownedTransport(server_end.handle()));
 }
 }  // namespace fdf
 

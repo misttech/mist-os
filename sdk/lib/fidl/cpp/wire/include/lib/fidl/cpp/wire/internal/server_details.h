@@ -128,7 +128,7 @@ class WeakEventSenderInner {
   // |message| will have its transaction ID set to zero.
   //
   // Errors are returned to the caller.
-  fidl::OneWayStatus SendEvent(::fidl::OutgoingMessage& message) const;
+  fidl::OneWayStatus SendEvent(::fidl::OutgoingMessage& message, WriteOptions options = {}) const;
 
   // Handles errors in sending events. This may lead to binding teardown.
   void HandleSendError(fidl::Status error) const;

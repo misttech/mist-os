@@ -474,6 +474,22 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-#pragma clang diagnostic pop
-
 }  // namespace fidl
+
+#ifdef __Fuchsia__
+template <>
+class ::fidl::internal::WireWeakBufferEventSender<::test_drivertwoway::TwoWay> : public ::fdf::internal::WeakBufferEventSenderBase {
+ public:
+  using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
+};
+
+template <>
+class ::fidl::internal::WireBufferEventSender<::test_drivertwoway::TwoWay>
+    : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireBufferEventSender<::test_drivertwoway::TwoWay>> {
+ public:
+  using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
+};
+
+#endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

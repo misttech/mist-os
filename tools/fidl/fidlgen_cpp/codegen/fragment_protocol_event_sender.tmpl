@@ -51,8 +51,8 @@ class {{ .WireEventSender }}
 };
 
 template<>
-class {{ .InternalWireBufferEventSender }}
-    : public ::fidl::internal::SyncEndpointBufferVeneer<{{ .InternalWireBufferEventSender }}> {
+class {{ .WireBufferEventSender }}
+    : public ::fidl::internal::SyncEndpointBufferVeneer<{{ .WireBufferEventSender }}> {
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 {{ "" }}
@@ -118,7 +118,7 @@ fidl::OneWayStatus {{ $.WireEventSender.NoLeading }}::{{ .Name }}(
 
     {{- /* Caller-allocated */}}
 {{ "" }}
-fidl::OneWayStatus {{ $.InternalWireBufferEventSender.NoLeading }}::{{ .Name }}(
+fidl::OneWayStatus {{ $.WireBufferEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<{{ .Marker }}>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =

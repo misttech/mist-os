@@ -401,8 +401,25 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 }  // namespace fidl
+
+#ifdef __Fuchsia__
+template <>
+class ::fidl::internal::WireWeakBufferEventSender<::test_driverhandle::DriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
+ public:
+  using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
+};
+
+template <>
+class ::fidl::internal::WireBufferEventSender<::test_driverhandle::DriverProtocol>
+    : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireBufferEventSender<::test_driverhandle::DriverProtocol>> {
+ public:
+  using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverhandle::HandlesInProtocol> : public ::fdf::internal::BufferClientImplBase {
@@ -437,10 +454,23 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driverhandle::HandlesInPro
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+template <>
+class ::fidl::internal::WireWeakBufferEventSender<::test_driverhandle::HandlesInProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
+ public:
+  using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
+};
+
+template <>
+class ::fidl::internal::WireBufferEventSender<::test_driverhandle::HandlesInProtocol>
+    : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireBufferEventSender<::test_driverhandle::HandlesInProtocol>> {
+ public:
+  using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
+};
 
 #endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

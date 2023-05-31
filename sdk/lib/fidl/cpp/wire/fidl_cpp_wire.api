@@ -26,7 +26,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/intrusive_container/wavl_tree.h": "39eb6d96e5d7c7a1b47930cea85a962f",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/intrusive_container/wavl_tree_internal.h": "83b29df78e334e1325d9d94198924239",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/make_response_context.h": "f6cc02ff60043349d7ec40f2ee102185",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/server_details.h": "6cd7faf2ad0924ed1eef665bc51034a0",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/server_details.h": "d159958fdd9649751ab5e30fa50b4cfd",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/synchronization_checker.h": "4c143e8c9eb85bb4cf0e2c35d3d9cd0a",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/thenable.h": "3f0ac164703381f05766132068212c9e",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/transport.h": "bd1b299b9195bbdf08404e358145d828",

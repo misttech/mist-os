@@ -76,3 +76,11 @@ protocol OnErrorCloseHandlesTest {
         h client_end:OneWayTest;
     });
 };
+
+@transport("Driver")
+protocol SendEventTest {
+    // Send an event.
+    -> OnSendEvent(resource struct {
+        s string:10;
+    });
+};

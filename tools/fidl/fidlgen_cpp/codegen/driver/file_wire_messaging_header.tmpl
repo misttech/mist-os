@@ -58,6 +58,9 @@ fidl/{{ .LibraryDots }}/cpp/driver/wire_messaging.h
 
   {{- range (call .ProtocolsForTransport "Driver") }}
     {{ template "Protocol:ClientImpl:driver/MessagingHeader" . }}
+
+    {{ template "Protocol:EventSender:driver/WireMessagingHeader" . }}
+
   {{- end }}
 
   #pragma clang diagnostic pop

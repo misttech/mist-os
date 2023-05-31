@@ -2391,6 +2391,14 @@ void ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownI
   }
     
     
+  
+
+
+#ifdef __Fuchsia__
+
+
+#endif  // __Fuchsia__
+
 
   
 
@@ -3707,6 +3715,14 @@ void ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownI
   }
     
     
+  
+
+
+#ifdef __Fuchsia__
+
+
+#endif  // __Fuchsia__
+
 
   
 
@@ -4896,6 +4912,14 @@ void ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownI
   }
     
     
+  
+
+
+#ifdef __Fuchsia__
+
+
+#endif  // __Fuchsia__
+
 
 #pragma clang diagnostic pop
 

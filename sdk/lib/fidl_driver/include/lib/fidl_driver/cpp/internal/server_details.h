@@ -6,11 +6,28 @@
 #define LIB_FIDL_DRIVER_CPP_INTERNAL_SERVER_DETAILS_H_
 
 #include <lib/fdf/cpp/arena.h>
+#include <lib/fidl/cpp/wire/async_binding.h>
+#include <lib/fidl/cpp/wire/internal/server_details.h>
 #include <lib/fidl/cpp/wire/transaction.h>
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
 #include <lib/fidl_driver/cpp/wire_messaging_declarations.h>
 
 namespace fdf::internal {
+
+// Base class for all weak event senders with caller-controlled memory allocation.
+struct WeakBufferEventSenderBase {
+  explicit WeakBufferEventSenderBase(fidl::internal::WeakServerBindingRef binding,
+                                     const fdf::Arena& arena)
+      : inner_(std::move(binding)), arena_(arena) {}
+
+ protected:
+  fidl::internal::WeakEventSenderInner& _inner() { return inner_; }
+  const fdf::Arena& _arena() { return arena_; }
+
+ private:
+  fidl::internal::WeakEventSenderInner inner_;
+  const fdf::Arena& arena_;
+};
 
 // A base class that adds the ability to set and get a contained |fdf::Arena&|.
 class BufferCompleterImplBase {
