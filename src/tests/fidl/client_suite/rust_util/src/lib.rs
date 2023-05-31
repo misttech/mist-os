@@ -44,3 +44,18 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         _ => FidlErrorKind::OtherError,
     }
 }
+
+/// Returns the FIDL method name for a request/event enum value.
+// TODO(fxbug.dev/127952): Provide this in FIDL bindings.
+pub fn method_name(request_or_event: &impl std::fmt::Debug) -> String {
+    let mut string = format!("{:?}", request_or_event);
+    let len = string.find('{').unwrap_or(string.len());
+    let len = string[..len].trim_end().len();
+    string.truncate(len);
+    assert!(
+        string.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
+        "failed to parse the method name from {:?}",
+        request_or_event
+    );
+    string
+}

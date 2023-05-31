@@ -14,7 +14,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/tests/fidl/server_suite/fidl:fidl.serversuite_rust",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//zircon/vdso/zx:zx_rust",
   ]
