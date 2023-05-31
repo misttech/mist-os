@@ -13,6 +13,7 @@ zx_library("gpt") {
     "gpt/guid.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/lib/fit-promise",
     "//src/lib/uuid",

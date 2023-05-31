@@ -2083,8 +2083,8 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
         component::Clone(gpt_dev->block_interface(), component::AssumeProtocolComposesNode);
     ASSERT_OK(clone);
     std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()), gpt_dev->block_size(),
-                                     gpt_dev->block_count(), &gpt));
+    ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()), gpt_dev->block_size(),
+                                                 gpt_dev->block_count(), &gpt));
     ASSERT_OK(gpt->Sync());
 
     for (const auto& part : init_partitions) {

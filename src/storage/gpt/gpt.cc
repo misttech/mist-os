@@ -649,6 +649,7 @@ zx_status_t GptDevice::GetDiffs(uint32_t idx, uint32_t* diffs) const {
 }
 
 zx_status_t GptDevice::Init(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                            fidl::ClientEnd<fuchsia_device::Controller> controller,
                             uint32_t blocksize, uint64_t block_count,
                             std::unique_ptr<GptDevice>* out_dev) {
   off_t offset;
@@ -689,14 +690,22 @@ zx_status_t GptDevice::Init(fidl::ClientEnd<fuchsia_hardware_block::Block> devic
     dev->blocks_ = block_count;
   }
   dev->device_ = std::move(device);
+  dev->controller_ = std::move(controller);
   *out_dev = std::move(dev);
   return ZX_OK;
 }
 
 zx_status_t GptDevice::Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                              fidl::ClientEnd<fuchsia_device::Controller> controller,
                               uint32_t blocksize, uint64_t blocks,
                               std::unique_ptr<GptDevice>* out) {
-  return Init(std::move(device), blocksize, blocks, out);
+  return Init(std::move(device), std::move(controller), blocksize, blocks, out);
+}
+
+zx_status_t GptDevice::CreateNoController(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                                          uint32_t blocksize, uint64_t blocks,
+                                          std::unique_ptr<GptDevice>* out_dev) {
+  return Create(std::move(device), {}, blocksize, blocks, out_dev);
 }
 
 zx_status_t GptDevice::Load(const uint8_t* buffer, uint64_t buffer_size, uint32_t blocksize,

@@ -407,9 +407,9 @@ class GptDevicePartitionerTests : public zxtest::Test {
     zx::result clone =
         component::Clone(device->block_interface(), component::AssumeProtocolComposesNode);
     ASSERT_OK(clone);
-    ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()),
-                                     /*blocksize=*/device->block_size(),
-                                     /*blocks=*/device->block_count(), gpt));
+    ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()),
+                                                 /*blocksize=*/device->block_size(),
+                                                 /*blocks=*/device->block_count(), gpt));
     ASSERT_OK((*gpt)->Sync());
   }
 
@@ -554,7 +554,8 @@ TEST_F(EfiDevicePartitionerTests, InitializeWithoutFvmSucceeds) {
       component::Clone(gpt_dev->block_interface(), component::AssumeProtocolComposesNode);
   ASSERT_OK(clone);
   std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()), kBlockSize, kBlockCount, &gpt));
+  ASSERT_OK(
+      gpt::GptDevice::CreateNoController(std::move(clone.value()), kBlockSize, kBlockCount, &gpt));
   ASSERT_OK(gpt->Sync());
 
   ASSERT_OK(CreatePartitioner(kDummyDevice));
@@ -578,7 +579,8 @@ TEST_F(EfiDevicePartitionerTests, InitializeTwoCandidatesWithoutFvmFails) {
       component::Clone(gpt_dev->block_interface(), component::AssumeProtocolComposesNode);
   ASSERT_OK(clone);
   std::unique_ptr<gpt::GptDevice> gpt2;
-  ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()), kBlockSize, kBlockCount, &gpt2));
+  ASSERT_OK(
+      gpt::GptDevice::CreateNoController(std::move(clone.value()), kBlockSize, kBlockCount, &gpt2));
   ASSERT_OK(gpt2->Sync());
 
   ASSERT_NOT_OK(CreatePartitioner(kDummyDevice));

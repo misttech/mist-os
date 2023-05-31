@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_GPT_INCLUDE_GPT_GPT_H_
 #define SRC_STORAGE_GPT_INCLUDE_GPT_GPT_H_
 
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/result.h>
@@ -124,8 +125,14 @@ zx::result<> GetPartitionName(const gpt_entry_t& entry, char* name, size_t capac
 class GptDevice {
  public:
   static zx_status_t Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                            fidl::ClientEnd<fuchsia_device::Controller> controller,
                             uint32_t blocksize, uint64_t blocks,
                             std::unique_ptr<GptDevice>* out_dev);
+
+  // TODO(fxbug.dev/127870): Remove this API to remove controller multiplexing.
+  static zx_status_t CreateNoController(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                                        uint32_t blocksize, uint64_t blocks,
+                                        std::unique_ptr<GptDevice>* out_dev);
 
   // Loads gpt header and gpt entries array from |buffer| of length |size|
   // belonging to "block device" with |blocks| number of blocks and each
@@ -240,8 +247,10 @@ class GptDevice {
   zx_status_t FinalizeAndSync(bool persist);
 
   // read the partition table from the device.
-  static zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_block::Block> device, uint32_t blocksize,
-                          uint64_t block_count, std::unique_ptr<GptDevice>* out_dev);
+  static zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                          fidl::ClientEnd<fuchsia_device::Controller> controller,
+                          uint32_t blocksize, uint64_t block_count,
+                          std::unique_ptr<GptDevice>* out_dev);
 
   zx_status_t LoadEntries(const uint8_t* buffer, uint64_t buffer_size, uint64_t block_count);
 
@@ -258,6 +267,7 @@ class GptDevice {
 
 #ifdef __Fuchsia__
   fidl::ClientEnd<fuchsia_hardware_block::Block> device_;
+  fidl::ClientEnd<fuchsia_device::Controller> controller_;
 #endif
 
   // block size in bytes

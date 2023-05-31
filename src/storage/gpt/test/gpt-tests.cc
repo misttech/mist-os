@@ -358,7 +358,8 @@ class LibGptTest {
   void Reset() {
     zx::result device = component::Connect<fuchsia_hardware_block::Block>(disk_path_);
     ASSERT_OK(device);
-    ASSERT_OK(GptDevice::Create(std::move(device.value()), GetBlockSize(), GetBlockCount(), &gpt_));
+    ASSERT_OK(GptDevice::CreateNoController(std::move(device.value()), GetBlockSize(),
+                                            GetBlockCount(), &gpt_));
   }
 
   // Finalize uninitialized disk and verify.
@@ -490,7 +491,8 @@ class LibGptTest {
     blk_count_ = response.value()->info.block_count;
 
     ASSERT_GE(GetDiskSize(), kAcceptableMinimumSize, "Insufficient disk space for tests");
-    ASSERT_OK(GptDevice::Create(std::move(device.value()), GetBlockSize(), GetBlockCount(), &gpt_));
+    ASSERT_OK(GptDevice::CreateNoController(std::move(device.value()), GetBlockSize(),
+                                            GetBlockCount(), &gpt_));
   }
 
   // Create and initialize and ramdisk.

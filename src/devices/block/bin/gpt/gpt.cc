@@ -137,8 +137,8 @@ std::unique_ptr<GptDevice> Init(const char* dev) {
   printf("blocksize=0x%X blocks=%" PRIu64 "\n", info.block_size, info.block_count);
 
   std::unique_ptr<GptDevice> gpt;
-  if (zx_status_t status =
-          GptDevice::Create(std::move(block.value()), info.block_size, info.block_count, &gpt);
+  if (zx_status_t status = GptDevice::CreateNoController(std::move(block.value()), info.block_size,
+                                                         info.block_count, &gpt);
       status != ZX_OK) {
     fprintf(stderr, "gpt: error initializing GPT from %s: %s\n", dev, zx_status_get_string(status));
     return nullptr;

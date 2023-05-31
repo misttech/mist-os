@@ -218,8 +218,8 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
   const fuchsia_hardware_block::wire::BlockInfo& info = response.value()->info;
 
   std::unique_ptr<GptDevice> gpt;
-  if (GptDevice::Create(std::move(device.value()), info.block_size, info.block_count, &gpt) !=
-      ZX_OK) {
+  if (GptDevice::CreateNoController(std::move(device.value()), info.block_size, info.block_count,
+                                    &gpt) != ZX_OK) {
     ERROR("Failed to get GPT info\n");
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -291,8 +291,8 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     }
 
     std::unique_ptr<GptDevice> gpt;
-    if (GptDevice::Create(std::move(device.value()), info.block_size, info.block_count, &gpt) !=
-        ZX_OK) {
+    if (GptDevice::CreateNoController(std::move(device.value()), info.block_size, info.block_count,
+                                      &gpt) != ZX_OK) {
       ERROR("Failed to get GPT info\n");
       return zx::error(ZX_ERR_BAD_STATE);
     }

@@ -135,9 +135,9 @@ class ChromebookX64AbrTests : public zxtest::Test {
         component::Clone(disk_->block_interface(), component::AssumeProtocolComposesNode);
     ASSERT_OK(clone);
     std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()),
-                                     /*blocksize=*/disk_->block_size(),
-                                     /*blocks=*/disk_->block_count(), &gpt));
+    ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()),
+                                                 /*blocksize=*/disk_->block_size(),
+                                                 /*blocks=*/disk_->block_count(), &gpt));
     ASSERT_OK(gpt->Sync());
     // 2 (GPT header and MBR header) blocks + number of blocks in entry array.
     uint64_t cur_start = 2 + gpt->EntryArrayBlockCount();
@@ -261,9 +261,9 @@ TEST_F(ChromebookX64AbrTests, AbrAlwaysMarksRSuccessful) {
       component::Clone(disk_->block_interface(), component::AssumeProtocolComposesNode);
   ASSERT_OK(clone);
   std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()),
-                                   /*blocksize=*/disk_->block_size(),
-                                   /*blocks=*/disk_->block_count(), &gpt));
+  ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()),
+                                               /*blocksize=*/disk_->block_size(),
+                                               /*blocks=*/disk_->block_count(), &gpt));
   gpt_partition_t* part = GetPartitionByName(gpt, GPT_ZIRCON_R_NAME);
   ASSERT_NE(part, nullptr);
   ASSERT_TRUE(gpt_cros_attr_get_successful(part->flags));
@@ -294,9 +294,9 @@ class CurrentSlotUuidTest : public zxtest::Test {
     zx::result clone =
         component::Clone(disk_->block_interface(), component::AssumeProtocolComposesNode);
     ASSERT_OK(clone);
-    ASSERT_OK(gpt::GptDevice::Create(std::move(clone.value()),
-                                     /*blocksize=*/disk_->block_size(),
-                                     /*blocks=*/disk_->block_count(), &gpt_));
+    ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()),
+                                                 /*blocksize=*/disk_->block_size(),
+                                                 /*blocks=*/disk_->block_count(), &gpt_));
     ASSERT_OK(gpt_->Sync());
     ASSERT_OK(gpt_->AddPartition(partition, kZirconType, kTestUuid,
                                  2 + gpt_->EntryArrayBlockCount(), 10, 0));
