@@ -50,7 +50,6 @@ class Endpoint : public fuchsia::netemul::network::Endpoint,
   void GetProxy(fidl::InterfaceRequest<FProxy> proxy) override;
 
   // fuchsia.netemul.network/DeviceProxy FIDL APIs.
-  void ServeMultiplexedDevice(zx::channel channel) override;
   void ServeController(fidl::InterfaceRequest<fuchsia::device::Controller> controller) override;
   void ServeDevice(
       fidl::InterfaceRequest<fuchsia::hardware::network::DeviceInstance> device) override;

@@ -47,7 +47,6 @@ class EndpointImpl : public data::Consumer {
 
   virtual void SetLinkUp(bool up, fit::callback<void()> done) = 0;
 
-  virtual void ServeMultiplexedDevice(zx::channel req) = 0;
   virtual void ServeDevice(
       ::fidl::InterfaceRequest<::fuchsia::hardware::network::DeviceInstance> device) = 0;
   virtual void ServeController(
@@ -148,12 +147,6 @@ class NetworkDeviceImpl : public EndpointImpl,
 
   void GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> port) override {
     tun_port_->GetPort(std::move(port));
-  }
-
-  void ServeMultiplexedDevice(zx::channel req) override {
-    instance_bindings_.AddBinding(
-        this,
-        fidl::InterfaceRequest<fuchsia::netemul::internal::NetworkDeviceInstance>(std::move(req)));
   }
 
   void ServeDevice(
@@ -322,10 +315,6 @@ void Endpoint::GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> 
 
 void Endpoint::GetProxy(fidl::InterfaceRequest<FProxy> proxy) {
   proxy_bindings_.AddBinding(this, std::move(proxy), parent_->dispatcher());
-}
-
-void Endpoint::ServeMultiplexedDevice(zx::channel channel) {
-  impl_->ServeMultiplexedDevice(std::move(channel));
 }
 
 void Endpoint::ServeController(::fidl::InterfaceRequest<::fuchsia::device::Controller> controller) {

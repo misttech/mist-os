@@ -157,15 +157,6 @@ closed protocol Network {
 
 /// Simple interface to serve devices over fidl.
 closed protocol DeviceProxy {
-    // TODO(https://fxbug.dev/127876): Remove this.
-    /// Serves the devices' protocol, with the fuchsia.device/Controller protocol multiplexed on
-    /// the same channel. This is technically serving
-    /// fuchsia.netemul.internal/NetworkDeviceInstance, but the type is erased so that FIDL library
-    /// does not gain more dependencies.
-    strict ServeMultiplexedDevice(resource struct {
-        req zx.Handle:CHANNEL;
-    });
-
     /// Serve the Controller protocol for this device.
     strict ServeController(resource struct {
         req server_end:fuchsia.device.Controller;

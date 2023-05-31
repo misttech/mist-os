@@ -520,10 +520,8 @@ impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
     ) {
         // If we are opening the device directly we get the device protocol.
         if path.is_dot() || path.is_empty() {
-            let () = self
-                .device
-                .serve_multiplexed_device(server_end.into_channel())
-                .unwrap_or_else(|e| {
+            let () =
+                self.device.serve_device(server_end.into_channel().into()).unwrap_or_else(|e| {
                     // PEER_CLOSED errors are expected
                     // to happen during test teardown.
                     if e.is_closed() {

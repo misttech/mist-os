@@ -4,7 +4,6 @@
 
 use std::fmt::Display;
 
-use fidl::endpoints::Proxy;
 use fidl_fuchsia_device as fdev;
 use fidl_fuchsia_hardware_network as fhwnet;
 use fuchsia_zircon as zx;
@@ -295,8 +294,8 @@ impl NetworkDeviceInstance {
 /// Returns the topological path for a device located at `filepath`, `filepath`
 /// converted to `String`, and a proxy to `S`.
 ///
-/// It is expected that the node at `filepath` implements `fuchsia.device/Controller`
-/// and `S`.
+/// It is expected that the node at `filepath` implements `S`,
+/// and that the node at `filepath` + `/device_controller` implements `fuchsia.device/Controller`.
 async fn get_topo_path_and_device<S: fidl::endpoints::ProtocolMarker>(
     filepath: &std::path::PathBuf,
 ) -> Result<(String, String, S::Proxy), errors::Error> {
@@ -309,8 +308,9 @@ async fn get_topo_path_and_device<S: fidl::endpoints::ProtocolMarker>(
     let (controller, req) = fidl::endpoints::create_proxy::<fdev::ControllerMarker>()
         .context("error creating fuchsia.device.Controller proxy")
         .map_err(errors::Error::Fatal)?;
-    fdio::service_connect(filepath, req.into_channel().into())
-        .with_context(|| format!("error calling fdio::service_connect({})", filepath))
+    let controller_path = format!("{filepath}/device_controller");
+    fdio::service_connect(&controller_path, req.into_channel().into())
+        .with_context(|| format!("error calling fdio::service_connect({})", controller_path))
         .map_err(errors::Error::NonFatal)?;
     let topological_path = controller
         .get_topological_path()
@@ -321,16 +321,13 @@ async fn get_topo_path_and_device<S: fidl::endpoints::ProtocolMarker>(
         .context("error getting topological path")
         .map_err(errors::Error::NonFatal)?;
 
-    // The same channel is expected to implement `S`.
-    let ch = controller
-        .into_channel()
-        .map_err(|_: fdev::ControllerProxy| anyhow::anyhow!("failed to get controller's channel"))
-        .map_err(errors::Error::Fatal)?
-        .into_zx_channel();
-    let device = fidl::endpoints::ClientEnd::<S>::new(ch)
-        .into_proxy()
-        .context("error getting client end proxy")
+    // Now connect to the device channel.
+    let (device, req) = fidl::endpoints::create_proxy::<S>()
+        .context("error creating fuchsia.device.Controller proxy")
         .map_err(errors::Error::Fatal)?;
+    fdio::service_connect(filepath, req.into_channel().into())
+        .with_context(|| format!("error calling fdio::service_connect({})", filepath))
+        .map_err(errors::Error::NonFatal)?;
 
     Ok((topological_path, filepath.to_string(), device))
 }
