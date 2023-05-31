@@ -227,6 +227,15 @@ if (current_os == "fuchsia") {
 
 support_rust = zircon_toolchain == false
 
+if (defined(toolchain_variant.is_basic) && toolchain_variant.is_basic) {
+  # The toolchains created by `basic_toolchain()` do not support c/cpp/rust.
+  toolchain_variant.supports_cpp = false
+  toolchain_variant.supports_rust = false
+} else {
+  toolchain_variant.supports_cpp = true
+  toolchain_variant.supports_rust = support_rust
+}
+
 # Some library targets may be built as different type depending on the target
 # platform. This variable specifies the default library type for each target.
 if (is_fuchsia) {

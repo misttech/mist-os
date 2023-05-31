@@ -2,21 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/c/fidl_c.gni")
-import("//build/cpp/fidl_cpp.gni")
-import("//build/dart/fidl_dart.gni")
+# First, import the gni files that define the names of the other toolchains, and
+# the "is_<foo>_toolchain" variables that are used throughout this file.
 import("//build/dart/toolchain.gni")
-import("//build/fidl/fidl_library.gni")
 import("//build/fidl/toolchain.gni")
-import("//build/go/fidl_go.gni")
 import("//build/go/toolchain.gni")
-import("//zircon/tools/zither/zither_library.gni")
 
-if (support_rust) {
-  import("//build/banjo/fidl_banjo.gni")
-  import("//build/bind/fidl_bind_library.gni")
-  import("//build/rust/fidl_rust.gni")
-}
+# NOTE: The imports of this gni file are dependent on the language used, as
+# there is no need to import the templates for the other languages when
+# processing this file in a given language's toolchain.  They are done only
+# within the scopes as needed below.
 
 # Declares a FIDL library.
 #
@@ -166,9 +161,6 @@ template("fidl") {
                "enable_zither",
              ])
 
-  is_go = current_toolchain == go_toolchain
-  is_dart = current_toolchain == dart_toolchain
-
   # Allow generated targets visibility to their dependant generated targets
   if (defined(invoker.visibility)) {
     invoker.visibility += [ ":*" ]
@@ -182,7 +174,9 @@ template("fidl") {
     "goldens_dir",
     "non_fidl_deps",
   ]
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
+    # Only import the fidl_library template when in the fidl toolchain
+    import("//build/fidl/fidl_library.gni")
     fidl_library(target_name) {
       forward_variables_from(invoker,
                              fidl_only + [
@@ -208,7 +202,11 @@ template("fidl") {
   }
 
   dart_only = [ "dart_analysis" ]
-  if (is_dart) {
+  if (is_dart_toolchain) {
+    # Only import the fidl_dart() template when in the Dart toolchain.
+    import("//build/dart/fidl_dart.gni")
+
+    # Define the Dart bindings
     fidl_dart("${target_name}_dart") {
       forward_variables_from(invoker,
                              dart_only + [
@@ -224,7 +222,11 @@ template("fidl") {
     not_needed(invoker, dart_only + [ "sources" ])
   }
 
-  if (is_go) {
+  if (is_go_toolchain) {
+    # Only import the fidl_go() template when in the Go toolchain.
+    import("//build/go/fidl_go.gni")
+
+    # Define the Go bindings
     fidl_go("${target_name}_go") {
       forward_variables_from(invoker,
                              [
@@ -247,8 +249,18 @@ template("fidl") {
     "fuzzers",
     "golden_fuzzer",
   ]
-  if (!is_dart && !is_go) {
+  if (is_fidl_toolchain || toolchain_variant.supports_cpp ||
+      toolchain_variant.supports_rust) {
+    # The C, C++, and Rust bindings are compiled in their own toolchain, from
+    # sources generated in the FIDL toolchain, so this section of the template
+    # is processed in the FIDL toolchain as well as the binary toolchain(s).
+
     if (enable_cpp || enable_hlcpp) {
+      # Only import fidl_cpp_family() if in a cpp toolchain and cpp bindings are
+      # enabled, as this can be particularly slow to import.
+      import("//build/cpp/fidl_cpp.gni")
+
+      # Define the cpp bindings.
       fidl_cpp_family(target_name) {
         forward_variables_from(invoker,
                                non_dart_go_only + [
@@ -265,7 +277,12 @@ template("fidl") {
       not_needed([ "non_dart_go_only" ])
     }
 
-    if (support_rust && enable_rust) {
+    if (enable_rust && (is_fidl_toolchain || toolchain_variant.supports_rust)) {
+      # Only import the fidl_rust() template if in a rust-capable toolchain and
+      # rust bindings are to be defined.
+      import("//build/rust/fidl_rust.gni")
+
+      # Define the Rust bindings.
       fidl_rust("${target_name}_rust") {
         forward_variables_from(invoker,
                                [
@@ -279,6 +296,10 @@ template("fidl") {
       }
 
       if (enable_bindlib) {
+        # Only import the fidl_bind_library() template if bindlib is enabled.
+        import("//build/bind/fidl_bind_library.gni")
+
+        # Define the bindlib bindings.
         fidl_bind_library("${target_name}_bindlib") {
           forward_variables_from(invoker,
                                  [
@@ -289,24 +310,32 @@ template("fidl") {
           fidl_gen_dir += "/bindlib"
         }
       }
+
+      if (enable_banjo) {
+        # Only import fidl_banjo() if banjo is enabled.
+        import("//build/banjo/fidl_banjo.gni")
+
+        # Define the banjo bindings.
+        fidl_banjo("${target_name}_banjo") {
+          forward_variables_from(invoker,
+                                 [
+                                   "testonly",
+                                   "visibility",
+                                   "public_deps",
+                                 ])
+          forward_variables_from(common_parameters, "*")
+          fidl_gen_dir += "/banjo"
+        }
+      }
     } else {
       not_needed(invoker, [ "disable_rustdoc" ])
     }
 
-    if (enable_banjo && support_rust) {
-      fidl_banjo("${target_name}_banjo") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visibility",
-                                 "public_deps",
-                               ])
-        forward_variables_from(common_parameters, "*")
-        fidl_gen_dir += "/banjo"
-      }
-    }
-
     if (enable_zither) {
+      # Only import zither_library() if zither is enabled.
+      import("//zircon/tools/zither/zither_library.gni")
+
+      # Define the zither bindings.
       zither_library("${target_name}_zither") {
         forward_variables_from(invoker,
                                [
@@ -324,7 +353,11 @@ template("fidl") {
       not_needed(invoker, [ "sources" ])
     }
 
-    if (current_toolchain != fidl_toolchain && !is_dart && !is_go) {
+    if (!is_fidl_toolchain) {
+      # Only import the fidl_tables() template if not in the fidl toolchain.
+      import("//build/c/fidl_c.gni")
+
+      # Define the fidl table bindings.
       fidl_tables("${target_name}_tables") {
         forward_variables_from(invoker,
                                [

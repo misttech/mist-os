@@ -3,3 +3,5 @@
 # found in the LICENSE file.
 
 fidl_toolchain = "//build/fidl:fidling"
+
+is_fidl_toolchain = current_toolchain == fidl_toolchain

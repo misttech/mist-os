@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/build_api_module.gni")
+import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
 import("//sdk/ctf/build/verify_sdk_compatibility.gni")
 

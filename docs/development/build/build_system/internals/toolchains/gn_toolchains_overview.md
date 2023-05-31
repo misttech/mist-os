@@ -179,6 +179,9 @@ with various features:
   These binaries typically require non-standard compile and linker commands
   (e.g. a different ABI, or lack of standard link environment).
 
+  NOTE: Toolchains created by `zircon_toolchain() do not support the Rust
+  programming language.
+
   One notable feature of this template is that it also supports
   building binaries using the GCC compiler, instead of Clang. This has
   proven useful to find low-level code generation issues that the

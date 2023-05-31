@@ -40,6 +40,8 @@ template("basic_toolchain") {
         toolchain_variant = {
         }
         toolchain_variant = {
+          # This is a "basic" toolchain
+          is_basic = true
           base = get_label_info(":$target_name", "label_no_toolchain")
           if (defined(invoker.expected_label)) {
             assert(

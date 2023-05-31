@@ -3,3 +3,5 @@
 # found in the LICENSE file.
 
 go_toolchain = "//build/go:gopher"
+
+is_go_toolchain = current_toolchain == go_toolchain

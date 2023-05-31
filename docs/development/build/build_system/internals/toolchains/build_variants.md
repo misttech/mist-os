@@ -421,6 +421,14 @@ This is a scope with the following schema:
 - **`suffix`**: This is `"-${toolchain_variant.name}"`, or `""` if name is empty.
   Used internally to simplify expansions without conditionals.
 
+- **`supports_cpp`**: A boolean that is `true` if this toolchain supports C/C++.
+
+- **`supports_rust`**: A boolean that is `true` if this toolchain supports Rust.
+
+- **`is_basic`**: A boolean that is `true` if this toolchain was created by the
+  `basic_toolchain()` template, and therefore does not use any of the built-in
+  support within GN for C/C++ and Rust.  It only has `copy` or `action` targets.
+
 The content of this global variable is seldom used by target definitions
 to alter their configuration based on the current toolchain context. This
 mostly happen for low-level targets, like the C library, kernel artifacts,
