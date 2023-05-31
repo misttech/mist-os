@@ -14,7 +14,7 @@
                 "api_levels": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/api_level"
+                        "$ref": "common.json#/definitions/api_level"
                     }
                 },
                 "name": {
