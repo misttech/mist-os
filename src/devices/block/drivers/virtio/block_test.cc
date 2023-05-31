@@ -21,6 +21,7 @@ constexpr uint64_t kCapacity = 1024;
 constexpr uint64_t kSizeMax = 4000;
 constexpr uint64_t kSegMax = 1024;
 constexpr uint64_t kBlkSize = 1024;
+constexpr uint64_t kVmoOffsetBlocks = 1;
 const uint16_t kRingSize = 128;  // Should match block.h
 
 // Fake virtio 'backend' for a virtio-scsi device.
@@ -84,6 +85,11 @@ class FakeBackendForBlock : public virtio::FakeBackend {
       vring_desc* desc = &descriptors[avail.ring[index]];
       uint16_t count = 1;
       while (desc->flags & VRING_DESC_F_NEXT) {
+        if (count == 2) {
+          // The second descriptor describes the first page of data transfer (the first descriptor
+          // is the head descriptor).
+          EXPECT_EQ(desc->addr % zx_system_get_page_size(), kBlkSize * kVmoOffsetBlocks);
+        }
         desc = &descriptors[desc->next];
         ++count;
       }
@@ -208,6 +214,15 @@ class BlockDeviceTest : public zxtest::Test {
     mock_ddk::ReleaseFlaggedDevices(fake_root_.get());
   }
 
+  virtio::block_txn_t TestReadCommand(uint32_t tranfser_blocks = 1) {
+    virtio::block_txn_t txn;
+    memset(&txn, 0, sizeof(txn));
+    txn.op.rw.command = BLOCK_OP_READ;
+    txn.op.rw.length = tranfser_blocks;
+    txn.op.rw.offset_vmo = kVmoOffsetBlocks;
+    return txn;
+  }
+
   static void CompletionCb(void* cookie, zx_status_t status, block_op_t* op) {
     BlockDeviceTest* operation = reinterpret_cast<BlockDeviceTest*>(cookie);
     operation->operation_status_ = status;
@@ -237,16 +252,13 @@ class BlockDeviceTest : public zxtest::Test {
 TEST_F(BlockDeviceTest, QueueOne) {
   InitDevice();
 
-  virtio::block_txn_t txn;
-  memset(&txn, 0, sizeof(txn));
-  txn.op.rw.command = BLOCK_OP_READ;
-  txn.op.rw.length = 0;
+  virtio::block_txn_t txn = TestReadCommand(0);
   device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
                           this);
   ASSERT_TRUE(Wait());
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, OperationStatus());
 
-  txn.op.rw.length = kCapacity * 10;
+  txn = TestReadCommand(kCapacity * 10);
   device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
                           this);
   ASSERT_TRUE(Wait());
@@ -267,10 +279,7 @@ TEST_F(BlockDeviceTest, CheckQuery) {
 TEST_F(BlockDeviceTest, ReadOk) {
   InitDevice();
 
-  virtio::block_txn_t txn;
-  memset(&txn, 0, sizeof(txn));
-  txn.op.rw.command = BLOCK_OP_READ;
-  txn.op.rw.length = 1;
+  virtio::block_txn_t txn = TestReadCommand();
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
   txn.op.rw.vmo = vmo.get();
@@ -285,10 +294,7 @@ TEST_F(BlockDeviceTest, ReadOk) {
 TEST_F(BlockDeviceTest, ReadError) {
   InitDevice(VIRTIO_BLK_S_IOERR);
 
-  virtio::block_txn_t txn;
-  memset(&txn, 0, sizeof(txn));
-  txn.op.rw.command = BLOCK_OP_READ;
-  txn.op.rw.length = 1;
+  virtio::block_txn_t txn = TestReadCommand();
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
   txn.op.rw.vmo = vmo.get();

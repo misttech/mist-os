@@ -313,7 +313,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
   for (size_t n = 0; n < pagecount; n++) {
     desc = vring_.DescFromIndex(desc->next);
-    desc->addr = pages[n];
+    desc->addr = pages[n];  // |pages| are all page-aligned addresses.
     desc->len = static_cast<uint32_t>((bytes > kPageSize) ? kPageSize : bytes);
     if (n == 0) {
       // First entry may not be page aligned.
@@ -357,6 +357,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 }
 
 namespace {
+// Out parameter |pages| are all page-aligned addresses.
 static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx_paddr_t* pages,
                              size_t* num_pages) {
   uint64_t suboffset = txn->op.rw.offset_vmo & kPageMask;
@@ -376,7 +377,6 @@ static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx
     return ZX_ERR_INTERNAL;
   }
 
-  pages[0] += suboffset;
   return ZX_OK;
 }
 }  // namespace
