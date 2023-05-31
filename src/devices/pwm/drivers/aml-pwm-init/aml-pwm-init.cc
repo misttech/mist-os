@@ -15,22 +15,30 @@ namespace pwm_init {
 
 zx_status_t PwmInitDevice::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
-  ddk::PwmProtocolClient pwm(parent, "pwm");
+
+  zx::result client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm");
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Failed to initialize PWM Client, st = %s", client_end.status_string());
+    return client_end.status_value();
+  }
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
   ddk::GpioProtocolClient wifi_gpio(parent, "gpio-wifi");
   ddk::GpioProtocolClient bt_gpio(parent, "gpio-bt");
   if (!pwm.is_valid() || !wifi_gpio.is_valid() || !bt_gpio.is_valid()) {
-    zxlogf(ERROR, "%s: could not get fragments", __func__);
+    zxlogf(ERROR, "could not get fragments");
     return ZX_ERR_NO_RESOURCES;
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<PwmInitDevice> dev(new (&ac) PwmInitDevice(parent, pwm, wifi_gpio, bt_gpio));
+  std::unique_ptr<PwmInitDevice> dev(new (&ac)
+                                         PwmInitDevice(parent, std::move(pwm), wifi_gpio, bt_gpio));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
   if ((status = dev->Init()) != ZX_OK) {
-    zxlogf(ERROR, "%s: could not initialize PWM for bluetooth and SDIO", __func__);
+    zxlogf(ERROR, "could not initialize PWM for bluetooth and SDIO");
     return status;
   }
 
@@ -55,7 +63,7 @@ zx_status_t PwmInitDevice::Init() {
 
   // Configure SOC_WIFI_LPO_32k768 pin for PWM_E
   if (((status = wifi_gpio_.SetAltFunction(1)) != ZX_OK)) {
-    zxlogf(ERROR, "%s: could not initialize GPIO for WIFI", __func__);
+    zxlogf(ERROR, "could not initialize GPIO for WIFI");
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -63,14 +71,19 @@ zx_status_t PwmInitDevice::Init() {
   ddk::ClockProtocolClient wifi_32k768_clk(parent(), "wifi-32k768-clk");
   if (wifi_32k768_clk.is_valid()) {
     if ((status = wifi_32k768_clk.Enable()) != ZX_OK) {
-      zxlogf(ERROR, "%s: could not enable clk for wifi_32k768", __func__);
+      zxlogf(ERROR, "could not enable clk for wifi_32k768");
       return status;
     }
   }
 
-  if ((status = pwm_.Enable()) != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not enable PWM", __func__);
-    return status;
+  auto result = pwm_->Enable();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Could not enable PWM: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Could not enable PWM: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
   aml_pwm::mode_config two_timer = {
       .mode = aml_pwm::Mode::kTwoTimer,
@@ -82,26 +95,32 @@ zx_status_t PwmInitDevice::Init() {
               .timer2 = 0x0a,
           },
   };
-  pwm_config_t init_cfg = {
+  fuchsia_hardware_pwm::wire::PwmConfig init_cfg = {
       .polarity = false,
       .period_ns = 30053,
       .duty_cycle = static_cast<float>(49.931787176),
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&two_timer),
-      .mode_config_size = sizeof(two_timer),
+      .mode_config = fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&two_timer),
+                                                             sizeof(two_timer)),
   };
-  if ((status = pwm_.SetConfig(&init_cfg)) != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not initialize PWM", __func__);
-    return status;
+  auto set_config_result = pwm_->SetConfig(init_cfg);
+  if (!set_config_result.ok()) {
+    zxlogf(ERROR, "Could not initialize PWM: %s", set_config_result.status_string());
+    return set_config_result.status();
+  }
+  if (set_config_result->is_error()) {
+    zxlogf(ERROR, "Could not initialize PWM: %s",
+           zx_status_get_string(set_config_result->error_value()));
+    return set_config_result->error_value();
   }
 
   // set GPIO to reset Bluetooth module
   if ((status = bt_gpio_.ConfigOut(0)) != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not initialize GPIO for Bluetooth", __func__);
+    zxlogf(ERROR, "Could not initialize GPIO for Bluetooth");
     return status;
   }
   usleep(10 * 1000);
   if ((status = bt_gpio_.Write(1)) != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not initialize GPIO for Bluetooth", __func__);
+    zxlogf(ERROR, "Could not initialize GPIO for Bluetooth");
     return status;
   }
   usleep(100 * 1000);

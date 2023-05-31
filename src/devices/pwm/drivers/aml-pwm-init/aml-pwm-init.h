@@ -5,9 +5,9 @@
 #ifndef SRC_DEVICES_PWM_DRIVERS_AML_PWM_INIT_AML_PWM_INIT_H_
 #define SRC_DEVICES_PWM_DRIVERS_AML_PWM_INIT_AML_PWM_INIT_H_
 
+#include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 
@@ -28,13 +28,13 @@ class PwmInitDevice : public PwmInitDeviceType {
  private:
   friend class FakePwmInitDevice;
 
-  explicit PwmInitDevice(zx_device_t* parent, ddk::PwmProtocolClient pwm,
+  explicit PwmInitDevice(zx_device_t* parent, fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm,
                          ddk::GpioProtocolClient wifi_gpio, ddk::GpioProtocolClient bt_gpio)
-      : PwmInitDeviceType(parent), pwm_(pwm), wifi_gpio_(wifi_gpio), bt_gpio_(bt_gpio) {}
+      : PwmInitDeviceType(parent), pwm_(std::move(pwm)), wifi_gpio_(wifi_gpio), bt_gpio_(bt_gpio) {}
 
   zx_status_t Init();
 
-  ddk::PwmProtocolClient pwm_;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_;
   ddk::GpioProtocolClient wifi_gpio_;
   ddk::GpioProtocolClient bt_gpio_;
 };
