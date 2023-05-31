@@ -424,10 +424,8 @@ impl RunningSuite {
         });
 
         // before destroying the realm, wait for any clients to finish accessing storage.
-        // TODO(fxbug.dev/84882): Remove signal for USER_0, this is used while Overnet does not support
-        // signalling ZX_EVENTPAIR_CLOSED when the eventpair is closed.
         let tokens_closed_signals = self.custom_artifact_tokens.iter().map(|token| {
-            fasync::OnSignals::new(token, zx::Signals::EVENTPAIR_CLOSED | zx::Signals::USER_0)
+            fasync::OnSignals::new(token, zx::Signals::EVENTPAIR_CLOSED)
                 .unwrap_or_else(|_| zx::Signals::empty())
         });
         // Before destroying the realm, ensure archivist has responded to a query. This ensures
