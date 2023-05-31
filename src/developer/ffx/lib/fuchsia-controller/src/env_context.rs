@@ -53,10 +53,9 @@ impl EnvContext {
         std::fs::create_dir_all(&cache_path)?;
         let _hoist_cache_dir = tempfile::tempdir_in(&cache_path)?;
         let hoist = Hoist::with_cache_dir_maybe_router(_hoist_cache_dir.path(), None)?;
-        let version_info = ffx_build_version::build_info();
         let injector = Box::new(Injection::new(
             context.clone(),
-            DaemonVersionCheck::SameVersionInfo(version_info),
+            DaemonVersionCheck::CheckApiLevel(version_history::LATEST_VERSION.api_level),
             hoist.clone(),
             None,
             None,

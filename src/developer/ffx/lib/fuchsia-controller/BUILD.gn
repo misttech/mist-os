@@ -5,7 +5,6 @@
 import("//build/python/python_binary.gni")
 import("//build/python/python_c_extension.gni")
 import("//build/rust/rustc_staticlib.gni")
-import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
 assert(is_host)
 
@@ -21,9 +20,9 @@ rustc_staticlib("lib") {
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/rcs:lib",
-    "//src/developer/ffx/lib/version:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/versioning/version-history/rust:version-history",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/lib/zircon/rust:fuchsia-zircon-types",
     "//third_party/rust_crates:anyhow",

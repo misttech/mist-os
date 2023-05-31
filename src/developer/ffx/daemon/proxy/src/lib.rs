@@ -29,6 +29,8 @@ pub enum DaemonVersionCheck {
     /// Compare details from VersionInfo other than buildid, requires the daemon to have been
     /// spawned by the same overall build.
     SameVersionInfo(VersionInfo),
+    /// Checks to see if the API level matches.
+    CheckApiLevel(u64),
 }
 
 pub struct Injection {
@@ -287,6 +289,11 @@ async fn init_daemon_proxy(
             if ours.build_version == daemon.build_version
                 && ours.commit_hash == daemon.commit_hash
                 && ours.commit_timestamp == daemon.commit_timestamp =>
+        {
+            true
+        }
+        (DaemonVersionCheck::CheckApiLevel(ours), VersionInfo { api_level: Some(daemon), .. })
+            if ours == daemon =>
         {
             true
         }
