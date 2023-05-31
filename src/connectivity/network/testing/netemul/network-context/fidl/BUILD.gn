@@ -4,19 +4,6 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("internal") {
-  name = "fuchsia.netemul.internal"
-  testonly = true
-  sources = [ "internal.fidl" ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.device",
-    "//sdk/fidl/fuchsia.hardware.network",
-    "//sdk/fidl/fuchsia.logger",
-  ]
-  enable_hlcpp = true
-}
-
 fidl("network") {
   name = "fuchsia.netemul.network"
   testonly = true

@@ -4,7 +4,8 @@
 
 #include "endpoint.h"
 
-#include <fuchsia/netemul/internal/cpp/fidl.h>
+#include <fuchsia/device/cpp/fidl.h>
+#include <fuchsia/hardware/network/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
@@ -93,7 +94,8 @@ class EndpointImpl : public data::Consumer {
 };
 
 class NetworkDeviceImpl : public EndpointImpl,
-                          public fuchsia::netemul::internal::NetworkDeviceInstance {
+                          public fuchsia::hardware::network::DeviceInstance,
+                          public fuchsia::device::Controller {
  public:
   explicit NetworkDeviceImpl(Endpoint::Config config) : EndpointImpl(std::move(config)) {}
 
@@ -151,16 +153,12 @@ class NetworkDeviceImpl : public EndpointImpl,
 
   void ServeDevice(
       ::fidl::InterfaceRequest<::fuchsia::hardware::network::DeviceInstance> device) override {
-    instance_bindings_.AddBinding(
-        this, fidl::InterfaceRequest<fuchsia::netemul::internal::NetworkDeviceInstance>(
-                  device.TakeChannel()));
+    instance_bindings_.AddBinding(this, std::move(device));
   }
 
   void ServeController(
       ::fidl::InterfaceRequest<::fuchsia::device::Controller> controller) override {
-    instance_bindings_.AddBinding(
-        this, fidl::InterfaceRequest<fuchsia::netemul::internal::NetworkDeviceInstance>(
-                  controller.TakeChannel()));
+    device_controller_bindings_.AddBinding(this, std::move(controller));
   }
 
   void Consume(const void* data, size_t len) override {
@@ -269,7 +267,8 @@ class NetworkDeviceImpl : public EndpointImpl,
   std::string device_name_;
   fuchsia::net::tun::DevicePtr tun_device_;
   fuchsia::net::tun::PortPtr tun_port_;
-  fidl::BindingSet<fuchsia::netemul::internal::NetworkDeviceInstance> instance_bindings_;
+  fidl::BindingSet<fuchsia::device::Controller> device_controller_bindings_;
+  fidl::BindingSet<fuchsia::hardware::network::DeviceInstance> instance_bindings_;
 };
 
 std::unique_ptr<EndpointImpl> MakeImpl(Endpoint::Config config) {
