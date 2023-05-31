@@ -5,7 +5,10 @@
 # https://opensource.org/licenses/MIT
 
 source_set("debugcommands") {
-  sources = [ "debugcommands.cc" ]
+  sources = [
+    "debugcommands.cc",
+    "undefined-behavior.cc",
+  ]
   deps = [
     "//zircon/kernel/lib/boot-options:boot-options-cli",
     "//zircon/kernel/lib/console",

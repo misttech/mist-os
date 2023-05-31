@@ -4,6 +4,7 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
+import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
 
 variant("asan") {
@@ -189,9 +190,20 @@ variant("lsan") {
 }
 
 variant("ubsan") {
-  common_flags = [ "-fsanitize=undefined" ]
+  common_flags = []
+  if (toolchain_environment == "kernel") {
+    configs = [
+      # Zircon uses kernel-specific ubsan flags.
+      "//zircon/kernel/lib/instrumentation/ubsan",
 
-  if (is_fuchsia) {
+      # The ubsan variant adds rtti, but that is not used by the kernel variant.
+      "//build/config:no_rtti",
+    ]
+  } else {
+    common_flags = [ "-fsanitize=undefined" ]
+  }
+
+  if (is_fuchsia && !is_kernel) {
     dynamic_linker_flags =
         "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
     ldflags = [ "-Wl,$dynamic_linker_flags" ]

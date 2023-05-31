@@ -15,6 +15,7 @@ zx_library("instrumentation") {
       ":profile",
       ":sancov",
       "asan",
+      "ubsan:runtime",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/version",
       "//zircon/kernel/object",

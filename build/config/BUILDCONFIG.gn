@@ -1515,7 +1515,6 @@ declare_args() {
         "instrumentation-runtime",
         "needs-compiler-abi",
         "needs-writable-globals",
-        "kernel-excluded",
         "ubsan",
       ]
     },
@@ -1722,6 +1721,18 @@ declare_args() {
         {
           variant = "tsan"
           host = true
+        },
+      ]
+    },
+    {
+      # This is the ubsan variant that applies only to the kernel.
+      # phys uses ubsan-trap, without a runtime.
+      name = "kubsan"
+      select_variant = []
+      select_variant = [
+        {
+          variant = "ubsan"
+          dir = [ "//zircon/kernel" ]
         },
       ]
     },

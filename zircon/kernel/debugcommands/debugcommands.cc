@@ -646,6 +646,9 @@ static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t fl
 #if __has_feature(shadow_call_stack)
         "shadow_call_stack",
 #endif
+#if __has_feature(undefined_behavior_sanitizer)
+        "undefined_behavior_sanitizer",
+#endif
     // missing: sancov, profile
   };
   for (const auto& feature : static_features) {

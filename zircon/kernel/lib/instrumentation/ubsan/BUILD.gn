@@ -1,0 +1,42 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/zircon/zircon_cpu.gni")
+
+_ubsan_tag = [ "ubsan" ]
+_toolchain_tags = toolchain_variant.tags
+is_ubsan = _toolchain_tags + _ubsan_tag - _ubsan_tag != _toolchain_tags
+
+source_set("runtime") {
+  if (is_ubsan) {
+    # The support code doesn't get compiled with instrumentation itself.
+    # Disabling it on the command-line not only saves adding NO_UBSAN
+    # annotations to each function, but covers inline functions from shared
+    # header files that shouldn't all be annotated for their other callers.
+    # The former could be addressed via `#pragma clang attribute`, but the
+    # latter cannot be.
+    configs -= [ "//build/config/sanitizers:ubsan" ]
+    sources = [ "runtime.cc" ]
+    deps = [
+      "..:headers",
+      "//zircon/kernel/lib/crashlog",
+    ]
+  }
+}
+
+config("ubsan") {
+  cflags = [
+    "-fsanitize=undefined",
+
+    # Checks whether an implicit truncation caused data loss. It's not
+    # undefined behavior but most of the time it is unintentional.
+    "-fsanitize=implicit-integer-truncation",
+
+    # The kernel has some _Nonnull annotations, this would check
+    # them at runtime.
+    "-fsanitize=nullability",
+  ]
+}
