@@ -76,7 +76,7 @@ class CtapHidDriver : public CtapHidDriverDeviceType,
 
   ~CtapHidDriver() {
     fbl::AutoLock lock(&lock_);
-    if (pending_response_->waiting_read) {
+    if (pending_response_ && pending_response_->waiting_read) {
       pending_response_->waiting_read->ReplyError(ZX_ERR_PEER_CLOSED);
       pending_response_->waiting_read.reset();
     }
