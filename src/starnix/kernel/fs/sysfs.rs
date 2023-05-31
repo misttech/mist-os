@@ -11,8 +11,8 @@ use crate::fs::kobject::*;
 use crate::task::*;
 use crate::types::*;
 
-struct SysFsOps;
-impl FileSystemOps for SysFsOps {
+struct SysFs;
+impl FileSystemOps for SysFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
         Ok(statfs::default(SYSFS_MAGIC))
     }
@@ -21,15 +21,9 @@ impl FileSystemOps for SysFsOps {
     }
 }
 
-pub struct SysFs {
-    root_kobject: KObjectHandle,
-    kernel: Arc<Kernel>,
-    fs: FileSystemHandle,
-}
-
 impl SysFs {
-    pub fn new(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Self {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFsOps, options);
+    pub fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.subdir(b"fs", 0o755, |dir| {
             dir.subdir(b"selinux", 0o755, |_| ());
@@ -41,82 +35,19 @@ impl SysFs {
             dir.subdir(b"fuse", 0o755, |dir| dir.subdir(b"connections", 0o755, |_| ()));
         });
 
-        let root_kobject = KObject::new_root();
-        dir.entry(b"devices", SysFsDirectory::new(root_kobject.clone()), mode!(IFDIR, 0o755));
+        dir.entry(
+            b"devices",
+            SysFsDirectory::new(kernel.device_registry.write().root_kobject()),
+            mode!(IFDIR, 0o755),
+        );
 
         dir.build_root();
-
-        let new_sysfs = Self { root_kobject, kernel: kernel.clone(), fs };
-        new_sysfs.add_common_devices();
-        new_sysfs
-    }
-
-    /// Returns the `FileSystemHandle` of the SysFs filesystem.
-    pub fn fs(&self) -> FileSystemHandle {
-        self.fs.clone()
-    }
-
-    /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
-    pub fn virtual_bus(&self) -> KObjectHandle {
-        self.root_kobject.get_or_create_child(b"virtual", KType::Bus)
-    }
-
-    /// Adds a single device kobject in the tree.
-    pub fn add_device(&self, subsystem: KObjectHandle, dev_attr: KObjectDeviceAttribute) {
-        let ktype =
-            KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
-        self.kernel.device_registry.write().dispatch_uevent(
-            UEventAction::Add,
-            subsystem.get_or_create_child(&dev_attr.kobject_name, ktype),
-        );
-    }
-
-    /// Adds a list of device kobjects in the tree.
-    pub fn add_devices(&self, subsystem: KObjectHandle, dev_attrs: Vec<KObjectDeviceAttribute>) {
-        for attr in dev_attrs {
-            self.add_device(subsystem.clone(), attr);
-        }
-    }
-
-    fn add_common_devices(&self) {
-        let virtual_bus = self.virtual_bus();
-
-        // MEM class.
-        self.add_devices(
-            virtual_bus.get_or_create_child(b"mem", KType::Class),
-            KObjectDeviceAttribute::new_from_vec(vec![
-                (b"null", b"null", DeviceType::NULL),
-                (b"zero", b"zero", DeviceType::ZERO),
-                (b"full", b"full", DeviceType::FULL),
-                (b"random", b"random", DeviceType::RANDOM),
-                (b"urandom", b"urandom", DeviceType::URANDOM),
-                (b"kmsg", b"kmsg", DeviceType::KMSG),
-            ]),
-        );
-
-        // MISC class.
-        self.add_devices(
-            virtual_bus.get_or_create_child(b"misc", KType::Class),
-            KObjectDeviceAttribute::new_from_vec(vec![
-                (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
-                (b"fuse", b"fuse", DeviceType::FUSE),
-                (b"device-mapper", b"mapper/control", DeviceType::DEVICE_MAPPER),
-            ]),
-        );
-
-        // TTY class.
-        self.add_devices(
-            virtual_bus.get_or_create_child(b"tty", KType::Class),
-            KObjectDeviceAttribute::new_from_vec(vec![
-                (b"tty", b"tty", DeviceType::TTY),
-                (b"ptmx", b"ptmx", DeviceType::PTMX),
-            ]),
-        );
+        fs
     }
 }
 
-pub fn sys_fs(kern: &Arc<Kernel>, options: FileSystemOptions) -> &SysFs {
-    kern.sys_fs.get_or_init(|| SysFs::new(kern, options))
+pub fn sys_fs(kern: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
+    kern.sys_fs.get_or_init(|| SysFs::new_fs(kern, options))
 }
 
 struct SysFsDirectory {

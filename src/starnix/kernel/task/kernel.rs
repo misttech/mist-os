@@ -14,7 +14,6 @@ use crate::device::framebuffer::Framebuffer;
 use crate::device::input::InputFile;
 use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
 use crate::fs::socket::SocketAddress;
-use crate::fs::sysfs::SysFs;
 use crate::fs::{FileOps, FileSystemHandle, FsNode};
 use crate::lock::RwLock;
 use crate::logging::set_zx_name;
@@ -60,7 +59,7 @@ pub struct Kernel {
     // Owned by procfs.rs
     pub proc_fs: OnceCell<FileSystemHandle>,
     // Owned by sysfs.rs
-    pub sys_fs: OnceCell<SysFs>,
+    pub sys_fs: OnceCell<FileSystemHandle>,
     // Owned by selinux.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
 

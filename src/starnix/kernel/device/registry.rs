@@ -62,6 +62,7 @@ pub trait DeviceListener: Send + Sync {
 
 /// The kernel's registry of drivers.
 pub struct DeviceRegistry {
+    root_kobject: KObjectHandle,
     /// Maps device identifier to character device implementation.
     char_devices: BTreeMap<u32, Box<dyn DeviceOps>>,
     dyn_devices: Arc<RwLock<DynRegistry>>,
@@ -81,7 +82,72 @@ impl DeviceRegistry {
         let mut registry = Self::new();
         registry.register_chrdev_major(MemDevice, MEM_MAJOR).unwrap();
         registry.register_chrdev_major(MiscDevice, MISC_MAJOR).unwrap();
+        registry.add_common_devices();
         registry
+    }
+
+    /// Returns the root kobject.
+    pub fn root_kobject(&self) -> KObjectHandle {
+        self.root_kobject.clone()
+    }
+
+    /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
+    pub fn virtual_bus(&self) -> KObjectHandle {
+        self.root_kobject.get_or_create_child(b"virtual", KType::Bus)
+    }
+
+    /// Adds a single device kobject in the tree.
+    pub fn add_device(&mut self, class: KObjectHandle, dev_attr: KObjectDeviceAttribute) {
+        let ktype =
+            KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
+        self.dispatch_uevent(
+            UEventAction::Add,
+            class.get_or_create_child(&dev_attr.kobject_name, ktype),
+        );
+    }
+
+    /// Adds a list of device kobjects in the tree.
+    pub fn add_devices(&mut self, class: KObjectHandle, dev_attrs: Vec<KObjectDeviceAttribute>) {
+        for attr in dev_attrs {
+            self.add_device(class.clone(), attr);
+        }
+    }
+
+    // TODO(fxb/119437): Refactor how to register a device.
+    fn add_common_devices(&mut self) {
+        let virtual_bus = self.virtual_bus();
+
+        // MEM class.
+        self.add_devices(
+            virtual_bus.get_or_create_child(b"mem", KType::Class),
+            KObjectDeviceAttribute::new_from_vec(vec![
+                (b"null", b"null", DeviceType::NULL),
+                (b"zero", b"zero", DeviceType::ZERO),
+                (b"full", b"full", DeviceType::FULL),
+                (b"random", b"random", DeviceType::RANDOM),
+                (b"urandom", b"urandom", DeviceType::URANDOM),
+                (b"kmsg", b"kmsg", DeviceType::KMSG),
+            ]),
+        );
+
+        // MISC class.
+        self.add_devices(
+            virtual_bus.get_or_create_child(b"misc", KType::Class),
+            KObjectDeviceAttribute::new_from_vec(vec![
+                (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
+                (b"fuse", b"fuse", DeviceType::FUSE),
+                (b"device-mapper", b"mapper/control", DeviceType::DEVICE_MAPPER),
+            ]),
+        );
+
+        // TTY class.
+        self.add_devices(
+            virtual_bus.get_or_create_child(b"tty", KType::Class),
+            KObjectDeviceAttribute::new_from_vec(vec![
+                (b"tty", b"tty", DeviceType::TTY),
+                (b"ptmx", b"ptmx", DeviceType::PTMX),
+            ]),
+        );
     }
 
     pub fn register_chrdev_major(
@@ -163,6 +229,7 @@ impl DeviceRegistry {
 impl Default for DeviceRegistry {
     fn default() -> Self {
         let mut registry = Self {
+            root_kobject: KObject::new_root(),
             char_devices: BTreeMap::new(),
             dyn_devices: Default::default(),
             next_anon_minor: 1,
