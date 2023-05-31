@@ -402,7 +402,7 @@ zx::result<> Ufs::InitDeviceInterface() {
 
   // Send Link Startup UIC command to start the link startup procedure.
   DmeLinkStartUpUicCommand link_startup_command(*this);
-  if (zx::result<std::optional<uint32_t>> result = link_startup_command.SendCommandWithNotify();
+  if (zx::result<std::optional<uint32_t>> result = link_startup_command.SendCommand();
       result.is_error()) {
     zxlogf(ERROR, "Failed to startup UFS link: %s", result.status_string());
     return result.take_error();

@@ -4,22 +4,28 @@
 
 #include "uic_commands.h"
 
-#include <optional>
-
 #include "src/devices/block/drivers/ufs/registers.h"
 #include "src/devices/block/drivers/ufs/ufs.h"
 
 namespace ufs {
 
 zx::result<std::optional<uint32_t>> UicCommand::SendCommand() {
-  if (zx::result<> result = SendUicCommand(0, 0, 0); result.is_error()) {
+  if (auto result = UicPreProcess(); result.is_error()) {
     return result.take_error();
   }
-  return zx::ok(std::nullopt);
+
+  if (auto result = SendUicCommand(); result.is_error()) {
+    return result.take_error();
+  }
+
+  if (auto result = UicPostProcess(); result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::ok(ReturnValue());
 }
 
-zx::result<> UicCommand::SendUicCommand(uint32_t argument1, uint32_t argument2,
-                                        uint32_t argument3) {
+zx::result<> UicCommand::SendUicCommand() {
   fdf::MmioBuffer &mmio = GetController().GetMmio();
 
   // Clear 'UIC command completion status' if set
@@ -28,9 +34,11 @@ zx::result<> UicCommand::SendUicCommand(uint32_t argument1, uint32_t argument2,
     InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(&mmio);
   }
 
-  UicCommandArgument1Reg::Get().FromValue(argument1).WriteTo(&mmio);
-  UicCommandArgument2Reg::Get().FromValue(argument2).WriteTo(&mmio);
-  UicCommandArgument3Reg::Get().FromValue(argument3).WriteTo(&mmio);
+  const auto [argument_1, argument_2, argument_3] = Arguments();
+
+  UicCommandArgument1Reg::Get().FromValue(argument_1).WriteTo(&mmio);
+  UicCommandArgument2Reg::Get().FromValue(argument_2).WriteTo(&mmio);
+  UicCommandArgument3Reg::Get().FromValue(argument_3).WriteTo(&mmio);
 
   // Wait for 'UIC command ready'
   auto wait_for_command_ready = [&]() -> bool {
@@ -60,77 +68,83 @@ zx::result<> UicCommand::SendUicCommand(uint32_t argument1, uint32_t argument2,
     return zx::error(status);
   }
 
-  // DME_RESET does not return a result code.
-  if (GetOpcode() != UicCommandOpcode::kDmeReset) {
-    uint32_t result_code = UicCommandArgument2Reg::Get().ReadFrom(&mmio).result_code();
-    if (result_code != UicCommandArgument2Reg::GenericErrorCode::kSuccess) {
-      zxlogf(ERROR, "Failed to send UIC command, result_code = %u", result_code);
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-  }
+  return zx::ok();
+}
 
-  // If it is a hibernate command, wait for transition.
-  if (GetOpcode() == UicCommandOpcode::kDmeHibernateEnter ||
-      GetOpcode() == UicCommandOpcode::kDmeHibernateExit) {
-    auto reg = InterruptStatusReg::Get().FromValue(0);
-    uint32_t flag = GetOpcode() == UicCommandOpcode::kDmeHibernateEnter
-                        ? reg.set_uic_hibernate_enter_status(1).reg_value()
-                        : reg.set_uic_hibernate_exit_status(1).reg_value();
-
-    auto wait_for = [&]() -> bool {
-      return InterruptStatusReg::Get().ReadFrom(&mmio).reg_value() & flag;
-    };
-    timeout_message = "Timeout waiting for hibernation transition";
-    if (zx_status_t status = controller_.WaitWithTimeout(wait_for, timeout_usec_, timeout_message);
-        status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    InterruptStatusReg::Get().FromValue(flag).WriteTo(&mmio);
+zx::result<> UicCommand::UicPostProcess() {
+  if (uint32_t result_code =
+          UicCommandArgument2Reg::Get().ReadFrom(&GetController().GetMmio()).result_code();
+      result_code != UicCommandArgument2Reg::GenericErrorCode::kSuccess) {
+    zxlogf(ERROR, "Failed to send UIC command, result_code = %u\n", result_code);
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   return zx::ok();
 }
 
-zx::result<std::optional<uint32_t>> DmeGetUicCommand::SendCommand() {
-  uint32_t argument_1 = UicCommandArgument1Reg::Get()
-                            .FromValue(0)
-                            .set_mib_attribute(GetMbiAttribute())
-                            .set_gen_selector_index(GetGenSelectorIndex())
-                            .reg_value();
-  if (zx::result<> result = SendUicCommand(argument_1, 0, 0); result.is_error()) {
-    return result.take_error();
-  }
-  return zx::ok(UicCommandArgument3Reg::Get().ReadFrom(&GetController().GetMmio()).value());
+std::tuple<uint32_t, uint32_t, uint32_t> DmeGetUicCommand::Arguments() const {
+  return std::make_tuple(UicCommandArgument1Reg::Get()
+                             .FromValue(0)
+                             .set_mib_attribute(GetMbiAttribute())
+                             .set_gen_selector_index(GetGenSelectorIndex())
+                             .reg_value(),
+                         0, 0);
 }
 
-zx::result<std::optional<uint32_t>> DmeSetUicCommand::SendCommand() {
-  uint32_t argument_1 = UicCommandArgument1Reg::Get()
-                            .FromValue(0)
-                            .set_mib_attribute(GetMbiAttribute())
-                            .set_gen_selector_index(GetGenSelectorIndex())
-                            .reg_value();
-  if (zx::result<> result = SendUicCommand(argument_1, 0, value_); result.is_error()) {
-    return result.take_error();
-  }
-  return zx::ok(std::nullopt);
+std::optional<uint32_t> DmeGetUicCommand::ReturnValue() {
+  return UicCommandArgument3Reg::Get().ReadFrom(&GetController().GetMmio()).value();
 }
 
-zx::result<std::optional<uint32_t>> DmeLinkStartUpUicCommand::SendCommandWithNotify() {
-  if (zx::result<> result = GetController().Notify(NotifyEvent::kPreLinkStartup, 0);
-      result.is_error()) {
+std::tuple<uint32_t, uint32_t, uint32_t> DmeSetUicCommand::Arguments() const {
+  return std::make_tuple(UicCommandArgument1Reg::Get()
+                             .FromValue(0)
+                             .set_mib_attribute(GetMbiAttribute())
+                             .set_gen_selector_index(GetGenSelectorIndex())
+                             .reg_value(),
+                         0, value_);
+}
+
+zx::result<> DmeLinkStartUpUicCommand::UicPreProcess() {
+  return GetController().Notify(NotifyEvent::kPreLinkStartup, 0);
+}
+
+zx::result<> DmeLinkStartUpUicCommand::UicPostProcess() {
+  if (auto result = UicCommand::UicPostProcess(); result.is_error()) {
     return result.take_error();
   }
 
-  if (zx::result<std::optional<uint32_t>> result = SendCommand(); result.is_error()) {
+  return GetController().Notify(NotifyEvent::kPostLinkStartup, 0);
+}
+
+zx::result<> DmeHibernateCommand::UicPostProcess() {
+  if (auto result = UicCommand::UicPostProcess(); result.is_error()) {
     return result.take_error();
   }
 
-  if (zx::result<> result = GetController().Notify(NotifyEvent::kPostLinkStartup, 0);
-      result.is_error()) {
-    return result.take_error();
+  fdf::MmioBuffer &mmio = GetController().GetMmio();
+  uint32_t flag = GetFlag();
+  uint32_t timeout = GetTimeoutUsec();
+
+  auto wait_for = [&]() -> bool {
+    return InterruptStatusReg::Get().ReadFrom(&mmio).reg_value() & flag;
+  };
+  fbl::String timeout_message = "Timeout waiting for hibernation transition";
+  if (zx_status_t status = GetController().WaitWithTimeout(wait_for, timeout, timeout_message);
+      status != ZX_OK) {
+    return zx::error(status);
   }
-  return zx::ok(std::nullopt);
+
+  InterruptStatusReg::Get().FromValue(flag).WriteTo(&mmio);
+
+  return zx::ok();
+}
+
+uint32_t DmeHibernateEnterCommand::GetFlag() {
+  return InterruptStatusReg::Get().FromValue(0).set_uic_hibernate_enter_status(1).reg_value();
+}
+
+uint32_t DmeHibernateExitCommand::GetFlag() {
+  return InterruptStatusReg::Get().FromValue(0).set_uic_hibernate_exit_status(1).reg_value();
 }
 
 }  // namespace ufs
