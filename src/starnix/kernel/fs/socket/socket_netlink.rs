@@ -411,17 +411,13 @@ impl SocketOps for BaseNetlinkSocket {
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let inner = self.lock();
-        let mut local_address = inner.address.clone();
-        drop(inner);
+        let mut local_address = self.lock().address.clone();
 
         let destination = match dest_address {
             Some(SocketAddress::Netlink(addr)) => addr,
             _ => match &mut local_address {
                 Some(addr) => addr,
-                _ => {
-                    return Ok(data.drain());
-                }
+                _ => return Ok(data.drain()),
             },
         };
 

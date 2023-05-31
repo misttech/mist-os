@@ -335,14 +335,12 @@ mod tests {
 
         let test_bytes_out: [u8; 10] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
         let mut buffer_iterator = VecInputBuffer::new(&test_bytes_out);
-        let bytes_written = server_socket
-            .write(&current_task, &mut buffer_iterator, &mut None, &mut vec![])
-            .unwrap();
-        assert_eq!(bytes_written, test_bytes_out.len());
+        server_socket.write(&current_task, &mut buffer_iterator, &mut None, &mut vec![]).unwrap();
+        assert_eq!(buffer_iterator.bytes_read(), test_bytes_out.len());
 
         let mut read_back_buf = [0u8; 100];
-        assert_eq!(bytes_written, fs1.read(&mut read_back_buf).unwrap());
-        assert_eq!(&read_back_buf[..bytes_written], &test_bytes_out);
+        assert_eq!(test_bytes_out.len(), fs1.read(&mut read_back_buf).unwrap());
+        assert_eq!(&read_back_buf[..test_bytes_out.len()], &test_bytes_out);
 
         server_socket.close();
         listen_socket.close();
