@@ -2095,10 +2095,8 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
 
     ASSERT_OK(gpt->Sync());
 
-    fidl::UnownedClientEnd block_interface = gpt_dev->block_interface();
-    fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                                 block_interface.channel()))
-                                  ->Rebind(fidl::StringView("gpt.cm"));
+    fidl::WireResult result =
+        fidl::WireCall(gpt_dev->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
     ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
     ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
   }

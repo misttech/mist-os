@@ -136,9 +136,18 @@ std::unique_ptr<GptDevice> Init(const char* dev) {
   fuchsia_hardware_block::wire::BlockInfo info = response.value()->info;
   printf("blocksize=0x%X blocks=%" PRIu64 "\n", info.block_size, info.block_count);
 
+  std::string controller_dev = std::string(dev) + "/device_controller";
+  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_dev.c_str());
+  if (controller.is_error()) {
+    fprintf(stderr, "gpt: error opening %s: %s\n", controller_dev.c_str(),
+            controller.status_string());
+    return nullptr;
+  }
+
   std::unique_ptr<GptDevice> gpt;
-  if (zx_status_t status = GptDevice::CreateNoController(std::move(block.value()), info.block_size,
-                                                         info.block_count, &gpt);
+  if (zx_status_t status =
+          GptDevice::Create(std::move(block.value()), std::move(controller.value()),
+                            info.block_size, info.block_count, &gpt);
       status != ZX_OK) {
     fprintf(stderr, "gpt: error initializing GPT from %s: %s\n", dev, zx_status_get_string(status));
     return nullptr;
