@@ -362,7 +362,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:16
+From //build/bazel/bazel_action.gni:15
 
 ### bless_goldens
 
@@ -8603,7 +8603,7 @@ vboot signing key directory. Must contain `kernel.keyblock` and
 
 **Current value (from the default):** `"//third_party/vboot_reference/tests/devkeys"`
 
-From //build/images/vboot/vboot.gni:16
+From //build/images/vboot/vboot.gni:15
 
 ### vboot_verbose
 
@@ -8611,7 +8611,7 @@ If true, vboot() image builds print out the exact "futility" command line.
 
 **Current value (from the default):** `false`
 
-From //build/images/vboot/vboot.gni:12
+From //build/images/vboot/vboot.gni:11
 
 ### verbose_image_assembly
 
@@ -8859,7 +8859,7 @@ From //build/images/args.gni:110
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:138
+From //build/config/fuchsia/BUILD.gn:150
 
 ### zircon_b_partition
 
