@@ -5,6 +5,10 @@
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 
+group("create_container_package") {
+  deps = [ ":host" ]
+}
+
 install_host_tools("host") {
   deps = [ ":create_container_package_bin" ]
   outputs = [ "create_container_package" ]
@@ -67,4 +71,13 @@ if (is_host) {
       "DEFAULT_INIT_X64_PATH=" + rebase_path(_default_init_x64_path, "src"),
     ]
   }
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    # NOTE: create_container_package does not have any test yet. By listing it here, we can at least
+    # verify that it compiles in CQ.
+    ":create_container_package_bin($host_toolchain)",
+  ]
 }

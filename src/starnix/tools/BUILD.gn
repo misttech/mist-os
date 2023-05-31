@@ -3,5 +3,10 @@
 # found in the LICENSE file.
 
 group("tools") {
-  deps = [ "create_container_package:host" ]
+  deps = [ "create_container_package" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "create_container_package:tests" ]
 }

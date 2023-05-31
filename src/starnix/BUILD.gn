@@ -19,5 +19,6 @@ group("tests") {
     "examples:tests",
     "kernel:tests",
     "tests",
+    "tools:tests",
   ]
 }
