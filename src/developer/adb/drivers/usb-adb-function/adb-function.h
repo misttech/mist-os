@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 
 #include <fidl/fuchsia.hardware.adb/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/driver.h>
@@ -18,8 +19,7 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <usb/request-cpp.h>
-#include <usb/usb-request.h>
+#include <usb-endpoint/usb-endpoint-client.h>
 
 namespace usb_adb_function {
 
@@ -50,9 +50,10 @@ class UsbAdbDevice : public UsbAdb,
     dispatcher_ = loop_->dispatcher();
   }
 
-  // Constructor used by tests. Injects dispatcher.
-  explicit UsbAdbDevice(zx_device_t* parent, async_dispatcher_t* dispatcher)
-      : UsbAdb(parent), function_(parent), dispatcher_(dispatcher) {}
+  // Constructor used by tests. Injects dispatcher and synchronizes Stop() and Shutdown() calls.
+  explicit UsbAdbDevice(zx_device_t* parent, async_dispatcher_t* dispatcher,
+                        sync_completion_t* stop_sync)
+      : UsbAdb(parent), function_(parent), dispatcher_(dispatcher), test_stop_sync_(stop_sync) {}
 
   // Initialize endpoints and request pools.
   zx_status_t Init();
@@ -90,14 +91,15 @@ class UsbAdbDevice : public UsbAdb,
   };
 
   // Helper method to perform bookkeeping and insert requests back to the free pool.
-  zx_status_t InsertUsbRequest(usb::Request<> request, usb::RequestPool<>& pool);
+  zx_status_t InsertUsbRequest(fuchsia_hardware_usb_request::Request req,
+                               usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep);
 
   // Helper method to get free request buffer and queue the request for transmitting.
-  zx_status_t SendLocked(const fidl::VectorView<uint8_t>& buf) __TA_REQUIRES(tx_mutex_);
+  zx_status_t SendLocked(const fidl::VectorView<uint8_t>& buf) __TA_REQUIRES(bulk_in_ep_.mutex_);
 
   // USB request completion callback methods.
-  void TxComplete(usb_request_t* req);
-  void RxComplete(usb_request_t* req);
+  void TxComplete(fuchsia_hardware_usb_endpoint::Completion completion);
+  void RxComplete(fuchsia_hardware_usb_endpoint::Completion completion);
 
   // Helper method to configure endpoints
   zx_status_t ConfigureEndpoints(bool enable);
@@ -118,10 +120,6 @@ class UsbAdbDevice : public UsbAdb,
   void ShutdownComplete() __TA_REQUIRES(lock_);
 
   ddk::UsbFunctionProtocolClient function_;
-  size_t parent_request_size_ = 0;
-  // Size of a usb request taking into account parent request size + alignment + internal
-  // bookkeeping. This is calculated by Usb::Request<>::RequestSize() method.
-  size_t usb_request_size_ = 0;
   usb_speed_t speed_ = 0;
 
   std::optional<async::Loop> loop_;
@@ -131,73 +129,36 @@ class UsbAdbDevice : public UsbAdb,
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_adb::UsbAdbImpl>> adb_binding_
       __TA_GUARDED(adb_mutex_);
 
-  // BULK IN / Transfer USB request buffer pool.
-  usb::RequestPool<> bulk_in_reqs_ __TA_GUARDED(tx_mutex_){};
-  // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
-  // become available.
-  std::queue<txn_info_t> tx_pending_infos_ __TA_GUARDED(tx_mutex_);
-
-  // BULK out / Receive USB request buffer pool.
-  usb::RequestPool<> bulk_out_reqs_ __TA_GUARDED(rx_mutex_){};
-  // Queue of pending Receive requests from client.
-  std::queue<fidl::internal::WireCompleter<::fuchsia_hardware_adb::UsbAdbImpl::Receive>::Async>
-      rx_requests_ __TA_GUARDED(adb_mutex_);
-
   // Set once the interface is configured.
   fuchsia_hardware_adb::StatusFlags status_ __TA_GUARDED(lock_);
-
-  // Count of requests currently passed down to controller and awaiting completion.
-  // The driver is shutdown only after all pending requests are completed.
-  int32_t pending_requests_ __TA_GUARDED(lock_) = 0;
 
   // Holds suspend/unbind DDK callback to be invoked once shutdown is complete.
   fit::callback<void()> shutdown_callback_ __TA_GUARDED(lock_);
   bool shutting_down_ __TA_GUARDED(lock_) = false;
 
-  // This driver uses 4 locks to avoid race conditions in different sub-parts of the
-  // driver. tx_mutex_ is used to avoid race conditions w.r.t transmit buffers. rx_mutex_ is used
-  // to avoid race conditions w.r.t receive buffers. adb_mutex_ is used to serialize concurrent
-  // access to adb_binding_ which is set/unset by a higher level component during the lifetime of
-  // the driver. lock_ is used for all driver internal states. Alternatively a single lock (lock_)
-  // could have been used for TX, RX and driver states, but that will serialize TX methods w.r.t RX.
-  // Hence the separation of locks.
+  // This driver uses 4 locks to avoid race conditions in different sub-parts of the driver. The
+  // OUT/IN endpoints each contain one mutex, where bulk_in_ep_.mutex_ is used to avoid race
+  // conditions w.r.t transmit buffers. bulk_out_ep_.mutex_ is used to avoid race conditions w.r.t
+  // receive buffers. adb_mutex_ is used to serialize concurrent access to adb_binding_ which is
+  // set/unset by a higher level component during the lifetime of the driver. lock_ is used for all
+  // driver internal states. Alternatively a single lock (lock_) could have been used for TX, RX and
+  // driver states, but that will serialize TX methods w.r.t RX. Hence the separation of locks.
   //
   // NOTE: In order to maintain reentrancy, do not hold any lock when invoking callbacks/methods
   // that can reenter the driver methods.
   //
-  // As for lock ordering, tx_mutex_/rx_mutex_ must be the highest order lock i.e. it must be
-  // acquired before lock_ (and adb_mutex_) when both locks are held. tx_mutex_ and rx_mutex_ are
+  // As for lock ordering, IN/OUT mutex_s must be the highest order lock i.e. it must be
+  // acquired before lock_ (and adb_mutex_) when both locks are held. IN/OUT mutex_s are
   // never acquired together.
 
-  //  tx_mutex_ must be acquired before lock_ when both locks are held.
-  fbl::Mutex tx_mutex_ __TA_ACQUIRED_BEFORE(lock_);
-  //  rx_mutex_ must be acquired before lock_ and adb_mutex_ when multiple locks are held.
-  fbl::Mutex rx_mutex_ __TA_ACQUIRED_BEFORE(lock_);
-  // Currently, adb_interface_ is used only in the RX path, therefore it must be
-  // acquired after rx_mutex_ and before lock_(lock_ should be the inner most lock in all cases),
-  // when multiple locks are held. Alternatively, a reader writer lock could have be used.
-  fbl::Mutex adb_mutex_ __TA_ACQUIRED_AFTER(rx_mutex_) __TA_ACQUIRED_BEFORE(lock_);
+  // adb_mutex_ must be acquired after IN/OUT mutex_s and before lock_(lock_ should be the inner
+  // most lock in all cases), when multiple locks are held. Alternatively, a reader writer lock
+  // could have be used.
+  fbl::Mutex adb_mutex_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex_)
+      __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex_) __TA_ACQUIRED_BEFORE(lock_);
   // Lock for guarding driver states. This should be held for only a short duration and is the inner
   // most lock in all cases.
   mutable fbl::Mutex lock_;
-
-  // Completion callbacks.
-  usb_request_complete_callback_t rx_complete_ = {
-      .callback =
-          [](void* ctx, usb_request_t* req) {
-            ZX_DEBUG_ASSERT(ctx != nullptr);
-            reinterpret_cast<UsbAdbDevice*>(ctx)->RxComplete(req);
-          },
-      .ctx = this,
-  };
-  usb_request_complete_callback_t tx_complete_ = {
-      .callback =
-          [](void* ctx, usb_request_t* req) {
-            ZX_DEBUG_ASSERT(ctx != nullptr);
-            reinterpret_cast<UsbAdbDevice*>(ctx)->TxComplete(req);
-          },
-      .ctx = this,
-  };
 
   // USB ADB interface descriptor.
   struct {
@@ -236,6 +197,30 @@ class UsbAdbDevice : public UsbAdb,
               .b_interval = 0,
           },
   };
+
+  zx_status_t InitEndpoint(fidl::ClientEnd<fuchsia_hardware_usb_function::UsbFunction>& client,
+                           uint8_t direction, uint8_t* ep_addrs,
+                           usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep, uint32_t req_count);
+
+  // Bulk OUT/RX endpoint
+  usb_endpoint::UsbEndpoint<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
+                                                       std::mem_fn(&UsbAdbDevice::RxComplete)};
+  // Queue of pending Receive requests from client.
+  std::queue<fidl::internal::WireCompleter<::fuchsia_hardware_adb::UsbAdbImpl::Receive>::Async>
+      rx_requests_ __TA_GUARDED(adb_mutex_);
+  // pending_replies_ only used for bulk_out_ep_
+  std::queue<fuchsia_hardware_usb_endpoint::Completion> pending_replies_
+      __TA_GUARDED(bulk_out_ep_.mutex_);
+
+  // Bulk IN/TX endpoint
+  usb_endpoint::UsbEndpoint<UsbAdbDevice> bulk_in_ep_{usb::EndpointType::BULK, this,
+                                                      std::mem_fn(&UsbAdbDevice::TxComplete)};
+  // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
+  // become available.
+  std::queue<txn_info_t> tx_pending_infos_ __TA_GUARDED(bulk_in_ep_.mutex_);
+
+  // Used for synchronizing the order of Stop() and Shutdown() in tests.
+  sync_completion_t* test_stop_sync_;
 };
 
 }  // namespace usb_adb_function
