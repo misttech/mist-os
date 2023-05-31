@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <threads.h>
 
-// TODO(kulakowski) Implement a real and secure prng
-
 static mtx_t counter_lock = MTX_INIT;
 static uint64_t counter;
 
