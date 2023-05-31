@@ -71,5 +71,5 @@ func GetFlashDeps(sdkRoot, productName string) ([]string, error) {
 
 // Flash flashes the target.
 func (f *FFXInstance) Flash(ctx context.Context, serialNum, manifest, sshKey string) error {
-	return f.Run(ctx, "--target", serialNum, "target", "flash", "--authorized-keys", sshKey, manifest)
+	return f.Run(ctx, "--target", serialNum, "target", "flash", "--authorized-keys", sshKey, "--manifest", manifest)
 }
