@@ -72,6 +72,7 @@ if (!use_bazel_images_only && bazel_assembly_targets != []) {
 group("verifications") {
   testonly = true
   deps = [
+    "board_configurations:verifications",
     "images_configurations:verifications",
     "partitions_configurations:verifications",
     "product_configurations:verifications",

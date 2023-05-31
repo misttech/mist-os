@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import(
+    "//build/bazel/assembly/board_configurations/verify_board_configuration.gni")
+import("//build/python/python_binary.gni")
+
+verify_board_configuration("verify_x64") {
+  bazel_board_config_target = "//boards:x64"
+  golden_json = "//boards/x64/board_information.json5"
+}
+
+group("verifications") {
+  testonly = true
+  deps = [ ":verify_x64" ]
+}
+
+python_binary("verify_board_configuration") {
+  main_source = "//build/bazel/assembly/board_configurations/verify_board_configuration.py"
+  main_callable = "main"
+  deps = [ "//third_party/pyjson5" ]
+}

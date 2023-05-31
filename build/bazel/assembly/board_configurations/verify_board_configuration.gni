@@ -1,0 +1,59 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+import("//build/python/python_action.gni")
+
+template("verify_board_configuration") {
+  assert(defined(invoker.bazel_board_config_target),
+         "bazel_board_config_target is required")
+  assert(defined(invoker.golden_json), "golden_json is required")
+
+  _bazel_board_config_action_target = "${target_name}.bazel_board_config_action"
+  _bazel_board_config_file = "${target_name}/board_config.json"
+  bazel_action(_bazel_board_config_action_target) {
+    forward_variables_from(invoker,
+                           [
+                             "bazel_inputs",
+                             "dep",
+                           ])
+    testonly = true
+    visibility = [ ":${invoker.target_name}" ]
+    command = "build"
+    bazel_targets = [ invoker.bazel_board_config_target ]
+    copy_outputs = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_PATH}}_board_config.json"
+        ninja = _bazel_board_config_file
+      },
+    ]
+  }
+
+  python_action(target_name) {
+    forward_variables_from(invoker, [ "visibility" ])
+    testonly = true
+
+    inputs = [
+      "${target_gen_dir}/${_bazel_board_config_file}",
+      invoker.golden_json,
+    ]
+    outputs = [ "${target_out_dir}/${target_name}/diff" ]
+
+    deps = [ ":${_bazel_board_config_action_target}" ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    binary_label =
+        "//build/bazel/assembly/board_configurations:verify_board_configuration"
+    args = [
+      "--generated_board_config",
+      rebase_path(inputs[0], root_build_dir),
+      "--golden_json5",
+      rebase_path(inputs[1], root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+}

@@ -14,7 +14,6 @@ fuchsia_board_configuration(
     name = "x64",
     board_name = "x64",
     provided_features = [
-        "fuchsia::usb_peripheral_support",
         "fuchsia::wlan_softmac",
     ],
 )
