@@ -485,8 +485,22 @@ zx::result<> Device::AllocateBars() {
   ZX_DEBUG_ASSERT(plugged_in_);
   ZX_DEBUG_ASSERT(bar_count_ <= bars_.max_size());
 
+  // Ensure we allocate BARs that already have an assigned address first, in
+  // case it lines up with the allocators that we might use an address in a
+  // lower BAR that is already assigned to a later BAR.
+  std::deque<uint32_t> bar_allocation_order;
+  for (auto& bar : bars_) {
+    if (bar) {
+      if (bar->address) {
+        bar_allocation_order.emplace_front(bar->bar_id);
+      } else {
+        bar_allocation_order.emplace_back(bar->bar_id);
+      }
+    }
+  }
+
   // Allocate BARs for the device
-  for (uint32_t bar_id = 0; bar_id < bar_count_; bar_id++) {
+  for (auto bar_id : bar_allocation_order) {
     if (bars_[bar_id]) {
       if (auto result = AllocateBar(bar_id); result.is_error()) {
         zxlogf(ERROR, "[%s] failed to allocate bar %u: %s", cfg_->addr(), bar_id,
