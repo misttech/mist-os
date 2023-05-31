@@ -21,9 +21,6 @@ group("isolated_test_spec_allowlist") {
   # single run of the test. Isolated mode should not be used unless absolutely
   # necessary, and justification must be included when it is used.
   visibility = [
-    # TODO(olivernewman): Remove or add justification.
-    "//src/sys/fuzzing/fuzzctl:*",
-
     # TODO(fxbug.dev/126316) ffx self-test seems to be buggy, so let's at least
     # prevent it from affecting other tests by isolating it to its own shard.
     "//src/developer/ffx/frontends/ffx:ffx-e2e-with-target",
