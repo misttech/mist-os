@@ -26,7 +26,7 @@ no_check_targets = [ "//third_party/*" ]
 # Use of `exec_script()` is discouraged for performance reasons.
 # See: https://fuchsia.dev/fuchsia-src/concepts/build_system/best_practices#exec-script
 exec_script_whitelist = [
-  "//build/config/clang/clang.gni",
+  "//build/config/fuchsia/BUILD.gn",
   "//build/config/mac/mac_sdk.gni",
   "//build/config/profile/BUILD.gn",
   "//build/config/sanitizers/BUILD.gn",

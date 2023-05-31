@@ -5,7 +5,6 @@
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
-import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
 
 declare_args() {

@@ -71,6 +71,18 @@ config("compiler") {
       configs += [ "//build/config/rust:one_codegen_unit" ]
     }
 
+    # TODO(phosek): this is inefficient, rather this should come from a JSON file.
+    # Relative path makes command-lines remote-portable.
+    _clang_resource_dir =
+        rebase_path(exec_script("$clang_prefix/clang",
+                                [
+                                  "--target=$current_target_tuple",
+                                  "-print-resource-dir",
+                                ],
+                                "trim string",
+                                []),
+                    root_build_dir)
+
     rustflags = [
       "-L",
       rebase_path(rust_sysroot_dir, root_build_dir) + "/lib",
@@ -82,7 +94,7 @@ config("compiler") {
       # build.
       "-Clink-arg=-L" + rebased_clang_prefix + "/../lib/" +
           current_target_tuple,
-      "-Clink-arg=-L" + clang_resource_dir + "/lib/" + current_target_tuple,
+      "-Clink-arg=-L" + _clang_resource_dir + "/lib/" + current_target_tuple,
       "-Clink-arg=--pack-dyn-relocs=relr",
       "-Clink-arg=-dynamic-linker=ld.so.1",
       "-Clink-arg=--icf=all",
@@ -200,8 +212,17 @@ config("integer-paranoia") {
 # clang_libunwind is only available on fuchsia.
 # See the definition in //build/config/clang/clang.gni.
 if (is_fuchsia) {
+  # TODO(fxbug.dev/57729): Get this information from runtime.json instead.
+  _clang_libunwind = exec_script("$clang_prefix/clang++",
+                                 [
+                                   "--target=$current_target_tuple",
+                                   "-print-file-name=libunwind.so",
+                                 ],
+                                 "trim string",
+                                 [])
+
   config("libunwind") {
-    libs = [ clang_libunwind ]
+    libs = [ _clang_libunwind ]
   }
 }
 

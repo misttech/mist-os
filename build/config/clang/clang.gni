@@ -31,29 +31,3 @@ declare_args() {
 # The value of clang_prefix relative to root_build_dir, useful
 # when expanding it in command arguments.
 rebased_clang_prefix = rebase_path(clang_prefix, root_build_dir)
-
-if (toolchain_variant.supports_cpp) {
-  # TODO(phosek): this is inefficient, rather this should come from a JSON file.
-  # Relative path makes command-lines remote-portable.
-  clang_resource_dir =
-      rebase_path(exec_script("$clang_prefix/clang",
-                              [
-                                "--target=$current_target_tuple",
-                                "-print-resource-dir",
-                              ],
-                              "trim string",
-                              []),
-                  root_build_dir)
-
-  # We only provide dynamic runtime libs on Fuchsia.
-  if (is_fuchsia) {
-    # TODO(fxbug.dev/57729): Get this information from runtime.json instead.
-    clang_libunwind = exec_script("$clang_prefix/clang++",
-                                  [
-                                    "--target=$current_target_tuple",
-                                    "-print-file-name=libunwind.so",
-                                  ],
-                                  "trim string",
-                                  [])
-  }
-}
