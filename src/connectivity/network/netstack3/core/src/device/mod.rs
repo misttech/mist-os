@@ -18,7 +18,7 @@ use core::{
     fmt::{self, Debug, Display, Formatter},
     hash::Hash,
     marker::PhantomData,
-    num::NonZeroU8,
+    num::{NonZeroU8, NonZeroUsize},
     ops::Deref as _,
 };
 
@@ -35,6 +35,7 @@ use net_types::{
     },
     BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use nonzero_ext::nonzero;
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
 use tracing::{debug, trace};
@@ -1569,7 +1570,7 @@ impl<C: DeviceLayerTypes> Debug for DeviceId<C> {
 }
 
 impl<C: DeviceLayerTypes> IdMapCollectionKey for DeviceId<C> {
-    const VARIANT_COUNT: usize = 2;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(2usize);
 
     fn get_id(&self) -> usize {
         match self {

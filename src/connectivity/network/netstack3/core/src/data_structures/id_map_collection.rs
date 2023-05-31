@@ -11,6 +11,7 @@
 //! performance requirements.
 
 use alloc::vec::Vec;
+use core::num::NonZeroUsize;
 
 use super::id_map::{self, EntryKey, IdMap};
 
@@ -21,7 +22,7 @@ use super::id_map::{self, EntryKey, IdMap};
 /// typically mapped to a number of `enum` variants (nested or not).
 pub trait IdMapCollectionKey {
     /// The number of variants this key supports.
-    const VARIANT_COUNT: usize;
+    const VARIANT_COUNT: NonZeroUsize;
 
     /// Get the variant index for this key.
     ///
@@ -266,7 +267,7 @@ impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
     /// Creates a new empty `IdMapCollection`.
     pub fn new() -> Self {
         let mut data = Vec::new();
-        data.resize_with(K::VARIANT_COUNT, IdMap::default);
+        data.resize_with(K::VARIANT_COUNT.get(), IdMap::default);
         Self { data, count: 0, _marker: core::marker::PhantomData }
     }
 
@@ -387,6 +388,8 @@ impl<K: IdMapCollectionKey, T> Default for IdMapCollection<K, T> {
 mod tests {
     use alloc::collections::HashSet;
 
+    use nonzero_ext::nonzero;
+
     use super::*;
     use crate::testutil::assert_empty;
 
@@ -410,7 +413,7 @@ mod tests {
     }
 
     impl IdMapCollectionKey for FakeKey {
-        const VARIANT_COUNT: usize = 3;
+        const VARIANT_COUNT: NonZeroUsize = nonzero!(3usize);
 
         fn get_variant(&self) -> usize {
             match self.var {

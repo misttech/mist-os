@@ -987,7 +987,7 @@ pub struct MaybeClosedConnectionId<I: Ip>(usize, IpVersionMarker<I>);
 pub struct ConnectionId<I: Ip>(usize, IpVersionMarker<I>);
 
 impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
-    const VARIANT_COUNT: usize = 2;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(2usize);
 
     fn get_variant(&self) -> usize {
         match I::VERSION {

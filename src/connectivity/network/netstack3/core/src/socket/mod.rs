@@ -10,13 +10,16 @@ pub mod datagram;
 pub(crate) mod posix;
 
 use alloc::collections::HashMap;
-use core::{convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData};
+use core::{
+    convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroUsize,
+};
+
+use derivative::Derivative;
 use net_types::{
     ip::{Ip, IpAddress},
     AddrAndZone, SpecifiedAddr, Witness as _,
 };
-
-use derivative::Derivative;
+use nonzero_ext::nonzero;
 
 use crate::{
     data_structures::{
@@ -397,7 +400,7 @@ impl<S: SocketMapStateSpec> SocketId<S> {
 }
 
 impl<S: SocketMapStateSpec> IdMapCollectionKey for SocketId<S> {
-    const VARIANT_COUNT: usize = 2;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(2usize);
     fn get_id(&self) -> usize {
         match self {
             Self::Listener(l) => l.get_key_index(),

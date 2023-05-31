@@ -4,7 +4,11 @@
 
 //! The Internet Control Message Protocol (ICMP).
 
-use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
+use core::{
+    convert::TryInto as _,
+    fmt::Debug,
+    num::{NonZeroU8, NonZeroUsize},
+};
 
 use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
@@ -15,6 +19,7 @@ use net_types::{
     },
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
+use nonzero_ext::nonzero;
 use packet::{
     BufferMut, EmptyBuf, InnerPacketBuilder as _, ParseBuffer, Serializer, TruncateDirection,
     TruncatingSerializer,
@@ -304,7 +309,7 @@ impl<I: Ip> Into<usize> for IcmpUnboundId<I> {
 }
 
 impl<I: Ip> IdMapCollectionKey for IcmpUnboundId<I> {
-    const VARIANT_COUNT: usize = 1;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
 
     fn get_variant(&self) -> usize {
         0
@@ -358,7 +363,7 @@ impl<I: Ip> Into<usize> for IcmpConnId<I> {
 }
 
 impl<I: Ip> IdMapCollectionKey for IcmpConnId<I> {
-    const VARIANT_COUNT: usize = 1;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
 
     fn get_variant(&self) -> usize {
         0

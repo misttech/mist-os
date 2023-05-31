@@ -8,7 +8,7 @@ use std::{
     convert::TryInto as _,
     fmt::Debug,
     marker::PhantomData,
-    num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
+    num::{NonZeroU16, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
     ops::ControlFlow,
     sync::Arc,
 };
@@ -40,6 +40,7 @@ use netstack3_core::{
     transport::udp,
     BufferNonSyncContext, NonSyncContext, SyncCtx,
 };
+use nonzero_ext::nonzero;
 use packet::{Buf, BufferMut, SerializeError};
 use packet_formats::{
     error::ParseError,
@@ -782,7 +783,7 @@ pub enum IcmpEcho {}
 pub(crate) enum IcmpListenerId {}
 
 impl IdMapCollectionKey for IcmpListenerId {
-    const VARIANT_COUNT: usize = 0;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
 
     fn get_variant(&self) -> usize {
         match *self {}

@@ -632,7 +632,7 @@ impl<I: Ip> From<UnboundId<I>> for usize {
 }
 
 impl<I: Ip> IdMapCollectionKey for UnboundId<I> {
-    const VARIANT_COUNT: usize = 1;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
 
     fn get_variant(&self) -> usize {
         0
@@ -665,7 +665,7 @@ impl<I: Ip> From<ConnId<I>> for usize {
 }
 
 impl<I: Ip> IdMapCollectionKey for ConnId<I> {
-    const VARIANT_COUNT: usize = 1;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
 
     fn get_variant(&self) -> usize {
         0
@@ -702,7 +702,7 @@ impl<I: Ip> ListenerId<I> {
 }
 
 impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
-    const VARIANT_COUNT: usize = 1;
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
     fn get_variant(&self) -> usize {
         0
     }
