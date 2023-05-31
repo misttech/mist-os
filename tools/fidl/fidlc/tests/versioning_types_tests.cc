@@ -287,9 +287,9 @@ TEST(VersioningTypesTests, BadAvailabilityInitWrongOrder) {
 
 TEST(VersioningTypesTests, GoodAvailabilityInheritUnbounded) {
   Availability availability;
-  ASSERT_TRUE(availability.Init({}));
+  ASSERT_TRUE(availability.Init({.added = v(1)}));
   ASSERT_TRUE(availability.Inherit(Availability::Unbounded()).Ok());
-  EXPECT_EQ(availability.Debug(), "-inf _ +inf n/a");
+  EXPECT_EQ(availability.Debug(), "1 _ +inf n/a");
 }
 
 TEST(VersioningTypesTests, GoodAvailabilityInheritUnset) {
@@ -436,7 +436,7 @@ TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentPartially) {
 
 TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentDeprecated) {
   Availability parent, child;
-  ASSERT_TRUE(parent.Init({.deprecated = v(2)}));
+  ASSERT_TRUE(parent.Init({.added = v(1), .deprecated = v(2)}));
   ASSERT_TRUE(child.Init({.added = v(1), .deprecated = v(3), .removed = v(4)}));
   ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
 
@@ -449,7 +449,7 @@ TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentDeprecated) {
 
 TEST(VersioningTypesTests, BadAvailabilityInheritLegacyNoNeverRemoved) {
   Availability parent, child;
-  ASSERT_TRUE(parent.Init({}));
+  ASSERT_TRUE(parent.Init({.added = v(1)}));
   ASSERT_TRUE(child.Init({.legacy = Legacy::kNo}));
   ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
 
@@ -462,7 +462,7 @@ TEST(VersioningTypesTests, BadAvailabilityInheritLegacyNoNeverRemoved) {
 
 TEST(VersioningTypesTests, BadAvailabilityInheritLegacyYesNeverRemoved) {
   Availability parent, child;
-  ASSERT_TRUE(parent.Init({}));
+  ASSERT_TRUE(parent.Init({.added = v(1)}));
   ASSERT_TRUE(child.Init({.legacy = Legacy::kYes}));
   ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
 

@@ -79,12 +79,6 @@ class Version final {
   static std::optional<Version> Parse(std::string_view str);
 
   // Special version before all others. "Added at -inf" means "no beginning".
-  //
-  // TODO(fxbug.dev/67858): Originally this was used for "unversioned"
-  // libraries, where everything was available on (-inf, +inf). We decided to
-  // eliminate the concept of an "unversioned" library, defaulting instead to
-  // the availability [HEAD, +inf). Now NegInf is not really needed, and PosInf
-  // should perhaps be renamed to "Inf".
   static constexpr Version NegInf() { return Version(0); }
   // Special version after all others. "Removed at +inf" means "no end".
   static constexpr Version PosInf() { return Version(std::numeric_limits<uint64_t>::max()); }
@@ -214,14 +208,8 @@ class Availability final {
  public:
   constexpr explicit Availability() = default;
 
-  // Returns an availability that exists forever.
-  //
-  // TODO(fxbug.dev/67858): Originally this was used for "unversioned"
-  // libraries, where everything was available on (-inf, +inf). We decided to
-  // eliminate the concept of an "unversioned" library, defaulting instead to
-  // the availability [HEAD, +inf). Now the only purpose of Unbounded is to be a
-  // base case for Inherit(), but we could possibly remove it and instead have a
-  // way of constructing a root availability already in the kInherited state.
+  // Returns an availability that exists forever. This only exists as the base
+  // case for calling `Inherit`. It never occurs as a final result.
   static constexpr Availability Unbounded() {
     Availability unbounded(State::kInherited);
     unbounded.added_ = Version::NegInf();
@@ -355,9 +343,6 @@ class VersionSelection final {
   // Returns the version for the given platform. Defaults to HEAD if no version
   // was inserted for this platform.
   Version Lookup(const Platform& platform) const;
-
-  // Returns the set of platforms that versions were selected for.
-  std::set<Platform, Platform::Compare> Platforms() const;
 
  private:
   std::map<Platform, Version, Platform::Compare> map_;

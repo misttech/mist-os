@@ -286,6 +286,7 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
 
   if (result.Ok()) {
     ZX_ASSERT(added_ && removed_ && legacy_);
+    ZX_ASSERT(added_.value() != Version::NegInf());
     ZX_ASSERT(ValidOrder());
     state_ = State::kInherited;
   } else {
@@ -354,14 +355,6 @@ Version VersionSelection::Lookup(const Platform& platform) const {
     return Version::Head();
   }
   return iter->second;
-}
-
-std::set<Platform, Platform::Compare> VersionSelection::Platforms() const {
-  std::set<Platform, Platform::Compare> platforms;
-  for (auto& [platform, version] : map_) {
-    platforms.insert(platform);
-  }
-  return platforms;
 }
 
 }  // namespace fidl

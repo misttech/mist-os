@@ -130,14 +130,6 @@ std::set<const Library*, LibraryComparator> Libraries::Unused() const {
   return unused;
 }
 
-std::set<Platform, Platform::Compare> Libraries::Platforms() const {
-  std::set<Platform, Platform::Compare> platforms;
-  for (auto& library : libraries_) {
-    platforms.insert(library->platform.value());
-  }
-  return platforms;
-}
-
 static size_t EditDistance(std::string_view sequence1, std::string_view sequence2) {
   size_t s1_length = sequence1.length();
   size_t s2_length = sequence2.length();

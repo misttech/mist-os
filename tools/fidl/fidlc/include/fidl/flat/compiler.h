@@ -123,9 +123,6 @@ class Libraries : private ReporterMixin {
   // in the target libary's dependency tree. Must have inserted at least one.
   std::set<const Library*, LibraryComparator> Unused() const;
 
-  // Returns the set of platforms that these libraries are versioned under.
-  std::set<Platform, Platform::Compare> Platforms() const;
-
   // Registers a new attribute schema under the given name, and returns it.
   AttributeSchema& AddAttributeSchema(std::string name);
 

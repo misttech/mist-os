@@ -149,13 +149,22 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     return;
   }
 
+  const auto init_args = Availability::InitArgs{
+      .added = GetVersion(added),
+      .deprecated = GetVersion(deprecated),
+      .removed = GetVersion(removed),
+      .legacy = GetLegacy(legacy),
+  };
   if (is_library) {
     library()->platform = GetPlatform(platform).value_or(GetDefaultPlatform());
+    if (!init_args.added) {
+      // Return early to avoid letting the -inf from Availability::Unbounded()
+      // propagate any further, since .Inherit() asserts added != -inf.
+      element->availability.Fail();
+      return;
+    }
   }
-  if (!element->availability.Init({.added = GetVersion(added),
-                                   .deprecated = GetVersion(deprecated),
-                                   .removed = GetVersion(removed),
-                                   .legacy = GetLegacy(legacy)})) {
+  if (!element->availability.Init(init_args)) {
     Fail(ErrInvalidAvailabilityOrder, attribute->span);
     // Return early to avoid confusing error messages about inheritance
     // conflicts for an availability that isn't even self-consistent.
