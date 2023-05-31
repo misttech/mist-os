@@ -6,7 +6,7 @@
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
 use {
-    crate::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec},
+    crate::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec, VolumesSpec},
     device_watcher::recursive_wait,
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
@@ -101,6 +101,39 @@ async fn write_blob() {
     // content sniffing of the FVM magic.
     builder.with_disk().format_volumes(volumes_spec()).with_gpt();
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
+
+    let fixture = builder.build().await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
+
+    // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
+    let admin =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+
+    // Ensure that we can write a blob into the new Blobfs instance.
+    write_test_blob(&blobfs_root).await;
+
+    fixture.tear_down().await;
+}
+
+// Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method when a data
+// data partition does not already exist.
+// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
+// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+#[fuchsia::test]
+#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+async fn write_blob_no_existing_data_partition() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("ramdisk_image", true);
+    // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
+    // content sniffing of the FVM magic.
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt();
+    builder
+        .with_zbi_ramdisk()
+        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() });
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;

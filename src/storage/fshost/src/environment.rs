@@ -14,7 +14,9 @@ use {
         },
         device::{
             constants::{
-                DATA_PARTITION_LABEL, DATA_TYPE_GUID, DEFAULT_F2FS_MIN_BYTES, ZXCRYPT_DRIVER_PATH,
+                BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
+                DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
+                ZXCRYPT_DRIVER_PATH,
             },
             BlockDevice, Device,
         },
@@ -22,6 +24,7 @@ use {
     },
     anyhow::{anyhow, bail, Context, Error},
     async_trait::async_trait,
+    device_watcher::{recursive_wait, recursive_wait_and_open},
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_fxfs::MountOptions,
     fidl_fuchsia_hardware_block_partition::Guid,
@@ -56,6 +59,12 @@ pub trait Environment: Send + Sync {
     /// Attaches the specified driver to the device.
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
 
+    /// Binds the fvm driver and returns a list of the names of the child partitions.
+    async fn bind_and_enumerate_fvm(
+        &mut self,
+        device: &mut dyn Device,
+    ) -> Result<Vec<String>, Error>;
+
     /// Creates a static instance of Fxfs on `device` and calls serve_multi_volume(). Only creates
     /// the overall Fxfs instance. Mount_blob_volume and mount_data_volume still need to be called.
     async fn mount_fxblob(&mut self, device: &mut dyn Device) -> Result<(), Error>;
@@ -66,18 +75,17 @@ pub trait Environment: Send + Sync {
     /// Mounts Fxblob's data volume on the given device.
     async fn mount_data_volume(&mut self) -> Result<(), Error>;
 
-    /// Mounts Blobfs on the given device.
-    async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+    /// Called after the fvm driver is bound. Waits for the block driver to bind itself to the
+    /// blobfs partition before creating a blobfs BlockDevice, which it passes into mount_blobfs().
+    async fn mount_blobfs_on(&mut self, blobfs_partition_name: &str) -> Result<(), Error>;
 
-    /// Launch data partition on the given device.
-    /// If formatting is required, returns ServeFilesystemStatus::FormatRequired.
-    async fn launch_data(
-        &mut self,
-        device: &mut dyn Device,
-    ) -> Result<ServeFilesystemStatus, Error>;
+    /// Called after the fvm driver is bound. Waits for the block driver to bind itself to the
+    /// data partition before creating a data BlockDevice, which it then passes into launch_data().
+    /// Calls bind_data() on the mounted filesystem.
+    async fn mount_data_on(&mut self, data_partition_name: &str) -> Result<(), Error>;
 
     /// Wipe and recreate data partition before reformatting with a filesystem.
-    async fn format_data(&mut self, device: &mut dyn Device) -> Result<Filesystem, Error>;
+    async fn format_data(&mut self, fvm_topo_path: &str) -> Result<Filesystem, Error>;
 
     /// Attempt to migrate |filesystem|, if requested, to some other format.
     /// |device| should refer to the FVM partition for |filesystem|.
@@ -183,6 +191,7 @@ pub struct FshostEnvironment {
     fxblob: Option<ServingMultiVolumeFilesystem>,
     blobfs: Filesystem,
     data: Filesystem,
+    fvm: Option<(/*topological_path*/ String, /*device_directory*/ fio::DirectoryProxy)>,
     launcher: Arc<FilesystemLauncher>,
     /// This lock can be taken and device.path() added to the vector to have them
     /// ignored the next time they appear to the Watcher/Matcher code.
@@ -203,10 +212,22 @@ impl FshostEnvironment {
             fxblob: None,
             blobfs: Filesystem::Queue(Vec::new()),
             data: Filesystem::Queue(Vec::new()),
+            fvm: None,
             launcher: Arc::new(FilesystemLauncher { config, boot_args, ramdisk_prefix }),
             matcher_lock,
             inspector,
         }
+    }
+
+    fn get_fvm(&self) -> Result<(&String, &fio::DirectoryProxy), Error> {
+        debug_assert!(
+            self.fvm.is_some(),
+            "fvm was not initialized, ensure `bind_and_enumerate_fvm()` was called!"
+        );
+        if let Some((ref fvm_topo_path, ref fvm_dir)) = self.fvm {
+            return Ok((fvm_topo_path, fvm_dir));
+        }
+        bail!("fvm was not initialized");
     }
 
     /// Returns a proxy for the root of the Blobfs filesystem.  This can be called before Blobfs is
@@ -425,63 +446,8 @@ impl FshostEnvironment {
             Ok(None)
         }
     }
-}
 
-#[async_trait]
-impl Environment for FshostEnvironment {
-    async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error> {
-        self.launcher.attach_driver(device, driver_path).await
-    }
-
-    async fn mount_fxblob(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        tracing::info!(
-            path = %device.path(),
-            expected_format = "fxfs",
-            "Mounting fxblob"
-        );
-        let serving_fs = self.launcher.serve_fxblob(device).await?;
-        self.fxblob = Some(serving_fs);
-        Ok(())
-    }
-
-    async fn mount_blob_volume(&mut self) -> Result<(), Error> {
-        let _ = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs partition already mounted"))?;
-
-        let multi_vol_fs =
-            self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
-        let () = multi_vol_fs
-            .check_volume("blob", None)
-            .await
-            .context("Failed to verify the blob volume")?;
-        let blobfs = multi_vol_fs
-            .open_volume("blob", MountOptions { crypt: None, as_blob: true })
-            .await
-            .context("Failed to open the blob volume")?;
-        let root_dir = blobfs.root();
-        let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
-        for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
-        }
-        self.blobfs = Filesystem::ServingVolumeInFxblob(None, "blob".to_string());
-        Ok(())
-    }
-
-    async fn mount_data_volume(&mut self) -> Result<(), Error> {
-        let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
-
-        let multi_vol_fs =
-            self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
-        let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
-
-        let queue = self.data.queue().unwrap();
-        let root_dir = filesystem.root(self.fxblob.as_mut())?;
-        for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
-        }
-        self.data = filesystem;
-        Ok(())
-    }
-
+    /// Mounts Blobfs on the given device.
     async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
 
@@ -495,6 +461,8 @@ impl Environment for FshostEnvironment {
         Ok(())
     }
 
+    /// Launch data partition on the given device.
+    /// If formatting is required, returns ServeFilesystemStatus::FormatRequired.
     async fn launch_data(
         &mut self,
         device: &mut dyn Device,
@@ -576,12 +544,177 @@ impl Environment for FshostEnvironment {
 
         Ok(filesystem)
     }
+}
 
-    async fn format_data(&mut self, device: &mut dyn Device) -> Result<Filesystem, Error> {
+#[async_trait]
+impl Environment for FshostEnvironment {
+    async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error> {
+        self.launcher.attach_driver(device, driver_path).await
+    }
+
+    async fn bind_and_enumerate_fvm(
+        &mut self,
+        device: &mut dyn Device,
+    ) -> Result<Vec<String>, Error> {
+        // Attach the FVM driver and connect to the VolumeManager.
+        self.attach_driver(device, FVM_DRIVER_PATH).await?;
+        let fvm_dir = fuchsia_fs::directory::open_in_namespace(
+            &device.topological_path(),
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )?;
+        let fvm_volume_manager_proxy =
+            recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "/fvm")
+                .await
+                .context("failed to connect to the VolumeManager")?;
+        // Call VolumeManager::GetInfo in order to ensure all partition entries are visible.
+        // TODO(https://fxbug.dev/126961): Right now, we rely on get_info() completing to ensure
+        // that fvm child partitions are visible in devfs. This should be revised when DF supports
+        // another way of safely enumerating child partitions.
+        zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
+            .context("get_info failed")?;
+
+        let fvm_topo_path = format!("{}/fvm", device.topological_path());
+        let fvm_dir = fuchsia_fs::directory::open_in_namespace(
+            &fvm_topo_path,
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )?;
+        let dir_entries = fuchsia_fs::directory::readdir(&fvm_dir).await?;
+
+        self.fvm = Some((fvm_topo_path, fvm_dir));
+        Ok(dir_entries.into_iter().map(|entry| entry.name).collect())
+    }
+
+    async fn mount_fxblob(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+        tracing::info!(
+            path = %device.path(),
+            expected_format = "fxfs",
+            "Mounting fxblob"
+        );
+        let serving_fs = self.launcher.serve_fxblob(device).await?;
+        self.fxblob = Some(serving_fs);
+        Ok(())
+    }
+
+    async fn mount_blob_volume(&mut self) -> Result<(), Error> {
+        let _ = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs partition already mounted"))?;
+
+        let multi_vol_fs =
+            self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
+        let () = multi_vol_fs
+            .check_volume("blob", None)
+            .await
+            .context("Failed to verify the blob volume")?;
+        let blobfs = multi_vol_fs
+            .open_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .await
+            .context("Failed to open the blob volume")?;
+        let root_dir = blobfs.root();
+        let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
+        for server in queue.drain(..) {
+            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+        }
+        self.blobfs = Filesystem::ServingVolumeInFxblob(None, "blob".to_string());
+        Ok(())
+    }
+
+    async fn mount_data_volume(&mut self) -> Result<(), Error> {
+        let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
+
+        let multi_vol_fs =
+            self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
+        let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
+
+        let queue = self.data.queue().unwrap();
+        let root_dir = filesystem.root(self.fxblob.as_mut())?;
+        for server in queue.drain(..) {
+            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+        }
+        self.data = filesystem;
+        Ok(())
+    }
+
+    async fn mount_blobfs_on(&mut self, blobfs_partition_name: &str) -> Result<(), Error> {
+        let (fvm_topo_path, fvm_dir) = self.get_fvm()?;
+        let blobfs_topo_path = format!("{}/{blobfs_partition_name}/block", fvm_topo_path);
+        recursive_wait(fvm_dir, &format!("{blobfs_partition_name}/block"))
+            .await
+            .context("failed to bind block driver to blobfs device")?;
+        let mut device = BlockDevice::new(blobfs_topo_path)
+            .await
+            .context("failed to create blobfs block device")?;
+        let (label, type_guid) =
+            (device.partition_label().await?.to_string(), *device.partition_type().await?);
+        if !(label == BLOBFS_PARTITION_LABEL && type_guid == BLOBFS_TYPE_GUID) {
+            tracing::error!(
+                "incorrect parameters for blobfs partition: label = {}, type = {:?}",
+                label,
+                type_guid
+            );
+            bail!("blobfs partition has incorrect label/guid");
+        }
+        self.mount_blobfs(&mut device).await
+    }
+
+    async fn mount_data_on(&mut self, data_partition_name: &str) -> Result<(), Error> {
+        let (fvm_topo_path, fvm_dir) = self.get_fvm()?;
+        let data_topo_path = format!("{}/{data_partition_name}/block", fvm_topo_path);
+        recursive_wait(fvm_dir, &format!("{data_partition_name}/block"))
+            .await
+            .context("failed to bind block driver to the data device")?;
+        let mut device = BlockDevice::new(data_topo_path)
+            .await
+            .context("failed to create blobfs block device")?;
+        let (label, type_guid) =
+            (device.partition_label().await?.to_string(), *device.partition_type().await?);
+        if !((label == DATA_PARTITION_LABEL || label == LEGACY_DATA_PARTITION_LABEL)
+            && type_guid == DATA_TYPE_GUID)
+        {
+            tracing::error!(
+                "incorrect parameters for data partition: label = {}, type = {:?}",
+                label,
+                type_guid
+            );
+            bail!("data partition has incorrect label/guid");
+        }
+
+        let fs = match self.launch_data(&mut device).await? {
+            ServeFilesystemStatus::Serving(mut filesystem) => {
+                // If this build supports migrating data partition, try now, failing back to
+                // just using `filesystem` in the case of any error. Non-migration builds
+                // should return Ok(None).
+                match self.try_migrate_data(&mut device, &mut filesystem).await {
+                    Ok(Some(new_filesystem)) => {
+                        // Migration successful.
+                        filesystem.shutdown(None).await.unwrap_or_else(|error| {
+                            tracing::error!(
+                                ?error,
+                                "Failed to shutdown original filesystem after migration"
+                            );
+                        });
+                        new_filesystem
+                    }
+                    Ok(None) => filesystem, // Migration not requested.
+                    Err(error) => {
+                        // Migration failed.
+                        tracing::error!(?error, "Failed to migrate filesystem");
+                        // TODO: Log migration failure metrics.
+                        // Continue with the original (unmigrated) filesystem.
+                        filesystem
+                    }
+                }
+            }
+            ServeFilesystemStatus::FormatRequired => {
+                self.format_data(&device.fvm_path().ok_or(anyhow!("Not an fvm device"))?).await?
+            }
+        };
+        self.bind_data(fs)
+    }
+
+    async fn format_data(&mut self, fvm_topo_path: &str) -> Result<Filesystem, Error> {
         // Reset FVM partition first, ensuring we blow away any existing zxcrypt volume.
         let mut device = self
             .launcher
-            .reset_fvm_partition(device, &mut *self.matcher_lock.lock().await)
+            .reset_fvm_partition(fvm_topo_path, &mut *self.matcher_lock.lock().await)
             .await
             .context("reset fvm")?;
         let device = device.as_mut();
@@ -844,16 +977,15 @@ impl FilesystemLauncher {
         }
     }
 
-    // Destroy all non-blob fvm partitions and reallocate only the data partition. Called on
-    // the reformatting codepath. Takes either an fvm or data device and returns a data device.
+    // Destroy all non-blob fvm partitions and reallocate only the data partition. Called on the
+    // reformatting codepath. Takes the topological path of an fvm device with the fvm driver
+    // bound.
     async fn reset_fvm_partition(
         &self,
-        device: &mut dyn Device,
+        fvm_topo_path: &str,
         ignore_paths: &mut HashSet<String>,
     ) -> Result<Box<dyn Device>, Error> {
-        tracing::info!(path = device.path(), "Resetting fvm partitions");
-
-        let fvm_topo_path = device.fvm_path().ok_or(anyhow!("Not an FVM partition"))?;
+        tracing::info!(path = fvm_topo_path, "Resetting fvm partitions");
         let fvm_directory_proxy = fuchsia_fs::directory::open_in_namespace(
             &fvm_topo_path,
             fio::OpenFlags::RIGHT_READABLE,

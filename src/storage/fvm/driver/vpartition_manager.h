@@ -25,6 +25,7 @@
 
 #include <ddktl/device.h>
 #include <fbl/algorithm.h>
+#include <fbl/condition_variable.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/mutex.h>
 #include <fbl/vector.h>
@@ -210,6 +211,13 @@ class VPartitionManager : public ManagerDeviceType {
   // have the same device name. This field is used to prevent reusing an FVM entry for the brief
   // period of time when the entry is clear but the device hasn't been removed yet.
   bool device_bound_at_entry_[fvm::kMaxVPartitions] TA_GUARDED(lock_) = {};
+
+  // True when all FVM entries have their child devices bound.
+  bool partitions_ready_ TA_GUARDED(lock_) = {};
+
+  // GetInfo request that occurred during device initialization. Used to allow GetInfo() as a
+  // barrier for child partition device enumeration.
+  std::optional<GetInfoCompleter::Async> get_info_request_ TA_GUARDED(lock_) = std::nullopt;
 
   // Block Protocol
   const size_t block_op_size_;

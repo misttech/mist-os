@@ -214,15 +214,16 @@ impl Disk {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub struct DataSpec {
     pub format: Option<&'static str>,
     pub zxcrypt: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct VolumesSpec {
     pub fxfs_blob: bool,
+    pub create_data_partition: bool,
 }
 
 enum FxfsType {
@@ -253,7 +254,7 @@ impl DiskBuilder {
             blob_hash: None,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
             data_spec: DataSpec { format: None, zxcrypt: false },
-            volumes_spec: VolumesSpec { fxfs_blob: false },
+            volumes_spec: VolumesSpec { fxfs_blob: false, create_data_partition: true },
             corrupt_contents: false,
             gpt: false,
             with_account_and_virtualization: false,
@@ -432,48 +433,49 @@ impl DiskBuilder {
         let serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
         self.blob_hash = Some(self.write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS).await);
         serving_blobfs.shutdown().await.expect("shutdown failed");
-
-        let data_label = if self.legacy_data_label { "minfs" } else { "data" };
-        // Create and format the data partition.
-        create_fvm_volume(
-            &volume_manager,
-            data_label,
-            &DATA_TYPE_GUID,
-            Uuid::new_v4().as_bytes(),
-            Some(self.data_volume_size),
-            0,
-        )
-        .await
-        .expect("create_fvm_volume failed");
-
-        // TODO(https://fxbug.dev/121274): Remove hardcoded path.
-        let data_block_path = format!("/fvm/{}-p-2/block", data_label);
-        let data_dir = recursive_wait_and_open_directory(&device_dir, &data_block_path)
+        if self.volumes_spec.create_data_partition {
+            let data_label = if self.legacy_data_label { "minfs" } else { "data" };
+            // Create and format the data partition.
+            create_fvm_volume(
+                &volume_manager,
+                data_label,
+                &DATA_TYPE_GUID,
+                Uuid::new_v4().as_bytes(),
+                Some(self.data_volume_size),
+                0,
+            )
             .await
-            .expect("failed to open data partition");
-        let data_controller =
-            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&data_dir, ".")
-                .expect("failed to connect to data device controller");
-        // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
-        let data_controller = if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt {
-            let zxcrypt_block_dir = zxcrypt::set_up_insecure_zxcrypt(&data_dir)
-                .await
-                .expect("failed to set up zxcrypt");
-            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&zxcrypt_block_dir, ".")
-                .expect("failed to connect to the device")
-        } else {
-            data_controller
-        };
+            .expect("create_fvm_volume failed");
 
-        if let Some(format) = self.data_spec.format {
-            match format {
-                "fxfs" => self.init_data_fxfs(FxfsType::Fxfs(data_controller)).await,
-                "minfs" => self.init_data_minfs(data_controller).await,
-                "f2fs" => self.init_data_f2fs(data_controller).await,
-                _ => panic!("unsupported data filesystem format type"),
+            // TODO(https://fxbug.dev/121274): Remove hardcoded path.
+            let data_block_path = format!("/fvm/{}-p-2/block", data_label);
+            let data_dir = recursive_wait_and_open_directory(&device_dir, &data_block_path)
+                .await
+                .expect("failed to open data partition");
+            let data_controller =
+                connect_to_named_protocol_at_dir_root::<ControllerMarker>(&data_dir, ".")
+                    .expect("failed to connect to data device controller");
+            // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
+            let data_controller = if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt
+            {
+                let zxcrypt_block_dir = zxcrypt::set_up_insecure_zxcrypt(&data_dir)
+                    .await
+                    .expect("failed to set up zxcrypt");
+                connect_to_named_protocol_at_dir_root::<ControllerMarker>(&zxcrypt_block_dir, ".")
+                    .expect("failed to connect to the device")
+            } else {
+                data_controller
+            };
+
+            if let Some(format) = self.data_spec.format {
+                match format {
+                    "fxfs" => self.init_data_fxfs(FxfsType::Fxfs(data_controller)).await,
+                    "minfs" => self.init_data_minfs(data_controller).await,
+                    "f2fs" => self.init_data_f2fs(data_controller).await,
+                    _ => panic!("unsupported data filesystem format type"),
+                }
             }
         }
-
         if self.with_account_and_virtualization {
             // Create account and virtualization partitions
             create_fvm_volume(

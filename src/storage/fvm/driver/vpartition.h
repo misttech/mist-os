@@ -39,6 +39,10 @@ class VPartition : public PartitionDeviceType,
   static zx_status_t Create(VPartitionManager* vpm, size_t entry_index,
                             std::unique_ptr<VPartition>* out);
   // Device Protocol
+  // TODO(https://fxbug.dev/126961): NOTE!! We are currently reliant on VPartition NOT implementing
+  // DdkInit to ensure that child partitions of the VPartitionManager are visible in devfs on the
+  // return of GetInfo(). If VPartition implements DdkInit, we can no longer rely on the
+  // completion of GetInfo() to know when it is safe to enumerate child partitions in devfs.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkRelease();
 

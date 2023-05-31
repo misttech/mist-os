@@ -6,7 +6,10 @@
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
 use {
-    super::{blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec},
+    super::{
+        blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec,
+        VolumesSpec,
+    },
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fshost::{AdminProxy, AdminWriteDataFileResult},
     fuchsia_zircon::{self as zx, HandleBased as _},
@@ -32,6 +35,42 @@ async fn unformatted() {
     builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
+
+    let fixture = builder.build().await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let admin =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    call_write_data_file(&admin).await.expect("write_data_file failed");
+    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+    fixture.tear_down().await;
+
+    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+        SECRET_FILE_NAME,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    .unwrap();
+    assert_eq!(&fuchsia_fs::file::read(&secret).await.unwrap(), PAYLOAD);
+
+    fixture.tear_down().await;
+}
+
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn no_existing_data_partition() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("ramdisk_image", true);
+    builder.with_disk().format_volumes(volumes_spec());
+    builder
+        .with_zbi_ramdisk()
+        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() });
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;

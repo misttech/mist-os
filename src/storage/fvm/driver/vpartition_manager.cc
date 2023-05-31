@@ -403,6 +403,21 @@ zx_status_t VPartitionManager::Load() {
   });
   zxlogf(INFO, "Loaded %lu partitions, slice size=%zu", device_count, slice_size_);
 
+  // Signal that all entries have now been bound, and respond to any outstanding GetInfo request.
+  std::optional<GetInfoCompleter::Async> get_info_request;
+  {
+    fbl::AutoLock lock(&lock_);
+    partitions_ready_ = true;
+    get_info_request = std::move(get_info_request_);
+  }
+  if (get_info_request.has_value()) {
+    ZX_DEBUG_ASSERT(get_info_request->is_reply_needed());
+    fidl::Arena allocator;
+    fidl::ObjectView<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> info(allocator);
+    GetInfoInternal(info.get());
+    get_info_request->Reply(ZX_OK, info);
+  }
+
   dump_header.cancel();
 
   return ZX_OK;
@@ -652,7 +667,6 @@ zx_status_t VPartitionManager::FreeSlicesLocked(VPartition* vp, uint64_t vslice_
 
 void VPartitionManager::GetInfoInternal(VolumeManagerInfo* info) {
   fbl::AutoLock lock(&lock_);
-
   info->slice_size = slice_size_;
   info->slice_count = GetHeaderLocked()->pslice_count;
   info->assigned_slice_count = pslice_allocated_count_;
@@ -862,6 +876,24 @@ void VPartitionManager::AllocatePartition(AllocatePartitionRequestView request,
 }
 
 void VPartitionManager::GetInfo(GetInfoCompleter::Sync& completer) {
+  // TODO(https://fxbug.dev/126961): GetInfo waits for partitions_ready_ to be true, which
+  // happens once DdkAdd has completed binding all child volumes of the VPartitionManager. So long
+  // as VPartition does NOT implement DdkInit, GetInfo() can be used as a barrier for enumerating
+  // child partitions in devfs, as long as the VPartitionManager has already been made visible.
+  {
+    fbl::AutoLock lock(&lock_);
+    if (!partitions_ready_) {
+      if (get_info_request_.has_value()) {
+        // Only one outstanding request is supported currently, can support more if required.
+        zxlogf(ERROR, "Only one GetInfo request can be issued before partitions are ready.");
+        completer.Close(ZX_ERR_BAD_STATE);
+        return;
+      }
+      get_info_request_ = completer.ToAsync();
+      return;  // Respond to the request when all child devices have been bound.
+    }
+  }
+
   fidl::Arena allocator;
   fidl::ObjectView<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> info(allocator);
   GetInfoInternal(info.get());

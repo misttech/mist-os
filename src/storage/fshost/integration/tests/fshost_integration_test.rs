@@ -86,7 +86,7 @@ fn data_fs_zxcrypt() -> bool {
 }
 
 fn volumes_spec() -> VolumesSpec {
-    VolumesSpec { fxfs_blob: DATA_FILESYSTEM_VARIANT == "fxblob" }
+    VolumesSpec { fxfs_blob: DATA_FILESYSTEM_VARIANT == "fxblob", create_data_partition: true }
 }
 
 fn data_fs_spec() -> DataSpec {
@@ -133,6 +133,21 @@ async fn data_formatted() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn data_partition_nonexistent() {
+    let mut builder = new_builder();
+    builder
+        .with_disk()
+        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() });
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_blob().await;
 
     fixture.tear_down().await;
 }
@@ -257,11 +272,25 @@ async fn ramdisk_blob_and_data_mounted() {
 }
 
 #[fuchsia::test]
+async fn ramdisk_blob_and_data_mounted_no_existing_data_partition() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("ramdisk_image", true);
+    builder
+        .with_zbi_ramdisk()
+        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() })
+        .format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_blob().await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
 async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
-    // Fake out the cpp fshost ramdisk checking by providing a nonsense ramdisk prefix. The rust
-    // fshost has tighter behavior - it only matches on the ramdisk path it created itself (which
-    // is also not this one).
     builder.fshost().set_config_value("ramdisk_image", true);
     builder
         .with_disk()
@@ -741,9 +770,54 @@ async fn reset_fvm_partitions() {
             slice_size * slice_count <= DEFAULT_DATA_VOLUME_SIZE + slice_size,
             "{} <= {}",
             slice_size * slice_count,
-            DEFAULT_DATA_VOLUME_SIZE + 2 * slice_size
+            DEFAULT_DATA_VOLUME_SIZE + slice_size
         );
     }
+}
+
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn reset_fvm_partitions_no_existing_data_partition() {
+    // We do not bother with setting the "data_max_bytes" config value because we do not have an
+    // existing data partition whose size we can compare with the newly allocated data partition.
+    let mut builder = new_builder();
+    builder
+        .with_disk()
+        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() })
+        .with_account_and_virtualization();
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let fvm_proxy = fuchsia_fs::directory::open_directory(
+        &fixture.dir("dev-topological", fio::OpenFlags::empty()),
+        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
+        fio::OpenFlags::empty(),
+    )
+    .await
+    .expect("Failed to open the fvm");
+
+    // Ensure that the account and virtualization partitions
+    // were successfully destroyed
+    let dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+        .await
+        .expect("Failed to readdir the fvm DirectoryProxy");
+    let mut count = 0;
+    let mut data_name = "".to_string();
+    for entry in dir_entries {
+        let name = entry.name;
+        if name.contains("blobfs") || name.contains("device") {
+            count += 1;
+        } else if name.contains("data") {
+            data_name = name;
+            count += 1;
+        } else {
+            panic!("Unexpected entry name: {name}");
+        }
+    }
+    assert_eq!(count, 4);
+    assert_ne!(&data_name, "");
 }
 
 // Toggle migration mode

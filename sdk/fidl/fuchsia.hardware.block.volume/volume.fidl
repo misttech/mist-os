@@ -70,6 +70,11 @@ protocol VolumeManager {
     });
 
     /// Gets the VolumeManagerInfo describing this instance of the `VolumeManager`.
+    ///
+    /// TODO(https://fxbug.dev/126961): GetInfo only completes after all the child partitions of
+    /// the `VolumeManager` have been added to devfs. Assuming that the `VolumeManager` is visible
+    /// in devfs, clients are guaranteed that the child partitions will also be visible in devfs on
+    /// return of GetInfo().
     GetInfo() -> (struct {
         status zx.Status;
         info box<VolumeManagerInfo>;

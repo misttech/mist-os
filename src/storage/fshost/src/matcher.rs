@@ -6,18 +6,18 @@ use {
     crate::{
         device::{
             constants::{
-                BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
-                DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
+                BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
+                FVM_DRIVER_PATH, GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH,
+                NAND_BROKER_DRIVER_PATH,
             },
             Device,
         },
-        environment::{Environment, ServeFilesystemStatus},
+        environment::Environment,
     },
-    anyhow::Error,
+    anyhow::{bail, Context, Error},
     async_trait::async_trait,
     fs_management::format::DiskFormat,
-    std::{collections::BTreeMap, ops::Bound},
+    std::collections::BTreeMap,
 };
 
 #[async_trait]
@@ -33,22 +33,6 @@ pub trait Matcher: Send {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<(), Error>;
-
-    /// This is called when a device appears that is a child of an already matched device.  It can
-    /// be anywhere within the hierarchy, so not necessarily an immediate child.  Devices will be
-    /// matched as children before being matched against global matches.
-    ///
-    /// Matchers are responsible for calling both match_device and process_device on their
-    /// children.
-    async fn match_and_process_child(
-        &mut self,
-        _device: &mut dyn Device,
-        _env: &mut dyn Environment,
-        _parent_path: &str,
-    ) -> Result<bool, Error> {
-        // By default, matchers don't match children.
-        Ok(false)
-    }
 }
 
 pub struct Matchers {
@@ -79,22 +63,14 @@ impl Matchers {
                     None
                 })));
             } else {
-                let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
-                    DiskFormat::Fvm,
-                    false,
-                    FVM_DRIVER_PATH,
-                    "/fvm",
-                    if config.ramdisk_image { ramdisk_path } else { None },
+                let ramdisk_required = if config.ramdisk_image { ramdisk_path } else { None };
+                let fvm_matcher = Box::new(FvmMatcher::new(
+                    ramdisk_required,
+                    config.netboot,
+                    config.blobfs,
+                    config.data,
                 ));
-                if !config.netboot {
-                    if config.blobfs {
-                        fvm_matcher.child_matchers.push(Box::new(BlobfsMatcher::new()));
-                    }
-                    if config.data {
-                        fvm_matcher.child_matchers.push(Box::new(DataMatcher::new()));
-                    }
-                }
-                if config.fvm || !fvm_matcher.child_matchers.is_empty() {
+                if config.fvm || (!config.netboot && (config.blobfs || config.data)) {
                     matchers.push(fvm_matcher);
                 }
             }
@@ -105,14 +81,13 @@ impl Matchers {
                 DiskFormat::Fvm,
                 false,
                 FVM_DRIVER_PATH,
-                "/fvm",
                 None,
             )));
         }
 
         let gpt_matcher =
-            Box::new(PartitionMapMatcher::new(DiskFormat::Gpt, false, GPT_DRIVER_PATH, "", None));
-        if config.gpt || !gpt_matcher.child_matchers.is_empty() {
+            Box::new(PartitionMapMatcher::new(DiskFormat::Gpt, false, GPT_DRIVER_PATH, None));
+        if config.gpt {
             matchers.push(gpt_matcher);
         }
 
@@ -121,7 +96,6 @@ impl Matchers {
                 DiskFormat::Gpt,
                 true,
                 GPT_DRIVER_PATH,
-                "",
                 None,
             )));
         }
@@ -131,7 +105,6 @@ impl Matchers {
                 DiskFormat::Mbr,
                 true,
                 MBR_DRIVER_PATH,
-                "",
                 None,
             )))
         }
@@ -147,18 +120,6 @@ impl Matchers {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<bool, Error> {
-        for (path, &index) in self
-            .matched
-            .range::<str, _>((Bound::Unbounded, Bound::Excluded(device.topological_path())))
-            .rev()
-        {
-            if device.topological_path().starts_with(path) {
-                if self.matchers[index].match_and_process_child(device, env, path).await? {
-                    self.matched.insert(device.topological_path().to_string(), index);
-                    return Ok(true);
-                }
-            }
-        }
         for (index, m) in self.matchers.iter_mut().enumerate() {
             if m.match_device(device).await {
                 m.process_device(device, env).await?;
@@ -257,8 +218,80 @@ impl Matcher for FxblobMatcher {
     }
 }
 
-// Matches partition maps. Matching is done using content sniffing. `child_matchers` contain
-// matchers that will match against partitions of partition maps.
+// Matches against the fvm partition and explicitly mounts the data and blob partitions.
+// Fails if the blob partition doesn't exist. Creates the data partition if it doesn't
+// already exist.
+struct FvmMatcher {
+    // If this partition is required to exist on a ramdisk, then this contains the prefix it should
+    // have.
+    ramdisk_required: Option<String>,
+
+    netboot: bool,
+
+    // Set if we want to mount the blob partition.
+    blobfs: bool,
+
+    // Set if we want to mount the data partition.
+    data: bool,
+}
+
+impl FvmMatcher {
+    fn new(ramdisk_required: Option<String>, netboot: bool, blobfs: bool, data: bool) -> Self {
+        Self { ramdisk_required, netboot, blobfs, data }
+    }
+}
+
+#[async_trait]
+impl Matcher for FvmMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if let Some(ramdisk_prefix) = &self.ramdisk_required {
+            if !device.topological_path().starts_with(ramdisk_prefix) {
+                return false;
+            }
+        }
+        device.content_format().await.ok() == Some(DiskFormat::Fvm)
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<(), Error> {
+        // volume names have the format {label}-p-{index}, e.g. blobfs-p-1
+        let volume_names = env.bind_and_enumerate_fvm(device).await?;
+        if !self.netboot {
+            if self.blobfs {
+                if let Some(blob_name) =
+                    volume_names.iter().find(|name| name.starts_with(BLOBFS_PARTITION_LABEL))
+                {
+                    env.mount_blobfs_on(blob_name).await?;
+                } else {
+                    tracing::error!(?volume_names, "Couldn't find blobfs partition!");
+                    bail!("Unable to find blobfs within FVM.");
+                }
+            }
+            if self.data {
+                if let Some(data_name) = volume_names.iter().find(|name| {
+                    name.starts_with(DATA_PARTITION_LABEL)
+                        || name.starts_with(LEGACY_DATA_PARTITION_LABEL)
+                }) {
+                    env.mount_data_on(data_name).await?;
+                } else {
+                    let fvm_driver_path = format!("{}/fvm", device.topological_path());
+                    tracing::warn!(%fvm_driver_path,
+                        "No existing data partition. Calling format_data().",
+                    );
+                    let fs =
+                        env.format_data(&fvm_driver_path).await.context("failed to format data")?;
+                    env.bind_data(fs)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// Matches partition maps. Matching is done using content sniffing.
 struct PartitionMapMatcher {
     // The content format expected.
     content_format: DiskFormat,
@@ -269,17 +302,10 @@ struct PartitionMapMatcher {
     // When matched, this driver is attached to the device.
     driver_path: &'static str,
 
-    // The expected path suffix used in the topological path. For example, FVM uses an "fvm/"
-    // suffix.
-    path_suffix: &'static str,
-
     ramdisk_path: Option<String>,
 
     // The topological paths of all devices matched so far.
     device_paths: Vec<String>,
-
-    // A list of matchers to use against partitions of matched devices.
-    child_matchers: Vec<Box<dyn Matcher + Sync>>,
 }
 
 impl PartitionMapMatcher {
@@ -287,18 +313,9 @@ impl PartitionMapMatcher {
         content_format: DiskFormat,
         allow_multiple: bool,
         driver_path: &'static str,
-        path_suffix: &'static str,
         ramdisk_path: Option<String>,
     ) -> Self {
-        Self {
-            content_format,
-            allow_multiple,
-            driver_path,
-            path_suffix,
-            ramdisk_path,
-            device_paths: Vec::new(),
-            child_matchers: Vec::new(),
-        }
+        Self { content_format, allow_multiple, driver_path, ramdisk_path, device_paths: Vec::new() }
     }
 }
 
@@ -327,139 +344,6 @@ impl Matcher for PartitionMapMatcher {
         self.device_paths.push(device.topological_path().to_string());
         Ok(())
     }
-
-    async fn match_and_process_child(
-        &mut self,
-        device: &mut dyn Device,
-        env: &mut dyn Environment,
-        parent_path: &str,
-    ) -> Result<bool, Error> {
-        let topological_path = device.topological_path();
-        // If allow_multiple is not true, don't match children multiple times either.
-        if !self.allow_multiple && self.device_paths.iter().any(|x| x == &topological_path) {
-            return Ok(false);
-        }
-        // Only match against children that are immediate children.
-        // Child partitions should have topological paths of the form:
-        //   ...<suffix>/<partition-name>/block
-        if let Some((head, file_name)) = topological_path.rsplit_once('/') {
-            if file_name == "block" {
-                if let Some(head) =
-                    head.rsplit_once('/').and_then(|(head, _)| head.strip_suffix(self.path_suffix))
-                {
-                    if head == parent_path {
-                        for m in self.child_matchers.iter_mut() {
-                            if m.match_device(device).await {
-                                m.process_device(device, env).await?;
-                                self.device_paths.push(device.topological_path().to_string());
-                                return Ok(true);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(false)
-    }
-}
-
-/// Matches a device with a given label and type guid. This is the common matching behavior between
-/// all matchers that match against devices in partition tables. It itself isn't a fully functional
-/// matcher - it doesn't know what to do with the device it matched - so it doesn't implement the
-/// Matcher trait.
-struct PartitionMatcher {
-    label: &'static str,
-    type_guid: &'static [u8; 16],
-}
-
-impl PartitionMatcher {
-    fn new(label: &'static str, type_guid: &'static [u8; 16]) -> Self {
-        Self { label, type_guid }
-    }
-
-    async fn match_device(&self, device: &mut dyn Device) -> bool {
-        device.partition_label().await.ok() == Some(self.label)
-            && device.partition_type().await.ok() == Some(self.type_guid)
-    }
-}
-
-// Matches against a Blobfs partition (by checking for partition label and type GUID).
-struct BlobfsMatcher(PartitionMatcher);
-
-impl BlobfsMatcher {
-    fn new() -> Self {
-        Self(PartitionMatcher::new(BLOBFS_PARTITION_LABEL, &BLOBFS_TYPE_GUID))
-    }
-}
-
-#[async_trait]
-impl Matcher for BlobfsMatcher {
-    async fn match_device(&self, device: &mut dyn Device) -> bool {
-        self.0.match_device(device).await
-    }
-
-    async fn process_device(
-        &mut self,
-        device: &mut dyn Device,
-        env: &mut dyn Environment,
-    ) -> Result<(), Error> {
-        env.mount_blobfs(device).await
-    }
-}
-
-// Matches against a Data partition (by checking for partition label and type GUID).
-struct DataMatcher(PartitionMatcher, PartitionMatcher);
-
-impl DataMatcher {
-    fn new() -> Self {
-        Self(
-            PartitionMatcher::new(DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
-            PartitionMatcher::new(LEGACY_DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
-        )
-    }
-}
-
-#[async_trait]
-impl Matcher for DataMatcher {
-    async fn match_device(&self, device: &mut dyn Device) -> bool {
-        self.0.match_device(device).await || self.1.match_device(device).await
-    }
-
-    async fn process_device(
-        &mut self,
-        device: &mut dyn Device,
-        env: &mut dyn Environment,
-    ) -> Result<(), Error> {
-        let fs = match env.launch_data(device).await? {
-            ServeFilesystemStatus::Serving(mut filesystem) => {
-                // If this build supports migrating data partition, try now, failing back to
-                // just using `filesystem` in the case of any error. Non-migration builds
-                // should return Ok(None).
-                match env.try_migrate_data(device, &mut filesystem).await {
-                    Ok(Some(new_filesystem)) => {
-                        // Migration successful.
-                        filesystem.shutdown(None).await.unwrap_or_else(|error| {
-                            tracing::warn!(
-                                ?error,
-                                "Failed to shutdown original filesystem after migration"
-                            );
-                        });
-                        new_filesystem
-                    }
-                    Ok(None) => filesystem, // Migration not requested.
-                    Err(error) => {
-                        // Migration failed.
-                        tracing::warn!(?error, "Failed to migrate filesystem");
-                        // TODO: Log migration failure metrics.
-                        // Continue with the original (unmigrated) filesystem.
-                        filesystem
-                    }
-                }
-            }
-            ServeFilesystemStatus::FormatRequired => env.format_data(device).await?,
-        };
-        env.bind_data(fs)
-    }
 }
 
 #[cfg(test)]
@@ -469,11 +353,11 @@ mod tests {
         crate::{
             config::default_config,
             device::constants::{
-                BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
-                DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
+                BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
+                FVM_DRIVER_PATH, GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
+                NAND_BROKER_DRIVER_PATH,
             },
-            environment::{Filesystem, ServeFilesystemStatus},
+            environment::Filesystem,
         },
         anyhow::{anyhow, Error},
         async_trait::async_trait,
@@ -590,34 +474,44 @@ mod tests {
 
     struct MockEnv {
         expected_driver_path: Mutex<Option<String>>,
-        expect_mount_blobfs: Mutex<bool>,
+        expect_bind_and_enumerate_fvm: Mutex<bool>,
+        expect_mount_blobfs_on: Mutex<bool>,
         expect_mount_fxblob: Mutex<bool>,
         expect_mount_blob_volume: Mutex<bool>,
         expect_mount_data_volume: Mutex<bool>,
+        expect_mount_data_on: Mutex<bool>,
         expect_format_data: Mutex<bool>,
         expect_bind_data: Mutex<bool>,
-        data_format_required: bool,
+        legacy_data_format: bool,
+        create_data_partition: bool,
     }
 
     impl MockEnv {
         fn new() -> Self {
             MockEnv {
                 expected_driver_path: Mutex::new(None),
-                expect_mount_blobfs: Mutex::new(false),
+                expect_bind_and_enumerate_fvm: Mutex::new(false),
+                expect_mount_blobfs_on: Mutex::new(false),
                 expect_mount_fxblob: Mutex::new(false),
                 expect_mount_blob_volume: Mutex::new(false),
                 expect_mount_data_volume: Mutex::new(false),
+                expect_mount_data_on: Mutex::new(false),
                 expect_format_data: Mutex::new(false),
                 expect_bind_data: Mutex::new(false),
-                data_format_required: false,
+                legacy_data_format: false,
+                create_data_partition: true,
             }
         }
         fn expect_attach_driver(mut self, path: impl ToString) -> Self {
             *self.expected_driver_path.get_mut().unwrap() = Some(path.to_string());
             self
         }
-        fn expect_mount_blobfs(mut self) -> Self {
-            *self.expect_mount_blobfs.get_mut().unwrap() = true;
+        fn expect_bind_and_enumerate_fvm(mut self) -> Self {
+            *self.expect_bind_and_enumerate_fvm.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_mount_blobfs_on(mut self) -> Self {
+            *self.expect_mount_blobfs_on.get_mut().unwrap() = true;
             self
         }
         fn expect_format_data(mut self) -> Self {
@@ -640,8 +534,16 @@ mod tests {
             *self.expect_mount_data_volume.get_mut().unwrap() = true;
             self
         }
-        fn data_format_required(mut self) -> Self {
-            self.data_format_required = true;
+        fn expect_mount_data_on(mut self) -> Self {
+            *self.expect_mount_data_on.get_mut().unwrap() = true;
+            self
+        }
+        fn legacy_data_format(mut self) -> Self {
+            self.legacy_data_format = true;
+            self
+        }
+        fn without_data_partition(mut self) -> Self {
+            self.create_data_partition = false;
             self
         }
     }
@@ -664,27 +566,45 @@ mod tests {
             Ok(())
         }
 
-        async fn mount_blobfs(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+        async fn bind_and_enumerate_fvm(
+            &mut self,
+            _device: &mut dyn Device,
+        ) -> Result<Vec<String>, Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_blobfs.lock().unwrap()),
+                std::mem::take(&mut *self.expect_bind_and_enumerate_fvm.lock().unwrap()),
                 true,
-                "Unexpected call to mount_blobfs"
+                "Unexpected call to bind_and_enumerate_fvm"
+            );
+            let mut volume_names = vec![BLOBFS_PARTITION_LABEL.to_string()];
+            if self.create_data_partition {
+                if self.legacy_data_format {
+                    volume_names.push(LEGACY_DATA_PARTITION_LABEL.to_string())
+                } else {
+                    volume_names.push(DATA_PARTITION_LABEL.to_string())
+                };
+            }
+            Ok(volume_names)
+        }
+
+        async fn mount_blobfs_on(&mut self, _blobfs_partition_name: &str) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_mount_blobfs_on.lock().unwrap()),
+                true,
+                "Unexpected call to mount_blobfs_on"
             );
             Ok(())
         }
 
-        async fn launch_data(
-            &mut self,
-            _device: &mut dyn Device,
-        ) -> Result<ServeFilesystemStatus, Error> {
-            Ok(if self.data_format_required {
-                ServeFilesystemStatus::FormatRequired
-            } else {
-                ServeFilesystemStatus::Serving(Filesystem::Queue(vec![]))
-            })
+        async fn mount_data_on(&mut self, _data_partition_name: &str) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_mount_data_on.lock().unwrap()),
+                true,
+                "Unexpected call to mount_data_on"
+            );
+            Ok(())
         }
 
-        async fn format_data(&mut self, _device: &mut dyn Device) -> Result<Filesystem, Error> {
+        async fn format_data(&mut self, _fvm_topo_path: &str) -> Result<Filesystem, Error> {
             assert_eq!(
                 std::mem::take(&mut *self.expect_format_data.lock().unwrap()),
                 true,
@@ -737,7 +657,9 @@ mod tests {
     impl Drop for MockEnv {
         fn drop(&mut self) {
             assert!(self.expected_driver_path.get_mut().unwrap().is_none());
-            assert!(!*self.expect_mount_blobfs.lock().unwrap());
+            assert!(!*self.expect_mount_blobfs_on.lock().unwrap());
+            assert!(!*self.expect_mount_data_on.lock().unwrap());
+            assert!(!*self.expect_bind_and_enumerate_fvm.lock().unwrap());
             assert!(!*self.expect_bind_data.lock().unwrap());
         }
     }
@@ -832,7 +754,10 @@ mod tests {
             .expect("match_device failed"));
 
         let mut fvm_device = fvm_device.set_topological_path("second_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new()
+            .expect_bind_and_enumerate_fvm()
+            .expect_mount_blobfs_on()
+            .expect_mount_data_on();
         assert!(matchers
             .match_device(&mut fvm_device, &mut env)
             .await
@@ -841,35 +766,6 @@ mod tests {
         let mut fvm_device = fvm_device.set_topological_path("third_prefix");
         assert!(!matchers
             .match_device(&mut fvm_device, &mut MockEnv::new())
-            .await
-            .expect("match_device failed"));
-
-        // Afterwards, filesystems will work on the device with the right prefix, and not on other
-        // devices without that prefix.
-        let mut blobfs_device = MockDevice::new()
-            .set_topological_path("first_prefix/fvm/blobfs-p-1/block")
-            .set_partition_label(BLOBFS_PARTITION_LABEL)
-            .set_partition_type(&BLOBFS_TYPE_GUID);
-        assert!(!matchers
-            .match_device(&mut blobfs_device, &mut MockEnv::new())
-            .await
-            .expect("match_device failed"));
-        let mut blobfs_device =
-            blobfs_device.set_topological_path("second_prefix/fvm/blobfs-p-1/block");
-        let mut env = MockEnv::new().expect_mount_blobfs();
-        assert!(matchers
-            .match_device(&mut blobfs_device, &mut env)
-            .await
-            .expect("match_device failed"));
-
-        // We will NOT bind to the device which matched the non-ramdisk prefix.
-        let mut data_device = MockDevice::new()
-            .set_topological_path("first_prefix/fvm/data-p-2/block")
-            .set_partition_label(DATA_PARTITION_LABEL)
-            .set_partition_type(&DATA_TYPE_GUID);
-        let mut env = MockEnv::new();
-        assert!(!matchers
-            .match_device(&mut data_device, &mut env)
             .await
             .expect("match_device failed"));
     }
@@ -898,16 +794,6 @@ mod tests {
         let mut fvm_device = fvm_device.set_topological_path("second_prefix");
         assert!(!matchers
             .match_device(&mut fvm_device, &mut MockEnv::new())
-            .await
-            .expect("match_device failed"));
-
-        // Does not match due to the wrong prefix.
-        let mut data_device = MockDevice::new()
-            .set_topological_path("first_prefix/fvm/data-p-2/block")
-            .set_partition_label(DATA_PARTITION_LABEL)
-            .set_partition_type(&DATA_TYPE_GUID);
-        assert!(!matchers
-            .match_device(&mut data_device, &mut MockEnv::new())
             .await
             .expect("match_device failed"));
     }
@@ -942,74 +828,27 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_blobfs_matcher() {
-        fn fake_blobfs_device() -> MockDevice {
-            MockDevice::new()
-                .set_topological_path("mock_device/fvm/blobfs-p-1/block")
-                .set_partition_label(BLOBFS_PARTITION_LABEL)
-                .set_partition_type(&BLOBFS_TYPE_GUID)
-        }
-
         let mut fvm_device = MockDevice::new().set_content_format(DiskFormat::Fvm);
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH).expect_mount_blobfs();
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm().expect_mount_blobfs_on();
 
-        let mut matchers = Matchers::new(&default_config(), None);
+        let mut matchers =
+            Matchers::new(&fshost_config::Config { data: false, ..default_config() }, None);
 
-        // Attach the first GPT device.
         assert!(matchers
             .match_device(&mut fvm_device, &mut env)
-            .await
-            .expect("match_device failed"));
-
-        // Attaching blobfs with a different path should fail.
-        assert!(!matchers
-            .match_device(
-                &mut fake_blobfs_device()
-                    .set_topological_path("another_device/fvm/blobfs-p-1/block"),
-                &mut env
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Attaching blobfs with a different label should fail.
-        assert!(!matchers
-            .match_device(&mut fake_blobfs_device().set_partition_label("data"), &mut env)
-            .await
-            .expect("match_device failed"));
-
-        // Attaching blobfs with a different type should fail.
-        assert!(!matchers
-            .match_device(&mut fake_blobfs_device().set_partition_type(&[1; 16]), &mut env)
-            .await
-            .expect("match_device failed"));
-
-        // Attach blobfs.
-        assert!(matchers
-            .match_device(&mut fake_blobfs_device(), &mut env)
             .await
             .expect("match_device failed"));
     }
 
     #[fuchsia::test]
     async fn test_data_matcher() {
-        let mut matchers = Matchers::new(&default_config(), None);
+        let mut matchers =
+            Matchers::new(&fshost_config::Config { blobfs: false, ..default_config() }, None);
 
-        // Attach FVM device.
         assert!(matchers
             .match_device(
                 &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
-                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Check that the data partition is mounted.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_topological_path("mock_device/fvm/data-p-2/block")
-                    .set_partition_label(DATA_PARTITION_LABEL)
-                    .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new().expect_bind_data()
+                &mut MockEnv::new().expect_bind_and_enumerate_fvm().expect_mount_data_on()
             )
             .await
             .expect("match_device failed"));
@@ -1019,49 +858,32 @@ mod tests {
     async fn test_legacy_data_matcher() {
         let mut matchers = Matchers::new(&default_config(), None);
 
-        // Attach FVM device.
         assert!(matchers
             .match_device(
                 &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
-                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Check that the data partition is mounted with the legacy label.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_topological_path("mock_device/fvm/data-p-2/block")
-                    .set_partition_label(LEGACY_DATA_PARTITION_LABEL)
-                    .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new().expect_bind_data()
+                &mut MockEnv::new()
+                    .legacy_data_format()
+                    .expect_bind_and_enumerate_fvm()
+                    .expect_mount_blobfs_on()
+                    .expect_mount_data_on()
             )
             .await
             .expect("match_device failed"));
     }
 
     #[fuchsia::test]
-    async fn test_data_matcher_reformat() {
+    async fn test_matcher_without_data_partition() {
         let mut matchers = Matchers::new(&default_config(), None);
 
-        // Attach FVM device.
         assert!(matchers
             .match_device(
                 &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
-                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Check that the data partition is reformatted and then mounted.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_topological_path("mock_device/fvm/data-p-2/block")
-                    .set_partition_label(DATA_PARTITION_LABEL)
-                    .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new().data_format_required().expect_format_data().expect_bind_data()
+                &mut MockEnv::new()
+                    .without_data_partition()
+                    .expect_bind_and_enumerate_fvm()
+                    .expect_mount_blobfs_on()
+                    .expect_format_data()
+                    .expect_bind_data()
             )
             .await
             .expect("match_device failed"));
@@ -1072,37 +894,10 @@ mod tests {
         let mut matchers =
             Matchers::new(&fshost_config::Config { netboot: true, ..default_config() }, None);
 
-        // Attach FVM device.
         assert!(matchers
             .match_device(
                 &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
-                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
-        let env = &mut MockEnv::new();
-
-        // Attaching blobfs should fail if netboot is true
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_topological_path("mock_device/fvm/blobfs-p-1/block")
-                    .set_partition_label(DATA_PARTITION_LABEL)
-                    .set_partition_type(&DATA_TYPE_GUID),
-                env
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Attaching data should fail if netboot is true
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_topological_path("mock_device/fvm/data-p-2/block")
-                    .set_partition_label(DATA_PARTITION_LABEL)
-                    .set_partition_type(&DATA_TYPE_GUID),
-                env
+                &mut MockEnv::new().expect_bind_and_enumerate_fvm()
             )
             .await
             .expect("match_device failed"));
@@ -1118,12 +913,11 @@ mod tests {
             },
             None,
         );
-        // Check that the data partition is mounted.
+
         assert!(matchers
             .match_device(
                 &mut MockDevice::new()
                     .set_content_format(DiskFormat::Fxfs)
-                    .set_topological_path("mock_device/data-p-2/block")
                     .set_partition_label(DATA_PARTITION_LABEL)
                     .set_partition_type(&DATA_TYPE_GUID),
                 &mut MockEnv::new()
