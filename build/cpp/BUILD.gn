@@ -71,6 +71,10 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
+    "//src/connectivity/network/testing/netemul/network-context/lib:network_service",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/tun/network-tun:network_tun_unittest",
 
     #------------------

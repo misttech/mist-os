@@ -41,6 +41,10 @@ source_set("network_service") {
     "//src/connectivity/lib/network-device/cpp",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_hlcpp",
   ]
+
+  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # rather than builders.
+  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 source_set("netdump") {
