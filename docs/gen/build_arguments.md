@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1862
+From //build/config/BUILDCONFIG.gn:1871
 
 ### allow_legacy_data_partition_names
 
@@ -118,6 +118,12 @@ Core shards that are required for including appmgr in a product.
 **Current value (from the default):** `["//src/sys/appmgr:appmgr_core_shard"]`
 
 From //src/sys/appmgr/core_shards.gni:7
+
+### archivist_max_cached_logs_bytes
+
+**Current value (from the default):** `4194304`
+
+From //src/diagnostics/archivist/configs.gni:6
 
 ### arm_sdk_tools
 
@@ -3130,7 +3136,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1609
+From //build/config/BUILDCONFIG.gn:1618
 
 ### extra_vbmeta_descriptors
 
@@ -3161,7 +3167,7 @@ From //build/images/args.gni:119
 
 **Current value (from the default):** `"default"`
 
-From //src/media/lib/ffmpeg/BUILD.gn:55
+From //src/media/lib/ffmpeg/BUILD.gn:53
 
 ### ffx_build_dual_mode_plugins_as_subtools
 
@@ -4027,7 +4033,7 @@ Contains the major version number of the ICU library, for dependencies that
 need different configuration based on the library version. Currently this
 is only useful in Fuchsia.
 
-**Current value (from the default):** `"72"`
+**Current value (from the default):** `"73"`
 
 From //third_party/icu/default/version.gni:13
 
@@ -4548,7 +4554,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1413
+From //build/config/BUILDCONFIG.gn:1422
 
 ### legacy_base_driver_package_labels
 
@@ -7663,7 +7669,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1852
+From //build/config/BUILDCONFIG.gn:1861
 
 ### select_variant_canonical
 
@@ -7673,7 +7679,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1857
+From //build/config/BUILDCONFIG.gn:1866
 
 ### select_variant_shortcuts
 
@@ -7725,7 +7731,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1655
+From //build/config/BUILDCONFIG.gn:1664
 
 ### size_checker_input
 
@@ -8171,7 +8177,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1639
+From //build/config/BUILDCONFIG.gn:1648
 
 ### universe_package_labels
 
