@@ -12,8 +12,8 @@ toc:
   path: /docs/development/drivers/developer_guide/ramdisk.md
 - title: "Create a composite node"
   path: /docs/development/drivers/developer_guide/composite-node.md
-
-
+- title: "Driver runtime API guidelines"
+  path: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
 - title: "Drivers rubric"
   path: /docs/development/drivers/developer_guide/rubric.md
 
