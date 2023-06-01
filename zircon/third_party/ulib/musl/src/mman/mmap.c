@@ -62,7 +62,7 @@ static zx_status_t mmap_inner(uintptr_t start, size_t len, int prot, int flags, 
     }
   } else {
     *context = _fd_get_context(fd);
-    if (context == NULL) {
+    if (*context == NULL) {
       return ZX_ERR_BAD_HANDLE;
     }
     zx_options |= ZX_VM_ALLOW_FAULTS;
