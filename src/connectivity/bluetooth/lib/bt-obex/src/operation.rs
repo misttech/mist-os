@@ -314,6 +314,10 @@ impl RequestPacket {
         let data = vec![flags.bits(), 0];
         Ok(Self::new(OpCode::SetPath, data, headers))
     }
+
+    pub fn new_abort(headers: HeaderSet) -> Self {
+        Self::new(OpCode::Abort, vec![], headers)
+    }
 }
 
 impl Decodable for RequestPacket {
@@ -485,7 +489,7 @@ impl<'a> GetOperation<'a> {
     /// Returns the headers included in the peer response.
     async fn do_get(&mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
         let request = RequestPacket::new_get(headers);
-        trace!("Making outgoing GET request: {request:?}");
+        trace!(?request, "Making outgoing GET request");
         self.transport.send(request)?;
         trace!("Successfully made GET request");
         let response = self.transport.receive_response(OpCode::Get).await?;
@@ -534,7 +538,7 @@ impl<'a> GetOperation<'a> {
         let request = RequestPacket::new_get_final();
         let mut body = vec![];
         loop {
-            trace!("Making outgoing GET final request: {request:?}");
+            trace!(?request, "Making outgoing GET final request");
             self.transport.send(request.clone())?;
             trace!("Successfully made GET final request");
             let response = self.transport.receive_response(OpCode::GetFinal).await?;
@@ -546,6 +550,24 @@ impl<'a> GetOperation<'a> {
             }
         }
         Ok(body)
+    }
+
+    /// Request to terminate a multi-packet GET request early.
+    /// Returns the informational headers from the peer response on success, Error otherwise.
+    /// If Error is returned, there are no guarantees about the synchronization between the local
+    /// OBEX client and remote OBEX server.
+    pub async fn terminate(mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
+        let opcode = OpCode::Abort;
+        if !self.is_started() {
+            return Err(Error::operation(opcode, "can't abort GET that hasn't started"));
+        }
+
+        let request = RequestPacket::new_abort(headers);
+        trace!(?request, "Making outgoing {opcode:?} request");
+        self.transport.send(request)?;
+        trace!("Successfully made {opcode:?} request");
+        let response = self.transport.receive_response(opcode).await?;
+        response.expect_code(opcode, ResponseCode::Ok).map(Into::into)
     }
 }
 
@@ -569,11 +591,13 @@ impl<'a> GetOperation<'a> {
 pub struct PutOperation<'a> {
     /// The L2CAP or RFCOMM connection to the remote peer.
     transport: ObexTransport<'a>,
+    /// Whether the operation is in-progress or not - one or more PUT requests have been made.
+    is_started: bool,
 }
 
 impl<'a> PutOperation<'a> {
     pub fn new(transport: ObexTransport<'a>) -> Self {
-        Self { transport }
+        Self { transport, is_started: false }
     }
 
     /// Returns Error if the `headers` contain non-informational OBEX Headers.
@@ -617,7 +641,9 @@ impl<'a> PutOperation<'a> {
     pub async fn write(&mut self, data: &[u8], mut headers: HeaderSet) -> Result<HeaderSet, Error> {
         Self::validate_headers(&headers)?;
         headers.add(Header::Body(data.to_vec()))?;
-        self.do_put(false, headers).await
+        let response_headers = self.do_put(false, headers).await?;
+        self.is_started = true;
+        Ok(response_headers)
     }
 
     /// Attempts to write the final `data` object to the remote OBEX server.
@@ -633,6 +659,23 @@ impl<'a> PutOperation<'a> {
         Self::validate_headers(&headers)?;
         headers.add(Header::EndOfBody(data.to_vec()))?;
         self.do_put(true, headers).await
+    }
+
+    /// Request to terminate a multi-packet PUT request early.
+    /// Returns the informational headers from the peer response on success, Error otherwise.
+    /// If Error is returned, there are no guarantees about the synchronization between the local
+    /// OBEX client and remote OBEX server.
+    pub async fn terminate(mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
+        let opcode = OpCode::Abort;
+        if !self.is_started {
+            return Err(Error::operation(opcode, "can't abort PUT that hasn't started"));
+        }
+        let request = RequestPacket::new_abort(headers);
+        trace!(?request, "Making outgoing {opcode:?} request");
+        self.transport.send(request)?;
+        trace!("Successfully made {opcode:?} request");
+        let response = self.transport.receive_response(opcode).await?;
+        response.expect_code(opcode, ResponseCode::Ok).map(Into::into)
     }
 }
 
@@ -1156,6 +1199,27 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn get_operation_terminate_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, mut remote) = new_manager();
+        let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let mut operation = setup_get_operation(&manager, initial);
+
+        // Start the GET operation.
+        let response_headers = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
+        let _received_headers = do_start(&mut exec, &mut operation, &mut remote, response_headers);
+
+        // Terminating early is OK. It should consume the operation and be considered complete.
+        let headers = HeaderSet::from_header(Header::Name("terminated".into())).unwrap();
+        let terminate_fut = operation.terminate(headers);
+        pin_mut!(terminate_fut);
+        let _ =
+            exec.run_until_stalled(&mut terminate_fut).expect_pending("waiting for peer response");
+        let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Abort), response);
+    }
+
+    #[fuchsia::test]
     fn get_operation_multiple_start_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager();
@@ -1237,6 +1301,17 @@ mod tests {
         let get_data_result =
             exec.run_until_stalled(&mut get_data_fut).expect("resolves with error");
         assert_matches!(get_data_result, Err(Error::IOError(_)));
+    }
+
+    #[fuchsia::test]
+    async fn get_operation_terminate_before_start_error() {
+        let (manager, _remote) = new_manager();
+        let initial = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
+        let operation = setup_get_operation(&manager, initial);
+
+        // The GET operation is not in progress yet so trying to terminate will fail.
+        let terminate_result = operation.terminate(HeaderSet::new()).await;
+        assert_matches!(terminate_result, Err(Error::OperationError { .. }));
     }
 
     #[fuchsia::test]
@@ -1406,6 +1481,37 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn put_operation_terminate_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, mut remote) = new_manager();
+        let mut operation = setup_put_operation(&manager);
+
+        // Write the first chunk of data to "start" the operation.
+        {
+            let put_fut = operation.write(&[1, 2, 3, 4, 5], HeaderSet::new());
+            pin_mut!(put_fut);
+            let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
+            let response = ResponsePacket::new_no_data(ResponseCode::Continue, HeaderSet::new());
+            expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Put), response);
+            let _received_headers = exec
+                .run_until_stalled(&mut put_fut)
+                .expect("response received")
+                .expect("valid response");
+        }
+
+        // Terminating early should be Ok - peer acknowledges.
+        let terminate_fut = operation.terminate(HeaderSet::new());
+        pin_mut!(terminate_fut);
+        let _ = exec.run_until_stalled(&mut terminate_fut).expect_pending("waiting for response");
+        let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
+        expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Abort), response);
+        let _received_headers = exec
+            .run_until_stalled(&mut terminate_fut)
+            .expect("response received")
+            .expect("valid response");
+    }
+
+    #[fuchsia::test]
     async fn put_with_body_header_is_error() {
         let (manager, _remote) = new_manager();
         let mut operation = setup_put_operation(&manager);
@@ -1455,5 +1561,17 @@ mod tests {
         .unwrap();
         let result = operation.delete(eob_headers).await;
         assert_matches!(result, Err(Error::OperationError { .. }));
+    }
+
+    #[fuchsia::test]
+    async fn put_operation_terminate_before_start_error() {
+        let (manager, _remote) = new_manager();
+        let operation = setup_put_operation(&manager);
+
+        // Trying to terminate early doesn't work as the operation has not started.
+        let headers =
+            HeaderSet::from_header(Header::Description("terminating test".into())).unwrap();
+        let terminate_result = operation.terminate(headers).await;
+        assert_matches!(terminate_result, Err(Error::OperationError { .. }));
     }
 }
