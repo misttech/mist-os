@@ -123,39 +123,43 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
     let NetlinkWorkerParams { route_client_receiver } = params;
 
     let route_clients = ClientTable::default();
-    // TODO(https://github.com/rust-lang/rfcs/issues/2407) Rust does not support
-    // cloning into closures, so clone the route_clients ahead of time.
-    let clients1 = route_clients.clone();
-    let clients2 = route_clients.clone();
-    let clients3 = route_clients.clone();
 
     let _: Vec<()> = futures::future::join_all([
         // Accept new NETLINK_ROUTE clients.
-        fasync::Task::spawn(async move {
-            connect_new_clients::<NetlinkRoute, _, _>(
-                clients1,
-                route_client_receiver,
-                NetlinkRouteRequestHandler,
-            )
-            .await;
-            panic!("route_client_receiver stream unexpectedly finished")
-        }),
+        {
+            let route_clients = route_clients.clone();
+            fasync::Task::spawn(async move {
+                connect_new_clients::<NetlinkRoute, _, _>(
+                    route_clients,
+                    route_client_receiver,
+                    NetlinkRouteRequestHandler,
+                )
+                .await;
+                panic!("route_client_receiver stream unexpectedly finished")
+            })
+        },
         // IPv4 Routes Worker.
-        fasync::Task::spawn(async move {
-            match routes::EventLoop::<P>::new(clients2).run::<Ipv4>().await {
-                RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
-                    panic!("Ipv4 routes event loop error: {:?}", e)
+        {
+            let route_clients = route_clients.clone();
+            fasync::Task::spawn(async move {
+                match routes::EventLoop::new(route_clients).run::<Ipv4>().await {
+                    RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
+                        panic!("Ipv4 routes event loop error: {:?}", e)
+                    }
                 }
-            }
-        }),
+            })
+        },
         // IPv6 Routes Worker.
-        fasync::Task::spawn(async move {
-            match routes::EventLoop::<P>::new(clients3).run::<Ipv6>().await {
-                RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
-                    panic!("Ipv6 routes event loop error: {:?}", e)
+        {
+            let route_clients = route_clients.clone();
+            fasync::Task::spawn(async move {
+                match routes::EventLoop::new(route_clients).run::<Ipv6>().await {
+                    RoutesEventLoopError::Fidl(e) | RoutesEventLoopError::Netstack(e) => {
+                        panic!("Ipv6 routes event loop error: {:?}", e)
+                    }
                 }
-            }
-        }),
+            })
+        },
         // Interfaces Worker.
         fasync::Task::spawn(async move {
             let worker = match interfaces::EventLoop::new() {

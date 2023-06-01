@@ -24,7 +24,7 @@ use tracing::{error, warn};
 
 use crate::{
     client::ClientTable,
-    messaging::SenderReceiverProvider,
+    messaging::Sender,
     multicast_groups::ModernGroup,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
 };
@@ -35,12 +35,12 @@ use crate::NETLINK_LOG_TAG;
 ///
 /// Connects to the route watcher and can respond to RTM_ROUTE
 /// message requests.
-pub(crate) struct EventLoop<P: SenderReceiverProvider> {
+pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
     /// Represents the current route state as observed by Netstack, converted into
     /// Netlink messages to send when requested.
     route_messages: HashSet<NetlinkRouteMessage>,
     /// The current set of clients of NETLINK_ROUTE protocol family.
-    route_clients: ClientTable<NetlinkRoute, P::Sender<<NetlinkRoute as ProtocolFamily>::Message>>,
+    route_clients: ClientTable<NetlinkRoute, S>,
 }
 
 /// RTM_ROUTE related event loop errors.
@@ -57,14 +57,9 @@ pub(crate) enum RoutesEventLoopError {
     Netstack(anyhow::Error),
 }
 
-impl<P: SenderReceiverProvider> EventLoop<P> {
+impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
     /// `new` returns an `EventLoop` instance.
-    pub(crate) fn new(
-        route_clients: ClientTable<
-            NetlinkRoute,
-            P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-        >,
-    ) -> Self {
+    pub(crate) fn new(route_clients: ClientTable<NetlinkRoute, S>) -> Self {
         EventLoop { route_messages: Default::default(), route_clients }
     }
 
@@ -163,7 +158,7 @@ impl<P: SenderReceiverProvider> EventLoop<P> {
                         None => return RoutesEventLoopError::Fidl(anyhow!("route event stream ended")),
                     };
 
-                    match handle_route_watcher_event::<I, P>(
+                    match handle_route_watcher_event(
                         route_messages,
                         route_clients,
                         event
@@ -207,9 +202,9 @@ enum RouteEventHandlerError<I: Ip> {
 /// from the underlying `NetlinkRouteMessage` set.
 ///
 /// Returns a `RoutesEventLoopError` when unexpected events or HashSet issues occur.
-fn handle_route_watcher_event<I: Ip, P: SenderReceiverProvider>(
+fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
     route_messages: &mut HashSet<NetlinkRouteMessage>,
-    route_clients: &ClientTable<NetlinkRoute, P::Sender<<NetlinkRoute as ProtocolFamily>::Message>>,
+    route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_routes_ext::Event<I>,
 ) -> Result<(), RouteEventHandlerError<I>> {
     let message_for_clients = match event {
@@ -439,7 +434,7 @@ mod tests {
     };
     use test_case::test_case;
 
-    use crate::messaging::testutil::{FakeSender, FakeSenderReceiverProvider};
+    use crate::messaging::testutil::FakeSender;
 
     fn create_installed_route<I: Ip>(
         subnet: Subnet<I::Addr>,
@@ -558,11 +553,7 @@ mod tests {
 
         // An event that is not an add or remove should result in an error.
         assert_matches!(
-            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
-                &mut route_messages,
-                &route_clients,
-                unknown_event
-            ),
+            handle_route_watcher_event(&mut route_messages, &route_clients, unknown_event),
             Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(_))
         );
         assert_eq!(route_messages.len(), 0);
@@ -570,11 +561,7 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         assert_eq!(
-            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
-                &mut route_messages,
-                &route_clients,
-                add_event1
-            ),
+            handle_route_watcher_event(&mut route_messages, &route_clients, add_event1),
             Ok(())
         );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
@@ -586,11 +573,7 @@ mod tests {
 
         // Adding the same route again should result in an error.
         assert_matches!(
-            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
-                &mut route_messages,
-                &route_clients,
-                add_event1
-            ),
+            handle_route_watcher_event(&mut route_messages, &route_clients, add_event1),
             Err(RouteEventHandlerError::AlreadyExistingRouteAddition(_))
         );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
@@ -599,11 +582,7 @@ mod tests {
 
         // Adding a different route should result in an addition.
         assert_eq!(
-            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
-                &mut route_messages,
-                &route_clients,
-                add_event2
-            ),
+            handle_route_watcher_event(&mut route_messages, &route_clients, add_event2),
             Ok(())
         );
         assert_eq!(
@@ -617,11 +596,7 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         assert_eq!(
-            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
-                &mut route_messages,
-                &route_clients,
-                remove_event
-            ),
+            handle_route_watcher_event(&mut route_messages, &route_clients, remove_event),
             Ok(())
         );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
@@ -633,11 +608,7 @@ mod tests {
 
         // Removing a route that doesn't exist should result in an error.
         assert_matches!(
-            handle_route_watcher_event::<I, FakeSenderReceiverProvider>(
-                &mut route_messages,
-                &route_clients,
-                remove_event
-            ),
+            handle_route_watcher_event(&mut route_messages, &route_clients, remove_event),
             Err(RouteEventHandlerError::NonExistentRouteDeletion(_))
         );
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
