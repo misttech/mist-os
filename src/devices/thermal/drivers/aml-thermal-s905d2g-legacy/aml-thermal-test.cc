@@ -4,7 +4,11 @@
 
 #include "aml-thermal.h"
 
-#include <fuchsia/hardware/pwm/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/device.h>
 #include <lib/mmio/mmio.h>
 #include <stdint.h>
@@ -13,6 +17,7 @@
 #include <zircon/types.h>
 
 #include <cstddef>
+#include <list>
 #include <memory>
 
 #include <fbl/alloc_checker.h>
@@ -20,10 +25,13 @@
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
-bool operator==(const pwm_config_t& lhs, const pwm_config_t& rhs) {
+bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
+                const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) && (lhs.mode_config_size == rhs.mode_config_size) &&
-         !memcmp(lhs.mode_config_buffer, rhs.mode_config_buffer, lhs.mode_config_size);
+         (lhs.duty_cycle == rhs.duty_cycle) &&
+         (lhs.mode_config.count() == rhs.mode_config.count()) &&
+         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
+          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
 }
 
 namespace {
@@ -288,22 +296,22 @@ class AmlTSensorTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    mock_pll_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_pll_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_pll_mmio_ alloc failed");
       return;
     }
 
-    mock_trim_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_trim_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_trim_mmio_ alloc failed");
       return;
     }
 
-    mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_hiu_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -438,9 +446,9 @@ TEST_F(AmlTSensorTest, LessTripPointsTest) { Create(true); }
 // Voltage Regulator
 class FakeAmlVoltageRegulator : public AmlVoltageRegulator {
  public:
-  static std::unique_ptr<FakeAmlVoltageRegulator> Create(const pwm_protocol_t* big_cluster_pwm,
-                                                         const pwm_protocol_t* little_cluster_pwm,
-                                                         uint32_t pid) {
+  static std::unique_ptr<FakeAmlVoltageRegulator> Create(
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> big_cluster_pwm,
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> little_cluster_pwm, uint32_t pid) {
     fbl::AllocChecker ac;
 
     auto test = fbl::make_unique_checked<FakeAmlVoltageRegulator>(&ac);
@@ -449,38 +457,98 @@ class FakeAmlVoltageRegulator : public AmlVoltageRegulator {
     }
 
     const auto& config = (pid == 4 ? sherlock_thermal_config : astro_thermal_config);
-    EXPECT_OK(test->Init(big_cluster_pwm, little_cluster_pwm, config, &fake_thermal_info));
+    EXPECT_OK(test->Init(std::move(big_cluster_pwm), std::move(little_cluster_pwm), config,
+                         &fake_thermal_info));
     return test;
   }
 };
 
+class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_pwm::Pwm> {
+ public:
+  void SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) override {
+    ASSERT_GT(expect_configs_.size(), 0);
+    auto expect_config = expect_configs_.front();
+
+    ASSERT_EQ(request->config, expect_config);
+
+    expect_configs_.pop_front();
+    mode_config_buffers_.pop_front();
+    completer.ReplySuccess();
+  }
+
+  void Enable(EnableCompleter::Sync& completer) override {
+    ASSERT_TRUE(expect_enable_);
+    expect_enable_ = false;
+    completer.ReplySuccess();
+  }
+
+  void ExpectSetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
+    std::unique_ptr<uint8_t[]> mode_config =
+        std::make_unique<uint8_t[]>(config.mode_config.count());
+    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.count());
+    auto copy = config;
+    copy.mode_config =
+        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
+    expect_configs_.push_back(std::move(copy));
+    mode_config_buffers_.push_back(std::move(mode_config));
+  }
+
+  void ExpectEnable() { expect_enable_ = true; }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> BindServer() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
+    EXPECT_TRUE(endpoints.is_ok());
+    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
+    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints->client));
+  }
+
+  void VerifyAndClear() {
+    ASSERT_EQ(expect_configs_.size(), 0);
+    ASSERT_EQ(mode_config_buffers_.size(), 0);
+    ASSERT_FALSE(expect_enable_);
+  }
+
+ private:
+  std::list<fuchsia_hardware_pwm::wire::PwmConfig> expect_configs_;
+  std::list<std::unique_ptr<uint8_t[]>> mode_config_buffers_;
+  bool expect_enable_ = false;
+};
+
 class AmlVoltageRegulatorTest : public zxtest::Test {
  public:
+  void SetUp() override { EXPECT_OK(pwm_loop_.StartThread("pwm-servers")); }
+
   void TearDown() override {
     // Verify
-    big_cluster_pwm_.VerifyAndClear();
-    little_cluster_pwm_.VerifyAndClear();
+    big_cluster_pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
+    little_cluster_pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
+    pwm_loop_.Shutdown();
   }
 
   void Create(uint32_t pid) {
     aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-    pwm_config_t cfg = {false, 1250, 43, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-
+    fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+        false, 1250, 43,
+        fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
     switch (pid) {
       case 4: {  // Sherlock
-        big_cluster_pwm_.ExpectEnable(ZX_OK);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.duty_cycle = 43;
-        big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
-        little_cluster_pwm_.ExpectEnable(ZX_OK);
+        little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.duty_cycle = 3;
-        little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
         break;
       }
       case 3: {  // Astro
-        big_cluster_pwm_.ExpectEnable(ZX_OK);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.duty_cycle = 13;
-        big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
         break;
       }
       default:
@@ -488,9 +556,10 @@ class AmlVoltageRegulatorTest : public zxtest::Test {
         return;
     }
 
-    auto big_cluster_pwm = big_cluster_pwm_.GetProto();
-    auto little_cluster_pwm = little_cluster_pwm_.GetProto();
-    voltage_regulator_ = FakeAmlVoltageRegulator::Create(big_cluster_pwm, little_cluster_pwm, pid);
+    auto big_cluster_pwm_client = big_cluster_pwm_.SyncCall(&MockPwmServer::BindServer);
+    auto little_cluster_pwm_client = little_cluster_pwm_.SyncCall(&MockPwmServer::BindServer);
+    voltage_regulator_ = FakeAmlVoltageRegulator::Create(std::move(big_cluster_pwm_client),
+                                                         std::move(little_cluster_pwm_client), pid);
     ASSERT_TRUE(voltage_regulator_ != nullptr);
   }
 
@@ -498,8 +567,12 @@ class AmlVoltageRegulatorTest : public zxtest::Test {
   std::unique_ptr<FakeAmlVoltageRegulator> voltage_regulator_;
 
   // Mmio Regs and Regions
-  ddk::MockPwm big_cluster_pwm_;
-  ddk::MockPwm little_cluster_pwm_;
+  async::Loop pwm_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<MockPwmServer> big_cluster_pwm_{pwm_loop_.dispatcher(),
+                                                                      std::in_place};
+
+  async_patterns::TestDispatcherBound<MockPwmServer> little_cluster_pwm_{pwm_loop_.dispatcher(),
+                                                                         std::in_place};
 };
 
 TEST_F(AmlVoltageRegulatorTest, SherlockGetVoltageTest) {
@@ -523,16 +596,18 @@ TEST_F(AmlVoltageRegulatorTest, SherlockSetVoltageTest) {
   Create(4);
   // SetBigClusterVoltage(761000)
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {false, 1250, 53, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, 1250, 53,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 63;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 73;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 83;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 86;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   EXPECT_OK(voltage_regulator_->SetVoltage(
       fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, 761000));
   uint32_t val = voltage_regulator_->GetVoltage(
@@ -541,13 +616,13 @@ TEST_F(AmlVoltageRegulatorTest, SherlockSetVoltageTest) {
 
   // SetLittleClusterVoltage(911000)
   cfg.duty_cycle = 13;
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 23;
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 33;
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 36;
-  little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   EXPECT_OK(voltage_regulator_->SetVoltage(
       fuchsia_hardware_thermal::wire::PowerDomain::kLittleClusterPowerDomain, 911000));
   val = voltage_regulator_->GetVoltage(
@@ -559,14 +634,16 @@ TEST_F(AmlVoltageRegulatorTest, AstroSetVoltageTest) {
   Create(3);
   // SetBigClusterVoltage(861000)
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-  pwm_config_t cfg = {false, 1250, 23, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+      false, 1250, 23,
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 33;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 43;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   cfg.duty_cycle = 53;
-  big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+  big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
   EXPECT_OK(voltage_regulator_->SetVoltage(
       fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, 861000));
   uint32_t val = voltage_regulator_->GetVoltage(
@@ -604,8 +681,8 @@ class AmlCpuFrequencyTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_hiu_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlCpuFrequencyTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -815,8 +892,10 @@ class FakeAmlThermal : public AmlThermal {
  public:
   static std::unique_ptr<FakeAmlThermal> Create(
       fdf::MmioBuffer tsensor_pll_mmio, fdf::MmioBuffer tsensor_trim_mmio,
-      fdf::MmioBuffer tsensor_hiu_mmio, const pwm_protocol_t* big_cluster_pwm,
-      const pwm_protocol_t* little_cluster_pwm, fdf::MmioBuffer cpufreq_scaling_hiu_mmio,
+      fdf::MmioBuffer tsensor_hiu_mmio,
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> big_cluster_pwm,
+      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> little_cluster_pwm,
+      fdf::MmioBuffer cpufreq_scaling_hiu_mmio,
       mmio_buffer_t cpufreq_scaling_mock_hiu_internal_mmio, uint32_t pid) {
     fbl::AllocChecker ac;
 
@@ -839,7 +918,8 @@ class FakeAmlThermal : public AmlThermal {
     if (!ac.check() || (status != ZX_OK)) {
       return nullptr;
     }
-    EXPECT_OK(voltage_regulator->Init(big_cluster_pwm, little_cluster_pwm, config, &info));
+    EXPECT_OK(voltage_regulator->Init(std::move(big_cluster_pwm), std::move(little_cluster_pwm),
+                                      config, &info));
 
     // CPU Frequency and Scaling
     auto cpufreq_scaling = fbl::make_unique_checked<AmlCpuFrequency>(
@@ -884,20 +964,20 @@ class AmlThermalTest : public zxtest::Test {
     fbl::AllocChecker ac;
 
     // Temperature Sensor
-    tsensor_mock_pll_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    tsensor_mock_pll_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: mock_pll_mmio_ alloc failed");
       return;
     }
-    tsensor_mock_trim_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    tsensor_mock_trim_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: mock_trim_mmio_ alloc failed");
       return;
     }
-    tsensor_mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    tsensor_mock_hiu_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -916,8 +996,8 @@ class AmlThermalTest : public zxtest::Test {
         .ExpectWrite(0x0F008000);
 
     // CPU Frequency and Scaling
-    cpufreq_scaling_mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    cpufreq_scaling_mock_hiu_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: cpufreq_scaling_mock_hiu_mmio_ alloc failed");
       return;
@@ -934,6 +1014,8 @@ class AmlThermalTest : public zxtest::Test {
         .size = kRegSize * sizeof(uint32_t),
         .vmo = ZX_HANDLE_INVALID};
     InitHiuInternalMmio();
+
+    EXPECT_OK(pwm_loop_.StartThread("pwm-servers"));
   }
 
   void TearDown() override {
@@ -941,9 +1023,12 @@ class AmlThermalTest : public zxtest::Test {
     tsensor_mock_pll_mmio_->VerifyAll();
     tsensor_mock_trim_mmio_->VerifyAll();
     tsensor_mock_hiu_mmio_->VerifyAll();
-    big_cluster_pwm_.VerifyAndClear();
-    little_cluster_pwm_.VerifyAndClear();
+
+    big_cluster_pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
+    little_cluster_pwm_.SyncCall(&MockPwmServer::VerifyAndClear);
     cpufreq_scaling_mock_hiu_mmio_->VerifyAll();
+
+    pwm_loop_.Shutdown();
 
     // Tear down
     thermal_device_ = nullptr;
@@ -953,17 +1038,19 @@ class AmlThermalTest : public zxtest::Test {
     ddk_mock::MockMmioRegRegion& tsensor_mmio = *tsensor_mock_pll_mmio_;
 
     aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
-    pwm_config_t cfg = {false, 1250, 43, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
+    fuchsia_hardware_pwm::wire::PwmConfig cfg = {
+        false, 1250, 43,
+        fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&on), sizeof(on))};
     switch (pid) {
       case 4: {  // Sherlock
         // Voltage Regulator
-        big_cluster_pwm_.ExpectEnable(ZX_OK);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.duty_cycle = 43;
-        big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
-        little_cluster_pwm_.ExpectEnable(ZX_OK);
+        little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.duty_cycle = 3;
-        little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        little_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
         // CPU Frequency and Scaling
         // Big
@@ -1001,9 +1088,9 @@ class AmlThermalTest : public zxtest::Test {
       }
       case 3: {  // Astro
         // Voltage Regulator
-        big_cluster_pwm_.ExpectEnable(ZX_OK);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.duty_cycle = 13;
-        big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
         // CPU Frequency and Scaling
         (*cpufreq_scaling_mock_hiu_mmio_)[412]
@@ -1030,10 +1117,10 @@ class AmlThermalTest : public zxtest::Test {
       }
       case 5: {  // Nelson
         // Voltage Regulator
-        big_cluster_pwm_.ExpectEnable(ZX_OK);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectEnable);
         cfg.period_ns = 1500;
         cfg.duty_cycle = 23;
-        big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
+        big_cluster_pwm_.SyncCall(&MockPwmServer::ExpectSetConfig, cfg);
 
         // CPU Frequency and Scaling
         (*cpufreq_scaling_mock_hiu_mmio_)[412]
@@ -1066,13 +1153,13 @@ class AmlThermalTest : public zxtest::Test {
     fdf::MmioBuffer tsensor_pll_mmio(tsensor_mock_pll_mmio_->GetMmioBuffer());
     fdf::MmioBuffer tsensor_trim_mmio(tsensor_mock_trim_mmio_->GetMmioBuffer());
     fdf::MmioBuffer tsensor_hiu_mmio(tsensor_mock_hiu_mmio_->GetMmioBuffer());
-    auto big_cluster_pwm = big_cluster_pwm_.GetProto();
-    auto little_cluster_pwm = little_cluster_pwm_.GetProto();
+    auto big_cluster_pwm_client = big_cluster_pwm_.SyncCall(&MockPwmServer::BindServer);
+    auto little_cluster_pwm_client = little_cluster_pwm_.SyncCall(&MockPwmServer::BindServer);
     fdf::MmioBuffer cpufreq_scaling_hiu_mmio(cpufreq_scaling_mock_hiu_mmio_->GetMmioBuffer());
     thermal_device_ = FakeAmlThermal::Create(
         std::move(tsensor_pll_mmio), std::move(tsensor_trim_mmio), std::move(tsensor_hiu_mmio),
-        big_cluster_pwm, little_cluster_pwm, std::move(cpufreq_scaling_hiu_mmio),
-        cpufreq_scaling_mock_hiu_internal_mmio_, pid);
+        std::move(big_cluster_pwm_client), std::move(little_cluster_pwm_client),
+        std::move(cpufreq_scaling_hiu_mmio), cpufreq_scaling_mock_hiu_internal_mmio_, pid);
     ASSERT_TRUE(thermal_device_ != nullptr);
   }
 
@@ -1091,8 +1178,11 @@ class AmlThermalTest : public zxtest::Test {
   std::unique_ptr<ddk_mock::MockMmioRegRegion> tsensor_mock_hiu_mmio_;
 
   // Voltage Regulator
-  ddk::MockPwm big_cluster_pwm_;
-  ddk::MockPwm little_cluster_pwm_;
+  async::Loop pwm_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<MockPwmServer> big_cluster_pwm_{pwm_loop_.dispatcher(),
+                                                                      std::in_place};
+  async_patterns::TestDispatcherBound<MockPwmServer> little_cluster_pwm_{pwm_loop_.dispatcher(),
+                                                                         std::in_place};
 
   // CPU Frequency and Scaling
   fbl::Array<uint32_t> cpufreq_scaling_hiu_internal_mmio_;

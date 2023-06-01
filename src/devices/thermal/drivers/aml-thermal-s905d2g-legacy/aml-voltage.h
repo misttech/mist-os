@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_THERMAL_DRIVERS_AML_THERMAL_S905D2G_LEGACY_AML_VOLTAGE_H_
 #define SRC_DEVICES_THERMAL_DRIVERS_AML_THERMAL_S905D2G_LEGACY_AML_VOLTAGE_H_
 
-#include <fuchsia/hardware/pwm/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/errors.h>
@@ -13,6 +13,7 @@
 
 #include <memory>
 
+#include <ddktl/device.h>
 #include <fbl/macros.h>
 #include <soc/aml-common/aml-pwm-regs.h>
 #include <soc/aml-common/aml-thermal.h>
@@ -29,7 +30,8 @@ class AmlVoltageRegulator {
                      const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
                      const aml_thermal_info_t* thermal_info);
   // For testing
-  zx_status_t Init(const pwm_protocol_t* big_cluster_pwm, const pwm_protocol_t* little_cluster_pwm,
+  zx_status_t Init(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> big_cluster_pwm,
+                   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> little_cluster_pwm,
                    const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
                    const aml_thermal_info_t* thermal_info);
   zx_status_t Init(const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
@@ -57,7 +59,8 @@ class AmlVoltageRegulator {
     FRAGMENT_COUNT = 3,
   };
 
-  zx_status_t SetClusterVoltage(int* current_voltage_index, const ddk::PwmProtocolClient& pwm,
+  zx_status_t SetClusterVoltage(int* current_voltage_index,
+                                const fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& pwm,
                                 uint32_t microvolt);
   zx_status_t SetBigClusterVoltage(uint32_t microvolt) {
     return SetClusterVoltage(&current_big_cluster_voltage_index_, big_cluster_pwm_, microvolt);
@@ -67,8 +70,8 @@ class AmlVoltageRegulator {
                              microvolt);
   }
 
-  ddk::PwmProtocolClient big_cluster_pwm_;
-  ddk::PwmProtocolClient little_cluster_pwm_;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> big_cluster_pwm_;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> little_cluster_pwm_;
   aml_thermal_info_t thermal_info_;
   int current_big_cluster_voltage_index_;
   int current_little_cluster_voltage_index_;
