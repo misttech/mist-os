@@ -6,9 +6,4 @@
         "//third_party/gvisor_syscall_tests/meta/netstack2/syncudp/use_sync_udp.shard.cml",
         "//third_party/gvisor_syscall_tests/meta/syscall_tests.shard.cml",
     ],
-    program: {
-        // TODO(https://fxbug.dev/121880): Move to common shard once a manifest
-        // can have more than one program.environ definition.
-        environ: [ "TEST_ON_GVISOR=fuchsia" ],
-    },
 }

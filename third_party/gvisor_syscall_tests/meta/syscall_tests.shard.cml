@@ -9,6 +9,7 @@
     program: {
         runner: "gtest_runner",
         args: [ "--use_fuchsia_test_expectations" ],
+        environ: [ "TEST_ON_GVISOR=fuchsia" ],
     },
     use: [
         {

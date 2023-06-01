@@ -3,13 +3,7 @@
 // found in the LICENSE file.
 {
     program: {
-        environ: [
-            "FAST_UDP=1",
-
-            // TODO(https://fxbug.dev/121880): Move to common shard once a
-            // manifest can have more than one program.environ definition.
-            "TEST_ON_GVISOR=fuchsia",
-        ],
+        environ: [ "FAST_UDP=1" ],
     },
     children: [
         {
