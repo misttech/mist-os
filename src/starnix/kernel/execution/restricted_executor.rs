@@ -4,7 +4,7 @@
 
 #![allow(non_camel_case_types)]
 
-use super::shared::{execute_syscall, process_completed_syscall, TaskInfo};
+use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
 use crate::arch::{
     execution::{generate_cfi_directives, restore_cfi_directives},
     registers::RegisterState,
@@ -334,7 +334,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             }
             _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
         }
-
         match reason_code {
             zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
                 trace_duration!(
@@ -361,28 +360,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
                 // Restore the CFI directives before continuing.
                 restore_cfi_directives!();
-
-                if let Some(exit_status) = process_completed_syscall(current_task, &error_context)?
-                {
-                    let dump_on_exit = current_task.read().dump_on_exit;
-                    if dump_on_exit {
-                        log_trace!("requesting backtrace");
-                        // Disable exception processing on the exception handling thread since we're about
-                        // to generate a SW breakpoint exception and we want the system to handle it. This
-                        // is a temporary workaround. Once Zircon gains the ability to return exceptions
-                        // generated from restricted mode through zx_restricted_enter's restricted_return
-                        // call we can just generate an exception here in normal mode and it will not be
-                        // confused with exceptions from restricted mode.
-                        current_task
-                            .ignore_exceptions
-                            .store(true, std::sync::atomic::Ordering::Release);
-                        // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
-                        generate_cfi_directives!(state);
-                        backtrace_request::backtrace_request_current_thread();
-                        restore_cfi_directives!();
-                    }
-                    return Ok(exit_status);
-                }
             }
             zx::sys::ZX_RESTRICTED_REASON_EXCEPTION => {
                 let restricted_exception = restricted_state.read_exception();
@@ -419,12 +396,43 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                     }
                 }
             }
+            zx::sys::ZX_RESTRICTED_REASON_KICK => {
+                // Copy the register state out of the VMO.
+                restricted_state.read_state(&mut state);
+
+                // Update the task's register state.
+                current_task.registers =
+                    zx::sys::zx_thread_state_general_regs_t::from(&state).into();
+
+                // Fall through to the post-syscall / post-exception handling logic. We were likely kicked because a
+                // signal is pending deliver or the task has exited. Spurious kicks are also possible.
+            }
             _ => {
                 return Err(format_err!(
                     "Received unexpected restricted reason code: {}",
                     reason_code
                 ))
             }
+        }
+
+        if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
+        {
+            let dump_on_exit = current_task.read().dump_on_exit;
+            if dump_on_exit {
+                log_trace!("requesting backtrace");
+                // Disable exception processing on the exception handling thread since we're about
+                // to generate a SW breakpoint exception and we want the system to handle it. This
+                // is a temporary workaround. Once Zircon gains the ability to return exceptions
+                // generated from restricted mode through zx_restricted_enter's restricted_return
+                // call we can just generate an exception here in normal mode and it will not be
+                // confused with exceptions from restricted mode.
+                current_task.ignore_exceptions.store(true, std::sync::atomic::Ordering::Release);
+                // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
+                generate_cfi_directives!(state);
+                backtrace_request::backtrace_request_current_thread();
+                restore_cfi_directives!();
+            }
+            return Ok(exit_status);
         }
     }
 }
@@ -511,50 +519,8 @@ fn process_completed_exception<E: ExceptionContext>(
 
             deliver_signal(&task, signal, &mut registers);
 
-            if task.read().exit_status.is_some() {
-                let exception_state = if task.read().dump_on_exit {
-                    // Let crashsvc or the debugger handle the exception.
-                    &zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT
-                } else {
-                    &zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT
-                };
-                exception.set_exception_state(exception_state).unwrap();
-
-                // Subtle logic / terrible hack ahead!
-                //
-                // At this point we want the task to exit.
-                //
-                // If we're not using in-thread exceptions, then the restricted mode thread is blocked until
-                // |exception| is handled with its PC pointed into a restricted mode address. We do not
-                // currently have a way to tell Zircon to kick this thread out of restricted mode, so we do not
-                // have a direct mechanism for executing the normal exit from restricted mode logic. Instead, we
-                // let the Zircon exception propagate so that Zircon terminates the thread and thus the process.
-                // Since we won't unwind the stack of the Starnix portion of the faulting thread, which would
-                // usually involve invoking the Drop handler of CurrentTask, we have to destroy it manually
-                // here.  Be aware that since we're destroying the process in a shared address space without
-                // unwinding the stack and dropping objects as would usually happen the state in the shared
-                // space may be surprising.
-                //
-                // If we are using in-thread exceptions then the generated exception has caused the thread to
-                // return to normal mode. This means we can unwind our stack normally and allow task's Drop
-                // impl to handle cleanup for us.
-                if !cfg!(feature = "in_thread_exceptions") {
-                    task.destroy_do_not_use_outside_of_drop_if_possible();
-                    unsafe {
-                        // The task reference that lives in the syscall dispatch loop will never
-                        // be dropped, so `task`'s reference count is decremented twice here.
-                        // Once for this reference, and once for the one in the syscall dispatch
-                        // loop.
-                        // TODO(https://fxbug.dev/117302): Remove this hack.
-                        let t = Arc::into_raw(task);
-                        Arc::decrement_strong_count(t);
-                        Arc::decrement_strong_count(t);
-                    }
-                }
-            } else {
-                exception.write_registers(registers);
-                exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
-            }
+            exception.write_registers(registers);
+            exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
         }
     }
 }
@@ -672,4 +638,9 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
     }
 
     Ok(())
+}
+
+pub fn interrupt_thread(thread: &zx::Thread) {
+    let status = unsafe { zx::sys::zx_restricted_kick(thread.raw_handle(), 0) };
+    assert_eq!(status, zx::sys::ZX_OK);
 }

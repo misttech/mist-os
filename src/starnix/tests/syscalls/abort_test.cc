@@ -6,18 +6,33 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <thread>
+
 #include <gtest/gtest.h>
 
+#include "src/starnix/tests/syscalls/test_helper.h"
+
 TEST(AbortTest, Abort) {
-  pid_t child = fork();
-  if (child == 0) {
-    abort();
-  } else {
-    int wstatus = 0;
-    int options = 0;
-    EXPECT_EQ(waitpid(child, &wstatus, options), child);
-    EXPECT_TRUE(!WIFEXITED(wstatus)) << wstatus;
-    EXPECT_TRUE(WIFSIGNALED(wstatus)) << wstatus;
-    EXPECT_EQ(WTERMSIG(wstatus), SIGABRT);
-  }
+  ForkHelper helper;
+  helper.ExpectSignal(SIGABRT);
+  helper.RunInForkedProcess([] { abort(); });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(AbortTest, AbortFromChildThread) {
+  ForkHelper helper;
+  helper.ExpectSignal(SIGABRT);
+  helper.RunInForkedProcess([] {
+    volatile bool done = false;
+    std::thread child_thread([] { abort(); });
+    // Spin in userspace forever to verify that we can kick out of restricted
+    // mode even when not executing any syscalls.
+    while (!done) {
+      // This loop issues a volatile load on each iteration which is considered
+      // progress by C++ even though it has no practical effect:
+      // http://eel.is/c++draft/basic.exec#intro.progress
+    }
+    ASSERT_TRUE(false) << "Should not be reached";
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
 }
