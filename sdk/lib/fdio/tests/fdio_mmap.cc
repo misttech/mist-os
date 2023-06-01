@@ -103,6 +103,11 @@ TEST_F(MmapTest, MapPrivate) {
   EXPECT_BYTES_EQ(static_cast<char*>(map_2), data_2, data_len);
 }
 
+TEST(MmapTest, InvalidFd) {
+  EXPECT_EQ(mmap(nullptr, kPageSize, PROT_READ, MAP_PRIVATE, -1, 0), MAP_FAILED);
+  EXPECT_EQ(errno, EBADF);
+}
+
 // Test that file writes are propagated to a shared read-only buffer.
 TEST_F(MmapTest, MapShared) {
   const char data_1[] = "this is a buffer";
