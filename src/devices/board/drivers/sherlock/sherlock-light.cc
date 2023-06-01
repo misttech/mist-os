@@ -17,8 +17,8 @@
 #include <bind/fuchsia/ams/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
-#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/lights.h>
 #include <ddktl/metadata/light-sensor.h>
 #include <soc/aml-t931/t931-pwm.h>
@@ -142,15 +142,17 @@ zx_status_t Sherlock::LightInit() {
   };
 
   auto amber_led_pwm_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
                               bind_fuchsia_amlogic_platform_t931::BIND_PWM_ID_PWM_AO_A),
   };
 
   auto amber_led_pwm_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
-      fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                        bind_fuchsia_pwm::PWM_ID_FUNCTION_AMBER_LED),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION,
+                        bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION_AMBER_LED),
   };
 
   auto green_led_gpio_bind_rules = std::vector{
@@ -165,15 +167,17 @@ zx_status_t Sherlock::LightInit() {
   };
 
   auto green_led_pwm_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
                               bind_fuchsia_amlogic_platform_t931::BIND_PWM_ID_PWM_F),
   };
 
   auto green_led_pwm_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
-      fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                        bind_fuchsia_pwm::PWM_ID_FUNCTION_GREEN_LED),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION,
+                        bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION_GREEN_LED),
   };
 
   auto parents = std::vector{

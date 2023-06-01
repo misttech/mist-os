@@ -6,7 +6,7 @@ composite aml_thermal_pll;
 
 using fuchsia.platform;
 using fuchsia.amlogic.platform;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.hardware.clock;
 using fuchsia.amlogic.platform.meson;
@@ -20,7 +20,7 @@ primary node "pdev" {
 }
 
 node "pwm-a" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.s905d3.BIND_PWM_ID.PWM_AO_D;
 }
 

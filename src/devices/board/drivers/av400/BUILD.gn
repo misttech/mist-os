@@ -49,7 +49,7 @@ driver_bind_rules("pwm_init_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.clock",
-    "//src/devices/bind/fuchsia.pwm",
+    "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
 
@@ -232,8 +232,8 @@ driver_bind_rules("av400-power-regulator-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 

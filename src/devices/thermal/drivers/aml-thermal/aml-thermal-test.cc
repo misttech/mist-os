@@ -4,7 +4,6 @@
 
 #include "aml-thermal.h"
 
-#include <fuchsia/hardware/pwm/cpp/banjo-mock.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
@@ -20,12 +19,6 @@
 #include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
-
-bool operator==(const pwm_config_t& lhs, const pwm_config_t& rhs) {
-  return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) && (lhs.mode_config_size == rhs.mode_config_size) &&
-         !memcmp(lhs.mode_config_buffer, rhs.mode_config_buffer, lhs.mode_config_size);
-}
 
 namespace {
 
@@ -167,22 +160,22 @@ class AmlTSensorTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    mock_sensor_base_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_sensor_base_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_sensor_base_mmio_ alloc failed");
       return;
     }
 
-    mock_trim_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_trim_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_trim_mmio_ alloc failed");
       return;
     }
 
-    mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, sizeof(uint32_t), kRegSize);
+    mock_hiu_mmio_ =
+        fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;

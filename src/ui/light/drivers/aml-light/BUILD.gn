@@ -19,8 +19,8 @@ driver_bind_rules("aml_light_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 

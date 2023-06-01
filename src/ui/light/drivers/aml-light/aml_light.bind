@@ -7,7 +7,7 @@ composite aml_light;
 using fuchsia.amlogic.platform;
 using fuchsia.gpio;
 using fuchsia.platform;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -22,8 +22,8 @@ node "gpio-amber-led" {
 }
 
 node "pwm-amber-led" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
-  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.AMBER_LED;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pwm.PWM_ID_FUNCTION == fuchsia.hardware.pwm.PWM_ID_FUNCTION.AMBER_LED;
 }
 
 optional node "gpio-green-led" {
@@ -32,6 +32,6 @@ optional node "gpio-green-led" {
 }
 
 optional node "pwm-green-led" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
-  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.GREEN_LED;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pwm.PWM_ID_FUNCTION == fuchsia.hardware.pwm.PWM_ID_FUNCTION.GREEN_LED;
 }

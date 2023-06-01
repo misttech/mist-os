@@ -44,8 +44,8 @@ driver_bind_rules("nelson_bt_uart_bind") {
   tests = "bind-tests/nelson_bt_uart-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -105,7 +105,7 @@ driver_bind_rules("pwm_init_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.pwm",
+    "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
 
@@ -118,8 +118,8 @@ driver_bind_rules("nelson_aml_sdio_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -212,8 +212,8 @@ driver_bind_rules("aml_thermal_pll_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -370,9 +370,9 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//src/devices/bind/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
+    "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
-    "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bus/lib/platform-bus-composites",

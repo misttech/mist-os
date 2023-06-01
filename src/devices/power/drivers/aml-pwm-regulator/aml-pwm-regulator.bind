@@ -5,16 +5,16 @@
 composite aml_pwm_regulator;
 
 using fuchsia.platform;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pwm-9" {
-    fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
-    fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_LITTLE_CLUSTER;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+    fuchsia.hardware.pwm.PWM_ID_FUNCTION == fuchsia.hardware.pwm.PWM_ID_FUNCTION.CORE_POWER_LITTLE_CLUSTER;
 }
 
 node "pwm-0" {
-    fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
-    fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_BIG_CLUSTER;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+    fuchsia.hardware.pwm.PWM_ID_FUNCTION == fuchsia.hardware.pwm.PWM_ID_FUNCTION.CORE_POWER_BIG_CLUSTER;
 }
 
 node "pdev" {

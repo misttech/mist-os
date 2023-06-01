@@ -20,9 +20,9 @@ driver_bind_rules("vim3-pwm-backlight-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.khadas.platform",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 

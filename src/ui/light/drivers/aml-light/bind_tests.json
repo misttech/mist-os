@@ -34,8 +34,8 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM",
-                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.AMBER_LED"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.pwm.PWM_ID_FUNCTION": "fuchsia.hardware.pwm.PWM_ID_FUNCTION.AMBER_LED"
                 }
             }
         ]
@@ -60,8 +60,8 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM",
-                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.GREEN_LED"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.pwm.PWM_ID_FUNCTION": "fuchsia.hardware.pwm.PWM_ID_FUNCTION.GREEN_LED"
                 }
             }
         ]

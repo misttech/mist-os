@@ -7,7 +7,7 @@ composite power_regulator;
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a5;
 using fuchsia.platform;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pdev" {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -18,7 +18,7 @@ primary node "pdev" {
 }
 
 node "pwm-f" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.a5.BIND_PWM_ID.PWM_F; // VDDCPU_PWM
 }
 

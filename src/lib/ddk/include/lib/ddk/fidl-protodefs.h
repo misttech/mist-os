@@ -39,5 +39,6 @@ DDK_FIDL_PROTOCOL_DEF(AMLOGIC_CANVAS,  20, "fuchsia.hardware.amlogiccanvas.Servi
 DDK_FIDL_PROTOCOL_DEF(POWER,           21, "fuchsia.hardware.power.Service")
 DDK_FIDL_PROTOCOL_DEF(CLOCK,           22, "fuchsia.hardware.clock.Service")
 DDK_FIDL_PROTOCOL_DEF(CODEC,           23, "fuchsia.hardware.audio.CodecService")
+DDK_FIDL_PROTOCOL_DEF(PWM,             24, "fuchsia.hardware.pwm.Service")
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

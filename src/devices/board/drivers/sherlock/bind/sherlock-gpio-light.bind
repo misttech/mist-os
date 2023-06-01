@@ -8,7 +8,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.t931;
 using fuchsia.gpio;
 using fuchsia.platform;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -24,7 +24,7 @@ node "gpio-amber-led" {
 }
 
 node "pwm-amber-led" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.t931.BIND_PWM_ID.PWM_AO_A;
 }
 
@@ -34,6 +34,6 @@ node "gpio-green-led" {
 }
 
 node "pwm-green-led" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.t931.BIND_PWM_ID.PWM_F;
 }

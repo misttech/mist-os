@@ -5,19 +5,5 @@
 library fuchsia.pwm;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  PWM = 127,
   PWM_IMPL = 128,
-};
-
-extend uint fuchsia.BIND_INIT_STEP {
-  GPIO = 0x4F495047,
-  PWM = 0x004D5750,
-};
-
-enum PWM_ID_FUNCTION {
-  AMBER_LED,
-  GREEN_LED,
-  CORE_POWER_BIG_CLUSTER,
-  CORE_POWER_LITTLE_CLUSTER,
-  LCD_BRIGHTNESS,
 };

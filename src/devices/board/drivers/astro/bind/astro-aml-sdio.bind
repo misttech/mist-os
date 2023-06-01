@@ -8,7 +8,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.s905d2;
 using fuchsia.platform;
 using fuchsia.gpio;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pdev" {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -24,6 +24,6 @@ node "gpio-wifi-power-on" {
 }
 
 node "pwm" {
-  fuchsia.BIND_INIT_STEP == fuchsia.pwm.BIND_INIT_STEP.PWM;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.pwm.BIND_INIT_STEP.PWM;
 }
 

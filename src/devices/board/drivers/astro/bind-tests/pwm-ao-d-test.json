@@ -23,7 +23,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_PWM_ID": "fuchsia.amlogic.platform.s905d2.BIND_PWM_ID.PWM_AO_D",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE"
                 }
             }
         ]

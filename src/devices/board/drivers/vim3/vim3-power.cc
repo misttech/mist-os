@@ -17,9 +17,9 @@
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
-#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <ddk/metadata/pwm.h>
 #include <ddktl/device.h>
@@ -284,26 +284,29 @@ zx_status_t Vim3::PowerInit() {
   };
 
   auto vreg_pwm_9_node = fuchsia_driver_framework::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                             bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                             bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
                      fdf::MakeAcceptBindRule(
                          bind_fuchsia::PWM_ID,
                          bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_AO_D)},
-      .properties = {fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      .properties = {fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                       bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
                      fdf::MakeProperty(
-                         bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                         bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_LITTLE_CLUSTER)},
+                         bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION,
+                         bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION_CORE_POWER_LITTLE_CLUSTER)},
   }};
 
   auto vreg_pwm_0_node = fuchsia_driver_framework::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                             bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                             bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
                      fdf::MakeAcceptBindRule(
                          bind_fuchsia::PWM_ID,
                          bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_A)},
-      .properties = {fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
-                     fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                                       bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER)},
+      .properties = {fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                       bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+                     fdf::MakeProperty(
+                         bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION,
+                         bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER)},
   }};
 
   auto vreg_node_spec = fuchsia_driver_framework::CompositeNodeSpec{{

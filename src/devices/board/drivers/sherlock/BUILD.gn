@@ -39,7 +39,7 @@ driver_bind_rules("sherlock-pwm-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.t931",
     "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.pwm",
+    "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
 
@@ -76,8 +76,8 @@ driver_bind_rules("sherlock-bluetooth-bind") {
   tests = "bind-tests/sherlock-bluetooth-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -209,8 +209,8 @@ driver_bind_rules("sherlock-thermal-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.amlogic.platform.t931",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -223,8 +223,8 @@ driver_bind_rules("sherlock-sdio-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.t931",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -380,12 +380,12 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
       "//src/devices/bind/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
       "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
+      "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
       "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
       "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
       "//src/devices/bind/fuchsia.isp:fuchsia.isp_cpp",
       "//src/devices/bind/fuchsia.mipicsi:fuchsia.mipicsi_cpp",
       "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-      "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
       "//src/devices/bind/fuchsia.thermal:fuchsia.thermal_cpp",

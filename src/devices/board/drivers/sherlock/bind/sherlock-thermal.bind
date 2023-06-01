@@ -4,7 +4,7 @@
 
 composite aml_thermal_pll;
 
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.meson;
 using fuchsia.amlogic.platform.t931;
@@ -21,12 +21,12 @@ primary node "pdev" {
 
 // First fragment must be big cluster PWM, second must be little cluster PWM.
 node "pwm-a" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.t931.BIND_PWM_ID.PWM_A;
 }
 
 node "pwm-ao-d" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.t931.BIND_PWM_ID.PWM_AO_D;
 }
 

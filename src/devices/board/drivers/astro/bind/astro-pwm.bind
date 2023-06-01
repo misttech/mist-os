@@ -6,10 +6,10 @@ composite pwm_init;
 
 using fuchsia.amlogic.platform.s905d2;
 using fuchsia.gpio;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pwm" {
-  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.pwm.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.s905d2.BIND_PWM_ID.PWM_E;
 }
 
