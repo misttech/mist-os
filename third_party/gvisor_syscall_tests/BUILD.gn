@@ -87,6 +87,7 @@ loopback_isolated_tcp_linger_timeout_test_label =
     "loopback_isolated_tcp_linger_timeout"
 raw_packet_test_label = "raw_packet"
 udp_test_label = "udp"
+udp_raw_test_label = "udp_raw"
 udp_unbound_test_label = "udp_unbound"
 tcp_test_label = "tcp"
 tcp_blocking_test_label = "tcp_blocking"
@@ -173,6 +174,17 @@ source_set("${udp_test_label}_socket_tests") {
     "//third_party/abseil-cpp/absl/memory",
     "//third_party/abseil-cpp/absl/strings",
     "//third_party/abseil-cpp/absl/strings:str_format",
+  ]
+
+  testonly = true
+}
+
+source_set("${udp_raw_test_label}_socket_tests") {
+  sources = [ "gvisor/test/syscalls/linux/udp_raw_socket.cc" ]
+
+  deps = [
+    ":gvisor_test_util",
+    "//third_party/abseil-cpp/absl/base",
   ]
 
   testonly = true
@@ -410,6 +422,8 @@ syscall_test_suite(raw_packet_test_label) {
 syscall_test_suite(udp_test_label) {
   with_distinct_fast_udp_expectations = true
 }
+syscall_test_suite(udp_raw_test_label) {
+}
 syscall_test_suite(udp_unbound_test_label) {
 }
 syscall_test_suite(loopback_tcp_accept_backlog_listen_v4_test_label) {
@@ -474,6 +488,7 @@ group("tests") {
     ":${raw_packet_test_label}",
     ":${tcp_blocking_test_label}",
     ":${tcp_test_label}",
+    ":${udp_raw_test_label}",
     ":${udp_test_label}",
     ":${udp_unbound_test_label}",
   ]

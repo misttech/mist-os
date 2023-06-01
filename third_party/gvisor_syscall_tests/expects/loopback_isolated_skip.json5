@@ -10,6 +10,7 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",

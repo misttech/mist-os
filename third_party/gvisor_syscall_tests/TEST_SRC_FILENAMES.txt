@@ -56,5 +56,6 @@ socket_stream_blocking.h
 tcp_socket.cc
 udp_bind.cc
 udp_socket.cc
+udp_raw_socket.cc
 unix_domain_socket_test_util.cc
 unix_domain_socket_test_util.h
