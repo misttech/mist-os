@@ -90,8 +90,9 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
   };
 
   struct CallbackContext {
-    CallbackContext(uint32_t exp_op) : expected_operations(exp_op) {}
-    uint32_t expected_operations;
+    CallbackContext(uint32_t exp_op) { expected_operations.store(exp_op); }
+
+    std::atomic<uint32_t> expected_operations;
     sync_completion_t completion;
   };
 
@@ -102,7 +103,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     block_op.private_storage()->completed = true;
     block_op.private_storage()->status = status;
 
-    if (--(cb_ctx->expected_operations) == 0) {
+    if (cb_ctx->expected_operations.fetch_sub(1) == 1) {
       sync_completion_signal(&cb_ctx->completion);
     }
   }
@@ -1009,7 +1010,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   boot1_.Queue(op1->operation(), OperationCallback, &ctx);
   EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
 
-  ctx.expected_operations = 1;
+  ctx.expected_operations.store(1);
   sync_completion_reset(&ctx.completion);
 
   sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
@@ -1022,7 +1023,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   boot2_.Queue(op2->operation(), OperationCallback, &ctx);
   EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
 
-  ctx.expected_operations = 1;
+  ctx.expected_operations.store(1);
   sync_completion_reset(&ctx.completion);
 
   sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
@@ -1078,7 +1079,7 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   boot2_.Queue(op1->operation(), OperationCallback, &ctx);
   EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
 
-  ctx.expected_operations = 2;
+  ctx.expected_operations.store(2);
   sync_completion_reset(&ctx.completion);
 
   // Repeated accesses to one partition should not generate more than one MMC_SWITCH command.
