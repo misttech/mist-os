@@ -226,10 +226,14 @@ std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_pa
   // If an interface was specified, check the topological path of this device and reject it if it
   // doesn't match.
   if (!topological_path.empty()) {
-    // NB: We need to take a trip through a fuchsia.device ClientEnd here to
-    // abide by llcpp endpoint typing.
-    fidl::UnownedClientEnd<fuchsia_device::Controller> controller(dev.channel().borrow());
-    fidl::WireResult result = fidl::WireCall(controller)->GetTopologicalPath();
+    std::string controller_path = filename + "/device_controller";
+    zx::result controller = component::ConnectAt<fuchsia_device::Controller>(dir, controller_path);
+    if (controller.is_error()) {
+      printf("netifc: failed to connect to %s/%s: %s\n", dirname.c_str(), controller_path.c_str(),
+             controller.status_string());
+      return std::nullopt;
+    }
+    fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
 
     if (!result.ok()) {
       printf("netifc: failed to get topological path %s: %s\n", filename.c_str(),
