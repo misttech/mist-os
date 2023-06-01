@@ -695,13 +695,13 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		}
 		defer func() {
 			if err := osmisc.CopyDir(tmpOutDir, testOutDir); err != nil {
-				logger.Errorf(ctx, "failed to copy outputs to %s", testOutDir)
+				logger.Errorf(ctx, "failed to copy outputs to %s: %s", testOutDir, err)
 			}
 			if err := os.Setenv(testrunnerconstants.TestOutDirEnvKey, testOutDir); err != nil {
-				logger.Errorf(ctx, "failed to reset %s to %s", testrunnerconstants.TestOutDirEnvKey, testOutDir)
+				logger.Errorf(ctx, "failed to reset %s to %s: %s", testrunnerconstants.TestOutDirEnvKey, testOutDir, err)
 			}
 			if err := os.RemoveAll(tmpOutDir); err != nil {
-				logger.Errorf(ctx, "failed to remove temp outputs dir %s", tmpOutDir)
+				logger.Errorf(ctx, "failed to remove temp outputs dir %s: %s", tmpOutDir, err)
 			}
 		}()
 	}
