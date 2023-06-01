@@ -34,23 +34,23 @@ impl Time {
     /// Convert from `zx::Time`. This only makes sense if the time is
     /// taken from the same source (for the real clock, this is
     /// `zx::ClockId::Monotonic`).
-    pub fn from_zx(t: zx::Time) -> Self {
+    pub const fn from_zx(t: zx::Time) -> Self {
         Time(t)
     }
 
     /// Convert into `zx::Time`. For the real clock, this will be a
     /// monotonic time.
-    pub fn into_zx(self) -> zx::Time {
+    pub const fn into_zx(self) -> zx::Time {
         self.0
     }
 
     /// Convert from nanoseconds.
-    pub fn from_nanos(nanos: i64) -> Self {
+    pub const fn from_nanos(nanos: i64) -> Self {
         Self::from_zx(zx::Time::from_nanos(nanos))
     }
 
     /// Convert to nanoseconds.
-    pub fn into_nanos(self) -> i64 {
+    pub const fn into_nanos(self) -> i64 {
         self.0.into_nanos()
     }
 
