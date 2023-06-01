@@ -22,14 +22,14 @@ int* const gDlopenDsoRelro = &gDlopenDsoData;
 
 }  // namespace
 
-__EXPORT void* DlopenDsoDataPointer() { return &gDlopenDsoData; }
+__EXPORT const void* DlopenDsoDataPointer() { return &gDlopenDsoData; }
 
-__EXPORT void* DlopenDsoBssPointer() { return &gDlopenDsoBss; }
+__EXPORT const void* DlopenDsoBssPointer() { return &gDlopenDsoBss; }
 
 __EXPORT const void* DlopenDsoRodataPointer() { return &gDlopenDsoRodata; }
 
 __EXPORT const void* DlopenDsoRelroPointer() { return &gDlopenDsoRelro; }
 
-__EXPORT void* DlopenDsoThreadLocalDataPointer() { return &gDlopenDsoThreadLocalData; }
+__EXPORT const void* DlopenDsoThreadLocalDataPointer() { return &gDlopenDsoThreadLocalData; }
 
-__EXPORT void* DlopenDsoThreadLocalBssPointer() { return &gDlopenDsoThreadLocalBss; }
+__EXPORT const void* DlopenDsoThreadLocalBssPointer() { return &gDlopenDsoThreadLocalBss; }

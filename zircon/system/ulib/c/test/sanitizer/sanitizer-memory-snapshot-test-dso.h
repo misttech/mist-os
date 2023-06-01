@@ -14,12 +14,12 @@ const void* NeededDsoRelroPointer();
 void* NeededDsoThreadLocalDataPointer();
 void* NeededDsoThreadLocalBssPointer();
 
-void* DlopenDsoDataPointer();
-void* DlopenDsoBssPointer();
+const void* DlopenDsoDataPointer();
+const void* DlopenDsoBssPointer();
 const void* DlopenDsoRodataPointer();
 const void* DlopenDsoRelroPointer();
-void* DlopenDsoThreadLocalDataPointer();
-void* DlopenDsoThreadLocalBssPointer();
+const void* DlopenDsoThreadLocalDataPointer();
+const void* DlopenDsoThreadLocalBssPointer();
 
 }  // extern "C"
 
