@@ -65,14 +65,13 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   using DoublyLinkedList = fbl::DoublyLinkedList<DoublyLinkedListPointer, fbl::DefaultObjectTag,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
-  Image(Controller* controller, const image_t& info, zx::vmo vmo, uint32_t stride_px,
-        inspect::Node* parent_node, uint32_t client_id);
+  Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
+        uint32_t client_id);
   Image(Controller* controller, const image_t& info, inspect::Node* parent_node,
         uint32_t client_id);
   ~Image();
 
   image_t& info() { return info_; }
-  uint32_t stride_px() const { return stride_px_; }
   uint32_t client_id() const { return client_id_; }
 
   // Marks the image as in use.
@@ -153,7 +152,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
       doubly_linked_list_node_state_ __TA_GUARDED(mtx());
 
   image_t info_;
-  uint32_t stride_px_;
 
   Controller* const controller_;
 

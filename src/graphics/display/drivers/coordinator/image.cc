@@ -18,10 +18,9 @@
 
 namespace display {
 
-Image::Image(Controller* controller, const image_t& info, zx::vmo handle, uint32_t stride_px,
+Image::Image(Controller* controller, const image_t& info, zx::vmo handle,
              inspect::Node* parent_node, uint32_t client_id)
     : info_(info),
-      stride_px_(stride_px),
       controller_(controller),
       client_id_(client_id),
       capture_image_(false),

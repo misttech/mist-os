@@ -34,8 +34,8 @@ class ImageTest : public TestBase, public FenceCallback {
     if (display()->ImportVmoImage(&dc_image, std::move(vmo), /*offset=*/0) != ZX_OK) {
       return nullptr;
     }
-    auto image = fbl::AdoptRef(new Image(controller(), dc_image, std::move(dup_vmo),
-                                         /*stride=*/0, nullptr, /*client_id=*/1u));
+    auto image = fbl::AdoptRef(
+        new Image(controller(), dc_image, std::move(dup_vmo), nullptr, /*client_id=*/1u));
     image->id = next_image_id_++;
     return image;
   }

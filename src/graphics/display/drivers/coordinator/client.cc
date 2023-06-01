@@ -102,11 +102,10 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   auto release_image =
       fit::defer([this, &dc_image]() { controller_->dc()->ReleaseImage(&dc_image); });
   zx::vmo vmo;
-  uint32_t stride = 0;
 
   fbl::AllocChecker ac;
-  auto image = fbl::AdoptRef(
-      new (&ac) Image(controller_, dc_image, std::move(vmo), stride, &proxy_->node(), id_));
+  auto image =
+      fbl::AdoptRef(new (&ac) Image(controller_, dc_image, std::move(vmo), &proxy_->node(), id_));
   if (!ac.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
     completer.Reply(ZX_ERR_NO_MEMORY);
