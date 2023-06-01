@@ -49,6 +49,8 @@ packages:
   - package: libxrandr2
   - package: libxrender-dev
   - package: libxrender1
+  - package: libxss-dev
+  - package: libxxf86vm-dev
   - package: linux-libc-dev
   - package: mesa-common-dev
   - package: x11proto-core-dev
