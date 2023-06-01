@@ -26,10 +26,4 @@
             subdir: "triage-detect",
         },
     ],
-    expose: [
-        {
-            protocol: [ "fuchsia.component.DetectBinder" ],
-            from: "#diagnostics",
-        },
-    ],
 }

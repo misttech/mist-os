@@ -35,11 +35,4 @@
             to: "#detect",
         },
     ],
-    expose: [
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#detect",
-            as: "fuchsia.component.DetectBinder",
-        },
-    ],
 }

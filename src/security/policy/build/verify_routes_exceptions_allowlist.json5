@@ -231,24 +231,6 @@
             errors: [
                 // TODO(https://fxbug.dev/107231)
                 {
-                    using_node: "/bootstrap/archivist",
-                    capability: "fuchsia.component.DetectBinder",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    offer_from_child_expose_not_found: {
-                                        child_moniker: "core",
-                                        moniker: "/",
-                                        capability_id: "fuchsia.component.DetectBinder",
-                                    },
-                                },
-                            },
-                        },
-                        message: "`/` tried to offer `fuchsia.component.DetectBinder` from its child `#core`, but `#core` does not expose `fuchsia.component.DetectBinder`.",
-                    },
-                },
-                {
                     using_node: "/bootstrap/console-launcher",
                     capability: "fuchsia.pkg.PackageResolver",
                     error: {
