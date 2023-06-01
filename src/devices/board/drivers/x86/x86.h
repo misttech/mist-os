@@ -29,7 +29,11 @@ namespace x86 {
 
 class SysSuspender : public fidl::WireServer<fuchsia_hardware_platform_bus::SysSuspend> {
  public:
-  void Callback(CallbackRequestView request, CallbackCompleter::Sync& completer);
+  explicit SysSuspender(zx_device_t* device) : device_(device) {}
+  void Callback(CallbackRequestView request, CallbackCompleter::Sync& completer) override;
+
+ private:
+  zx_device_t* device_;
 };
 
 class X86;
@@ -41,7 +45,7 @@ class X86 : public DeviceType {
  public:
   explicit X86(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
                std::unique_ptr<acpi::Acpi> acpi)
-      : DeviceType(parent), pbus_(std::move(pbus)), acpi_(std::move(acpi)) {}
+      : DeviceType(parent), pbus_(std::move(pbus)), acpi_(std::move(acpi)), suspender_(parent) {}
   ~X86();
 
   static zx_status_t Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* out);

@@ -66,8 +66,8 @@ acpi::status<UniquePtr<ACPI_DEVICE_INFO>> GetObjectInfo(ACPI_HANDLE obj) {
 
 }  // namespace acpi
 
-zx_status_t acpi_suspend(uint8_t requested_state, bool enable_wake, uint8_t suspend_reason,
-                         uint8_t* out_state) {
+zx_status_t acpi_suspend(zx_device_t* device, uint8_t requested_state, bool enable_wake,
+                         uint8_t suspend_reason, uint8_t* out_state) {
   switch (suspend_reason & DEVICE_MASK_SUSPEND_REASON) {
     case DEVICE_SUSPEND_REASON_MEXEC: {
       AcpiTerminate();
@@ -77,10 +77,10 @@ zx_status_t acpi_suspend(uint8_t requested_state, bool enable_wake, uint8_t susp
       // Don't do anything, we expect the higher layers to execute the reboot.
       return ZX_OK;
     case DEVICE_SUSPEND_REASON_POWEROFF:
-      poweroff();
+      poweroff(device);
       exit(0);
     case DEVICE_SUSPEND_REASON_SUSPEND_RAM:
-      return suspend_to_ram();
+      return suspend_to_ram(device);
     default:
       return ZX_ERR_NOT_SUPPORTED;
   };

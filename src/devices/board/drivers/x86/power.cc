@@ -9,7 +9,10 @@
 
 #include <acpica/acpi.h>
 
-void poweroff(void) {
+zx_handle_t acpi_root_resource;
+
+void poweroff(zx_device_t* device) {
+  acpi_root_resource = get_root_resource();
   ACPI_STATUS status = AcpiEnterSleepStatePrep(5);
   if (status == AE_OK) {
     // AcpiEnterSleepState is usually called with interrupts disabled so that the interrupt state
@@ -19,14 +22,15 @@ void poweroff(void) {
   }
 }
 
-zx_status_t suspend_to_ram(void) {
+zx_status_t suspend_to_ram(zx_device_t* device) {
+  acpi_root_resource = get_root_resource();
   zx_status_t status = ZX_OK;
 
   acpica_enable_noncontested_mode();
 
   // Please do not use get_root_resource() in new code. See ZX-1467.
   status = zx_system_powerctl(get_root_resource(), ZX_SYSTEM_POWERCTL_DISABLE_ALL_CPUS_BUT_PRIMARY,
-                              NULL);
+                              nullptr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "acpi: Failed to shutdown CPUs: %d", status);
     goto cleanup;
@@ -64,7 +68,7 @@ zx_status_t suspend_to_ram(void) {
 cleanup:
   zx_status_t status2;
   // Please do not use get_root_resource() in new code. See ZX-1467.
-  status2 = zx_system_powerctl(get_root_resource(), ZX_SYSTEM_POWERCTL_ENABLE_ALL_CPUS, NULL);
+  status2 = zx_system_powerctl(get_root_resource(), ZX_SYSTEM_POWERCTL_ENABLE_ALL_CPUS, nullptr);
   if (status2 != ZX_OK) {
     zxlogf(ERROR, "acpi: Re-enabling all cpus failed: %d", status2);
   }

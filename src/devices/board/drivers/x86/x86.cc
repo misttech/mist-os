@@ -38,7 +38,7 @@ namespace x86 {
 
 void SysSuspender::Callback(CallbackRequestView request, CallbackCompleter::Sync& completer) {
   uint8_t out_state;
-  zx_status_t status = acpi_suspend(request->requested_state, request->enable_wake,
+  zx_status_t status = acpi_suspend(device_, request->requested_state, request->enable_wake,
                                     request->suspend_reason, &out_state);
   completer.Reply(status, out_state);
 }

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_POWER_H_
 #define SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_POWER_H_
 
+#include <lib/ddk/driver.h>
 #include <zircon/types.h>
 
 typedef struct {
@@ -65,10 +66,7 @@ typedef struct {
   uint32_t present_voltage;
 } battery_info_t;
 
-void poweroff(void);
-void reboot(void);
-void reboot_recovery(void);
-void reboot_bootloader(void);
-zx_status_t suspend_to_ram(void);
+void poweroff(zx_device_t* device);
+zx_status_t suspend_to_ram(zx_device_t* device);
 
 #endif  // SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_POWER_H_
