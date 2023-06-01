@@ -153,11 +153,6 @@
 	url = https://fuchsia.googlesource.com/third_party/expat
 	name = third_party/expat
 	ignore = all
-[submodule "third_party/flite"]
-	path = third_party/flite
-	url = https://fuchsia.googlesource.com/third_party/flite
-	name = third_party/flite
-	ignore = all
 [submodule "third_party/fmtlib/src"]
 	path = third_party/fmtlib/src
 	url = https://fuchsia.googlesource.com/third_party/github.com/fmtlib/fmt
@@ -302,11 +297,6 @@
 	path = third_party/libxml2
 	url = https://fuchsia.googlesource.com/third_party/libxml2
 	name = third_party/libxml2
-	ignore = all
-[submodule "third_party/libyuv"]
-	path = third_party/libyuv
-	url = https://fuchsia.googlesource.com/third_party/libyuv
-	name = third_party/libyuv
 	ignore = all
 [submodule "third_party/llvm-libc/src"]
 	path = third_party/llvm-libc/src
