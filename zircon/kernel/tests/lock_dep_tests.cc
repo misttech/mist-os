@@ -61,9 +61,11 @@ struct TA_CAP("mutex") spinlock_t {
 };
 LOCK_DEP_TRAITS(spinlock_t, lockdep::LockFlagsIrqSafe);
 
-void spinlock_lock(spinlock_t* lock) TA_ACQ(lock) { lock->Acquire(); }
-void spinlock_unlock(spinlock_t* lock) TA_REL(lock) { lock->Release(); }
-bool spinlock_try_lock(spinlock_t* lock) TA_TRY_ACQ(true, lock) { return lock->TryAcquire(); }
+static void spinlock_lock(spinlock_t* lock) TA_ACQ(lock) { lock->Acquire(); }
+static void spinlock_unlock(spinlock_t* lock) TA_REL(lock) { lock->Release(); }
+static bool spinlock_try_lock(spinlock_t* lock) TA_TRY_ACQ(true, lock) {
+  return lock->TryAcquire();
+}
 
 // Type tags to select Guard<> lock policies for Spinlock and spinlock_t.
 struct IrqSave {};
@@ -278,7 +280,7 @@ lockdep::LockResult GetLastResult(const GuardType&) {
 #endif
 }
 
-void ResetTrackingState() {
+static void ResetTrackingState() {
 #if WITH_LOCK_DEP
   for (auto& state : lockdep::LockClassState::Iter())
     state.Reset();
