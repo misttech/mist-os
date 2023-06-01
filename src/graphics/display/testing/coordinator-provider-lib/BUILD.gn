@@ -1,0 +1,105 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/components.gni")
+import("//build/test.gni")
+
+# Provides a C++ implementation of fuchsia.hardware.display.Provider, which returns a connection to
+# the default display controller (via a proxied connection to the driver-provided version).  This
+# makes it easy for a component to implement this service.
+#
+# NOTE: the component's sandbox must contain "dev": "class/display-coordinator".
+source_set("devfs_factory_hlcpp") {
+  sources = [
+    "devfs-factory-hlcpp.cc",
+    "devfs-factory-hlcpp.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fit",
+    "//src/lib/fsl",
+    "//src/lib/fxl",
+    "//zircon/system/ulib/zx",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
+    "//sdk/lib/sys/cpp",
+    "//src/lib/files",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+# Provides a C++ utility function GetHardwareDisplayController() which connects to and interacts
+# with the fuchsia.hardware.display.Provider service, found within the component's environment.
+source_set("client_hlcpp") {
+  sources = [
+    "client-hlcpp.cc",
+    "client-hlcpp.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/lib/fit-promise",
+  ]
+  deps = [
+    ":devfs_factory_hlcpp",
+    "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/trace",
+  ]
+}
+
+# Below tests exercise the different code paths caused by having fake-display injected via
+# facets:injected-services in .cmx files. We have two packages to add two different .cmx configs.
+test("get_hardware_display_controller_test_bin") {
+  sources = [ "tests/get_hardware_display_controller_test.cc" ]
+
+  deps = [
+    ":client_hlcpp",
+    ":devfs_factory_hlcpp",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/sys/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+fuchsia_unittest_package("get_hardware_display_controller_test") {
+  deps = [ ":get_hardware_display_controller_test_bin" ]
+  manifest = "tests/meta/get_hardware_display_controller_test.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+test("get_hardware_display_controller_inject_services_test_bin") {
+  sources = [ "tests/get_hardware_display_controller_inject_services_test.cc" ]
+
+  deps = [
+    ":client_hlcpp",
+    ":devfs_factory_hlcpp",
+    "//sdk/lib/fit-promise",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+fuchsia_unittest_package(
+    "get_hardware_display_controller_inject_services_test") {
+  deps = [
+    ":get_hardware_display_controller_inject_services_test_bin",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+  ]
+  manifest =
+      "tests/meta/get_hardware_display_controller_inject_services_test.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}

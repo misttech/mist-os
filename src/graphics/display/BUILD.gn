@@ -48,6 +48,8 @@ group("tests") {
     "drivers:tests",
     "lib:tests",
     "testing/coordinator-provider:tests",
+    "testing/coordinator-provider-lib:get_hardware_display_controller_inject_services_test",
+    "testing/coordinator-provider-lib:get_hardware_display_controller_test",
   ]
 }
 

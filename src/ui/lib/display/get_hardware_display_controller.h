@@ -1,34 +1,31 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// TODO(fxbug.dev/127211): Remove this file after migrating all clients to the
+// headers in //src/graphics/display/testing.
 
 #ifndef SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 #define SRC_UI_LIB_DISPLAY_GET_HARDWARE_DISPLAY_CONTROLLER_H_
 
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <lib/fpromise/promise.h>
+#include "src/graphics/display/testing/coordinator-provider-lib/client-hlcpp.h"
+#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
 
 namespace ui_display {
 
-class HardwareDisplayCoordinatorProviderImpl;
+using DisplayCoordinatorHandles = display::CoordinatorHandlesHlcpp;
 
-struct DisplayCoordinatorHandles {
-  fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator> coordinator;
-};
+using HardwareDisplayCoordinatorProviderImpl = display::DevFsCoordinatorFactoryHlcpp;
 
-// Connect to the fuchsia::hardware::display::Provider service, and return a promise which will be
-// resolved when the display coordinator is obtained. One variant uses the explicitly-provided
-// service, and the other variant finds the service in the component's environment.
-//
-// If the display coordinator cannot be obtained for some reason, |hdcp_service_impl| will be used
-// to bind a connection if given. Otherwise, the handles will be null.
-//
-// |hdcp_service_impl| binding to Display is done internally and does not need any published
-// services. This breaks the dependency in Scenic service startup.
-fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
-    std::shared_ptr<fuchsia::hardware::display::ProviderPtr> provider);
-fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
-    HardwareDisplayCoordinatorProviderImpl* hdcp_service_impl = nullptr);
+inline fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
+    std::shared_ptr<fuchsia::hardware::display::ProviderPtr> provider) {
+  return display::GetCoordinatorHlcpp(std::move(provider));
+}
+
+inline fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
+    HardwareDisplayCoordinatorProviderImpl* hdcp_service_impl = nullptr) {
+  return display::GetCoordinatorHlcpp(hdcp_service_impl);
+}
 
 }  // namespace ui_display
 

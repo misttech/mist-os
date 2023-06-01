@@ -27,7 +27,6 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 
 using namespace scenic_impl;
-using namespace display;
 
 class DisplayTest : public gtest::RealLoopFixture {
  protected:
@@ -42,7 +41,7 @@ class DisplayTest : public gtest::RealLoopFixture {
     async_set_default_dispatcher(dispatcher());
     executor_ = std::make_unique<async::Executor>(dispatcher());
 
-    display_manager_ = std::make_unique<display::DisplayManager>([]() {});
+    display_manager_ = std::make_unique<scenic_impl::display::DisplayManager>([]() {});
 
     // TODO(fxbug.dev/122131): This reuses the display coordinator from previous
     // test cases in the same test component, so the display coordinator may be
@@ -68,7 +67,8 @@ class DisplayTest : public gtest::RealLoopFixture {
   }
 
   uint64_t InitializeDisplayLayer(
-      fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator, Display* display) {
+      fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
+      scenic_impl::display::Display* display) {
     uint64_t layer_id;
     zx_status_t create_layer_status;
     zx_status_t transport_status =
@@ -88,7 +88,7 @@ class DisplayTest : public gtest::RealLoopFixture {
   }
 
   std::unique_ptr<async::Executor> executor_;
-  std::unique_ptr<display::DisplayManager> display_manager_;
+  std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
 };
 

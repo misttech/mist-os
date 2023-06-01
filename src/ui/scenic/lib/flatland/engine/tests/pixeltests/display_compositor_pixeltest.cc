@@ -48,7 +48,6 @@ using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 
 using namespace scenic_impl;
-using namespace display;
 
 namespace flatland {
 namespace test {
@@ -246,7 +245,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     executor_ = std::make_unique<async::Executor>(dispatcher());
 
-    display_manager_ = std::make_unique<display::DisplayManager>([]() {});
+    display_manager_ = std::make_unique<scenic_impl::display::DisplayManager>([]() {});
 
     auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
     executor_->schedule_task(
@@ -282,7 +281,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;
-  std::unique_ptr<display::DisplayManager> display_manager_;
+  std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
 
   static std::pair<std::unique_ptr<escher::Escher>, std::shared_ptr<flatland::VkRenderer>>
   NewVkRenderer() {

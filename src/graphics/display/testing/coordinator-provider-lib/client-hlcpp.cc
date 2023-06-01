@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/lib/display/get_hardware_display_controller.h"
+#include "src/graphics/display/testing/coordinator-provider-lib/client-hlcpp.h"
 
 #include <lib/fdio/directory.h>
 #include <lib/fpromise/bridge.h>
@@ -12,36 +12,36 @@
 
 #include <memory>
 
+#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
 #include "src/lib/files/directory.h"
-#include "src/ui/lib/display/hardware_display_controller_provider_impl.h"
 
-namespace ui_display {
+namespace display {
 
-fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
+fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp(
     std::shared_ptr<fuchsia::hardware::display::ProviderPtr> provider) {
   zx::channel ctrl_server, ctrl_client;
   zx_status_t status = zx::channel::create(0, &ctrl_server, &ctrl_client);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to create display coordinator channel: "
                    << zx_status_get_string(status);
-    return fpromise::make_ok_promise(DisplayCoordinatorHandles{});
+    return fpromise::make_ok_promise(CoordinatorHandlesHlcpp{});
   }
 
   // A reference to |provider| is retained in the closure, to keep the connection open until the
   // response is received.
-  fpromise::bridge<DisplayCoordinatorHandles> dc_handles_bridge;
+  fpromise::bridge<CoordinatorHandlesHlcpp> dc_handles_bridge;
   (*provider)->OpenCoordinatorForPrimary(
       ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator>(std::move(ctrl_server)),
       [provider, completer = std::move(dc_handles_bridge.completer),
        ctrl_client = std::move(ctrl_client)](zx_status_t status) mutable {
         if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "GetHardwareDisplayCoordinator() provider responded with status: "
+          FX_LOGS(ERROR) << "GetCoordinatorHlcpp() provider responded with status: "
                          << zx_status_get_string(status);
-          completer.complete_ok(DisplayCoordinatorHandles{});
+          completer.complete_ok(CoordinatorHandlesHlcpp{});
           return;
         }
 
-        DisplayCoordinatorHandles handles{
+        CoordinatorHandlesHlcpp handles{
             ::fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
                 std::move(ctrl_client))};
         completer.complete_ok(std::move(handles));
@@ -50,9 +50,9 @@ fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
   return dc_handles_bridge.consumer.promise();
 }
 
-fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
-    ui_display::HardwareDisplayCoordinatorProviderImpl* hdcp_service_impl) {
-  TRACE_DURATION("gfx", "GetHardwareDisplayCoordinator");
+fpromise::promise<CoordinatorHandlesHlcpp> GetCoordinatorHlcpp(
+    DevFsCoordinatorFactoryHlcpp* devfs_provider_opener) {
+  TRACE_DURATION("gfx", "GetCoordinatorHlcpp");
 
   // We check the environment to see if there is any fake display is provided through
   // fuchsia.hardware.display.Provider protocol. We connect to fake display if given. Otherwise, we
@@ -70,18 +70,18 @@ fpromise::promise<DisplayCoordinatorHandles> GetHardwareDisplayCoordinator(
     zx_status_t status =
         fdio_service_connect(kSvcPath, provider->NewRequest().TakeChannel().release());
     if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "GetHardwareDisplayCoordinator() failed to connect to " << kSvcPath
+      FX_LOGS(ERROR) << "GetCoordinatorHlcpp() failed to connect to " << kSvcPath
                      << " with status: " << zx_status_get_string(status)
                      << ". Something went wrong in fake-display injection routing.";
-      return fpromise::make_result_promise<DisplayCoordinatorHandles>(fpromise::error());
+      return fpromise::make_result_promise<CoordinatorHandlesHlcpp>(fpromise::error());
     }
-  } else if (hdcp_service_impl) {
-    hdcp_service_impl->BindDisplayProvider(provider->NewRequest());
+  } else if (devfs_provider_opener) {
+    devfs_provider_opener->BindDisplayProvider(provider->NewRequest());
   } else {
     FX_LOGS(ERROR) << "No display provider given.";
-    return fpromise::make_result_promise<DisplayCoordinatorHandles>(fpromise::error());
+    return fpromise::make_result_promise<CoordinatorHandlesHlcpp>(fpromise::error());
   }
-  return GetHardwareDisplayCoordinator(std::move(provider));
+  return GetCoordinatorHlcpp(std::move(provider));
 }
 
-}  // namespace ui_display
+}  // namespace display

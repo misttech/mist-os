@@ -41,7 +41,6 @@ using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 
 using namespace scenic_impl;
-using namespace display;
 
 namespace flatland {
 namespace test {
@@ -65,7 +64,7 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
     executor_ = std::make_unique<async::Executor>(dispatcher());
 
-    display_manager_ = std::make_unique<display::DisplayManager>([]() {});
+    display_manager_ = std::make_unique<scenic_impl::display::DisplayManager>([]() {});
 
     // TODO(fxbug.dev/122131): This reuses the display coordinator from previous
     // test cases in the same test component, so the display coordinator may be
@@ -99,7 +98,7 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;
-  std::unique_ptr<display::DisplayManager> display_manager_;
+  std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
 
   static std::pair<std::unique_ptr<escher::Escher>, std::shared_ptr<flatland::VkRenderer>>
   NewVkRenderer() {

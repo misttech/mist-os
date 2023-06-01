@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/lib/display/hardware_display_controller_provider_impl.h"
+#include "src/graphics/display/testing/coordinator-provider-lib/devfs-factory-hlcpp.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -14,17 +14,16 @@
 
 #include "src/lib/fsl/io/device_watcher.h"
 
-namespace ui_display {
+namespace display {
 
 static const std::string kDisplayDir = "/dev/class/display-coordinator";
 
-HardwareDisplayCoordinatorProviderImpl::HardwareDisplayCoordinatorProviderImpl(
-    sys::ComponentContext* app_context) {
+DevFsCoordinatorFactoryHlcpp::DevFsCoordinatorFactoryHlcpp(sys::ComponentContext* app_context) {
   app_context->outgoing()->AddPublicService(bindings_.GetHandler(this));
 }
 
 // |fuchsia::hardware::display::Provider|.
-void HardwareDisplayCoordinatorProviderImpl::OpenCoordinatorForPrimary(
+void DevFsCoordinatorFactoryHlcpp::OpenCoordinatorForPrimary(
     ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> request,
     OpenCoordinatorForPrimaryCallback callback) {
   // Watcher's lifetime needs to be at most as long as the lifetime of |this|,
@@ -84,9 +83,9 @@ void HardwareDisplayCoordinatorProviderImpl::OpenCoordinatorForPrimary(
   holders_[id] = std::move(watcher);
 }
 
-void HardwareDisplayCoordinatorProviderImpl::BindDisplayProvider(
+void DevFsCoordinatorFactoryHlcpp::BindDisplayProvider(
     fidl::InterfaceRequest<fuchsia::hardware::display::Provider> request) {
   bindings_.AddBinding(this, std::move(request));
 }
 
-}  // namespace ui_display
+}  // namespace display
