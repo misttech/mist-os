@@ -7,7 +7,6 @@ use crate::error::Error;
 use crate::features::FeatureSet;
 use crate::include;
 use crate::util;
-use crate::validate;
 use fidl::persist;
 use std::fs;
 use std::io::Write;

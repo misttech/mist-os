@@ -20,7 +20,6 @@ mod merge;
 mod opts;
 mod reference;
 mod util;
-mod validate;
 
 fn main() -> Result<(), Error> {
     run_cmc()
@@ -41,15 +40,24 @@ fn optional_path_exists(optional_path: Option<&PathBuf>) -> Result<(), Error> {
 fn run_cmc() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
     match opt.cmd {
+        // TODO(fxbug.dev/69367): Remove `cmc validate`.
         opts::Commands::Validate { files, must_offer_protocol, must_use_protocol } => {
-            validate::validate(
-                &files,
-                &features::FeatureSet::empty(),
-                cml::ProtocolRequirements {
-                    must_offer: &must_offer_protocol,
-                    must_use: &must_use_protocol,
-                },
-            )?
+            if files.is_empty() {
+                return Err(error::Error::invalid_args("No files provided").into());
+            }
+
+            for file in files {
+                let file = file.as_ref();
+                cml::compile(
+                    &util::read_cml(file)?,
+                    cml::CompileOptions::new().file(&file).protocol_requirements(
+                        cml::ProtocolRequirements {
+                            must_offer: &must_offer_protocol,
+                            must_use: &must_use_protocol,
+                        },
+                    ),
+                )?;
+            }
         }
         opts::Commands::ValidateReferences { component_manifest, package_manifest, context } => {
             reference::validate(&component_manifest, &package_manifest, context.as_ref())?

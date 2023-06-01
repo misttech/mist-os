@@ -43,7 +43,6 @@ rustc_binary("cmc") {
     "src/opts.rs",
     "src/reference.rs",
     "src/util.rs",
-    "src/validate.rs",
   ]
 }
 
