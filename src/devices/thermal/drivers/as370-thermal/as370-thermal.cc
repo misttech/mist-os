@@ -39,11 +39,14 @@ zx_status_t As370Thermal::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::ClockProtocolClient cpu_clock(parent, "clock");
-  if (!cpu_clock.is_valid()) {
-    zxlogf(ERROR, "%s: Failed to get clock protocol", __func__);
-    return ZX_ERR_NO_RESOURCES;
+  zx::result clock_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent, "clock");
+  if (clock_result.is_error()) {
+    zxlogf(WARNING, "Failed to get clock protocol from fragment: %s", clock_result.status_string());
+    return clock_result.status_value();
   }
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_clock = std::move(*clock_result);
 
   ddk::PowerProtocolClient cpu_power(parent, "power");
   if (!cpu_power.is_valid()) {
@@ -72,7 +75,7 @@ zx_status_t As370Thermal::Create(void* ctx, zx_device_t* parent) {
 
   fbl::AllocChecker ac;
   auto device = fbl::make_unique_checked<As370Thermal>(&ac, parent, *std::move(mmio), device_info,
-                                                       cpu_clock, cpu_power);
+                                                       std::move(cpu_clock), cpu_power);
   if (!ac.check()) {
     zxlogf(ERROR, "%s: Failed to allocate device memory", __func__);
     return ZX_ERR_NO_MEMORY;
@@ -214,14 +217,28 @@ zx_status_t As370Thermal::SetOperatingPoint(uint16_t op_idx) {
       return ZX_ERR_BAD_STATE;
     }
 
-    if ((status = cpu_clock_.SetRate(opps[op_idx].freq_hz)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to set CPU frequency: %d", __func__, status);
-      return status;
+    fidl::WireResult set_rate_result = cpu_clock_->SetRate(opps[op_idx].freq_hz);
+    if (!set_rate_result.ok()) {
+      zxlogf(ERROR, "Failed to send SetRate request to clock: %s\n",
+             set_rate_result.status_string());
+      return set_rate_result.status();
+    }
+    if (set_rate_result->is_error()) {
+      zxlogf(ERROR, "Failed to set rate for clock: %s\n",
+             zx_status_get_string(set_rate_result->error_value()));
+      return set_rate_result->error_value();
     }
   } else {
-    if ((status = cpu_clock_.SetRate(opps[op_idx].freq_hz)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to set CPU frequency: %d", __func__, status);
-      return status;
+    fidl::WireResult set_rate_result = cpu_clock_->SetRate(opps[op_idx].freq_hz);
+    if (!set_rate_result.ok()) {
+      zxlogf(ERROR, "Failed to send SetRate request to clock: %s\n",
+             set_rate_result.status_string());
+      return set_rate_result.status();
+    }
+    if (set_rate_result->is_error()) {
+      zxlogf(ERROR, "Failed to set rate for clock: %s\n",
+             zx_status_get_string(set_rate_result->error_value()));
+      return set_rate_result->error_value();
     }
 
     if ((status = cpu_power_.RequestVoltage(opps[op_idx].volt_uv, &actual_voltage)) != ZX_OK) {

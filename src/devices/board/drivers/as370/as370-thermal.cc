@@ -76,7 +76,7 @@ zx_status_t As370::ThermalInit() {
   };
 
   static constexpr zx_bind_inst_t cpu_clock_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CLOCK),
+      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_CLOCK),
       BI_MATCH_IF(EQ, BIND_CLOCK_ID, as370::kClkCpu),
   };
   static const device_fragment_part_t cpu_clock_fragment[] = {

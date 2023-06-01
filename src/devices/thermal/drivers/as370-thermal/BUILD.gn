@@ -23,8 +23,8 @@ fuchsia_driver("as370-thermal-driver") {
   sources = [ "as370-thermal.cc" ]
   deps = [
     ":as370-thermal-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/as370",
@@ -55,12 +55,12 @@ test("as370-thermal-test-bin") {
   ]
   deps = [
     ":as370-thermal-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/as370",
     "//src/devices/lib/mmio",
@@ -69,7 +69,9 @@ test("as370-thermal-test-bin") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fidl/cpp",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mock-function",
