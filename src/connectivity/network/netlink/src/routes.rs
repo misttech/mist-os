@@ -543,10 +543,14 @@ mod tests {
             IpVersion::V4 => (ModernGroup(RTNLGRP_IPV4_ROUTE), ModernGroup(RTNLGRP_IPV6_ROUTE)),
             IpVersion::V6 => (ModernGroup(RTNLGRP_IPV6_ROUTE), ModernGroup(RTNLGRP_IPV4_ROUTE)),
         };
-        let (mut right_sink, right_client) =
-            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[right_group]);
-        let (mut wrong_sink, wrong_client) =
-            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[wrong_group]);
+        let (mut right_sink, right_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[right_group],
+        );
+        let (mut wrong_sink, wrong_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_2,
+            &[wrong_group],
+        );
         let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
         route_clients.add_client(right_client);
         route_clients.add_client(wrong_client);

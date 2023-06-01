@@ -1110,23 +1110,30 @@ mod tests {
         const PPP_INTERFACE_ID: u64 = 4;
         const PPP_NAME: &str = "ppp";
 
-        let (mut link_sink, link_client) =
-            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[ModernGroup(RTNLGRP_LINK)]);
+        let (mut link_sink, link_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[ModernGroup(RTNLGRP_LINK)],
+        );
         let (mut addr4_sink, addr4_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_2,
             &[ModernGroup(RTNLGRP_IPV4_IFADDR)],
         );
         let (mut addr6_sink, addr6_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_3,
             &[ModernGroup(RTNLGRP_IPV6_IFADDR)],
         );
         let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_4,
             &[ModernGroup(RTNLGRP_IPV4_ROUTE)],
         );
-        let (mut all_sink, all_client) =
-            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[
+        let (mut all_sink, all_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_5,
+            &[
                 ModernGroup(RTNLGRP_LINK),
                 ModernGroup(RTNLGRP_IPV6_IFADDR),
                 ModernGroup(RTNLGRP_IPV4_IFADDR),
-            ]);
+            ],
+        );
         let Setup { event_loop, mut watcher_stream } = setup_with_route_clients({
             let route_clients = ClientTable::default();
             route_clients.add_client(link_client);

@@ -31,7 +31,7 @@ use netlink_packet_route::RtnlMessage;
 use tracing::debug;
 
 use crate::{
-    client::{ClientTable, InternalClient},
+    client::{ClientIdGenerator, ClientTable, InternalClient},
     interfaces::InterfacesEventLoopError,
     messaging::{Receiver, Sender, SenderReceiverProvider},
     protocol_family::{
@@ -46,6 +46,8 @@ pub const NETLINK_LOG_TAG: &'static str = "netlink";
 
 /// The implementation of the Netlink protocol suite.
 pub struct Netlink<P: SenderReceiverProvider> {
+    /// Generator of new Client IDs.
+    id_generator: ClientIdGenerator,
     /// Sender to attach new `NETLINK_ROUTE` clients to the Netlink worker.
     route_client_sender: UnboundedSender<
         ClientWithReceiver<
@@ -65,7 +67,7 @@ impl<P: SenderReceiverProvider> Netlink<P> {
     pub fn new() -> (Self, impl Future<Output = ()> + Send) {
         let (route_client_sender, route_client_receiver) = mpsc::unbounded();
         (
-            Netlink { route_client_sender },
+            Netlink { id_generator: ClientIdGenerator::default(), route_client_sender },
             run_netlink_worker(NetlinkWorkerParams::<P> { route_client_receiver }),
         )
     }
@@ -79,8 +81,10 @@ impl<P: SenderReceiverProvider> Netlink<P> {
         sender: P::Sender<NetlinkMessage<RtnlMessage>>,
         receiver: P::Receiver<NetlinkMessage<RtnlMessage>>,
     ) -> Result<NetlinkRouteClient, NewClientError> {
-        let (external_client, internal_client) = client::new_client_pair::<NetlinkRoute, _>(sender);
-        self.route_client_sender
+        let Netlink { id_generator, route_client_sender } = self;
+        let (external_client, internal_client) =
+            client::new_client_pair::<NetlinkRoute, _>(id_generator.new_id(), sender);
+        route_client_sender
             .unbounded_send(ClientWithReceiver { client: internal_client, receiver })
             .map_err(|e| {
                 // Sending on an `UnboundedSender` can never fail with `is_full()`.
@@ -235,10 +239,10 @@ fn spawn_client_request_handler<
             .fold(
                 FoldState { client, handler },
                 |FoldState { mut client, mut handler }, req| async {
-                    debug!(tag = NETLINK_LOG_TAG, "Received {} request: {:?}", F::NAME, req);
+                    debug!(tag = NETLINK_LOG_TAG, "{} Received request: {:?}", client, req);
                     let responses = handler.handle_request(req).await;
                     for response in responses {
-                        debug!(tag = NETLINK_LOG_TAG, "Responding with {:?}", response);
+                        debug!(tag = NETLINK_LOG_TAG, "{} Responding with {:?}", client, response);
                         client.send(response);
                     }
                     FoldState { client, handler }
@@ -261,8 +265,9 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_spawn_client_request_handler() {
         let (mut req_sender, req_receiver) = mpsc::channel(0);
-        let (mut client_sink, client) =
-            crate::client::testutil::new_fake_client::<FakeProtocolFamily>(&[]);
+        let (mut client_sink, client) = crate::client::testutil::new_fake_client::<
+            FakeProtocolFamily,
+        >(crate::client::testutil::CLIENT_ID_1, &[]);
 
         let mut client_task = spawn_client_request_handler::<FakeProtocolFamily, _, _>(
             client,
@@ -308,16 +313,18 @@ mod tests {
         assert_eq!((&mut client_acceptor_fut).now_or_never(), None);
 
         // Connect Client 1.
-        let (mut _client_sink1, client1) =
-            crate::client::testutil::new_fake_client::<FakeProtocolFamily>(&[]);
+        let (mut _client_sink1, client1) = crate::client::testutil::new_fake_client::<
+            FakeProtocolFamily,
+        >(crate::client::testutil::CLIENT_ID_1, &[]);
         let (mut req_sender1, req_receiver1) = mpsc::channel(0);
         client_sender
             .unbounded_send(ClientWithReceiver { client: client1, receiver: req_receiver1 })
             .expect("should send without error");
 
         // Connect Client 2.
-        let (mut client_sink2, client2) =
-            crate::client::testutil::new_fake_client::<FakeProtocolFamily>(&[]);
+        let (mut client_sink2, client2) = crate::client::testutil::new_fake_client::<
+            FakeProtocolFamily,
+        >(crate::client::testutil::CLIENT_ID_2, &[]);
         let (mut req_sender2, req_receiver2) = mpsc::channel(0);
         client_sender
             .unbounded_send(ClientWithReceiver { client: client2, receiver: req_receiver2 })
