@@ -153,6 +153,5 @@ Send the change for review using the regular process.
 Reach out for questions or for status updates:
 
 *   <digit@google.com>
-*   <shayba@google.com>
 
 [gn-reference]: https://gn.googlesource.com/gn/+/master/docs/reference.md
