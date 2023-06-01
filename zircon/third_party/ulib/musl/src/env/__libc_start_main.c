@@ -50,6 +50,15 @@ __asan_weak_ref("memset")
 // the newly-allocated (safe) stack.
 static _Noreturn void start_main(const struct start_params*) __asm__("start_main")
     __attribute__((used));
+
+// Do not instrument this function with checks for function-type-mismatches.
+// UBSan will report errors on the entry to main via *p->main if the application
+// happens to define main with a signiature different from int(*)(int, char**,
+// char**). It's not uncommon for users to instead use const char** for argv
+// where this can be reported.
+#if __has_feature(undefined_behavior_sanitizer)
+__attribute__((no_sanitize("function")))
+#endif
 static void start_main(const struct start_params* p) {
 #if defined(SHADOW_CALL_STACK_INIT) && !__has_feature(shadow_call_stack)
   __asm__ volatile(
