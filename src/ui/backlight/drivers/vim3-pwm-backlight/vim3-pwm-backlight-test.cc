@@ -5,75 +5,119 @@
 #include "src/ui/backlight/drivers/vim3-pwm-backlight/vim3-pwm-backlight.h"
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async-testing/test_loop.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/reader.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/errors.h>
 
+#include <fbl/auto_lock.h>
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <soc/aml-common/aml-pwm-regs.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
+bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
+                const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
+  return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
+         (lhs.duty_cycle == rhs.duty_cycle) &&
+         (lhs.mode_config.count() == rhs.mode_config.count()) &&
+         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
+          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
+}
+
 namespace vim3_pwm_backlight {
 
 namespace {
 
-class MockPwm : public ddk::PwmProtocol<MockPwm> {
+class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_pwm::Pwm> {
  public:
-  MockPwm() : proto_{&pwm_protocol_ops_, this} {}
+  explicit MockPwmServer(async_dispatcher_t* dispatcher)
+      : dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
-  zx_status_t Unsupported() {
-    EXPECT_TRUE(false, "unexpected call");
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  zx_status_t PwmEnable() { return Unsupported(); }
-  zx_status_t PwmDisable() { return Unsupported(); }
-  zx_status_t PwmGetConfig(pwm_config_t* out_config) { return Unsupported(); }
-  zx_status_t PwmSetConfig(const pwm_config_t* config) {
+  void SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) override {
     if (set_config_override_callback_ != nullptr) {
-      return set_config_override_callback_(config);
+      zx_status_t status = set_config_override_callback_(request->config);
+      if (status == ZX_OK) {
+        completer.ReplySuccess();
+      } else {
+        completer.ReplyError(status);
+      }
+      return;
     }
 
     calls_["SetConfig"] = true;
-    EXPECT_TRUE(config->mode_config_buffer);
-    EXPECT_EQ(config->mode_config_size, sizeof(mode_config_));
-    if (config->mode_config_buffer == nullptr || config->mode_config_size != sizeof(mode_config_)) {
-      return ZX_ERR_INVALID_ARGS;
+
+    EXPECT_TRUE(request->config.mode_config.data());
+    EXPECT_EQ(request->config.mode_config.count(), sizeof(mode_config_));
+    if (request->config.mode_config.data() == nullptr ||
+        request->config.mode_config.count() != sizeof(mode_config_)) {
+      return completer.ReplyError(ZX_ERR_INVALID_ARGS);
     }
 
-    memcpy(&mode_config_, config->mode_config_buffer, sizeof(mode_config_));
-    recent_config_ = *config;
-    recent_config_.mode_config_buffer = reinterpret_cast<uint8_t*>(&mode_config_);
-    return ZX_OK;
-  }
-  const pwm_config_t& GetMostRecentConfig() const { return recent_config_; }
-  const aml_pwm::mode_config& GetMostRecentModeConfig() const { return mode_config_; }
+    memcpy(&mode_config_, request->config.mode_config.data(), sizeof(mode_config_));
+    recent_config_ = request->config;
+    recent_config_.mode_config = fidl::VectorView<uint8_t>::FromExternal(
+        reinterpret_cast<uint8_t*>(&mode_config_), sizeof(mode_config_));
 
-  const pwm_protocol_t* GetProto() const { return &proto_; }
+    completer.ReplySuccess();
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> Connect() {
+    auto device_handler = [this](fidl::ServerEnd<fuchsia_hardware_pwm::Pwm> request) {
+      fidl::BindServer(dispatcher_, std::move(request), this);
+    };
+    fuchsia_hardware_pwm::Service::InstanceHandler handler({.pwm = std::move(device_handler)});
+
+    auto service_result = outgoing_.AddService<fuchsia_hardware_pwm::Service>(std::move(handler));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    return std::move(endpoints->client);
+  }
+
+  const fuchsia_hardware_pwm::wire::PwmConfig& GetMostRecentConfig() const {
+    return recent_config_;
+  }
+  const aml_pwm::mode_config& GetMostRecentModeConfig() const { return mode_config_; }
 
   bool IsCalled(const std::string& op) const { return calls_.find(op) != calls_.end(); }
   void ClearCallMap() { calls_.clear(); }
 
-  void SetSetConfigOverrideCallback(fit::function<zx_status_t(const pwm_config_t*)> callback) {
+  void SetSetConfigOverrideCallback(
+      fit::function<zx_status_t(const fuchsia_hardware_pwm::wire::PwmConfig)> callback) {
     set_config_override_callback_ = std::move(callback);
   }
 
  private:
-  fit::function<zx_status_t(const pwm_config_t*)> set_config_override_callback_ = nullptr;
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+
+  fuchsia_hardware_pwm::wire::PwmConfig recent_config_ = {};
+  aml_pwm::mode_config mode_config_ = {};
+
+  fit::function<zx_status_t(fuchsia_hardware_pwm::wire::PwmConfig)> set_config_override_callback_ =
+      nullptr;
 
   std::unordered_map<std::string, bool> calls_;
-  pwm_config_t recent_config_ = {};
-  aml_pwm::mode_config mode_config_ = {};
-  const pwm_protocol_t proto_;
 };
 
 class MockGpio : public ddk::GpioProtocol<MockGpio> {
@@ -134,14 +178,17 @@ class MockGpio : public ddk::GpioProtocol<MockGpio> {
 class Vim3PwmBacklightDeviceTest : public zxtest::Test, public inspect::InspectTestHelper {
  public:
   Vim3PwmBacklightDeviceTest()
-      : fake_parent_(MockDevice::FakeRootParent()), loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+      : fake_parent_(MockDevice::FakeRootParent()),
+        pwm_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        loop_(&kAsyncLoopConfigNeverAttachToThread) {}
   ~Vim3PwmBacklightDeviceTest() override = default;
 
   void SetUp() override {
+    pwm_loop_.StartThread("pwm-thread");
+    fake_parent_->AddFidlService(fuchsia_hardware_pwm::Service::Name,
+                                 mock_pwm_.SyncCall(&MockPwmServer::Connect), "pwm");
     fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio_.GetProto()->ops, &mock_gpio_,
                               "gpio-lcd-backlight-enable");
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PWM, mock_pwm_.GetProto()->ops, &mock_pwm_, "pwm");
-
     fbl::AllocChecker ac;
     dev_ = fbl::make_unique_checked<Vim3PwmBacklight>(&ac, fake_parent_.get());
     ASSERT_TRUE(ac.check());
@@ -178,11 +225,13 @@ class Vim3PwmBacklightDeviceTest : public zxtest::Test, public inspect::InspectT
  protected:
   const fidl::ClientEnd<fuchsia_hardware_backlight::Device>& client() const { return client_; }
 
-  MockPwm mock_pwm_;
   MockGpio mock_gpio_;
   std::unique_ptr<Vim3PwmBacklight> dev_;
   std::shared_ptr<MockDevice> fake_parent_;
   inspect::InspectTestHelper inspector_;
+  async::Loop pwm_loop_;
+  async_patterns::TestDispatcherBound<MockPwmServer> mock_pwm_{
+      pwm_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
 
   async::Loop loop_;
 
@@ -202,11 +251,11 @@ TEST_F(Vim3PwmBacklightDeviceTest, TestLifeCycle) {
 TEST_F(Vim3PwmBacklightDeviceTest, InitialState) {
   EXPECT_OK(dev_->Bind());
 
-  EXPECT_TRUE(mock_pwm_.IsCalled("SetConfig"));
+  EXPECT_TRUE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   EXPECT_TRUE(mock_gpio_.IsCalled("ConfigOut"));
 
-  EXPECT_EQ(mock_pwm_.GetMostRecentConfig().duty_cycle, 100.0f);
-  EXPECT_EQ(mock_pwm_.GetMostRecentModeConfig().mode, aml_pwm::Mode::kOn);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentConfig).duty_cycle, 100.0f);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentModeConfig).mode, aml_pwm::Mode::kOn);
   EXPECT_EQ(mock_gpio_.GetMostRecentValueWritten(), 1u);
 
   fidl::WireResult result_get = fidl::WireCall(client())->GetStateNormalized();
@@ -220,7 +269,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, InitialState) {
 
 TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedTurnOff) {
   EXPECT_OK(dev_->Bind());
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   fidl::WireResult result =
@@ -228,10 +277,10 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedTurnOff) {
   EXPECT_OK(result);
   EXPECT_TRUE(result.value().is_ok());
 
-  EXPECT_TRUE(mock_pwm_.IsCalled("SetConfig"));
+  EXPECT_TRUE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   EXPECT_TRUE(mock_gpio_.IsCalled("Write"));
 
-  EXPECT_EQ(mock_pwm_.GetMostRecentModeConfig().mode, aml_pwm::Mode::kOff);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentModeConfig).mode, aml_pwm::Mode::kOff);
   EXPECT_EQ(mock_gpio_.GetMostRecentValueWritten(), 0u);
 
   fidl::WireResult result_get = fidl::WireCall(client())->GetStateNormalized();
@@ -244,7 +293,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedTurnOff) {
 
 TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedTurnOn) {
   EXPECT_OK(dev_->Bind());
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   fidl::WireResult result =
@@ -252,13 +301,13 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedTurnOn) {
   EXPECT_OK(result);
   EXPECT_TRUE(result.value().is_ok());
 
-  EXPECT_TRUE(mock_pwm_.IsCalled("SetConfig"));
+  EXPECT_TRUE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   EXPECT_TRUE(mock_gpio_.IsCalled("Write"));
 
-  EXPECT_EQ(mock_pwm_.GetMostRecentModeConfig().mode, aml_pwm::Mode::kOn);
-  EXPECT_EQ(mock_pwm_.GetMostRecentConfig().duty_cycle, 50.0f);
-  EXPECT_EQ(mock_pwm_.GetMostRecentConfig().period_ns, 5'555'555u);
-  EXPECT_EQ(mock_pwm_.GetMostRecentConfig().polarity, false);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentModeConfig).mode, aml_pwm::Mode::kOn);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentConfig).duty_cycle, 50.0f);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentConfig).period_ns, 5'555'555u);
+  EXPECT_EQ(mock_pwm_.SyncCall(&MockPwmServer::GetMostRecentConfig).polarity, false);
   EXPECT_EQ(mock_gpio_.GetMostRecentValueWritten(), 1u);
 
   fidl::WireResult result_get = fidl::WireCall(client())->GetStateNormalized();
@@ -334,7 +383,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedInspect) {
 
 TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedNoDuplicateConfigs) {
   EXPECT_OK(dev_->Bind());
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   fidl::WireResult result =
@@ -342,7 +391,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedNoDuplicateConfigs) {
   EXPECT_OK(result);
   EXPECT_TRUE(result.value().is_ok());
 
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   fidl::WireResult result_same_call =
@@ -350,13 +399,13 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedNoDuplicateConfigs) {
   EXPECT_OK(result_same_call);
   EXPECT_TRUE(result_same_call.value().is_ok());
 
-  EXPECT_FALSE(mock_pwm_.IsCalled("SetConfig"));
+  EXPECT_FALSE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   EXPECT_FALSE(mock_gpio_.IsCalled("Write"));
 }
 
 TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedRejectInvalidValue) {
   EXPECT_OK(dev_->Bind());
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   fidl::WireResult result_too_large_brightness =
@@ -364,10 +413,10 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedRejectInvalidValue) {
   EXPECT_OK(result_too_large_brightness);
   EXPECT_EQ(result_too_large_brightness.value().error_value(), ZX_ERR_INVALID_ARGS);
 
-  EXPECT_FALSE(mock_pwm_.IsCalled("SetConfig"));
+  EXPECT_FALSE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   EXPECT_FALSE(mock_gpio_.IsCalled("Write"));
 
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   fidl::WireResult result_negative_brightness =
@@ -375,7 +424,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedRejectInvalidValue) {
   EXPECT_OK(result_negative_brightness);
   EXPECT_EQ(result_negative_brightness.value().error_value(), ZX_ERR_INVALID_ARGS);
 
-  EXPECT_FALSE(mock_pwm_.IsCalled("SetConfig"));
+  EXPECT_FALSE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   EXPECT_FALSE(mock_gpio_.IsCalled("Write"));
 }
 
@@ -386,7 +435,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedBailoutGpioConfig) {
   EXPECT_OK(result);
   EXPECT_TRUE(result.value().is_ok());
 
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
   std::vector<uint8_t> gpio_values_written;
@@ -421,16 +470,17 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedBailoutPwmConfig) {
   EXPECT_OK(result);
   EXPECT_TRUE(result.value().is_ok());
 
-  mock_pwm_.ClearCallMap();
+  mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
   mock_gpio_.ClearCallMap();
 
-  std::vector<pwm_config_t> pwm_configs_set;
+  std::vector<fuchsia_hardware_pwm::wire::PwmConfig> pwm_configs_set;
   std::vector<aml_pwm::mode_config> mode_configs_set;
-  mock_pwm_.SetSetConfigOverrideCallback(
-      [&pwm_configs_set, &mode_configs_set](const pwm_config_t* config) {
-        pwm_configs_set.push_back(*config);
+  mock_pwm_.SyncCall(
+      &MockPwmServer::SetSetConfigOverrideCallback,
+      [&pwm_configs_set, &mode_configs_set](fuchsia_hardware_pwm::wire::PwmConfig config) {
+        pwm_configs_set.push_back(config);
         mode_configs_set.push_back(
-            *reinterpret_cast<aml_pwm::mode_config*>(config->mode_config_buffer));
+            *reinterpret_cast<aml_pwm::mode_config*>(config.mode_config.data()));
         return ZX_ERR_INTERNAL;
       });
 

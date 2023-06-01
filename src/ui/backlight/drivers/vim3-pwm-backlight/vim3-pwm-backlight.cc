@@ -91,7 +91,7 @@ void Vim3PwmBacklight::SetStateNormalized(SetStateNormalizedRequestView request,
 }
 
 zx_status_t Vim3PwmBacklight::SetPwmConfig(bool enabled, float duty_cycle) {
-  ZX_ASSERT(pwm_.is_valid());
+  ZX_ASSERT(pwm_proto_client_.is_valid());
   ZX_ASSERT(duty_cycle >= aml_pwm::kMinimumAllowedDutyCycle);
   ZX_ASSERT(duty_cycle <= aml_pwm::kMaximumAllowedDutyCycle);
 
@@ -100,18 +100,22 @@ zx_status_t Vim3PwmBacklight::SetPwmConfig(bool enabled, float duty_cycle) {
       .mode = mode,
       .regular = {},
   };
-  pwm_config_t config = {
+  fuchsia_hardware_pwm::wire::PwmConfig config = {
       .polarity = kDefaultPolarity,
       .period_ns = kDefaultPeriodNs,
       .duty_cycle = duty_cycle,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&mode_config),
-      .mode_config_size = sizeof(mode_config),
+      .mode_config = fidl::VectorView<uint8_t>::FromExternal(
+          reinterpret_cast<uint8_t*>(&mode_config), sizeof(mode_config)),
   };
 
-  zx_status_t status = pwm_.SetConfig(&config);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cannot set PWM config: %s", zx_status_get_string(status));
-    return status;
+  auto result = pwm_proto_client_->SetConfig(config);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Cannot set PWM config: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Cannot set PWM config: %s", zx_status_get_string(result.value().error_value()));
+    return result->error_value();
   }
   return ZX_OK;
 }
@@ -199,10 +203,13 @@ zx_status_t Vim3PwmBacklight::SetState(State target) {
 zx_status_t Vim3PwmBacklight::Bind() {
   root_ = inspector_.GetRoot().CreateChild("vim3-pwm-backlight");
 
-  pwm_ = ddk::PwmProtocolClient(parent_, "pwm");
-  if (!pwm_.is_valid()) {
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+  zx::result client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>("pwm");
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Unable to connect to fidl protocol - status: %s", client_end.status_string());
+    return client_end.status_value();
   }
+  pwm_proto_client_.Bind(std::move(client_end.value()));
+
   gpio_backlight_power_ = ddk::GpioProtocolClient(parent_, "gpio-lcd-backlight-enable");
   if (!gpio_backlight_power_.is_valid()) {
     return ZX_ERR_PROTOCOL_NOT_SUPPORTED;

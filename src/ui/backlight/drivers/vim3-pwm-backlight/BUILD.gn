@@ -32,10 +32,11 @@ source_set("common") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [ "vim3-pwm-backlight.cc" ]
+  public_deps =
+      [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire" ]
   deps = [
     ":vim3-pwm-backlight-bind",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
     "//sdk/lib/fidl",
     "//src/devices/bus/lib/device-protocol-pdev",
@@ -68,12 +69,14 @@ test("vim3-pwm-backlight-test") {
   deps = [
     ":common",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp:cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/lib/amlogic:amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/async-testing",
