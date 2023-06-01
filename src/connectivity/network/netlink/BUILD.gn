@@ -39,7 +39,9 @@ rustc_library("netlink") {
     "//src/connectivity/lib/net-declare",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:test-case",
   ]
 
