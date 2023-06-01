@@ -9,7 +9,7 @@
 //! protocol families each offering different functionality. This crate targets
 //! the implementation of families related to networking.
 
-#![deny(missing_docs)]
+#![deny(missing_docs, unused)]
 
 mod client;
 mod interfaces;

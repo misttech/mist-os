@@ -772,54 +772,74 @@ mod tests {
             .await
     }
 
+    async fn respond_to_watcher_with_interfaces<
+        S: Stream<Item = fnet_interfaces::WatcherRequest>,
+    >(
+        stream: S,
+        existing_interfaces: impl IntoIterator<Item = fnet_interfaces_ext::Properties>,
+        new_interfaces: Option<(
+            impl IntoIterator<Item = fnet_interfaces_ext::Properties>,
+            fn(fnet_interfaces::Properties) -> fnet_interfaces::Event,
+        )>,
+    ) {
+        let map_fn = |fnet_interfaces_ext::Properties {
+                          id,
+                          name,
+                          device_class,
+                          online,
+                          addresses,
+                          has_default_ipv4_route,
+                          has_default_ipv6_route,
+                      }| {
+            fnet_interfaces::Properties {
+                id: Some(id.get()),
+                name: Some(name),
+                device_class: Some(device_class),
+                online: Some(online),
+                addresses: Some(
+                    addresses
+                        .into_iter()
+                        .map(|fnet_interfaces_ext::Address { addr, valid_until }| {
+                            fnet_interfaces::Address {
+                                addr: Some(addr),
+                                valid_until: Some(valid_until),
+                                ..Default::default()
+                            }
+                        })
+                        .collect(),
+                ),
+                has_default_ipv4_route: Some(has_default_ipv4_route),
+                has_default_ipv6_route: Some(has_default_ipv6_route),
+                ..Default::default()
+            }
+        };
+        respond_to_watcher(
+            stream,
+            existing_interfaces
+                .into_iter()
+                .map(|properties| fnet_interfaces::Event::Existing(map_fn(properties)))
+                .chain(std::iter::once(fnet_interfaces::Event::Idle(fnet_interfaces::Empty)))
+                .chain(
+                    new_interfaces
+                        .map(|(new_interfaces, event_fn)| {
+                            new_interfaces
+                                .into_iter()
+                                .map(move |properties| event_fn(map_fn(properties)))
+                        })
+                        .into_iter()
+                        .flatten(),
+                ),
+        )
+        .await
+    }
+
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_stream_ended() {
         let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-        let interfaces: Vec<_> = vec![get_fake_interface(1, "lo", LOOPBACK)];
-
-        let interfaces =
-            futures::stream::iter(interfaces.into_iter().map(Some).chain(std::iter::once(None)));
-        let watcher_fut = watcher_stream.zip(interfaces).for_each(|(req, properties)| match req {
-            fnet_interfaces::WatcherRequest::Watch { responder } => {
-                let event = properties.map_or(
-                    fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
-                    |fnet_interfaces_ext::Properties {
-                         id,
-                         name,
-                         device_class,
-                         online,
-                         addresses,
-                         has_default_ipv4_route,
-                         has_default_ipv6_route,
-                     }| {
-                        fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
-                            id: Some(id.get()),
-                            name: Some(name),
-                            device_class: Some(device_class),
-                            online: Some(online),
-                            addresses: Some(
-                                addresses
-                                    .into_iter()
-                                    .map(|fnet_interfaces_ext::Address { addr, valid_until }| {
-                                        fnet_interfaces::Address {
-                                            addr: Some(addr),
-                                            valid_until: Some(valid_until),
-                                            ..Default::default()
-                                        }
-                                    })
-                                    .collect(),
-                            ),
-                            has_default_ipv4_route: Some(has_default_ipv4_route),
-                            has_default_ipv6_route: Some(has_default_ipv6_route),
-                            ..Default::default()
-                        })
-                    },
-                );
-                let () = responder.send(&event).expect("send watcher event");
-                futures::future::ready(())
-            }
-        });
+        let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
+        let watcher_fut =
+            respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
 
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         assert_matches!(
@@ -834,51 +854,10 @@ mod tests {
     async fn test_event_loop_errors_duplicate_events() {
         let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-        let interfaces: Vec<_> =
-            vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
-
         let interfaces =
-            futures::stream::iter(interfaces.into_iter().map(Some).chain(std::iter::once(None)));
-        let watcher_fut = watcher_stream.zip(interfaces).for_each(|(req, properties)| match req {
-            fnet_interfaces::WatcherRequest::Watch { responder } => {
-                let event = properties.map_or(
-                    fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
-                    |fnet_interfaces_ext::Properties {
-                         id,
-                         name,
-                         device_class,
-                         online,
-                         addresses,
-                         has_default_ipv4_route,
-                         has_default_ipv6_route,
-                     }| {
-                        fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
-                            id: Some(id.get()),
-                            name: Some(name),
-                            device_class: Some(device_class),
-                            online: Some(online),
-                            addresses: Some(
-                                addresses
-                                    .into_iter()
-                                    .map(|fnet_interfaces_ext::Address { addr, valid_until }| {
-                                        fnet_interfaces::Address {
-                                            addr: Some(addr),
-                                            valid_until: Some(valid_until),
-                                            ..Default::default()
-                                        }
-                                    })
-                                    .collect(),
-                            ),
-                            has_default_ipv4_route: Some(has_default_ipv4_route),
-                            has_default_ipv6_route: Some(has_default_ipv6_route),
-                            ..Default::default()
-                        })
-                    },
-                );
-                let () = responder.send(&event).expect("send watcher event");
-                futures::future::ready(())
-            }
-        });
+            vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
+        let watcher_fut =
+            respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
 
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         assert_matches!(err, InterfacesEventLoopError::Netstack(NetstackError::Unspecified(_)));
@@ -888,67 +867,13 @@ mod tests {
     async fn test_event_loop_errors_duplicate_adds() {
         let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-        let interfaces_existing: Vec<_> = vec![get_fake_interface(1, "lo", LOOPBACK)];
-        let interfaces_new: Vec<_> = vec![get_fake_interface(1, "lo", LOOPBACK)];
-
-        let interfaces = futures::stream::iter(
-            interfaces_existing
-                .into_iter()
-                .map(Some)
-                .chain(std::iter::once(None))
-                .chain(interfaces_new.into_iter().map(Some)),
+        let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
+        let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
+        let watcher_fut = respond_to_watcher_with_interfaces(
+            watcher_stream,
+            interfaces_existing,
+            Some((interfaces_new, fnet_interfaces::Event::Added)),
         );
-        let mut req_num = 0;
-        let watcher_fut = watcher_stream.zip(interfaces).for_each(|(req, properties)| match req {
-            fnet_interfaces::WatcherRequest::Watch { responder } => {
-                let event = properties.map_or(
-                    fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
-                    |fnet_interfaces_ext::Properties {
-                         id,
-                         name,
-                         device_class,
-                         online,
-                         addresses,
-                         has_default_ipv4_route,
-                         has_default_ipv6_route,
-                     }| {
-                        let inner = fnet_interfaces::Properties {
-                            id: Some(id.get()),
-                            name: Some(name),
-                            device_class: Some(device_class),
-                            online: Some(online),
-                            addresses: Some(
-                                addresses
-                                    .into_iter()
-                                    .map(|fnet_interfaces_ext::Address { addr, valid_until }| {
-                                        fnet_interfaces::Address {
-                                            addr: Some(addr),
-                                            valid_until: Some(valid_until),
-                                            ..Default::default()
-                                        }
-                                    })
-                                    .collect(),
-                            ),
-                            has_default_ipv4_route: Some(has_default_ipv4_route),
-                            has_default_ipv6_route: Some(has_default_ipv6_route),
-                            ..Default::default()
-                        };
-
-                        // The first request will add the interface in the call to `existing` and
-                        // the second will attempt to add the interface via the
-                        // `handle_interface_watcher_event` call.
-                        req_num += 1;
-                        if req_num == 1 {
-                            fnet_interfaces::Event::Existing(inner)
-                        } else {
-                            fnet_interfaces::Event::Added(inner)
-                        }
-                    },
-                );
-                let () = responder.send(&event).expect("send watcher event");
-                futures::future::ready(())
-            }
-        });
 
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         // The properties that are being added again has interface id 1.
@@ -965,58 +890,14 @@ mod tests {
     async fn test_event_loop_errors_existing_after_add() {
         let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-        let interfaces_existing: Vec<_> =
+        let interfaces_existing =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
-        let interfaces_new: Vec<_> = vec![get_fake_interface(3, "eth002", ETHERNET)];
-
-        let interfaces = futures::stream::iter(
-            interfaces_existing
-                .into_iter()
-                .map(Some)
-                .chain(std::iter::once(None))
-                .chain(interfaces_new.into_iter().map(Some)),
+        let interfaces_new = vec![get_fake_interface(3, "eth002", ETHERNET)];
+        let watcher_fut = respond_to_watcher_with_interfaces(
+            watcher_stream,
+            interfaces_existing,
+            Some((interfaces_new, fnet_interfaces::Event::Existing)),
         );
-        let watcher_fut = watcher_stream.zip(interfaces).for_each(|(req, properties)| match req {
-            fnet_interfaces::WatcherRequest::Watch { responder } => {
-                let event = properties.map_or(
-                    fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
-                    |fnet_interfaces_ext::Properties {
-                         id,
-                         name,
-                         device_class,
-                         online,
-                         addresses,
-                         has_default_ipv4_route,
-                         has_default_ipv6_route,
-                     }| {
-                        let inner = fnet_interfaces::Properties {
-                            id: Some(id.get()),
-                            name: Some(name),
-                            device_class: Some(device_class),
-                            online: Some(online),
-                            addresses: Some(
-                                addresses
-                                    .into_iter()
-                                    .map(|fnet_interfaces_ext::Address { addr, valid_until }| {
-                                        fnet_interfaces::Address {
-                                            addr: Some(addr),
-                                            valid_until: Some(valid_until),
-                                            ..Default::default()
-                                        }
-                                    })
-                                    .collect(),
-                            ),
-                            has_default_ipv4_route: Some(has_default_ipv4_route),
-                            has_default_ipv6_route: Some(has_default_ipv6_route),
-                            ..Default::default()
-                        };
-                        fnet_interfaces::Event::Existing(inner)
-                    },
-                );
-                let () = responder.send(&event).expect("send watcher event");
-                futures::future::ready(())
-            }
-        });
 
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         // The second existing properties has interface id 3.
