@@ -41,8 +41,6 @@ python_library("honeydew") {
     "interfaces/device_classes/component_capable_device.py",
     "interfaces/device_classes/fuchsia_device.py",
     "interfaces/device_classes/tracing_capable_device.py",
-    "mobly_controller/__init__.py",
-    "mobly_controller/fuchsia_device.py",
     "transports/__init__.py",
     "transports/ffx.py",
     "transports/sl4f.py",

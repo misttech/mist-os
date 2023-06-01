@@ -4,14 +4,11 @@
 
 import("//build/python/python_library.gni")
 
-python_library("fuchsia_base_test") {
-  library_name = "fuchsia_base_test"
+python_library("mobly_controller") {
+  library_name = "mobly_controller"
+  source_root = "."
   sources = [
     "__init__.py",
-    "fuchsia_base_test.py",
-  ]
-  library_deps = [
-    "//src/testing/end_to_end/mobly_controller",
-    "//third_party/mobly",
+    "fuchsia_device.py",
   ]
 }
