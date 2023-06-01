@@ -30,7 +30,9 @@ rustc_library("bt-obex") {
   ]
 
   sources = [
+    "src/client/get.rs",
     "src/client/mod.rs",
+    "src/client/put.rs",
     "src/error.rs",
     "src/header/header_set.rs",
     "src/header/mod.rs",

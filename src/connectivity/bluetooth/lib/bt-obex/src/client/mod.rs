@@ -5,13 +5,21 @@
 use fuchsia_bluetooth::types::Channel;
 use tracing::trace;
 
+pub use crate::client::get::GetOperation;
+pub use crate::client::put::PutOperation;
 use crate::error::Error;
 use crate::header::HeaderSet;
 use crate::operation::{
-    GetOperation, OpCode, PutOperation, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags,
-    MAX_PACKET_SIZE, MIN_MAX_PACKET_SIZE,
+    OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags, MAX_PACKET_SIZE,
+    MIN_MAX_PACKET_SIZE,
 };
 use crate::transport::ObexTransportManager;
+
+/// Implements the OBEX PUT operation.
+mod put;
+
+/// Implements the OBEX GET operation.
+mod get;
 
 /// Returns the maximum packet size that will be used for the OBEX session.
 /// `transport_max` is the maximum size that the underlying transport (e.g. L2CAP, RFCOMM) supports.
