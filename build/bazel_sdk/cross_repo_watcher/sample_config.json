@@ -1,0 +1,21 @@
+{
+    "BUILD_WIFI_DRIVER" : {
+        "repo": "~/iwlwifi",
+        "commands": [
+            "tools/bazel build third_party/iwlwifi/platform:iwlwifi_pkg"
+        ],
+        "triggered_events": [
+            "BUILD_BEGONIA",
+            "UNDEFINED"
+        ]
+    },
+    "BUILD_BEGONIA" : {
+        "repo": "~/fuchsia",
+        "commands": [
+            "fx clean",
+            "fx set begonia_eng.x64",
+            "fx build"
+        ],
+        "triggered_events": []
+    }
+}
