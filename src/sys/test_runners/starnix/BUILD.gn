@@ -13,7 +13,6 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -28,7 +27,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/lib/fuchsiaperf",
-    "//src/starnix/lib/kernel_config",
+    "//src/starnix/lib/kernel_manager",
     "//src/sys/lib/runner",
     "//src/sys/test_runners:lib",
     "//src/sys/test_runners/gtest:lib",

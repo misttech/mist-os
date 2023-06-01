@@ -22,13 +22,10 @@ rustc_binary("starnix_runner_bin") {
   source_root = "main.rs"
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/starnix/lib/kernel_config",
+    "//src/starnix/lib/kernel_manager",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

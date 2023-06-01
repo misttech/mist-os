@@ -16,23 +16,14 @@
             url: "#meta/netstack.cm",
         },
     ],
-
-    // This collection will contain the starnix kernel that will run the linux
-    // binary.
     collections: [
         {
-            name: "runners",
+            name: "kernels",
             durability: "single_run",
-            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
-        {
-            directory: "kernels",
-            rights: [ "r*" ],
-            path: "/kernels",
-        },
     ],
     use: [
         {
@@ -54,7 +45,7 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: [ "#runners" ],
+            to: [ "#kernels" ],
         },
         {
             protocol: [
@@ -64,7 +55,7 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#scenic",
-            to: [ "#runners" ],
+            to: [ "#kernels" ],
         },
         {
             protocol: [
@@ -72,12 +63,12 @@
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#netstack",
-            to: "#runners",
+            to: "#kernels",
         },
         {
             directory: "dev-gpu",
             from: "parent",
-            to: [ "#runners" ],
+            to: [ "#kernels" ],
         },
         {
             protocol: "fuchsia.logger.LogSink",

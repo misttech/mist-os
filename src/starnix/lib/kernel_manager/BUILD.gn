@@ -1,0 +1,21 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+rustc_library("kernel_manager") {
+  edition = "2021"
+  sources = [ "src/lib.rs" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:rand",
+  ]
+}
