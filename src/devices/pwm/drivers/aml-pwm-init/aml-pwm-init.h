@@ -6,7 +6,6 @@
 #define SRC_DEVICES_PWM_DRIVERS_AML_PWM_INIT_AML_PWM_INIT_H_
 
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>

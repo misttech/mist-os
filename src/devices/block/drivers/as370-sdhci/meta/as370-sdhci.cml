@@ -15,6 +15,7 @@
         colocate: "true",
     },
     use: [
+        { service: "fuchsia.hardware.clock.Service" },
         { service: "fuchsia.hardware.i2c.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.registers.Service" },

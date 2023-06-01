@@ -4,6 +4,7 @@
 
 #include "aml-cpufreq.h"
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <unistd.h>
 #include <zircon/types.h>
@@ -11,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include <ddktl/device.h>
 #include <fbl/algorithm.h>
 
 #include "aml-fclk.h"
@@ -80,20 +82,27 @@ zx_status_t AmlCpuFrequency::Create(
   }
 
   for (const auto& fragment : fragments) {
-    ddk::ClockProtocolClient clock;
-    status = ddk::ClockProtocolClient::CreateFromDevice(parent, fragment, &clock);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "aml-cpufreq: failed to get clk protocol");
-      return status;
+    zx::result clock_result =
+        ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+            parent, fragment);
+    if (clock_result.is_error()) {
+      zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s", fragment,
+             clock_result.status_string());
+      return clock_result.status_value();
     }
-
-    status = clock.Enable();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "aml-cpufreq: failed to enable clock, status = %d", status);
-      return status;
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock{std::move(*clock_result)};
+    fidl::WireResult result = clock->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Enable request to clock %s: %s", fragment,
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to enable clock %s: %s", fragment,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
-
   return Init();
 }
 

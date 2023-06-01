@@ -4,8 +4,8 @@
 
 #include "as370-sdhci.h"
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
@@ -35,6 +35,8 @@ constexpr uint8_t kIODirectionAddress = 0x3;
 constexpr uint8_t kOutputStateAddress = 0x5;
 constexpr uint8_t kOutputHighZAddress = 0x7;
 constexpr uint8_t kPullEnableAddress = 0xb;
+
+const char* kClockSd0FragName = "clock-sd-0";
 
 zx_status_t I2cModifyBit(ddk::I2cChannel& i2c, uint8_t reg, uint8_t set_mask, uint8_t clear_mask) {
   uint8_t reg_value = 0;
@@ -90,9 +92,23 @@ zx_status_t InitGpioExpanders(zx_device_t* parent) {
 
   // The SDIO core clock defaults to 100 MHz on VS680, even though the SDHCI capabilities register
   // says it is 200 MHz. Correct it so that the bus clock can be set properly.
-  ddk::ClockProtocolClient clock(parent, "clock-sd-0");
-  if (clock.is_valid() && (status = clock.SetRate(kVs680CoreClockFreqHz)) != ZX_OK) {
-    zxlogf(WARNING, "%s: Failed to set core clock frequency: %d", __FILE__, status);
+  zx::result clock_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent, kClockSd0FragName);
+  if (clock_result.is_error()) {
+    zxlogf(WARNING, "Failed to get clock protocol from fragment '%s': %s", kClockSd0FragName,
+           clock_result.status_string());
+    return clock_result.status_value();
+  }
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_sd_0{std::move(*clock_result)};
+  fidl::WireResult result = clock_sd_0->SetRate(kVs680CoreClockFreqHz);
+  if (!result.ok()) {
+    zxlogf(WARNING, "Failed to send SetRate request to clock: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(WARNING, "Failed to set rate of clock: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
   return ZX_OK;

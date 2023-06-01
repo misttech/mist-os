@@ -20,7 +20,6 @@ fuchsia_driver("aml-ethernet-driver") {
   sources = [ "aml-ethernet.cc" ]
   deps = [
     ":aml_eth_bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",

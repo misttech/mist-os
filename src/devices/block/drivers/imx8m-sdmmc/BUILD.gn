@@ -26,7 +26,6 @@ fuchsia_driver("imx8m-sdmmc-driver") {
   sources = [ "imx8m-sdmmc.cc" ]
   deps = [
     ":imx8m-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
@@ -72,7 +71,6 @@ test("imx8m-sdmmc-test-bin") {
   ]
   deps = [
     ":imx8m-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/lib/async_patterns/testing/cpp",

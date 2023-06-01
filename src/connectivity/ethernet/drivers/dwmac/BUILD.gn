@@ -28,7 +28,6 @@ fuchsia_driver("dwmac-driver") {
   ]
   deps = [
     ":dwmac_bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet.mac:fuchsia.hardware.ethernet.mac_banjo_cpp",

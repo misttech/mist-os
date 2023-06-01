@@ -25,7 +25,6 @@ fuchsia_driver("aml-g12-pdm-dsp-driver") {
 
   deps = [
     ":aml_g12_pdm_dsp_bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.dsp:fuchsia.hardware.dsp_cpp",
     "//sdk/fidl/fuchsia.hardware.mailbox:fuchsia.hardware.mailbox_cpp",

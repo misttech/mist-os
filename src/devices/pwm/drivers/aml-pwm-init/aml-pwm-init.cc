@@ -4,7 +4,7 @@
 
 #include "aml-pwm-init.h"
 
-#include <fuchsia/hardware/clock/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <unistd.h>
 
@@ -12,6 +12,8 @@
 #include <fbl/alloc_checker.h>
 
 namespace pwm_init {
+
+const char* kWifiClkFragName = "wifi-32k768-clk";
 
 zx_status_t PwmInitDevice::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
@@ -68,11 +70,21 @@ zx_status_t PwmInitDevice::Init() {
   }
 
   // Enable PWM_CLK_* for WIFI 32K768
-  ddk::ClockProtocolClient wifi_32k768_clk(parent(), "wifi-32k768-clk");
-  if (wifi_32k768_clk.is_valid()) {
-    if ((status = wifi_32k768_clk.Enable()) != ZX_OK) {
-      zxlogf(ERROR, "could not enable clk for wifi_32k768");
-      return status;
+  zx::result clock_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent(), kWifiClkFragName);
+  if (clock_result.is_ok()) {
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> wifi_32k768_clk{std::move(*clock_result)};
+    fidl::WireResult result = wifi_32k768_clk->Enable();
+    if (!result.ok()) {
+      zxlogf(WARNING, "Failed to send Enable request to clock for wifi_32k768: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(WARNING, "Failed to enable clock for wifi_32k768: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
 

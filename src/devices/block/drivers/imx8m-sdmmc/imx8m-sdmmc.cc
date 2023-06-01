@@ -4,7 +4,6 @@
 
 #include "imx8m-sdmmc.h"
 
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <inttypes.h>

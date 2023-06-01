@@ -24,9 +24,9 @@ fuchsia_driver("as370-sdhci-driver") {
   sources = [ "as370-sdhci.cc" ]
   deps = [
     ":as370-sdhci-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
