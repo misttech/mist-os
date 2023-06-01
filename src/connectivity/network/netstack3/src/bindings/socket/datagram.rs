@@ -13,6 +13,7 @@ use std::{
     sync::Arc,
 };
 
+use either::Either;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -37,7 +38,7 @@ use netstack3_core::{
         SetMulticastMembershipError, ShutdownType, SockCreationError,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    transport::udp,
+    transport::udp::{self, ExpectedConnError, ExpectedUnboundError},
     BufferNonSyncContext, NonSyncContext, SyncCtx,
 };
 use packet::{Buf, BufferMut};
@@ -70,27 +71,7 @@ pub(crate) enum DatagramProtocol {
 /// A minimal abstraction over transport protocols that allows bindings-side state to be stored.
 pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
     const PROTOCOL: DatagramProtocol;
-    type UnboundId: Debug + Copy + IdMapCollectionKey + Send + Sync;
-    type ConnId: Debug + Copy + IdMapCollectionKey + Send + Sync;
-    type ListenerId: Debug + Copy + IdMapCollectionKey + Send + Sync;
-}
-
-#[derive(Debug)]
-pub(crate) enum BoundSocketId<I, T: Transport<I>> {
-    Connected(T::ConnId),
-    Listener(T::ListenerId),
-}
-
-#[derive(Debug)]
-pub(crate) enum SocketId<I, T: Transport<I>> {
-    Unbound(T::UnboundId),
-    Bound(BoundSocketId<I, T>),
-}
-
-impl<I, T: Transport<I>> From<BoundSocketId<I, T>> for SocketId<I, T> {
-    fn from(id: BoundSocketId<I, T>) -> Self {
-        SocketId::Bound(id)
-    }
+    type SocketId: Debug + Copy + IdMapCollectionKey + Send + Sync;
 }
 
 /// Mapping from socket IDs to their receive queues.
@@ -104,13 +85,12 @@ impl<I, T: Transport<I>> From<BoundSocketId<I, T>> for SocketId<I, T> {
 /// available and some bindings code here holds the `MessageQueue` and
 /// attempts to lock Core state via a `netstack3_core` call.
 pub(crate) struct SocketCollection<I: Ip, T: Transport<I>> {
-    conns: IdMapCollection<T::ConnId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
-    listeners: IdMapCollection<T::ListenerId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
+    received: IdMapCollection<T::SocketId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
 }
 
 impl<I: Ip, T: Transport<I>> Default for SocketCollection<I, T> {
     fn default() -> Self {
-        Self { conns: Default::default(), listeners: Default::default() }
+        Self { received: IdMapCollection::default() }
     }
 }
 
@@ -233,12 +213,13 @@ pub(crate) struct RemoteAddress<I: Ip, D, R> {
 
 /// An abstraction over transport protocols that allows generic manipulation of Core state.
 pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
-    type CreateConnError: IntoErrno;
-    type CreateListenerError: IntoErrno;
-    type ConnectListenerError: IntoErrno;
-    type ReconnectConnError: IntoErrno;
+    type ConnectError: IntoErrno;
+    type ListenError: IntoErrno;
+    type DisconnectError: IntoErrno;
     type SetSocketDeviceError: IntoErrno;
     type SetMulticastMembershipError: IntoErrno;
+    type SetReusePortError: IntoErrno;
+    type ShutdownError: IntoErrno;
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: OptionFromU16 + Into<u16> + Send;
     type SocketInfo<C: NonSyncContext>: IntoFidl<LocalAddress<I, WeakDeviceId<C>, Self::LocalIdentifier>>
@@ -247,114 +228,85 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
             Error = fposix::Errno,
         >;
 
-    fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::UnboundId;
+    fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::SocketId;
 
-    fn connect_unbound<C: NonSyncContext>(
+    fn connect<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::UnboundId,
+        id: &Self::SocketId,
         remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, Self::CreateConnError>;
+    ) -> Result<Self::SocketId, Self::ConnectError>;
 
-    fn listen_on_unbound<C: NonSyncContext>(
+    fn bind<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::UnboundId,
+        id: &Self::SocketId,
         addr: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
         port: Option<Self::LocalIdentifier>,
-    ) -> Result<Self::ListenerId, Self::CreateListenerError>;
+    ) -> Result<Self::SocketId, Self::ListenError>;
 
-    fn connect_listener<C: NonSyncContext>(
+    fn disconnect<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::ListenerId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-        remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, Self::ConnectListenerError>;
-
-    fn disconnect_connected<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ConnId,
-    ) -> Self::ListenerId;
-
-    fn reconnect_conn<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ConnId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-        remote_id: Self::RemoteIdentifier,
-    ) -> Result<(), Self::ReconnectConnError>;
+        id: &Self::SocketId,
+    ) -> Result<Self::SocketId, Self::DisconnectError>;
 
     fn shutdown<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: Self::ConnId,
+        id: &Self::SocketId,
         which: ShutdownType,
-    );
+    ) -> Result<(), Self::ShutdownError>;
 
     fn get_shutdown<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: Self::ConnId,
+        id: &Self::SocketId,
     ) -> Option<ShutdownType>;
 
     fn get_socket_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> Self::SocketInfo<C>;
 
-    fn remove_conn<C: NonSyncContext>(
+    fn remove<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::ConnId,
-    ) -> (
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::LocalIdentifier,
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::RemoteIdentifier,
-    );
-
-    fn remove_listener<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C>>>, Self::LocalIdentifier);
-
-    fn remove_unbound<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::UnboundId);
+        id: Self::SocketId,
+    ) -> Self::SocketInfo<C>;
 
     fn set_socket_device<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         device: Option<&DeviceId<C>>,
     ) -> Result<(), Self::SetSocketDeviceError>;
 
     fn get_bound_device<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> Option<WeakDeviceId<C>>;
 
     fn set_reuse_port<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::UnboundId,
+        id: &Self::SocketId,
         reuse_port: bool,
-    );
+    ) -> Result<(), Self::SetReusePortError>;
 
     fn get_reuse_port<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> bool;
 
     fn set_multicast_membership<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         multicast_group: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
         want_membership: bool,
@@ -363,59 +315,49 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     fn set_unicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
     );
 
     fn set_multicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
     );
 
     fn get_unicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> NonZeroU8;
 
     fn get_multicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> NonZeroU8;
 }
 
 /// An abstraction over transport protocols that allows data to be sent via the Core.
 pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
-    type SendConnError: IntoErrno;
-    type SendConnToError: IntoErrno;
-    type SendListenerError: IntoErrno;
+    type SendError: IntoErrno;
+    type SendToError: IntoErrno;
 
-    fn send_conn<C: BufferNonSyncContext<B>>(
+    fn send<C: BufferNonSyncContext<B>>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        conn: Self::ConnId,
+        id: &Self::SocketId,
         body: B,
-    ) -> Result<(), (B, Self::SendConnError)>;
+    ) -> Result<(), (B, Self::SendError)>;
 
-    fn send_conn_to<C: BufferNonSyncContext<B>>(
+    fn send_to<C: BufferNonSyncContext<B>>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        conn: Self::ConnId,
-        body: B,
+        id: &Self::SocketId,
         remote: (ZonedAddr<I::Addr, DeviceId<C>>, Self::RemoteIdentifier),
-    ) -> Result<(), (B, Self::SendConnToError)>;
-
-    fn send_listener<C: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        listener: Self::ListenerId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-        remote_id: Self::RemoteIdentifier,
         body: B,
-    ) -> Result<(), (B, Self::SendListenerError)>;
+    ) -> (Option<Self::SocketId>, Result<(), (B, Self::SendToError)>);
 }
 
 #[derive(Debug)]
@@ -423,27 +365,7 @@ pub(crate) enum Udp {}
 
 impl<I: Ip> Transport<I> for Udp {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::Udp;
-    type UnboundId = udp::UnboundId<I>;
-    type ConnId = udp::ConnId<I>;
-    type ListenerId = udp::ListenerId<I>;
-}
-
-impl<I: Ip> From<BoundSocketId<I, Udp>> for udp::BoundId<I> {
-    fn from(id: BoundSocketId<I, Udp>) -> Self {
-        match id {
-            BoundSocketId::Connected(c) => udp::BoundId::Connected(c),
-            BoundSocketId::Listener(c) => udp::BoundId::Listening(c),
-        }
-    }
-}
-
-impl<I: Ip> From<SocketId<I, Udp>> for udp::SocketId<I> {
-    fn from(id: SocketId<I, Udp>) -> Self {
-        match id {
-            SocketId::Unbound(id) => Self::Unbound(id),
-            SocketId::Bound(id) => Self::Bound(id.into()),
-        }
-    }
+    type SocketId = udp::SocketId<I>;
 }
 
 impl OptionFromU16 for NonZeroU16 {
@@ -453,81 +375,62 @@ impl OptionFromU16 for NonZeroU16 {
 }
 
 impl<I: IpExt> TransportState<I> for Udp {
-    type CreateConnError = SockCreationError;
-    type CreateListenerError = LocalAddressError;
-    type ConnectListenerError = ConnectListenerError;
-    type ReconnectConnError = ConnectListenerError;
+    type ConnectError = Either<SockCreationError, ConnectListenerError>;
+    type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
+    type DisconnectError = ExpectedConnError;
+    type ShutdownError = ExpectedConnError;
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = SetMulticastMembershipError;
+    type SetReusePortError = ExpectedUnboundError;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = NonZeroU16;
     type SocketInfo<C: NonSyncContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
 
-    fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::UnboundId {
-        udp::create_udp_unbound(ctx)
+    fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::SocketId {
+        udp::create_udp(ctx)
     }
 
-    fn connect_unbound<C: NonSyncContext>(
+    fn connect<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::UnboundId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
+        id: &Self::SocketId,
+        remote_ip: ZonedAddr<<I as Ip>::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, Self::CreateConnError> {
+    ) -> Result<Self::SocketId, Self::ConnectError> {
         udp::connect_udp(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
-    fn listen_on_unbound<C: NonSyncContext>(
+    fn bind<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::UnboundId,
-        addr: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
+        id: &Self::SocketId,
+        addr: Option<ZonedAddr<<I as Ip>::Addr, DeviceId<C>>>,
         port: Option<Self::LocalIdentifier>,
-    ) -> Result<Self::ListenerId, Self::CreateListenerError> {
+    ) -> Result<Self::SocketId, Self::ListenError> {
         udp::listen_udp(sync_ctx, ctx, id, addr, port)
     }
 
-    fn connect_listener<C: NonSyncContext>(
+    fn disconnect<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::ListenerId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-        remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::ConnId, Self::ConnectListenerError> {
-        udp::connect_udp_listener(sync_ctx, ctx, id, remote_ip, remote_id)
-    }
-
-    fn disconnect_connected<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ConnId,
-    ) -> Self::ListenerId {
+        id: &Self::SocketId,
+    ) -> Result<Self::SocketId, Self::DisconnectError> {
         udp::disconnect_udp_connected(sync_ctx, ctx, id)
-    }
-
-    fn reconnect_conn<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ConnId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-        remote_id: Self::RemoteIdentifier,
-    ) -> Result<(), Self::ReconnectConnError> {
-        udp::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
     fn shutdown<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: Self::ConnId,
+        id: &Self::SocketId,
         which: ShutdownType,
-    ) {
+    ) -> Result<(), Self::ShutdownError> {
         udp::shutdown(sync_ctx, ctx, id, which)
     }
 
     fn get_shutdown<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: Self::ConnId,
+        id: &Self::SocketId,
     ) -> Option<ShutdownType> {
         udp::get_shutdown(sync_ctx, ctx, id)
     }
@@ -535,90 +438,63 @@ impl<I: IpExt> TransportState<I> for Udp {
     fn get_socket_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> Self::SocketInfo<C> {
-        udp::get_udp_info(sync_ctx, ctx, id.into())
+        udp::get_udp_info(sync_ctx, ctx, id)
     }
 
-    fn remove_conn<C: NonSyncContext>(
+    fn remove<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::ConnId,
-    ) -> (
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::LocalIdentifier,
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::RemoteIdentifier,
-    ) {
-        let udp::ConnInfo { local_ip, local_port, remote_ip, remote_port } =
-            udp::remove_udp_conn(sync_ctx, ctx, id);
-        (local_ip, local_port, remote_ip, remote_port)
-    }
-
-    fn remove_listener<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C>>>, Self::LocalIdentifier) {
-        let udp::ListenerInfo { local_ip, local_port } =
-            udp::remove_udp_listener(sync_ctx, ctx, id);
-        (local_ip, local_port)
-    }
-
-    fn remove_unbound<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::UnboundId) {
-        udp::remove_udp_unbound(sync_ctx, ctx, id)
+        id: Self::SocketId,
+    ) -> Self::SocketInfo<C> {
+        udp::remove_udp(sync_ctx, ctx, id)
     }
 
     fn set_socket_device<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         device: Option<&DeviceId<C>>,
     ) -> Result<(), Self::SetSocketDeviceError> {
-        match id {
-            SocketId::Unbound(id) => {
-                udp::set_unbound_udp_device(sync_ctx, ctx, id, device);
-                Ok(())
-            }
-            SocketId::Bound(id) => match id {
-                BoundSocketId::Listener(id) => {
-                    udp::set_listener_udp_device(sync_ctx, ctx, id, device)
-                        .map_err(SocketError::Local)
-                }
-                BoundSocketId::Connected(id) => udp::set_conn_udp_device(sync_ctx, ctx, id, device),
-            },
-        }
+        udp::set_udp_device(sync_ctx, ctx, id, device)
     }
 
     fn get_bound_device<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> Option<WeakDeviceId<C>> {
-        udp::get_udp_bound_device(sync_ctx, ctx, id.into())
+        udp::get_udp_bound_device(sync_ctx, ctx, id)
     }
 
     fn set_reuse_port<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::UnboundId,
+        id: &Self::SocketId,
         reuse_port: bool,
-    ) {
-        udp::set_udp_posix_reuse_port(sync_ctx, ctx, id, reuse_port)
+    ) -> Result<(), Self::SetReusePortError> {
+        match udp::set_udp_posix_reuse_port(sync_ctx, ctx, id, reuse_port) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                warn!("tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/100840");
+                Err(e)
+            }
+        }
     }
 
     fn get_reuse_port<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> bool {
-        udp::get_udp_posix_reuse_port(sync_ctx, ctx, id.into())
+        udp::get_udp_posix_reuse_port(sync_ctx, ctx, id)
     }
 
     fn set_multicast_membership<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         multicast_group: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
         want_membership: bool,
@@ -626,7 +502,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         udp::set_udp_multicast_membership(
             sync_ctx,
             ctx,
-            id.into(),
+            id,
             multicast_group,
             interface,
             want_membership,
@@ -636,110 +512,85 @@ impl<I: IpExt> TransportState<I> for Udp {
     fn set_unicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
     ) {
-        udp::set_udp_unicast_hop_limit(sync_ctx, ctx, id.into(), hop_limit)
+        udp::set_udp_unicast_hop_limit(sync_ctx, ctx, id, hop_limit)
     }
 
     fn set_multicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
         hop_limit: Option<NonZeroU8>,
     ) {
-        udp::set_udp_multicast_hop_limit(sync_ctx, ctx, id.into(), hop_limit)
+        udp::set_udp_multicast_hop_limit(sync_ctx, ctx, id, hop_limit)
     }
 
     fn get_unicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> NonZeroU8 {
-        udp::get_udp_unicast_hop_limit(sync_ctx, ctx, id.into())
+        udp::get_udp_unicast_hop_limit(sync_ctx, ctx, id)
     }
 
     fn get_multicast_hop_limit<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
-        id: SocketId<I, Self>,
+        id: &Self::SocketId,
     ) -> NonZeroU8 {
-        udp::get_udp_multicast_hop_limit(sync_ctx, ctx, id.into())
+        udp::get_udp_multicast_hop_limit(sync_ctx, ctx, id)
     }
 }
 
-impl<I: IpExt, B: BufferMut> BufferTransportState<I, B> for Udp {
-    type SendConnError = udp::SendError;
-    type SendConnToError = udp::SendToError;
-    type SendListenerError = udp::SendToError;
+impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp {
+    type SendError = Either<udp::SendError, fposix::Errno>;
+    type SendToError = Either<LocalAddressError, udp::SendToError>;
 
-    fn send_conn<C: BufferNonSyncContext<B>>(
+    fn send<C: BufferNonSyncContext<B>>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        conn: Self::ConnId,
+        id: &Self::SocketId,
         body: B,
-    ) -> Result<(), (B, Self::SendConnError)> {
-        udp::send_udp_conn(sync_ctx, ctx, conn, body)
+    ) -> Result<(), (B, Self::SendError)> {
+        udp::send_udp(sync_ctx, ctx, id, body)
+            .map_err(|(b, e)| (b, e.map_right(|ExpectedConnError| fposix::Errno::Edestaddrreq)))
     }
 
-    fn send_conn_to<C: BufferNonSyncContext<B>>(
+    fn send_to<C: BufferNonSyncContext<B>>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        conn: Self::ConnId,
+        id: &Self::SocketId,
+        (remote_ip, remote_port): (ZonedAddr<<I as Ip>::Addr, DeviceId<C>>, Self::RemoteIdentifier),
         body: B,
-        (remote_ip, remote_port): (ZonedAddr<I::Addr, DeviceId<C>>, Self::RemoteIdentifier),
-    ) -> Result<(), (B, Self::SendConnToError)> {
-        udp::send_udp_conn_to(sync_ctx, ctx, conn, remote_ip, remote_port, body)
-    }
-
-    fn send_listener<C: BufferNonSyncContext<B>>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        listener: Self::ListenerId,
-        remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-        remote_id: Self::RemoteIdentifier,
-        body: B,
-    ) -> Result<(), (B, Self::SendListenerError)> {
-        udp::send_udp_listener(sync_ctx, ctx, listener, remote_ip, remote_id, body)
+    ) -> (Option<Self::SocketId>, Result<(), (B, Self::SendToError)>) {
+        match udp::send_udp_to(sync_ctx, ctx, id, remote_ip, remote_port, body) {
+            Ok(new_id) => (new_id, Ok(())),
+            Err((body, Either::Left(e))) => (None, Err((body, Either::Left(e)))),
+            Err((body, Either::Right((new_id, e)))) => (new_id, Err((body, Either::Right(e)))),
+        }
     }
 }
 
 impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I> for SocketCollection<I, Udp> {
-    fn receive_icmp_error(&mut self, id: udp::BoundId<I>, err: I::ErrorCode) {
-        let Self { conns, listeners } = self;
-        let id = match &id {
-            udp::BoundId::Connected(conn) => conns.get(conn),
-            udp::BoundId::Listening(listener) => listeners.get(listener),
-        };
+    fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
         // NB: Logging at error as a means of failing tests that provoke this condition.
         error!("unimplemented receive_icmp_error {:?} on {:?}", err, id)
     }
 }
 
 impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollection<I, Udp> {
-    fn receive_udp_from_conn(
+    fn receive_udp(
         &mut self,
-        conn: udp::ConnId<I>,
-        src_ip: I::Addr,
-        src_port: NonZeroU16,
+        id: udp::SocketId<I>,
+        _dst_ip: <I>::Addr,
+        (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        let Self { conns, listeners: _ } = self;
-        let conn = conns.get(&conn).unwrap();
-        conn.lock().receive(IntoAvailableMessage(src_ip, src_port.get(), body.as_ref()))
-    }
-
-    fn receive_udp_from_listen(
-        &mut self,
-        listener: udp::ListenerId<I>,
-        src_ip: I::Addr,
-        _dst_ip: I::Addr,
-        src_port: Option<NonZeroU16>,
-        body: &B,
-    ) {
-        let Self { conns: _, listeners } = self;
-        let listeners = listeners.get(&listener).unwrap();
-        listeners.lock().receive(IntoAvailableMessage(
+        let Self { received } = self;
+        let queue = received.get(&id).unwrap();
+        queue.lock().receive(IntoAvailableMessage(
             src_ip,
             src_port.map_or(0, NonZeroU16::get),
             body.as_ref(),
@@ -800,7 +651,7 @@ where
     /// Creates a new `BindingData`.
     fn new(
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         properties: SocketWorkerProperties,
     ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
@@ -812,16 +663,15 @@ where
         if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
             error!("socket failed to signal peer: {:?}", e);
         }
-        let unbound_id = T::create_unbound(sync_ctx);
+        let id = T::create_unbound(sync_ctx);
+        let messages = Arc::new(CoreMutex::new(MessageQueue::new(local_event)));
 
-        Self {
-            peer_event,
-            info: SocketControlInfo {
-                _properties: properties,
-                state: SocketState::Unbound { unbound_id },
-            },
-            messages: Arc::new(CoreMutex::new(MessageQueue::new(local_event))),
-        }
+        assert_matches!(
+            I::with_collection_mut(non_sync_ctx, |c| c.received.insert(&id, messages.clone())),
+            None
+        );
+
+        Self { peer_event, info: SocketControlInfo { _properties: properties, id }, messages }
     }
 }
 
@@ -829,27 +679,7 @@ where
 #[derive(Debug)]
 pub(crate) struct SocketControlInfo<I: Ip, T: Transport<I>> {
     _properties: SocketWorkerProperties,
-    state: SocketState<I, T>,
-}
-
-/// Possible states for a datagram socket.
-#[derive(Debug)]
-enum SocketState<I: Ip, T: Transport<I>> {
-    Unbound { unbound_id: T::UnboundId },
-    BoundListen { listener_id: T::ListenerId },
-    BoundConnect { conn_id: T::ConnId },
-}
-
-impl<'a, I: Ip, T: Transport<I>> From<&'a SocketState<I, T>> for SocketId<I, T> {
-    fn from(id: &'a SocketState<I, T>) -> Self {
-        match id {
-            SocketState::Unbound { unbound_id } => SocketId::Unbound(*unbound_id),
-            SocketState::BoundListen { listener_id } => {
-                BoundSocketId::Listener(*listener_id).into()
-            }
-            SocketState::BoundConnect { conn_id } => BoundSocketId::Connected(*conn_id).into(),
-        }
-    }
+    id: T::SocketId,
 }
 
 pub(crate) trait SocketWorkerDispatcher:
@@ -934,37 +764,9 @@ where
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
-        let Self { info: SocketControlInfo { _properties, state }, messages: _, peer_event: _ } =
-            self;
-        match state {
-            SocketState::Unbound { unbound_id } => {
-                T::remove_unbound(sync_ctx, non_sync_ctx, unbound_id)
-            }
-            SocketState::BoundListen { listener_id } => {
-                // Remove from bindings:
-                assert_matches!(
-                    I::with_collection_mut(non_sync_ctx, |c| c.listeners.remove(&listener_id)),
-                    Some(_)
-                );
-                // Remove from core:
-                let _: (Option<ZonedAddr<I::Addr, _>>, T::LocalIdentifier) =
-                    T::remove_listener(sync_ctx, non_sync_ctx, listener_id);
-            }
-            SocketState::BoundConnect { conn_id, .. } => {
-                // Remove from bindings:
-                assert_matches!(
-                    I::with_collection_mut(non_sync_ctx, |c| c.conns.remove(&conn_id)),
-                    Some(_)
-                );
-                // Remove from core:
-                let _: (
-                    ZonedAddr<I::Addr, _>,
-                    T::LocalIdentifier,
-                    ZonedAddr<I::Addr, _>,
-                    T::RemoteIdentifier,
-                ) = T::remove_conn(sync_ctx, non_sync_ctx, conn_id);
-            }
-        }
+        let Self { info: SocketControlInfo { _properties, id }, messages: _, peer_event: _ } = self;
+        let _: Option<_> = I::with_collection_mut(non_sync_ctx, |c| c.received.remove(&id));
+        let _: T::SocketInfo<_> = T::remove(sync_ctx, non_sync_ctx, id);
     }
 }
 
@@ -1441,7 +1243,16 @@ where
     ///
     /// [POSIX socket connect request]: fposix_socket::SynchronousDatagramSocketRequest::Connect
     fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    messages: _,
+                    info: SocketControlInfo { _properties: _, id },
+                },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let sockaddr = I::SocketAddress::from_sock_addr(addr)?;
         trace!("connect sockaddr: {:?}", sockaddr);
@@ -1453,56 +1264,14 @@ where
         // remote address as localhost.
         let remote_addr = remote_addr.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
 
-        let (conn_id, messages) = match self.data.info.state {
-            SocketState::Unbound { unbound_id } => {
-                // Use None for local_addr and local_port.
-                let conn_id = T::connect_unbound(
-                    sync_ctx,
-                    non_sync_ctx,
-                    unbound_id,
-                    remote_addr,
-                    remote_port,
-                )
-                .map_err(IntoErrno::into_errno)?;
-                (conn_id, self.data.messages.clone())
-            }
-            SocketState::BoundListen { listener_id } => {
-                match T::connect_listener(
-                    sync_ctx,
-                    non_sync_ctx,
-                    listener_id,
-                    remote_addr,
-                    remote_port,
-                ) {
-                    Ok(conn_id) => (
-                        conn_id,
-                        assert_matches!(
-                            I::with_collection_mut(non_sync_ctx, |c| c.listeners.remove(&listener_id)),
-                            Some(t) => t
-                        ),
-                    ),
-                    Err(e) => {
-                        return Err(e.into_errno());
-                    }
-                }
-            }
-            SocketState::BoundConnect { conn_id } => {
-                return T::reconnect_conn(
-                    sync_ctx,
-                    non_sync_ctx,
-                    conn_id,
-                    remote_addr,
-                    remote_port,
-                )
-                .map_err(IntoErrno::into_errno);
-            }
-        };
+        let new_id = T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
+            .map_err(IntoErrno::into_errno)?;
+        I::with_collection_mut(non_sync_ctx, |c| {
+            let messages = c.received.remove(id).expect("had message queue");
+            assert_matches!(c.received.insert(&new_id, messages), None);
+        });
+        *id = new_id;
 
-        self.data.info.state = SocketState::BoundConnect { conn_id };
-        assert_matches!(
-            I::with_collection_mut(non_sync_ctx, |c| c.conns.insert(&conn_id, messages)),
-            None
-        );
         Ok(())
     }
 
@@ -1513,48 +1282,34 @@ where
         let sockaddr = I::SocketAddress::from_sock_addr(addr)?;
         trace!("bind sockaddr: {:?}", sockaddr);
 
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    messages: _,
+                    info: SocketControlInfo { _properties: _, id },
+                },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let (sockaddr, port) =
             TryFromFidlWithContext::try_from_fidl_with_ctx(&non_sync_ctx, sockaddr)
                 .map_err(IntoErrno::into_errno)?;
-        let unbound_id = match self.data.info.state {
-            SocketState::Unbound { unbound_id } => Ok(unbound_id),
-            SocketState::BoundListen { listener_id: _ }
-            | SocketState::BoundConnect { conn_id: _ } => Err(fposix::Errno::Einval),
-        }?;
-        let listener_id = Self::bind_inner(
-            sync_ctx,
-            non_sync_ctx,
-            unbound_id,
-            &self.data.messages,
-            sockaddr,
-            T::LocalIdentifier::from_u16(port),
-        )?;
-        self.data.info.state = SocketState::BoundListen { listener_id };
-        Ok(())
-    }
+        let local_port = T::LocalIdentifier::from_u16(port);
 
-    /// Helper function for common functionality to self.bind() and self.send_msg().
-    fn bind_inner(
-        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
-        unbound_id: <T as Transport<I>>::UnboundId,
-        available_data: &Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>,
-        local_addr: Option<ZonedAddr<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>>,
-        local_port: Option<<T as TransportState<I>>::LocalIdentifier>,
-    ) -> Result<<T as Transport<I>>::ListenerId, fposix::Errno> {
-        let listener_id =
-            T::listen_on_unbound(sync_ctx, non_sync_ctx, unbound_id, local_addr, local_port)
-                .map_err(IntoErrno::into_errno)?;
+        let new_id = T::bind(sync_ctx, non_sync_ctx, id, sockaddr, local_port)
+            .map_err(IntoErrno::into_errno)?;
         assert_matches!(
-            I::with_collection_mut(non_sync_ctx, |c| c
-                .listeners
-                .insert(&listener_id, available_data.clone())),
+            I::with_collection_mut(non_sync_ctx, |c| {
+                let messages = c.received.remove(&id).expect("has message queue");
+                c.received.insert(&new_id, messages)
+            }),
             None
         );
-        Ok(listener_id)
+        *id = new_id;
+        Ok(())
     }
 
     /// Handles a [POSIX socket disconnect request].
@@ -1563,26 +1318,24 @@ where
     fn disconnect(self) -> Result<(), fposix::Errno> {
         trace!("disconnect socket");
 
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    messages: _,
+                    info: SocketControlInfo { _properties: _, id },
+                },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
-        let (listener_id, messages) = match self.data.info.state {
-            SocketState::Unbound { unbound_id: _ }
-            | SocketState::BoundListen { listener_id: _ } => return Err(fposix::Errno::Einval),
-            SocketState::BoundConnect { conn_id, .. } => {
-                let messages = assert_matches!(
-                    I::with_collection_mut(non_sync_ctx, |c| c.conns.remove(&conn_id)),
-                    Some(t) => t);
-                let listener_id = T::disconnect_connected(sync_ctx, non_sync_ctx, conn_id);
-                (listener_id, messages)
-            }
-        };
-
-        self.data.info.state = SocketState::BoundListen { listener_id };
-        assert_matches!(
-            I::with_collection_mut(non_sync_ctx, |c| c.listeners.insert(&listener_id, messages)),
-            None
-        );
+        let new_id = T::disconnect(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
+        I::with_collection_mut(non_sync_ctx, |c| {
+            let messages = c.received.remove(&id).expect("has message queue");
+            assert_matches!(c.received.insert(&new_id, messages), None);
+        });
+        *id = new_id;
         Ok(())
     }
 
@@ -1596,10 +1349,9 @@ where
                 BindingData {
                     peer_event: _,
                     messages: _,
-                    info: SocketControlInfo { _properties: _, state },
+                    info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let id = (&*state).into();
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
@@ -1634,10 +1386,9 @@ where
                 BindingData {
                     peer_event: _,
                     messages: _,
-                    info: SocketControlInfo { _properties: _, state },
+                    info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let id = (&*state).into();
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
@@ -1659,20 +1410,21 @@ where
     > {
         trace_duration!("datagram::recv_msg");
 
-        let Self { ctx, data: BindingData { peer_event: _, info, messages } } = self;
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
         let Ctx { sync_ctx, non_sync_ctx } = ctx;
-
-        let conn_id = match info.state {
-            SocketState::Unbound { unbound_id: _ }
-            | SocketState::BoundListen { listener_id: _ } => None,
-            SocketState::BoundConnect { conn_id } => Some(conn_id),
-        };
-        let mut messages = messages.lock();
-        let front = if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
-            messages.peek().cloned()
-        } else {
-            messages.pop()
-        };
+        let front = I::with_collection(non_sync_ctx, |c| {
+            let messages = c.received.get(&id).expect("has queue");
+            let mut messages = messages.lock();
+            if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
+                messages.peek().cloned()
+            } else {
+                messages.pop()
+            }
+        });
 
         let available = match front {
             None => {
@@ -1682,8 +1434,7 @@ where
                 // another thread setting the shutdown flag, then this check
                 // executing, could result in a race that causes this this code
                 // to signal EOF with a packet still waiting.
-                let shutdown =
-                    conn_id.and_then(|conn_id| T::get_shutdown(sync_ctx, non_sync_ctx, conn_id));
+                let shutdown = T::get_shutdown(sync_ctx, non_sync_ctx, id);
                 return match shutdown {
                     Some(ShutdownType::Receive | ShutdownType::SendAndReceive) => {
                         // Return empty data to signal EOF.
@@ -1721,68 +1472,55 @@ where
         trace_duration!("datagram::send_msg");
 
         let remote_addr = addr.map(I::SocketAddress::from_sock_addr).transpose()?;
-
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        let remote = match remote_addr {
-            Some(remote_addr) => {
+        let remote = remote_addr
+            .map(|remote_addr| {
                 let (remote_addr, port) =
                     TryFromFidlWithContext::try_from_fidl_with_ctx(&non_sync_ctx, remote_addr)
                         .map_err(IntoErrno::into_errno)?;
                 // Emulate Linux, which was emulating BSD, by treating the
                 // unspecified remote address as localhost.
-                Some((
+                Ok((
                     remote_addr.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS)),
                     T::RemoteIdentifier::from_u16(port).ok_or(fposix::Errno::Einval)?,
                 ))
-            }
-            None => None,
-        };
-
+            })
+            .transpose()?;
         let len = data.len() as i64;
         let body = Buf::new(data, ..);
-        match self.data.info.state {
-            SocketState::Unbound { unbound_id } => match remote {
-                Some((addr, port)) => {
-                    // On Linux, sending on an unbound socket is equivalent to
-                    // first binding to a system-selected port for all IPs, then
-                    // sending from that socket. Emulate that here by binding
-                    // with an unspecified IP and port.
-                    Self::bind_inner(
-                        sync_ctx,
-                        non_sync_ctx,
-                        unbound_id,
-                        &self.data.messages,
-                        None,
-                        None,
-                    )
-                    .and_then(|listener_id| {
-                        self.data.info.state = SocketState::BoundListen { listener_id };
-                        T::send_listener(sync_ctx, non_sync_ctx, listener_id, addr, port, body)
-                            .map_err(|(_body, err)| err.into_errno())
-                    })
+        match remote {
+            Some(remote) => {
+                let (new_id, r) = T::send_to(sync_ctx, non_sync_ctx, id, remote, body);
+                // T::send_to can implicitly bind the socket, in which case the
+                // old ID is no longer valid. Handle the update even if an error
+                // was returned.
+                if let Some(new_id) = new_id {
+                    I::with_collection_mut(non_sync_ctx, |c| {
+                        let messages = c.received.remove(&id).expect("has queue");
+                        assert_matches!(c.received.insert(&new_id, messages), None);
+                    });
+                    *id = new_id;
                 }
-                None => Err(fposix::Errno::Edestaddrreq),
-            },
-            SocketState::BoundConnect { conn_id } => match remote {
-                None => T::send_conn(sync_ctx, non_sync_ctx, conn_id, body)
-                    .map_err(|(_body, err)| err.into_errno()),
-                Some(remote) => T::send_conn_to(sync_ctx, non_sync_ctx, conn_id, body, remote)
-                    .map_err(|(_body, err)| err.into_errno()),
-            },
-            SocketState::BoundListen { listener_id } => match remote {
-                Some((addr, port)) => {
-                    T::send_listener(sync_ctx, non_sync_ctx, listener_id, addr, port, body)
-                        .map_err(|(_body, err)| err.into_errno())
-                }
-                None => Err(fposix::Errno::Edestaddrreq),
-            },
+                r.map_err(|(_body, e)| e.into_errno())
+            }
+            None => T::send(sync_ctx, non_sync_ctx, id, body).map_err(|(_body, e)| e.into_errno()),
         }
         .map(|()| len)
     }
 
     fn bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device = device
             .map(|name| {
@@ -1793,18 +1531,18 @@ where
                     .ok_or(fposix::Errno::Enodev)
             })
             .transpose()?;
-        let state: &SocketState<_, _> = &self.data.info.state;
-        let id = state.into();
 
         T::set_socket_device(sync_ctx, non_sync_ctx, id, device.as_ref())
             .map_err(IntoErrno::into_errno)
     }
 
     fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
-        let ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
         let Ctx { sync_ctx, non_sync_ctx } = &ctx;
-        let state: &SocketState<_, _> = &self.data.info.state;
-        let id = state.into();
 
         let device = match T::get_bound_device(sync_ctx, non_sync_ctx, id) {
             None => return Ok(None),
@@ -1821,63 +1559,60 @@ where
     }
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match self.data.info.state {
-            SocketState::Unbound { unbound_id } => {
-                T::set_reuse_port(sync_ctx, non_sync_ctx, unbound_id, reuse_port);
-                Ok(())
-            }
-            SocketState::BoundListen { .. } | SocketState::BoundConnect { .. } => {
-                warn!("tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/100840");
-                Err(fposix::Errno::Eopnotsupp)
-            }
-        }
+        T::set_reuse_port(sync_ctx, non_sync_ctx, id, reuse_port).map_err(IntoErrno::into_errno)
     }
 
     fn get_reuse_port(self) -> bool {
-        let ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
         let Ctx { sync_ctx, non_sync_ctx } = &ctx;
 
-        T::get_reuse_port(sync_ctx, non_sync_ctx, (&self.data.info.state).into())
+        T::get_reuse_port(sync_ctx, non_sync_ctx, id)
     }
 
     fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { peer_event: _, info, messages }, ctx } = self;
+        let Self {
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { id, _properties }, messages },
+            ctx,
+        } = self;
         let Ctx { sync_ctx, non_sync_ctx } = ctx;
-
-        // Only "connected" sockets can be shutdown.
-        if let SocketState::BoundConnect { conn_id } = info.state {
-            let how = match (
-                how.contains(fposix_socket::ShutdownMode::READ),
-                how.contains(fposix_socket::ShutdownMode::WRITE),
-            ) {
-                (true, true) => ShutdownType::SendAndReceive,
-                (false, true) => ShutdownType::Send,
-                (true, false) => ShutdownType::Receive,
-                (false, false) => return Err(fposix::Errno::Einval),
-            };
-            T::shutdown(sync_ctx, non_sync_ctx, conn_id, how);
-
-            match how {
-                ShutdownType::Receive | ShutdownType::SendAndReceive => {
-                    // Make sure to signal the peer so any ongoing call to
-                    // receive that is waiting for a signal will poll again.
-                    if let Err(e) = messages
-                        .lock()
-                        .local_event()
-                        .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-                    {
-                        error!("Failed to signal peer when shutting down: {:?}", e);
-                    }
+        let how = match (
+            how.contains(fposix_socket::ShutdownMode::READ),
+            how.contains(fposix_socket::ShutdownMode::WRITE),
+        ) {
+            (true, true) => ShutdownType::SendAndReceive,
+            (false, true) => ShutdownType::Send,
+            (true, false) => ShutdownType::Receive,
+            (false, false) => return Err(fposix::Errno::Einval),
+        };
+        T::shutdown(sync_ctx, non_sync_ctx, id, how).map_err(IntoErrno::into_errno)?;
+        match how {
+            ShutdownType::Receive | ShutdownType::SendAndReceive => {
+                // Make sure to signal the peer so any ongoing call to
+                // receive that is waiting for a signal will poll again.
+                if let Err(e) = messages
+                    .lock()
+                    .local_event()
+                    .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
+                {
+                    error!("Failed to signal peer when shutting down: {:?}", e);
                 }
-                ShutdownType::Send => (),
             }
-
-            Ok(())
-        } else {
-            Err(fposix::Errno::Enotconn)
+            ShutdownType::Send => (),
         }
+
+        Ok(())
     }
 
     fn set_multicast_membership<
@@ -1898,9 +1633,12 @@ where
         let interface = interface
             .map_or(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, Into::into);
 
-        let id = (&self.data.info.state).into();
-
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let interface =
@@ -1928,13 +1666,16 @@ where
             return Err(fposix::Errno::Enoprotoopt);
         }
 
-        let id = (&self.data.info.state).into();
-
         let hop_limit: Option<u8> = hop_limit.into_core();
         let hop_limit =
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
 
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         T::set_unicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
         Ok(())
@@ -1951,15 +1692,18 @@ where
             return Err(fposix::Errno::Enoprotoopt);
         }
 
-        let id = (&self.data.info.state).into();
-
         let hop_limit: Option<u8> = hop_limit.into_core();
         // TODO(https://fxbug.dev/108323): Support setting a multicast hop limit
         // of 0.
         let hop_limit =
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
 
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         T::set_multicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
         Ok(())
@@ -1972,9 +1716,11 @@ where
             return Err(fposix::Errno::Enoprotoopt);
         }
 
-        let id = (&self.data.info.state).into();
-
-        let ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
         let Ctx { sync_ctx, non_sync_ctx } = &ctx;
         Ok(T::get_unicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
@@ -1986,12 +1732,27 @@ where
             return Err(fposix::Errno::Enoprotoopt);
         }
 
-        let id = (&self.data.info.state).into();
-
-        let ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
         let Ctx { sync_ctx, non_sync_ctx } = &ctx;
 
         Ok(T::get_multicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
+    }
+}
+impl IntoErrno for ExpectedUnboundError {
+    fn into_errno(self) -> fposix::Errno {
+        let ExpectedUnboundError = self;
+        fposix::Errno::Einval
+    }
+}
+
+impl IntoErrno for ExpectedConnError {
+    fn into_errno(self) -> fposix::Errno {
+        let ExpectedConnError = self;
+        fposix::Errno::Enotconn
     }
 }
 
@@ -2710,9 +2471,8 @@ mod tests {
             t.get(i).with_ctx(|ctx| {
                 <A::AddrType as IpAddress>::Version::with_collection(
                     &ctx.non_sync_ctx,
-                    |SocketCollection { conns, listeners }| {
-                        assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                        assert_matches!(listeners.iter().collect::<Vec<_>>()[..], [_]);
+                    |SocketCollection { received }| {
+                        assert_matches!(received.iter().collect::<Vec<_>>()[..], [_]);
                     },
                 )
             });
@@ -2736,9 +2496,8 @@ mod tests {
             t.get(i).with_ctx(|ctx| {
                 <A::AddrType as IpAddress>::Version::with_collection(
                     &ctx.non_sync_ctx,
-                    |SocketCollection { conns, listeners }| {
-                        assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                        assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                    |SocketCollection { received }| {
+                        assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                     },
                 )
             });
@@ -2780,9 +2539,8 @@ mod tests {
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
                 &ctx.non_sync_ctx,
-                |SocketCollection { conns, listeners }| {
-                    assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                    assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                |SocketCollection { received }| {
+                    assert_matches!(received.iter().collect::<Vec<_>>()[..], [_]);
                 },
             )
         });
@@ -2796,9 +2554,8 @@ mod tests {
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
                 &ctx.non_sync_ctx,
-                |SocketCollection { conns, listeners }| {
-                    assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                    assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                |SocketCollection { received }| {
+                    assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -2832,9 +2589,8 @@ mod tests {
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
                 &ctx.non_sync_ctx,
-                |SocketCollection { conns, listeners }| {
-                    assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                    assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                |SocketCollection { received }| {
+                    assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -2864,9 +2620,8 @@ mod tests {
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
                 &ctx.non_sync_ctx,
-                |SocketCollection { conns, listeners }| {
-                    assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                    assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                |SocketCollection { received }| {
+                    assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -3030,10 +2785,10 @@ mod tests {
                 stack.with_ctx(|Ctx { sync_ctx: _, non_sync_ctx }| {
                     <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<
                         Udp,
-                    >>::with_collection(non_sync_ctx, |SocketCollection { conns: _, listeners }| {
+                    >>::with_collection(non_sync_ctx, |SocketCollection { received }| {
                         // Check the lone socket to see if the packets were
                         // received.
-                        let messages = listeners.iter().next().unwrap();
+                        let messages = received.iter().next().unwrap();
                         has_all_delivered(&messages.lock())
                     })
                 });

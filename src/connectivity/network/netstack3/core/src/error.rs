@@ -134,7 +134,7 @@ pub enum RemoteAddressError {
 pub enum SocketError {
     #[error("{}", _0)]
     /// Errors related to the local address.
-    Local(LocalAddressError),
+    Local(#[from] LocalAddressError),
 
     #[error("{}", _0)]
     /// Errors related to the remote address.

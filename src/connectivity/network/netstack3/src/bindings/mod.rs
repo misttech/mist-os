@@ -420,7 +420,7 @@ impl<I> udp::NonSyncContext<I> for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {
-    fn receive_icmp_error(&mut self, id: udp::BoundId<I>, err: I::ErrorCode) {
+    fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
         I::with_collection_mut(self, |c| c.receive_icmp_error(id, err))
     }
 }
@@ -429,27 +429,14 @@ impl<I, B: BufferMut> udp::BufferNonSyncContext<I, B> for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
 {
-    fn receive_udp_from_conn(
+    fn receive_udp(
         &mut self,
-        conn: udp::ConnId<I>,
-        src_ip: I::Addr,
-        src_port: NonZeroU16,
+        id: udp::SocketId<I>,
+        dst_ip: <I>::Addr,
+        src_addr: (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        I::with_collection_mut(self, |c| c.receive_udp_from_conn(conn, src_ip, src_port, body))
-    }
-
-    fn receive_udp_from_listen(
-        &mut self,
-        listener: udp::ListenerId<I>,
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
-        src_port: Option<NonZeroU16>,
-        body: &B,
-    ) {
-        I::with_collection_mut(self, |c| {
-            c.receive_udp_from_listen(listener, src_ip, dst_ip, src_port, body)
-        })
+        I::with_collection_mut(self, |c| c.receive_udp(id, dst_ip, src_addr, body))
     }
 }
 

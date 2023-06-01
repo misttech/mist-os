@@ -13,10 +13,11 @@ use core::{
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
-use lock_order::Locked;
+use lock_order::{Locked, Unlocked};
 
 use derivative::Derivative;
 use either::Either;
+use explicit::ResultExt as _;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
@@ -611,7 +612,7 @@ impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
 /// identifiers. These identifiers can then be used to connect the socket or
 /// make it a listener.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub struct UnboundId<I: Ip>(usize, IpVersionMarker<I>);
+pub(crate) struct UnboundId<I: Ip>(usize, IpVersionMarker<I>);
 
 impl<I: Ip> UnboundId<I> {
     fn new(id: usize) -> UnboundId<I> {
@@ -650,7 +651,7 @@ impl<I: Ip> IdMapCollectionKey for UnboundId<I> {
 /// around 0, making it possible to store any associated data in a `Vec` indexed
 /// by the ID. `ConnId` implements `Into<usize>`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub struct ConnId<I: Ip>(usize, IpVersionMarker<I>);
+pub(crate) struct ConnId<I: Ip>(usize, IpVersionMarker<I>);
 
 impl<I: Ip> ConnId<I> {
     fn new(id: usize) -> ConnId<I> {
@@ -690,7 +691,7 @@ impl<I: Ip> From<usize> for ConnId<I> {
 /// `Vec` indexed by the ID. The `listener_type` field is used to look at the
 /// correct backing `Vec`: `listeners` or `wildcard_listeners`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub struct ListenerId<I: Ip> {
+pub(crate) struct ListenerId<I: Ip> {
     id: usize,
     _marker: IpVersionMarker<I>,
 }
@@ -728,7 +729,7 @@ impl<I: Ip> From<usize> for ListenerId<I> {
 /// Contains either a [`ConnId`] or [`ListenerId`] in contexts where either
 /// can be present.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub enum BoundId<I: Ip> {
+pub(crate) enum BoundId<I: Ip> {
     /// A UDP connection.
     Connected(ConnId<I>),
     /// A UDP listener.
@@ -768,12 +769,36 @@ impl<I: Ip + IpExt, D: WeakId> From<ListenerId<I>> for DatagramBoundId<Udp<I, D>
     }
 }
 
-/// A unique identifier for a bound or unbound UDP socket.
-///
-/// Contains either a [`UdpBoundId`] or [`UnboundId`] in contexts where
-/// either can be present.
+/// A unique identifier for a UDP socket.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub enum SocketId<I: Ip> {
+
+pub struct SocketId<I: Ip>(SocketIdInner<I>);
+
+// TODO(https://fxbug.dev/125489): remove this once Bindings isn't doing
+// lookups by socket ID.
+impl<I: Ip> IdMapCollectionKey for SocketId<I> {
+    const VARIANT_COUNT: NonZeroUsize = nonzero!(3usize);
+    fn get_variant(&self) -> usize {
+        let Self(id) = self;
+        match id {
+            SocketIdInner::Unbound(UnboundId(_, _marker)) => 0,
+            SocketIdInner::Bound(BoundId::Listening(ListenerId { id: _, _marker })) => 1,
+            SocketIdInner::Bound(BoundId::Connected(ConnId(_, _marker))) => 2,
+        }
+    }
+
+    fn get_id(&self) -> usize {
+        let Self(id) = self;
+        *match id {
+            SocketIdInner::Unbound(UnboundId(index, _marker)) => index,
+            SocketIdInner::Bound(BoundId::Listening(ListenerId { id, _marker })) => id,
+            SocketIdInner::Bound(BoundId::Connected(ConnId(index, _marker))) => index,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+enum SocketIdInner<I: Ip> {
     /// A bound UDP socket ID.
     Bound(BoundId<I>),
     /// An unbound UDP socket ID.
@@ -782,33 +807,70 @@ pub enum SocketId<I: Ip> {
 
 impl<I: Ip> From<BoundId<I>> for SocketId<I> {
     fn from(id: BoundId<I>) -> Self {
-        Self::Bound(id)
+        Self(SocketIdInner::Bound(id))
     }
 }
 
 impl<I: Ip> From<UnboundId<I>> for SocketId<I> {
     fn from(id: UnboundId<I>) -> Self {
-        Self::Unbound(id)
+        Self(SocketIdInner::Unbound(id))
     }
 }
 
 impl<I: Ip> From<ListenerId<I>> for SocketId<I> {
     fn from(id: ListenerId<I>) -> Self {
-        Self::Bound(id.into())
+        Self(SocketIdInner::Bound(id.into()))
     }
 }
 
 impl<I: Ip> From<ConnId<I>> for SocketId<I> {
     fn from(id: ConnId<I>) -> Self {
-        Self::Bound(id.into())
+        Self(SocketIdInner::Bound(id.into()))
+    }
+}
+
+/// A connected socket was expected.
+#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+pub struct ExpectedConnError;
+/// An unbound socket was expected.
+#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+pub struct ExpectedUnboundError;
+
+impl<I: Ip> TryFrom<BoundId<I>> for ConnId<I> {
+    type Error = ExpectedConnError;
+    fn try_from(id: BoundId<I>) -> Result<Self, Self::Error> {
+        match id {
+            BoundId::Connected(id) => Ok(id),
+            BoundId::Listening(_) => Err(ExpectedConnError),
+        }
+    }
+}
+
+impl<I: Ip> TryFrom<SocketId<I>> for UnboundId<I> {
+    type Error = ExpectedUnboundError;
+    fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
+        match id {
+            SocketIdInner::Unbound(id) => Ok(id),
+            SocketIdInner::Bound(_) => Err(ExpectedUnboundError),
+        }
+    }
+}
+
+impl<I: Ip> TryFrom<SocketId<I>> for ConnId<I> {
+    type Error = ExpectedConnError;
+    fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
+        match id {
+            SocketIdInner::Bound(id) => id.try_into(),
+            SocketIdInner::Unbound(_) => Err(ExpectedConnError),
+        }
     }
 }
 
 impl<I: IpExt, D: WeakId> From<SocketId<I>> for DatagramSocketId<Udp<I, D>> {
-    fn from(id: SocketId<I>) -> Self {
+    fn from(SocketId(id): SocketId<I>) -> Self {
         match id {
-            SocketId::Unbound(id) => Self::Unbound(id),
-            SocketId::Bound(id) => Self::Bound(id.into()),
+            SocketIdInner::Unbound(id) => Self::Unbound(id),
+            SocketIdInner::Bound(id) => Self::Bound(id.into()),
         }
     }
 }
@@ -828,9 +890,7 @@ pub trait NonSyncContext<I: IcmpIpExt> {
     /// from a previous socket with the same addresses, it may be the result of
     /// packet corruption on the network, it may have been injected by a
     /// malicious party, etc.
-    fn receive_icmp_error(&mut self, _id: BoundId<I>, _err: I::ErrorCode) {
-        log_unimplemented!((), "UdpContext::receive_icmp_error: not implemented");
-    }
+    fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode);
 }
 
 /// The non-synchronized context for UDP.
@@ -885,28 +945,14 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
 /// link-layer frames to reuse that buffer rather than needing to always
 /// allocate a new one.
 pub trait BufferNonSyncContext<I: IpExt, B: BufferMut>: NonSyncContext<I> {
-    /// Receives a UDP packet from a connection socket.
-    fn receive_udp_from_conn(
+    /// Receives a UDP packet on a socket.
+    fn receive_udp(
         &mut self,
-        _conn: ConnId<I>,
-        _src_ip: I::Addr,
-        _src_port: NonZeroU16,
-        _body: &B,
-    ) {
-        log_unimplemented!((), "BufferNonSyncContext::receive_udp_from_conn: not implemented");
-    }
-
-    /// Receives a UDP packet from a listener socket.
-    fn receive_udp_from_listen(
-        &mut self,
-        _listener: ListenerId<I>,
-        _src_ip: I::Addr,
-        _dst_ip: I::Addr,
-        _src_port: Option<NonZeroU16>,
-        _body: &B,
-    ) {
-        log_unimplemented!((), "BufferNonSyncContext::receive_udp_from_listen: not implemented");
-    }
+        id: SocketId<I>,
+        dst_ip: I::Addr,
+        src_addr: (I::Addr, Option<NonZeroU16>),
+        body: &B,
+    );
 }
 
 /// The non-synchronized context for UDP with a buffer.
@@ -1046,9 +1092,14 @@ impl<
                                 ip: ConnIpAddr { local: _, remote: (remote_ip, remote_port) },
                                 device: _,
                             },
-                        ) => ctx.receive_udp_from_conn(id, remote_ip.get(), remote_port, &buffer),
+                        ) => ctx.receive_udp(
+                            id.into(),
+                            dst_ip.get(),
+                            (remote_ip.get(), Some(remote_port)),
+                            &buffer,
+                        ),
                         LookupResult::Listener(id, _) => {
-                            ctx.receive_udp_from_listen(id, src_ip, dst_ip.get(), src_port, &buffer)
+                            ctx.receive_udp(id.into(), dst_ip.get(), (src_ip, src_port), &buffer)
                         }
                     }
                 }
@@ -1277,19 +1328,19 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         })
     }
 
-    fn get_udp_posix_reuse_port(&mut self, _ctx: &C, id: SocketId<I>) -> bool {
+    fn get_udp_posix_reuse_port(&mut self, _ctx: &C, SocketId(id): SocketId<I>) -> bool {
         self.with_sockets(|_sync_ctx, state| {
             let Sockets {
                 sockets: DatagramSockets { bound_state, bound: _, unbound },
                 lazy_port_alloc: _,
             } = state;
             match id {
-                SocketId::Unbound(id) => {
+                SocketIdInner::Unbound(id) => {
                     let UnboundSocketState { device: _, sharing, ip_options: _ } =
                         unbound.get(id.into()).expect("unbound UDP socket not found");
                     sharing
                 }
-                SocketId::Bound(id) => match id {
+                SocketIdInner::Bound(id) => match id {
                     BoundId::Listening(id) => {
                         let state = bound_state
                             .get(&<Listener as ConvertSocketTypeState<
@@ -1582,23 +1633,28 @@ impl<
     }
 }
 
-/// Sends a UDP packet on an existing connected socket.
+/// Sends a UDP packet on an existing socket.
 ///
 /// # Errors
 ///
+/// Returns an error if the socket is not connected or the packet cannot be sent.
 /// On error, the original `body` is returned unmodified so that it can be
 /// reused by the caller.
 ///
 /// # Panics
 ///
-/// Panics if `conn` is not a valid UDP connection identifier.
-pub fn send_udp_conn<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
+/// Panics if `id` is not a valid UDP socket identifier.
+pub fn send_udp<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    conn: ConnId<I>,
+    id: &SocketId<I>,
     body: B,
-) -> Result<(), (B, SendError)> {
+) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let conn: ConnId<I> = match id.clone().try_into() {
+        Ok(id) => id,
+        Err(e) => return Err((body, Either::Right(e))),
+    };
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, body)), conn),
         |(IpInvariant((sync_ctx, ctx, body)), conn)| {
@@ -1610,91 +1666,100 @@ pub fn send_udp_conn<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
                 .map_err(IpInvariant)
         },
     )
-    .map_err(|IpInvariant(a)| a)
+    .map_err(|IpInvariant((b, e))| (b, Either::Left(e)))
 }
 
-/// Sends a UDP packet using an existing connected socket but overriding the
-/// destination address.
-pub fn send_udp_conn_to<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    conn: ConnId<I>,
-    remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-    remote_port: NonZeroU16,
-    body: B,
-) -> Result<(), (B, SendToError)> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), conn, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
-            BufferSocketHandler::<Ipv4, _, _>::send_udp_conn_to(
-                sync_ctx,
-                ctx,
-                conn,
-                remote_ip,
-                remote_port,
-                body,
-            )
-            .map_err(IpInvariant)
-        },
-        |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
-            BufferSocketHandler::<Ipv6, _, _>::send_udp_conn_to(
-                sync_ctx,
-                ctx,
-                conn,
-                remote_ip,
-                remote_port,
-                body,
-            )
-            .map_err(IpInvariant)
-        },
-    )
-    .map_err(|IpInvariant(e)| e)
-}
-
-/// Send a UDP packet on an existing listener.
+/// Sends a UDP packet to the provided destination address.
 ///
-/// `send_udp_listener` sends a UDP packet on an existing listener.
+/// If this is called with an unbound socket, the socket will be implicitly
+/// bound. If that succeeds, the ID for the new socket is returned.
+///
+/// # Errors
+///
+/// Returns an error if the socket is unbound and connecting fails, or if the
+/// packet could not be sent. If the socket is unbound and connecting succeeds
+/// but sending fails, the socket remains connected.
 ///
 /// # Panics
 ///
-/// `send_udp_listener` panics if `listener` is not associated with a listener
-/// for this IP version.
-pub fn send_udp_listener<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
+/// Panics if `id` is not a valid UDP socket identifier.
+pub fn send_udp_to<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    listener: ListenerId<I>,
+    id: &SocketId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
     body: B,
-) -> Result<(), (B, SendToError)> {
+) -> Result<Option<SocketId<I>>, (B, Either<LocalAddressError, (Option<SocketId<I>>, SendToError)>)>
+{
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), listener, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
-            BufferSocketHandler::<Ipv4, _, _>::send_udp_listener(
-                sync_ctx,
-                ctx,
-                listener,
-                remote_ip,
-                remote_port,
-                body,
-            )
-            .map_err(IpInvariant)
-        },
-        |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
-            BufferSocketHandler::<Ipv6, _, _>::send_udp_listener(
-                sync_ctx,
-                ctx,
-                listener,
-                remote_ip,
-                remote_port,
-                body,
-            )
-            .map_err(IpInvariant)
-        },
-    )
-    .map_err(|IpInvariant(e)| e)
+    let SocketId(id) = id.clone();
+    let (id, new_id) = match id {
+        SocketIdInner::Unbound(id) => {
+            match listen_udp_unbound(&mut sync_ctx, ctx, id, None, None) {
+                Ok(listen) => (BoundId::Listening(listen.clone()), Some(listen.into())),
+                Err(e) => return Err((body, Either::Left(e))),
+            }
+        }
+        SocketIdInner::Bound(id) => (id, None),
+    };
+
+    let r = match id {
+        BoundId::Connected(conn) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), conn, remote_ip),
+            |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
+                BufferSocketHandler::<Ipv4, _, _>::send_udp_conn_to(
+                    sync_ctx,
+                    ctx,
+                    conn,
+                    remote_ip,
+                    remote_port,
+                    body,
+                )
+                .map_err(IpInvariant)
+            },
+            |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
+                BufferSocketHandler::<Ipv6, _, _>::send_udp_conn_to(
+                    sync_ctx,
+                    ctx,
+                    conn,
+                    remote_ip,
+                    remote_port,
+                    body,
+                )
+                .map_err(IpInvariant)
+            },
+        ),
+        BoundId::Listening(listener) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), listener, remote_ip),
+            |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
+                BufferSocketHandler::<Ipv4, _, _>::send_udp_listener(
+                    sync_ctx,
+                    ctx,
+                    listener,
+                    remote_ip,
+                    remote_port,
+                    body,
+                )
+                .map_err(IpInvariant)
+            },
+            |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
+                BufferSocketHandler::<Ipv6, _, _>::send_udp_listener(
+                    sync_ctx,
+                    ctx,
+                    listener,
+                    remote_ip,
+                    remote_port,
+                    body,
+                )
+                .map_err(IpInvariant)
+            },
+        ),
+    };
+    match r {
+        Ok(()) => Ok(new_id),
+        Err(IpInvariant((body, e))) => Err((body, Either::Right((new_id, e)))),
+    }
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
@@ -1765,48 +1830,39 @@ impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
     }
 }
 
+fn listen_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
+    sync_ctx: &mut Locked<&SyncCtx<C>, Unlocked>,
+    ctx: &mut C,
+    id: UnboundId<I>,
+    addr: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
+    port: Option<NonZeroU16>,
+) -> Result<ListenerId<I>, LocalAddressError> {
+    I::map_ip::<_, Result<_, _>>(
+        (IpInvariant((sync_ctx, ctx, port)), id, addr),
+        |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
+            SocketHandler::<Ipv4, _>::listen_udp(sync_ctx, ctx, id, addr, port)
+        },
+        |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
+            SocketHandler::<Ipv6, _>::listen_udp(sync_ctx, ctx, id, addr, port)
+        },
+    )
+}
+
 /// Creates an unbound UDP socket.
 ///
-/// `create_udp_unbound` creates a new unbound UDP socket and returns an
-/// identifier for it. The ID can be used to connect the socket to a remote
-/// address or to listen for incoming packets.
-pub fn create_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-) -> UnboundId<I> {
+/// `create_udp` creates a new UDP socket and returns an identifier for it.
+pub fn create_udp<I: IpExt, C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId<I> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
+    UnboundId::into(I::map_ip(
         IpInvariant(&mut sync_ctx),
         |IpInvariant(sync_ctx)| SocketHandler::<Ipv4, _>::create_udp_unbound(sync_ctx),
         |IpInvariant(sync_ctx)| SocketHandler::<Ipv6, _>::create_udp_unbound(sync_ctx),
-    )
+    ))
 }
 
-/// Removes a socket that has been created but not bound.
+/// Connect a UDP socket
 ///
-/// `remove_udp_unbound` removes state for a socket that has been created
-/// but not bound.
-///
-/// # Panics if `id` is not a valid [`UnboundId`].
-pub fn remove_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: UnboundId<I>,
-) {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::remove_udp_unbound(sync_ctx, ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::remove_udp_unbound(sync_ctx, ctx, id)
-        },
-    )
-}
-
-/// Create a UDP connection.
-///
-/// `connect_udp` binds `conn` as a connection to the remote address and port.
+/// `connect_udp` binds `id` as a connection to the remote address and port.
 /// It is also bound to a local address and port, meaning that packets sent on
 /// this connection will always come from that address and port. The local
 /// address will be chosen based on the route to the remote address, and the
@@ -1821,6 +1877,7 @@ pub fn remove_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
 ///   the request (e.g., `local_ip` is specified but there are no available
 ///   local ports for that address)
 /// - If there is no route to `remote_ip`
+/// - If `id` belongs to an already-connected socket
 ///
 /// # Panics
 ///
@@ -1828,101 +1885,118 @@ pub fn remove_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
 pub fn connect_udp<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: UnboundId<I>,
+    id: &SocketId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
-) -> Result<ConnId<I>, SockCreationError> {
+) -> Result<SocketId<I>, Either<SockCreationError, ConnectListenerError>> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::<Ipv4, _>::connect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
+    let SocketId(id) = id.clone();
+    match id {
+        SocketIdInner::Unbound(id) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
+            |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+                SocketHandler::<Ipv4, _>::connect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
+                    .map_err(IpInvariant)
+            },
+            |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+                SocketHandler::<Ipv6, _>::connect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
+                    .map_err(IpInvariant)
+            },
+        )
+        .map(ConnId::into)
+        .map_err(|IpInvariant(e)| Either::Left(e)),
+        SocketIdInner::Bound(BoundId::Listening(id)) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
+            |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+                SocketHandler::<Ipv4, _>::connect_udp_listener(
+                    sync_ctx,
+                    ctx,
+                    id,
+                    remote_ip,
+                    remote_port,
+                )
                 .map_err(IpInvariant)
-        },
-        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::<Ipv6, _>::connect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
+            },
+            |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+                SocketHandler::<Ipv6, _>::connect_udp_listener(
+                    sync_ctx,
+                    ctx,
+                    id,
+                    remote_ip,
+                    remote_port,
+                )
                 .map_err(IpInvariant)
-        },
-    )
-    .map_err(|IpInvariant(a)| a)
+            },
+        )
+        .map(ConnId::into)
+        .map_err(|IpInvariant(e)| Either::Right(e)),
+        SocketIdInner::Bound(BoundId::Connected(id)) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
+            |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+                SocketHandler::<Ipv4, _>::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
+                    .map_err(IpInvariant)
+            },
+            |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+                SocketHandler::<Ipv6, _>::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
+                    .map_err(IpInvariant)
+            },
+        )
+        .map(|()| id.into())
+        .map_err(|IpInvariant(e)| Either::Right(e)),
+    }
 }
 
-/// Sets the device to be bound to for an unbound socket.
+/// Sets the bound device for a socket.
+///
+/// Sets the device to be used for sending and receiving packets for a socket.
+/// If the socket is not currently bound to a local address and port, the device
+/// will be used when binding.
 ///
 /// # Panics
 ///
-/// `set_unbound_udp_device` panics if `id` is not a valid [`UnboundId`].
-pub fn set_unbound_udp_device<I: IpExt, C: crate::NonSyncContext>(
+/// Panics if `id` is not a valid [`SocketId`].
+pub fn set_udp_device<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: UnboundId<I>,
-    device_id: Option<&DeviceId<C>>,
-) {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-            SocketHandler::<Ipv4, _>::set_unbound_udp_device(sync_ctx, ctx, id, device_id)
-        },
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-            SocketHandler::<Ipv6, _>::set_unbound_udp_device(sync_ctx, ctx, id, device_id)
-        },
-    )
-}
-
-/// Sets the device the specified listening socket is bound to.
-///
-/// Updates the socket state to set the bound-to device if one is provided, or
-/// to remove any device binding if not.
-///
-/// # Panics
-///
-/// `set_listener_udp_device` panics if `id` is not a valid [`ListenerId`].
-pub fn set_listener_udp_device<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-    device_id: Option<&DeviceId<C>>,
-) -> Result<(), LocalAddressError> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-            SocketHandler::<Ipv4, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
-        },
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-            SocketHandler::<Ipv6, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
-        },
-    )
-}
-
-/// Sets the device the specified connected socket is bound to.
-///
-/// Updates the socket state to set the bound-to device if one is provided, or
-/// to remove any device binding if not.
-///
-/// # Panics
-///
-/// `set_conn_udp_device` panics if `id` is not a valid [`ConnId`].
-pub fn set_conn_udp_device<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ConnId<I>,
+    id: &SocketId<I>,
     device_id: Option<&DeviceId<C>>,
 ) -> Result<(), SocketError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-            SocketHandler::<Ipv4, _>::set_conn_udp_device(sync_ctx, ctx, id, device_id)
-                .map_err(IpInvariant)
-        },
-        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-            SocketHandler::<Ipv6, _>::set_conn_udp_device(sync_ctx, ctx, id, device_id)
-                .map_err(IpInvariant)
-        },
-    )
-    .map_err(|IpInvariant(a)| a)
+    let SocketId(id) = id.clone();
+
+    match id {
+        SocketIdInner::Unbound(id) => Ok(I::map_ip(
+            (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
+            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+                SocketHandler::<Ipv4, _>::set_unbound_udp_device(sync_ctx, ctx, id, device_id)
+            },
+            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+                SocketHandler::<Ipv6, _>::set_unbound_udp_device(sync_ctx, ctx, id, device_id)
+            },
+        )),
+        SocketIdInner::Bound(BoundId::Listening(id)) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
+            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+                SocketHandler::<Ipv4, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
+            },
+            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+                SocketHandler::<Ipv6, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
+            },
+        )
+        .map_err(LocalAddressError::into),
+        SocketIdInner::Bound(BoundId::Connected(id)) => I::map_ip::<_, Result<_, _>>(
+            (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
+            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+                SocketHandler::<Ipv4, _>::set_conn_udp_device(sync_ctx, ctx, id, device_id)
+                    .map_err(IpInvariant)
+            },
+            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+                SocketHandler::<Ipv6, _>::set_conn_udp_device(sync_ctx, ctx, id, device_id)
+                    .map_err(IpInvariant)
+            },
+        )
+        .map_err(|IpInvariant(a)| a),
+    }
 }
 
 /// Gets the device the specified socket is bound to.
@@ -1933,9 +2007,10 @@ pub fn set_conn_udp_device<I: IpExt, C: crate::NonSyncContext>(
 pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
 ) -> Option<WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<WeakDeviceId<C>>>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -1950,17 +2025,22 @@ pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
 
 /// Sets the POSIX `SO_REUSEPORT` option for the specified socket.
 ///
+/// # Errors
+///
+/// Returns an error if the socket is already bound.
+///
 /// # Panics
 ///
-/// `set_udp_posix_reuse_port` panics if `id` is not a valid `UnboundId`.
+/// `set_udp_posix_reuse_port` panics if `id` is not a valid `SocketId`.
 pub fn set_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: UnboundId<I>,
+    id: &SocketId<I>,
     reuse_port: bool,
-) {
+) -> Result<(), ExpectedUnboundError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
+    let id: UnboundId<I> = id.clone().try_into()?;
+    Ok(I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, reuse_port)), id),
         |(IpInvariant((sync_ctx, ctx, reuse_port)), id)| {
             SocketHandler::<Ipv4, _>::set_udp_posix_reuse_port(sync_ctx, ctx, id, reuse_port)
@@ -1968,20 +2048,21 @@ pub fn set_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
         |(IpInvariant((sync_ctx, ctx, reuse_port)), id)| {
             SocketHandler::<Ipv6, _>::set_udp_posix_reuse_port(sync_ctx, ctx, id, reuse_port)
         },
-    )
+    ))
 }
 
 /// Gets the POSIX `SO_REUSEPORT` option for the specified socket.
 ///
 /// # Panics
 ///
-/// Panics if `id` is not a valid `UdpSocketId`.
+/// Panics if `id` is not a valid `SocketId`.
 pub fn get_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
 ) -> bool {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     let IpInvariant(reuse_port) = I::map_ip::<_, IpInvariant<bool>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2004,12 +2085,13 @@ pub fn get_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
 pub fn set_udp_multicast_membership<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     multicast_group: MulticastAddr<I::Addr>,
     interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, want_membership)), id, multicast_group, interface),
         |(IpInvariant((sync_ctx, ctx, want_membership)), id, multicast_group, interface)| {
@@ -2045,10 +2127,11 @@ pub fn set_udp_multicast_membership<I: IpExt, C: crate::NonSyncContext>(
 pub fn set_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     unicast_hop_limit: Option<NonZeroU8>,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, unicast_hop_limit)), id),
         |(IpInvariant((sync_ctx, ctx, unicast_hop_limit)), id)| {
@@ -2077,10 +2160,11 @@ pub fn set_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 pub fn set_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     multicast_hop_limit: Option<NonZeroU8>,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, multicast_hop_limit)), id),
         |(IpInvariant((sync_ctx, ctx, multicast_hop_limit)), id)| {
@@ -2106,9 +2190,10 @@ pub fn set_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 pub fn get_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
 ) -> NonZeroU8 {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     let IpInvariant(hop_limit) = I::map_ip::<_, IpInvariant<NonZeroU8>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2128,9 +2213,10 @@ pub fn get_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 pub fn get_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
 ) -> NonZeroU8 {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id = id.clone();
     let IpInvariant(hop_limit) = I::map_ip::<_, IpInvariant<NonZeroU8>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2143,65 +2229,27 @@ pub fn get_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
     hop_limit
 }
 
-/// Connects an already existing UDP socket to a remote destination.
-///
-/// Replaces a previously created UDP socket indexed by the [`ListenerId`]
-/// `id`.  It returns the new connected socket ID on success. On failure, an
-/// error status is returned, along with a replacement `ListenerId` that
-/// should be used in place of `id` for future operations.
-///
-/// # Panics
-///
-/// `connect_udp_listener` panics if `id` is not a valid `ListenerId`.
-pub fn connect_udp_listener<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-    remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-    remote_port: NonZeroU16,
-) -> Result<ConnId<I>, ConnectListenerError> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::<Ipv4, _>::connect_udp_listener(
-                sync_ctx,
-                ctx,
-                id,
-                remote_ip,
-                remote_port,
-            )
-            .map_err(IpInvariant)
-        },
-        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::<Ipv6, _>::connect_udp_listener(
-                sync_ctx,
-                ctx,
-                id,
-                remote_ip,
-                remote_port,
-            )
-            .map_err(IpInvariant)
-        },
-    )
-    .map_err(|IpInvariant(e)| e)
-}
-
 /// Disconnects a connected UDP socket.
 ///
 /// `disconnect_udp_connected` removes an existing connected socket and replaces
 /// it with a listening socket bound to the same local address and port.
 ///
+/// # Errors
+///
+/// Returns an error if the socket is not connected.
+///
 /// # Panics
 ///
-/// Panics if `id` is not a valid `ConnId`.
+/// Panics if `id` is not a valid `SocketId`.
 pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: ConnId<I>,
-) -> ListenerId<I> {
+    id: &SocketId<I>,
+) -> Result<SocketId<I>, ExpectedConnError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
+    let id: ConnId<I> = id.clone().try_into()?;
+
+    let id: ListenerId<I> = I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             SocketHandler::<Ipv4, _>::disconnect_udp_connected(sync_ctx, ctx, id)
@@ -2209,50 +2257,29 @@ pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
         |(IpInvariant((sync_ctx, ctx)), id)| {
             SocketHandler::<Ipv6, _>::disconnect_udp_connected(sync_ctx, ctx, id)
         },
-    )
-}
-
-/// Disconnects an already existing UDP socket and connects it to a new remote
-/// destination.
-///
-/// # Panics
-///
-/// `reconnect_udp` panics if `id` is not a valid `ConnId`.
-pub fn reconnect_udp<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ConnId<I>,
-    remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
-    remote_port: NonZeroU16,
-) -> Result<(), ConnectListenerError> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::<Ipv4, _>::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
-                .map_err(IpInvariant)
-        },
-        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::<Ipv6, _>::reconnect_udp(sync_ctx, ctx, id, remote_ip, remote_port)
-                .map_err(IpInvariant)
-        },
-    )
-    .map_err(IpInvariant::into_inner)
+    );
+    Ok(id.into())
 }
 
 /// Shuts down a socket for reading and/or writing.
 ///
+/// # Errors
+///
+/// Returns an error if the socket is not connected.
+///
 /// # Panics
 ///
-/// Panics if `id` is not a valid `ConnId`.
+/// Panics if `id` is not a valid `SocketId`.
 pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
-    id: ConnId<I>,
+    id: &SocketId<I>,
     which: ShutdownType,
-) {
+) -> Result<(), ExpectedConnError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
+    let id: ConnId<I> = id.clone().try_into()?;
+
+    Ok(I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, which)), id),
         |(IpInvariant((sync_ctx, ctx, which)), id)| {
             SocketHandler::<Ipv4, _>::shutdown(sync_ctx, ctx, id, which)
@@ -2260,20 +2287,25 @@ pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
         |(IpInvariant((sync_ctx, ctx, which)), id)| {
             SocketHandler::<Ipv6, _>::shutdown(sync_ctx, ctx, id, which)
         },
-    )
+    ))
 }
 
 /// Get the shutdown state for a socket.
 ///
+/// If the socket is not connected, or if `shutdown` was not called on it,
+/// returns `None`.
+///
 /// # Panics
 ///
-/// Panics if `id` is not a valid `ConnId`.
+/// Panics if `id` is not a valid `SocketId`.
 pub fn get_shutdown<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
-    id: ConnId<I>,
+    id: &SocketId<I>,
 ) -> Option<ShutdownType> {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let id: ConnId<I> = id.clone().try_into().ok_checked::<ExpectedConnError>()?;
+
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2303,12 +2335,13 @@ pub enum SocketInfo<A: IpAddress, D> {
 pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
 ) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
+    let SocketId(id) = id.clone();
     match id {
-        SocketId::Unbound(_) => SocketInfo::Unbound,
-        SocketId::Bound(BoundId::Connected(id)) => SocketInfo::Connected(I::map_ip(
+        SocketIdInner::Unbound(_) => SocketInfo::Unbound,
+        SocketIdInner::Bound(BoundId::Connected(id)) => SocketInfo::Connected(I::map_ip(
             (IpInvariant((&mut sync_ctx, ctx)), id),
             |(IpInvariant((sync_ctx, ctx)), id)| {
                 SocketHandler::<Ipv4, _>::get_udp_conn_info(sync_ctx, ctx, id)
@@ -2317,7 +2350,7 @@ pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
                 SocketHandler::<Ipv6, _>::get_udp_conn_info(sync_ctx, ctx, id)
             },
         )),
-        SocketId::Bound(BoundId::Listening(id)) => SocketInfo::Listener(I::map_ip(
+        SocketIdInner::Bound(BoundId::Listening(id)) => SocketInfo::Listener(I::map_ip(
             (IpInvariant((&mut sync_ctx, ctx)), id),
             |(IpInvariant((sync_ctx, ctx)), id)| {
                 SocketHandler::<Ipv4, _>::get_udp_listener_info(sync_ctx, ctx, id)
@@ -2329,91 +2362,85 @@ pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
     }
 }
 
-/// Removes a previously registered UDP connection.
-///
-/// `remove_udp_conn` removes a previously registered UDP connection indexed by
-/// the [`UpConnId`] `id`. It returns the [`ConnInfo`] information that was
-/// associated with that UDP connection.
+/// Removes a socket that was previously created.
 ///
 /// # Panics
 ///
-/// `remove_udp_conn` panics if `id` is not a valid `ConnId`.
-pub fn remove_udp_conn<I: IpExt, C: crate::NonSyncContext>(
+/// Panics if `id` is not a valid [`SocketId`].
+pub fn remove_udp<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: ConnId<I>,
-) -> ConnInfo<I::Addr, WeakDeviceId<C>> {
+    id: SocketId<I>,
+) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::remove_udp_conn(sync_ctx, ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::remove_udp_conn(sync_ctx, ctx, id)
-        },
-    )
+    let SocketId(id) = id.clone();
+    match id {
+        SocketIdInner::Unbound(id) => {
+            let () = I::map_ip(
+                (IpInvariant((&mut sync_ctx, ctx)), id),
+                |(IpInvariant((sync_ctx, ctx)), id)| {
+                    SocketHandler::<Ipv4, _>::remove_udp_unbound(sync_ctx, ctx, id)
+                },
+                |(IpInvariant((sync_ctx, ctx)), id)| {
+                    SocketHandler::<Ipv6, _>::remove_udp_unbound(sync_ctx, ctx, id)
+                },
+            );
+            SocketInfo::Unbound
+        }
+        SocketIdInner::Bound(BoundId::Listening(id)) => SocketInfo::Listener(I::map_ip(
+            (IpInvariant((&mut sync_ctx, ctx)), id),
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv4, _>::remove_udp_listener(sync_ctx, ctx, id)
+            },
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv6, _>::remove_udp_listener(sync_ctx, ctx, id)
+            },
+        )),
+        SocketIdInner::Bound(BoundId::Connected(id)) => SocketInfo::Connected(I::map_ip(
+            (IpInvariant((&mut sync_ctx, ctx)), id),
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv4, _>::remove_udp_conn(sync_ctx, ctx, id)
+            },
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv6, _>::remove_udp_conn(sync_ctx, ctx, id)
+            },
+        )),
+    }
 }
 
 /// Use an existing socket to listen for incoming UDP packets.
 ///
-/// `listen_udp` converts `id` into a listening socket and registers `listener`
-/// as a listener for incoming UDP packets on the given `port`. If `addr` is
-/// `None`, the listener is a "wildcard listener", and is bound to all local
-/// addresses. See the `transport` module documentation for more details.
+/// `listen_udp` converts `id` into a listening socket and registers the new
+/// socket as a listener for incoming UDP packets on the given `port`. If `addr`
+/// is `None`, the listener is a "wildcard listener", and is bound to all local
+/// addresses. See the [`crate::transport`] module documentation for more
+/// details.
 ///
 /// If `addr` is `Some``, and `addr` is already bound on the given port (either
 /// by a listener or a connection), `listen_udp` will fail. If `addr` is `None`,
 /// and a wildcard listener is already bound to the given port, `listen_udp`
 /// will fail.
 ///
+/// # Errors
+///
+/// Returns an error if the socket is not currently unbound.
+///
 /// # Panics
 ///
-/// `listen_udp` panics if `listener` is already in use, or if `id` is not a
-/// valid [`UnboundId`].
+/// `listen_udp` panics if `id` is not a valid [`SocketId`].
 pub fn listen_udp<I: IpExt, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: UnboundId<I>,
+    id: &SocketId<I>,
     addr: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
     port: Option<NonZeroU16>,
-) -> Result<ListenerId<I>, LocalAddressError> {
+) -> Result<SocketId<I>, Either<ExpectedUnboundError, LocalAddressError>> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut sync_ctx, ctx, port)), id, addr),
-        |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
-            SocketHandler::<Ipv4, _>::listen_udp(sync_ctx, ctx, id, addr, port)
-        },
-        |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
-            SocketHandler::<Ipv6, _>::listen_udp(sync_ctx, ctx, id, addr, port)
-        },
-    )
-}
+    let id: UnboundId<I> = id.clone().try_into().map_err(Either::Left)?;
 
-/// Removes a previously registered UDP listener.
-///
-/// `remove_udp_listener` removes a previously registered UDP listener indexed
-/// by the [`ListenerId`] `id`. It returns the [`ListenerInfo`]
-/// information that was associated with that UDP listener.
-///
-/// # Panics
-///
-/// `remove_listener` panics if `id` is not a valid `ListenerId`.
-pub fn remove_udp_listener<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-) -> ListenerInfo<I::Addr, WeakDeviceId<C>> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::remove_udp_listener(sync_ctx, ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::remove_udp_listener(sync_ctx, ctx, id)
-        },
-    )
+    listen_udp_unbound(&mut sync_ctx, ctx, id, addr, port)
+        .map_err(Either::Right)
+        .map(|id: ListenerId<I>| SocketId::from(id))
 }
 
 #[cfg(test)]
@@ -2484,7 +2511,7 @@ mod tests {
     /// An ICMP error delivered to a [`FakeUdpCtx`].
     #[derive(Debug, Eq, PartialEq)]
     struct IcmpError<I: TestIpExt> {
-        id: BoundId<I>,
+        id: SocketId<I>,
         err: I::ErrorCode,
     }
 
@@ -2564,7 +2591,7 @@ mod tests {
     }
 
     impl<I: TestIpExt> NonSyncContext<I> for FakeUdpNonSyncCtx<I> {
-        fn receive_icmp_error(&mut self, id: BoundId<I>, err: I::ErrorCode) {
+        fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode) {
             self.state_mut().icmp_errors.push(IcmpError { id, err })
         }
     }
@@ -2610,31 +2637,30 @@ mod tests {
     }
 
     impl<I: TestIpExt, B: BufferMut> BufferNonSyncContext<I, B> for FakeUdpNonSyncCtx<I> {
-        fn receive_udp_from_conn(
+        fn receive_udp(
             &mut self,
-            conn: ConnId<I>,
-            _src_ip: <I as Ip>::Addr,
-            _src_port: NonZeroU16,
+            id: SocketId<I>,
+            dst_ip: I::Addr,
+            (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {
-            self.state_mut().conn_data.push(ConnData { conn, body: body.as_ref().to_owned() })
-        }
-
-        fn receive_udp_from_listen(
-            &mut self,
-            listener: ListenerId<I>,
-            src_ip: <I as Ip>::Addr,
-            dst_ip: <I as Ip>::Addr,
-            src_port: Option<NonZeroU16>,
-            body: &B,
-        ) {
-            self.state_mut().listen_data.push(ListenData {
-                listener,
-                src_ip,
-                dst_ip,
-                src_port,
-                body: body.as_ref().to_owned(),
-            })
+            let SocketId(id) = id;
+            let FakeNonSyncCtxState { conn_data, listen_data, icmp_errors: _ } = self.state_mut();
+            match id {
+                SocketIdInner::Unbound(_) => unreachable!("unbound sockets can't receive"),
+                SocketIdInner::Bound(BoundId::Connected(conn)) => {
+                    conn_data.push(ConnData { conn, body: body.as_ref().to_owned() })
+                }
+                SocketIdInner::Bound(BoundId::Listening(listener)) => {
+                    listen_data.push(ListenData {
+                        listener,
+                        src_ip,
+                        dst_ip,
+                        src_port,
+                        body: body.as_ref().to_owned(),
+                    })
+                }
+            }
         }
     }
 

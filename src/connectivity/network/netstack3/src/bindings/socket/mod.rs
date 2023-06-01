@@ -14,6 +14,7 @@ pub(crate) mod worker;
 use std::{convert::Infallible as Never, num::NonZeroU64};
 
 use const_unwrap::const_unwrap_option;
+use either::Either;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix::Errno;
 use fidl_fuchsia_posix_socket as psocket;
@@ -496,6 +497,21 @@ mod testutil {
 pub(crate) trait IntoErrno {
     /// Returns the most equivalent POSIX error code for `self`.
     fn into_errno(self) -> Errno;
+}
+
+impl IntoErrno for Errno {
+    fn into_errno(self) -> Errno {
+        self
+    }
+}
+
+impl<A: IntoErrno, B: IntoErrno> IntoErrno for Either<A, B> {
+    fn into_errno(self) -> Errno {
+        match self {
+            Either::Left(a) => a.into_errno(),
+            Either::Right(b) => b.into_errno(),
+        }
+    }
 }
 
 impl IntoErrno for LocalAddressError {

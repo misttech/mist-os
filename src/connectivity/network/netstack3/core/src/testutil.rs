@@ -848,9 +848,23 @@ impl FakeNonSyncCtx {
     }
 }
 
-impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {}
+impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {
+    fn receive_icmp_error(&mut self, _id: udp::SocketId<I>, _err: <I as IcmpIpExt>::ErrorCode) {
+        unimplemented!()
+    }
+}
 
-impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for FakeNonSyncCtx {}
+impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for FakeNonSyncCtx {
+    fn receive_udp(
+        &mut self,
+        _id: udp::SocketId<I>,
+        _dst_ip: <I>::Addr,
+        _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
+        _body: &B,
+    ) {
+        unimplemented!()
+    }
+}
 
 impl<I: IcmpIpExt> IcmpContext<I> for FakeNonSyncCtx {
     fn receive_icmp_error(&mut self, _conn: IcmpConnId<I>, _seq_num: u16, _err: I::ErrorCode) {
