@@ -2286,6 +2286,50 @@ pub fn get_shutdown<I: IpExt, C: crate::NonSyncContext>(
     )
 }
 
+/// Information about the addresses for a socket.
+pub enum SocketInfo<A: IpAddress, D> {
+    /// The socket was not bound.
+    Unbound,
+    /// The socket was listening.
+    Listener(ListenerInfo<A, D>),
+    /// The socket was connected.
+    Connected(ConnInfo<A, D>),
+}
+
+/// Gets the [`SocketInfo`] associated with the UDP socket referenced by `id`.
+///
+/// # Panics
+///
+/// `get_udp_info` panics if `id` is not a valid `SocketId`.
+pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: SocketId<I>,
+) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    match id {
+        SocketId::Unbound(_) => SocketInfo::Unbound,
+        SocketId::Bound(BoundId::Connected(id)) => SocketInfo::Connected(I::map_ip(
+            (IpInvariant((&mut sync_ctx, ctx)), id),
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv4, _>::get_udp_conn_info(sync_ctx, ctx, id)
+            },
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv6, _>::get_udp_conn_info(sync_ctx, ctx, id)
+            },
+        )),
+        SocketId::Bound(BoundId::Listening(id)) => SocketInfo::Listener(I::map_ip(
+            (IpInvariant((&mut sync_ctx, ctx)), id),
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv4, _>::get_udp_listener_info(sync_ctx, ctx, id)
+            },
+            |(IpInvariant((sync_ctx, ctx)), id)| {
+                SocketHandler::<Ipv6, _>::get_udp_listener_info(sync_ctx, ctx, id)
+            },
+        )),
+    }
+}
+
 /// Removes a previously registered UDP connection.
 ///
 /// `remove_udp_conn` removes a previously registered UDP connection indexed by
@@ -2308,28 +2352,6 @@ pub fn remove_udp_conn<I: IpExt, C: crate::NonSyncContext>(
         },
         |(IpInvariant((sync_ctx, ctx)), id)| {
             SocketHandler::<Ipv6, _>::remove_udp_conn(sync_ctx, ctx, id)
-        },
-    )
-}
-
-/// Gets the [`ConnInfo`] associated with the UDP connection referenced by [`id`].
-///
-/// # Panics
-///
-/// `get_udp_conn_info` panics if `id` is not a valid `ConnId`.
-pub fn get_udp_conn_info<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ConnId<I>,
-) -> ConnInfo<I::Addr, WeakDeviceId<C>> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::get_udp_conn_info(sync_ctx, ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::get_udp_conn_info(sync_ctx, ctx, id)
         },
     )
 }
@@ -2391,29 +2413,6 @@ pub fn remove_udp_listener<I: IpExt, C: crate::NonSyncContext>(
         },
         |(IpInvariant((sync_ctx, ctx)), id)| {
             SocketHandler::<Ipv6, _>::remove_udp_listener(sync_ctx, ctx, id)
-        },
-    )
-}
-
-/// Gets the [`ListenerInfo`] associated with the UDP listener referenced by
-/// [`id`].
-///
-/// # Panics
-///
-/// `get_udp_conn_info` panics if `id` is not a valid `ListenerId`.
-pub fn get_udp_listener_info<I: IpExt, C: crate::NonSyncContext>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-) -> ListenerInfo<I::Addr, WeakDeviceId<C>> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::get_udp_listener_info(sync_ctx, ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::get_udp_listener_info(sync_ctx, ctx, id)
         },
     )
 }

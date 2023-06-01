@@ -8,7 +8,7 @@ use std::{
     convert::TryInto as _,
     fmt::Debug,
     marker::PhantomData,
-    num::{NonZeroU16, NonZeroU64, NonZeroU8,  TryFromIntError},
+    num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
     ops::ControlFlow,
     sync::Arc,
 };
@@ -50,8 +50,8 @@ use crate::bindings::{
     },
     trace_duration,
     util::{
-        DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
-        TryIntoCoreWithContext, TryIntoFidlWithContext,
+        DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
+        TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
     },
     BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _, StaticCommonInfo,
 };
@@ -222,6 +222,15 @@ pub(crate) trait OptionFromU16: Sized {
     fn from_u16(_: u16) -> Option<Self>;
 }
 
+pub(crate) struct LocalAddress<I: Ip, D, L> {
+    address: Option<ZonedAddr<I::Addr, D>>,
+    identifier: Option<L>,
+}
+pub(crate) struct RemoteAddress<I: Ip, D, R> {
+    address: ZonedAddr<I::Addr, D>,
+    identifier: R,
+}
+
 /// An abstraction over transport protocols that allows generic manipulation of Core state.
 pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type CreateConnError: IntoErrno;
@@ -232,6 +241,11 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SetMulticastMembershipError: IntoErrno;
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: OptionFromU16 + Into<u16> + Send;
+    type SocketInfo<C: NonSyncContext>: IntoFidl<LocalAddress<I, WeakDeviceId<C>, Self::LocalIdentifier>>
+        + TryIntoFidl<
+            RemoteAddress<I, WeakDeviceId<C>, Self::RemoteIdentifier>,
+            Error = fposix::Errno,
+        >;
 
     fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::UnboundId;
 
@@ -286,22 +300,11 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: Self::ConnId,
     ) -> Option<ShutdownType>;
 
-    fn get_conn_info<C: NonSyncContext>(
+    fn get_socket_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::ConnId,
-    ) -> (
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::LocalIdentifier,
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::RemoteIdentifier,
-    );
-
-    fn get_listener_info<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C>>>, Self::LocalIdentifier);
+        id: SocketId<I, Self>,
+    ) -> Self::SocketInfo<C>;
 
     fn remove_conn<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -458,6 +461,7 @@ impl<I: IpExt> TransportState<I> for Udp {
     type SetMulticastMembershipError = SetMulticastMembershipError;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = NonZeroU16;
+    type SocketInfo<C: NonSyncContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
 
     fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::UnboundId {
         udp::create_udp_unbound(ctx)
@@ -528,29 +532,12 @@ impl<I: IpExt> TransportState<I> for Udp {
         udp::get_shutdown(sync_ctx, ctx, id)
     }
 
-    fn get_conn_info<C: NonSyncContext>(
+    fn get_socket_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
-        id: Self::ConnId,
-    ) -> (
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::LocalIdentifier,
-        ZonedAddr<I::Addr, WeakDeviceId<C>>,
-        Self::RemoteIdentifier,
-    ) {
-        let udp::ConnInfo { local_ip, local_port, remote_ip, remote_port } =
-            udp::get_udp_conn_info(sync_ctx, ctx, id);
-        (local_ip, local_port, remote_ip, remote_port)
-    }
-
-    fn get_listener_info<C: NonSyncContext>(
-        sync_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C>>>, Self::LocalIdentifier) {
-        let udp::ListenerInfo { local_ip, local_port } =
-            udp::get_udp_listener_info(sync_ctx, ctx, id);
-        (local_ip, local_port)
+        id: SocketId<I, Self>,
+    ) -> Self::SocketInfo<C> {
+        udp::get_udp_info(sync_ctx, ctx, id.into())
     }
 
     fn remove_conn<C: NonSyncContext>(
@@ -1603,29 +1590,21 @@ where
     ///
     /// [POSIX socket get_sock_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetSockName
     fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    messages: _,
+                    info: SocketControlInfo { _properties: _, state },
+                },
+        } = self;
+        let id = (&*state).into();
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match self.data.info.state {
-            SocketState::Unbound { .. } => {
-                return Err(fposix::Errno::Enotsock);
-            }
-            SocketState::BoundConnect { conn_id, .. } => {
-                let (local_ip, local_port, _, _): (
-                    _,
-                    _,
-                    ZonedAddr<I::Addr, _>,
-                    T::RemoteIdentifier,
-                ) = T::get_conn_info(sync_ctx, non_sync_ctx, conn_id);
-                (Some(local_ip), local_port.into()).try_into_fidl_with_ctx(&non_sync_ctx)
-            }
-            SocketState::BoundListen { listener_id } => {
-                let (local_ip, local_port) =
-                    T::get_listener_info(sync_ctx, non_sync_ctx, listener_id);
-                (local_ip, local_port.into()).try_into_fidl_with_ctx(&non_sync_ctx)
-            }
-        }
-        .map(SockAddr::into_sock_addr)
-        .map_err(IntoErrno::into_errno)
+
+        let l: LocalAddress<_, _, _> = T::get_socket_info(sync_ctx, non_sync_ctx, id).into_fidl();
+        l.try_into_fidl_with_ctx(non_sync_ctx).map(SockAddr::into_sock_addr)
     }
 
     /// Handles a [POSIX socket get_info request].
@@ -1649,28 +1628,24 @@ where
     ///
     /// [POSIX socket get_peer_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetPeerName
     fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
-        let mut ctx = self.ctx.clone();
+        let Self {
+            ctx,
+            data:
+                BindingData {
+                    peer_event: _,
+                    messages: _,
+                    info: SocketControlInfo { _properties: _, state },
+                },
+        } = self;
+        let id = (&*state).into();
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match self.data.info.state {
-            SocketState::Unbound { .. } => {
-                return Err(fposix::Errno::Enotsock);
-            }
-            SocketState::BoundListen { .. } => {
-                return Err(fposix::Errno::Enotconn);
-            }
-            SocketState::BoundConnect { conn_id, .. } => {
-                let (_, _, remote_ip, remote_port): (
-                    ZonedAddr<I::Addr, _>,
-                    T::LocalIdentifier,
-                    _,
-                    _,
-                ) = T::get_conn_info(sync_ctx, non_sync_ctx, conn_id);
-                (Some(remote_ip), remote_port.into())
-                    .try_into_fidl_with_ctx(&non_sync_ctx)
-                    .map(SockAddr::into_sock_addr)
-                    .map_err(IntoErrno::into_errno)
-            }
-        }
+
+        T::get_socket_info(sync_ctx, non_sync_ctx, id).try_into_fidl().and_then(
+            |r: RemoteAddress<_, _, _>| {
+                r.try_into_fidl_with_ctx(non_sync_ctx).map(SockAddr::into_sock_addr)
+            },
+        )
     }
 
     fn recv_msg(
@@ -2020,6 +1995,75 @@ where
     }
 }
 
+impl<I: Ip, D> IntoFidl<LocalAddress<I, D, NonZeroU16>> for udp::SocketInfo<I::Addr, D> {
+    fn into_fidl(self) -> LocalAddress<I, D, NonZeroU16> {
+        let (local_ip, local_port) = match self {
+            Self::Unbound => (None, None),
+            Self::Listener(udp::ListenerInfo { local_ip, local_port }) => {
+                (local_ip, Some(local_port))
+            }
+            Self::Connected(udp::ConnInfo {
+                local_ip,
+                local_port,
+                remote_ip: _,
+                remote_port: _,
+            }) => (Some(local_ip), Some(local_port)),
+        };
+        LocalAddress { address: local_ip, identifier: local_port }
+    }
+}
+
+impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, NonZeroU16>> for udp::SocketInfo<I::Addr, D> {
+    type Error = fposix::Errno;
+    fn try_into_fidl(self) -> Result<RemoteAddress<I, D, NonZeroU16>, Self::Error> {
+        match self {
+            Self::Unbound | Self::Listener(_) => Err(fposix::Errno::Enotconn),
+            Self::Connected(udp::ConnInfo {
+                local_ip: _,
+                local_port: _,
+                remote_ip,
+                remote_port,
+            }) => Ok(RemoteAddress { address: remote_ip, identifier: remote_port }),
+        }
+    }
+}
+
+impl<I: IpSockAddrExt, D, L: Into<u16>> TryIntoFidlWithContext<I::SocketAddress>
+    for LocalAddress<I, D, L>
+where
+    D: TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+{
+    type Error = fposix::Errno;
+
+    fn try_into_fidl_with_ctx<Ctx: crate::bindings::util::ConversionContext>(
+        self,
+        ctx: &Ctx,
+    ) -> Result<I::SocketAddress, Self::Error> {
+        let Self { address, identifier } = self;
+        (address, identifier.map_or(0, Into::into))
+            .try_into_fidl_with_ctx(ctx)
+            .map_err(IntoErrno::into_errno)
+    }
+}
+
+impl<I: IpSockAddrExt, D, R: Into<u16>> TryIntoFidlWithContext<I::SocketAddress>
+    for RemoteAddress<I, D, R>
+where
+    D: TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+{
+    type Error = fposix::Errno;
+
+    fn try_into_fidl_with_ctx<Ctx: crate::bindings::util::ConversionContext>(
+        self,
+        ctx: &Ctx,
+    ) -> Result<I::SocketAddress, Self::Error> {
+        let Self { address, identifier } = self;
+        (Some(address), identifier.into())
+            .try_into_fidl_with_ctx(ctx)
+            .map_err(IntoErrno::into_errno)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2313,12 +2357,12 @@ mod tests {
 
         // Verify that Alice has no local or peer addresses bound
         assert_eq!(
-            alice_socket.get_sock_name().await.unwrap().expect_err("alice getsockname fails"),
-            fposix::Errno::Enotsock
+            alice_socket.get_sock_name().await.unwrap().unwrap(),
+            A::new(None, 0).into_sock_addr(),
         );
         assert_eq!(
             alice_socket.get_peer_name().await.unwrap().expect_err("alice getpeername fails"),
-            fposix::Errno::Enotsock
+            fposix::Errno::Enotconn
         );
 
         // Setup Alice as a server, bound to LOCAL_ADDR:200

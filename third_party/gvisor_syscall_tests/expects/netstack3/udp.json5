@@ -59,8 +59,6 @@
                 "AllInetTests/UdpSocketTest.FIONREADZeroLengthPacket/*",
                 "AllInetTests/UdpSocketTest.FIONREADZeroLengthWriteShutdown/*",
                 "AllInetTests/UdpSocketTest.Fionread/*",
-                "AllInetTests/UdpSocketTest.Getpeername/*",
-                "AllInetTests/UdpSocketTest.Getsockname/*",
                 "AllInetTests/UdpSocketTest.ReadShutdownNonblockPendingData/*",
                 "AllInetTests/UdpSocketTest.RecvBufLimits/*",
                 "AllInetTests/UdpSocketTest.SoNoCheck/*",
