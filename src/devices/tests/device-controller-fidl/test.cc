@@ -87,6 +87,15 @@ TEST_F(DeviceControllerFidl, ControllerTest) {
     ASSERT_EQ(ZX_OK, result.status());
     ASSERT_EQ(sent_string, result.value().response.get());
   }
+
+  // Get the controller connection again.
+  {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    ASSERT_EQ(client->ConnectToController(std::move(endpoints->server)).status(), ZX_OK);
+
+    auto result = fidl::WireCall(endpoints->client)->GetTopologicalPath();
+    ASSERT_EQ(result->value()->path.get(), "/dev/sys/test/sample_driver");
+  }
 }
 
 TEST_F(DeviceControllerFidl, ControllerTestDfv2) {
@@ -156,5 +165,14 @@ TEST_F(DeviceControllerFidl, ControllerTestDfv2) {
     auto result = echo->EchoString(fidl::StringView::FromExternal(sent_string));
     ASSERT_EQ(ZX_OK, result.status());
     ASSERT_EQ(sent_string, result.value().response.get());
+  }
+
+  // Get the controller connection again.
+  {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    ASSERT_EQ(client->ConnectToController(std::move(endpoints->server)).status(), ZX_OK);
+
+    auto result = fidl::WireCall(endpoints->client)->GetTopologicalPath();
+    ASSERT_EQ(result->value()->path.get(), "/dev/sys/test/sample_driver");
   }
 }

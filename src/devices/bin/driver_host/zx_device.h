@@ -465,6 +465,8 @@ struct zx_device
   bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) override;
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override;
+  void ConnectToController(ConnectToControllerRequestView request,
+                           ConnectToControllerCompleter::Sync& completer) override;
   void Bind(BindRequestView request, BindCompleter::Sync& completer) override;
   void Rebind(RebindRequestView request, RebindCompleter::Sync& completer) override;
   void UnbindChildren(UnbindChildrenCompleter::Sync& completer) override;

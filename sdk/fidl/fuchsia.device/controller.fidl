@@ -132,6 +132,11 @@ protocol Controller {
         server zx.Handle:CHANNEL;
     });
 
+    /// Connect to the same Controller FIDL protocol.
+    ConnectToController(resource struct {
+        server server_end:Controller;
+    });
+
     /// Attempt to bind a driver to this device.
     /// + request `driver` This represents the suffix of a driver URL (e.g: "fvm.cm").
     ///            If this is non-empty, then the only drivers that will try to bind

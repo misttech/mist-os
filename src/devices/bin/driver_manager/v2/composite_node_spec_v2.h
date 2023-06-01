@@ -31,6 +31,10 @@ class CompositeNodeDeviceController : public fidl::WireServer<fuchsia_device::Co
                            ConnectToDeviceFidlCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
+  void ConnectToController(ConnectToControllerRequestView request,
+                           ConnectToControllerCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
   void Bind(BindRequestView request, BindCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }

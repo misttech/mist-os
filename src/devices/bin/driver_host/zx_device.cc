@@ -439,6 +439,13 @@ void zx_device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
   }
 }
 
+void zx_device::ConnectToController(ConnectToControllerRequestView request,
+                                    ConnectToControllerCompleter::Sync& completer) {
+  if (vnode.has_value()) {
+    vnode.value().ConnectToController(std::move(request->server));
+  }
+}
+
 void zx_device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
   zx_status_t status = device_bind(fbl::RefPtr(this), std::string(request->driver.get()).c_str());
   if (status != ZX_OK) {

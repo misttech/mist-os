@@ -27,6 +27,10 @@ class TestInterface : public devfs_fidl::DeviceInterface {
                            ConnectToDeviceFidlCompleter::Sync& completer) override {
     ZX_PANIC("Unimplemented");
   }
+  void ConnectToController(fuchsia_device::wire::ControllerConnectToControllerRequest* request,
+                           ConnectToControllerCompleter::Sync& completer) override {
+    ZX_PANIC("Unimplemented");
+  }
   void Bind(fuchsia_device::wire::ControllerBindRequest* request,
             BindCompleter::Sync& completer) override {
     ZX_PANIC("Unimplemented");

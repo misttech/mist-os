@@ -1002,6 +1002,11 @@ void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
   devfs_server_.ConnectToDeviceFidl(std::move(request->server));
 }
 
+void Device::ConnectToController(ConnectToControllerRequestView request,
+                                 ConnectToControllerCompleter::Sync& completer) {
+  devfs_server_.ConnectToController(std::move(request->server));
+}
+
 void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
   fidl::Arena arena;
   auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)

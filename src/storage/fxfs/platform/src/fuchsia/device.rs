@@ -542,6 +542,14 @@ impl BlockServer {
                 // TODO(https://fxbug.dev/103827): make it so.
                 self.handle_clone_request(server);
             }
+            VolumeAndNodeRequest::ConnectToController { server, control_handle: _ } => {
+                // This should serve *only* Controller, but it's a pain to write that without
+                // duplication.
+                //
+                // TODO(https://fxbug.dev/89873):  make it so.
+                // TODO(https://fxbug.dev/103827): make it so.
+                self.handle_clone_request(server.into_channel());
+            }
             VolumeAndNodeRequest::Bind { driver: _, responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }

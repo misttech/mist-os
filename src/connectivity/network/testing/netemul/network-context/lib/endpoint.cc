@@ -200,6 +200,9 @@ class NetworkDeviceImpl : public EndpointImpl,
 
   void ConnectToDeviceFidl(zx::channel server) override {}
 
+  void ConnectToController(
+      ::fidl::InterfaceRequest<::fuchsia::device::Controller> server) override {}
+
   void Bind(std::string driver, BindCallback callback) override {
     callback(fuchsia::device::Controller_Bind_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
