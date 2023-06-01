@@ -20,13 +20,13 @@ pub async fn run_binder_latency(
     test: ftest::Invocation,
     start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
-    starnix_kernel: &frunner::ComponentRunnerProxy,
+    component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     run_starnix_benchmark(
         test,
         start_info,
         run_listener_proxy,
-        starnix_kernel,
+        component_runner,
         "benchmark.json",
         binder_latency_to_fuchsiaperf,
     )

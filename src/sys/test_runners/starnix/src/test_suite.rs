@@ -7,9 +7,10 @@ use {
     crate::gbenchmark::*,
     crate::gtest::*,
     crate::helpers::*,
+    crate::test_container::TestContainer,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest},
     futures::TryStreamExt,
     tracing::debug,
@@ -18,26 +19,23 @@ use {
 /// Handles a single `ftest::SuiteRequestStream`.
 ///
 /// # Parameters
-/// - `kernels_dir`: The root directory for the starnix_kernel instance's configuration.
 /// - `start_info`: The start info to use when running the test component.
 /// - `stream`: The request stream to handle.
 pub async fn handle_suite_requests(
-    kernels_dir: &vfs::directory::immutable::Simple,
     mut start_info: frunner::ComponentStartInfo,
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
     debug!(?start_info, "got suite request stream");
     let test_type = test_type(start_info.program.as_ref().unwrap());
-    // The kernel start info is largely the same as that of the test component. The main difference
-    // is that the kernel_start_info does not contain the outgoing directory of the test component.
-    let kernel_start_info = clone_start_info(&mut start_info)?;
 
-    // Instantiates a starnix_kernel instance in the test component's realm. Running the kernel
-    // in the test realm allows coverage data to be collected for the runner itself, during the
+    // The kernel start info is largely the same as that of the test component. The main difference
+    // is that the `container_start_info` does not contain the outgoing directory of the test component.
+    let container_start_info = clone_start_info(&mut start_info)?;
+
+    // Instantiates a Starnix container in the test component's realm. Running the Starnix kernel
+    // in the test realm allows coverage data to be collected for the kernel itself, during the
     // execution of the test.
-    let TestKernel { kernel_runner: starnix_kernel, realm, name: kernel_name } =
-        TestKernel::instantiate_in_realm(kernels_dir, kernel_start_info).await?;
-    debug!(%kernel_name, "instantiated starnix test kernel");
+    let container = TestContainer::create(container_start_info).await?;
 
     while let Some(event) = stream.try_next().await? {
         let mut test_start_info = clone_start_info(&mut start_info)?;
@@ -48,8 +46,12 @@ pub async fn handle_suite_requests(
                 let stream = iterator.into_stream()?;
 
                 if test_type.is_gtest_like() {
-                    handle_case_iterator_for_gtests(test_start_info, &starnix_kernel, stream)
-                        .await?;
+                    handle_case_iterator_for_gtests(
+                        test_start_info,
+                        &container.component_runner,
+                        stream,
+                    )
+                    .await?;
                 } else {
                     handle_case_iterator(
                         test_start_info
@@ -87,7 +89,7 @@ pub async fn handle_suite_requests(
                             tests,
                             test_start_info,
                             &run_listener_proxy,
-                            &starnix_kernel,
+                            &container.component_runner,
                             &test_type,
                         )
                         .await?;
@@ -97,7 +99,7 @@ pub async fn handle_suite_requests(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
-                            &starnix_kernel,
+                            &container.component_runner,
                         )
                         .await?
                     }
@@ -106,7 +108,7 @@ pub async fn handle_suite_requests(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
-                            &starnix_kernel,
+                            &container.component_runner,
                         )
                         .await?
                     }
@@ -115,7 +117,7 @@ pub async fn handle_suite_requests(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
-                            &starnix_kernel,
+                            &container.component_runner,
                         )
                         .await?
                     }
@@ -126,14 +128,7 @@ pub async fn handle_suite_requests(
         }
     }
 
-    realm
-        .destroy_child(&fdecl::ChildRef {
-            name: kernel_name,
-            collection: Some(RUNNERS_COLLECTION.into()),
-        })
-        .await?
-        .map_err(|e| anyhow::anyhow!("failed to destory runner child: {:?}", e))?;
-
+    container.destroy().await?;
     Ok(())
 }
 
@@ -147,12 +142,12 @@ pub async fn handle_suite_requests(
 /// - `test_url`: The URL of the test component.
 /// - `program`: The program data associated with the runner request for the test component.
 /// - `run_listener_proxy`: The listener proxy for the test run.
-/// - `starnix_kernel`: The instance of the starnix kernel that will run the test component.
+/// - `component_runner`: The runner that will run the test component.
 async fn run_test_case(
     test: ftest::Invocation,
     mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
-    starnix_kernel: &frunner::ComponentRunnerProxy,
+    component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     debug!("running generic fallback test suite");
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
@@ -171,7 +166,7 @@ async fn run_test_case(
     )?;
 
     debug!("starting test component");
-    let component_controller = start_test_component(start_info, starnix_kernel)?;
+    let component_controller = start_test_component(start_info, component_runner)?;
 
     let result = read_result(component_controller.take_event_stream()).await;
     debug!(?result, "notifying client test case finished");
@@ -305,7 +300,7 @@ mod tests {
     /// `runner_proxy`. The call is made with a mock test case.
     fn spawn_run_test_cases(
         run_listener: ClientEnd<ftest::RunListenerMarker>,
-        starnix_kernel: frunner::ComponentRunnerProxy,
+        component_runner: frunner::ComponentRunnerProxy,
     ) {
         fasync::Task::local(async move {
             let _ = run_test_case(
@@ -316,7 +311,7 @@ mod tests {
                 },
                 frunner::ComponentStartInfo { ns: Some(vec![]), ..Default::default() },
                 &run_listener.into_proxy().expect("Couldn't create proxy."),
-                &starnix_kernel,
+                &component_runner,
             )
             .await;
         })
@@ -352,11 +347,11 @@ mod tests {
     /// passes.
     #[fasync::run_singlethreaded(test)]
     async fn test_component_controller_epitaph_ok() {
-        let starnix_kernel = spawn_runner(zx::Status::OK);
+        let component_runner = spawn_runner(zx::Status::OK);
         let (run_listener, run_listener_stream) =
             create_request_stream::<ftest::RunListenerMarker>()
                 .expect("Couldn't create case listener");
-        spawn_run_test_cases(run_listener, starnix_kernel);
+        spawn_run_test_cases(run_listener, component_runner);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Passed));
     }
 
@@ -364,11 +359,11 @@ mod tests {
     /// fails.
     #[fasync::run_singlethreaded(test)]
     async fn test_component_controller_epitaph_not_ok() {
-        let starnix_kernel = spawn_runner(zx::Status::INTERNAL);
+        let component_runner = spawn_runner(zx::Status::INTERNAL);
         let (run_listener, run_listener_stream) =
             create_request_stream::<ftest::RunListenerMarker>()
                 .expect("Couldn't create case listener");
-        spawn_run_test_cases(run_listener, starnix_kernel);
+        spawn_run_test_cases(run_listener, component_runner);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Failed));
     }
 }

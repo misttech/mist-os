@@ -66,7 +66,7 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
 /// in response to `ftest::CaseIteratorRequest::GetNext`.
 pub async fn handle_case_iterator_for_gtests(
     mut start_info: frunner::ComponentStartInfo,
-    starnix_kernel: &frunner::ComponentRunnerProxy,
+    component_runner: &frunner::ComponentRunnerProxy,
     mut stream: ftest::CaseIteratorRequestStream,
 ) -> Result<(), Error> {
     // Replace the program args to get test cases in a json file.
@@ -85,7 +85,7 @@ pub async fn handle_case_iterator_for_gtests(
     start_info.numbered_handles = Some(vec![]);
     let output_dir = add_output_dir_to_namespace(&mut start_info)?;
 
-    let component_controller = start_test_component(start_info, starnix_kernel)?;
+    let component_controller = start_test_component(start_info, component_runner)?;
     let _ = read_result(component_controller.take_event_stream()).await;
 
     // Parse tests from output file.
@@ -138,13 +138,13 @@ pub async fn handle_case_iterator_for_gtests(
 /// - `start_info`: The component start info of the test to run.
 /// - `run_listener_proxy`: The proxy used to communicate results of the test run to the test
 ///                         framework.
-/// - `starnix_kernel`: The kernel in which to run the test component.
+/// - `component_runner`: The runner that will run the test component.
 /// - `test_type`: The type of test to run, used to determine which arguments to pass to the test.
 pub async fn run_gtest_cases(
     tests: Vec<ftest::Invocation>,
     mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
-    starnix_kernel: &frunner::ComponentRunnerProxy,
+    component_runner: &frunner::ComponentRunnerProxy,
     test_type: &TestType,
 ) -> Result<(), Error> {
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
@@ -203,7 +203,7 @@ pub async fn run_gtest_cases(
     let output_dir = add_output_dir_to_namespace(&mut start_info)?;
 
     // Start the test component.
-    let component_controller = start_test_component(start_info, starnix_kernel)?;
+    let component_controller = start_test_component(start_info, component_runner)?;
     let _ = read_result(component_controller.take_event_stream()).await;
     overall_test_listener_proxy
         .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;

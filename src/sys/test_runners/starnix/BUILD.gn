@@ -26,7 +26,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/lib/fuchsiaperf",
     "//src/starnix/lib/kernel_config",
@@ -52,6 +51,7 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/results_parser.rs",
     "src/runner.rs",
+    "src/test_container.rs",
     "src/test_suite.rs",
   ]
 }

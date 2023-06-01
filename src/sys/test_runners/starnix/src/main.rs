@@ -8,6 +8,7 @@ mod gtest;
 mod helpers;
 mod results_parser;
 mod runner;
+mod test_container;
 mod test_suite;
 
 use anyhow::Error;

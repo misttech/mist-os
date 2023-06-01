@@ -51,18 +51,18 @@ const MAX_BENCHMARK_COUNT: u8 = 5;
 /// - `start_info`: The component start info of the test to run.
 /// - `run_listener_proxy`: The proxy used to communicate results of the test run to the test
 ///                         framework.
-/// - `starnix_kernel`: The kernel in which to run the test component.
+/// - `component_runner`: The runner that will run the test component.
 pub async fn run_gbenchmark(
     test: ftest::Invocation,
     start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
-    starnix_kernel: &frunner::ComponentRunnerProxy,
+    component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     run_starnix_benchmark(
         test,
         start_info,
         run_listener_proxy,
-        starnix_kernel,
+        component_runner,
         GBENCHMARK_RESULT_FILE,
         gbenchmark_to_fuchsiaperf,
     )
