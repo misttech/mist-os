@@ -393,11 +393,6 @@
 	url = https://pigweed.googlesource.com/pigweed/pigweed
 	name = third_party/pigweed
 	ignore = all
-[submodule "third_party/processor-trace"]
-	path = third_party/processor-trace
-	url = https://fuchsia.googlesource.com/third_party/processor-trace
-	name = third_party/processor-trace
-	ignore = all
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
 	url = https://fuchsia.googlesource.com/third_party/protobuf
@@ -437,11 +432,6 @@
 	path = third_party/rust_crates/mirrors/serde_json5
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/serde_json5
 	name = third_party/github.com/google/serde_json5
-	ignore = all
-[submodule "third_party/safeside"]
-	path = third_party/safeside
-	url = https://fuchsia.googlesource.com/third_party/safeside
-	name = third_party/safeside
 	ignore = all
 [submodule "third_party/sbase"]
 	path = third_party/sbase
