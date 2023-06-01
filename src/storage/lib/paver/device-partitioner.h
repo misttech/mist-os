@@ -139,6 +139,11 @@ class DevicePartitioner {
   virtual zx::result<> Flush() const = 0;
 };
 
+struct BlockAndController {
+  fidl::ClientEnd<fuchsia_hardware_block::Block> device;
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+};
+
 class DevicePartitionerFactory {
  public:
   // Factory method which automatically returns the correct DevicePartitioner
@@ -147,8 +152,7 @@ class DevicePartitionerFactory {
   // against. It's only meaningful for EFI and CROS devices which may have multiple storage devices.
   static std::unique_ptr<DevicePartitioner> Create(
       fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
-      fidl::ClientEnd<fuchsia_hardware_block::Block> block_device = {});
+      std::shared_ptr<Context> context, BlockAndController block_device = {});
 
   static void Register(std::unique_ptr<DevicePartitionerFactory> factory);
 

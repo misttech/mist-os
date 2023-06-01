@@ -473,10 +473,16 @@ void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter:
 
 void Paver::UseBlockDevice(UseBlockDeviceRequestView request,
                            UseBlockDeviceCompleter::Sync& _completer) {
-  UseBlockDevice(std::move(request->block_device), std::move(request->data_sink));
+  // TODO(fxbug.dev/127870): The controller needs to be filled in here.
+  UseBlockDevice(
+      BlockAndController{
+          .device = std::move(request->block_device),
+          .controller = {},
+      },
+      std::move(request->data_sink));
 }
 
-void Paver::UseBlockDevice(fidl::ClientEnd<fuchsia_hardware_block::Block> block_device,
+void Paver::UseBlockDevice(BlockAndController block_device,
                            fidl::ServerEnd<fuchsia_paver::DynamicDataSink> dynamic_data_sink) {
   // Use global devfs if one wasn't injected via set_devfs_root.
   if (!devfs_root_) {
@@ -709,7 +715,7 @@ void DataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
 
 void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
                            fidl::ClientEnd<fuchsia_io::Directory> svc_root,
-                           fidl::ClientEnd<fuchsia_hardware_block::Block> block_device,
+                           BlockAndController block_device,
                            fidl::ServerEnd<fuchsia_paver::DynamicDataSink> server,
                            std::shared_ptr<Context> context) {
   auto partitioner =
