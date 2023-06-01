@@ -26,19 +26,21 @@ def _execute_test(
         python_path: str,
         test_path: str,
         timeout_sec: int = 0,
-        test_data_path: Optional[str] = None) -> None:
+        test_data_path: Optional[str] = None,
+        verbose: bool = False) -> None:
     """Executes a Mobly test with the specified Mobly Driver.
 
     Mobly test output is streamed to the console.
 
     Args:
-        driver: The environment-specific Mobly driver to use for test execution.
-        python_path: path to the Python runtime for to use.
-        test_path: path to the Mobly test executable to run.
-        timeout_sec: Number of seconds before a test is killed due to timeout.
-          If set to 0, timeout is not enforced.
-        test_data_path: path to directory containing test-time data
-          dependencies.
+      driver: The environment-specific Mobly driver to use for test execution.
+      python_path: path to the Python runtime for to use.
+      test_path: path to the Mobly test executable to run.
+      timeout_sec: Number of seconds before a test is killed due to timeout.
+        If set to 0, timeout is not enforced.
+      test_data_path: path to directory containing test-time data
+        dependencies.
+      verbose: Whether to enable verbose output from the mobly test.
 
     Raises:
       MoblyTestFailureException if Mobly test returns non-zero return code.
@@ -61,6 +63,8 @@ def _execute_test(
         tmp_config.flush()
 
         cmd = [python_path, test_path, '-c', tmp_config.name]
+        if (verbose):
+            cmd.append('-v')
         cmd_str = ' '.join(cmd)
         print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"')
 
@@ -93,7 +97,8 @@ def run(
         python_path: str,
         test_path: str,
         timeout_sec: int = 0,
-        test_data_path: Optional[str] = None) -> None:
+        test_data_path: Optional[str] = None,
+        verbose: bool = False) -> None:
     """Runs the Mobly Driver which handles the lifecycle of a Mobly test.
 
     This method manages the lifecycle of a Mobly test's execution.
@@ -101,13 +106,14 @@ def run(
     it, and performs any necessary clean up after test execution.
 
     Args:
-    driver: The environment-specific Mobly driver to use for test execution.
-    python_path: path to the Python runtime to use for test execution.
-    test_path: path to the Mobly test executable to run.
-    timeout_sec: Number of seconds before a test is killed due to timeout.
+      driver: The environment-specific Mobly driver to use for test execution.
+      python_path: path to the Python runtime to use for test execution.
+      test_path: path to the Mobly test executable to run.
+      timeout_sec: Number of seconds before a test is killed due to timeout.
           If set to 0, timeout is not enforced.
-    test_data_path: path to directory containing test-time data
+      test_data_path: path to directory containing test-time data
           dependencies.
+      verbose: Whether to enable verbose output from the mobly test.
 
     Raises:
       MoblyTestFailureException if the test returns a non-zero return code.
@@ -129,6 +135,7 @@ def run(
             test_path=test_path,
             driver=driver,
             timeout_sec=timeout_sec,
-            test_data_path=test_data_path)
+            test_data_path=test_data_path,
+            verbose=verbose)
     finally:
         driver.teardown()

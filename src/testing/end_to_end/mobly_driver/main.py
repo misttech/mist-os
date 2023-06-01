@@ -30,6 +30,12 @@ parser.add_argument(
     '-test_data_path',
     default=None,
     help='path to directory containing test-time data dependencies.')
+parser.add_argument(
+    '-v',
+    action='store_const',
+    const=True,
+    default=False,
+    help='run the mobly test with the -v flag.')
 args = parser.parse_args()
 
 
@@ -53,4 +59,5 @@ def main():
         python_path=sys.executable,
         test_path=args.mobly_test_path,
         timeout_sec=args.test_timeout_sec,
-        test_data_path=args.test_data_path)
+        test_data_path=args.test_data_path,
+        verbose=args.v)
