@@ -40,6 +40,21 @@ rustc_library("netstack3_sync_not_instrumented") {
   deps = _deps
 }
 
+if (is_host) {
+  rustc_library("netstack3_sync_loom") {
+    version = "0.0.1"
+    edition = "2021"
+    with_unit_tests = false
+    testonly = true
+
+    sources = _sources
+    deps = _deps + [ "//third_party/rust_crates:loom" ]
+
+    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+    configs += [ "//src/connectivity/network/netstack3/core:loom" ]
+  }
+}
+
 fuchsia_unittest_package("netstack3-sync-instrumented-package") {
   package_name = "netstack3-sync-instrumented"
   deps = [ ":netstack3_sync_instrumented_test" ]

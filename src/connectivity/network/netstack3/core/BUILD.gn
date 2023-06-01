@@ -178,6 +178,35 @@ rustc_library("netstack3-core-testutils") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+if (is_host) {
+  rustc_library("netstack3-core-loom") {
+    version = "0.1.0"
+    edition = "2021"
+    testonly = true
+
+    deps = lib_deps + [ "sync:netstack3_sync_loom" ] + lib_testutils_deps
+
+    features = [
+      "instrumented",
+      "testutils",
+    ]
+
+    sources = lib_sources
+
+    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+    configs += [ ":loom" ]
+  }
+}
+
+config("loom") {
+  rustflags = [ "--cfg=loom" ]
+
+  # The loom crate documentation recommends compiling with optimizations since
+  # the number of iterations can be large enough to make tests unreasonably slow
+  # otherwise.
+  configs = [ "//build/config:optimize_default" ]
+}
+
 config("benchmark") {
   rustflags = [
     "--cfg=benchmark",
@@ -253,5 +282,6 @@ group("tests") {
     ":netstack3-core-test-package",
     "lock-order:tests",
     "sync:tests",
+    "tests($host_toolchain)",
   ]
 }

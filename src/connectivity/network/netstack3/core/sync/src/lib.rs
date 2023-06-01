@@ -7,6 +7,8 @@
 #![deny(missing_docs, unreachable_patterns, unused)]
 
 extern crate alloc;
+#[cfg(loom)]
+extern crate loom as std;
 
 pub mod rc;
 

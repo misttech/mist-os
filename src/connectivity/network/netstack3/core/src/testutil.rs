@@ -65,6 +65,7 @@ use crate::{
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent,
     },
+    sync::Mutex,
     transport::{
         tcp::{buffer::RingBuffer, socket::NonSyncContext, BufferSizes},
         udp,
@@ -903,17 +904,18 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
 }
 
 impl crate::device::socket::DeviceSocketTypes for FakeNonSyncCtx {
-    type SocketState = ();
+    type SocketState = Mutex<Vec<(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)>>;
 }
 
 impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_frame(
         &self,
-        _state: &Self::SocketState,
-        _device: &DeviceId<Self>,
+        state: &Self::SocketState,
+        device: &DeviceId<Self>,
         _frame: crate::device::socket::Frame<&[u8]>,
-        _raw_frame: &[u8],
+        raw_frame: &[u8],
     ) {
+        state.lock().push((device.downgrade(), raw_frame.into()));
     }
 }
 

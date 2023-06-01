@@ -628,7 +628,7 @@ fn make_send_metadata<SC: DeviceIdContext<AnyDevice>>(
 /// Strongly owns the state of the socket. So long as the `SocketId` for a
 /// socket is not dropped, the socket is guaranteed to exist.
 #[derive(Derivative)]
-#[derivative(Debug(bound = "C::SocketState: Debug"))]
+#[derivative(Clone(bound = ""), Debug(bound = "C::SocketState: Debug"))]
 pub struct SocketId<C: crate::NonSyncContext>(StrongId<C::SocketState, WeakDeviceId<C>>);
 
 impl<C: crate::NonSyncContext> SocketId<C> {
@@ -2111,14 +2111,14 @@ mod tests {
 
         let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
 
-        let never_bound = create(sync_ctx, ());
+        let never_bound = create(sync_ctx, Mutex::default());
         let bound_any_device = {
-            let id = create(sync_ctx, ());
+            let id = create(sync_ctx, Mutex::default());
             set_device(sync_ctx, &id, TargetDevice::AnyDevice);
             id
         };
         let bound_specific_device = {
-            let id = create(sync_ctx, ());
+            let id = create(sync_ctx, Mutex::default());
             set_device(
                 sync_ctx,
                 &id,
