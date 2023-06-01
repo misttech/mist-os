@@ -26,6 +26,7 @@ if (is_host) {
     ]
     if (is_linux) {
       deps += [
+        "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
         "//src/lib/fuchsia",
         "//third_party/rust_crates:async-trait",
         "//third_party/rust_crates:event-listener",

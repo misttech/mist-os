@@ -195,7 +195,7 @@ pub async fn put(
     if let Some(_) = dir.lookup(filename).await? {
         bail!("{} already exists", filename);
     }
-    let handle = dir.create_child_file(&mut transaction, &filename).await?;
+    let handle = dir.create_child_file(&mut transaction, &filename, None).await?;
     transaction.commit().await?;
     let mut buf = handle.allocate_buffer(data.len());
     buf.as_mut_slice().copy_from_slice(&data);

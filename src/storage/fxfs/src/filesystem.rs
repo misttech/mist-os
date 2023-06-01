@@ -883,7 +883,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, &format!("{}", i))
+                .create_child_file(&mut transaction, &format!("{}", i), None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -970,7 +970,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "test")
+            .create_child_file(&mut transaction, "test", None)
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");

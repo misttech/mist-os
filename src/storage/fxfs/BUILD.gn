@@ -18,6 +18,7 @@ import("//src/storage/testing/driver_test_realm.gni")
 import("//tools/cmc/build/cmc.gni")
 fxfs_deps = [
   ":fxfs_macros",
+  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//src/lib/async-utils",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fuchsia-async",

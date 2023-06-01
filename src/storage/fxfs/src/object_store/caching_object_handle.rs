@@ -502,10 +502,15 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        handle =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        handle = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         let object = CachingObjectHandle::new(handle);
         {
@@ -573,6 +578,7 @@ mod tests {
             &fs.root_store(),
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -657,10 +663,15 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let handle2 =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let handle2 = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         let object2 = CachingObjectHandle::new(handle2);
         let mut ef_buffer = object.allocate_buffer(512);
@@ -790,10 +801,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
-        handle =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        handle = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         let object = Arc::new(CachingObjectHandle::new(handle));
         transaction.commit().await.expect("commit failed");
         for _ in 0..100 {
@@ -870,6 +886,7 @@ mod tests {
                 &fs.root_store(),
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await
@@ -948,6 +965,7 @@ mod tests {
                 &fs.root_store(),
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await
@@ -1030,6 +1048,7 @@ mod tests {
             &mut transaction,
             HandleOptions::default(),
             None,
+            None,
         )
         .await
         .expect("create_object failed");
@@ -1074,7 +1093,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object = root_directory
-            .create_child_file(&mut transaction, "foo")
+            .create_child_file(&mut transaction, "foo", None)
             .await
             .expect("create_child_file failed");
         let block_size = object.block_size();

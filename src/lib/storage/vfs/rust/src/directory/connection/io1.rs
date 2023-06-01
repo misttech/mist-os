@@ -454,12 +454,10 @@ where
             return Err(zx::Status::INVALID_ARGS);
         }
 
-        if protocols.create_attributes().is_some() {
-            if protocols.open_mode() == fio::OpenMode::OpenExisting {
-                return Err(zx::Status::INVALID_ARGS);
-            }
-            // TODO(fxbug.dev/77623): Support setting attributes at creation time.
-            return Err(zx::Status::NOT_SUPPORTED);
+        if protocols.create_attributes().is_some()
+            && protocols.open_mode() == fio::OpenMode::OpenExisting
+        {
+            return Err(zx::Status::INVALID_ARGS);
         }
 
         if path.is_dot() {

@@ -165,7 +165,7 @@ async fn install_blob(
         .await
         .context("new transaction")?;
     handle = directory
-        .create_child_file(&mut transaction, merkle.as_str())
+        .create_child_file(&mut transaction, merkle.as_str(), None)
         .await
         .context("create child file")?;
     transaction.commit().await.context("transaction commit")?;

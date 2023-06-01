@@ -238,7 +238,7 @@ mod tests {
                 .await
                 .expect("open failed");
             root_directory
-                .create_child_file(&mut transaction, "foo")
+                .create_child_file(&mut transaction, "foo", None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -286,7 +286,7 @@ mod tests {
                 .await
                 .expect("open failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "foo")
+                .create_child_file(&mut transaction, "foo", None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");

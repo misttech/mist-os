@@ -408,8 +408,10 @@ mod tests {
             )
             .await
             .expect("new_transaction failed");
-        let file =
-            dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
+        let file = dir
+            .create_child_file(&mut transaction, "foo", None)
+            .await
+            .expect("create_child_file failed");
         transaction.commit().await.expect("transaction commit failed");
         let object_id = file.object_id();
 

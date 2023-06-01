@@ -26,7 +26,7 @@ use {
             self,
             directory::{self, ObjectDescriptor, ReplacedChild},
             transaction::{LockKey, Options, Transaction},
-            Directory, ObjectStore, PosixAttributes, Timestamp,
+            Directory, ObjectStore,
         },
     },
     std::{
@@ -96,7 +96,6 @@ impl FxDirectory {
         self: &Arc<Self>,
         protocols: &dyn ProtocolsExt,
         mut path: Path,
-        posix_attributes: Option<PosixAttributes>,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
         if path.is_empty() {
             return Ok(OpenedNode::new(self.clone()));
@@ -177,7 +176,7 @@ impl FxDirectory {
                                     &mut transaction,
                                     name,
                                     protocols.create_directory(),
-                                    posix_attributes,
+                                    protocols.create_attributes(),
                                 )
                                 .await?,
                         );
@@ -210,16 +209,17 @@ impl FxDirectory {
         transaction: &mut Transaction<'_>,
         name: &str,
         create_dir: bool, // If false, creates a file.
-        posix_attributes: Option<PosixAttributes>,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<Arc<dyn FxNode>, Error> {
         if create_dir {
             Ok(Arc::new(FxDirectory::new(
                 Some(self.clone()),
-                self.directory.create_child_dir(transaction, name, posix_attributes).await?,
+                self.directory.create_child_dir(transaction, name, create_attributes).await?,
             )) as Arc<dyn FxNode>)
         } else {
-            Ok(FxFile::new(self.directory.create_child_file(transaction, name).await?)
-                as Arc<dyn FxNode>)
+            Ok(FxFile::new(
+                self.directory.create_child_file(transaction, name, create_attributes).await?,
+            ) as Arc<dyn FxNode>)
         }
     }
 
@@ -376,13 +376,12 @@ impl MutableDirectory for FxDirectory {
         flags: fio::NodeAttributeFlags,
         attrs: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
-        let crtime = flags
-            .contains(fio::NodeAttributeFlags::CREATION_TIME)
-            .then(|| Timestamp::from_nanos(attrs.creation_time));
-        let mtime = flags
+        let creation_time =
+            flags.contains(fio::NodeAttributeFlags::CREATION_TIME).then(|| attrs.creation_time);
+        let modification_time = flags
             .contains(fio::NodeAttributeFlags::MODIFICATION_TIME)
-            .then(|| Timestamp::from_nanos(attrs.modification_time));
-        if let (None, None) = (crtime.as_ref(), mtime.as_ref()) {
+            .then(|| attrs.modification_time);
+        if let (None, None) = (creation_time.as_ref(), modification_time.as_ref()) {
             return Ok(());
         }
 
@@ -396,7 +395,15 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
         self.directory
-            .update_attributes(&mut transaction, crtime, mtime, 0, None)
+            .update_attributes(
+                &mut transaction,
+                Some(&fio::MutableNodeAttributes {
+                    creation_time,
+                    modification_time,
+                    ..Default::default()
+                }),
+                0,
+            )
             .await
             .map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;
@@ -601,7 +608,7 @@ impl DirectoryEntry for FxDirectory {
         let scope = self.volume().scope().clone();
         flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
             Box::pin(async move {
-                let node = self.lookup(&flags, path, None).await.map_err(map_to_status)?;
+                let node = self.lookup(&flags, path).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
                     object_request.create_connection(
                         scope,
@@ -653,7 +660,7 @@ impl DirectoryEntry for FxDirectory {
         let scope = self.volume().scope().clone();
         object_request.take().spawn(&scope.clone(), move |object_request| {
             Box::pin(async move {
-                let node = self.lookup(&protocols, path, None).await.map_err(map_to_status)?;
+                let node = self.lookup(&protocols, path).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
                     object_request.create_connection(
                         scope,
@@ -796,12 +803,9 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
 
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         let props = self.get_properties().await.map_err(map_to_status)?;
-        let mode = props.posix_attributes.map(|attr| attr.mode).unwrap_or(
-            fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-        );
         Ok(fio::NodeAttributes {
-            mode,
+            mode: fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
             id: self.directory.object_id(),
             content_size: props.data_attribute_size,
             storage_size: props.allocated_size,
@@ -822,6 +826,10 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
+                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
+                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
+                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
+                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
@@ -864,6 +872,7 @@ mod tests {
     use {
         crate::{
             directory::FxDirectory,
+            file::FxFile,
             fuchsia::testing::{
                 close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
                 open_file_checked, TestFixture, TestFixtureOptions,
@@ -876,12 +885,13 @@ mod tests {
         fuchsia_fs::file,
         fuchsia_zircon as zx,
         futures::StreamExt,
-        fxfs::object_store::PosixAttributes,
+        fxfs::object_store::Timestamp,
         rand::Rng,
         std::{sync::Arc, time::Duration},
         storage_device::{fake_device::FakeDevice, DeviceHolder},
         vfs::{
-            common::rights_to_posix_mode_bits, directory::entry_container::Directory, path::Path,
+            common::rights_to_posix_mode_bits, directory::entry_container::Directory, file::File,
+            path::Path,
         },
     };
 
@@ -1637,82 +1647,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_creating_dir_with_mode() {
-        let fixture = TestFixture::new().await;
-        {
-            let root_dir = fixture.volume().root_dir();
-
-            let path_str = "foo";
-            let path = Path::validate_and_split(path_str).unwrap();
-
-            let flags = fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE;
-
-            let mode = fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
-
-            let dir = root_dir
-                .lookup(&flags, path, Some(PosixAttributes { mode, ..Default::default() }))
-                .await
-                .expect("lookup failed");
-
-            let properties = dir.get_properties().await.expect("get_properties failed");
-            assert_eq!(mode, properties.posix_attributes.unwrap().mode);
-
-            let attrs = dir
-                .clone()
-                .into_any()
-                .downcast::<FxDirectory>()
-                .expect("Not a directory")
-                .get_attrs()
-                .await
-                .expect("FIDL call failed");
-            assert_eq!(mode, attrs.mode);
-        }
-        fixture.close().await;
-    }
-
-    #[fuchsia::test]
-    async fn test_creating_dir_with_no_mode() {
-        let fixture = TestFixture::new().await;
-        {
-            let root_dir = fixture.volume().root_dir();
-
-            let path_str = "foo";
-            let path = Path::validate_and_split(path_str).unwrap();
-
-            let flags = fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE;
-
-            // We should still be able to create the directory even if we don't
-            // pass it any mode bits
-            let dir = root_dir.lookup(&flags, path, None).await.expect("lookup failed");
-            let properties = dir.get_properties().await.expect("get_properties failed");
-            assert!(properties.posix_attributes.is_none());
-
-            // get_attrs() returns a fio::NodeAttributes which includes `mode`.
-            // Since dir was not created with any mode bits, get_attrs() will
-            // return a fio::NodeAttributes with the default mode value.
-            let attrs = dir
-                .clone()
-                .into_any()
-                .downcast::<FxDirectory>()
-                .expect("Not a directory")
-                .get_attrs()
-                .await
-                .expect("FIDL call failed");
-            let default_mode = fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false);
-            assert_eq!(default_mode, attrs.mode);
-        }
-        fixture.close().await;
-    }
-
-    #[fuchsia::test]
     async fn extended_attributes() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
@@ -1801,6 +1735,257 @@ mod tests {
         );
 
         close_dir_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_dir_with_mutable_node_attributes() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let mode = fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::MaybeCreate),
+                create_attributes: Some(fio::MutableNodeAttributes {
+                    mode: Some(mode),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+
+            let dir = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+
+            let attrs = dir
+                .clone()
+                .into_any()
+                .downcast::<FxDirectory>()
+                .expect("Not a directory")
+                .get_attributes(fio::NodeAttributesQuery::MODE | fio::NodeAttributesQuery::UID)
+                .await
+                .expect("FIDL call failed");
+            assert_eq!(attrs.mutable_attributes.mode.unwrap(), mode);
+            assert_eq!(attrs.mutable_attributes.uid.unwrap(), 0);
+            // Expect these attributes to be None as they were not queried in `get_attributes(..)`
+            assert!(attrs.mutable_attributes.gid.is_none());
+            assert!(attrs.mutable_attributes.rdev.is_none());
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_dir_with_no_mutable_node_attributes() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let flags = fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::CREATE;
+
+            let dir = root_dir.lookup(&flags, path).await.expect("lookup failed");
+
+            // `get_attrs()` returns a `fio::NodeAttributes` which includes `mode`. Since dir was
+            // not created with any mode bits, `get_attrs()` will return a `fio::NodeAttributes`
+            // with the default mode value.
+            let attrs = dir
+                .clone()
+                .into_any()
+                .downcast::<FxDirectory>()
+                .expect("Not a directory")
+                .get_attrs()
+                .await
+                .expect("FIDL call failed");
+            let default_mode = fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false);
+            assert_eq!(attrs.mode, default_mode);
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_dir_with_default_mutable_node_attributes() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::MaybeCreate),
+                create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
+                ..Default::default()
+            });
+
+            let dir = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+
+            let attrs = dir
+                .clone()
+                .into_any()
+                .downcast::<FxDirectory>()
+                .expect("Not a directory")
+                .get_attributes(fio::NodeAttributesQuery::MODE)
+                .await
+                .expect("FIDL call failed");
+            // As mode was requested, `get_attributes(..)` must return a (default) value.
+            assert_eq!(attrs.mutable_attributes.mode.unwrap(), 0);
+            // The attributes not requested should be None.
+            assert!(attrs.mutable_attributes.uid.is_none());
+            assert!(attrs.mutable_attributes.gid.is_none());
+            assert!(attrs.mutable_attributes.rdev.is_none());
+            assert!(attrs.mutable_attributes.creation_time.is_none());
+            assert!(attrs.mutable_attributes.modification_time.is_none());
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_file_with_mutable_node_attributes() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let mode = fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let uid = 1;
+            let gid = 2;
+            let rdev = 3;
+            let modification_time = Timestamp::now().as_nanos();
+            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::MaybeCreate),
+                create_attributes: Some(fio::MutableNodeAttributes {
+                    modification_time: Some(modification_time),
+                    mode: Some(mode),
+                    uid: Some(uid),
+                    gid: Some(gid),
+                    rdev: Some(rdev),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+
+            let file = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+
+            let attributes = file
+                .clone()
+                .into_any()
+                .downcast::<FxFile>()
+                .expect("Not a file")
+                .get_attributes(
+                    fio::NodeAttributesQuery::CREATION_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME
+                        | fio::NodeAttributesQuery::MODE
+                        | fio::NodeAttributesQuery::UID
+                        | fio::NodeAttributesQuery::GID
+                        | fio::NodeAttributesQuery::RDEV,
+                )
+                .await
+                .expect("FIDL call failed");
+            assert_eq!(mode, attributes.mutable_attributes.mode.unwrap());
+            assert_eq!(uid, attributes.mutable_attributes.uid.unwrap());
+            assert_eq!(gid, attributes.mutable_attributes.gid.unwrap());
+            assert_eq!(rdev, attributes.mutable_attributes.rdev.unwrap());
+            assert_eq!(modification_time, attributes.mutable_attributes.modification_time.unwrap());
+            // Although the file was created with `creation_time` and `modification_time` set to
+            // `None`,
+            assert!(attributes.mutable_attributes.creation_time.is_some());
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_file_with_no_with_mutable_node_attributes() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let flags = fio::OpenFlags::CREATE
+                | fio::OpenFlags::NOT_DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE;
+
+            let file = root_dir.lookup(&flags, path).await.expect("lookup failed");
+
+            let attrs = file
+                .clone()
+                .into_any()
+                .downcast::<FxFile>()
+                .expect("Not a file")
+                .get_attrs()
+                .await
+                .expect("FIDL call failed");
+            let default_mode = fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false);
+            assert_eq!(default_mode, attrs.mode);
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_file_with_default_mutable_node_attributes() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::MaybeCreate),
+                create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
+                ..Default::default()
+            });
+
+            let file = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+
+            let attrs = file
+                .clone()
+                .into_any()
+                .downcast::<FxFile>()
+                .expect("Not a directory")
+                .get_attributes(fio::NodeAttributesQuery::MODE)
+                .await
+                .expect("FIDL call failed");
+            // As mode was requested, `get_attributes(..)` must return a (default) value.
+            assert_eq!(attrs.mutable_attributes.mode.unwrap(), 0);
+            // The attributes not requested should be None.
+            assert!(attrs.mutable_attributes.uid.is_none());
+            assert!(attrs.mutable_attributes.gid.is_none());
+            assert!(attrs.mutable_attributes.rdev.is_none());
+            assert!(attrs.mutable_attributes.creation_time.is_none());
+            assert!(attrs.mutable_attributes.modification_time.is_none());
+        }
         fixture.close().await;
     }
 }

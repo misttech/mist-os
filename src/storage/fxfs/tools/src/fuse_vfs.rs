@@ -9,7 +9,7 @@ use {
         fuse_fs::{FuseFs, FuseStrParser},
     },
     async_trait::async_trait,
-    fuchsia as _,
+    fidl_fuchsia_io as fio, fuchsia as _,
     fuse3::{
         raw::prelude::{Filesystem as FuseFilesystem, *},
         Result,
@@ -334,7 +334,16 @@ impl FuseFs {
                 )
                 .await?;
             let dir = self.open_dir(inode).await?;
-            dir.update_attributes(&mut transaction, ctime, mtime, 0, None).await?;
+            dir.update_attributes(
+                &mut transaction,
+                Some(&fio::MutableNodeAttributes {
+                    creation_time: ctime.map(|t| t.as_nanos()),
+                    modification_time: mtime.map(|t| t.as_nanos()),
+                    ..Default::default()
+                }),
+                0,
+            )
+            .await?;
             transaction.commit().await?;
         }
 
@@ -371,7 +380,8 @@ impl FuseFs {
                 )
                 .await?;
 
-            let child_file = dir.create_child_file(&mut transaction, name.osstr_to_str()?).await?;
+            let child_file =
+                dir.create_child_file(&mut transaction, name.osstr_to_str()?, None).await?;
             transaction.commit().await?;
             let child_id = child_file.object_id();
 

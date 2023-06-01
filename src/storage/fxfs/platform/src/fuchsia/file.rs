@@ -306,6 +306,10 @@ impl File for FxFile {
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
+                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
+                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
+                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
+                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,

@@ -61,6 +61,7 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     assert_matches::assert_matches,
     async_trait::async_trait,
+    fidl_fuchsia_io as fio,
     fprint::TypeFingerprint,
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
@@ -583,10 +584,12 @@ impl ObjectStore {
                 options.object_id,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await?
         } else {
-            ObjectStore::create_object(self, transaction, HandleOptions::default(), None).await?
+            ObjectStore::create_object(self, transaction, HandleOptions::default(), None, None)
+                .await?
         };
         let filesystem = self.filesystem();
         let store = if let Some(crypt) = options.crypt {
@@ -860,6 +863,7 @@ impl ObjectStore {
         mut object_id: u64,
         options: HandleOptions,
         mut crypt: Option<&dyn Crypt>,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<StoreObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         if object_id == INVALID_OBJECT_ID {
@@ -873,11 +877,29 @@ impl ObjectStore {
             crypt = store_crypt.as_deref();
         }
         let now = Timestamp::now();
+        let creation_time = create_attributes
+            .and_then(|a| a.creation_time)
+            .map(Timestamp::from_nanos)
+            .unwrap_or_else(|| now.clone());
+        let modification_time = create_attributes
+            .and_then(|a| a.modification_time)
+            .map(Timestamp::from_nanos)
+            .unwrap_or_else(|| now);
+        let posix_attributes = create_attributes.and_then(|a| {
+            (a.mode.is_some() || a.uid.is_some() || a.gid.is_some() || a.rdev.is_some()).then_some(
+                PosixAttributes {
+                    mode: a.mode.unwrap_or_default(),
+                    uid: a.uid.unwrap_or_default(),
+                    gid: a.gid.unwrap_or_default(),
+                    rdev: a.rdev.unwrap_or_default(),
+                },
+            )
+        });
         transaction.add(
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::object(object_id),
-                ObjectValue::file(1, 0, now.clone(), now, 0),
+                ObjectValue::file(1, 0, creation_time, modification_time, 0, posix_attributes),
             ),
         );
         let unwrapped_keys = if let Some(crypt) = crypt {
@@ -920,6 +942,7 @@ impl ObjectStore {
         mut transaction: &mut Transaction<'_>,
         options: HandleOptions,
         crypt: Option<&dyn Crypt>,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<StoreObjectHandle<S>, Error> {
         ObjectStore::create_object_with_id(
             owner,
@@ -927,6 +950,7 @@ impl ObjectStore {
             INVALID_OBJECT_ID,
             options,
             crypt,
+            create_attributes,
         )
         .await
     }
@@ -2045,9 +2069,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object1 = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         let mut transaction = fs
@@ -2056,9 +2086,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object2 = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2070,9 +2106,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object3 = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2132,9 +2174,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2193,6 +2241,7 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await
             .expect("create_object failed");
@@ -2226,6 +2275,7 @@ mod tests {
                 &root_store,
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await
@@ -2277,7 +2327,7 @@ mod tests {
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "test")
+            .create_child_file(&mut transaction, "test", None)
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -2333,7 +2383,7 @@ mod tests {
                     .await
                     .expect("open failed");
                 let object = root_directory
-                    .create_child_file(&mut transaction, &format!("test {}", iteration))
+                    .create_child_file(&mut transaction, &format!("test {}", iteration), None)
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
@@ -2467,7 +2517,7 @@ mod tests {
                 .await
                 .expect("open failed");
             let object = root_directory
-                .create_child_file(&mut transaction, "test")
+                .create_child_file(&mut transaction, "test", None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -2509,7 +2559,7 @@ mod tests {
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         root_directory
-            .create_child_file(&mut transaction, "test")
+            .create_child_file(&mut transaction, "test", None)
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -2538,7 +2588,7 @@ mod tests {
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         root_directory
-            .create_child_file(&mut transaction, "test")
+            .create_child_file(&mut transaction, "test", None)
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -2575,7 +2625,7 @@ mod tests {
                 .await
                 .expect("open failed");
             object_id = root_directory
-                .create_child_file(&mut transaction, "test")
+                .create_child_file(&mut transaction, "test", None)
                 .await
                 .expect("create_child_file failed")
                 .object_id();
@@ -2671,7 +2721,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             root_directory
-                .create_child_file(&mut transaction, "test")
+                .create_child_file(&mut transaction, "test", None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -2686,7 +2736,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             root_directory
-                .create_child_file(&mut transaction, "test2")
+                .create_child_file(&mut transaction, "test2", None)
                 .await
                 .map(|_| ())
                 .expect_err("create_child_file should fail");

@@ -153,6 +153,7 @@ impl BlobDirectory {
                         &mut transaction,
                         HandleOptions::default(),
                         store.crypt().as_deref(),
+                        None,
                     )
                     .await?,
                 ) as Arc<dyn FxNode>);
@@ -1347,7 +1348,7 @@ mod tests {
             let mut transaction =
                 fixture.fs().clone().new_transaction(&keys, Default::default()).await.unwrap();
             handle = root_dir
-                .create_child_file(&mut transaction, &format!("{}", tree.root()))
+                .create_child_file(&mut transaction, &format!("{}", tree.root()), None)
                 .await
                 .unwrap();
             transaction.commit().await.unwrap();

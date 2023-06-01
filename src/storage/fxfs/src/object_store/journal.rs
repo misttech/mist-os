@@ -936,6 +936,7 @@ impl Journal {
             SuperBlockInstance::A.object_id(),
             HandleOptions::default(),
             None,
+            None,
         )
         .await
         .context("create super block")?;
@@ -948,6 +949,7 @@ impl Journal {
             &mut transaction,
             SuperBlockInstance::B.object_id(),
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -962,6 +964,7 @@ impl Journal {
             &root_parent,
             &mut transaction,
             journal_handle_options(),
+            None,
             None,
         )
         .await
@@ -1585,7 +1588,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "test")
+                .create_child_file(&mut transaction, "test", None)
                 .await
                 .expect("create_child_file failed");
 
@@ -1647,7 +1650,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "test")
+                .create_child_file(&mut transaction, "test", None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -1672,7 +1675,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 let handle = root_directory
-                    .create_child_file(&mut transaction, &format!("{}", i))
+                    .create_child_file(&mut transaction, &format!("{}", i), None)
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
@@ -1724,7 +1727,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "test2")
+                .create_child_file(&mut transaction, "test2", None)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");

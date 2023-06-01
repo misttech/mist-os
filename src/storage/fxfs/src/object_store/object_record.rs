@@ -548,6 +548,7 @@ impl ObjectValue {
         creation_time: Timestamp,
         modification_time: Timestamp,
         project_id: u64,
+        posix_attributes: Option<PosixAttributes>,
     ) -> ObjectValue {
         ObjectValue::Object {
             kind: ObjectKind::File { refs, allocated_size },
@@ -555,7 +556,7 @@ impl ObjectValue {
                 creation_time,
                 modification_time,
                 project_id,
-                ..Default::default()
+                posix_attributes,
             },
         }
     }
