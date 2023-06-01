@@ -602,15 +602,41 @@ to your test manifest file to selectively allow resolution of some packages:
 
 ```
 
-### Legacy non-hermetic tests
+### Non-hermetic tests
 
-These tests that were introduced before hermetic testing was enforced. They
-could access some pre-defined capabilities outside of the test realm. A
-capability accessed by non-hermetic test from outside its test realm is called
+These tests can access some pre-defined capabilities outside of the test realm.
+A capability accessed by non-hermetic test from outside its test realm is called
 a *system capability*.
 
 To use a system capability, a test must explicitly mark itself to run in
-non-hermetic "system" realm as shown below.
+non-hermetic realm as shown below.
+
+```gn
+# BUILD.gn
+
+fuchsia_test_component("my_test_component") {
+  component_name = "my_test"
+  manifest = "meta/my_test.cml"
+  deps = [ ":my_test_bin" ]
+
+  # This runs the test in "system-tests" non-hermetic realm.
+  test_type = "system"
+}
+```
+
+Possible values of `test_type`:
+
+| Value | Description |
+| ----- | ----------- |
+| `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
+| `test_arch` | [Test Architecture Tests] |
+
+### Non-hermetic legacy test realms
+
+These are legacy test realms created before we had
+[Test Manager as a Service][test-manager-as-a-service]. We are in process of
+porting these realms. If your tests depend on one of these realms, it should
+explicitly mark itself to run in the legacy realm as shown below.
 
 ```json5
 // my_component_test.cml
@@ -621,8 +647,8 @@ non-hermetic "system" realm as shown below.
         // rust, gtest, go, etc.
         "//src/sys/test_runners/rust/default.shard.cml",
 
-        // This includes the facet which marks the test type as "system".
-        {{ '<strong>' }}"sys/testing/system-test.shard.cml",{{ '</strong>' }}
+        // This includes the facet which marks the test type as 'devices'.
+        {{ '<strong>' }}"//src/devices/testing/devices_test.shard.cml",{{ '</strong>' }}
     ],
     program: {
         binary: "bin/my_component_test",
@@ -630,7 +656,7 @@ non-hermetic "system" realm as shown below.
     {{ '<strong>' }}
     use: [
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [ "fuchsia.driver.development.DriverDevelopment" ],
         },
     ],{{ '</strong>' }}
 }
@@ -639,7 +665,7 @@ non-hermetic "system" realm as shown below.
 The shard includes following facet in the manifest file:
 
 ```json5
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/lib/sys/testing/system-test.shard.cml" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/devices/testing/devices_test.shard.cml" %}
 ```
 
 Possible values of `fuchsia.test.type`:
@@ -647,61 +673,17 @@ Possible values of `fuchsia.test.type`:
 | Value | Description |
 | ----- | ----------- |
 | `hermetic` | Hermetic realm |
-| `system` | Legacy non hermetic realm with access to some system capabilities. |
+| `chromium` | Chromium test realm |
+| `chromium-system` | Chromium system test realm |
 | `cts` | [CTF test realm] |
-
-Below is the list of system capabilities provided to legacy non-hermetic tests:
-
-{# Update the list when it is updated at
-//src/sys/test_manager/meta/common.shard.cml#}
-Protocols:
-
-```text
-fuchsia.boot.ReadOnlyLog
-fuchsia.boot.RootResource
-fuchsia.component.resolution.Resolver
-fuchsia.exception.Handler
-fuchsia.hwinfo.Board
-fuchsia.hwinfo.Device
-fuchsia.hwinfo.Product
-fuchsia.kernel.Counter
-fuchsia.kernel.CpuResource
-fuchsia.kernel.DebugResource
-fuchsia.kernel.HypervisorResource
-fuchsia.kernel.InfoResource
-fuchsia.kernel.IoportResource
-fuchsia.kernel.IrqResource
-fuchsia.kernel.MmioResource
-fuchsia.kernel.PowerResource
-fuchsia.kernel.RootJob
-fuchsia.kernel.RootJobForInspect
-fuchsia.kernel.SmcResource
-fuchsia.kernel.Stats
-fuchsia.kernel.VmexResource
-fuchsia.media.ProfileProvider
-fuchsia.net.http.Loader
-fuchsia.scheduler.ProfileProvider
-fuchsia.sysinfo.SysInfo
-fuchsia.sysmem.Allocator
-fuchsia.tracing.provider.Registry
-fuchsia.vulkan.loader.Loader
-```
-
-Directories:
-
-```text
-root-ssl-certificates
-config-data
-dev-input-report
-dev-display-coordinator
-dev-goldfish-address-space
-dev-goldfish-control
-dev-goldfish-pipe
-dev-goldfish-sync
-dev-gpu
-dev-gpu-performance-counters
-dev-mediacodec
-```
+| `devices` | Device test realm. |
+| `drm` | DRM test realm |
+| `google` | Google test realm |
+| `media` | Media test realm |
+| `starnix` | Starnix test realm |
+| `system-validation` | system validation apps test realm |
+| `vfs-compliance` | VFS compliance test realm |
+| `vulkan` | Vulkan test realm |
 
 ## Restricted logs
 
@@ -844,6 +826,8 @@ offer: [
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
 [component-unit-tests]: /docs/development/components/build.md#unit-tests
 [CTF test realm]: /docs/development/testing/ctf/test_collection.md
+[Test Architecture Tests]: /src/sys/testing/meta/test-arch-tests.shard.cml
+[system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml
 [custom-artifact-example]: /examples/tests/rust/custom_artifact_test.rs
 [fidl-test-manager]: /sdk/fidl/fuchsia.test.manager/test_manager.fidl
 [fidl-test-suite]: /sdk/fidl/fuchsia.test/suite.fidl
@@ -862,3 +846,4 @@ offer: [
 [framework-capabilities]: /docs/concepts/components/v2/capabilities/protocol.md#framework
 [sys-migration-guide]: /docs/development/components/v2/migration/tests.md
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
+[test-manager-as-a-service]: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md
