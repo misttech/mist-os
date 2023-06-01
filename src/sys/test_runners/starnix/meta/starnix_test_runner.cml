@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // This component serves the actual test runner protocol. It delegates running the actual test
-    // binary to the `fuchsia.component.runner.ComponentRunner` protocol offered by its parent.
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
         binary: "bin/starnix_test_runner",
-        use_next_vdso: "true",
     },
     capabilities: [
         {

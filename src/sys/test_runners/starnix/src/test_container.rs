@@ -65,16 +65,17 @@ fn get_realm(
                 let directory = entry
                     .directory
                     .take()
-                    .unwrap()
+                    .expect("Missing directory handle for /svc")
                     .into_proxy()
                     .expect("Failed to grab directory proxy.");
-                let r = Some(fuchsia_component::client::connect_to_protocol_at_dir_root::<
+                let realm = Some(fuchsia_component::client::connect_to_protocol_at_dir_root::<
                     fcomponent::RealmMarker,
                 >(&directory));
 
-                let dir_channel: zx::Channel = directory.into_channel().expect("").into();
+                let dir_channel: zx::Channel =
+                    directory.into_channel().expect("Could not extract channel from proxy").into();
                 entry.directory = Some(dir_channel.into());
-                r
+                realm
             } else {
                 None
             }
