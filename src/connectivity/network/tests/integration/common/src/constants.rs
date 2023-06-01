@@ -43,4 +43,7 @@ pub mod eth {
     ///
     /// 02:00:00:00:00:01
     pub const MAC_ADDR: Mac = net_mac!("02:00:00:00:00:01");
+
+    /// Another MAC address.
+    pub const MAC_ADDR2: Mac = net_mac!("02:FF:FF:FF:FF:FF");
 }

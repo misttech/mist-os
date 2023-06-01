@@ -44,7 +44,7 @@ use net_types::{
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface};
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
-    ndp, ping,
+    devices, ndp, ping,
     realms::{Netstack, Netstack2, Netstack2WithFastUdp, NetstackVersion, TestSandboxExt as _},
     Result,
 };
@@ -1860,36 +1860,17 @@ async fn ip_endpoints_socket<N: Netstack>(name: &str) {
         .create_netstack_realm::<N, _>(format!("{}_server", name))
         .expect("failed to create server realm");
 
-    let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
-        .expect("failed to connect to tun protocol");
-
-    let (tun_pair, req) = fidl::endpoints::create_proxy::<fnet_tun::DevicePairMarker>()
-        .expect("failed to create endpoints");
-    let () = tun
-        .create_pair(&fnet_tun::DevicePairConfig::default(), req)
-        .expect("failed to create tun pair");
-
-    let () = tun_pair
-        .add_port(&fnet_tun::DevicePairPortConfig {
+    let (_tun_pair, client_port, server_port) = devices::create_tun_pair_with(
+        Default::default(), /* device_pair_config */
+        fnet_tun::DevicePairPortConfig {
             base: Some(base_ip_device_port_config()),
             // No MAC, this is a pure IP device.
             mac_left: None,
             mac_right: None,
             ..Default::default()
-        })
-        .await
-        .expect("add_port failed")
-        .map_err(zx::Status::from_raw)
-        .expect("add_port returned error");
-
-    let (client_port, client_req) =
-        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-            .expect("failed to create proxy");
-    let (server_port, server_req) =
-        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-            .expect("failed to create proxy");
-    let () = tun_pair.get_left_port(TUN_DEFAULT_PORT_ID, client_req).expect("get_left failed");
-    let () = tun_pair.get_right_port(TUN_DEFAULT_PORT_ID, server_req).expect("get_right failed");
+        },
+    )
+    .await;
 
     // Addresses must be in the same subnet.
     const SERVER_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
