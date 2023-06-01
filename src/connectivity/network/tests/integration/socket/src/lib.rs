@@ -1823,13 +1823,11 @@ async fn install_ip_device(
     (id, control, device_control)
 }
 
-const TUN_DEFAULT_PORT_ID: u8 = 0;
-
 /// Creates default base config for an IP tun device.
 fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
     fnet_tun::BasePortConfig {
-        id: Some(TUN_DEFAULT_PORT_ID),
-        mtu: Some(1500),
+        id: Some(devices::TUN_DEFAULT_PORT_ID),
+        mtu: Some(netemul::DEFAULT_MTU.into()),
         rx_types: Some(vec![
             fhardware_network::FrameType::Ipv4,
             fhardware_network::FrameType::Ipv6,
@@ -1861,7 +1859,7 @@ async fn ip_endpoints_socket<N: Netstack>(name: &str) {
         .expect("failed to create server realm");
 
     let (_tun_pair, client_port, server_port) = devices::create_tun_pair_with(
-        Default::default(), /* device_pair_config */
+        fnet_tun::DevicePairConfig::default(),
         fnet_tun::DevicePairPortConfig {
             base: Some(base_ip_device_port_config()),
             // No MAC, this is a pure IP device.
@@ -2072,7 +2070,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     // Send v4 ping request.
     let () = tun_dev
         .write_frame(&fnet_tun::Frame {
-            port: Some(TUN_DEFAULT_PORT_ID),
+            port: Some(devices::TUN_DEFAULT_PORT_ID),
             frame_type: Some(fhardware_network::FrameType::Ipv4),
             data: Some(packet.clone()),
             meta: None,
@@ -2113,7 +2111,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         write_frame_and_read_with_timeout(
             &tun_dev,
             fnet_tun::Frame {
-                port: Some(TUN_DEFAULT_PORT_ID),
+                port: Some(devices::TUN_DEFAULT_PORT_ID),
                 frame_type: Some(fhardware_network::FrameType::Ipv6),
                 data: Some(packet),
                 meta: None,
@@ -2144,7 +2142,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     // Send v6 ping request.
     let () = tun_dev
         .write_frame(&fnet_tun::Frame {
-            port: Some(TUN_DEFAULT_PORT_ID),
+            port: Some(devices::TUN_DEFAULT_PORT_ID),
             frame_type: Some(fhardware_network::FrameType::Ipv6),
             data: Some(packet.clone()),
             meta: None,
@@ -2185,7 +2183,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         write_frame_and_read_with_timeout(
             &tun_dev,
             fnet_tun::Frame {
-                port: Some(TUN_DEFAULT_PORT_ID),
+                port: Some(devices::TUN_DEFAULT_PORT_ID),
                 frame_type: Some(fhardware_network::FrameType::Ipv4),
                 data: Some(packet),
                 meta: None,

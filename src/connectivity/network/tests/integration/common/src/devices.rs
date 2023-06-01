@@ -122,17 +122,18 @@ pub async fn create_eth_tun_port(
     create_tun_port_with(tun_device, id, [fhardware_network::FrameType::Ethernet], Some(mac)).await
 }
 
-const TUN_DEFAULT_PORT_ID: u8 = 0;
+/// Default port ID when creating a tun device pair.
+pub const TUN_DEFAULT_PORT_ID: u8 = 0;
 
 /// Create a Tun device pair with an Ethernet port.
 pub async fn create_eth_tun_pair(
 ) -> (fnet_tun::DevicePairProxy, fhardware_network::PortProxy, fhardware_network::PortProxy) {
     create_tun_pair_with(
-        Default::default(),
+        fnet_tun::DevicePairConfig::default(),
         fnet_tun::DevicePairPortConfig {
             base: Some(fnet_tun::BasePortConfig {
                 id: Some(TUN_DEFAULT_PORT_ID),
-                mtu: Some(1500),
+                mtu: Some(netemul::DEFAULT_MTU.into()),
                 rx_types: Some(vec![fhardware_network::FrameType::Ethernet]),
                 tx_types: Some(vec![fhardware_network::FrameTypeSupport {
                     type_: fhardware_network::FrameType::Ethernet,
@@ -149,8 +150,9 @@ pub async fn create_eth_tun_pair(
     .await
 }
 
-/// Create a Tun device pair, returning handles to the created
-/// `fuchsia.net.tun/DevicePair` and both underlying ports.
+/// Create a Tun device pair with the provided configurations, returning
+/// handles to the created `fuchsia.net.tun/DevicePair` and both underlying
+/// ports.
 pub async fn create_tun_pair_with(
     dev_pair_config: fnet_tun::DevicePairConfig,
     dev_pair_port_config: fnet_tun::DevicePairPortConfig,
