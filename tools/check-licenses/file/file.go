@@ -93,6 +93,18 @@ func LoadFile(path string, ft FileType, projectName string) (*File, error) {
 	return f, nil
 }
 
+func (f *File) Search() error {
+	data, err := f.Data()
+	if err != nil {
+		return err
+	}
+
+	for _, d := range data {
+		d.Search()
+	}
+	return nil
+}
+
 // Setters
 // TODO(fxbug.dev/125736): Remove all setters.
 func (f *File) SetURL(url string) { f.url = url }

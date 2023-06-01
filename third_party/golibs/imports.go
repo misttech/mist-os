@@ -16,6 +16,7 @@ import (
 	_ "github.com/golang/glog"
 	_ "github.com/google/go-cmp/cmp"
 	_ "github.com/google/go-cmp/cmp/cmpopts"
+	_ "github.com/google/licenseclassifier/v2"
 	_ "github.com/google/shlex"
 	_ "github.com/google/subcommands"
 	_ "github.com/kr/fs"

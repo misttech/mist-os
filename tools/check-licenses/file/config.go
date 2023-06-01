@@ -10,6 +10,10 @@ type FileConfig struct {
 	// Path to the root of the fuchsia repository.
 	FuchsiaDir string `json:"fuchsiaDir"`
 
+	// Classifier initialization fields.
+	ClassifierThreshold    float64  `json:"classifierThreshold"`
+	ClassifierLicensePaths []string `json:"classifierLicensePaths"`
+
 	// Number of bytes to read in to capture copyright information
 	// in regular source files.
 	CopyrightSize int
@@ -63,6 +67,11 @@ func (c *FileConfig) Merge(other *FileConfig) {
 	if c.FuchsiaDir == "" {
 		c.FuchsiaDir = other.FuchsiaDir
 	}
+
+	if c.ClassifierThreshold == 0.0 {
+		c.ClassifierThreshold = other.ClassifierThreshold
+	}
+	c.ClassifierLicensePaths = append(c.ClassifierLicensePaths, other.ClassifierLicensePaths...)
 
 	if c.CopyrightSize == 0 {
 		c.CopyrightSize = other.CopyrightSize

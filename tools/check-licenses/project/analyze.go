@@ -7,6 +7,7 @@ package project
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
@@ -23,10 +24,30 @@ func AnalyzeLicenses() error {
 	}
 	sort.Sort(Order(filteredProjectsList))
 
+	var wg sync.WaitGroup
 	for _, p := range filteredProjectsList {
 		plusVal(NumFilteredProjects, p.Root)
 		// Analyze the license files in each project.
 		sort.Sort(file.Order(p.LicenseFiles))
+
+		if useLicenseClassifier {
+			wg.Add(1)
+
+			go func(project *Project) {
+				defer wg.Done()
+
+				for _, l := range project.LicenseFiles {
+					l.Search()
+				}
+				// Analyze the copyright headers in the files in each project.
+				sort.Sort(file.Order(project.SearchableRegularFiles))
+				for _, f := range project.SearchableRegularFiles {
+					f.Search()
+				}
+			}(p)
+			continue
+		}
+
 		for _, l := range p.LicenseFiles {
 			if results, err := license.Search(p.Root, l); err != nil {
 				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmeFile.ReadmePath, err)
@@ -67,6 +88,7 @@ func AnalyzeLicenses() error {
 		}
 		sort.Sort(license.SearchResultOrder(p.RegularFileSearchResults))
 	}
+	wg.Wait()
 
 	// Perform any cleanup steps in the license package.
 	license.Finalize()

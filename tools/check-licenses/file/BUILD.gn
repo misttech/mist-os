@@ -18,6 +18,7 @@ go_library("file") {
   ]
   deps = [
     "notice",
+    "//third_party/golibs:github.com/google/licenseclassifier",
     "//tools/lib/logger",
   ]
 }

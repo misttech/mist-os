@@ -18,6 +18,10 @@
                 ]
             }
         ],
+        "classifierThreshold": 0.8,
+        "classifierLicensePaths": [
+            "tools/check-licenses/assets"
+        ],
         "extensions": {
             ".gyp": true,
             ".gypi": true,

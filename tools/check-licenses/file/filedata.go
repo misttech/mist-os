@@ -12,6 +12,7 @@ import (
 	"hash/fnv"
 	"strings"
 
+	classifierLib "github.com/google/licenseclassifier/v2"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file/notice"
 )
 
@@ -26,6 +27,8 @@ type FileData struct {
 	libraryName string
 	lineNumber  int
 	data        []byte
+
+	searchResults *classifierLib.Results
 
 	// ---------------
 	licenseType string
@@ -178,22 +181,30 @@ func LoadFileData(f *File, content []byte) ([]*FileData, error) {
 	return data, nil
 }
 
+func (fd *FileData) Search() {
+	if fd.searchResults == nil {
+		results := classifier.Match(fd.data)
+		fd.searchResults = &results
+	}
+}
+
 // Setters
 // TODO(fxbug.dev/125736): Remove all setters.
 func (fd *FileData) SetLicenseType(lt string) { fd.licenseType = lt }
 
 // Getters
-func (fd *FileData) File() *File                { return fd.file }
-func (fd *FileData) LibraryName() string        { return fd.libraryName }
-func (fd *FileData) LineNumber() int            { return fd.lineNumber }
-func (fd *FileData) Data() []byte               { return fd.data }
-func (fd *FileData) LicenseType() string        { return fd.licenseType }
-func (fd *FileData) PatternPath() string        { return fd.patternPath }
-func (fd *FileData) URL() string                { return fd.url }
-func (fd *FileData) BeingSurfaced() string      { return fd.beingSurfaced }
-func (fd *FileData) SourceCodeIncluded() string { return fd.sourceCodeIncluded }
-func (fd *FileData) SPDXName() string           { return fd.spdxName }
-func (fd *FileData) SPDXID() string             { return fd.spdxID }
+func (fd *FileData) File() *File                           { return fd.file }
+func (fd *FileData) LibraryName() string                   { return fd.libraryName }
+func (fd *FileData) LineNumber() int                       { return fd.lineNumber }
+func (fd *FileData) Data() []byte                          { return fd.data }
+func (fd *FileData) LicenseType() string                   { return fd.licenseType }
+func (fd *FileData) PatternPath() string                   { return fd.patternPath }
+func (fd *FileData) URL() string                           { return fd.url }
+func (fd *FileData) BeingSurfaced() string                 { return fd.beingSurfaced }
+func (fd *FileData) SourceCodeIncluded() string            { return fd.sourceCodeIncluded }
+func (fd *FileData) SPDXName() string                      { return fd.spdxName }
+func (fd *FileData) SPDXID() string                        { return fd.spdxID }
+func (fd *FileData) SearchResults() *classifierLib.Results { return fd.searchResults }
 
 // For copyright data, we want "filedata" to only contain the copyright
 // text. Not the rest of the source code in the given file.

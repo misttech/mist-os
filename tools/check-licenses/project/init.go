@@ -29,9 +29,14 @@ var (
 	ctx context.Context
 
 	spdxIndex int
+
+	// Flag for testing license classifier usage.
+	useLicenseClassifier bool
 )
 
 func init() {
+	useLicenseClassifier = false
+
 	AllProjects = make(map[string]*Project, 0)
 	FilteredProjects = make(map[string]*Project, 0)
 	DedupedLicenseData = make([][]*file.FileData, 0)

@@ -192,6 +192,57 @@ go_library("github.com/theupdateframework/go-tuf") {
   ]
 }
 
+go_library("github.com/davecgh/go-spew") {
+  name = "github.com/davecgh/go-spew/..."
+  source_dir = "vendor/github.com/davecgh/go-spew"
+  deps = []
+  sources = [
+    "spew/bypass.go",
+    "spew/bypasssafe.go",
+    "spew/common.go",
+    "spew/config.go",
+    "spew/doc.go",
+    "spew/dump.go",
+    "spew/format.go",
+    "spew/spew.go",
+  ]
+}
+
+go_library("github.com/sergi/go-diff") {
+  name = "github.com/sergi/go-diff/..."
+  source_dir = "vendor/github.com/sergi/go-diff"
+  deps = []
+  sources = [
+    "diffmatchpatch/diff.go",
+    "diffmatchpatch/diffmatchpatch.go",
+    "diffmatchpatch/match.go",
+    "diffmatchpatch/mathutil.go",
+    "diffmatchpatch/operation_string.go",
+    "diffmatchpatch/patch.go",
+    "diffmatchpatch/stringutil.go",
+  ]
+}
+
+go_library("github.com/google/licenseclassifier") {
+  name = "github.com/google/licenseclassifier/..."
+  source_dir = "vendor/github.com/google/licenseclassifier"
+  deps = [
+    ":github.com/davecgh/go-spew",
+    ":github.com/sergi/go-diff",
+    ":golang.org/x/sys",
+  ]
+  sources = [
+    "v2/classifier.go",
+    "v2/diff.go",
+    "v2/document.go",
+    "v2/frequencies.go",
+    "v2/scoring.go",
+    "v2/searchset.go",
+    "v2/tokenizer.go",
+    "v2/trace.go",
+  ]
+}
+
 go_library("github.com/fsnotify/fsnotify") {
   name = "github.com/fsnotify/fsnotify/..."
   source_dir = "vendor/github.com/fsnotify/fsnotify"

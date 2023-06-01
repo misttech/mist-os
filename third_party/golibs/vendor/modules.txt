@@ -27,6 +27,9 @@ github.com/BurntSushi/toml/internal
 # github.com/creack/pty v1.1.18
 ## explicit; go 1.13
 github.com/creack/pty
+# github.com/davecgh/go-spew v1.1.1
+## explicit
+github.com/davecgh/go-spew/spew
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
@@ -60,6 +63,9 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
+# github.com/google/licenseclassifier/v2 v2.0.0
+## explicit; go 1.16
+github.com/google/licenseclassifier/v2
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 ## explicit; go 1.13
 github.com/google/shlex
@@ -101,6 +107,9 @@ github.com/rogpeppe/go-internal/fmtsort
 # github.com/sasha-s/go-deadlock v0.3.1
 ## explicit
 github.com/sasha-s/go-deadlock
+# github.com/sergi/go-diff v1.3.1
+## explicit; go 1.12
+github.com/sergi/go-diff/diffmatchpatch
 # github.com/spdx/tools-golang v0.3.1-0.20221108182156-8a01147e6342
 ## explicit; go 1.13
 github.com/spdx/tools-golang/spdx/common
