@@ -1,0 +1,38 @@
+{
+    "data": {
+        "description": "",
+        "hardware": {
+            "audio": {
+                "model": "hda"
+            },
+            "cpu": {
+                "arch": "x64"
+            },
+            "inputs": {
+                "pointing_device": "touch"
+            },
+            "memory": {
+                "quantity": 16,
+                "units": "gigabytes"
+            },
+            "storage": {
+                "quantity": 8,
+                "units": "terabytes"
+            },
+            "window_size": {
+                "height": 2160,
+                "units": "pixels",
+                "width": 3840
+            }
+        },
+        "name": "test",
+        "ports": {
+            "debug": 2345,
+            "mdns": 5353,
+            "ssh": 22
+        },
+        "start_up_args_template": "test.json.template",
+        "type": "virtual_device"
+    },
+    "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json"
+}

@@ -1,0 +1,36 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "ARCH", "fuchsia_virtual_device")
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_virtual_device(
+    name = "x64-emu-recommended",
+    arch = ARCH.X64,
+    description = "Recommended configuration for running this product",
+    device_name = "x64-emu-recommended",
+    window_height_px = 800,
+    window_width_px = 1280,
+)
+
+fuchsia_virtual_device(
+    name = "x64-emu-min",
+    arch = ARCH.X64,
+    description = "Minimum configuration for running this product",
+    device_name = "x64-emu-min",
+    memory_quantity = 2048,
+    window_height_px = 800,
+    window_width_px = 1280,
+)
+
+fuchsia_virtual_device(
+    name = "x64-emu-large",
+    arch = ARCH.X64,
+    description = "Large configuration for running this product",
+    device_name = "x64-emu-large",
+    storage_quantity = 10,
+    window_height_px = 800,
+    window_width_px = 1280,
+)

@@ -47,12 +47,12 @@ def _fuchsia_virtual_device_impl(ctx):
                     "units": "pixels",
                 },
                 "memory": {
-                    "quantity": 8192,
-                    "units": "megabytes",
+                    "quantity": ctx.attr.memory_quantity,
+                    "units": ctx.attr.memory_unit,
                 },
                 "storage": {
-                    "quantity": 2,
-                    "units": "gigabytes",
+                    "quantity": ctx.attr.storage_quantity,
+                    "units": ctx.attr.storage_unit,
                 },
             },
             "ports": {
@@ -99,6 +99,22 @@ fuchsia_virtual_device = rule(
         "window_height_px": attr.int(
             doc = "Height of the virtual device's screen, in pixels",
             default = 800,
+        ),
+        "memory_quantity": attr.int(
+            doc = "Memory of the virtual device",
+            default = 8192,
+        ),
+        "memory_unit": attr.string(
+            doc = "Unit for memory of the virtual device (e.g. megabytes, gigabytes, etc.)",
+            default = "megabytes",
+        ),
+        "storage_quantity": attr.int(
+            doc = "Storage of the virtual device",
+            default = 2,
+        ),
+        "storage_unit": attr.string(
+            doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.)",
+            default = "gigabytes",
         ),
         "_start_up_args_template": attr.label(
             allow_single_file = True,

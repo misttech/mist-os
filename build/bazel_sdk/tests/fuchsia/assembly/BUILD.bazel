@@ -5,6 +5,7 @@
 load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test")
 load(":fuchsia_images_configuration_test.bzl", "fuchsia_images_configuration_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
+load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BLOBFS_LAYOUT",
@@ -27,6 +28,7 @@ load(
     "fuchsia_prebuilt_package",
     "fuchsia_product_configuration",
     "fuchsia_vbmeta",
+    "fuchsia_virtual_device",
     "fuchsia_zbi",
 )
 
@@ -324,5 +326,24 @@ fuchsia_partitions_configuration_test(
     name = "partitions_config_golden_test",
     golden_file = ":test_data/partitions_config_golden_file.json",
     partitions_config = ":my_partitions_config",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_virtual_device(
+    name = "my_virtual_device",
+    arch = "x64",
+    device_name = "test",
+    memory_quantity = 16,
+    memory_unit = "gigabytes",
+    storage_quantity = 8,
+    storage_unit = "terabytes",
+    window_height_px = 2160,
+    window_width_px = 3840,
+)
+
+fuchsia_virtual_device_test(
+    name = "virtual_device_golden_test",
+    golden_file = ":test_data/virtual_device_golden_file.json",
+    virtual_device = ":my_virtual_device",
     visibility = ["//visibility:public"],
 )
