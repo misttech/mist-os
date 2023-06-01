@@ -2,8 +2,8 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Build the final Fuchsia Base IDK archive, by performing several local
-sub-builds and merging the results."""
+"""Build the final Fuchsia Base IDK archive, by merging the result for a
+top-level IDK build with those of extra CPU-specific sub-builds."""
 
 import argparse
 import collections
@@ -12,10 +12,11 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set, Tuple
 
-_DEFAULT_BUILD_DIR_NAME = "fuchsia-idk-sub-build"
+_DEFAULT_BUILD_DIR_PREFIX = "fuchsia-idk-build-"
 
 _ARGS_GN_TEMPLATE = r"""# Auto-generated - DO NOT EDIT
 import("//products/bringup.gni")
@@ -68,34 +69,15 @@ def error(msg: str) -> int:
     return 1
 
 
-def my_relpath(path: Path) -> Path:
-    """Return input path, relative to the current directory."""
-    # Only needed because Path.relative_to() does not work in all cases.
-    return Path(os.path.relpath(path.resolve()))
+def write_file_if_unchanged(path: Path, content: str) -> bool:
+    """Write |content| into |path| if needed. Return True on write."""
+    if path.exists() and path.read_text() == content:
+        # Nothing to do
+        return False
 
-
-def copy_tree_resolving_symlinks(src_dir: Path, dst_dir: Path):
-    """Like shutil.copytree() but ensures that symlinks are fully resolved.
-
-    When a source symlink points to another symlink, shutil.copytree()
-    just creates another symlink at the destination. This function ensures
-    that any symlink in the source tree results in a real file copy.
-
-    Args:
-       src_dir: Source directory path.
-       dst_dir: Destination directory path.
-    """
-    for root, dirs, files in os.walk(src_dir):
-        for file in files:
-            src_file = Path(root) / file
-            rel_file_path = src_file.relative_to(src_dir)
-
-            if src_file.is_symlink():
-                src_file = src_file.resolve()
-
-            dst_file = dst_dir / rel_file_path
-            dst_file.parent.mkdir(exist_ok=True, parents=True)
-            shutil.copy2(src_file, dst_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    return True
 
 
 def run_command(args: List, cwd=None):
@@ -111,7 +93,11 @@ def run_command(args: List, cwd=None):
     cmd_args = [str(a) for a in args]
     cmd_str = " ".join(shlex.quote(a) for a in cmd_args)
     log(f"RUN: {cmd_str}")
-    return subprocess.run([str(c) for c in cmd_args], cwd=cwd)
+    start_time = time.time()
+    result = subprocess.run([str(c) for c in cmd_args], cwd=cwd)
+    end_time = time.time()
+    log('DURATION: %.1fs' % (end_time - start_time))
+    return result
 
 
 def run_checked_command(args: List, cwd=None):
@@ -135,18 +121,22 @@ def main():
         help="List of GN sdk() targets to build.",
     )
     parser.add_argument(
-        "--target-cpus",
+        "--base-build-dir",
+        required=True,
+        help="Build directory containing host tools and host_cpu atoms.")
+    parser.add_argument(
+        "--extra-target-cpus",
         nargs="+",
         required=True,
-        help="List of target CPU names.")
+        help="List of extra target CPU names.")
     parser.add_argument("--stamp-file", help="Optional output stamp file.")
     parser.add_argument(
         "--fuchsia-dir", help="Specify Fuchsia source directory.")
     parser.add_argument(
-        "--build-dir-name",
-        default=_DEFAULT_BUILD_DIR_NAME,
+        "--build-dir-prefix",
+        default=_DEFAULT_BUILD_DIR_PREFIX,
         help=
-        "Specify intermediate build directory prefix (default {_DEFAULT_BUILD_DIR_NAME})",
+        f"Specify intermediate build directory prefix (default {_DEFAULT_BUILD_DIR_PREFIX})",
     )
     parser.add_argument(
         "--cxx-rbe-enable",
@@ -175,9 +165,9 @@ def main():
         # Assume this script is under //build/sdk/...
         fuchsia_dir = Path(__file__).parent.parent.parent
 
-    build_dir_name = args.build_dir_name
-    if not build_dir_name:
-        parser.error("--build-dir-name value cannot be empty!")
+    build_dir_prefix = args.build_dir_prefix
+    if not build_dir_prefix:
+        parser.error("--build-dir-prefix value cannot be empty!")
 
     # Locate GN and Ninja prebuilts.
     if args.host_tag:
@@ -193,57 +183,69 @@ def main():
     if not ninja_path.exists():
         return error(f"Missing ninja prebuilt binary: {ninja_path}")
 
-    # This script uses a single common build directory, but switches the
-    # content of args.gn between cpu-specific builds. This is done to avoid
-    # rebuilding host binaries.
+    base_build_dir = Path(args.base_build_dir)
+
+    # This script creates CPU-specific sub-builds under:
     #
-    # Generating an exported sdk() target populates a directory like:
+    #   $BUILD_DIR/fuchsia-idk-build-$CPU/
     #
-    #   $BUILD_DIR/sdk/exported/<name>/
+    # In each build, generating an exported sdk() target populates a directory
+    # like:
+    #
+    #   $BUILD_DIR/fuchsia-idk-build-$CPU/sdk/exported/<name>/
     #
     # With a tree of symlinks to build artifacts that are in other parts
-    # of $BUILD_DIR/
+    # of $BUILD_DIR/fuchsia-idk-sub-build-$CPU
     #
-    # This script will copy these into:
+    # This script will merge all these into $OUTPUT_DIR.
     #
-    #   $BUILD_DIR/sdk/<cpu>-exported/<name>/
-    #
-    # While following all symlinks to their final destination, i.e. copying
-    # the files there.
-    #
-
-    build_dir = Path(build_dir_name)
-    build_dir.mkdir(exist_ok=True, parents=True)
-
-    if args.clean and build_dir.exists():
-        log(f"Cleaning build directory {build_dir}")
-        run_command([ninja_path, "-C", build_dir, "-t", "clean"])
-
     # Parse --sdk-targets GN labels and record related information for each entry.
-    SdkTargetInfo = collections.namedtuple(
-        "SdkTargetInfo", "name ninja_target stamp_file, exported_dir")
-
-    sdk_targets = []
-    for target_label in args.sdk_targets:
+    def sdk_label_partition(target_label: str) -> Tuple[str, str]:
+        """Split an SDK GN label into a (dir, name) pair."""
         # Expected format is //<dir>:<name>
         path, colon, name = target_label.partition(":")
-        if colon != ":" or not path.startswith("//"):
-            parser.error(f"Invalid SDK target label: {target_label}")
+        assert colon == ":" and path.startswith("//"), (
+            f'Invalid SDK target label: {target_label}')
+        return (path[2:], name)
 
-        sdk_targets.append(
-            SdkTargetInfo(
-                name=name,
-                ninja_target=path[2:] + ":" + name,
-                stamp_file=build_dir / f"gen/sdk/{name}.exported",
-                exported_dir=build_dir / f"sdk/exported/{name}",
-            ))
+    def sdk_label_to_ninja_target(target_label: str) -> str:
+        """Convert SDK GN label to Ninja target path."""
+        target_dir, target_name = sdk_label_partition(target_label)
+        return f'{target_dir}:{target_name}'
 
-    # Parse --cpu-targets and record related information for reach entry.
-    CpuInfo = collections.namedtuple("CpuInfo", "name args_gn result_dir")
+    def sdk_label_to_exported_dir(target_label: str, build_dir: Path) -> Path:
+        """Convert SDK GN label to exported directory in build_dir."""
+        target_dir, target_name = sdk_label_partition(target_label)
+        return build_dir / 'sdk' / 'exported' / target_name
 
-    cpu_infos: List[CpuInfo] = []
-    for target_cpu in args.target_cpus:
-        # Generate the args.gn files for all CPUs in advance.
+    # Compute the list of Ninja targets to build in each sub-build.
+    ninja_targets = [sdk_label_to_ninja_target(l) for l in args.sdk_targets]
+    log('Ninja targets to build: %s' % ' '.join(sorted(ninja_targets)))
+
+    # The list of all input directories for the final merge operation.
+    # Start by adding all export SDK directories from the main build dir.
+    all_input_dirs: List[Path] = []
+    for sdk_target in args.sdk_targets:
+        base_exported_dir = sdk_label_to_exported_dir(
+            sdk_target, base_build_dir)
+        if not base_exported_dir.exists():
+            parser.error(
+                f'Required base directory does not exist: {base_exported_dir}')
+        all_input_dirs.append(str(base_exported_dir))
+
+    for target_cpu in args.extra_target_cpus:
+        build_dir = Path(build_dir_prefix + target_cpu)
+        build_dir.mkdir(exist_ok=True, parents=True)
+        log(
+            f'{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}'
+        )
+
+        if args.clean and build_dir.exists():
+            log(f'{build_dir}: Cleaning build directory')
+            run_command([ninja_path, "-C", build_dir, "-t", "clean"])
+
+        log(f'{build_dir}: Generating GN/Ninja build plan.')
+
         args_gn_content = _ARGS_GN_TEMPLATE.format(
             cpu=target_cpu,
             cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
@@ -253,69 +255,23 @@ def main():
         if args.use_goma and args.goma_dir:
             args_gn_content += 'goma_dir = "%s"\n' % args.goma_dir
 
-        if target_cpu == "x64":
-            # Ensure linux-arm64 host binaries are also generated
-            # Only needed for a single sub-build.
-            args_gn_content += "sdk_cross_compile_host_tools = true\n"
+        # Only build host tools in the x64 sub-build, to save
+        # considerable time.
+        args_gn_content += "sdk_no_host_tools = true\n"
 
-        cpu_infos.append(
-            CpuInfo(
-                name=target_cpu,
-                args_gn=args_gn_content,
-                result_dir=build_dir / "sdk" / f"{target_cpu}-exported",
-            ))
-
-    # Generate the Ninja build plans. Do this for all cpus before building
-    # anything to catch all GN errors as soon as possible.
-    for cpu_info in cpu_infos:
-        with open(build_dir / "args.gn", "w") as f:
-            f.write(cpu_info.args_gn)
-
-        log(f"Checking GN/Ninja build plan for target_cpu {cpu_info.name}")
-        if run_checked_command([gn_path, "--root=%s" % fuchsia_dir.resolve(),
-                                "gen", build_dir]):
-            return 1
-
-    # Normally, the IDK is built using a merged_sdk("core") target in
-    # //sdk/BUILD.gn. This takes a list of dependencies to sdk() targets, which
-    # all create an independent $BUILD_DIR/sdk/exported/<name>/ directory,
-    # then their content is merged into $BUILD_DIR/sdk/exported/core/ and
-    # $BUILD_DIR/sdk/archive/core.tar.gz
-    #
-    # There is no point here in building merged_sdk() targets, and creating an
-    # archive that will never be used, so just build the sdk() dependencies
-    # directly instead, which are called "IDK sub-targets" here.
-    for cpu_info in cpu_infos:
-        # Overwrite args.gn
-        with open(build_dir / "args.gn", "w") as f:
-            f.write(cpu_info.args_gn)
-
-        log(f"Generating {cpu_info.name} IDK sub-targets in {build_dir}")
-        for sdk in sdk_targets:
-            stamp_file = sdk.stamp_file
-            if stamp_file.exists():
-                os.unlink(stamp_file)
-                exported_dir = build_dir / sdk.exported_dir
-                if exported_dir.exists():
-                    shutil.rmtree(exported_dir)
-
-        if not (build_dir / "build.ninja").exists():
+        if write_file_if_unchanged(build_dir / 'args.gn', args_gn_content):
             if run_checked_command([gn_path,
                                     "--root=%s" % fuchsia_dir.resolve(), "gen",
                                     build_dir]):
                 return 1
 
-        if run_checked_command([ninja_path, "-C", build_dir] +
-                               [sdk.ninja_target for sdk in sdk_targets]):
+        log(f'{build_dir}: Generating IDK sub-targets')
+        if run_checked_command([ninja_path, "-C", build_dir] + ninja_targets):
             return 1
 
-        dst_dir = cpu_info.result_dir
-        log(f"Copying exported SDKs to {dst_dir}")
-        if dst_dir.exists():
-            shutil.rmtree(dst_dir)
-        dst_dir.mkdir(parents=True)
-        for sdk in sdk_targets:
-            copy_tree_resolving_symlinks(sdk.exported_dir, dst_dir / sdk.name)
+        for sdk_target in args.sdk_targets:
+            all_input_dirs.append(
+                sdk_label_to_exported_dir(sdk_target, build_dir))
 
     # Merge everything into the final directory (or archive).
     merge_cmd_args = [
@@ -323,11 +279,8 @@ def main():
         "-S",
         fuchsia_dir / "scripts" / "sdk" / "merger" / "merge.py",
     ]
-    for cpu_info in cpu_infos:
-        for sdk in sdk_targets:
-            merge_cmd_args += [
-                "--input-directory", cpu_info.result_dir / sdk.name
-            ]
+    for input_dir in all_input_dirs:
+        merge_cmd_args += ["--input-directory", str(input_dir)]
 
     if args.output_dir:
         merge_cmd_args += ["--output-directory", args.output_dir]
@@ -336,11 +289,6 @@ def main():
 
     if run_checked_command(merge_cmd_args):
         return 1
-
-    # Remove result directories.
-    for cpu_info in cpu_infos:
-        for sdk in sdk_targets:
-            shutil.rmtree(cpu_info.result_dir / sdk.name)
 
     # Write stamp file if needed.
     if args.stamp_file:

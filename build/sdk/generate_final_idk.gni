@@ -4,18 +4,20 @@
 
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
+import("config.gni")
 
 # Generate a final Fuchsia IDK archive, which merges outputs from different
-# arch-specific sub-builds into a single one. The generated archive will have
-# host tools for both Linux/x64 and Linux/arm64, and include prebuilts and
-# sysroots for both x64 and arm64 libraries.
+# arch-specific sub-builds into a single one. The generated archive will
+# include prebuilts for x64 and arm64 libraries. On a host Linux machine, the
+# generated archive will have host tools for both Linux/x64 and Linux/arm64.
 #
 # The generated archive will go into
 # $root_build_dir/sdk/archive/{output_name}.tgz
 #
 # Arguments:
 #    target_cpus: (required)
-#      List of target cpu names.
+#      List of target cpu names. This must include the default target_cpu
+#      value for the current build configuration.
 #
 #    sdk_target_labels: (required)
 #      List of labels to sdk() GN targets that will be merged into the
@@ -28,85 +30,109 @@ import("//build/toolchain/rbe.gni")
 #      Usual GN meaning.
 #
 template("generate_final_idk") {
-  # Determine output archive location
-  _output_name = target_name
-  if (defined(invoker.output_name)) {
-    _output_name = invoker.output_name
-  }
-  _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tgz"
-
-  # Compute sdk target labels to pass to the script
-  _sdk_targets = []
-  foreach(label, invoker.sdk_target_labels) {
-    _dir = get_label_info(label, "dir")
-    _name = get_label_info(label, "name")
-    _sdk_targets += [ "${_dir}:${_name}" ]
-  }
-
-  # Run the script.
-  action(target_name) {
-    script = "//build/sdk/build_final_idk.py"
-    outputs = [ _output_archive ]
-
-    inputs = [
-      # Invoked at runtime by this action's script.
-      "//prebuilt/third_party/pigz/pigz",
-      "//scripts/sdk/merger/merge.py",
-    ]
-
-    stamp_file = "$target_out_dir/$target_name.stamp"
-
-    args = [
-             "--output-archive",
-             rebase_path(outputs[0], root_build_dir),
-             "--stamp-file",
-             rebase_path(stamp_file, root_build_dir),
-             "--sdk-targets",
-           ] + _sdk_targets
-
-    args += [ "--target-cpus" ] + invoker.target_cpus
-
-    if (cxx_rbe_enable) {
-      args += [ "--cxx-rbe-enable" ]
+  if (sdk_no_host_tools) {
+    # sdk_no_host_tools should only be defined in the sub-builds generated
+    # by build_final_idk.py, If this happens, do not define anything here.
+    group(target_name) {
+      not_needed(invoker, "*")
     }
-    if (rust_rbe_enable) {
-      args += [ "--rust-rbe-enable" ]
+  } else {
+    # Compute the list of target_cpu values that will require a sub-build
+    # directory.
+    _extra_target_cpus = invoker.target_cpus + [ host_cpu ] - [ host_cpu ]
+    assert(_extra_target_cpus != invoker.target_cpus,
+           "The value of target_cpus should include $host_cpu as well!")
+
+    assert(
+        _extra_target_cpus != [],
+        "The target_cpus list must include other architectures besides $host_cpu")
+
+    # Determine output archive location
+    _output_name = target_name
+    if (defined(invoker.output_name)) {
+      _output_name = invoker.output_name
     }
-    if (use_goma) {
-      args += [ "--use-goma" ]
-      if (goma_dir != prebuilt_goma_dir) {
-        args += [ "--goma-dir=${goma_dir}" ]
-      }
+    _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tgz"
+
+    # Compute sdk target labels to pass to the script
+    _sdk_targets = []
+    foreach(label, invoker.sdk_target_labels) {
+      _dir = get_label_info(label, "dir")
+      _name = get_label_info(label, "name")
+      _sdk_targets += [ "${_dir}:${_name}" ]
     }
 
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
+    # Run the script.
+    action(target_name) {
+      script = "//build/sdk/build_final_idk.py"
+      outputs = [ _output_archive ]
 
-    deps = invoker.sdk_target_labels
-
-    # This script cannot be hermetic.
-    hermetic_deps = false
-
-    metadata = {
-      sdk_archives = [
-        {
-          name = target_name
-
-          # TODO(https://fxbug.dev/126262): Determine which values are
-          # appropriate, since the archive contains binaries for all
-          # Fuchsia CPU architectures (but only one, or even two in
-          # the case of Linux) host CPU architectures!
-          os = current_os
-          cpu = current_cpu
-          label = get_label_info(":$target_name", "label_with_toolchain")
-          path = rebase_path(_output_archive, root_build_dir)
-        },
+      inputs = [
+        # Invoked at runtime by this action's script.
+        "//prebuilt/third_party/pigz/pigz",
+        "//scripts/sdk/merger/merge.py",
       ]
-    }
 
-    pool = "//:console"
+      stamp_file = "$target_out_dir/$target_name.stamp"
+
+      args = [
+               "--output-archive",
+               rebase_path(outputs[0], root_build_dir),
+               "--stamp-file",
+               rebase_path(stamp_file, root_build_dir),
+               "--sdk-targets",
+             ] + _sdk_targets
+
+      args += [
+                "--base-build-dir",
+                rebase_path(root_build_dir, root_build_dir),
+                "--extra-target-cpus",
+              ] + _extra_target_cpus
+
+      if (cxx_rbe_enable) {
+        args += [ "--cxx-rbe-enable" ]
+      }
+      if (rust_rbe_enable) {
+        args += [ "--rust-rbe-enable" ]
+      }
+      if (use_goma) {
+        args += [ "--use-goma" ]
+        if (goma_dir != prebuilt_goma_dir) {
+          args += [ "--goma-dir=${goma_dir}" ]
+        }
+      }
+
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+
+      # Depending on sdk_target_labels ensures that these are built in
+      # the top-level Ninja build directory.
+      deps = invoker.sdk_target_labels
+
+      # This script cannot be hermetic.
+      hermetic_deps = false
+
+      metadata = {
+        sdk_archives = [
+          {
+            name = target_name
+
+            # TODO(https://fxbug.dev/126262): Determine which values are
+            # appropriate, since the archive contains binaries for all
+            # Fuchsia CPU architectures (but only one, or even two in
+            # the case of Linux) host CPU architectures!
+            os = current_os
+            cpu = current_cpu
+            label = get_label_info(":$target_name", "label_with_toolchain")
+            path = rebase_path(_output_archive, root_build_dir)
+          },
+        ]
+      }
+
+      pool = "//:console"
+    }
   }
 }
