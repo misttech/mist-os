@@ -259,22 +259,25 @@ async fn create_container(
 
     let container = Arc::new(Container { kernel, _node: node });
 
-    if let Some(outgoing_dir_channel) = config.outgoing_dir.take() {
-        let container_clone = container.clone();
+    if let Some(outgoing_dir) = config.outgoing_dir.take() {
         // Add `ComponentRunner` to the exposed services of the container, and then serve the
         // outgoing directory.
-        let mut outgoing_directory = ServiceFs::new_local();
-        outgoing_directory
-            .dir("svc")
+        let mut fs = ServiceFs::new_local();
+        fs.dir("svc")
             .add_fidl_service(ExposedServices::ComponentRunner)
             .add_fidl_service(ExposedServices::ContainerController);
-        outgoing_directory
-            .serve_connection(outgoing_dir_channel.into())
-            .map_err(|_| errno!(EINVAL))?;
 
+        // Expose the root of the container's filesystem.
+        let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
+        fs.add_remote("fs_root", fs_root);
+        expose_root(&container, fs_root_server_end)?;
+
+        fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
+
+        let container_clone = container.clone();
         fasync::Task::local(async move {
             let container_clone = container_clone.clone();
-            while let Some(request_stream) = outgoing_directory.next().await {
+            while let Some(request_stream) = fs.next().await {
                 let container_clone = container_clone.clone();
                 match request_stream {
                     ExposedServices::ComponentRunner(request_stream) => {

@@ -29,11 +29,11 @@ use super::*;
 
 pub fn expose_root(
     container: &Arc<Container>,
-    server_end: ServerEnd<fio::NodeMarker>,
+    server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
     let system_task = container.kernel.kthreads.system_task();
     let root_file = system_task.open_file(b"/", OpenFlags::RDONLY)?;
-    serve_file_at(server_end, system_task, &root_file)?;
+    serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
 }
 

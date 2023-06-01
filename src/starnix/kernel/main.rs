@@ -11,12 +11,9 @@
 extern crate macro_rules_attribute;
 
 use crate::execution::Container;
-use crate::lock::Mutex;
-use crate::logging::log_warn;
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process_lifecycle as flifecycle;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
@@ -122,18 +119,11 @@ async fn main() -> Result<(), Error> {
 
     maybe_serve_lifecycle();
 
-    let (root_client_end, root_server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-    let maybe_root_server_end = Mutex::new(Some(root_server_end));
-
     let mut fs = ServiceFs::new_local();
     fs.dir("svc")
         .add_fidl_service_at("fuchsia.starnix.container.Runner", KernelServices::ContainerRunner)
         .add_fidl_service(KernelServices::ComponentRunner)
         .add_fidl_service(KernelServices::ContainerController);
-    fs.add_remote(
-        "linux_root",
-        fio::DirectoryProxy::new(fidl::AsyncChannel::from_channel(root_client_end.into_channel())?),
-    );
 
     #[cfg(target_arch = "x86_64")]
     {
@@ -148,15 +138,10 @@ async fn main() -> Result<(), Error> {
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
             KernelServices::ContainerRunner(stream) => {
-                let local_container = container
+                container
                     .get_or_try_init(|| execution::create_component_from_stream(stream))
                     .await
                     .expect("failed to start container");
-                if let Some(root_server_end) = maybe_root_server_end.lock().take() {
-                    let _ = execution::expose_root(local_container, root_server_end).map_err(|e| {
-                        log_warn!("failed to expose linux_root: {}", e);
-                    });
-                }
             }
             KernelServices::ComponentRunner(stream) => {
                 execution::serve_component_runner(stream, container.wait().await.clone())
