@@ -10,21 +10,29 @@ use {
         pager::{PagerBackedVmo, TransferBuffers, TRANSFER_BUFFER_MAX_SIZE},
         vmo_data_buffer::VmoDataBuffer,
         volume::info_to_filesystem_info,
-        volume::FxVolume,
+        volume::{FxVolume, RootDir},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
+    fidl::{
+        endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
+        HandleBased as _,
+    },
+    fidl_fuchsia_fxfs::{
+        BlobWriterMarker, BlobWriterRequest, CreateBlobError, WriteBlobRequest,
+        WriteBlobRequestStream,
+    },
     fidl_fuchsia_io::{
         self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeMarker, VmoFlags,
         WatchMask,
     },
+    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_hash::Hash,
     fuchsia_merkle::{hash_block, MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{future::BoxFuture, join, FutureExt},
+    futures::{future::BoxFuture, join, lock::Mutex as AsyncMutex, FutureExt, TryStreamExt},
     fxfs::{
         async_enter,
         errors::FxfsError,
@@ -42,9 +50,11 @@ use {
         round::{round_down, round_up},
         serialized_types::BlobMetadata,
     },
+    lazy_static::lazy_static,
     once_cell::sync::Lazy,
     once_cell::sync::OnceCell,
     std::{
+        collections::HashMap,
         io::Read,
         ops::Range,
         str::FromStr,
@@ -77,12 +87,63 @@ pub(crate) const BLOCK_SIZE: u64 = fuchsia_merkle::BLOCK_SIZE as u64;
 
 pub(crate) const READ_AHEAD_SIZE: u64 = 131_072;
 
+lazy_static! {
+    static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);
+}
 /// A flat directory containing content-addressable blobs (names are their hashes).
 /// It is not possible to create sub-directories.
 /// It is not possible to write to an existing blob.
 /// It is not possible to open or read a blob until it is written and verified.
 pub struct BlobDirectory {
     directory: Arc<FxDirectory>,
+}
+
+#[async_trait]
+impl RootDir for BlobDirectory {
+    fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
+        self as Arc<dyn DirectoryEntry>
+    }
+
+    fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
+        self as Arc<dyn FxNode>
+    }
+
+    async fn handle_blob_requests(
+        self: Arc<Self>,
+        mut requests: WriteBlobRequestStream,
+    ) -> Result<(), Error> {
+        let blob_state: AsyncMutex<HashMap<Hash, fasync::Task<()>>> =
+            AsyncMutex::new(HashMap::default());
+        while let Some(request) = requests.try_next().await? {
+            match request {
+                WriteBlobRequest::Create { responder, hash, .. } => {
+                    let mut blob_state = blob_state.lock().await;
+                    let hash = Hash::from(hash);
+                    let res = if blob_state.contains_key(&hash) {
+                        Err(CreateBlobError::AlreadyExists)
+                    } else {
+                        match self.create_blob(&hash).await {
+                            Ok((task, client_end)) => {
+                                blob_state.insert(hash, task);
+                                Ok(client_end)
+                            }
+                            Err(e) => {
+                                tracing::error!("blob service: create failed: {:?}", e);
+                                Err(e)
+                            }
+                        }
+                    };
+                    responder.send(res).unwrap_or_else(|e| {
+                        tracing::error!("failed to send Create response. error: {:?}", e);
+                    });
+                }
+            }
+        }
+        for (_, task) in std::mem::take(&mut *blob_state.lock().await) {
+            task.await;
+        }
+        Ok(())
+    }
 }
 
 impl BlobDirectory {
@@ -232,6 +293,124 @@ impl BlobDirectory {
                 Ok(node)
             }
         }
+    }
+
+    async fn create_blob(
+        self: &Arc<Self>,
+        hash: &Hash,
+    ) -> Result<(fasync::Task<()>, ClientEnd<BlobWriterMarker>), CreateBlobError> {
+        let flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE;
+        let path = Path::validate_and_split(hash.to_string()).map_err(|e| {
+            tracing::error!("failed to validate path: {:?}", e);
+            CreateBlobError::Internal
+        })?;
+        let node = self.lookup(flags, path).await.map_err(|e| {
+            tracing::error!("lookup failed: {:?}", e);
+            CreateBlobError::Internal
+        })?;
+        if !node.is::<FxUnsealedBlob>() {
+            return Err(CreateBlobError::AlreadyExists);
+        }
+        let unsealed_blob = node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
+        let (client, server_end) = create_proxy::<BlobWriterMarker>().map_err(|e| {
+            tracing::error!("create_proxy failed for the BlobWriter protocol: {:?}", e);
+            CreateBlobError::Internal
+        })?;
+        let client_channel = client.into_channel().map_err(|_| {
+            tracing::error!("failed to create client channel");
+            CreateBlobError::Internal
+        })?;
+        let client_end = ClientEnd::new(client_channel.into());
+        let this = self.clone();
+        let task = fasync::Task::spawn(async move {
+            if let Err(e) = this.handle_blob_writer_requests(unsealed_blob, server_end).await {
+                tracing::error!("Failed to handle blob writer requests: {}", e);
+            }
+        });
+        return Ok((task, client_end));
+    }
+
+    async fn write_bytes(
+        self: &Arc<Self>,
+        blob: &FxUnsealedBlob,
+        bytes_written: u64,
+    ) -> Result<(), Error> {
+        // TODO(https://fxbug.dev/126617): Remove extra copy.
+        if bytes_written > *RING_BUFFER_SIZE {
+            return Err(anyhow!("bytes written exceeded size of ring buffer"));
+        }
+        let mut buf = vec![0; bytes_written as usize];
+        let write_offset;
+        {
+            let inner = blob.inner.lock().unwrap();
+            let vmo_offset = inner.write_offset % *RING_BUFFER_SIZE;
+            if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
+                let split = (*RING_BUFFER_SIZE - vmo_offset) as usize;
+                inner.vmo.read(&mut buf[0..split], vmo_offset)?;
+                inner.vmo.read(&mut buf[split..], 0)?;
+            } else {
+                inner.vmo.read(&mut buf, vmo_offset)?;
+            }
+            write_offset = inner.write_offset;
+        }
+        blob.write_at(write_offset, &buf).await.context("write_at failed")?;
+        Ok(())
+    }
+
+    async fn get_vmo(
+        self: &Arc<Self>,
+        unsealed_blob: &FxUnsealedBlob,
+        size: u64,
+    ) -> Result<zx::Vmo, Error> {
+        let _ = unsealed_blob.truncate(size).await?;
+        let vmo = zx::Vmo::create(*RING_BUFFER_SIZE)?;
+        let vmo_dup =
+            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed to duplicate VMO");
+        {
+            let mut inner = unsealed_blob.inner.lock().unwrap();
+            inner.vmo = vmo;
+        }
+        Ok(vmo_dup)
+    }
+
+    async fn handle_blob_writer_requests(
+        self: &Arc<Self>,
+        blob: OpenedNode<FxUnsealedBlob>,
+        server_end: ServerEnd<BlobWriterMarker>,
+    ) -> Result<(), Error> {
+        let mut stream = server_end.into_stream()?;
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                BlobWriterRequest::GetVmo { size, responder } => {
+                    let res = match self.get_vmo(blob.as_ref(), size).await {
+                        Ok(vmo) => Ok(vmo),
+                        Err(e) => {
+                            tracing::error!("blob service: get_vmo failed: {:?}", e);
+                            Err(zx::Status::INTERNAL.into_raw())
+                        }
+                    };
+                    responder.send(res).unwrap_or_else(|e| {
+                        tracing::error!("failed to send GetVmo response. error: {:?}", e);
+                    });
+                }
+                BlobWriterRequest::BytesReady { bytes_written, responder } => {
+                    let res = match self.write_bytes(blob.as_ref(), bytes_written).await {
+                        Ok(()) => Ok(()),
+                        Err(e) => {
+                            tracing::error!("blob service: bytes_ready failed: {:?}", e);
+                            Err(zx::Status::INTERNAL.into_raw())
+                        }
+                    };
+                    responder.send(res).unwrap_or_else(|e| {
+                        tracing::error!("failed to send BytesReady response. error: {:?}", e);
+                    });
+                }
+            }
+        }
+        let _ = blob.close().await;
+        Ok(())
     }
 }
 
@@ -841,6 +1020,7 @@ pub struct FxUnsealedBlob {
 struct Inner {
     writing: bool,
     write_offset: u64,
+    vmo: zx::Vmo,
     merkle_builder: Option<MerkleTreeBuilder>,
     buffer: Vec<u8>,
 }
@@ -859,6 +1039,7 @@ impl FxUnsealedBlob {
             inner: Mutex::new(Inner {
                 writing: false,
                 write_offset: 0,
+                vmo: zx::Vmo::from_handle(zx::Handle::invalid()),
                 merkle_builder: Some(MerkleTreeBuilder::new()),
                 buffer: Vec::new(),
             }),
@@ -1175,8 +1356,10 @@ mod tests {
         },
         assert_matches::assert_matches,
         async_trait::async_trait,
+        fidl_fuchsia_fxfs,
         fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
         fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _},
+        fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_fs::directory::{
             readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
         },
@@ -1194,6 +1377,7 @@ mod tests {
             round::round_up,
             serialized_types::BlobMetadata,
         },
+        rand::{thread_rng, Rng},
         std::path::PathBuf,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };
@@ -1281,6 +1465,187 @@ mod tests {
         }
     }
 
+    /// Tests for the new write API.
+    #[fasync::run(10, test)]
+    async fn test_new_write_empty_blob() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![];
+
+        // Build merkle root
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(
+                &blob_volume_outgoing_dir,
+            )
+            .expect("failed to connect to the Blob service");
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let _vmo = writer
+                .get_vmo(data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+        }
+        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_new_write_small_blob_no_wrap() {
+        let fixture = new_blob_fixture().await;
+
+        let mut data = vec![1; 196608];
+        thread_rng().fill(&mut data[..]);
+
+        // Build merkle root
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(
+                &blob_volume_outgoing_dir,
+            )
+            .expect("failed to connect to the Blob service");
+
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let vmo = writer
+                .get_vmo(data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            let vmo_size = vmo.get_size().expect("failed to get vmo size");
+            // Write to disk using a ring buffer
+            let list_of_writes =
+                vec![(0, 8192), (8192, 24576), (24576, 32768), (32768, 98304), (98304, 196608)];
+            let mut write_offset = 0;
+            for write in list_of_writes {
+                let len = (write.1 - write.0) as u64;
+                vmo.write(&data[write.0..write.1], write_offset % vmo_size)
+                    .expect("failed to write to vmo");
+                let _ = writer
+                    .bytes_ready(len)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo");
+                write_offset += len;
+            }
+        }
+        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_new_write_large_blob_wraps_multiple_times() {
+        let fixture = new_blob_fixture().await;
+
+        let mut data = vec![1; 1024921];
+        thread_rng().fill(&mut data[..]);
+
+        // Build merkle root
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(
+                &blob_volume_outgoing_dir,
+            )
+            .expect("failed to connect to the Blob service");
+
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let vmo = writer
+                .get_vmo(data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            let vmo_size = vmo.get_size().expect("failed to get vmo size");
+
+            // Write to disk using a ring buffer
+            let list_of_writes = vec![
+                (0, 8089),
+                (8089, 24473),
+                (24473, 57241),
+                (57241, 122777),
+                (122777, 253849),
+                (253849, 510873),
+                (510873, 767897),
+                (767897, 1024921),
+            ];
+            let mut write_offset = 0;
+            for write in list_of_writes {
+                let len = write.1 - write.0;
+                let vmo_offset = write_offset % vmo_size;
+                let start = write.0 as usize;
+                let end = write.1 as usize;
+                if vmo_offset + len > vmo_size {
+                    let split = vmo_size - vmo_offset;
+                    vmo.write(&data[start..start + split as usize], vmo_offset)
+                        .expect("failed to write to vmo");
+                    vmo.write(&data[start + split as usize..end], 0)
+                        .expect("failed to write to vmo");
+                } else {
+                    vmo.write(&data[start..end], vmo_offset).expect("failed to write to vmo");
+                }
+                let _ = writer
+                    .bytes_ready(len)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo");
+                write_offset += len;
+            }
+        }
+        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    /// Tests for the old write API.
     #[fasync::run(10, test)]
     async fn test_simple() {
         let fixture = new_blob_fixture().await;

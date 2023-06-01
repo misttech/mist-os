@@ -6,6 +6,7 @@ use {
     crate::fuchsia::{
         blob::BlobDirectory, component::spawn_on_pager_executor, directory::FxDirectory,
         file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
+        volumes_directory::VolumesDirectory,
     },
     anyhow::Context,
     anyhow::Error,
@@ -27,11 +28,12 @@ struct State {
     filesystem: OpenFxFilesystem,
     volume: FxVolumeAndRoot,
     root: fio::DirectoryProxy,
+    volumes_directory: Arc<VolumesDirectory>,
 }
 
-impl From<State> for (OpenFxFilesystem, FxVolumeAndRoot) {
-    fn from(state: State) -> (OpenFxFilesystem, FxVolumeAndRoot) {
-        (state.filesystem, state.volume)
+impl From<State> for (OpenFxFilesystem, FxVolumeAndRoot, Arc<VolumesDirectory>) {
+    fn from(state: State) -> (OpenFxFilesystem, FxVolumeAndRoot, Arc<VolumesDirectory>) {
+        (state.filesystem, state.volume, state.volumes_directory)
     }
 }
 
@@ -64,7 +66,7 @@ impl TestFixture {
     }
 
     pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
-        let (filesystem, volume) = if options.format {
+        let (filesystem, volume, volumes_directory) = if options.format {
             let filesystem = FxFilesystemBuilder::new()
                 .background_task_spawner(spawn_on_pager_executor)
                 .format(true)
@@ -80,6 +82,8 @@ impl TestFixture {
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();
+            let volumes_directory =
+                VolumesDirectory::new(root_volume, Weak::new(), None).await.unwrap();
             let vol = if options.as_blob {
                 FxVolumeAndRoot::new::<BlobDirectory>(Weak::new(), store, store_object_id)
                     .await
@@ -89,7 +93,7 @@ impl TestFixture {
                     .await
                     .unwrap()
             };
-            (filesystem, vol)
+            (filesystem, vol, volumes_directory)
         } else {
             let filesystem = FxFilesystemBuilder::new()
                 .background_task_spawner(spawn_on_pager_executor)
@@ -105,6 +109,8 @@ impl TestFixture {
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();
+            let volumes_directory =
+                VolumesDirectory::new(root_volume, Weak::new(), None).await.unwrap();
             let vol = if options.as_blob {
                 FxVolumeAndRoot::new::<BlobDirectory>(Weak::new(), store, store_object_id)
                     .await
@@ -115,7 +121,7 @@ impl TestFixture {
                     .unwrap()
             };
 
-            (filesystem, vol)
+            (filesystem, vol, volumes_directory)
         };
         let (root, server_end) =
             create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
@@ -127,7 +133,10 @@ impl TestFixture {
             Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );
-        Self { state: Some(State { filesystem, volume, root }), encrypted: options.encrypted }
+        Self {
+            state: Some(State { filesystem, volume, root, volumes_directory }),
+            encrypted: options.encrypted,
+        }
     }
 
     /// Closes the test fixture, shutting down the filesystem. Returns the device, which can be
@@ -148,8 +157,9 @@ impl TestFixture {
             .expect("FIDL call failed")
             .map_err(Status::from_raw)
             .expect("close root failed");
-        let (filesystem, volume) = state.into();
-
+        let (filesystem, volume, volumes_directory) = state.into();
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
         let store_id = volume.volume().store().store_object_id();
 
         // Wait for all tasks to finish running.  If we don't do this, it's possible that we haven't
@@ -206,6 +216,10 @@ impl TestFixture {
 
     pub fn volume(&self) -> &FxVolumeAndRoot {
         &self.state.as_ref().unwrap().volume
+    }
+
+    pub fn volumes_directory(&self) -> &Arc<VolumesDirectory> {
+        &self.state.as_ref().unwrap().volumes_directory
     }
 }
 

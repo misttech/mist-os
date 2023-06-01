@@ -415,6 +415,9 @@ impl Component {
                         "Create {}volume",
                         if crypt.is_some() { "encrypted " } else { "" }
                     );
+                    // TODO(https://fxbug.dev/126745): We should NOT be relying on a string for
+                    // as_blob. Instead, we should add an as_blob option to Volume.Create.
+                    let as_blob = name == "blob";
                     responder
                         .send(
                             volumes
@@ -422,6 +425,7 @@ impl Component {
                                     &name,
                                     crypt,
                                     outgoing_directory.into_channel().into(),
+                                    as_blob,
                                 )
                                 .await
                                 .map_err(map_to_raw_status),

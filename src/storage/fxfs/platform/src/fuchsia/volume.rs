@@ -18,6 +18,7 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_fxfs::{
         BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
+        WriteBlobRequestStream,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectVolume, VolumeData},
@@ -380,20 +381,16 @@ impl FsInspectVolume for FxVolume {
     }
 }
 
+#[async_trait]
 pub trait RootDir: FxNode + DirectoryEntry {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry>;
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
-}
 
-impl<T: FxNode + DirectoryEntry> RootDir for T {
-    fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
-        self as Arc<dyn DirectoryEntry>
-    }
-
-    fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
-        self as Arc<dyn FxNode>
-    }
+    async fn handle_blob_requests(
+        self: Arc<Self>,
+        requests: WriteBlobRequestStream,
+    ) -> Result<(), Error>;
 }
 
 #[derive(Clone)]
@@ -428,6 +425,10 @@ impl FxVolumeAndRoot {
 
     pub fn root(&self) -> &Arc<dyn RootDir> {
         &self.root
+    }
+
+    pub fn root_clone(&self) -> Arc<dyn RootDir> {
+        self.root.clone()
     }
 
     // The same as root but downcasted to FxDirectory.
@@ -1184,7 +1185,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false)
+                .serve_volume(&volume_and_root, dir_server_end, false, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1310,7 +1311,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create dir proxy to succeed");
                 volumes_directory
-                    .serve_volume(&volume_and_root, dir_server_end, false)
+                    .serve_volume(&volume_and_root, dir_server_end, false, false)
                     .await
                     .expect("serve_volume failed");
 
@@ -1369,7 +1370,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                 .expect("Create dir proxy to succeed");
         volumes_directory
-            .serve_volume(&volume_and_root, dir_server_end, false)
+            .serve_volume(&volume_and_root, dir_server_end, false, false)
             .await
             .expect("serve_volume failed");
         let project_proxy = connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
@@ -1423,7 +1424,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false)
+                .serve_volume(&volume_and_root, dir_server_end, false, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1558,7 +1559,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create dir proxy to succeed");
                 volumes_directory
-                    .serve_volume(&volume_and_root, dir_server_end, false)
+                    .serve_volume(&volume_and_root, dir_server_end, false, false)
                     .await
                     .expect("serve_volume failed");
 
@@ -1730,7 +1731,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false)
+                .serve_volume(&volume_and_root, dir_server_end, false, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1869,7 +1870,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false)
+                .serve_volume(&volume_and_root, dir_server_end, false, false)
                 .await
                 .expect("serve_volume failed");
             let project_proxy =

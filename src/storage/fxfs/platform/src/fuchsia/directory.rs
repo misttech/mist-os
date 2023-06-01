@@ -9,12 +9,13 @@ use {
         file::FxFile,
         node::{FxNode, GetResult, OpenedNode},
         symlink::FxSymlink,
-        volume::{info_to_filesystem_info, FxVolume},
+        volume::{info_to_filesystem_info, FxVolume, RootDir},
     },
     anyhow::{bail, Error},
     async_trait::async_trait,
     either::{Left, Right},
     fidl::endpoints::ServerEnd,
+    fidl_fuchsia_fxfs::WriteBlobRequestStream,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::FutureExt,
     fxfs::{
@@ -57,6 +58,24 @@ pub struct FxDirectory {
     parent: Option<Mutex<Arc<FxDirectory>>>,
     directory: object_store::Directory<FxVolume>,
     watchers: Mutex<Watchers>,
+}
+
+#[async_trait]
+impl RootDir for FxDirectory {
+    fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
+        self as Arc<dyn DirectoryEntry>
+    }
+
+    fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
+        self as Arc<dyn FxNode>
+    }
+
+    async fn handle_blob_requests(
+        self: Arc<Self>,
+        _requests: WriteBlobRequestStream,
+    ) -> Result<(), Error> {
+        return Err(fuchsia_zircon::Status::NOT_SUPPORTED.into());
+    }
 }
 
 impl FxDirectory {

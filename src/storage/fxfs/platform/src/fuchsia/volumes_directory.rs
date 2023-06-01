@@ -16,7 +16,7 @@ use {
     fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
     fidl_fuchsia_fxfs::{
         CheckOptions, CryptMarker, CryptProxy, MountOptions, ProjectIdMarker, VolumeRequest,
-        VolumeRequestStream,
+        VolumeRequestStream, WriteBlobMarker,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectTree, FsInspectVolume},
@@ -106,6 +106,10 @@ impl VolumesDirectory {
         &self.directory_node
     }
 
+    pub fn root_volume(&self) -> &RootVolume {
+        &self.root_volume
+    }
+
     fn add_directory_entry(self: &Arc<Self>, name: &str, store_id: u64) {
         let weak = Arc::downgrade(self);
         let name_owned = Arc::new(name.to_string());
@@ -134,6 +138,23 @@ impl VolumesDirectory {
     ) -> Result<FxVolumeAndRoot, Error> {
         let volume = self
             .mount_store::<FxDirectory>(
+                name,
+                self.root_volume.new_volume(name, crypt).await?,
+                FlushTaskConfig::default(),
+            )
+            .await?;
+        self.add_directory_entry(name, volume.volume().store().store_object_id());
+        Ok(volume)
+    }
+
+    /// Creates a blob volume.  If |crypt| is set, the volume will be encrypted.
+    pub async fn create_blob_volume(
+        self: &Arc<Self>,
+        name: &str,
+        crypt: Option<Arc<dyn Crypt>>,
+    ) -> Result<FxVolumeAndRoot, Error> {
+        let volume = self
+            .mount_store::<BlobDirectory>(
                 name,
                 self.root_volume.new_volume(name, crypt).await?,
                 FlushTaskConfig::default(),
@@ -256,6 +277,7 @@ impl VolumesDirectory {
         volume: &FxVolumeAndRoot,
         outgoing_dir_server_end: ServerEnd<fio::DirectoryMarker>,
         executable: bool,
+        as_blob: bool,
     ) -> Result<(), Error> {
         let outgoing_dir = vfs::directory::immutable::simple();
 
@@ -284,7 +306,18 @@ impl VolumesDirectory {
                 }
             }),
         )?;
-
+        let blob_handler = volume.clone();
+        if as_blob {
+            svc_dir.add_entry(
+                WriteBlobMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let blob_handler = blob_handler.clone();
+                    async move {
+                        let _ = blob_handler.root_clone().handle_blob_requests(requests).await;
+                    }
+                }),
+            )?;
+        }
         // Use the volume's scope here which should be OK for now.  In theory the scope represents a
         // filesystem instance and the pseudo filesystem we are using is arguably a different
         // filesystem to the volume we are exporting.  The reality is that it only matters for
@@ -343,10 +376,16 @@ impl VolumesDirectory {
         name: &str,
         crypt: Option<ClientEnd<CryptMarker>>,
         outgoing_directory: ServerEnd<fio::DirectoryMarker>,
+        as_blob: bool,
     ) -> Result<(), Error> {
         let crypt = crypt
             .map(|crypt| Arc::new(RemoteCrypt::new(crypt.into_proxy().unwrap())) as Arc<dyn Crypt>);
-        self.serve_volume(&self.create_volume(&name, crypt).await?, outgoing_directory, false).await
+        let volume = if as_blob {
+            self.create_blob_volume(&name, crypt).await?
+        } else {
+            self.create_volume(&name, crypt).await?
+        };
+        self.serve_volume(&volume, outgoing_directory, false, as_blob).await
     }
 
     async fn handle_volume_requests(
@@ -518,7 +557,7 @@ impl VolumesDirectory {
             )
         };
 
-        self.serve_volume(&volume, outgoing_directory, executable).await
+        self.serve_volume(&volume, outgoing_directory, executable, options.as_blob).await
     }
 
     async fn handle_admin_requests(
@@ -1179,7 +1218,7 @@ mod tests {
             .expect("Create proxy to succeed");
 
         volumes_directory
-            .serve_volume(&vol, dir_server_end, false)
+            .serve_volume(&vol, dir_server_end, false, false)
             .await
             .expect("serve_volume failed");
 
@@ -1291,7 +1330,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume, dir_server_end, false)
+                .serve_volume(&volume, dir_server_end, false, false)
                 .await
                 .expect("serve_volume failed");
 

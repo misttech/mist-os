@@ -16,7 +16,7 @@ mod remote_crypt;
 mod symlink;
 pub mod vmo_data_buffer;
 pub mod volume;
-mod volumes_directory;
+pub mod volumes_directory;
 
 #[cfg(test)]
 mod testing;
