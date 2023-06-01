@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1871
+From //build/config/BUILDCONFIG.gn:1882
 
 ### allow_legacy_data_partition_names
 
@@ -3136,7 +3136,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1618
+From //build/config/BUILDCONFIG.gn:1617
 
 ### extra_vbmeta_descriptors
 
@@ -4478,7 +4478,7 @@ Each element of the list is one variant, which is a scope defining:
 }, {
   configs = ["//build/config/sanitizers:ubsan"]
   remove_common_configs = ["//build/config:no_rtti"]
-  tags = ["instrumented", "instrumentation-runtime", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "ubsan"]
+  tags = ["instrumented", "instrumentation-runtime", "needs-compiler-abi", "needs-writable-globals", "ubsan"]
 }, {
   configs = ["//build/config/sanitizers:ubsan", "//build/config/sanitizers:sancov"]
   remove_common_configs = ["//build/config:no_rtti"]
@@ -7599,6 +7599,16 @@ Identifier for the Core SDK.
 
 From //sdk/config.gni:7
 
+### sdk_no_host_tools
+
+Whether to omit host tools from the generated IDKs.
+Should only be set in the args.gn files created by generate_final_idk()
+actions.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:16
+
 ### select_variant
 
 List of "selectors" to request variant builds of certain targets.
@@ -7669,7 +7679,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1861
+From //build/config/BUILDCONFIG.gn:1872
 
 ### select_variant_canonical
 
@@ -7679,7 +7689,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1866
+From //build/config/BUILDCONFIG.gn:1877
 
 ### select_variant_shortcuts
 
@@ -7728,10 +7738,16 @@ a list that can be spliced into [`select_variant`](#select_variant).
   host = true
   variant = "tsan"
 }]
+}, {
+  name = "kubsan"
+  select_variant = [{
+  dir = ["//zircon/kernel"]
+  variant = "ubsan"
+}]
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1664
+From //build/config/BUILDCONFIG.gn:1663
 
 ### size_checker_input
 
@@ -7877,7 +7893,7 @@ From //src/starnix/kernel/BUILD.gn:19
 
 Whether or not to enable 'in-thread' exception handling for restricted mode.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/starnix/kernel/BUILD.gn:13
 
@@ -8177,7 +8193,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1648
+From //build/config/BUILDCONFIG.gn:1647
 
 ### universe_package_labels
 
