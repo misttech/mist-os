@@ -282,12 +282,18 @@ pub fn sys_setuid(current_task: &CurrentTask, uid: uid_t) -> Result<(), Errno> {
     if !new_uid_allowed(&creds, uid) {
         return error!(EPERM);
     }
+
+    let prev_uid = creds.uid;
+    let prev_euid = creds.euid;
+    let prev_saved_uid = creds.saved_uid;
     let has_cap_setuid = creds.has_capability(CAP_SETUID);
     creds.euid = uid;
     if has_cap_setuid {
         creds.uid = uid;
         creds.saved_uid = uid;
     }
+
+    creds.update_capabilities(prev_uid, prev_euid, prev_saved_uid);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -349,7 +355,10 @@ pub fn sys_setreuid(current_task: &CurrentTask, ruid: uid_t, euid: uid_t) -> Res
     if !allowed(ruid) || !allowed(euid) {
         return error!(EPERM);
     }
-    let previous_ruid = creds.uid;
+
+    let prev_ruid = creds.uid;
+    let prev_euid = creds.euid;
+    let prev_saved_uid = creds.saved_uid;
     let mut is_ruid_set = false;
     if ruid != u32::MAX {
         creds.uid = ruid;
@@ -359,10 +368,11 @@ pub fn sys_setreuid(current_task: &CurrentTask, ruid: uid_t, euid: uid_t) -> Res
         creds.euid = euid;
     }
 
-    if is_ruid_set || previous_ruid != euid {
+    if is_ruid_set || prev_ruid != euid {
         creds.saved_uid = creds.euid;
     }
 
+    creds.update_capabilities(prev_ruid, prev_euid, prev_saved_uid);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -402,6 +412,10 @@ pub fn sys_setresuid(
     if !allowed(ruid) || !allowed(euid) || !allowed(suid) {
         return error!(EPERM);
     }
+
+    let prev_ruid = creds.uid;
+    let prev_euid = creds.euid;
+    let prev_saved_uid = creds.saved_uid;
     if ruid != u32::MAX {
         creds.uid = ruid;
     }
@@ -411,6 +425,7 @@ pub fn sys_setresuid(
     if suid != u32::MAX {
         creds.saved_uid = suid;
     }
+    creds.update_capabilities(prev_ruid, prev_euid, prev_saved_uid);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -666,8 +681,16 @@ pub fn sys_prctl(
             not_implemented!("prctl(PR_SET_PTRACER, {})", arg2);
             Ok(().into())
         }
+        PR_GET_KEEPCAPS => {
+            Ok(current_task.creds().securebits.contains(SecureBits::KEEP_CAPS).into())
+        }
         PR_SET_KEEPCAPS => {
-            not_implemented!("prctl(PR_SET_KEEPCAPS, {})", arg2);
+            if arg2 != 0 && arg2 != 1 {
+                return error!(EINVAL);
+            }
+            let mut creds = current_task.creds();
+            creds.securebits.set(SecureBits::KEEP_CAPS, arg2 != 0);
+            current_task.set_creds(creds);
             Ok(().into())
         }
         PR_SET_NO_NEW_PRIVS => {

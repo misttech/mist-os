@@ -39,6 +39,7 @@
                 "ChmodTest.FchmodDirWithOpath",
 
                 // chown_test
+                "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
                 "ChownTest.FchownDirWithOpath",
                 "ChownTest.FchownatWithOpath",
                 "ChownTest.FchownatEmptyPath",

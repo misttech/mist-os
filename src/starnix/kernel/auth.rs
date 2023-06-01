@@ -154,9 +154,18 @@ impl Credentials {
         // > when execve(2) is called.
         // https://man7.org/linux/man-pages/man7/capabilities.7.html
 
-        // TODO(security): This should take file capabilities into account.
-        // (inheritable & file.inheritable) | (file.permitted & bounding) | ambient
-        self.cap_permitted = self.cap_inheritable | self.cap_ambient;
+        // When a process with nonzero UIDs execve(2)s a set-user-ID-
+        // root program that does not have capabilities attached, or when a
+        // process whose real and effective UIDs are zero execve(2)s a
+        // program, the calculation of the process's new permitted
+        // capabilities simplifies to: inheritable | bounding.
+        if self.uid == 0 && self.euid == 0 {
+            self.cap_permitted = self.cap_inheritable | self.cap_bounding;
+        } else {
+            // TODO(security): This should take file capabilities into account.
+            // (inheritable & file.inheritable) | (file.permitted & bounding) | ambient
+            self.cap_permitted = self.cap_inheritable | self.cap_ambient;
+        }
 
         // TODO(security): This should take file capabilities into account.
         // if file.effective { permitted | ambient } else { 0 }
@@ -167,6 +176,45 @@ impl Credentials {
 
     pub fn as_fscred(&self) -> FsCred {
         FsCred { uid: self.euid, gid: self.egid }
+    }
+
+    pub fn update_capabilities(
+        &mut self,
+        prev_uid: uid_t,
+        prev_euid: uid_t,
+        prev_saved_uid: uid_t,
+    ) {
+        // https://man7.org/linux/man-pages/man7/capabilities.7.html
+        // If one or more of the real, effective, or saved set user IDs
+        // was previously 0, and as a result of the UID changes all of
+        // these IDs have a nonzero value, then all capabilities are
+        // cleared from the permitted, effective, and ambient capability
+        // sets.
+        //
+        // SECBIT_KEEP_CAPS: Setting this flag allows a thread that has one or more 0
+        // UIDs to retain capabilities in its permitted set when it
+        // switches all of its UIDs to nonzero values.
+        // The setting of the SECBIT_KEEP_CAPS flag is ignored if the
+        // SECBIT_NO_SETUID_FIXUP flag is set.  (The latter flag
+        // provides a superset of the effect of the former flag.)
+        if !self.securebits.contains(SecureBits::KEEP_CAPS)
+            && !self.securebits.contains(SecureBits::NO_SETUID_FIXUP)
+            && (prev_uid == 0 || prev_euid == 0 || prev_saved_uid == 0)
+            && (self.uid != 0 && self.euid != 0 && self.saved_uid != 0)
+        {
+            self.cap_permitted = Capabilities::empty();
+            self.cap_effective = Capabilities::empty();
+            self.cap_ambient = Capabilities::empty();
+        }
+        // If the effective user ID is changed from 0 to nonzero, then
+        // all capabilities are cleared from the effective set.
+        if prev_euid == 0 && self.euid != 0 {
+            self.cap_effective = Capabilities::empty();
+        } else if prev_euid != 0 && self.euid == 0 {
+            // If the effective user ID is changed from nonzero to 0, then
+            // the permitted set is copied to the effective set.
+            self.cap_effective = self.cap_permitted;
+        }
     }
 }
 

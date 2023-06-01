@@ -33,9 +33,6 @@
                 "BadOffset/AIOReadWriteParamTest.BadOffset/0",
                 "BadOffset/AIOReadWriteParamTest.BadOffset/2",
 
-                // chown_test
-                "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
-
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
                 "Sleepers/WallClockNanosleepTest.InterruptedNanosleep/*",
@@ -462,12 +459,7 @@
                 "PpollTest.SignalMaskBlocksSignal",
 
                 // prctl_setuid_test
-                "PrctlKeepCapsSetuidTest.PrctlBadArgsToKeepCaps",
-                "PrctlKeepCapsSetuidTest.SetUidNoKeepCaps",
-                "PrctlKeepCapsSetuidTest.NoKeepCapsAfterExec",
-                "PrctlKeepCapsSetuidTest.SetUidKeepCaps",
                 "PrctlKeepCapsSetuidTest.NoKeepCapsAfterNewUserNamespace",
-                "PrctlKeepCapsSetuidTest.PrGetKeepCaps",
 
                 // prctl_test
                 "PrctlTest.InvalidPrSetMM",
@@ -482,7 +474,6 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcCpuinfo.DeniesWriteNonRoot",
                 "ProcCpuinfo.RequiredFieldsArePresent",
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",
@@ -502,7 +493,6 @@
                 "Proc.GetdentsEnoent",
                 "Proc.PidTidIOAccounting",
                 "ProcPidMem.DifferentUserAttached",
-                "ProcPidMem.DifferentUser",
 
                 // proc_isolated_test
                 "ProcDefaults.PresenceOfSem",
