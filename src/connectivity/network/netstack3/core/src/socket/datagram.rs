@@ -74,7 +74,7 @@ where
 {
     pub(crate) fn iter_receivers(
         &self,
-        (src_ip, src_port): (SpecifiedAddr<A::IpAddr>, A::RemoteIdentifier),
+        (src_ip, src_port): (SpecifiedAddr<A::IpAddr>, Option<A::RemoteIdentifier>),
         (dst_ip, dst_port): (SpecifiedAddr<A::IpAddr>, A::LocalIdentifier),
         device: A::WeakDeviceId,
     ) -> Option<FoundSockets<AddrEntry<'_, A, S>, impl Iterator<Item = AddrEntry<'_, A, S>> + '_>>
@@ -112,13 +112,18 @@ where
     /// were found, or the results of the lookup.
     fn lookup(
         &self,
-        (src_ip, src_port): (SpecifiedAddr<A::IpAddr>, A::RemoteIdentifier),
+        (src_ip, src_port): (SpecifiedAddr<A::IpAddr>, Option<A::RemoteIdentifier>),
         (dst_ip, dst_port): (SpecifiedAddr<A::IpAddr>, A::LocalIdentifier),
         device: A::WeakDeviceId,
     ) -> Option<FoundSockets<AddrEntry<'_, A, S>, impl Iterator<Item = AddrEntry<'_, A, S>> + '_>>
     {
         let mut matching_entries = AddrVecIter::with_device(
-            ConnIpAddr { local: (dst_ip, dst_port), remote: (src_ip, src_port) }.into(),
+            match src_port {
+                Some(src_port) => {
+                    ConnIpAddr { local: (dst_ip, dst_port), remote: (src_ip, src_port) }.into()
+                }
+                None => ListenerIpAddr { addr: Some(dst_ip), identifier: dst_port }.into(),
+            },
             device,
         )
         .filter_map(move |addr: AddrVec<A>| match addr {

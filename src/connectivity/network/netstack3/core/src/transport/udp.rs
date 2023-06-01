@@ -457,9 +457,9 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
     /// Uses the provided addresses and receiving device to look up sockets that
     /// should receive a matching incoming packet. The returned iterator may
     /// yield 0, 1, or multiple sockets.
-    fn lookup_recipients(
+    fn lookup(
         &self,
-        (src_ip, src_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
+        (src_ip, src_port): (SpecifiedAddr<I::Addr>, Option<NonZeroU16>),
         (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
         device: D,
     ) -> impl Iterator<Item = LookupResult<I, D>> + '_ {
@@ -472,7 +472,7 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
                 let selector = SocketSelectorParams {
                     src_ip,
                     dst_ip,
-                    src_port: src_port.get(),
+                    src_port: src_port.map_or(0, NonZeroU16::get),
                     dst_port: dst_port.get(),
                     _ip: IpVersionMarker::default(),
                 };
@@ -947,21 +947,22 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
         device: &SC::DeviceId,
         src_ip: Option<SpecifiedAddr<I::Addr>>,
         dst_ip: SpecifiedAddr<I::Addr>,
-        mut udp_packet: &[u8],
+        mut original_udp_packet: &[u8],
         err: I::ErrorCode,
     ) {
         ctx.increment_debug_counter("UdpIpTransportContext::receive_icmp_error");
         trace!("UdpIpTransportContext::receive_icmp_error({:?})", err);
 
-        let udp_packet =
-            match udp_packet.parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<I>::default()) {
-                Ok(packet) => packet,
-                Err(e) => {
-                    let _: ParseError = e;
-                    // TODO(joshlf): Do something with this error.
-                    return;
-                }
-            };
+        let udp_packet = match original_udp_packet
+            .parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<I>::default())
+        {
+            Ok(packet) => packet,
+            Err(e) => {
+                let _: ParseError = e;
+                // TODO(joshlf): Do something with this error.
+                return;
+            }
+        };
         if let (Some(src_ip), Some(src_port), Some(dst_port)) =
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
@@ -969,7 +970,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
                 let Sockets {sockets, lazy_port_alloc: _} = state;
 
                 let receiver = sockets
-                    .lookup_recipients((dst_ip, dst_port), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
+                    .lookup((dst_ip, Some(dst_port)), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
                     .next();
 
             if let Some(id) = receiver {
@@ -1022,22 +1023,20 @@ impl<
 
             let device_weak = sync_ctx.downgrade_device_id(device);
 
+            let src_port = packet.src_port();
             let mut recipients = SpecifiedAddr::new(src_ip)
-                .and_then(|src_ip| {
-                    packet.src_port().map(|src_port| {
-                        sockets.lookup_recipients(
-                            (src_ip, src_port),
-                            (dst_ip, packet.dst_port()),
-                            device_weak.clone(),
-                        )
-                    })
+                .map(|src_ip| {
+                    sockets.lookup(
+                        (src_ip, src_port),
+                        (dst_ip, packet.dst_port()),
+                        device_weak.clone(),
+                    )
                 })
                 .into_iter()
                 .flatten()
                 .peekable();
 
             if recipients.peek().is_some() {
-                let src_port = packet.src_port();
                 drop(packet);
                 for lookup_result in recipients {
                     match lookup_result {
@@ -2670,11 +2669,12 @@ mod tests {
         device: D,
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        src_port: NonZeroU16,
+        src_port: impl Into<u16>,
         dst_port: NonZeroU16,
         body: &[u8],
     ) {
-        let builder = UdpPacketBuilder::new(src_ip, dst_ip, Some(src_port), dst_port);
+        let builder =
+            UdpPacketBuilder::new(src_ip, dst_ip, NonZeroU16::new(src_port.into()), dst_port);
         let buffer = Buf::new(body.to_owned(), ..)
             .encapsulate(builder)
             .serialize_vec_outer()
@@ -3918,6 +3918,39 @@ mod tests {
         assert_eq!(pkt.dst_ip, local_ip_b.get());
         assert_eq!(pkt.src_port.unwrap(), remote_port);
         assert_eq!(pkt.body, &body[..]);
+    }
+
+    #[ip_test]
+    fn test_receive_source_port_zero_on_listener<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        let listener = SocketHandler::<I, _>::listen_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            None,
+            Some(LOCAL_PORT),
+        )
+        .expect("listen_udp failed");
+
+        let body = [];
+        receive_udp_packet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            FakeDeviceId,
+            I::FAKE_CONFIG.remote_ip.get(),
+            I::FAKE_CONFIG.local_ip.get(),
+            0u16,
+            LOCAL_PORT,
+            &body[..],
+        );
+        // Check that we received both packets for the listener.
+        assert_eq!(
+            non_sync_ctx.state().listen_data(),
+            HashMap::from([(listener, vec![[].as_slice()])]),
+        );
     }
 
     #[ip_test]
