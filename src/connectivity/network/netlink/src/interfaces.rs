@@ -115,33 +115,41 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                 }
             }
         };
-
         pin_mut!(if_event_stream);
 
-        let interfaces_res =
-            fnet_interfaces_ext::existing(if_event_stream.by_ref(), HashMap::new()).await;
-        let mut interface_properties = match interfaces_res {
-            Ok(interfaces) => interfaces,
-            Err(e) => {
-                return InterfacesEventLoopError::Netstack(NetstackError::Unspecified(anyhow!(
-                    "could not fetch existing interface events: {:?}",
-                    e
-                )));
-            }
-        };
+        // Fetch the existing interfaces and addresses to generate the initial
+        // state before starting to publish events to members of multicast
+        // groups. This is because messages should not be sent for
+        // interfaces/addresses that already existed. Sending messages in
+        // response to existing (`fnet_interfaces::Event::Existing`) events will
+        // violate that expectation.
+        let (mut interface_properties, mut addresses) = {
+            let interface_properties =
+                match fnet_interfaces_ext::existing(if_event_stream.by_ref(), HashMap::new()).await
+                {
+                    Ok(interfaces) => interfaces,
+                    Err(e) => {
+                        return InterfacesEventLoopError::Netstack(NetstackError::Unspecified(
+                            anyhow!("could not fetch existing interface events: {:?}", e),
+                        ));
+                    }
+                };
 
-        // `BTreeMap` so that addresses are iterated in deterministic order
-        // (useful for tests).
-        let mut addresses: BTreeMap<_, _> = interface_properties
-            .values()
-            .map(|properties| {
-                addresses_optionally_from_interface_properties(properties)
-                    .map(IntoIterator::into_iter)
-                    .into_iter()
-                    .flatten()
-            })
-            .flatten()
-            .collect();
+            // `BTreeMap` so that addresses are iterated in deterministic order
+            // (useful for tests).
+            let addresses: BTreeMap<_, _> = interface_properties
+                .values()
+                .map(|properties| {
+                    addresses_optionally_from_interface_properties(properties)
+                        .map(IntoIterator::into_iter)
+                        .into_iter()
+                        .flatten()
+                })
+                .flatten()
+                .collect();
+
+            (interface_properties, addresses)
+        };
 
         loop {
             let stream_res = if_event_stream.try_next().await;
@@ -1137,6 +1145,7 @@ mod tests {
             ..Default::default()
         };
 
+        // Existing events should never trigger messages to be sent.
         let watcher_stream_fut = respond_to_watcher(
             watcher_stream.by_ref(),
             [
