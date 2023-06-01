@@ -16,7 +16,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -59,13 +59,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
                 // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
                 // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
                 // that combination of arguments would normally result in MetaAsFile being used.
-                ImmutableConnection::create_connection(
-                    scope,
-                    self,
-                    flags.to_directory_options()?,
-                    object_request.take(),
-                );
-                Ok(())
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
             return;
         }

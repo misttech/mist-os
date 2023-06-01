@@ -24,7 +24,7 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
-    ProtocolsExt, ToObjectRequest,
+    ToObjectRequest,
 };
 
 use {
@@ -188,23 +188,21 @@ where
             (path_ref, Some(name)) => (name, path_ref),
             (_, None) => {
                 flags.to_object_request(server_end).handle(|object_request| {
-                    let options = flags.to_directory_options()?;
                     if Connection::MUTABLE {
-                        MutableConnection::create_connection(
+                        object_request.spawn_connection(
                             scope,
                             self,
-                            options,
-                            object_request.take(),
-                        );
+                            flags,
+                            MutableConnection::create,
+                        )
                     } else {
-                        ImmutableConnection::create_connection(
+                        object_request.spawn_connection(
                             scope,
                             self,
-                            options,
-                            object_request.take(),
-                        );
+                            flags,
+                            ImmutableConnection::create,
+                        )
                     }
-                    Ok(())
                 });
                 return;
             }

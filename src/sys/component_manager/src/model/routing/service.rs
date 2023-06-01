@@ -48,7 +48,7 @@ use {
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -126,13 +126,12 @@ impl DirectoryEntry for FilteredServiceDirectory {
         flags.to_object_request(server_end).handle(|object_request| {
             if path.is_empty() {
                 // If path is empty just connect to itself as a directory.
-                ImmutableConnection::create_connection(
+                return object_request.spawn_connection(
                     scope,
                     self,
-                    flags.to_directory_options()?,
-                    object_request.take(),
+                    flags,
+                    ImmutableConnection::create,
                 );
-                return Ok(());
             }
             let input_path_string = path.clone().into_string();
             let service_instance_name =
@@ -342,7 +341,7 @@ impl CapabilityProvider for FilteredServiceProvider {
         // does one of 3 things depending on the path argument.
         // 1. We open an actual instance, which forwards the open call to the directory entry in the source (original unfiltered) service providing instance.
         // 2. The path is unknown/ not in the directory and we error.
-        // 3. we call ImmutableConnection::create_connection with self as one of the arguments.
+        // 3. we create a connection with self as one of the arguments.
         // In case 3 the directory will stay in scope until the server_end channel is closed.
         Arc::new(FilteredServiceDirectory {
             source_instance_filter: self.source_instance_filter,

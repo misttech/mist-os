@@ -25,7 +25,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -72,12 +72,7 @@ impl DirectoryEntry for PkgfsPackagesVariants {
 
             match path.next().map(|variant| self.variant(variant)) {
                 None => {
-                    ImmutableConnection::create_connection(
-                        scope,
-                        self,
-                        flags.to_directory_options()?,
-                        object_request.take(),
-                    );
+                    object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
                 }
                 Some(Some(hash)) => {
                     let blobfs = self.blobfs.clone();
@@ -94,11 +89,11 @@ impl DirectoryEntry for PkgfsPackagesVariants {
                                 anyhow!(e)
                             );
                         }
-                    })
+                    });
+                    Ok(())
                 }
-                Some(None) => return Err(zx::Status::NOT_FOUND),
+                Some(None) => Err(zx::Status::NOT_FOUND),
             }
-            Ok(())
         });
     }
 

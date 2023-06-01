@@ -22,7 +22,7 @@ use crate::{
     execution_scope::ExecutionScope,
     path::{validate_name, Path},
     token_registry::{TokenInterface, TokenRegistry, Tokenizable},
-    ObjectRequest,
+    ObjectRequestRef, ProtocolsExt,
 };
 
 use {
@@ -31,7 +31,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{pin_mut, TryStreamExt as _},
     pin_project::pin_project,
-    std::{pin::Pin, sync::Arc},
+    std::{future::Future, pin::Pin, sync::Arc},
 };
 
 #[pin_project]
@@ -71,43 +71,23 @@ impl DerivedConnection for MutableConnection {
 }
 
 impl MutableConnection {
-    pub fn create_connection(
+    pub fn create(
         scope: ExecutionScope,
-        directory: Arc<dyn MutableDirectory>,
-        options: DirectoryOptions,
-        object_request: ObjectRequest,
-    ) {
+        directory: Arc<impl MutableDirectory>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef,
+    ) -> Result<impl Future<Output = ()>, zx::Status> {
         // Ensure we close the directory if we fail to prepare the connection.
-        let directory = OpenDirectory::new(directory);
+        let directory = OpenDirectory::new(directory as Arc<dyn MutableDirectory>);
 
-        let connection = Self::new(scope.clone(), directory, options);
+        let connection = Self::new(scope, directory, protocols.to_directory_options()?);
 
-        // If we fail to send the task to the executor, it is probably shut down or is in the
-        // process of shutting down (this is the only error state currently).  So there is
-        // nothing for us to do - the connection will be closed automatically when the
-        // connection object is dropped.
-        let _ = scope.spawn(async {
+        let object_request = object_request.take();
+        Ok(async move {
             if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                Self::handle_requests(connection, requests).await;
+                connection.handle_requests(requests).await
             }
-        });
-    }
-
-    /// Very similar to create_connection, but creates a connection without spawning a new task.
-    pub async fn create_connection_async(
-        scope: ExecutionScope,
-        directory: Arc<dyn MutableDirectory>,
-        options: DirectoryOptions,
-        object_request: ObjectRequest,
-    ) {
-        // Ensure we close the directory if we fail to prepare the connection.
-        let directory = OpenDirectory::new(directory);
-
-        let connection = Self::new(scope, directory, options);
-
-        if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-            connection.handle_requests(requests).await
-        }
+        })
     }
 
     async fn handle_request(
@@ -376,7 +356,7 @@ mod tests {
                 traversal_position::TraversalPosition,
             },
             path::Path,
-            ProtocolsExt, ToObjectRequest,
+            ToObjectRequest,
         },
         async_trait::async_trait,
         fidl::endpoints::ServerEnd,
@@ -547,13 +527,12 @@ mod tests {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             flags.to_object_request(server_end).handle(|object_request| {
-                MutableConnection::create_connection(
+                object_request.spawn_connection(
                     self.scope.clone(),
                     dir.clone(),
-                    flags.to_directory_options()?,
-                    object_request.take(),
-                );
-                Ok(())
+                    flags,
+                    MutableConnection::create,
+                )
             });
             (dir, proxy)
         }

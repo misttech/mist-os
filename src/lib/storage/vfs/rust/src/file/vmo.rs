@@ -12,11 +12,9 @@ use crate::{
     common::rights_to_posix_mode_bits,
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
-    file::{
-        common::vmo_flags_to_rights, connection::io1::create_connection, File, FileIo, FileOptions,
-    },
+    file::{common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileOptions},
     path::Path,
-    ProtocolsExt, ToObjectRequest,
+    ToObjectRequest,
 };
 
 use {
@@ -243,16 +241,7 @@ impl DirectoryEntry for VmoFile {
                 return Err(Status::NOT_SUPPORTED);
             }
 
-            create_connection(
-                scope.clone(),
-                self.clone(),
-                flags.to_file_options()?,
-                object_request.take(),
-                self.readable,
-                self.writable,
-                self.executable,
-            );
-            Ok(())
+            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
         });
     }
 
@@ -303,6 +292,18 @@ impl FileIo for VmoFile {
 
 #[async_trait]
 impl File for VmoFile {
+    fn readable(&self) -> bool {
+        self.readable
+    }
+
+    fn writable(&self) -> bool {
+        self.writable
+    }
+
+    fn executable(&self) -> bool {
+        self.executable
+    }
+
     async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         let mut vmo_state = self.vmo.lock().await;
         if vmo_state.is_some() {

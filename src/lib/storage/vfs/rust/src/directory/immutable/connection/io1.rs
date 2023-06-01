@@ -18,10 +18,15 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
-    ObjectRequest,
+    ObjectRequestRef, ProtocolsExt,
 };
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon::Status, futures::TryStreamExt as _, std::sync::Arc};
+use {
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon::Status,
+    futures::TryStreamExt as _,
+    std::{future::Future, sync::Arc},
+};
 
 pub struct ImmutableConnection {
     base: BaseConnection<Self>,
@@ -37,26 +42,27 @@ impl ImmutableConnection {
         }
     }
 
-    pub fn create_connection(
+    pub fn create(
         scope: ExecutionScope,
-        directory: Arc<dyn entry_container::Directory>,
-        options: DirectoryOptions,
-        object_request: ObjectRequest,
-    ) {
+        directory: Arc<impl entry_container::Directory>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef,
+    ) -> Result<impl Future<Output = ()>, Status> {
         // Ensure we close the directory if we fail to create the connection.
-        let directory = OpenDirectory::new(directory);
+        let directory = OpenDirectory::new(directory as Arc<dyn entry_container::Directory>);
 
-        let connection = Self::new(scope.clone(), directory, options);
+        let connection = Self::new(scope.clone(), directory, protocols.to_directory_options()?);
 
         // If we fail to send the task to the executor, it is probably shut down or is in the
         // process of shutting down (this is the only error state currently).  So there is nothing
         // for us to do - the connection will be closed automatically when the connection object is
         // dropped.
-        let _ = scope.spawn(async {
+        let object_request = object_request.take();
+        Ok(async move {
             if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
                 connection.handle_requests(requests).await;
             }
-        });
+        })
     }
 }
 

@@ -9,8 +9,8 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::Arc,
     vfs::{
-        directory::entry::EntryInfo, execution_scope::ExecutionScope, path::Path as VfsPath,
-        ProtocolsExt, ToObjectRequest,
+        directory::entry::EntryInfo, execution_scope::ExecutionScope, file::FidlIoConnection,
+        path::Path as VfsPath, ToObjectRequest,
     },
 };
 
@@ -52,18 +52,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsF
                 return Err(zx::Status::NOT_SUPPORTED);
             }
 
-            let () = vfs::file::connection::io1::create_connection(
-                scope,
-                self,
-                flags.to_file_options()?,
-                object_request.take(),
-                // readable/writable/executable do not override the flags, they tell the
-                // FileConnection if it's ever valid to open the file with that right.
-                true,  /*=readable*/
-                false, /*=writable*/
-                false, /*=executable*/
-            );
-            Ok(())
+            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
         });
     }
 
@@ -154,6 +143,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             file::{File, FileIo},
+            ProtocolsExt,
         },
     };
 

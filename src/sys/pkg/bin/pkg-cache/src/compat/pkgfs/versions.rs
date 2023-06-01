@@ -21,7 +21,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -133,13 +133,7 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
             // still holds any remaining path elements.
             match path.next().map(Hash::from_str) {
                 None => {
-                    ImmutableConnection::create_connection(
-                        scope,
-                        self,
-                        flags.to_directory_options()?,
-                        object_request.take(),
-                    );
-                    Ok(())
+                    object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
                 }
                 Some(Ok(package_hash)) => {
                     let cloned_scope = scope.clone();

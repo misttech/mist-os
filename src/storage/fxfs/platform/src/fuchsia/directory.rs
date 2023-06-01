@@ -603,13 +603,12 @@ impl DirectoryEntry for FxDirectory {
             Box::pin(async move {
                 let node = self.lookup(&flags, path, None).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
-                    Ok(MutableConnection::create_connection_async(
+                    object_request.create_connection(
                         scope,
                         node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        flags.to_directory_options()?,
-                        object_request.take(),
+                        flags,
+                        MutableConnection::create,
                     )
-                    .boxed())
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
@@ -620,12 +619,7 @@ impl DirectoryEntry for FxDirectory {
                         }
                         .boxed())
                     } else {
-                        FxFile::create_connection_async(
-                            node,
-                            scope,
-                            flags.to_file_options()?,
-                            object_request,
-                        )
+                        FxFile::create_connection_async(node, scope, flags, object_request)
                     }
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
@@ -661,21 +655,15 @@ impl DirectoryEntry for FxDirectory {
             Box::pin(async move {
                 let node = self.lookup(&protocols, path, None).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
-                    Ok(MutableConnection::create_connection_async(
+                    object_request.create_connection(
                         scope,
                         node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        protocols.to_directory_options()?,
-                        object_request.take(),
+                        protocols,
+                        MutableConnection::create,
                     )
-                    .boxed())
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    FxFile::create_connection_async(
-                        node,
-                        scope,
-                        protocols.to_file_options()?,
-                        object_request,
-                    )
+                    FxFile::create_connection_async(node, scope, protocols, object_request)
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
                     Ok(symlink::Connection::run(

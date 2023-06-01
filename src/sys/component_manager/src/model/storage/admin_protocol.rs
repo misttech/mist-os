@@ -879,7 +879,7 @@ mod tests {
             file::vmo::read_only,
             mut_pseudo_directory,
             path::Path,
-            ProtocolsExt, ToObjectRequest,
+            ToObjectRequest,
         },
     };
 
@@ -1373,7 +1373,6 @@ mod tests {
     struct FakeDir {
         used: u64,
         total: u64,
-        scope: ExecutionScope,
     }
 
     impl std::fmt::Debug for FakeDir {
@@ -1385,19 +1384,13 @@ mod tests {
     impl DirectoryEntry for FakeDir {
         fn open(
             self: Arc<Self>,
-            _scope: ExecutionScope,
+            scope: ExecutionScope,
             flags: fio::OpenFlags,
             _path: Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
             flags.to_object_request(server_end).handle(|object_request| {
-                ImmutableConnection::create_connection(
-                    self.scope.clone(),
-                    self,
-                    flags.to_directory_options()?,
-                    object_request.take(),
-                );
-                Ok(())
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
         }
 
@@ -1460,7 +1453,7 @@ mod tests {
 
         let used = 10;
         let total = 1000;
-        let fake_dir = Arc::new(FakeDir { used, total, scope: execution_scope.clone() });
+        let fake_dir = Arc::new(FakeDir { used, total });
 
         fake_dir.open(
             execution_scope.clone(),

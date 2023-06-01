@@ -20,7 +20,7 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
-    ProtocolsExt, ToObjectRequest,
+    ToObjectRequest,
 };
 
 use {
@@ -188,13 +188,7 @@ impl<T: LazyDirectory> DirectoryEntry for Lazy<T> {
             Some(name) => name.to_string(),
             None => {
                 flags.to_object_request(server_end).handle(|object_request| {
-                    ImmutableConnection::create_connection(
-                        scope,
-                        self,
-                        flags.to_directory_options()?,
-                        object_request.take(),
-                    );
-                    Ok(())
+                    object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
                 });
                 return;
             }

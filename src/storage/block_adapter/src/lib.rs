@@ -20,9 +20,9 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{connection::io1::create_connection, File, FileIo, FileOptions},
+        file::{FidlIoConnection, File, FileIo, FileOptions},
         path::Path,
-        pseudo_directory, ProtocolsExt, ToObjectRequest,
+        pseudo_directory, ToObjectRequest,
     },
 };
 
@@ -52,16 +52,7 @@ impl DirectoryEntry for BlockFile {
             if !path.is_empty() {
                 return Err(zx::Status::NOT_FILE);
             }
-            create_connection(
-                scope,
-                self,
-                flags.to_file_options()?,
-                object_request.take(),
-                true,
-                true,
-                false,
-            );
-            Ok(())
+            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
         });
     }
 
@@ -72,6 +63,10 @@ impl DirectoryEntry for BlockFile {
 
 #[async_trait]
 impl File for BlockFile {
+    fn writable(&self) -> bool {
+        true
+    }
+
     async fn open(&self, _options: &FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }

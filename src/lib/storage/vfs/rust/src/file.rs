@@ -18,6 +18,8 @@ mod common;
 
 pub mod connection;
 
+pub use connection::io1::{FidlIoConnection, GetVmo, RawIoConnection, StreamIoConnection};
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FileOptions {
     pub rights: fio::Operations,
@@ -72,6 +74,17 @@ impl FileOptions {
 /// Trait used for all files.
 #[async_trait]
 pub trait File: Send + Sync {
+    /// Capabilities:
+    fn readable(&self) -> bool {
+        true
+    }
+    fn writable(&self) -> bool {
+        false
+    }
+    fn executable(&self) -> bool {
+        false
+    }
+
     /// Called when the file is going to be accessed, typically by a new connection.
     /// Flags is the same as the flags passed to `fidl_fuchsia_io.Node/Open`.
     /// The following flags are handled by the connection and do not need to be handled inside

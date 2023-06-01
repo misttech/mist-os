@@ -18,7 +18,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -83,13 +83,7 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
 
-                ImmutableConnection::create_connection(
-                    scope,
-                    self,
-                    flags.to_directory_options()?,
-                    object_request.take(),
-                );
-                Ok(())
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
             return;
         }

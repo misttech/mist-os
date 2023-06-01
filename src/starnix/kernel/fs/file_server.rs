@@ -18,7 +18,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
-use vfs::{directory, execution_scope, file, path, ProtocolsExt, ToObjectRequest};
+use vfs::{directory, execution_scope, file, path, ToObjectRequest};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(
@@ -201,13 +201,12 @@ impl StarnixNodeConnection {
                 flags
                     .to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into()))
                     .handle(|object_request| {
-                        directory::mutable::connection::io1::MutableConnection::create_connection(
+                        object_request.spawn_connection(
                             scope,
                             dir,
-                            flags.to_directory_options()?,
-                            object_request.take(),
-                        );
-                        Ok(())
+                            flags,
+                            directory::mutable::connection::io1::MutableConnection::create,
+                        )
                     });
                 return Ok(());
             }
@@ -250,22 +249,11 @@ impl StarnixNodeConnection {
             return error!(EINVAL);
         }
         let file = self.reopen(flags)?;
-        flags.to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into())).spawn(
-            &scope.clone(),
-            move |object_request| {
-                Box::pin(async move {
-                    Ok(file::connection::io1::create_raw_connection_async(
-                        scope,
-                        file,
-                        flags.to_file_options()?,
-                        object_request.take(),
-                        true,
-                        true,
-                        false,
-                    ))
-                })
-            },
-        );
+        flags
+            .to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into()))
+            .handle(|object_request| {
+                object_request.spawn_connection(scope, file, flags, file::RawIoConnection::create)
+            });
         Ok(())
     }
 
@@ -388,6 +376,9 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
 
 #[async_trait]
 impl file::File for StarnixNodeConnection {
+    fn writable(&self) -> bool {
+        true
+    }
     async fn open(&self, _optionss: &file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }

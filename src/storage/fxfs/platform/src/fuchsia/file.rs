@@ -39,10 +39,8 @@ use {
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{
-            connection::io1::{
-                create_node_reference_connection_async, create_stream_connection_async,
-            },
-            File, FileOptions,
+            connection::io1::create_node_reference_connection, File, FileOptions, GetVmo,
+            StreamIoConnection,
         },
         path::Path,
         ObjectRequestRef, ProtocolsExt, ToObjectRequest,
@@ -80,35 +78,18 @@ impl FxFile {
     pub fn create_connection_async(
         this: OpenedNode<FxFile>,
         scope: ExecutionScope,
-        options: FileOptions,
+        flags: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
-        if options.is_node {
-            Ok(create_node_reference_connection_async(
-                scope,
-                this.take(),
-                options,
-                object_request.take(),
-            )
-            .boxed())
+        if flags.is_node() {
+            Ok(create_node_reference_connection(scope, this.take(), flags, object_request)?.boxed())
         } else {
-            let stream_options = options
-                .to_stream_options()
-                .unwrap_or_else(|| panic!("Invalid options for stream connection: {:?}", options));
-            let stream = zx::Stream::create(stream_options, this.vmo(), 0)?;
-            Ok(create_stream_connection_async(
-                // Note readable/writable/executable do not override what's set in flags, they
-                // merely tell the FileConnection which set of rights the file can be opened as.
+            object_request.create_connection(
                 scope.clone(),
                 this.take(),
-                options,
-                object_request.take(),
-                /*readable=*/ true,
-                /*writable=*/ true,
-                /*executable=*/ false,
-                stream,
+                flags,
+                StreamIoConnection::create,
             )
-            .boxed())
         }
     }
 
@@ -233,12 +214,7 @@ impl DirectoryEntry for FxFile {
                 if !path.is_empty() {
                     return Err(Status::NOT_FILE);
                 }
-                Self::create_connection_async(
-                    OpenedNode::new(self),
-                    scope,
-                    flags.to_file_options()?,
-                    object_request,
-                )
+                Self::create_connection_async(OpenedNode::new(self), scope, flags, object_request)
             })
         });
     }
@@ -250,6 +226,10 @@ impl DirectoryEntry for FxFile {
 
 #[async_trait]
 impl File for FxFile {
+    fn writable(&self) -> bool {
+        true
+    }
+
     async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
@@ -504,6 +484,12 @@ impl PagerBackedVmo for FxFile {
     fn on_zero_children(&self) {
         // Drop the open count that we took in `get_backing_memory`.
         self.open_count_sub_one();
+    }
+}
+
+impl GetVmo for FxFile {
+    fn get_vmo(&self) -> &zx::Vmo {
+        self.vmo()
     }
 }
 

@@ -40,7 +40,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -758,25 +758,21 @@ impl DirectoryEntry for FatDirectory {
         flags.to_object_request(server_end).handle(|object_request| {
             match self.lookup(flags, path, &mut closer)? {
                 FatNode::Dir(entry) => {
-                    let options = flags.to_directory_options()?;
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    MutableConnection::create_connection(
+                    object_request.spawn_connection(
                         scope,
                         entry.clone(),
-                        options,
-                        object_request.take(),
-                    );
-                    Ok(())
+                        flags,
+                        MutableConnection::create,
+                    )
                 }
                 FatNode::File(entry) => {
-                    let options = flags.to_file_options()?;
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    entry.clone().create_connection(scope, options, object_request.take());
-                    Ok(())
+                    entry.clone().create_connection(scope, flags, object_request)
                 }
             }
         });

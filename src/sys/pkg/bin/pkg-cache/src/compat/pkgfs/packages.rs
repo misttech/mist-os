@@ -25,7 +25,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -91,13 +91,7 @@ impl DirectoryEntry for PkgfsPackages {
 
             match path.next().map(PackageName::from_str) {
                 None => {
-                    ImmutableConnection::create_connection(
-                        scope.clone(),
-                        self,
-                        flags.to_directory_options()?,
-                        object_request.take(),
-                    );
-                    Ok(())
+                    object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
                 }
                 Some(Ok(package_name)) => {
                     let object_request = object_request.take();

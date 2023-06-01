@@ -26,9 +26,9 @@ use {
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{connection, File as VfsFile, FileIo as VfsFileIo, FileOptions},
+        file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions},
         path::Path,
-        ObjectRequest, ProtocolsExt, ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
@@ -152,20 +152,10 @@ impl FatFile {
     pub(crate) fn create_connection(
         self: Arc<Self>,
         scope: ExecutionScope,
-        options: FileOptions,
-        object_request: ObjectRequest,
-    ) {
-        connection::io1::create_connection(
-            // Note readable/writable do not override what's set in flags, they merely tell the
-            // FileConnection that it's valid to open the file readable/writable.
-            scope,
-            self,
-            options,
-            object_request,
-            /*readable=*/ true,
-            /*writable=*/ true,
-            /*executable=*/ false,
-        );
+        flags: fio::OpenFlags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
     }
 }
 
@@ -232,6 +222,10 @@ impl Debug for FatFile {
 
 #[async_trait]
 impl VfsFile for FatFile {
+    fn writable(&self) -> bool {
+        return true;
+    }
+
     async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
@@ -371,10 +365,8 @@ impl DirectoryEntry for FatFile {
             if !path.is_empty() {
                 return Err(Status::NOT_DIR);
             }
-            let options = flags.to_file_options()?;
             self.open_ref(&self.filesystem.lock().unwrap())?;
-            self.create_connection(scope, options, object_request.take());
-            Ok(())
+            self.create_connection(scope, flags, object_request)
         });
     }
 

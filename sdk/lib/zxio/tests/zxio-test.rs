@@ -15,11 +15,11 @@ use {
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{connection::io1::create_connection, File, FileIo, FileOptions},
+        file::{FidlIoConnection, File, FileIo, FileOptions},
         path::Path,
         pseudo_directory,
         symlink::Symlink,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 
@@ -242,16 +242,12 @@ impl DirectoryEntry for XattrFile {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         flags.to_object_request(server_end).handle(|object_request| {
-            create_connection(
+            object_request.spawn_connection(
                 scope.clone(),
                 self.clone(),
-                flags.to_file_options()?,
-                object_request.take(),
-                true,
-                true,
-                false,
-            );
-            Ok(())
+                flags,
+                FidlIoConnection::create,
+            )
         });
     }
 
@@ -275,6 +271,9 @@ impl FileIo for XattrFile {
 
 #[async_trait]
 impl File for XattrFile {
+    fn writable(&self) -> bool {
+        true
+    }
     async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }

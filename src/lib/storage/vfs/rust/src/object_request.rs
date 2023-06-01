@@ -104,16 +104,12 @@ impl ObjectRequest {
     }
 
     /// Calls `f` and sends an error on the object request channel upon failure.
-    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, zx::Status>) -> Option<T> {
+    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, zx::Status>) {
         let mut request = Some(self);
-        match f(ObjectRequestRef(&mut request)) {
-            Err(s) => {
-                if let Some(r) = request {
-                    r.shutdown(s);
-                }
-                None
+        if let Err(s) = f(ObjectRequestRef(&mut request)) {
+            if let Some(r) = request {
+                r.shutdown(s);
             }
-            Ok(o) => Some(o),
         }
     }
 
@@ -174,6 +170,30 @@ impl ObjectRequestRef<'_> {
     /// Take the ObjectRequest.  The caller is responsible for sending errors.
     pub fn take(self) -> ObjectRequest {
         self.0.take().unwrap()
+    }
+
+    /// Returns a future that will run the connection. `f` is a callback that returns a future
+    /// that will run the connection.
+    pub fn create_connection<N, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
+        self,
+        scope: ExecutionScope,
+        node: N,
+        protocols: P,
+        f: impl FnOnce(ExecutionScope, N, P, Self) -> Result<F, zx::Status>,
+    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+        Ok(Box::pin(f(scope, node, protocols, self)?))
+    }
+
+    /// Spawns a new connection for this request. `f` is similar to `create_connection` above.
+    pub fn spawn_connection<N, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
+        self,
+        scope: ExecutionScope,
+        node: N,
+        protocols: P,
+        f: impl FnOnce(ExecutionScope, N, P, Self) -> Result<F, zx::Status>,
+    ) -> Result<(), zx::Status> {
+        scope.spawn(f(scope.clone(), node, protocols, self)?);
+        Ok(())
     }
 }
 

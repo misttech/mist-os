@@ -65,14 +65,11 @@ use {
         },
         execution_scope::ExecutionScope,
         file::{
-            connection::io1::{
-                create_connection_async, create_node_reference_connection_async,
-                create_stream_connection_async,
-            },
-            File, FileIo, FileOptions,
+            connection::io1::create_node_reference_connection, FidlIoConnection, File, FileIo,
+            FileOptions, GetVmo, StreamIoConnection,
         },
         path::Path,
-        ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
+        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -313,30 +310,23 @@ impl DirectoryEntry for BlobDirectory {
                     map_to_status(e)
                 })?;
                 if node.is::<BlobDirectory>() {
-                    Ok(MutableConnection::create_connection_async(
+                    object_request.create_connection(
                         scope,
                         node.downcast::<BlobDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        flags.to_directory_options()?,
-                        object_request.take(),
+                        flags,
+                        MutableConnection::create,
                     )
-                    .boxed())
                 } else if node.is::<FxBlob>() {
                     let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
-                    FxBlob::create_connection_async(
-                        node,
-                        scope,
-                        flags.to_file_options()?,
-                        object_request,
-                    )
+                    FxBlob::create_connection_async(node, scope, flags, object_request)
                 } else if node.is::<FxUnsealedBlob>() {
                     let node = node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
-                    Ok(FxUnsealedBlob::create_connection(
-                        node,
+                    object_request.create_connection(
                         scope,
-                        flags.to_file_options()?,
-                        object_request.take(),
+                        node.take(),
+                        flags,
+                        FidlIoConnection::create,
                     )
-                    .boxed())
                 } else {
                     unreachable!();
                 }
@@ -434,34 +424,20 @@ impl FxBlob {
     fn create_connection_async(
         this: OpenedNode<Self>,
         scope: ExecutionScope,
-        options: FileOptions,
+        protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
-        Ok(if options.is_node {
-            create_node_reference_connection_async(
-                scope,
-                this.take(),
-                options,
-                object_request.take(),
-            )
-            .boxed()
+        if protocols.is_node() {
+            Ok(create_node_reference_connection(scope, this.take(), protocols, object_request)?
+                .boxed())
         } else {
-            let stream_options = options
-                .to_stream_options()
-                .unwrap_or_else(|| panic!("Invalid options for stream connection: {options:?}"));
-            let stream = zx::Stream::create(stream_options, this.buffer.vmo(), 0)?;
-            create_stream_connection_async(
+            object_request.create_connection(
                 scope,
                 this.take(),
-                options,
-                object_request.take(),
-                /*readable=*/ true,
-                /*writable=*/ false,
-                /*executable=*/ true,
-                stream,
+                protocols,
+                StreamIoConnection::create,
             )
-            .boxed()
-        })
+        }
     }
 }
 
@@ -479,12 +455,7 @@ impl DirectoryEntry for FxBlob {
                 if !path.is_empty() {
                     return Err(Status::NOT_FILE);
                 }
-                Self::create_connection_async(
-                    OpenedNode::new(self),
-                    scope,
-                    flags.to_file_options()?,
-                    object_request,
-                )
+                Self::create_connection_async(OpenedNode::new(self), scope, flags, object_request)
             })
         });
     }
@@ -630,6 +601,10 @@ pub async fn init_vmex_resource() -> Result<(), Error> {
 /// Implement VFS trait so blobs can be accessed as files.
 #[async_trait]
 impl File for FxBlob {
+    fn executable(&self) -> bool {
+        true
+    }
+
     async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
@@ -845,6 +820,12 @@ impl PagerBackedVmo for FxBlob {
     }
 }
 
+impl GetVmo for FxBlob {
+    fn get_vmo(&self) -> &zx::Vmo {
+        self.buffer.vmo()
+    }
+}
+
 /// Represents a blob that is being written.
 /// The blob cannot be read until writes complete and hash is verified.
 /// Another blob of the same name (hash) cannot be written at the same time.
@@ -943,26 +924,6 @@ impl FxUnsealedBlob {
 // Writes to FxUnsealedBlob are assumed to be pre-compressed, so we don't need the complexity found
 // in FxBlob.
 
-impl FxUnsealedBlob {
-    async fn create_connection(
-        this: OpenedNode<Self>,
-        scope: ExecutionScope,
-        options: FileOptions,
-        object_request: ObjectRequest,
-    ) {
-        create_connection_async(
-            scope,
-            this.take(),
-            options,
-            object_request,
-            /*readable=*/ true,
-            /*writable=*/ true,
-            /*executable=*/ false,
-        )
-        .await
-    }
-}
-
 impl DirectoryEntry for FxUnsealedBlob {
     fn open(
         self: Arc<Self>,
@@ -971,18 +932,11 @@ impl DirectoryEntry for FxUnsealedBlob {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                if !path.is_empty() {
-                    return Err(Status::NOT_FILE);
-                }
-                Ok(Self::create_connection(
-                    OpenedNode::new(self),
-                    scope,
-                    flags.to_file_options()?,
-                    object_request.take(),
-                ))
-            })
+        flags.to_object_request(server_end).handle(|object_request| {
+            if !path.is_empty() {
+                return Err(Status::NOT_FILE);
+            }
+            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
         });
     }
 
@@ -1029,6 +983,10 @@ impl FxNode for FxUnsealedBlob {
 
 #[async_trait]
 impl File for FxUnsealedBlob {
+    fn writable(&self) -> bool {
+        true
+    }
+
     async fn open(&self, _optionss: &FileOptions) -> Result<(), Status> {
         Ok(())
     }

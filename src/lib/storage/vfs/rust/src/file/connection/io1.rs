@@ -16,7 +16,7 @@ use {
         },
         object_request::Representation,
         path::Path,
-        ObjectRequest,
+        ObjectRequestRef, ProtocolsExt,
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -31,6 +31,7 @@ use {
     static_assertions::assert_eq_size,
     std::{
         convert::TryInto as _,
+        future::Future,
         io::SeekFrom,
         marker::{Send, Sync},
         ops::{Deref, DerefMut},
@@ -38,167 +39,57 @@ use {
     },
 };
 
-/// Initializes a file connection, which will be running in the context of the specified
-/// execution `scope`. This function will also check the flags and will send the `OnOpen`
-/// event if necessary.
-pub fn create_connection<U: 'static + File + FileIo + DirectoryEntry>(
-    scope: ExecutionScope,
-    file: Arc<U>,
-    options: FileOptions,
-    object_request: ObjectRequest,
-    readable: bool,
-    writable: bool,
-    executable: bool,
-) {
-    // If we failed to send the task to the executor, it is probably shut down or is in the
-    // process of shutting down (this is the only error state currently). `object_request` and the
-    // file will be closed when they're dropped - there seems to be no error to report there.
-    let _ = scope.clone().spawn(create_connection_async(
-        scope,
-        file,
-        options,
-        object_request,
-        readable,
-        writable,
-        executable,
-    ));
-}
-
-/// Same as create_connection, but does not spawn a new task.
-pub async fn create_connection_async<U: 'static + File + FileIo + DirectoryEntry>(
-    scope: ExecutionScope,
-    file: Arc<U>,
-    options: FileOptions,
-    object_request: ObjectRequest,
-    readable: bool,
-    writable: bool,
-    executable: bool,
-) {
-    let file = FidlIoFile { file, seek: 0, is_append: options.is_append };
-    create_connection_async_impl(
-        scope,
-        file,
-        options,
-        object_request,
-        readable,
-        writable,
-        executable,
-    )
-    .await
-}
-
-/// Same as create_connection, but does not spawn a new task.
-pub async fn create_raw_connection_async<
-    U: 'static + File + RawFileIoConnection + DirectoryEntry,
->(
-    scope: ExecutionScope,
-    file: Arc<U>,
-    options: FileOptions,
-    object_request: ObjectRequest,
-    readable: bool,
-    writable: bool,
-    executable: bool,
-) {
-    let file = RawIoFile { file };
-    create_connection_async_impl(
-        scope,
-        file,
-        options,
-        object_request,
-        readable,
-        writable,
-        executable,
-    )
-    .await
-}
-
-/// Initializes a file connection that uses a stream running in the context of the specified
-/// execution `scope`. A stream based file connection sends a zx::stream to clients that can be used
-/// for issuing read, write, and seek calls. Any read, write, and seek calls that continue to come
-/// in over FIDL will be forwarded to `stream` instead of being sent to `file`.
-///
-/// This should only be used for files. For node connections to services then
-/// `create_node_reference_connection_async` should be used instead. Reading, writing, or seeking on
-/// a node reference should return ZX_ERR_BAD_HANDLE. If a client attempts those operations on a
-/// zx::stream then ZX_ERR_ACCESS_DENIED will be returned.
-pub async fn create_stream_connection_async<U: 'static + File + DirectoryEntry>(
-    scope: ExecutionScope,
-    file: Arc<U>,
-    options: FileOptions,
-    object_request: ObjectRequest,
-    readable: bool,
-    writable: bool,
-    executable: bool,
-    stream: zx::Stream,
-) {
-    assert!(!options.is_node, "Stream based connections can not be used for node references");
-    let file = StreamIoFile { file, stream };
-    create_connection_async_impl(
-        scope,
-        file,
-        options,
-        object_request,
-        readable,
-        writable,
-        executable,
-    )
-    .await
-}
-
 /// Initializes a node reference file connection running in the context of the specified execution
 /// `scope`.
-pub async fn create_node_reference_connection_async<U: 'static + File + DirectoryEntry>(
+pub fn create_node_reference_connection<U: 'static + File + DirectoryEntry>(
     scope: ExecutionScope,
     file: Arc<U>,
-    options: FileOptions,
-    object_request: ObjectRequest,
-) {
-    assert!(options.is_node);
-    create_connection_async_impl(
+    protocols: impl ProtocolsExt,
+    object_request: ObjectRequestRef,
+) -> Result<impl Future<Output = ()>, zx::Status> {
+    let file = OpenFile::new(file, scope.clone());
+    create_connection(
         scope,
         NodeReferenceIoFile { file },
-        options,
+        protocols.to_file_options()?,
         object_request,
-        false,
-        false,
-        false,
     )
-    .await
 }
 
-async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFile>(
+/// Initializes a file connection and returns a future which will process the connection.
+fn create_connection<
+    T: 'static + File,
+    U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler + CloneFile,
+>(
     scope: ExecutionScope,
     file: U,
     options: FileOptions,
-    object_request: ObjectRequest,
-    readable: bool,
-    writable: bool,
-    executable: bool,
-) {
-    // RAII helper that ensures that the file is closed if we fail to create the connection.
-    let file = OpenFile::new(file, scope.clone());
+    object_request: ObjectRequestRef,
+) -> Result<impl Future<Output = ()>, zx::Status> {
+    new_connection_validate_options(&options, file.readable(), file.writable(), file.executable())?;
 
-    if let Err(s) = (|| async {
-        new_connection_validate_options(&options, readable, writable, executable)?;
+    let object_request = object_request.take();
+    Ok(async move {
+        if let Err(s) = (|| async {
+            file.open(&options).await?;
 
-        file.open(&options).await?;
+            if object_request.truncate {
+                file.truncate(0).await?;
+            }
 
-        if object_request.truncate {
-            file.truncate(0).await?;
+            Ok(())
+        })()
+        .await
+        {
+            object_request.shutdown(s);
+            return;
         }
 
-        Ok(())
-    })()
-    .await
-    {
-        object_request.shutdown(s);
-        return;
-    }
-
-    let connection = FileConnection { scope: scope.clone(), file, options };
-    if let Ok(requests) = object_request.into_request_stream(&connection).await {
-        connection.handle_requests(requests).await
-    }
+        let connection = FileConnection { scope: scope.clone(), file, options };
+        if let Ok(requests) = object_request.into_request_stream(&connection).await {
+            connection.handle_requests(requests).await
+        }
+    })
 }
 
 /// Trait for dispatching read, write, and seek FIDL requests.
@@ -230,98 +121,19 @@ trait IoOpHandler: Send + Sync {
     fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status>;
 }
 
-/// Convenience trait for delegating `File` method calls to a field.
-trait AsFile {
-    type FileType: File;
-    fn as_file(&self) -> &Self::FileType;
-}
-
-#[async_trait]
-impl<T: ?Sized + Send + Sync> File for T
-where
-    T: AsFile,
-{
-    async fn open(&self, options: &FileOptions) -> Result<(), Status> {
-        self.as_file().open(options).await
-    }
-
-    async fn truncate(&self, length: u64) -> Result<(), Status> {
-        self.as_file().truncate(length).await
-    }
-
-    async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        self.as_file().get_backing_memory(flags).await
-    }
-
-    async fn get_size(&self) -> Result<u64, Status> {
-        self.as_file().get_size().await
-    }
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        self.as_file().get_attrs().await
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        self.as_file().get_attributes(requested_attributes).await
-    }
-
-    async fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        self.as_file().set_attrs(flags, attrs).await
-    }
-
-    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-        self.as_file().list_extended_attributes().await
-    }
-
-    async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
-        self.as_file().get_extended_attribute(name).await
-    }
-
-    async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
-        self.as_file().set_extended_attribute(name, value).await
-    }
-
-    async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
-        self.as_file().remove_extended_attribute(name).await
-    }
-
-    async fn close(&self) -> Result<(), Status> {
-        self.as_file().close().await
-    }
-
-    async fn sync(&self) -> Result<(), Status> {
-        self.as_file().sync().await
-    }
-
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        self.as_file().query_filesystem()
-    }
-
-    fn event(&self) -> Result<Option<zx::Event>, Status> {
-        self.as_file().event()
-    }
-}
-
 /// On a fuchsia.io/Node.Clone request, the `FileConnection` needs to clone the `Arc` of the
 /// underlying file object that implements `DirectoryEntry` so a new connection can be opened. This
-/// trait gives `FileConnection` a way of cloning the `file` contained in the `FidlIoFile` and
-/// `StreamIoFile` wrappers.
+/// trait gives `FileConnection` a way of cloning the `file` contained in the `FidlIoConnection` and
+/// `StreamIoConnection` wrappers.
 trait CloneFile {
     fn clone_file(&self) -> Arc<dyn DirectoryEntry>;
 }
 
 /// Wrapper around a file that manages the seek offset of the connection and transforms `IoOpHandler`
 /// requests into `FileIo` requests. All `File` requests are forwarded to `file`.
-struct FidlIoFile<T: 'static + File + FileIo + DirectoryEntry> {
+pub struct FidlIoConnection<T: 'static + File> {
     /// File that requests will be forwarded to.
-    file: Arc<T>,
+    file: OpenFile<T>,
 
     /// Seek position. Next byte to be read or written within the buffer. This might be beyond the
     /// current size of buffer, matching POSIX:
@@ -340,8 +152,41 @@ struct FidlIoFile<T: 'static + File + FileIo + DirectoryEntry> {
     is_append: bool,
 }
 
+impl<T: 'static + File> Deref for FidlIoConnection<T> {
+    type Target = OpenFile<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl<T: 'static + File> DerefMut for FidlIoConnection<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
+    }
+}
+
+impl<T: 'static + DirectoryEntry + File + FileIo> FidlIoConnection<T> {
+    /// Creates a connection to a file that uses FIDL for all IO.
+    pub fn create(
+        scope: ExecutionScope,
+        file: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef,
+    ) -> Result<impl Future<Output = ()>, zx::Status> {
+        let file = OpenFile::new(file, scope.clone());
+        let options = protocols.to_file_options()?;
+        create_connection(
+            scope,
+            FidlIoConnection { file, seek: 0, is_append: options.is_append },
+            options,
+            object_request,
+        )
+    }
+}
+
 #[async_trait]
-impl<T: 'static + File + FileIo + DirectoryEntry> IoOpHandler for FidlIoFile<T> {
+impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
         let buffer = self.read_at(self.seek, count).await?;
         let count: u64 = buffer.len().try_into().unwrap();
@@ -408,25 +253,49 @@ impl<T: 'static + File + FileIo + DirectoryEntry> IoOpHandler for FidlIoFile<T> 
     }
 }
 
-impl<T: 'static + File + FileIo + DirectoryEntry> AsFile for FidlIoFile<T> {
-    type FileType = T;
-    fn as_file(&self) -> &Self::FileType {
-        self.file.as_ref()
-    }
-}
-
-impl<T: 'static + File + FileIo + DirectoryEntry> CloneFile for FidlIoFile<T> {
+impl<T: 'static + DirectoryEntry + File> CloneFile for FidlIoConnection<T> {
     fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
         self.file.clone()
     }
 }
 
-struct RawIoFile<T: 'static + File + RawFileIoConnection + DirectoryEntry> {
-    file: Arc<T>,
+pub struct RawIoConnection<T: 'static + File> {
+    file: OpenFile<T>,
+}
+
+impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> RawIoConnection<T> {
+    pub fn create(
+        scope: ExecutionScope,
+        file: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef,
+    ) -> Result<impl Future<Output = ()>, zx::Status> {
+        let file = OpenFile::new(file, scope.clone());
+        create_connection(
+            scope,
+            RawIoConnection { file },
+            protocols.to_file_options()?,
+            object_request,
+        )
+    }
+}
+
+impl<T: 'static + File> Deref for RawIoConnection<T> {
+    type Target = OpenFile<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl<T: 'static + File> DerefMut for RawIoConnection<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
+    }
 }
 
 #[async_trait]
-impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for RawIoFile<T> {
+impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for RawIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
         self.file.read(count).await
     }
@@ -456,30 +325,71 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for R
     }
 }
 
-impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> AsFile for RawIoFile<T> {
-    type FileType = T;
-    fn as_file(&self) -> &Self::FileType {
-        self.file.as_ref()
-    }
-}
-
-impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> CloneFile for RawIoFile<T> {
+impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> CloneFile for RawIoConnection<T> {
     fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
         self.file.clone()
     }
 }
 
+pub trait GetVmo {
+    /// Returns the underlying VMO for the node.
+    fn get_vmo(&self) -> &zx::Vmo;
+}
+
 /// Wrapper around a file that forwards `File` requests to `file` and `FileIo` requests to `stream`.
-struct StreamIoFile<T: 'static + File + DirectoryEntry> {
+pub struct StreamIoConnection<T: 'static + File> {
     /// File that requests will be forwarded to.
-    file: Arc<T>,
+    file: OpenFile<T>,
 
     /// The stream backing the connection that all read, write, and seek calls are forwarded to.
     stream: zx::Stream,
 }
 
+impl<T: 'static + File> Deref for StreamIoConnection<T> {
+    type Target = OpenFile<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl<T: 'static + File> DerefMut for StreamIoConnection<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
+    }
+}
+
+impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
+    /// Creates a stream-based file connection. A stream based file connection sends a zx::stream to
+    /// clients that can be used for issuing read, write, and seek calls. Any read, write, and seek
+    /// calls that continue to come in over FIDL will be forwarded to `stream` instead of being sent
+    /// to `file`.
+    ///
+    /// This should only be used for files. For node connections to services then
+    /// `create_node_reference_connection` should be used instead. Reading, writing, or seeking on a
+    /// node reference should return ZX_ERR_BAD_HANDLE. If a client attempts those operations on a
+    /// zx::stream then ZX_ERR_ACCESS_DENIED will be returned.
+    pub fn create(
+        scope: ExecutionScope,
+        file: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef,
+    ) -> Result<impl Future<Output = ()>, zx::Status>
+    where
+        T: GetVmo,
+    {
+        let file = OpenFile::new(file, scope.clone());
+        let options = protocols.to_file_options()?;
+        let stream_options = options
+            .to_stream_options()
+            .unwrap_or_else(|| panic!("Invalid options for stream connection: {:?}", options));
+        let stream = zx::Stream::create(stream_options, file.get_vmo(), 0)?;
+        create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
+    }
+}
+
 #[async_trait]
-impl<T: 'static + File + DirectoryEntry> IoOpHandler for StreamIoFile<T> {
+impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
         let mut data = vec![0u8; count as usize];
         let actual = self.stream.readv(zx::StreamReadOptions::empty(), &[&mut data])?;
@@ -531,14 +441,7 @@ impl<T: 'static + File + DirectoryEntry> IoOpHandler for StreamIoFile<T> {
     }
 }
 
-impl<T: 'static + File + DirectoryEntry> AsFile for StreamIoFile<T> {
-    type FileType = T;
-    fn as_file(&self) -> &Self::FileType {
-        self.file.as_ref()
-    }
-}
-
-impl<T: 'static + File + DirectoryEntry> CloneFile for StreamIoFile<T> {
+impl<T: 'static + File + DirectoryEntry> CloneFile for StreamIoConnection<T> {
     fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
         self.file.clone()
     }
@@ -548,7 +451,21 @@ impl<T: 'static + File + DirectoryEntry> CloneFile for StreamIoFile<T> {
 /// requests.
 struct NodeReferenceIoFile<T: 'static + File + DirectoryEntry> {
     /// File that requests will be forwarded to.
-    file: Arc<T>,
+    file: OpenFile<T>,
+}
+
+impl<T: 'static + File + DirectoryEntry> Deref for NodeReferenceIoFile<T> {
+    type Target = OpenFile<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl<T: 'static + File + DirectoryEntry> DerefMut for NodeReferenceIoFile<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
+    }
 }
 
 #[async_trait]
@@ -582,13 +499,6 @@ impl<T: 'static + File + DirectoryEntry> IoOpHandler for NodeReferenceIoFile<T> 
     }
 }
 
-impl<T: 'static + File + DirectoryEntry> AsFile for NodeReferenceIoFile<T> {
-    type FileType = T;
-    fn as_file(&self) -> &Self::FileType {
-        self.file.as_ref()
-    }
-}
-
 impl<T: 'static + File + DirectoryEntry> CloneFile for NodeReferenceIoFile<T> {
     fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
         self.file.clone()
@@ -597,13 +507,13 @@ impl<T: 'static + File + DirectoryEntry> CloneFile for NodeReferenceIoFile<T> {
 
 /// This struct is a RAII wrapper around a file that will call close() on it unless the `close`
 /// function is called.
-struct OpenFile<T: 'static + File + IoOpHandler + CloneFile> {
-    file: Option<T>,
+pub struct OpenFile<T: 'static + File> {
+    file: Option<Arc<T>>,
     scope: ExecutionScope,
 }
 
-impl<T: 'static + File + IoOpHandler + CloneFile> OpenFile<T> {
-    pub fn new(file: T, scope: ExecutionScope) -> Self {
+impl<T: 'static + File> OpenFile<T> {
+    fn new(file: Arc<T>, scope: ExecutionScope) -> Self {
         Self { file: Some(file), scope }
     }
 
@@ -616,7 +526,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> OpenFile<T> {
     }
 }
 
-impl<T: 'static + File + IoOpHandler + CloneFile> Drop for OpenFile<T> {
+impl<T: 'static + File> Drop for OpenFile<T> {
     fn drop(&mut self) {
         if let Some(file) = self.file.take() {
             let guard = self.scope.active_guard();
@@ -629,15 +539,15 @@ impl<T: 'static + File + IoOpHandler + CloneFile> Drop for OpenFile<T> {
     }
 }
 
-impl<T: 'static + File + IoOpHandler + CloneFile> Deref for OpenFile<T> {
-    type Target = T;
+impl<T: 'static + File> Deref for OpenFile<T> {
+    type Target = Arc<T>;
 
     fn deref(&self) -> &Self::Target {
         self.file.as_ref().unwrap()
     }
 }
 
-impl<T: 'static + File + IoOpHandler + CloneFile> DerefMut for OpenFile<T> {
+impl<T: 'static + File> DerefMut for OpenFile<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.file.as_mut().unwrap()
     }
@@ -656,19 +566,21 @@ enum ConnectionState {
 }
 
 /// Represents a FIDL connection to a file.
-struct FileConnection<T: 'static + File + IoOpHandler + CloneFile> {
+struct FileConnection<U> {
     /// Execution scope this connection and any async operations and connections it creates will
     /// use.
     scope: ExecutionScope,
 
     /// File this connection is associated with.
-    file: OpenFile<T>,
+    file: U,
 
     /// Options for this connection.
     options: FileOptions,
 }
 
-impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
+impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler + CloneFile>
+    FileConnection<U>
+{
     async fn handle_requests(mut self, mut requests: fio::FileRequestStream) {
         while let Some(request) = requests.next().await {
             let Some(_guard) = self.scope.try_active_guard() else { break };
@@ -1022,7 +934,9 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
 }
 
 #[async_trait]
-impl<T: 'static + File + IoOpHandler + CloneFile> Representation for FileConnection<T> {
+impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + IoOpHandler + CloneFile> Representation
+    for FileConnection<U>
+{
     type Protocol = fio::FileMarker;
 
     async fn get_representation(
@@ -1057,10 +971,10 @@ impl<T: 'static + File + IoOpHandler + CloneFile> Representation for FileConnect
 mod tests {
     use {
         super::*,
-        crate::{file::FileOptions, ProtocolsExt, ToObjectRequest},
+        crate::{file::FileOptions, ToObjectRequest},
         assert_matches::assert_matches,
         async_trait::async_trait,
-        fuchsia_zircon::{self as zx, AsHandleRef},
+        fuchsia_zircon::{self as zx, HandleBased},
         futures::prelude::*,
         std::sync::Mutex,
     };
@@ -1099,6 +1013,8 @@ mod tests {
         callback: MockCallbackType,
         /// Only used for get_size/get_attributes
         file_size: u64,
+        /// VMO if using streams.
+        vmo: zx::Vmo,
     }
 
     const MOCK_FILE_SIZE: u64 = 256;
@@ -1107,11 +1023,16 @@ mod tests {
     const MOCK_FILE_CREATION_TIME: u64 = 10;
     const MOCK_FILE_MODIFICATION_TIME: u64 = 100;
     impl MockFile {
-        pub fn new(callback: MockCallbackType) -> Arc<Self> {
+        fn new(callback: MockCallbackType) -> Arc<Self> {
+            Self::new_with_vmo(callback, zx::Handle::invalid().into())
+        }
+
+        fn new_with_vmo(callback: MockCallbackType, vmo: zx::Vmo) -> Arc<Self> {
             Arc::new(MockFile {
                 operations: Mutex::new(Vec::new()),
                 callback,
                 file_size: MOCK_FILE_SIZE,
+                vmo,
             })
         }
 
@@ -1127,6 +1048,10 @@ mod tests {
 
     #[async_trait]
     impl File for MockFile {
+        fn writable(&self) -> bool {
+            true
+        }
+
         async fn open(&self, options: &FileOptions) -> Result<(), zx::Status> {
             self.handle_operation(FileOperation::Init { options: *options })?;
             Ok(())
@@ -1216,21 +1141,23 @@ mod tests {
             assert!(path.is_empty());
 
             flags.to_object_request(server_end).handle(|object_request| {
-                create_connection(
+                object_request.spawn_connection(
                     scope.clone(),
                     self.clone(),
-                    flags.to_file_options()?,
-                    object_request.take(),
-                    true,
-                    true,
-                    false,
-                );
-                Ok(())
+                    flags,
+                    FidlIoConnection::create,
+                )
             });
         }
 
         fn entry_info(&self) -> crate::directory::entry::EntryInfo {
             todo!()
+        }
+    }
+
+    impl GetVmo for MockFile {
+        fn get_vmo(&self) -> &zx::Vmo {
+            &self.vmo
         }
     }
 
@@ -1261,16 +1188,12 @@ mod tests {
         let scope = ExecutionScope::new();
 
         flags.to_object_request(server_end).handle(|object_request| {
-            create_connection(
+            object_request.spawn_connection(
                 scope.clone(),
                 file.clone(),
-                flags.to_file_options()?,
-                object_request.take(),
-                true,
-                true,
-                false,
-            );
-            Ok(())
+                flags,
+                FidlIoConnection::create,
+            )
         });
 
         TestEnv { file, proxy, scope }
@@ -1907,53 +1830,42 @@ mod tests {
         }
     }
 
-    fn init_mock_stream_file(stream: &zx::Stream, flags: fio::OpenFlags) -> TestEnv {
-        let file = MockFile::new(Box::new(always_succeed_callback));
+    fn init_mock_stream_file(vmo: zx::Vmo, flags: fio::OpenFlags) -> TestEnv {
+        let file = MockFile::new_with_vmo(Box::new(always_succeed_callback), vmo);
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::FileMarker>().expect("Create proxy to succeed");
-        let stream =
-            stream.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Duplicate handle to succeed");
 
         let scope = ExecutionScope::new();
 
         let cloned_file = file.clone();
         let cloned_scope = scope.clone();
-        flags.to_object_request(server_end).spawn(&scope, move |object_request| {
-            Box::pin(async move {
-                Ok(create_stream_connection_async(
-                    cloned_scope,
-                    cloned_file,
-                    flags.to_file_options()?,
-                    object_request.take(),
-                    /*readable=*/ true,
-                    /*writeable=*/ true,
-                    /*executable=*/ false,
-                    stream,
-                ))
-            })
+        flags.to_object_request(server_end).handle(|object_request| {
+            object_request.spawn_connection(
+                cloned_scope,
+                cloned_file,
+                flags,
+                StreamIoConnection::create,
+            )
         });
 
         TestEnv { file, proxy, scope }
     }
 
-    fn create_stream(vmo: &zx::Vmo, flags: fio::OpenFlags) -> zx::Stream {
-        zx::Stream::create(flags.to_file_options().unwrap().to_stream_options().unwrap(), vmo, 0)
-            .unwrap()
-    }
-
     #[fuchsia::test]
     async fn test_stream_describe() {
-        let vmo = zx::Vmo::create(100).unwrap();
+        const VMO_CONTENTS: &[u8] = b"hello there";
+        let vmo = zx::Vmo::create(VMO_CONTENTS.len() as u64).unwrap();
+        vmo.write(VMO_CONTENTS, 0).unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env = init_mock_stream_file(vmo, flags);
 
-        let fio::FileInfo { stream: desc_stream, .. } = env.proxy.describe().await.unwrap();
+        let fio::FileInfo { stream: Some(stream), .. } = env.proxy.describe().await.unwrap() else { panic!("Missing stream") };
+        let mut buf = [0; 20];
         assert_eq!(
-            desc_stream.unwrap().get_koid().unwrap(),
-            stream.get_koid().unwrap(),
-            "Describe should return a duplicate stream"
+            stream.readv(zx::StreamReadOptions::empty(), &[&mut buf]).expect("readv failed"),
+            VMO_CONTENTS.len()
         );
+        assert_eq!(&buf[..VMO_CONTENTS.len()], &VMO_CONTENTS[..]);
     }
 
     #[fuchsia::test]
@@ -1962,8 +1874,7 @@ mod tests {
         let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
         vmo.write(&vmo_contents, 0).unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env = init_mock_stream_file(vmo, flags);
 
         let data = env
             .proxy
@@ -1989,8 +1900,7 @@ mod tests {
         let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
         vmo.write(&vmo_contents, 0).unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env = init_mock_stream_file(vmo, flags);
 
         const OFFSET: u64 = 4;
         let data = env
@@ -2016,8 +1926,8 @@ mod tests {
         const DATA_SIZE: u64 = 10;
         let vmo = zx::Vmo::create(DATA_SIZE).unwrap();
         let flags = fio::OpenFlags::RIGHT_WRITABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env =
+            init_mock_stream_file(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), flags);
 
         let data: [u8; DATA_SIZE as usize] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
         let written = env.proxy.write(&data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
@@ -2041,8 +1951,8 @@ mod tests {
         const DATA_SIZE: u64 = 10;
         let vmo = zx::Vmo::create(DATA_SIZE + OFFSET).unwrap();
         let flags = fio::OpenFlags::RIGHT_WRITABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env =
+            init_mock_stream_file(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), flags);
 
         let data: [u8; DATA_SIZE as usize] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
         let written =
@@ -2067,8 +1977,7 @@ mod tests {
         let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
         vmo.write(&vmo_contents, 0).unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env = init_mock_stream_file(vmo, flags);
 
         let position = env
             .proxy
@@ -2119,8 +2028,8 @@ mod tests {
         let data = [0, 1, 2, 3, 4];
         let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 100).unwrap();
         let flags = fio::OpenFlags::RIGHT_WRITABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env =
+            init_mock_stream_file(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), flags);
 
         let written = env.proxy.write(&data).await.unwrap().map_err(zx::Status::from_raw).unwrap();
         assert_eq!(written, data.len() as u64);
@@ -2158,8 +2067,7 @@ mod tests {
     async fn test_stream_read_validates_count() {
         let vmo = zx::Vmo::create(10).unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env = init_mock_stream_file(vmo, flags);
         let result =
             env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::OUT_OF_RANGE));
@@ -2169,8 +2077,7 @@ mod tests {
     async fn test_stream_read_at_validates_count() {
         let vmo = zx::Vmo::create(10).unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        let stream = create_stream(&vmo, flags);
-        let env = init_mock_stream_file(&stream, flags);
+        let env = init_mock_stream_file(vmo, flags);
         let result = env
             .proxy
             .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)

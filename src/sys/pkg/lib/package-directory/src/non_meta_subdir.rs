@@ -18,7 +18,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
-        ProtocolsExt, ToObjectRequest,
+        ToObjectRequest,
     },
 };
 pub(crate) struct NonMetaSubdir<S: crate::NonMetaStorage> {
@@ -57,13 +57,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
 
-                ImmutableConnection::create_connection(
-                    scope,
-                    self,
-                    flags.to_directory_options()?,
-                    object_request.take(),
-                );
-                Ok(())
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
             return;
         }

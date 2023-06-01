@@ -11,7 +11,7 @@ use {
 };
 
 /// Extends fio::ConnectionProtocols and fio::OpenFlags
-pub trait ProtocolsExt: Sync {
+pub trait ProtocolsExt: Sync + 'static {
     /// True if the directory protocol is allowed.
     fn is_dir_allowed(&self) -> bool;
 
@@ -58,6 +58,9 @@ pub trait ProtocolsExt: Sync {
 
     /// If creating an object, Whether to create a directory.
     fn create_directory(&self) -> bool;
+
+    /// True if the protocol should be a limited node connection.
+    fn is_node(&self) -> bool;
 }
 
 impl ProtocolsExt for fio::ConnectionProtocols {
@@ -214,6 +217,21 @@ impl ProtocolsExt for fio::ConnectionProtocols {
             self,
             fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols { directory: Some(_), .. }),
+                ..
+            })
+        )
+    }
+
+    fn is_node(&self) -> bool {
+        matches!(
+            self,
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: None,
+                    file: None,
+                    symlink: None,
+                    ..
+                }),
                 ..
             })
         )
@@ -419,5 +437,9 @@ impl ProtocolsExt for fio::OpenFlags {
 
     fn create_directory(&self) -> bool {
         self.contains(fio::OpenFlags::DIRECTORY)
+    }
+
+    fn is_node(&self) -> bool {
+        self.contains(fio::OpenFlags::NODE_REFERENCE)
     }
 }
