@@ -434,6 +434,13 @@ group("log") {
   visibility = third_party_rust_crate_log_visibility
 }
 
+if (!(current_os == "fuchsia")) {
+  group("loom") {
+    public_deps = [ ":loom-v0_5_6" ]
+    testonly = true
+  }
+}
+
 group("lru-cache") {
   public_deps = [ ":lru-cache-v0_1_2" ]
 }
@@ -4416,6 +4423,36 @@ rust_library("futures-util-v0_3_19") {
   visibility = [ ":*" ]
 }
 
+rust_library("generator-v0_7_4") {
+  crate_name = "generator"
+  crate_root = "//third_party/rust_crates/vendor/generator-0.7.4/src/lib.rs"
+  output_name = "generator-a1d2e33639bec451"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":log-v0_4_11" ]
+  if (true) {
+    deps += [ ":libc-v0_2_142" ]
+  }
+  if (false) {
+    deps += [ ":windows-v0_48_0" ]
+  }
+  deps += [ "//build/validate:non_production_tag" ]
+  deps += [ "//third_party/rust_crates/compat/generator:asm" ]
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=a1d2e33639bec451",
+    "-Cextra-filename=-a1d2e33639bec451",
+  ]
+
+  visibility = []
+  visibility += [ ":loom-v0_5_6" ]
+  testonly = true
+}
+
 rust_library("generic-array-v0_14_5") {
   crate_name = "generic_array"
   crate_root =
@@ -5655,6 +5692,34 @@ rust_library("log-v0_4_11") {
   visibility = [ ":*" ]
 }
 
+rust_library("loom-v0_5_6") {
+  crate_name = "loom"
+  crate_root = "//third_party/rust_crates/vendor/loom-0.5.6/src/lib.rs"
+  output_name = "loom-8008abaee09dc883"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cfg-if-v1_0_0" ]
+  deps += [ ":generator-v0_7_4" ]
+  deps += [ ":scoped-tls-v1_0_1" ]
+  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-subscriber-v0_3_1" ]
+  deps += [ "//build/validate:non_production_tag" ]
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=8008abaee09dc883",
+    "-Cextra-filename=-8008abaee09dc883",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  testonly = true
+}
+
 rust_library("lru-cache-v0_1_2") {
   crate_name = "lru_cache"
   crate_root = "//third_party/rust_crates/vendor/lru-cache-0.1.2/src/lib.rs"
@@ -5735,6 +5800,27 @@ rust_library("maplit-v1_0_1") {
     "--edition=2015",
     "-Cmetadata=42f6d562ec404170",
     "-Cextra-filename=-42f6d562ec404170",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("matchers-v0_1_0") {
+  crate_name = "matchers"
+  crate_root = "//third_party/rust_crates/vendor/matchers-0.1.0/src/lib.rs"
+  output_name = "matchers-d20ec4d350970f68"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":regex-automata-v0_1_9" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=d20ec4d350970f68",
+    "-Cextra-filename=-d20ec4d350970f68",
   ]
 
   visibility = [ ":*" ]
@@ -8704,6 +8790,31 @@ rust_library("regex-v1_5_6") {
   visibility = [ ":*" ]
 }
 
+rust_library("regex-automata-v0_1_9") {
+  crate_name = "regex_automata"
+  crate_root = "//third_party/rust_crates/ask2patch/regex-automata/src/lib.rs"
+  output_name = "regex_automata-cdaa0041c57f3413"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":regex-syntax-v0_6_26" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=cdaa0041c57f3413",
+    "-Cextra-filename=-cdaa0041c57f3413",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"regex-syntax\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("regex-syntax-v0_6_26") {
   crate_name = "regex_syntax"
   crate_root = "//third_party/rust_crates/vendor/regex-syntax-0.6.26/src/lib.rs"
@@ -9450,6 +9561,28 @@ rust_proc_macro("schemars_derive-v0_8_10") {
   ]
 
   visibility = [ ":*" ]
+}
+
+rust_library("scoped-tls-v1_0_1") {
+  crate_name = "scoped_tls"
+  crate_root = "//third_party/rust_crates/vendor/scoped-tls-1.0.1/src/lib.rs"
+  output_name = "scoped_tls-ab3bb947caca0081"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ "//build/validate:non_production_tag" ]
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=ab3bb947caca0081",
+    "-Cextra-filename=-ab3bb947caca0081",
+  ]
+
+  visibility = []
+  visibility += [ ":loom-v0_5_6" ]
+  testonly = true
 }
 
 rust_library("scopeguard-v1_1_0") {
@@ -11236,8 +11369,14 @@ rust_library("tracing-subscriber-v0_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":ansi_term-v0_12_1" ]
+  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":matchers-v0_1_0" ]
+  deps += [ ":regex-v1_5_6" ]
   deps += [ ":sharded-slab-v0_1_4" ]
+  deps += [ ":smallvec-v1_8_0" ]
   deps += [ ":thread_local-v1_0_1" ]
+  deps += [ ":tracing-v0_1_34" ]
   deps += [ ":tracing-core-v0_1_26" ]
   deps += [ ":tracing-log-v0_1_2" ]
 
@@ -11249,11 +11388,20 @@ rust_library("tracing-subscriber-v0_3_1") {
     "-Cmetadata=3c92bd8481194a1d",
     "-Cextra-filename=-3c92bd8481194a1d",
     "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"ansi\"",
+    "--cfg=feature=\"ansi_term\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"env-filter\"",
     "--cfg=feature=\"fmt\"",
+    "--cfg=feature=\"lazy_static\"",
+    "--cfg=feature=\"matchers\"",
+    "--cfg=feature=\"regex\"",
     "--cfg=feature=\"registry\"",
     "--cfg=feature=\"sharded-slab\"",
+    "--cfg=feature=\"smallvec\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"thread_local\"",
+    "--cfg=feature=\"tracing\"",
     "--cfg=feature=\"tracing-log\"",
   ]
 
@@ -12615,6 +12763,30 @@ rust_library("winapi-util-v0_1_5") {
     "--edition=2015",
     "-Cmetadata=d22658bf7990adbd",
     "-Cextra-filename=-d22658bf7990adbd",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("windows-v0_48_0") {
+  crate_name = "windows"
+  crate_root = "//third_party/rust_crates/empty/windows/src/lib.rs"
+  output_name = "windows-541fc3d7afee256"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=541fc3d7afee256",
+    "-Cextra-filename=-541fc3d7afee256",
+    "--cfg=feature=\"Win32_Foundation\"",
+    "--cfg=feature=\"Win32_System_Diagnostics_Debug\"",
+    "--cfg=feature=\"Win32_System_Memory\"",
+    "--cfg=feature=\"Win32_System_SystemInformation\"",
   ]
 
   visibility = [ ":*" ]

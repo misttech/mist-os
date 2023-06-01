@@ -234,7 +234,7 @@ zstd = "0.11.2"
 [dependencies.tracing-subscriber]
 version = "0.3.1"
 default-features = false
-features = ["registry", "tracing-log", "fmt", "std"]
+features = ["env-filter", "fmt", "registry", "std", "tracing-log"]
 
 # Target-side only dependencies
 [target.'cfg(target_os = "fuchsia")'.dependencies]
@@ -277,6 +277,7 @@ fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.3"
 hyper-rustls = { version = "0.22.1", default-features = false, features = ["rustls-native-certs"] }
 indoc = "1.0.3"
+loom = "0.5.6"
 # TODO(fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
 mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
@@ -329,12 +330,14 @@ ctor = { path = "empty/ctor" }
 miow = { path = "empty/miow" }
 ntapi = { path = "empty/ntapi" }
 output_vt100 = { path = "empty/output_vt100" }
+rustversion = { path = "empty/rustversion" }
 wasi = { path = "empty/wasi" }
 wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
 web-sys = { path = "empty/web-sys" }
 wepoll-ffi = { path = "empty/wepoll-ffi" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
+windows = { path = "empty/windows" }
 windows-sys = { path = "empty/windows-sys" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
@@ -461,6 +464,16 @@ env_vars = [ "CARGO_PKG_NAME=futures-task" ]
 env_vars = [ "CARGO_PKG_NAME=futures-util" ]
 rustflags = [ "--cfg=fn_like_proc_macro" ]
 
+# generator has not gone through a thorough safety review yet, and needs to be
+# re-reviewed before it can be used outside of tests.
+[gn.package.generator."0.7.4"]
+deps = [
+  "//build/validate:non_production_tag",
+  "//third_party/rust_crates/compat/generator:asm",
+]
+visibility = [ ":loom-v0_5_6" ]
+testonly = true
+
 [gn.package.generic-array."0.14.5"]
 rustflags = [ "--cfg=relaxed_coherence" ]
 
@@ -503,6 +516,12 @@ rustflags = ["--cfg=has_const_fn_trait_bound"]
 [gn.package.log."0.4.11"]
 rustflags = ["--cfg=atomic_cas"]
 group_visibility = { import = "//src/lib/diagnostics/log/log_visibility.gni", variable = "third_party_rust_crate_log_visibility" }
+
+# Loom has not gone through a thorough safety review yet, and needs to be
+# re-reviewed before it can be used outside of tests.
+[gn.package.loom."0.5.6"]
+deps = [ "//build/validate:non_production_tag" ]
+testonly = true
 
 [gn.package.memchr."2.4.0"]
 rustflags = ["--cfg=memchr_runtime_simd", "--cfg=memchr_runtime_sse2", "--cfg=memchr_runtime_sse42", "--cfg=memchr_runtime_avx"]
@@ -594,6 +613,13 @@ rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
 
 [gn.package.schemars."0.8.10"]
 rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
+
+# scoped-tls has not gone through a thorough safety review yet, and needs to be
+# re-reviewed before it can be used outside of tests.
+[gn.package.scoped-tls."1.0.1"]
+deps = [ "//build/validate:non_production_tag" ]
+visibility = [ ":loom-v0_5_6" ]
+testonly = true
 
 # We always want to optimize scrypt for speed, because a single key derivation
 # that takes 150 msec when speed-optimized takes 20 seconds (!) when not
