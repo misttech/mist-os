@@ -126,6 +126,21 @@ __asm__(
     "end_add:"
     ".popsection");
 
+// If this function is instrumented with UBSan, it will check for function type
+// mismatches on certain function calls. One of the things it will check first
+// is a 4-byte function signiature that would be placed before the function
+// under UBSan instrumentation. However, since the begin_add function for this
+// particular test is memcpy'd from rodata into a page allocated at runtime, it
+// will not have this signature before the page and will lead to a page fault.
+// We can just disable this particular check here.
+#if __has_feature(undefined_behavior_sanitizer)
+[[clang::no_sanitize("function")]]
+#endif
+int CallAdd(uintptr_t addr, int arg1, int arg2) {
+  auto add_func = reinterpret_cast<int (*)(int, int)>(reinterpret_cast<uintptr_t>(addr));
+  return add_func(1, 2);
+}
+
 TEST(MemoryMappingTest, MmapProtExecTest) {
   if (getenv("NO_AMBIENT_MARK_VMO_EXEC")) {
     ZXTEST_SKIP("Running without the AMBIENT_MARK_VMO_EXEC policy, skipping test case.");
@@ -146,8 +161,7 @@ TEST(MemoryMappingTest, MmapProtExecTest) {
   EXPECT_EQ(0, result, "Unable to mark pages PROT_READ|PROT_EXEC");
 
   // Execute the code from our new location.
-  auto add_func = reinterpret_cast<int (*)(int, int)>(reinterpret_cast<uintptr_t>(addr));
-  int add_result = add_func(1, 2);
+  int add_result = CallAdd(reinterpret_cast<uintptr_t>(addr), 1, 2);
 
   // Check that the result of adding 1+2 is 3.
   EXPECT_EQ(3, add_result);
