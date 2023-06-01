@@ -255,7 +255,7 @@ void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state
   state.r15 = frame.r15;
 
   state.ip = frame.ip;
-  state.flags = frame.flags;
+  state.flags = frame.flags & X86_FLAGS_USER;
   state.rsp = frame.user_sp;
 
   // vector, err_code, cs, and user_ss are unused.

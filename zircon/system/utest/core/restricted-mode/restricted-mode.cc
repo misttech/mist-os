@@ -125,6 +125,17 @@ class ArchRegisterState {
     EXPECT_EQ(0x0303030303030304, fs_val_);
     EXPECT_EQ(0x0c0c0c0c0c0c0c0d, gs_val_);
   }
+
+  void VerifyArchSpecificRestrictedState() const {
+    // Verify that the flags field does not contain reserved bits. These are rejected by
+    // zx_restricted_enter.
+    // [intel/vol1]: 3.4.3 EFLAGS Register: Bits 1, 3, 5, 15, and 22 through 31 of this register are
+    // reserved. Software should not use or depend on the states of any of these bits.
+    constexpr uint64_t kX86ReservedFlagBitss =
+        0b11111111'11000000'10000000'00101010 | (0xffffffffull << 32);
+    EXPECT_EQ(state_.flags & kX86ReservedFlagBitss, 0);
+  }
+
   uintptr_t pc() { return state_.ip; }
   void set_pc(uintptr_t pc) { state_.ip = pc; }
   zx_restricted_state_t& restricted_state() { return state_; }
@@ -237,6 +248,9 @@ class ArchRegisterState {
     // Check that thread local storage was updated correctly in restricted mode.
     EXPECT_EQ(0x0202020202020203, tls_val_);
   }
+
+  void VerifyArchSpecificRestrictedState() const {}
+
   uintptr_t pc() { return state_.pc; }
   void set_pc(uintptr_t pc) { state_.pc = pc; }
   zx_restricted_state_t& restricted_state() { return state_; }
@@ -337,6 +351,9 @@ class ArchRegisterState {
     // Check that thread local storage was updated correctly in restricted mode.
     EXPECT_EQ(0x0505050505050506, tls_val_);
   }
+
+  void VerifyArchSpecificRestrictedState() const {}
+
   uintptr_t pc() { return state_.pc; }
   void set_pc(uintptr_t pc) { state_.pc = pc; }
   zx_restricted_state_t& restricted_state() { return state_; }
@@ -439,6 +456,8 @@ TEST(RestrictedMode, Basic) {
 
   // Read the state out of the thread.
   ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  state.VerifyArchSpecificRestrictedState();
 
   // Validate that the instruction pointer is right after the syscall instruction.
   EXPECT_EQ((uintptr_t)&syscall_bounce_post_syscall, state.pc());
@@ -732,6 +751,7 @@ TEST(RestrictedMode, KickBeforeEnter) {
 
   // Read the state out of the thread.
   ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  state.VerifyArchSpecificRestrictedState();
 
   // Validate that the instruction pointer is still pointing at the entry point.
   EXPECT_EQ(reinterpret_cast<uintptr_t>(&syscall_bounce), state.pc());
@@ -752,6 +772,7 @@ TEST(RestrictedMode, KickBeforeEnter) {
 
   // Read the state out of the thread.
   ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  state.VerifyArchSpecificRestrictedState();
 
   // Validate that the instruction pointer is right after the syscall instruction.
   EXPECT_EQ(reinterpret_cast<uintptr_t>(&syscall_bounce_post_syscall), state.pc());
@@ -889,6 +910,7 @@ TEST(RestrictedMode, KickWhileRunning) {
 
   // Read the state out of the thread.
   ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  state.VerifyArchSpecificRestrictedState();
 
   // Expect to see second general purpose register incremented in the observed restricted state.
 #if defined(__x86_64__)
