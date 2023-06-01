@@ -18,6 +18,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
@@ -106,13 +107,13 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
 
   const zx::vmo& vmo() { return vmo_; }
 
-  void set_latest_controller_config_stamp(config_stamp_t stamp) {
+  void set_latest_controller_config_stamp(ConfigStamp stamp) {
     latest_controller_config_stamp_ = stamp;
   }
-  config_stamp_t latest_controller_config_stamp() const { return latest_controller_config_stamp_; }
+  ConfigStamp latest_controller_config_stamp() const { return latest_controller_config_stamp_; }
 
-  void set_latest_client_config_stamp(config_stamp_t stamp) { latest_client_config_stamp_ = stamp; }
-  config_stamp_t latest_client_config_stamp() const { return latest_client_config_stamp_; }
+  void set_latest_client_config_stamp(ConfigStamp stamp) { latest_client_config_stamp_ = stamp; }
+  ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
 
   // Aliases controller_->mtx() for the purpose of thread-safety analysis.
   mtx_t* mtx() const;
@@ -160,7 +161,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   const uint32_t client_id_;
 
   // Stamp of the latest Controller display configuration that uses this image.
-  config_stamp_t latest_controller_config_stamp_ = kInvalidConfigStampBanjo;
+  ConfigStamp latest_controller_config_stamp_ = kInvalidConfigStamp;
 
   // Stamp of the latest display configuration in Client (the DisplayController
   // FIDL service) that uses this image.
@@ -169,7 +170,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   // doesn't match the |latest_controller_config_stamp_|. This could happen when
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
-  config_stamp_t latest_client_config_stamp_ = kInvalidConfigStampBanjo;
+  ConfigStamp latest_client_config_stamp_ = kInvalidConfigStamp;
 
   // Indicates that the image contents are ready for display.
   // Only ever accessed on loop thread, so no synchronization

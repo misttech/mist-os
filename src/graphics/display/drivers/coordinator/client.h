@@ -41,6 +41,7 @@
 #include <fbl/ring_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
@@ -293,7 +294,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // A counter for the number of times the client has successfully applied
   // a configuration. This does not account for changes due to waiting images.
   uint32_t client_apply_count_ = 0;
-  config_stamp_t latest_config_stamp_ = kInvalidConfigStampBanjo;
+  ConfigStamp latest_config_stamp_ = kInvalidConfigStamp;
 
   // This is the client's clamped RGB value.
   uint8_t client_minimum_rgb_ = 0;
@@ -357,7 +358,7 @@ class ClientProxy {
 
   // Requires holding controller_->mtx() lock
   zx_status_t OnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
-                             config_stamp_t controller_stamp);
+                             ConfigStamp controller_stamp);
   void OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
                          const uint64_t* displays_removed, size_t removed_count);
   void SetOwnership(bool is_owner);
@@ -384,18 +385,18 @@ class ClientProxy {
 
   inspect::Node& node() { return node_; }
 
-  using config_stamp_pair_t = struct config_stamp_pair {
-    config_stamp_t controller_stamp;
-    config_stamp_t client_stamp;
+  struct ConfigStampPair {
+    ConfigStamp controller_stamp;
+    ConfigStamp client_stamp;
   };
-  std::list<config_stamp_pair_t>& pending_applied_config_stamps() {
+  std::list<ConfigStampPair>& pending_applied_config_stamps() {
     return pending_applied_config_stamps_;
   }
 
   // Add a new mapping entry from |stamps.controller_stamp| to |stamp.config_stamp|.
   // Controller should guarantee that |stamps.controller_stamp| is strictly
   // greater than existing pending controller stamps.
-  void UpdateConfigStampMapping(config_stamp_pair_t stamps);
+  void UpdateConfigStampMapping(ConfigStampPair stamps);
 
   // This is used for testing
   void CloseTest();
@@ -441,7 +442,7 @@ class ClientProxy {
   using vsync_msg_t = struct vsync_msg {
     uint64_t display_id;
     zx_time_t timestamp;
-    config_stamp_t config_stamp;
+    ConfigStamp config_stamp;
   };
 
   fbl::RingBuffer<vsync_msg_t, kVsyncBufferSize> buffered_vsync_messages_;
@@ -457,7 +458,7 @@ class ClientProxy {
   // Mapping from controller_stamp to client_stamp for all configurations that
   // are already applied and pending to be presented on the display.
   // Ordered by |controller_stamp_| in increasing order.
-  std::list<config_stamp_pair_t> pending_applied_config_stamps_;
+  std::list<ConfigStampPair> pending_applied_config_stamps_;
 
  private:
   inspect::Node node_;

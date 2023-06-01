@@ -85,7 +85,7 @@ bool Layer::ResolvePendingLayerProperties() {
   return true;
 }
 
-bool Layer::ResolvePendingImage(FenceCollection* fences, config_stamp_t stamp) {
+bool Layer::ResolvePendingImage(FenceCollection* fences, ConfigStamp stamp) {
   if (pending_image_) {
     auto wait_fence = fences->GetFence(pending_wait_event_id_);
     if (wait_fence && wait_fence->InContainer()) {
@@ -181,7 +181,7 @@ bool Layer::CleanUpImage(const Image& image) {
   return false;
 }
 
-std::optional<config_stamp_t> Layer::GetCurrentClientConfigStamp() const {
+std::optional<ConfigStamp> Layer::GetCurrentClientConfigStamp() const {
   if (displayed_image_ != nullptr) {
     return displayed_image_->latest_client_config_stamp();
   }

@@ -14,6 +14,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 
@@ -64,7 +65,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   //   layers to determine the current frame state.
   //
   // Returns false if there were any errors.
-  bool ResolvePendingImage(FenceCollection* fence, config_stamp_t stamp = kInvalidConfigStampBanjo);
+  bool ResolvePendingImage(FenceCollection* fence, ConfigStamp stamp = kInvalidConfigStamp);
 
   // Make the staged config current.
   void ApplyChanges(const display_mode_t& mode);
@@ -87,7 +88,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   // Get the stamp of configuration that is associated (at ResolvePendingImage)
   // with the image that is currently being displayed on the device.
   // If no image is being displayed on this layer, returns nullopt.
-  std::optional<config_stamp_t> GetCurrentClientConfigStamp() const;
+  std::optional<ConfigStamp> GetCurrentClientConfigStamp() const;
 
   // Adds the pending_layer_ to a display list, at z_index. Returns false if the pending_layer_ is
   // currently in use.

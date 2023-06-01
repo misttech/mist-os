@@ -11,6 +11,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <queue>
@@ -21,6 +22,7 @@
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -92,7 +94,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   // If a configuration applied by Controller has layer change to occur on the
   // display (i.e. |pending_layer_change| is true), this stores the Controller's
   // config stamp for that configuration; otherwise it stores an invalid stamp.
-  config_stamp_t pending_layer_change_controller_config_stamp;
+  ConfigStamp pending_layer_change_controller_config_stamp;
 
   // Flag indicating that a new configuration was delayed during a layer change
   // and should be reapplied after the layer change completes.
@@ -112,7 +114,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   //
   // TODO(fxbug.dev/72588): Remove once we remove image IDs in OnVsync() events.
   struct ConfigImages {
-    const config_stamp_t config_stamp;
+    const ConfigStamp config_stamp;
 
     struct ImageMetadata {
       uint64_t image_id;

@@ -11,6 +11,7 @@
 #include <fbl/intrusive_single_list.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -91,7 +92,7 @@ TEST_F(LayerTest, CleanUpImage) {
   auto displayed_image = CreateReadyImage();
   layer.SetImage(displayed_image, INVALID_ID, INVALID_ID);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 1}));
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -101,7 +102,7 @@ TEST_F(LayerTest, CleanUpImage) {
 
   auto waiting_image = CreateReadyImage();
   layer.SetImage(waiting_image, kWaitFenceId, INVALID_ID);
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 2}));
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
 
   auto pending_image = CreateReadyImage();
   layer.SetImage(pending_image, INVALID_ID, INVALID_ID);
@@ -166,7 +167,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer.SetImage(image, INVALID_ID, INVALID_ID);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 1}));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -185,7 +186,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer.SetImage(image, INVALID_ID, INVALID_ID);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 2}));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -211,7 +212,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
   auto displayed_image = CreateReadyImage();
   layer.SetImage(displayed_image, INVALID_ID, INVALID_ID);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 1}));
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -221,7 +222,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 
   auto waiting_image = CreateReadyImage();
   layer.SetImage(waiting_image, kWaitFenceId, INVALID_ID);
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 2}));
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
 
   auto pending_image = CreateReadyImage();
   layer.SetImage(pending_image, INVALID_ID, INVALID_ID);
@@ -263,7 +264,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer.SetImage(image, INVALID_ID, INVALID_ID);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 1}));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -282,7 +283,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer.SetImage(image, INVALID_ID, INVALID_ID);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), /*stamp=*/{.value = 2}));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());

@@ -16,13 +16,6 @@ DEFINE_BINARY_OPERATOR(fuchsia_hardware_display::wire::ConfigStamp, >=)
 DEFINE_BINARY_OPERATOR(fuchsia_hardware_display::wire::ConfigStamp, <)
 DEFINE_BINARY_OPERATOR(fuchsia_hardware_display::wire::ConfigStamp, <=)
 
-DEFINE_BINARY_OPERATOR(config_stamp_t, ==)
-DEFINE_BINARY_OPERATOR(config_stamp_t, !=)
-DEFINE_BINARY_OPERATOR(config_stamp_t, >)
-DEFINE_BINARY_OPERATOR(config_stamp_t, >=)
-DEFINE_BINARY_OPERATOR(config_stamp_t, <)
-DEFINE_BINARY_OPERATOR(config_stamp_t, <=)
-
 #undef DEFINE_BINARY_OPERATOR
 
 }  // namespace display

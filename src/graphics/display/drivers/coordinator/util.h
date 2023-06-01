@@ -22,13 +22,6 @@ DECLARE_BINARY_OPERATOR(fuchsia_hardware_display::wire::ConfigStamp, >=)
 DECLARE_BINARY_OPERATOR(fuchsia_hardware_display::wire::ConfigStamp, <)
 DECLARE_BINARY_OPERATOR(fuchsia_hardware_display::wire::ConfigStamp, <=)
 
-DECLARE_BINARY_OPERATOR(config_stamp_t, ==)
-DECLARE_BINARY_OPERATOR(config_stamp_t, !=)
-DECLARE_BINARY_OPERATOR(config_stamp_t, >)
-DECLARE_BINARY_OPERATOR(config_stamp_t, >=)
-DECLARE_BINARY_OPERATOR(config_stamp_t, <)
-DECLARE_BINARY_OPERATOR(config_stamp_t, <=)
-
 #undef DECLARE_BINARY_OPERATOR
 
 // TODO(fxbug.dev/89828): FIDL and banjo don't support constant structs.

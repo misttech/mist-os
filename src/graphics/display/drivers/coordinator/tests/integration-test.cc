@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/coordinator/tests/fidl_client.h"
@@ -74,7 +75,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     ClientProxy* client_ptr = controller()->active_client_;
     EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
     // EnableVsync(false) has not completed here, because we are still holding controller()->mtx()
-    client_ptr->OnDisplayVsync(display_id, 0, kInvalidConfigStampBanjo);
+    client_ptr->OnDisplayVsync(display_id, 0, kInvalidConfigStamp);
   }
 
   bool primary_client_dead() {
@@ -89,7 +90,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
 
   void client_proxy_send_vsync() {
     fbl::AutoLock l(controller()->mtx());
-    controller()->active_client_->OnDisplayVsync(0, 0, kInvalidConfigStampBanjo);
+    controller()->active_client_->OnDisplayVsync(0, 0, kInvalidConfigStamp);
   }
 
   void SendDisplayVsync() { display()->SendVsync(); }
@@ -186,7 +187,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
     EXPECT_OK(primary_client->dc_->SetDisplayLayers(primary_client->display_id(), {}).status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  config_stamp_t empty_config_stamp = controller()->TEST_controller_stamp();
+  ConfigStamp empty_config_stamp = controller()->TEST_controller_stamp();
   // Wait for it to apply
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
       [this, id = primary_client->displays_[0].id_]() {
@@ -216,8 +217,9 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
       zx::sec(1)));
 
   // Empty vsync for last client. Nothing should be sent to the new client.
+  const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(empty_config_stamp);
   controller()->DisplayControllerInterfaceOnDisplayVsync(primary_client->display_id(), 0u,
-                                                         &empty_config_stamp);
+                                                         &banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   count = primary_client->vsync_count();
@@ -255,9 +257,10 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
       [p = primary_client.get()]() { return p->vsync_count() == 1; }, zx::sec(1)));
   // Send the controller a vsync for an image / a config it won't recognize anymore.
-  config_stamp_t invalid_config_stamp = {.value = controller()->TEST_controller_stamp().value - 1};
+  ConfigStamp invalid_config_stamp = controller()->TEST_controller_stamp() - ConfigStamp{1};
+  const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
   controller()->DisplayControllerInterfaceOnDisplayVsync(primary_client->display_id(), 0u,
-                                                         &invalid_config_stamp);
+                                                         &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   SendDisplayVsync();

@@ -33,6 +33,7 @@
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
@@ -306,9 +307,9 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   last_vsync_timestamp_ = zx::time(timestamp);
   vsync_stalled_ = false;
 
-  config_stamp_t controller_config_stamp =
-      config_stamp_ptr ? *config_stamp_ptr : kInvalidConfigStampBanjo;
-  last_vsync_config_stamp_property_.Set(controller_config_stamp.value);
+  ConfigStamp controller_config_stamp =
+      config_stamp_ptr ? ToConfigStamp(*config_stamp_ptr) : kInvalidConfigStamp;
+  last_vsync_config_stamp_property_.Set(controller_config_stamp.value());
 
   fbl::AutoLock lock(mtx());
   DisplayInfo* info = nullptr;
@@ -332,7 +333,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
     bool done = controller_config_stamp >= info->pending_layer_change_controller_config_stamp;
     if (done) {
       info->pending_layer_change = false;
-      info->pending_layer_change_controller_config_stamp = kInvalidConfigStampBanjo;
+      info->pending_layer_change_controller_config_stamp = kInvalidConfigStamp;
       info->switching_client = false;
 
       if (active_client_ && info->delayed_apply) {
@@ -412,7 +413,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   // OnVsync() DisplayController FIDL events. In the future we'll remove this
   // logic and only return config seqnos in OnVsync() events instead.
 
-  if (controller_config_stamp != kInvalidConfigStampBanjo) {
+  if (controller_config_stamp != kInvalidConfigStamp) {
     auto& config_image_queue = info->config_image_queue;
 
     // Evict retired configurations from the queue.
@@ -482,14 +483,13 @@ zx_status_t Controller::DisplayControllerInterfaceGetAudioFormat(
 }
 
 void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc,
-                             config_stamp_t config_stamp, uint32_t layer_stamp,
-                             uint32_t client_id) {
+                             ConfigStamp config_stamp, uint32_t layer_stamp, uint32_t client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
   last_valid_apply_config_timestamp_ = timestamp;
 
-  last_valid_apply_config_config_stamp_property_.Set(config_stamp.value);
+  last_valid_apply_config_config_stamp_property_.Set(config_stamp.value());
 
   // Release the bootloader framebuffer referenced by the kernel. This only
   // needs to be done once on the first ApplyConfig().
@@ -507,7 +507,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
   // The applied configuration's stamp.
   //
   // Populated from `controller_stamp_` while the mutex is held.
-  config_stamp_t applied_config_stamp = {};
+  ConfigStamp applied_config_stamp = {};
 
   {
     fbl::AutoLock lock(mtx());
@@ -546,7 +546,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 
     // Now we can guarantee that this configuration will be applied to display
     // controller. Thus increment the controller ApplyConfiguration() counter.
-    ++controller_stamp_.value;
+    ++controller_stamp_;
     applied_config_stamp = controller_stamp_;
 
     for (int i = 0; i < count; i++) {
@@ -619,7 +619,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
     }
   }
 
-  dc_.ApplyConfiguration(display_configs.get(), display_count, &applied_config_stamp);
+  const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
+  dc_.ApplyConfiguration(display_configs.get(), display_count, &banjo_config_stamp);
 }
 
 void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
@@ -888,7 +889,7 @@ void Controller::OnVsyncMonitor() {
   }
 }
 
-config_stamp_t Controller::TEST_controller_stamp() const {
+ConfigStamp Controller::TEST_controller_stamp() const {
   fbl::AutoLock lock(mtx());
   return controller_stamp_;
 }
@@ -970,8 +971,9 @@ void Controller::DdkRelease() {
   const display_config_t* configs;
   {
     fbl::AutoLock lock(mtx());
-    ++controller_stamp_.value;
-    dc_.ApplyConfiguration(&configs, 0, &controller_stamp_);
+    ++controller_stamp_;
+    const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
+    dc_.ApplyConfiguration(&configs, 0, &banjo_config_stamp);
   }
   delete this;
 }

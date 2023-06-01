@@ -29,6 +29,7 @@
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -85,7 +86,7 @@ class Controller : public DeviceType,
   void ShowActiveDisplay();
 
   void ApplyConfig(DisplayConfig* configs[], int32_t count, bool vc_client,
-                   config_stamp_t config_stamp, uint32_t layer_stamp, uint32_t client_id)
+                   ConfigStamp config_stamp, uint32_t layer_stamp, uint32_t client_id)
       __TA_EXCLUDES(mtx());
 
   void ReleaseImage(Image* image);
@@ -123,7 +124,7 @@ class Controller : public DeviceType,
 
   // Test helpers
   size_t TEST_imported_images_count() const;
-  config_stamp_t TEST_controller_stamp() const;
+  ConfigStamp TEST_controller_stamp() const;
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -200,7 +201,7 @@ class Controller : public DeviceType,
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;
 
-  config_stamp_t controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStampBanjo;
+  ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStamp;
 };
 
 }  // namespace display

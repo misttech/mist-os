@@ -15,6 +15,7 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
@@ -25,8 +26,8 @@ namespace display {
 TEST(DisplayTest, NoOpTest) { EXPECT_OK(ZX_OK); }
 
 TEST(DisplayTest, ClientVSyncOk) {
-  constexpr uint64_t kControllerStampValue = 1u;
-  constexpr uint64_t kClientStampValue = 2u;
+  constexpr ConfigStamp kControllerStampValue(1);
+  constexpr ConfigStamp kClientStampValue(2);
 
   zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
       fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
@@ -38,22 +39,23 @@ TEST(DisplayTest, ClientVSyncOk) {
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
-      .controller_stamp = {.value = kControllerStampValue},
-      .client_stamp = {.value = kClientStampValue},
+      .controller_stamp = kControllerStampValue,
+      .client_stamp = kClientStampValue,
   });
 
-  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, {.value = kControllerStampValue}));
+  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, kControllerStampValue));
 
   fidl::WireSyncClient client(std::move(client_end));
 
   class EventHandler
       : public fidl::testing::WireSyncEventHandlerTestBase<fuchsia_hardware_display::Coordinator> {
    public:
-    EventHandler(fuchsia_hardware_display::wire::ConfigStamp expected_config_stamp)
+    explicit EventHandler(ConfigStamp expected_config_stamp)
         : expected_config_stamp_(expected_config_stamp) {}
 
     void OnVsync(fidl::WireEvent<fuchsia_hardware_display::Coordinator::OnVsync>* event) override {
-      if (event->applied_config_stamp == expected_config_stamp_) {
+      ConfigStamp applied_config_stamp = ToConfigStamp(event->applied_config_stamp);
+      if (applied_config_stamp == expected_config_stamp_) {
         vsync_handled_ = true;
       }
     }
@@ -61,10 +63,10 @@ TEST(DisplayTest, ClientVSyncOk) {
     void NotImplemented_(const std::string& name) override { FAIL() << "Unexpected " << name; }
 
     bool vsync_handled_ = false;
-    fuchsia_hardware_display::wire::ConfigStamp expected_config_stamp_ = kInvalidConfigStampFidl;
+    ConfigStamp expected_config_stamp_ = kInvalidConfigStamp;
   };
 
-  EventHandler event_handler({.value = kClientStampValue});
+  EventHandler event_handler(kClientStampValue);
   EXPECT_TRUE(client.HandleOneEvent(event_handler).ok());
   EXPECT_TRUE(event_handler.vsync_handled_);
 
@@ -82,7 +84,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   client_end.reset();
-  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStampBanjo));
+  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
 }
 
@@ -95,7 +97,7 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStampBanjo));
+  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
 }
 
@@ -115,19 +117,19 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {
     clientproxy.UpdateConfigStampMapping({
-        .controller_stamp = {.value = kControllerStampValues[i]},
-        .client_stamp = {.value = kClientStampValues[i]},
+        .controller_stamp = ConfigStamp(kControllerStampValues[i]),
+        .client_stamp = ConfigStamp(kClientStampValues[i]),
     });
   }
 
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                clientproxy.OnDisplayVsync(0, 0, {.value = kControllerStampValues.back()}));
+                clientproxy.OnDisplayVsync(0, 0, ConfigStamp(kControllerStampValues.back())));
 
   // Even if Vsync is disabled, ClientProxy should always drain pending
   // controller stamps.
   EXPECT_EQ(clientproxy.pending_applied_config_stamps().size(), 1u);
-  EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().controller_stamp.value,
-            kControllerStampValues.back());
+  EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().controller_stamp,
+            ConfigStamp(kControllerStampValues.back()));
 
   clientproxy.CloseTest();
 }

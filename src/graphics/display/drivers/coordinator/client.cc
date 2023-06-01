@@ -38,6 +38,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
@@ -521,7 +522,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
 
   // Now that we can guarantee that the configuration will be applied, it is
   // safe to increment the config stamp counter.
-  ++latest_config_stamp_.value;
+  ++latest_config_stamp_;
 
   // First go through and reset any current layer lists that are changing, so
   // we don't end up trying to put an image into two lists.
@@ -603,9 +604,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
 }
 
 void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& completer) {
-  completer.Reply({
-      .value = latest_config_stamp_.value,
-  });
+  completer.Reply(ToFidlConfigStamp(latest_config_stamp_));
 }
 
 void Client::EnableVsync(EnableVsyncRequestView request,
@@ -962,7 +961,7 @@ void Client::ApplyConfig() {
   //
   // The final config_stamp sent to |Controller| will be the minimum of all
   // per-layer stamps.
-  config_stamp_t current_applied_config_stamp = latest_config_stamp_;
+  ConfigStamp current_applied_config_stamp = latest_config_stamp_;
 
   for (auto& display_config : configs_) {
     display_config.current_.layer_count = 0;
@@ -979,10 +978,10 @@ void Client::ApplyConfig() {
         display_config.pending_apply_layer_change_property_.Set(true);
       }
 
-      auto layer_client_config_stamp = layer->GetCurrentClientConfigStamp();
+      std::optional<ConfigStamp> layer_client_config_stamp = layer->GetCurrentClientConfigStamp();
       if (layer_client_config_stamp) {
-        current_applied_config_stamp.value =
-            std::min(current_applied_config_stamp.value, layer_client_config_stamp->value);
+        current_applied_config_stamp =
+            std::min(current_applied_config_stamp, *layer_client_config_stamp);
       }
 
       display_config.current_.layer_count++;
@@ -1486,19 +1485,19 @@ zx_status_t ClientProxy::OnCaptureComplete() {
 }
 
 zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
-                                        config_stamp_t controller_stamp) {
+                                        ConfigStamp controller_stamp) {
   ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
   fidl::Status event_sending_result = fidl::Status::Ok();
 
-  config_stamp_t client_stamp = {};
+  ConfigStamp client_stamp = {};
   auto it =
       std::find_if(pending_applied_config_stamps_.begin(), pending_applied_config_stamps_.end(),
-                   [controller_stamp](const config_stamp_pair_t& stamp) {
+                   [controller_stamp](const ConfigStampPair& stamp) {
                      return stamp.controller_stamp >= controller_stamp;
                    });
 
   if (it == pending_applied_config_stamps_.end() || it->controller_stamp != controller_stamp) {
-    client_stamp = kInvalidConfigStampBanjo;
+    client_stamp = kInvalidConfigStamp;
   } else {
     client_stamp = it->client_stamp;
     pending_applied_config_stamps_.erase(pending_applied_config_stamps_.begin(), it);
@@ -1579,9 +1578,8 @@ zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp
     vsync_msg_t v = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
     event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnVsync(
-          v.display_id, v.timestamp,
-          fuchsia_hardware_display::wire::ConfigStamp{v.config_stamp.value}, 0);
+      return fidl::WireSendEvent(endpoint)->OnVsync(v.display_id, v.timestamp,
+                                                    ToFidlConfigStamp(v.config_stamp), 0);
     });
     if (!event_sending_result.ok()) {
       zxlogf(ERROR, "Failed to send all buffered vsync messages: %s\n",
@@ -1593,9 +1591,8 @@ zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp
 
   // Send the latest vsync event
   event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnVsync(
-        display_id, timestamp, fuchsia_hardware_display::wire::ConfigStamp{client_stamp.value},
-        cookie);
+    return fidl::WireSendEvent(endpoint)->OnVsync(display_id, timestamp,
+                                                  ToFidlConfigStamp(client_stamp), cookie);
   });
   if (!event_sending_result.ok()) {
     return event_sending_result.status();
@@ -1625,7 +1622,7 @@ void ClientProxy::OnClientDead() {
   }
 }
 
-void ClientProxy::UpdateConfigStampMapping(config_stamp_pair_t stamps) {
+void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
   ZX_DEBUG_ASSERT(pending_applied_config_stamps_.empty() ||
                   pending_applied_config_stamps_.back().controller_stamp < stamps.controller_stamp);
   pending_applied_config_stamps_.push_back({
