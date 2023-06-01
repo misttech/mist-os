@@ -403,13 +403,13 @@ class GptDevicePartitionerTests : public zxtest::Test {
 
   // Create GPT from a device.
   static void CreateGptDevice(BlockDevice* device, std::unique_ptr<gpt::GptDevice>* gpt) {
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    zx::result clone =
-        component::Clone(device->block_interface(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(clone);
-    ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()),
-                                                 /*blocksize=*/device->block_size(),
-                                                 /*blocks=*/device->block_count(), gpt));
+    zx::result new_connection = GetNewConnections(device->block_controller_interface());
+    ASSERT_OK(new_connection);
+    ASSERT_OK(gpt::GptDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
+        std::move(new_connection->controller),
+        /*blocksize=*/device->block_size(),
+        /*blocks=*/device->block_count(), gpt));
     ASSERT_OK((*gpt)->Sync());
   }
 
@@ -548,14 +548,12 @@ TEST_F(EfiDevicePartitionerTests, InitializeWithoutFvmSucceeds) {
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, kBlockCount, &gpt_dev));
 
   // Set up a valid GPT.
-  //
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result clone =
-      component::Clone(gpt_dev->block_interface(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(clone);
+  zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
+  ASSERT_OK(new_connection);
   std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_OK(
-      gpt::GptDevice::CreateNoController(std::move(clone.value()), kBlockSize, kBlockCount, &gpt));
+  ASSERT_OK(gpt::GptDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
+      std::move(new_connection->controller), kBlockSize, kBlockCount, &gpt));
   ASSERT_OK(gpt->Sync());
 
   ASSERT_OK(CreatePartitioner(kDummyDevice));
@@ -573,14 +571,12 @@ TEST_F(EfiDevicePartitionerTests, InitializeTwoCandidatesWithoutFvmFails) {
   ASSERT_NO_FATAL_FAILURE(BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, &gpt_dev2));
 
   // Set up a valid GPT.
-  //
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result clone =
-      component::Clone(gpt_dev->block_interface(), component::AssumeProtocolComposesNode);
-  ASSERT_OK(clone);
+  zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
+  ASSERT_OK(new_connection);
   std::unique_ptr<gpt::GptDevice> gpt2;
-  ASSERT_OK(
-      gpt::GptDevice::CreateNoController(std::move(clone.value()), kBlockSize, kBlockCount, &gpt2));
+  ASSERT_OK(gpt::GptDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
+      std::move(new_connection->controller), kBlockSize, kBlockCount, &gpt2));
   ASSERT_OK(gpt2->Sync());
 
   ASSERT_NOT_OK(CreatePartitioner(kDummyDevice));

@@ -33,6 +33,14 @@ constexpr uint32_t kPagesPerBlock = 128;
 constexpr uint32_t kSkipBlockSize = kPageSize * kPagesPerBlock;
 constexpr uint32_t kNumBlocks = 400;
 
+struct DeviceAndController {
+  zx::channel device;
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+};
+
+zx::result<DeviceAndController> GetNewConnections(
+    fidl::UnownedClientEnd<fuchsia_device::Controller> controller);
+
 class BlockDevice {
  public:
   static void Create(const fbl::unique_fd& devfs_root, const uint8_t* guid,

@@ -2078,13 +2078,13 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
     ASSERT_OK(pauser);
 
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    zx::result clone =
-        component::Clone(gpt_dev->block_interface(), component::AssumeProtocolComposesNode);
-    ASSERT_OK(clone);
+    zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
+    ASSERT_OK(new_connection);
     std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::CreateNoController(std::move(clone.value()), gpt_dev->block_size(),
-                                                 gpt_dev->block_count(), &gpt));
+    ASSERT_OK(gpt::GptDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
+        std::move(new_connection->controller), gpt_dev->block_size(), gpt_dev->block_count(),
+        &gpt));
     ASSERT_OK(gpt->Sync());
 
     for (const auto& part : init_partitions) {

@@ -41,6 +41,32 @@ void CreateBadBlockMap(void* buffer) {
 
 }  // namespace
 
+zx::result<DeviceAndController> GetNewConnections(
+    fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  if (fidl::OneWayError response =
+          fidl::WireCall(controller)->ConnectToController(std::move(endpoints->server));
+      !response.ok()) {
+    return zx::error(response.status());
+  }
+  zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  if (device_endpoints.is_error()) {
+    return device_endpoints.take_error();
+  }
+  if (fidl::OneWayError response =
+          fidl::WireCall(controller)->ConnectToDeviceFidl(device_endpoints->server.TakeChannel());
+      !response.ok()) {
+    return zx::error(response.status());
+  }
+  return zx::ok(DeviceAndController{
+      .device = device_endpoints->client.TakeChannel(),
+      .controller = std::move(endpoints->client),
+  });
+}
+
 void BlockDevice::Create(const fbl::unique_fd& devfs_root, const uint8_t* guid,
                          std::unique_ptr<BlockDevice>* device) {
   ramdisk_client_t* client;
