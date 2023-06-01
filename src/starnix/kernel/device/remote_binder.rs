@@ -679,6 +679,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 log_error!("Error when servicing the DevBinder protocol: {e:#}");
             }
             handle.exit(result.map_err(|_| errno!(ENOENT)));
+
+            // The task requests in state may refer to async FIDL streams and must be dropped before
+            // dropping the executor.
+            let mut state = handle.state.lock();
+            state.pending_requests.clear();
+            state.unassigned_requests.clear();
+            state.taskless_requests.clear();
         });
 
         error!(EAGAIN)

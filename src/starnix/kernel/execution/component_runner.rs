@@ -5,16 +5,22 @@
 use crate::device::run_component_features;
 use ::runner::{get_program_string, get_program_strvec};
 use anyhow::{anyhow, bail, Error};
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_runner::{ComponentControllerMarker, ComponentStartInfo};
+use fidl_fuchsia_component_runner::{
+    ComponentControllerMarker, ComponentControllerRequest, ComponentControllerRequestStream,
+    ComponentStartInfo,
+};
 use fidl_fuchsia_io as fio;
+use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
+use futures::channel::oneshot;
+use futures::{FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::auth::Credentials;
 use crate::execution::{
@@ -23,6 +29,7 @@ use crate::execution::{
 use crate::fs::fuchsia::RemoteFs;
 use crate::fs::*;
 use crate::logging::{log_error, log_info};
+use crate::signals;
 use crate::task::*;
 use crate::types::*;
 
@@ -146,19 +153,100 @@ pub async fn start_component(
             log_error!("failed to set component features for {} - {:?}", url, e);
         });
 
-    execute_task(current_task, move |result| {
-        let _ = match result {
-            Ok(ExitStatus::Exit(0)) => controller.close_with_epitaph(zx::Status::OK),
-            _ => controller.close_with_epitaph(zx::Status::from_raw(
-                fcomponent::Error::InstanceDied.into_primitive() as i32,
-            )),
-        };
+    let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
+    let controller = controller.into_stream()?;
+    fasync::Task::local(serve_component_controller(
+        controller,
+        Arc::downgrade(&current_task.task),
+        task_complete,
+    ))
+    .detach();
 
+    execute_task(current_task, move |result| {
+        // If the component controller server has gone away, there is nobody for us to
+        // report the result to.
+        let _ = task_complete_sender.send(result);
         // Unmount all the directories for this component.
         std::mem::drop(mount_record);
     });
 
     Ok(())
+}
+
+type TaskResult = Result<ExitStatus, Error>;
+
+/// Translates [ComponentControllerRequest] messages to signals on the `task`.
+///
+/// When a `Stop` request is received, it will send a `SIGINT` to the task.
+/// When a `Kill` request is received, it will send a `SIGKILL` to the task and close the component
+/// controller channel regardless if/how the task responded to the signal. Due to Linux's design,
+/// this may not reliably cleanup everything that was started as a result of running the component.
+///
+/// If the task has completed, it will also close the controller channel.
+async fn serve_component_controller(
+    controller: ComponentControllerRequestStream,
+    task: Weak<Task>,
+    task_complete: oneshot::Receiver<TaskResult>,
+) {
+    let controller_handle = controller.control_handle();
+
+    enum Event<T, U> {
+        Controller(T),
+        Completion(U),
+    }
+
+    let mut stream = futures::stream::select(
+        controller.map(Event::Controller),
+        task_complete.into_stream().map(Event::Completion),
+    );
+
+    while let Some(event) = stream.next().await {
+        match event {
+            Event::Controller(request) => match request {
+                Ok(ComponentControllerRequest::Stop { .. }) => {
+                    if let Some(task) = task.upgrade() {
+                        signals::send_signal(
+                            task.as_ref(),
+                            signals::SignalInfo::new(
+                                SIGINT,
+                                SI_KERNEL,
+                                signals::SignalDetail::default(),
+                            ),
+                        );
+                        log_info!("Sent SIGINT to program {:}", task.command().to_string_lossy());
+                    }
+                }
+                Ok(ComponentControllerRequest::Kill { .. }) => {
+                    if let Some(task) = task.upgrade() {
+                        signals::send_signal(
+                            task.as_ref(),
+                            signals::SignalInfo::new(
+                                SIGKILL,
+                                SI_KERNEL,
+                                signals::SignalDetail::default(),
+                            ),
+                        );
+                        log_info!("Sent SIGKILL to program {:}", task.command().to_string_lossy());
+                        controller_handle.shutdown_with_epitaph(zx::Status::from_raw(
+                            fcomponent::Error::InstanceDied.into_primitive() as i32,
+                        ));
+                    }
+                    return;
+                }
+                Err(_) => {
+                    return;
+                }
+            },
+            Event::Completion(result) => match result {
+                Ok(Ok(ExitStatus::Exit(0))) => {
+                    controller_handle.shutdown_with_epitaph(zx::Status::OK)
+                }
+                _ => controller_handle.shutdown_with_epitaph(zx::Status::from_raw(
+                    fcomponent::Error::InstanceDied.into_primitive() as i32,
+                )),
+            },
+        }
+    }
 }
 
 /// Returns /container/component/{random} that doesn't already exist
