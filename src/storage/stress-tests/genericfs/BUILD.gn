@@ -26,7 +26,7 @@ rustc_test("stressor-bin") {
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/key-bag",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/storage/fxfs:fuchsia.fxfs_rust",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/stress-tests/utils",
     "//src/sys/lib/stress-test",
     "//third_party/rust_crates:anyhow",

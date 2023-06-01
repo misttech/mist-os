@@ -299,7 +299,6 @@ hlcpp_visibility = [
   "//src/storage/f2fs/test:*",
   "//src/storage/fs_test:*",
   "//src/storage/fxfs:*",
-  "//src/storage/fxfs:fuchsia.fxfs_hlcpp",
   "//src/storage/minfs/test:*",
   "//src/storage/testing:*",
   "//src/sys/activity:*",

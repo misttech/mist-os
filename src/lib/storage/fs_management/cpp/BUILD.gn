@@ -40,7 +40,7 @@ if (is_fuchsia) {
       "//sdk/lib/fidl",
       "//src/lib/uuid",
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
-      "//src/storage/fxfs:fuchsia.fxfs_cpp_wire",
+      "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp_wire",
       "//zircon/system/ulib/async",
       "//zircon/system/ulib/fbl",
     ]

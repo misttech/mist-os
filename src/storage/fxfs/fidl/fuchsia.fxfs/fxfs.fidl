@@ -210,3 +210,53 @@ closed protocol Volumes {
         name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
 };
+
+/// Error type for [`WriteBlob.Create`].
+type CreateBlobError = strict enum {
+    /// This blob is currently readable in fxblob.
+    ALREADY_EXISTS = 1;
+
+    /// An unspecified error occurred while creating the blob.
+    INTERNAL = 2;
+};
+
+@discoverable
+closed protocol WriteBlob {
+    /// Creates an blob with the merkle root `hash`. If `allow_existing` is true, the server will
+    /// overwrite the existing blob if there is one. The client will truncate the blob with
+    /// [BlobWriter.GetVmo] and get a handle to a vmo in return. The client will then write blob
+    /// contents into the vmo and call [BlobWriter.BytesReady] on the 'writer` to signal to the
+    /// server that some number of bytes has been written to the vmo.
+    strict Create(struct {
+        hash array<uint8, 32>;
+        allow_existing bool;
+    }) -> (resource struct {
+        writer client_end:BlobWriter;
+    }) error CreateBlobError;
+};
+
+closed protocol BlobWriter {
+    /// Truncates the blob associated with this BlobWriter proxy to length `size`. Returns a handle
+    /// to a `vmo` shared between the server and the client, which is implemented as a ring buffer.
+    /// As the client writes blob contents into the `vmo`, it will call BytesReady to signal to the
+    /// server that some number of bytes have been written.
+    ///
+    /// Ring Buffer Semantics
+    /// The server sets the size of the vmo passed back to the client. The chunks that the client
+    /// writes are arbitrarily sized and do not have any alignment guarantees. Any particular write
+    /// can wrap around the ring buffer. The client can have several outstanding BytesReady
+    /// requests but the client is responsible for not overwriting a given range in the ring buffer
+    /// until the BytesReady request corresponding to that range has completed.
+    strict GetVmo(struct {
+        size uint64;
+    }) -> (resource struct {
+        vmo zx.Handle:VMO;
+    }) error zx.Status;
+
+    /// Indicates to the server that an additional `bytes_written` number of bytes have been
+    /// written to the shared vmo and are ready to be read off the vmo and written to disk. The
+    /// blob will be readable when the final BytesReady response is received by the client.
+    strict BytesReady(struct {
+        bytes_written uint64;
+    }) -> () error zx.Status;
+};

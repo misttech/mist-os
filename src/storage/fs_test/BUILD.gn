@@ -420,7 +420,7 @@ static_library("crypt_service") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp-macros",
-    "//src/storage/fxfs:fuchsia.fxfs_cpp_wire",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp_wire",
     "//zircon/system/ulib/zx",
   ]
 }

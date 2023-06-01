@@ -34,7 +34,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/benchmarks:framework",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
-    "//src/storage/fxfs:fuchsia.fxfs_rust",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:argh",
