@@ -69,7 +69,7 @@ fit::result<fit::failed, Tracer> StartTracing() {
               case ZX_ERR_PEER_CLOSED:
                 return ZX_OK;
               case ZX_OK:
-                ofs.write(buffer.data(), actual);
+                ofs.write(buffer.data(), static_cast<std::streamsize>(actual));
                 break;
               default:
                 return status;

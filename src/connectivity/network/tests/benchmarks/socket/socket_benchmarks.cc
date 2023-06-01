@@ -157,7 +157,7 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   recv_bytes.resize(transfer, 0xBB);
 
   while (state->KeepRunning()) {
-    for (int sent = 0; sent < transfer;) {
+    for (ssize_t sent = 0; sent < transfer;) {
       ssize_t wr;
       {
 #ifdef __Fuchsia__
@@ -168,7 +168,7 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
       CHECK_POSITIVE(wr);
       sent += wr;
     }
-    for (int recv = 0; recv < transfer;) {
+    for (ssize_t recv = 0; recv < transfer;) {
       ssize_t rd;
       {
 #ifdef __Fuchsia__
@@ -354,6 +354,7 @@ void RegisterTests() {
   };
 
   auto get_udp_test_name = [&bytes_with_unit, &network_to_string](
+                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                Network network, size_t raw_bytes,
                                size_t message_count) -> std::string {
     const char* network_name = network_to_string(network);
@@ -362,9 +363,8 @@ void RegisterTests() {
     if (message_count > 1) {
       return fxl::StringPrintf("MultiWriteRead/%s/%s/%ld%s/%ldMessages", kUDP, network_name, bytes,
                                bytes_unit, message_count);
-    } else {
-      return fxl::StringPrintf(kSingleReadTestNameFmt, kUDP, network_name, bytes, bytes_unit);
     }
+    return fxl::StringPrintf(kSingleReadTestNameFmt, kUDP, network_name, bytes, bytes_unit);
   };
 
   constexpr int kTransferSizesForTcp[] = {
@@ -395,7 +395,7 @@ void RegisterTests() {
       // When running on not-Fuchsia, we may not be permitted to create ICMP sockets.
       if (int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP); fd < 0) {
         if (errno == EACCES) {
-          std::cout << "ICMP sockets are not permitted; skipping ping benchmarks" << std::endl;
+          std::cout << "ICMP sockets are not permitted; skipping ping benchmarks\n";
           return;
         }
       } else {
@@ -438,9 +438,8 @@ int main(int argc, char** argv) {
     if (result.is_error()) {
       FX_LOGS(ERROR) << "failed to start tracing";
       return 1;
-    } else {
-      tracer = std::move(*result);
     }
+    tracer = std::move(*result);
   }
 #endif
 
