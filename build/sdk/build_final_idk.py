@@ -29,6 +29,7 @@ is_debug = false
 cxx_rbe_enable = {cxx_rbe_enable}
 rust_rbe_enable = {rust_rbe_enable}
 use_goma = {use_goma}
+universe_package_labels += [{sdk_labels_list}]
 """
 
 
@@ -251,6 +252,7 @@ def main():
             cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
             rust_rbe_enable="true" if args.rust_rbe_enable else "false",
             use_goma="true" if args.use_goma else "false",
+            sdk_labels_list=', '.join(f'"{l}"' for l in args.sdk_targets),
         )
         if args.use_goma and args.goma_dir:
             args_gn_content += 'goma_dir = "%s"\n' % args.goma_dir
