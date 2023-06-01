@@ -7,7 +7,6 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
-#include <fuchsia/hardware/pwm/c/banjo.h>
 
 namespace fragment {
 
@@ -192,33 +191,6 @@ struct PowerProxyResponse {
   uint32_t current_voltage;
   uint32_t reg_value;
 };
-
-// ZX_PROTOCOL_PWM proxy support.
-enum class PwmOp {
-  GET_CONFIG,
-  SET_CONFIG,
-  ENABLE,
-  DISABLE,
-};
-
-constexpr uint32_t kPwmProxyRequestPadding = 12;
-static constexpr uint32_t MAX_MODE_CFG_SIZE = kProxyMaxTransferSize - sizeof(pwm_config_t) -
-                                              sizeof(ProxyRequest) - sizeof(PwmOp) -
-                                              kPwmProxyRequestPadding;
-struct PwmProxyRequest {
-  ProxyRequest header;
-  PwmOp op;
-  pwm_config_t config;
-  uint8_t mode_cfg[MAX_MODE_CFG_SIZE];
-};
-static_assert(sizeof(PwmProxyRequest) < kProxyMaxTransferSize);
-
-struct PwmProxyResponse {
-  ProxyResponse header;
-  pwm_config_t config;
-  uint8_t mode_cfg[MAX_MODE_CFG_SIZE];
-};
-static_assert(sizeof(PwmProxyResponse) < kProxyMaxTransferSize);
 
 // ZX_PROTOCOL_SYSMEM proxy support.
 enum class SysmemOp {

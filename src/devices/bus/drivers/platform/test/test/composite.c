@@ -6,7 +6,6 @@
 #include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
-#include <fuchsia/hardware/pwm/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -43,7 +42,6 @@ enum Fragments_2 {
   FRAGMENT_POWER_2,
   FRAGMENT_CHILD4_2,
   FRAGMENT_SPI_2,
-  FRAGMENT_PWM_2,
   FRAGMENT_COUNT_2,
 };
 
@@ -272,35 +270,6 @@ static zx_status_t test_power(power_protocol_t* power) {
   return ZX_OK;
 }
 
-static zx_status_t test_pwm(pwm_protocol_t* pwm) {
-  zx_status_t status = ZX_OK;
-  mode_config_t mode_cfg = {.mode = 0, .magic = {12345}};
-  pwm_config_t cfg = {
-      false, 1000, 39.0, (uint8_t*)&mode_cfg, sizeof(mode_cfg),
-  };
-  if ((status = pwm_set_config(pwm, &cfg)) != ZX_OK) {
-    return status;
-  }
-  mode_config_t out_mode_cfg = {.mode = 0, .magic = {0}};
-  pwm_config_t out_config = {
-      false, 0, 0.0, (uint8_t*)&out_mode_cfg, sizeof(out_mode_cfg),
-  };
-  pwm_get_config(pwm, &out_config);
-  if (cfg.polarity != out_config.polarity || cfg.period_ns != out_config.period_ns ||
-      cfg.duty_cycle != out_config.duty_cycle ||
-      cfg.mode_config_size != out_config.mode_config_size ||
-      memcmp(cfg.mode_config_buffer, out_config.mode_config_buffer, cfg.mode_config_size)) {
-    return ZX_ERR_INTERNAL;
-  }
-  if ((status = pwm_enable(pwm)) != ZX_OK) {
-    return status;
-  }
-  if ((status = pwm_disable(pwm)) != ZX_OK) {
-    return status;
-  }
-  return ZX_OK;
-}
-
 static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
@@ -308,7 +277,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
 
   uint32_t count = device_get_fragment_count(parent);
   size_t actual;
-  composite_device_fragment_t fragments[FRAGMENT_COUNT_2] = {};
+  composite_device_fragment_t fragments[FRAGMENT_COUNT_1] = {};
   device_get_fragments(parent, fragments, count, &actual);
   if (count != actual) {
     zxlogf(ERROR, "%s: got the wrong number of fragments (%u, %zu)", DRIVER_NAME, count, actual);
@@ -352,7 +321,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   clock_protocol_t child4;
   gpio_protocol_t gpio;
   spi_protocol_t spi;
-  pwm_protocol_t pwm;
 
   if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_1) {
     if (count != FRAGMENT_COUNT_1) {
@@ -456,15 +424,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_SPI", DRIVER_NAME);
       return status;
     }
-    if (strncmp(fragments[FRAGMENT_PWM_2].name, "pwm", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_PWM_2].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_PWM_2].device, ZX_PROTOCOL_PWM, &pwm);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_PWM", DRIVER_NAME);
-      return status;
-    }
     if ((status = test_clock(&clock)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_clock failed: %d", DRIVER_NAME, status);
       return status;
@@ -475,10 +434,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     }
     if ((status = test_spi(&spi)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_spi failed: %d", DRIVER_NAME, status);
-      return status;
-    }
-    if ((status = test_pwm(&pwm)) != ZX_OK) {
-      zxlogf(ERROR, "%s: test_pwm failed: %d", DRIVER_NAME, status);
       return status;
     }
   } else if (metadata.composite_device_id == PDEV_DID_TEST_GOLDFISH_CONTROL_COMPOSITE) {

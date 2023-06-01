@@ -307,50 +307,6 @@ zx_status_t Fragment::RpcPower(const uint8_t* req_buf, uint32_t req_size, uint8_
   }
 }
 
-zx_status_t Fragment::RpcPwm(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                             uint32_t* out_resp_size, zx::handle* req_handles,
-                             uint32_t req_handle_count, zx::handle* resp_handles,
-                             uint32_t* resp_handle_count) {
-  if (!pwm_client_.proto_client().is_valid()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  auto* req = reinterpret_cast<const PwmProxyRequest*>(req_buf);
-  if (req_size < sizeof(*req)) {
-    zxlogf(ERROR, "%s received %u, expecting %zu", __FUNCTION__, req_size, sizeof(*req));
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto* resp = reinterpret_cast<PwmProxyResponse*>(resp_buf);
-  *out_resp_size = sizeof(*resp);
-  switch (req->op) {
-    case PwmOp::GET_CONFIG: {
-      if (req->config.mode_config_size > MAX_MODE_CFG_SIZE * sizeof(uint8_t)) {
-        return ZX_ERR_NO_SPACE;
-      }
-      resp->config.mode_config_size = req->config.mode_config_size;
-      resp->config.mode_config_buffer = resp->mode_cfg;
-      return pwm_client_.proto_client().GetConfig(&resp->config);
-    }
-    case PwmOp::SET_CONFIG: {
-      if (req->config.mode_config_size > MAX_MODE_CFG_SIZE * sizeof(uint8_t)) {
-        return ZX_ERR_NO_SPACE;
-      }
-      uint8_t mode_cfg[MAX_MODE_CFG_SIZE] = {0};
-      memcpy(mode_cfg, req->mode_cfg, req->config.mode_config_size);
-      pwm_config_t cfg = {req->config.polarity, req->config.period_ns, req->config.duty_cycle,
-                          mode_cfg, req->config.mode_config_size};
-      return pwm_client_.proto_client().SetConfig(&cfg);
-    }
-    case PwmOp::ENABLE:
-      return pwm_client_.proto_client().Enable();
-    case PwmOp::DISABLE:
-      return pwm_client_.proto_client().Disable();
-    default:
-      zxlogf(ERROR, "%s: unknown Pwm op %u", __func__, static_cast<uint32_t>(req->op));
-      return ZX_ERR_INTERNAL;
-  }
-}
-
 zx_status_t Fragment::RpcSpi(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                              uint32_t* out_resp_size, zx::handle* req_handles,
                              uint32_t req_handle_count, zx::handle* resp_handles,
@@ -523,10 +479,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
       status = RpcPower(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                         resp_handles, &resp_handle_count);
       break;
-    case ZX_PROTOCOL_PWM:
-      status = RpcPwm(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
-                      resp_handles, &resp_handle_count);
-      break;
     case ZX_PROTOCOL_SPI:
       status = RpcSpi(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                       resp_handles, &resp_handle_count);
@@ -597,13 +549,6 @@ zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       pdev_client_.proto_client().GetProto(static_cast<pdev_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
-    case ZX_PROTOCOL_PWM: {
-      if (!pwm_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      pwm_client_.proto_client().GetProto(static_cast<pwm_protocol_t*>(out_protocol));
       return ZX_OK;
     }
     case ZX_PROTOCOL_SPI: {

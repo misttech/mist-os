@@ -21,7 +21,7 @@ class PwmDevice;
 using PwmDeviceType =
     ddk::Device<PwmDevice, ddk::Initializable, ddk::Messageable<fuchsia_hardware_pwm::Pwm>::Mixin>;
 
-class PwmDevice : public PwmDeviceType, public ddk::PwmProtocol<PwmDevice, ddk::base_protocol> {
+class PwmDevice : public PwmDeviceType {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 

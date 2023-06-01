@@ -44,7 +44,6 @@ fuchsia_driver("test-board-driver") {
     "test-gpio.cc",
     "test-i2c.cc",
     "test-power.cc",
-    "test-pwm.cc",
     "test-spi.cc",
     "test.cc",
   ]
@@ -244,38 +243,6 @@ fuchsia_driver_component("test-spi") {
   manifest = "meta/test-spi.cml"
 }
 
-driver_bind_rules("test-pwm-bind") {
-  rules = "test/test-pwm.bind"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.test.platform",
-  ]
-}
-
-fuchsia_driver("test-pwm-driver") {
-  output_name = "test-pwm"
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/pwm.cc" ]
-  deps = [
-    ":test-pwm-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("test-pwm") {
-  component_name = "test-pwm"
-  deps = [ ":test-pwm-driver" ]
-  info = "test-driver-info.json"
-  manifest = "meta/test-pwm.cml"
-}
-
 driver_bind_rules("test-composite-node-spec-bind") {
   rules = "test/test-composite-node-spec.bind"
   deps = [
@@ -320,7 +287,6 @@ fuchsia_driver("test-composite-driver") {
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
@@ -408,7 +374,6 @@ fuchsia_unittest_package("platform-bus-test") {
     ":test-gpio",
     ":test-i2c",
     ":test-power",
-    ":test-pwm",
     ":test-spi",
     "//src/devices/bus/drivers/platform",
     "//src/devices/clock/drivers/clock",
@@ -416,7 +381,6 @@ fuchsia_unittest_package("platform-bus-test") {
     "//src/devices/i2c/drivers/i2c",
     "//src/devices/internal/drivers/fragment",
     "//src/devices/power/drivers/power",
-    "//src/devices/pwm/drivers/pwm",
     "//src/devices/spi/drivers/spi",
   ]
   foreach(driver, simple_drivers) {

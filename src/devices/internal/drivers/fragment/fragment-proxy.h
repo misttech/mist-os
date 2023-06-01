@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/power/cpp/banjo.h>
-#include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
@@ -35,7 +34,6 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::DaiProtocol<FragmentProxy>,
                       public ddk::PDevProtocol<FragmentProxy>,
                       public ddk::PowerProtocol<FragmentProxy>,
-                      public ddk::PwmProtocol<FragmentProxy>,
                       public ddk::SpiProtocol<FragmentProxy>,
                       public ddk::SysmemProtocol<FragmentProxy> {
  public:
@@ -96,10 +94,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t PowerGetCurrentVoltage(uint32_t index, uint32_t* current_voltage);
   zx_status_t PowerWritePmicCtrlReg(uint32_t reg_addr, uint32_t value);
   zx_status_t PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out_value);
-  zx_status_t PwmGetConfig(pwm_config_t* out_config);
-  zx_status_t PwmSetConfig(const pwm_config_t* config);
-  zx_status_t PwmEnable();
-  zx_status_t PwmDisable();
   zx_status_t SpiTransmit(const uint8_t* txdata_list, size_t txdata_count);
   zx_status_t SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
                          size_t* out_rxdata_actual);

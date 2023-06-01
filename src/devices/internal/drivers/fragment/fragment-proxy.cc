@@ -58,9 +58,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_POWER:
       proto->ops = &power_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_PWM:
-      proto->ops = &pwm_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_SPI:
       proto->ops = &spi_protocol_ops_;
       return ZX_OK;
@@ -566,54 +563,6 @@ zx_status_t FragmentProxy::PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out
   }
   *out_value = resp.reg_value;
   return status;
-}
-
-zx_status_t FragmentProxy::PwmGetConfig(pwm_config_t* out_config) {
-  PwmProxyRequest req = {};
-  PwmProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_PWM;
-  req.op = PwmOp::GET_CONFIG;
-  req.config.mode_config_size = out_config->mode_config_size;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  out_config->polarity = resp.config.polarity;
-  out_config->period_ns = resp.config.period_ns;
-  out_config->duty_cycle = resp.config.duty_cycle;
-  out_config->mode_config_size = resp.config.mode_config_size;
-  memcpy(out_config->mode_config_buffer, resp.mode_cfg, resp.config.mode_config_size);
-  return status;
-}
-
-zx_status_t FragmentProxy::PwmSetConfig(const pwm_config_t* config) {
-  PwmProxyRequest req = {};
-  PwmProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_PWM;
-  req.op = PwmOp::SET_CONFIG;
-  req.config = *config;
-  memcpy(req.mode_cfg, config->mode_config_buffer, config->mode_config_size);
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::PwmEnable() {
-  PwmProxyRequest req = {};
-  PwmProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_PWM;
-  req.op = PwmOp::ENABLE;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::PwmDisable() {
-  PwmProxyRequest req = {};
-  PwmProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_PWM;
-  req.op = PwmOp::DISABLE;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
 }
 
 zx_status_t FragmentProxy::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {

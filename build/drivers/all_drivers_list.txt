@@ -130,7 +130,6 @@
 //src/devices/bus/drivers/platform/test:test-i2c-driver
 //src/devices/bus/drivers/platform/test:test-parent-driver
 //src/devices/bus/drivers/platform/test:test-power-driver
-//src/devices/bus/drivers/platform/test:test-pwm-driver
 //src/devices/bus/drivers/platform/test:test-spi-driver
 //src/devices/bus/drivers/platform:platform-bus-driver
 //src/devices/bus/drivers/platform:platform-bus.proxy-driver
