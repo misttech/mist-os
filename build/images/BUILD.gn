@@ -266,7 +266,6 @@ group("default-images") {
   if (!use_bazel_images_only) {
     # Bazel assembly uses product bundle to flash.
     deps += [
-      "//build/images/flash:fastboot_manifest",
       "//build/images/flash:flash_script",
       "//build/images/tools:fastboot($host_toolchain)",
     ]
@@ -296,6 +295,10 @@ group("default-images") {
       deps += [ ":uefi-disk" ]
     }
   }
+
+  # Even if Bazel assembly uses product bundle to flash, downstream tools can
+  # still expect flash.json to exist for flashing.
+  deps += [ "//build/images/flash:fastboot_manifest" ]
 
   if (size_checker_input != {
       }) {

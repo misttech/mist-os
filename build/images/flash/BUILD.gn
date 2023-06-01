@@ -344,7 +344,6 @@ generated_file("fastboot_manifest") {
   output_conversion = "json"
   deps = [
     ":fastboot_credentials",
-    ":flash_script",
     "//build/images/tools:board_tools",
   ]
 
