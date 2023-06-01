@@ -32,7 +32,6 @@ source_set("legacy_c_gigaboot") {
     "$dir_gigaboot/src/mdns.c",
     "$dir_gigaboot/src/netifc.c",
     "$dir_gigaboot/src/tcp.c",
-    "$dir_gigaboot/src/util.c",
     "$dir_gigaboot/src/zircon.c",
   ]
   configs += [ "$dir_gigaboot/src:config" ]

@@ -18,25 +18,8 @@
 __BEGIN_CDECLS
 
 void xefi_init(efi_handle img, efi_system_table* sys);
-
-// Fetches a single character from the console or serial.
-//
-// Returns whichever interface has an input character ready first. If both
-// have characters ready, the console input will be returned.
-//
-// Console characters are converted from UTF-16 to ASCII. If the character
-// can't be represented in ASCII, '\0' is returned instead.
-//
-// timeout_us: how long to wait in milliseconds. 0 will poll once and
-//             return, negative values will wait forever.
-//
-// Returns the character, or -1 on timeout/error.
-int xefi_getc(int64_t timeout_ms);
-
-void xefi_fatal(const char* msg, efi_status status);
 char16_t* xefi_handle_to_str(efi_handle handle);
 const char* xefi_strerror(efi_status status);
-const char16_t* xefi_wstrerror(efi_status status);
 size_t strlen_16(char16_t* str);
 
 char16_t* xefi_devpath_to_str(efi_device_path_protocol* path);

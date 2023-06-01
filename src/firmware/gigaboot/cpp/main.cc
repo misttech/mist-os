@@ -11,7 +11,6 @@
 #include "backends.h"
 #include "fastboot_tcp.h"
 #include "gigaboot/src/netifc.h"
-#include "gigaboot/src/util.h"
 #include "input.h"
 #include "lib/zircon_boot/zircon_boot.h"
 #include "utils.h"

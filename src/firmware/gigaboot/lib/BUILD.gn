@@ -29,15 +29,3 @@ source_set("bootbyte") {
 config("shared_config") {
   include_dirs = [ "../include/shared" ]
 }
-
-test("gigaboot_shared_lib_test") {
-  sources = [ "xefi_test.cc" ]
-
-  deps = [
-    ":shared",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gmock",
-    "//zircon/kernel/lib/efi",
-    "//zircon/kernel/lib/efi/testing",
-  ]
-}

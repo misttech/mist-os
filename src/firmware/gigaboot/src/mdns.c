@@ -14,7 +14,6 @@
 #include "device_id.h"
 #include "inet6.h"
 #include "netifc.h"
-#include "util.h"
 
 #define MDNS_FLAG_QUERY_RESPONSE 0x8000
 #define MDNS_FLAG_AUTHORITATIVE 0x400
