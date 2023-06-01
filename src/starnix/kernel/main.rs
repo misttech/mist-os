@@ -13,7 +13,7 @@ extern crate macro_rules_attribute;
 use crate::execution::Container;
 use crate::lock::Mutex;
 use crate::logging::log_warn;
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
@@ -143,16 +143,6 @@ async fn main() -> Result<(), Error> {
         );
     }
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
-
-    if let Some(local_container) = execution::maybe_create_container_from_startup_handles().await? {
-        let local_container = container
-            .set(local_container)
-            .await
-            .map_err(|_| anyhow!("container initialized twice"))?;
-        if let Some(root_server_end) = maybe_root_server_end.lock().take() {
-            execution::expose_root(local_container, root_server_end)?;
-        }
-    }
 
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |request: KernelServices| async {

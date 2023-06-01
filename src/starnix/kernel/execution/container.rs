@@ -7,7 +7,6 @@ use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl::AsyncChannel;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
@@ -19,7 +18,7 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::Task as _;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use runner::{get_program_string, get_program_strvec, get_value};
+use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -34,7 +33,6 @@ use crate::fs::*;
 use crate::logging::{log_error, log_info};
 use crate::task::*;
 use crate::types::*;
-use fidl::HandleBased;
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
 /// handles for the container's component controller and `/pkg` directory.
@@ -51,11 +49,9 @@ struct ConfigWrapper {
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
     /// directory.
-    #[allow(dead_code)]
     outgoing_dir: Option<zx::Channel>,
 
     /// The svc directory of the container, used to access protocols from the container.
-    #[allow(dead_code)]
     svc_dir: Option<zx::Channel>,
 }
 
@@ -63,48 +59,6 @@ impl std::ops::Deref for ConfigWrapper {
     type Target = Config;
     fn deref(&self) -> &Self::Target {
         &self.config
-    }
-}
-
-/// Returns the configuration object for the container being run by this `starnix_kernel`.
-fn get_config() -> Option<ConfigWrapper> {
-    if let Ok(config_bytes) = std::fs::read("/container_config/config") {
-        let program_dict: fdata::Dictionary =
-            fidl::unpersist(&config_bytes).expect("Failed to unpersist the program dictionary.");
-
-        let apex_hack = get_config_strvec(&program_dict, "apex_hack").unwrap_or_default();
-        let features = get_config_strvec(&program_dict, "features").unwrap_or_default();
-        let init = get_config_strvec(&program_dict, "init").unwrap_or_default();
-        let kernel_cmdline = get_config_str(&program_dict, "kernel_cmdline").unwrap_or_default();
-        let mounts = get_config_strvec(&program_dict, "mounts").unwrap_or_default();
-        let name = get_config_str(&program_dict, "name").unwrap_or_default();
-        let startup_file_path =
-            get_config_str(&program_dict, "startup_file_path").unwrap_or_default();
-
-        let pkg_dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
-            .map(zx::Channel::from_handle);
-        let outgoing_dir =
-            fruntime::take_startup_handle(kernel_config::CONTAINER_OUTGOING_DIR_HANDLE_INFO)
-                .map(zx::Channel::from_handle);
-        let svc_dir = fruntime::take_startup_handle(kernel_config::CONTAINER_SVC_HANDLE_INFO)
-            .map(zx::Channel::from_handle);
-
-        Some(ConfigWrapper {
-            config: Config {
-                apex_hack,
-                features,
-                init,
-                kernel_cmdline,
-                mounts,
-                name,
-                startup_file_path,
-            },
-            pkg_dir,
-            outgoing_dir,
-            svc_dir,
-        })
-    } else {
-        None
     }
 }
 
@@ -158,20 +112,6 @@ fn get_config_from_component_start_info(
     }
 }
 
-fn get_config_strvec(dict: &fdata::Dictionary, key: &str) -> Option<Vec<String>> {
-    match get_value(dict, key) {
-        Some(fdata::DictionaryValue::StrVec(values)) => Some(values.clone()),
-        _ => None,
-    }
-}
-
-fn get_config_str(dict: &fdata::Dictionary, key: &str) -> Option<String> {
-    match get_value(dict, key) {
-        Some(fdata::DictionaryValue::Str(string)) => Some(string.clone()),
-        _ => None,
-    }
-}
-
 // Creates a CString from a String. Calling this with an invalid CString will panic.
 fn to_cstr(str: &str) -> CString {
     CString::new(str.to_string()).unwrap()
@@ -192,28 +132,6 @@ enum ExposedServices {
 }
 
 type TaskResult = Result<ExitStatus, Error>;
-
-/// Attempts to read /container_config/config and the startup handles to create a container.
-///
-/// Returns None if /container_config/config does not exist.
-///
-/// This function will be replaced with a version that starts a container from ComponentStartInfo,
-/// but this function exists to make a soft transition.
-pub async fn maybe_create_container_from_startup_handles() -> Result<Option<Arc<Container>>, Error>
-{
-    if let Some(config) = get_config() {
-        let (sender, receiver) = oneshot::channel::<TaskResult>();
-        let container = create_container(config, sender).await?;
-        fasync::Task::spawn(async {
-            let _ = receiver.await;
-            // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
-            fruntime::job_default().kill().expect("Failed to kill job");
-        })
-        .detach();
-        return Ok(Some(container));
-    }
-    Ok(None)
-}
 
 async fn server_component_controller(
     request_stream: frunner::ComponentControllerRequestStream,

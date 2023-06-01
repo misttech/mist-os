@@ -8,8 +8,5 @@ rustc_library("kernel_config") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
 
-  deps = [
-    "//src/lib/fuchsia-runtime",
-    "//third_party/rust_crates:rand",
-  ]
+  deps = [ "//third_party/rust_crates:rand" ]
 }
