@@ -522,6 +522,13 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($delegate:expr) => { fs_node_impl_xattr_delegate(self, $delegate) };
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TimeUpdateType {
+    Now,
+    Omit,
+    Time(zx::Time),
+}
+
 // Public re-export of macros allows them to be used like regular rust items.
 pub(crate) use fs_node_impl_dir_readonly;
 pub(crate) use fs_node_impl_symlink;
@@ -1130,6 +1137,49 @@ impl FsNode {
         let mut info = self.info_write();
         let now = fuchsia_runtime::utc_time();
         info.time_status_change = now;
+    }
+
+    /// Update the atime and mtime if the `current_task` has write access, is the file owner, or
+    /// holds either the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
+    pub fn update_atime_mtime(
+        &self,
+        current_task: &CurrentTask,
+        atime: TimeUpdateType,
+        mtime: TimeUpdateType,
+    ) -> Result<(), Errno> {
+        // To set the timestamps to the current time the caller must either have write access to
+        // the file, be the file owner, or hold the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
+        // To set the timestamps to other values the caller must either be the file owner or hold
+        // the CAP_FOWNER capability.
+        let creds = current_task.creds();
+        let has_owner_priviledge =
+            creds.euid == self.info().uid || creds.has_capability(CAP_FOWNER);
+        let set_current_time = matches!((atime, mtime), (TimeUpdateType::Now, TimeUpdateType::Now));
+        if !has_owner_priviledge {
+            if set_current_time {
+                self.check_access(current_task, Access::WRITE)?
+            } else {
+                return error!(EPERM);
+            }
+        }
+
+        if !matches!((atime, mtime), (TimeUpdateType::Omit, TimeUpdateType::Omit)) {
+            let mut info = self.info_write();
+            let now = fuchsia_runtime::utc_time();
+            info.time_status_change = now;
+            let get_time = |time: TimeUpdateType| match time {
+                TimeUpdateType::Now => Some(now),
+                TimeUpdateType::Time(t) => Some(t),
+                TimeUpdateType::Omit => None,
+            };
+            if let Some(time) = get_time(atime) {
+                info.time_access = time;
+            }
+            if let Some(time) = get_time(mtime) {
+                info.time_modify = time;
+            }
+        }
+        Ok(())
     }
 }
 

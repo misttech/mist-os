@@ -28,6 +28,10 @@ use fuchsia_zircon as zx;
 /// See Errors section of https://man7.org/linux/man-pages/man2/memfd_create.2.html
 const MEMFD_NAME_MAX_LEN: usize = 250;
 
+// Constants from bionic/libc/include/sys/stat.h
+const UTIME_NOW: i64 = 0x3fffffff;
+const UTIME_OMIT: i64 = 0x3ffffffe;
+
 pub fn sys_read(
     current_task: &CurrentTask,
     fd: FdNumber,
@@ -2030,14 +2034,45 @@ pub fn sys_inotify_rm_watch(
 }
 
 pub fn sys_utimensat(
-    _current_task: &CurrentTask,
-    _dir_fd: FdNumber,
-    _user_path: UserCString,
-    _user_times: UserRef<[timespec; 2]>,
-    _flags: u32,
+    current_task: &CurrentTask,
+    dir_fd: FdNumber,
+    user_path: UserCString,
+    user_times: UserRef<[timespec; 2]>,
+    flags: u32,
 ) -> Result<(), Errno> {
-    not_implemented!("utimensat");
-    Ok(())
+    let (atime, mtime) = if user_times.addr().is_null() {
+        // If user_times is null, the timestamps are updated to the current time.
+        (TimeUpdateType::Now, TimeUpdateType::Now)
+    } else {
+        let ts: [timespec; 2] = current_task.mm.read_object(user_times)?;
+        let atime = ts[0];
+        let mtime = ts[1];
+        let parse_timespec = |spec: timespec| match spec.tv_nsec {
+            UTIME_NOW => Ok(TimeUpdateType::Now),
+            UTIME_OMIT => Ok(TimeUpdateType::Omit),
+            _ => time_from_timespec(spec).map(TimeUpdateType::Time),
+        };
+        (parse_timespec(atime)?, parse_timespec(mtime)?)
+    };
+
+    if let (TimeUpdateType::Omit, TimeUpdateType::Omit) = (atime, mtime) {
+        return Ok(());
+    };
+
+    // Non-standard feature: if user_path is null, the timestamps are updated on the file referred
+    // to by dir_fd.
+    // See https://man7.org/linux/man-pages/man2/utimensat.2.html
+    let name = if user_path.addr().is_null() {
+        if dir_fd == FdNumber::AT_FDCWD {
+            return error!(EFAULT);
+        }
+        let (node, _) = current_task.resolve_dir_fd(dir_fd, b"")?;
+        node
+    } else {
+        let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
+        lookup_at(current_task, dir_fd, user_path, lookup_flags)?
+    };
+    name.entry.node.update_atime_mtime(current_task, atime, mtime)
 }
 
 pub fn sys_splice(

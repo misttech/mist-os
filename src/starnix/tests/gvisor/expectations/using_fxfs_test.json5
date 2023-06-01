@@ -747,6 +747,13 @@
 
                 // tcp_socket_test
                 "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
+
+                // utimes_test
+                // Creating a temporary directory fails.
+                "FutimesatTest.OnRelPath",
+                "UtimensatTest.OnRelPath",
+                "UtimeTest.ZeroAtimeandMtime",
+                "UtimesTest.OnDir",
             ],
         },
     ],

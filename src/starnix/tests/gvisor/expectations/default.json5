@@ -827,9 +827,6 @@
                 // statfs_test
                 "FstatfsTest.BlocksFree",
 
-                // stat_times_test
-                "StatTimesTest.FileUtimes",
-
                 // tuntap_test
                 "TuntapStaticTest.NetTunExists",
                 "TuntapTest.CreateInterfaceNoCap",
@@ -932,15 +929,6 @@
                 "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
-
-                // utimes_test
-                "UtimesTest.*",
-                "FutimesatTest.*",
-                "UtimensatTest.OnAbsPath",
-                "UtimensatTest.OnRelPath",
-                "UtimensatTest.InvalidNsec",
-                "Utimensat.*",
-                "UtimeTest.*",
 
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",

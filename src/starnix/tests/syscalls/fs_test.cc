@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -16,6 +17,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <linux/capability.h>
 
 #include "src/starnix/tests/syscalls/test_helper.h"
 
@@ -195,4 +197,231 @@ TEST(FsTest, DevZeroAndNullQuirks) {
   }
 }
 
+constexpr uid_t kOwnerUid = 65534;
+constexpr uid_t kNonOwnerUid = 65533;
+constexpr gid_t kOwnerGid = 65534;
+constexpr gid_t kNonOwnerGid = 65533;
+
+class UtimensatTest : public ::testing::Test {
+ protected:
+  void SetUp() {
+    char dir_template[] = "/tmp/XXXXXX";
+    ASSERT_NE(mkdtemp(dir_template), nullptr)
+        << "failed to create test folder: " << std::strerror(errno);
+    test_folder_ = std::string(dir_template);
+
+    test_file_ = test_folder_ + "/testfile";
+    int fd = open(test_file_.c_str(), O_RDWR | O_CREAT, 0666);
+    ASSERT_NE(fd, -1) << "failed to create test file: " << std::strerror(errno);
+    close(fd);
+
+    ASSERT_EQ(chown(test_folder_.c_str(), kOwnerUid, kOwnerGid), 0);
+    ASSERT_EQ(chmod(test_folder_.c_str(), 0777), 0);
+    ASSERT_EQ(chmod(test_file_.c_str(), 0666), 0);
+    ASSERT_EQ(chown(test_file_.c_str(), kOwnerUid, kOwnerGid), 0);
+  }
+
+  void TearDown() {
+    ASSERT_EQ(remove(test_file_.c_str()), 0);
+    ASSERT_EQ(remove(test_folder_.c_str()), 0);
+  }
+
+  // test folder owned by kOwnerUid, perms 0o777
+  std::string test_folder_;
+
+  // test file owned by kOwnerUid, perms 0o666
+  std::string test_file_;
+};
+
+void unset_capability(int cap) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
+  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
+  caps[CAP_TO_INDEX(cap)].effective &= ~CAP_TO_MASK(cap);
+  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
+}
+
+bool has_capability(int cap) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
+  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
+  return caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap);
+}
+
+bool change_ids(uid_t user, gid_t group) {
+  // TODO(https://fxbug.dev/125669): changing the filesystem user ID from 0 to
+  // nonzero should drop capabilities, dropping them manually as a workaround.
+  uid_t current_ruid, current_euid, current_suid;
+  SAFE_SYSCALL(getresuid(&current_ruid, &current_euid, &current_suid));
+  if (current_euid == 0 && user != 0) {
+    unset_capability(CAP_DAC_OVERRIDE);
+    unset_capability(CAP_FOWNER);
+  }
+
+  return (setresgid(group, group, group) == 0) && (setresuid(user, user, user) == 0);
+}
+
+TEST_F(UtimensatTest, OwnerCanAlwaysSetTime) {
+  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
+  ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
+
+  // File owner can change time to now even without write perms.
+  ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    ASSERT_TRUE(change_ids(kOwnerUid, kOwnerGid));
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // File owner can change time to any time without write perms.
+  helper.RunInForkedProcess([this] {
+    ASSERT_TRUE(change_ids(kOwnerUid, kOwnerGid));
+    struct timespec times[2] = {{0, 0}};
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), times, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(UtimensatTest, NonOwnerWithWriteAccessCanOnlySetTimeToNow) {
+  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
+  ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
+
+  // Non file owner cannot change time to now without write perms.
+  ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    ASSERT_TRUE(change_ids(kNonOwnerUid, kNonOwnerGid));
+    EXPECT_NE(0, utimensat(-1, test_file_.c_str(), NULL, 0));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Non file owner can change time to now with write perms.
+  ASSERT_EQ(chmod(test_file_.c_str(), 0006), 0);
+  helper.RunInForkedProcess([this] {
+    ASSERT_TRUE(change_ids(kNonOwnerUid, kNonOwnerGid));
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Non file owner cannot change time to some other value, even with write
+  // perms.
+  helper.RunInForkedProcess([this] {
+    ASSERT_TRUE(change_ids(kNonOwnerUid, kNonOwnerGid));
+    struct timespec times[2] = {{0, 0}};
+    EXPECT_NE(0, utimensat(-1, test_file_.c_str(), times, 0));
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
+  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
+  ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
+
+  // Non file owner without write permissions can set the time to now with
+  // either CAP_DAC_OVERRIDE or CAP_FOWNER capability.
+  ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    ASSERT_TRUE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_TRUE(has_capability(CAP_FOWNER));
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  helper.RunInForkedProcess([this] {
+    unset_capability(CAP_DAC_OVERRIDE);
+    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_TRUE(has_capability(CAP_FOWNER));
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  helper.RunInForkedProcess([this] {
+    unset_capability(CAP_FOWNER);
+    ASSERT_TRUE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  helper.RunInForkedProcess([this] {
+    unset_capability(CAP_DAC_OVERRIDE);
+    unset_capability(CAP_FOWNER);
+    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    EXPECT_NE(0, utimensat(-1, test_file_.c_str(), NULL, 0));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Non file owner without write permissions can set the time to some other
+  // value with the CAP_FOWNER capability.
+  helper.RunInForkedProcess([this] {
+    unset_capability(CAP_DAC_OVERRIDE);
+    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_TRUE(has_capability(CAP_FOWNER));
+    struct timespec times[2] = {{0, 0}};
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), times, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  helper.RunInForkedProcess([this] {
+    unset_capability(CAP_DAC_OVERRIDE);
+    unset_capability(CAP_FOWNER);
+    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    struct timespec times[2] = {{0, 0}};
+    EXPECT_NE(0, utimensat(-1, test_file_.c_str(), times, 0));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(UtimensatTest, CanSetOmitTimestampsWithoutPermissions) {
+  ASSERT_EQ(geteuid(), 0u) << "This test needs to run as root";
+
+  // Non file owner without write permissions and without the CAP_DAC_OVERRIDE or
+  // CAP_FOWNER capability can set the timestamps to UTIME_OMIT.
+  ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
+  ForkHelper helper;
+  helper.RunInForkedProcess([this] {
+    unset_capability(CAP_DAC_OVERRIDE);
+    unset_capability(CAP_FOWNER);
+    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    struct timespec times[2] = {{0, UTIME_OMIT}, {0, UTIME_OMIT}};
+    EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), times, 0))
+        << "utimensat failed: " << std::strerror(errno);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(UtimensatTest, ReturnsEFAULTOnNullPathAndCWDDirFd) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    struct timespec times[2] = {{0, 0}};
+    EXPECT_NE(0, syscall(SYS_utimensat, AT_FDCWD, NULL, times, 0));
+    EXPECT_EQ(errno, EFAULT);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(UtimensatTest, ReturnsENOENTOnEmptyPath) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    EXPECT_NE(0, utimensat(-1, "", NULL, 0));
+    EXPECT_EQ(errno, ENOENT);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
 }  // namespace

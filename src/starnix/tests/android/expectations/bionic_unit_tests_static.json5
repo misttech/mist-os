@@ -32,8 +32,6 @@
                 "sys_sendfile.sendfile",
                 "sys_sendfile.sendfile64_smoke",
                 "sys_shm.smoke",
-                "sys_stat.futimens",
-                "sys_stat.futimens_EBADF",
                 "sys_stat.stat64_lstat64_fstat64",
                 "sys_stat.statx",
                 "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_symlink",

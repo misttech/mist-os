@@ -101,7 +101,6 @@
                 "*/ltp_clock_adjtime02.cm",
                 "*/ltp_clock_getres01.cm",
                 "*/ltp_clock_gettime03.cm",
-                "*/ltp_clock_gettime04.cm",
                 "*/ltp_clock_nanosleep01.cm",
                 "*/ltp_clock_nanosleep03.cm",
                 "*/ltp_clock_nanosleep04.cm",

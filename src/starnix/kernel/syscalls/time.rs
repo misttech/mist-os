@@ -54,7 +54,7 @@ pub fn sys_clock_gettime(
         get_dynamic_clock(current_task, which_clock)?
     } else {
         match which_clock as u32 {
-            CLOCK_REALTIME => utc_time().into_nanos(),
+            CLOCK_REALTIME | CLOCK_REALTIME_COARSE => utc_time().into_nanos(),
             CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
                 zx::Time::get_monotonic().into_nanos()
             }
