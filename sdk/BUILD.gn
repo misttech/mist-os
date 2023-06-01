@@ -7,6 +7,7 @@
 import("//build/config/build_api_module.gni")
 import("//build/dart/toolchain.gni")
 import("//build/fidl/toolchain.gni")
+import("//build/sdk/config.gni")
 import("//build/sdk/generate_final_idk.gni")
 import("//build/sdk/merged_sdk.gni")
 import("//build/sdk/sdk.gni")
@@ -245,10 +246,12 @@ sdk("e2e_testing") {
 sdk_molecule("e2e_testing_tools") {
   visibility = [ ":*" ]
 
-  deps = [
-    "//src/performance/trace2json:bin_sdk($host_toolchain)",
-    "//src/sys/pkg/testing/fake-omaha-client:bin_sdk($host_toolchain)",
-  ]
+  if (!sdk_no_host_tools) {
+    deps = [
+      "//src/performance/trace2json:bin_sdk($host_toolchain)",
+      "//src/sys/pkg/testing/fake-omaha-client:bin_sdk($host_toolchain)",
+    ]
+  }
 }
 
 # Tools and data used on a 'host' development machine; where host is often
@@ -390,9 +393,12 @@ sdk_molecule("core_testing_idk") {
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp/testing:cpp_sdk",
     "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",
-    "//tools/docsgen:ref_docs_sdk",
     "//zircon/system/ulib/async-testing:async-testing_sdk",
   ]
+  if (!sdk_no_host_tools) {
+    # This target depends on //dsk:host_tools.all($host_toolchain) indirectly.
+    deps += [ "//tools/docsgen:ref_docs_sdk" ]
+  }
 }
 
 sdk_molecule("platform_fidls") {
@@ -447,10 +453,10 @@ sdk("core") {
 
   filter_api_host_tools = !sdk_cross_compile_host_tools
 
-  deps = [
-    ":core_idk",
-    ":host_tools",
-  ]
+  deps = [ ":core_idk" ]
+  if (!sdk_no_host_tools) {
+    deps += [ ":host_tools" ]
+  }
 }
 
 sdk("core_testing") {
@@ -535,8 +541,6 @@ sdk("fuchsia_dart") {
   api = "manifests/fuchsia_dart.manifest"
 
   deps = [
-    "//sdk/dart:gen_snapshot_sdk($dart_toolchain)",
-    "//sdk/dart:kernel_compiler_sdk($dart_toolchain)",
     "//sdk/docs:modular_config_schema",
 
     # TODO(fxbug.dev/122070): remove, needed to soft transition
@@ -566,20 +570,26 @@ sdk("fuchsia_dart") {
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_sdk($fidl_toolchain)",
-    "//tools/fidl/fidlgen_dart:fidlgen_dart_sdk($host_toolchain)",
   ]
-
-  toolchains = []
-  if (host_os == "linux") {
-    toolchains += [
-      host_x64_toolchain,
-      host_arm64_toolchain,
+  if (!sdk_no_host_tools) {
+    deps += [
+      "//sdk/dart:gen_snapshot_sdk($dart_toolchain)",
+      "//sdk/dart:kernel_compiler_sdk($dart_toolchain)",
+      "//tools/fidl/fidlgen_dart:fidlgen_dart_sdk($host_toolchain)",
     ]
-  } else if (host_os == "mac") {
-    toolchains += [ host_toolchain ]
-  }
-  foreach(toolchain, toolchains) {
-    deps += [ "//tools/fidl/fidlgen_dart:fidlgen_dart_sdk($toolchain)" ]
+
+    toolchains = []
+    if (host_os == "linux") {
+      toolchains += [
+        host_x64_toolchain,
+        host_arm64_toolchain,
+      ]
+    } else if (host_os == "mac") {
+      toolchains += [ host_toolchain ]
+    }
+    foreach(toolchain, toolchains) {
+      deps += [ "//tools/fidl/fidlgen_dart:fidlgen_dart_sdk($toolchain)" ]
+    }
   }
 }
 
@@ -662,7 +672,6 @@ sdk("driver") {
   deps = [
     ":bind",
     ":driver_fidl",
-    ":driver_host_tools",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
     "//sdk/lib/driver/component:driver_component",
@@ -680,6 +689,9 @@ sdk("driver") {
     "//src/lib/fidl/cpp:cpp_sdk",
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
   ]
+  if (!sdk_no_host_tools) {
+    deps += [ ":driver_host_tools" ]
+  }
 }
 
 action("get_atoms_from_sdk_manifest") {

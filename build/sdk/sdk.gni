@@ -159,6 +159,9 @@ template("sdk") {
       "--updated",
       rebase_path(computed_api_file, root_build_dir),
     ]
+    if (sdk_no_host_tools) {
+      args += [ "--ensure-no-host-tools" ]
+    }
 
     if (defined(invoker.api)) {
       inputs += [ api_reference ]

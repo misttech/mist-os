@@ -27,6 +27,10 @@ def main():
         help=
         'If the reference has been filtered to remove items, this is the original file'
     )
+    parser.add_argument(
+        '--ensure-no-host-tools',
+        action='store_true',
+        help='Error if there are host tools in the SDK manifest.')
 
     args = parser.parse_args()
 
@@ -47,6 +51,16 @@ def main():
     with open(args.reference, 'r') as reference_file:
         old_ids = [l.strip() for l in reference_file.readlines()]
 
+    def is_host_tool_id(id: str) -> bool:
+        """Return True if id should not appear when --no-host-tools is used."""
+        return id.startswith('sdk://tools/') or id == 'sdk://docs/ref_docs'
+
+    if args.ensure_no_host_tools:
+        # Remove any host tools from the golden manifest, as well as the
+        # //sdk:docs/ref_docs target which depends on
+        # //sdk:host_tools.all($host_toolchain)
+        old_ids = [i for i in old_ids if not is_host_tool_id(i)]
+
     # tools/arm64 should not exist on mac hosts
     # TODO(fxbug.dev/42999): remove when SDK transition is complete.
     if platform.mac_ver()[0]:
@@ -66,6 +80,18 @@ def main():
 
     added_ids = new_id_set - (required_id_set | optional_id_set)
     removed_ids = required_id_set - new_id_set
+
+    if args.ensure_no_host_tools:
+        added_host_ids = {i for i in added_ids if is_host_tool_id(i)}
+        if added_host_ids:
+            print('Error: Host tools incorrectly added to SDK:')
+            for id in sorted(added_host_ids):
+                print(' - %s' % id)
+            print(
+                'The SDK atoms above should not be dependencies of GN sdk() targets used'
+            )
+            print('to build this SDK when sdk_no_host_tools is set!')
+            return 1
 
     if added_ids:
         print('Elements added to SDK:')

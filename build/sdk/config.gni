@@ -9,4 +9,9 @@ declare_args() {
   # Whether to only warn when an SDK has been modified.
   # If false, any unacknowledged SDK change will cause a build failure.
   warn_on_sdk_changes = false
+
+  # Whether to omit host tools from the generated IDKs.
+  # Should only be set in the args.gn files created by generate_final_idk()
+  # actions.
+  sdk_no_host_tools = false
 }
