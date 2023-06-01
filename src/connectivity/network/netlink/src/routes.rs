@@ -213,7 +213,7 @@ fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>:
                 if !route_messages.insert(route_message.clone()) {
                     return Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route));
                 }
-                Some(route_message.as_rtnl_new_route())
+                Some(route_message.into_rtnl_new_route())
             } else {
                 None
             }
@@ -223,7 +223,7 @@ fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>:
                 if !route_messages.remove(&route_message) {
                     return Err(RouteEventHandlerError::NonExistentRouteDeletion(route));
                 }
-                Some(route_message.as_rtnl_del_route())
+                Some(route_message.into_rtnl_del_route())
             } else {
                 None
             }
@@ -266,7 +266,7 @@ fn new_set_with_existing_routes<I: Ip>(
 impl NetlinkRouteMessage {
     /// Implement optional conversions from `InstalledRoute` to `NetlinkRouteMessage`.
     /// `Ok` becomes `Some`, while `Err` is logged and becomes `None`.
-    pub(crate) fn optionally_from<I: Ip>(
+    fn optionally_from<I: Ip>(
         route: fnet_routes_ext::InstalledRoute<I>,
     ) -> Option<NetlinkRouteMessage> {
         match route.try_into() {
@@ -289,13 +289,13 @@ impl NetlinkRouteMessage {
     }
 
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::NewRoute`].
-    fn as_rtnl_new_route(self) -> NetlinkMessage<RtnlMessage> {
+    fn into_rtnl_new_route(self) -> NetlinkMessage<RtnlMessage> {
         let NetlinkRouteMessage(message) = self;
         RtnlMessage::NewRoute(message).into()
     }
 
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::DelRoute`].
-    fn as_rtnl_del_route(self) -> NetlinkMessage<RtnlMessage> {
+    fn into_rtnl_del_route(self) -> NetlinkMessage<RtnlMessage> {
         let NetlinkRouteMessage(message) = self;
         RtnlMessage::DelRoute(message).into()
     }
@@ -567,7 +567,7 @@ mod tests {
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message1.clone().as_rtnl_new_route()]
+            &[expected_route_message1.clone().into_rtnl_new_route()]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -591,7 +591,7 @@ mod tests {
         );
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message2.clone().as_rtnl_new_route()]
+            &[expected_route_message2.clone().into_rtnl_new_route()]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -602,7 +602,7 @@ mod tests {
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message1.clone().as_rtnl_del_route()]
+            &[expected_route_message1.clone().into_rtnl_del_route()]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
