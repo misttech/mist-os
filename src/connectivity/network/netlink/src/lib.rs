@@ -161,25 +161,29 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
             })
         },
         // Interfaces Worker.
-        fasync::Task::spawn(async move {
-            let worker = match interfaces::EventLoop::new() {
-                Ok(worker) => worker,
-                Err(InterfacesEventLoopError::Fidl(e)) => {
-                    panic!("Interfaces event loop creation error: {:?}", e)
+        {
+            fasync::Task::spawn(async move {
+                let worker = match interfaces::EventLoop::new(route_clients) {
+                    Ok(worker) => worker,
+                    Err(InterfacesEventLoopError::Fidl(e)) => {
+                        panic!("Interfaces event loop creation error: {:?}", e)
+                    }
+                    Err(InterfacesEventLoopError::Netstack(_)) => {
+                        unreachable!(
+                            "The Netstack variant is not returned when creating a new worker"
+                        );
+                    }
+                };
+                match worker.run().await {
+                    InterfacesEventLoopError::Fidl(e) => {
+                        panic!("Interfaces event loop error: {:?}", e)
+                    }
+                    InterfacesEventLoopError::Netstack(e) => {
+                        panic!("Interfaces event loop error: {:?}", e)
+                    }
                 }
-                Err(InterfacesEventLoopError::Netstack(_)) => {
-                    unreachable!("The Netstack variant is not returned when creating a new worker");
-                }
-            };
-            match worker.run().await {
-                InterfacesEventLoopError::Fidl(e) => {
-                    panic!("Interfaces event loop error: {:?}", e)
-                }
-                InterfacesEventLoopError::Netstack(e) => {
-                    panic!("Interfaces event loop error: {:?}", e)
-                }
-            }
-        }),
+            })
+        },
     ])
     .await;
 }

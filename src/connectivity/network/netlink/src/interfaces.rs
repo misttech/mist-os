@@ -12,27 +12,37 @@ use std::{
 };
 
 use anyhow::anyhow;
+use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 use futures::{pin_mut, StreamExt as _, TryStreamExt as _};
+use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::{
-    AddressHeader, AddressMessage, LinkHeader, LinkMessage, AF_INET, AF_INET6, AF_UNSPEC,
-    ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT, IFF_LOOPBACK,
-    IFF_RUNNING, IFF_UP,
+    AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
+    AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT,
+    IFF_LOOPBACK, IFF_RUNNING, IFF_UP, RTNLGRP_LINK,
 };
 use netlink_packet_utils::nla::Nla;
-use tracing::debug;
+use tracing::{debug, warn};
 
-use crate::NETLINK_LOG_TAG;
+use crate::{
+    client::ClientTable,
+    messaging::Sender,
+    multicast_groups::ModernGroup,
+    protocol_family::{route::NetlinkRoute, ProtocolFamily},
+    NETLINK_LOG_TAG,
+};
 
 /// Contains the asynchronous work related to RTM_LINK and RTM_ADDR messages.
 ///
 /// Connects to the interfaces watcher and can respond to RTM_LINK and RTM_ADDR
 /// message requests.
-pub(crate) struct EventLoop {
+pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
     /// A `StateProxy` to connect to the interfaces watcher.
     state_proxy: fnet_interfaces::StateProxy,
+    /// The current set of clients of NETLINK_ROUTE protocol family.
+    route_clients: ClientTable<NetlinkRoute, S>,
 }
 
 /// RTM_LINK and RTM_ADDR related event loop errors.
@@ -72,15 +82,17 @@ pub(crate) enum NetstackError {
     Update(fnet_interfaces_ext::UpdateError),
 }
 
-impl EventLoop {
+impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
     /// `new` returns a `Result<EventLoop, InterfacesEventLoopError>` instance.
     /// This is fallible iff it is not possible to obtain the `StateProxy`.
-    pub(crate) fn new() -> Result<Self, InterfacesEventLoopError> {
+    pub(crate) fn new(
+        route_clients: ClientTable<NetlinkRoute, S>,
+    ) -> Result<Self, InterfacesEventLoopError> {
         use fuchsia_component::client::connect_to_protocol;
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
             .map_err(|e| InterfacesEventLoopError::Fidl(FidlError::Unspecified(e)))?;
 
-        Ok(EventLoop { state_proxy })
+        Ok(EventLoop { state_proxy, route_clients })
     }
 
     /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -91,7 +103,7 @@ impl EventLoop {
     /// event loop task, for example, if the watcher stream ends or if
     /// the FIDL protocol cannot be connected.
     pub(crate) async fn run(self) -> InterfacesEventLoopError {
-        let EventLoop { state_proxy } = self;
+        let EventLoop { state_proxy, route_clients } = self;
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(&state_proxy);
 
@@ -130,7 +142,7 @@ impl EventLoop {
                 }
             };
 
-            match handle_interface_watcher_event(&mut interface_properties, event) {
+            match handle_interface_watcher_event(&mut interface_properties, &route_clients, event) {
                 Ok(()) => {}
                 Err(InterfaceEventHandlerError::ExistingEventReceived(properties)) => {
                     // This error indicates there is an inconsistent interface state shared
@@ -163,8 +175,9 @@ enum InterfaceEventHandlerError {
 ///
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
-fn handle_interface_watcher_event(
+fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
     interface_properties: &mut HashMap<u64, fnet_interfaces_ext::Properties>,
+    route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_interfaces::Event,
 ) -> Result<(), InterfaceEventHandlerError> {
     let update = match interface_properties.update(event) {
@@ -174,7 +187,11 @@ fn handle_interface_watcher_event(
 
     match update {
         fnet_interfaces_ext::UpdateResult::Added(properties) => {
-            // TODO(issuetracker.google.com/283826506): Send update to RTMGRP_LINK group
+            if let Some(message) = NetlinkLinkMessage::optionally_from(properties) {
+                route_clients
+                    .send_message_to_group(message.into_rtnl_new_link(), ModernGroup(RTNLGRP_LINK))
+            }
+
             // TODO(issuetracker.google.com/283826112): Send update to RTMGRP_IPV{4,6}_ADDR group
             debug!(tag = NETLINK_LOG_TAG, "processed add/existing event for id {}", properties.id);
         }
@@ -191,7 +208,7 @@ fn handle_interface_watcher_event(
                     ..
                 },
             current:
-                fnet_interfaces_ext::Properties {
+                current @ fnet_interfaces_ext::Properties {
                     addresses: current_addresses,
                     id,
                     name: _,
@@ -202,7 +219,13 @@ fn handle_interface_watcher_event(
                 },
         } => {
             if online.is_some() {
-                // TODO: Send update to RTMGRP_LINK group
+                if let Some(message) = NetlinkLinkMessage::optionally_from(current) {
+                    route_clients.send_message_to_group(
+                        message.into_rtnl_new_link(),
+                        ModernGroup(RTNLGRP_LINK),
+                    )
+                }
+
                 debug!(
                     tag = NETLINK_LOG_TAG,
                     "processed interface link change event for id {}", id
@@ -227,8 +250,13 @@ fn handle_interface_watcher_event(
             };
         }
         fnet_interfaces_ext::UpdateResult::Removed(properties) => {
-            // TODO: Send deletion to RTMGRP_LINK group
             // TODO: Send deletion to RTMGRP_IPV{4,6}_ADDR group
+
+            if let Some(message) = NetlinkLinkMessage::optionally_from(&properties) {
+                route_clients
+                    .send_message_to_group(message.into_rtnl_del_link(), ModernGroup(RTNLGRP_LINK))
+            }
+
             debug!(
                 tag = NETLINK_LOG_TAG,
                 "processed interface remove event for id {}", properties.id
@@ -248,6 +276,28 @@ fn handle_interface_watcher_event(
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct NetlinkLinkMessage(LinkMessage);
 
+impl NetlinkLinkMessage {
+    fn optionally_from(properties: &fnet_interfaces_ext::Properties) -> Option<Self> {
+        match properties.clone().try_into() {
+            Ok(o) => Some(o),
+            Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id)) => {
+                warn!(tag = NETLINK_LOG_TAG, "Invalid interface id: {:?}", id);
+                None
+            }
+        }
+    }
+
+    fn into_rtnl_new_link(self) -> NetlinkMessage<RtnlMessage> {
+        let Self(message) = self;
+        RtnlMessage::NewLink(message).into()
+    }
+
+    fn into_rtnl_del_link(self) -> NetlinkMessage<RtnlMessage> {
+        let Self(message) = self;
+        RtnlMessage::DelLink(message).into()
+    }
+}
+
 // NetlinkLinkMessage conversion related errors.
 #[derive(Debug, PartialEq)]
 enum NetlinkLinkMessageConversionError {
@@ -259,14 +309,13 @@ fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 
     match device_class {
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => ARPHRD_LOOPBACK,
         fnet_interfaces::DeviceClass::Device(device_class) => match device_class {
-            fidl_fuchsia_hardware_network::DeviceClass::Ethernet
-            | fidl_fuchsia_hardware_network::DeviceClass::Wlan
-            | fidl_fuchsia_hardware_network::DeviceClass::WlanAp => ARPHRD_ETHER,
-            fidl_fuchsia_hardware_network::DeviceClass::Ppp => ARPHRD_PPP,
+            fhwnet::DeviceClass::Ethernet
+            | fhwnet::DeviceClass::Wlan
+            | fhwnet::DeviceClass::WlanAp => ARPHRD_ETHER,
+            fhwnet::DeviceClass::Ppp => ARPHRD_PPP,
             // TODO(https://issuetracker.google.com/284962255): Find a better mapping for
             // Bridge and Virtual device class
-            fidl_fuchsia_hardware_network::DeviceClass::Bridge
-            | fidl_fuchsia_hardware_network::DeviceClass::Virtual => ARPHRD_VOID,
+            fhwnet::DeviceClass::Bridge | fhwnet::DeviceClass::Virtual => ARPHRD_VOID,
         },
     }
 }
@@ -355,7 +404,6 @@ impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
     }
 }
 
-#[allow(unused)]
 /// A wrapper type for the netlink_packet_route `AddressMessage` to enable conversions
 /// from [`fnet_interfaces_ext::Properties`] and implement hashing.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -379,7 +427,6 @@ impl Hash for NetlinkAddressMessage {
     }
 }
 
-#[allow(unused)]
 // NetlinkAddressMessage conversion related errors.
 #[derive(Debug, PartialEq)]
 enum NetlinkAddressMessageConversionError {
@@ -468,22 +515,28 @@ fn interface_properties_to_address_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
-    use fidl_fuchsia_hardware_network;
+
+    use std::num::NonZeroU64;
+
     use fidl_fuchsia_net as fnet;
     use fuchsia_async::{self as fasync};
+    use futures::{future::FutureExt as _, stream::Stream};
+
+    use assert_matches::assert_matches;
     use net_declare::fidl_ip;
     use netlink_packet_route::{AddressHeader, AddressMessage, AF_INET, AF_INET6};
-    use std::num::NonZeroU64;
     use test_case::test_case;
+
+    use crate::messaging::testutil::FakeSender;
+
     const ETHERNET: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Ethernet);
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ethernet);
     const WLAN: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Wlan);
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Wlan);
     const WLAN_AP: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::WlanAp);
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::WlanAp);
     const PPP: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fidl_fuchsia_hardware_network::DeviceClass::Ppp);
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ppp);
     const LOOPBACK: fnet_interfaces::DeviceClass =
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
     const TEST_V4_ADDR: fnet::Subnet = fnet::Subnet { addr: fidl_ip!("192.0.2.0"), prefix_len: 24 };
@@ -600,13 +653,18 @@ mod tests {
     fn test_handle_interface_watcher_event() {
         let mut interface_properties: HashMap<u64, fnet_interfaces_ext::Properties> =
             HashMap::new();
+        let route_clients = ClientTable::<NetlinkRoute, FakeSender<_>>::default();
 
         let mut interface1 = create_interface(1, "test".into(), ETHERNET, true, vec![]);
         let interface2 = create_interface(2, "lo".into(), LOOPBACK, true, vec![]);
 
         let interface1_add_event = fnet_interfaces::Event::Added(interface1.clone().into());
         assert_matches!(
-            handle_interface_watcher_event(&mut interface_properties, interface1_add_event),
+            handle_interface_watcher_event(
+                &mut interface_properties,
+                &route_clients,
+                interface1_add_event
+            ),
             Ok(())
         );
         assert_eq!(interface_properties.get(&1).unwrap(), &interface1);
@@ -616,14 +674,22 @@ mod tests {
         interface1.online = false;
         let interface1_change_event = fnet_interfaces::Event::Changed(interface1.clone().into());
         assert_matches!(
-            handle_interface_watcher_event(&mut interface_properties, interface1_change_event),
+            handle_interface_watcher_event(
+                &mut interface_properties,
+                &route_clients,
+                interface1_change_event
+            ),
             Ok(())
         );
         assert_eq!(interface_properties.get(&1).unwrap(), &interface1);
 
         let interface2_add_event = fnet_interfaces::Event::Added(interface2.clone().into());
         assert_matches!(
-            handle_interface_watcher_event(&mut interface_properties, interface2_add_event),
+            handle_interface_watcher_event(
+                &mut interface_properties,
+                &route_clients,
+                interface2_add_event
+            ),
             Ok(())
         );
         assert_eq!(interface_properties.get(&1).unwrap(), &interface1);
@@ -633,7 +699,11 @@ mod tests {
         // interface properties HashMap.
         let interface1_remove_event = fnet_interfaces::Event::Removed(1);
         assert_matches!(
-            handle_interface_watcher_event(&mut interface_properties, interface1_remove_event),
+            handle_interface_watcher_event(
+                &mut interface_properties,
+                &route_clients,
+                interface1_remove_event
+            ),
             Ok(())
         );
         assert_eq!(interface_properties.get(&1), None);
@@ -656,12 +726,17 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn test_event_loop_errors_stream_ended() {
+    struct Setup<W> {
+        event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>>,
+        watcher_stream: W,
+    }
+
+    fn setup_with_route_clients(
+        route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
+    ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
         let (state_proxy, if_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
-        let event_loop = EventLoop { state_proxy };
-        let event_loop_fut = event_loop.run();
+        let event_loop = EventLoop::<FakeSender<_>> { state_proxy, route_clients };
 
         let watcher_stream = if_stream
             .and_then(|req| match req {
@@ -674,6 +749,33 @@ mod tests {
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
 
+        Setup { event_loop, watcher_stream }
+    }
+
+    fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
+        setup_with_route_clients(ClientTable::default())
+    }
+
+    async fn respond_to_watcher<S: Stream<Item = fnet_interfaces::WatcherRequest>>(
+        stream: S,
+        updates: impl IntoIterator<Item = fnet_interfaces::Event>,
+    ) {
+        stream
+            .zip(futures::stream::iter(updates.into_iter()))
+            .for_each(|(req, update)| async move {
+                match req {
+                    fnet_interfaces::WatcherRequest::Watch { responder } => {
+                        responder.send(&update).expect("send watch response")
+                    }
+                }
+            })
+            .await
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_event_loop_errors_stream_ended() {
+        let Setup { event_loop, watcher_stream } = setup();
+        let event_loop_fut = event_loop.run();
         let interfaces: Vec<_> = vec![get_fake_interface(1, "lo", LOOPBACK)];
 
         let interfaces =
@@ -730,22 +832,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_events() {
-        let (state_proxy, if_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
-        let event_loop = EventLoop { state_proxy };
+        let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-
-        let watcher_stream = if_stream
-            .and_then(|req| match req {
-                fnet_interfaces::StateRequest::GetWatcher {
-                    options: _,
-                    watcher,
-                    control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
-            })
-            .try_flatten()
-            .map(|res| res.expect("watcher stream error"));
-
         let interfaces: Vec<_> =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
 
@@ -798,22 +886,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_adds() {
-        let (state_proxy, if_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
-        let event_loop = EventLoop { state_proxy };
+        let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-
-        let watcher_stream = if_stream
-            .and_then(|req| match req {
-                fnet_interfaces::StateRequest::GetWatcher {
-                    options: _,
-                    watcher,
-                    control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
-            })
-            .try_flatten()
-            .map(|res| res.expect("watcher stream error"));
-
         let interfaces_existing: Vec<_> = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let interfaces_new: Vec<_> = vec![get_fake_interface(1, "lo", LOOPBACK)];
 
@@ -889,22 +963,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_existing_after_add() {
-        let (state_proxy, if_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
-        let event_loop = EventLoop { state_proxy };
+        let Setup { event_loop, watcher_stream } = setup();
         let event_loop_fut = event_loop.run();
-
-        let watcher_stream = if_stream
-            .and_then(|req| match req {
-                fnet_interfaces::StateRequest::GetWatcher {
-                    options: _,
-                    watcher,
-                    control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
-            })
-            .try_flatten()
-            .map(|res| res.expect("watcher stream error"));
-
         let interfaces_existing: Vec<_> =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
         let interfaces_new: Vec<_> = vec![get_fake_interface(3, "eth002", ETHERNET)];
@@ -1027,5 +1087,123 @@ mod tests {
         let expected =
             create_default_address_messages(interface_id, interface_name, IFA_F_PERMANENT);
         assert_eq!(actual, expected);
+    }
+
+    #[fuchsia::test]
+    async fn test_deliver_updates() {
+        const LO_INTERFACE_ID: u64 = 1;
+        const LO_NAME: &str = "lo";
+        const ETH_INTERFACE_ID: u64 = 2;
+        const ETH_NAME: &str = "eth";
+        const WLAN_INTERFACE_ID: u64 = 3;
+        const WLAN_NAME: &str = "wlan";
+
+        let (mut right_sink, right_client) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(&[ModernGroup(RTNLGRP_LINK)]);
+        let (mut wrong_sink, wrong_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            &[ModernGroup(RTNLGRP_LINK + 1)],
+        );
+        let Setup { event_loop, mut watcher_stream } = setup_with_route_clients({
+            let route_clients = ClientTable::default();
+            route_clients.add_client(right_client);
+            route_clients.add_client(wrong_client);
+            route_clients
+        });
+        let event_loop_fut = event_loop.run().fuse();
+        futures::pin_mut!(event_loop_fut);
+
+        let watcher_stream_fut = respond_to_watcher(
+            watcher_stream.by_ref(),
+            [
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(LO_INTERFACE_ID),
+                    name: Some(LO_NAME.to_string()),
+                    device_class: Some(LOOPBACK),
+                    online: Some(false),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(ETH_INTERFACE_ID),
+                    name: Some(ETH_NAME.to_string()),
+                    device_class: Some(ETHERNET),
+                    online: Some(false),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
+            ],
+        );
+        futures::select! {
+            () = watcher_stream_fut.fuse() => {},
+            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+        }
+        assert_eq!(&right_sink.take_messages()[..], &[]);
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
+
+        // Note that we provide the stream by value so that it is dropped/closed
+        // after this round of updates is sent to the event loop. We wait for
+        // the eventloop to terminate below to indicate that all updates have
+        // been received and handled so that we can properly assert the sent
+        // messages.
+        let watcher_stream_fut = respond_to_watcher(
+            watcher_stream,
+            [
+                fnet_interfaces::Event::Added(fnet_interfaces::Properties {
+                    id: Some(WLAN_INTERFACE_ID),
+                    name: Some(WLAN_NAME.to_string()),
+                    device_class: Some(WLAN),
+                    online: Some(false),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+                    id: Some(LO_INTERFACE_ID),
+                    online: Some(true),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Removed(ETH_INTERFACE_ID),
+            ],
+        );
+        let ((), err) = futures::future::join(watcher_stream_fut, event_loop_fut).await;
+        assert_matches!(
+            err,
+            InterfacesEventLoopError::Fidl(FidlError::EventStream(
+                fidl::Error::ClientChannelClosed { .. },
+            ))
+        );
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[
+                create_netlink_link_message(
+                    WLAN_INTERFACE_ID,
+                    ARPHRD_ETHER,
+                    0,
+                    create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false),
+                )
+                .into_rtnl_new_link(),
+                create_netlink_link_message(
+                    LO_INTERFACE_ID,
+                    ARPHRD_LOOPBACK,
+                    IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                    create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+                )
+                .into_rtnl_new_link(),
+                create_netlink_link_message(
+                    ETH_INTERFACE_ID,
+                    ARPHRD_ETHER,
+                    0,
+                    create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+                )
+                .into_rtnl_del_link(),
+            ],
+        );
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 }
