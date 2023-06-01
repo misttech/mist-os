@@ -54,6 +54,22 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    command, you will get an updated version. As of writing, however, this
    matches the recipe behavior.
 
+<!-- The next two steps are only needed until we start publishing a riscv64 source root. -->
+
+1. If you haven't already, [Download the Fuchsia source code](/docs/get-started/get_fuchsia_source.md).
+
+1. Run the following commands to generate a riscv64 sysroot:
+
+   ```posix-terminal
+   DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
+   chmod 0644 $DEV_ROOT/sdk/pkg/sysroot/meta.json
+   $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
+     $DEV_ROOT/fuchsia/scripts/clang/generate_sysroot.py \
+       --sdk-dir=$DEV_ROOT/sdk \
+       --arch=riscv64 \
+       --ifs-path=$DEV_ROOT/fuchsia/prebuilt/third_party/clang/{{ '<var>' }}linux-x64{{ '</var>' }}/bin/llvm-ifs
+   ```
+
 1. If you haven't already, clone the Rust source. The
    [Guide to Rustc Development] is a good resource to reference whenever you're
    working on the compiler.
