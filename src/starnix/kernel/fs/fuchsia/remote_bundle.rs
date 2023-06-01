@@ -63,7 +63,8 @@ impl RemoteBundle {
             Zxio::create(root.into_handle()).map_err(|status| from_status_like_fdio!(status))?,
         );
         let mut root_node = FsNode::new_root(DirectoryObject);
-        root_node.inode_num = ext4_metadata::ROOT_INODE_NUM;
+        root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
+        root_node.info_write().ino = ext4_metadata::ROOT_INODE_NUM;
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached,
@@ -139,7 +140,7 @@ impl FsNodeOps for File {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         Ok(bundle
-            .get_node(node.inode_num)
+            .get_node(node.node_id)
             .extended_attributes
             .get(name)
             .ok_or(errno!(ENOENT))?
@@ -150,7 +151,7 @@ impl FsNodeOps for File {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         Ok(bundle
-            .get_node(node.inode_num)
+            .get_node(node.node_id)
             .extended_attributes
             .keys()
             .map(|k| k.clone().to_vec())
@@ -184,7 +185,7 @@ impl FileOps for DirectoryObject {
 
         let bundle = RemoteBundle::from_fs(&file.fs);
         let child_iter =
-            bundle.get_node(file.node().inode_num).directory().ok_or(errno!(EIO))?.children.iter();
+            bundle.get_node(file.node().node_id).directory().ok_or(errno!(EIO))?.children.iter();
 
         for (name, inode_num) in child_iter.skip(sink.offset() as usize - 2) {
             let node = bundle.metadata.get(*inode_num).ok_or(errno!(EIO))?;
@@ -223,7 +224,7 @@ impl FsNodeOps for DirectoryObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let metadata = &bundle.metadata;
-        let inode_num = metadata.lookup(node.inode_num, name).map_err(|_| errno!(ENOENT))?;
+        let inode_num = metadata.lookup(node.node_id, name).map_err(|_| errno!(ENOENT))?;
         let metadata_node = metadata.get(inode_num).ok_or(errno!(EIO))?;
         let mode = FileMode::from_bits(metadata_node.mode.into());
         let owner = FsCred { uid: metadata_node.uid.into(), gid: metadata_node.gid.into() };
@@ -286,7 +287,7 @@ impl FsNodeOps for DirectoryObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let value = bundle
-            .get_node(node.inode_num)
+            .get_node(node.node_id)
             .extended_attributes
             .get(name)
             .ok_or(errno!(ENOENT))?
@@ -298,7 +299,7 @@ impl FsNodeOps for DirectoryObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         Ok(bundle
-            .get_node(node.inode_num)
+            .get_node(node.node_id)
             .extended_attributes
             .keys()
             .map(|k| k.clone().to_vec())
@@ -314,7 +315,7 @@ impl FsNodeOps for SymlinkObject {
     fn readlink(&self, node: &FsNode, _current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        let target = bundle.get_node(node.inode_num).symlink().ok_or(errno!(EIO))?.target.clone();
+        let target = bundle.get_node(node.node_id).symlink().ok_or(errno!(EIO))?.target.clone();
         Ok(SymlinkTarget::Path(target.into_bytes()))
     }
 }
@@ -432,10 +433,10 @@ mod test {
         assert_eq!(
             sink.entries,
             [
-                (b".".to_vec(), (test_dir.entry.node.inode_num, DirectoryEntryType::DIR)),
-                (b"..".to_vec(), (root.entry.node.inode_num, DirectoryEntryType::DIR)),
-                (b"file".to_vec(), (test_file.node().inode_num, DirectoryEntryType::REG)),
-                (b"symlink".to_vec(), (test_symlink.entry.node.inode_num, DirectoryEntryType::LNK))
+                (b".".to_vec(), (test_dir.entry.node.node_id, DirectoryEntryType::DIR)),
+                (b"..".to_vec(), (root.entry.node.node_id, DirectoryEntryType::DIR)),
+                (b"file".to_vec(), (test_file.node().node_id, DirectoryEntryType::REG)),
+                (b"symlink".to_vec(), (test_symlink.entry.node.node_id, DirectoryEntryType::LNK))
             ]
             .into()
         );

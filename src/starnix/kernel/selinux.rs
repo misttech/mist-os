@@ -234,7 +234,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
                 .map(|(name, node)| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
                     name: name.clone(),
-                    inode: Some(node.inode_num),
+                    inode: Some(node.node_id),
                 })
                 .collect(),
         ))

@@ -22,7 +22,7 @@ const LRU_CAPACITY: usize = 32;
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
     root: OnceCell<DirEntryHandle>,
-    next_inode: AtomicU64,
+    next_node_id: AtomicU64,
     ops: Box<dyn FileSystemOps>,
 
     /// The options specified when mounting the filesystem. Saved here for display in
@@ -112,7 +112,7 @@ impl FileSystem {
     ) -> FileSystemHandle {
         Arc::new(FileSystem {
             root: OnceCell::new(),
-            next_inode: AtomicU64::new(1),
+            next_node_id: AtomicU64::new(1),
             ops: Box::new(ops),
             options,
             dev_id: kernel.device_registry.write().next_anonymous_dev_id(),
@@ -133,12 +133,12 @@ impl FileSystem {
 
     /// Set up the root of the filesystem. Must not be called more than once.
     pub fn set_root_node(self: &FileSystemHandle, mut root: FsNode) {
-        if root.inode_num == 0 {
-            root.inode_num = self.next_inode_num();
+        if root.node_id == 0 {
+            root.node_id = self.next_node_id();
         }
         root.set_fs(self);
         let root_node = Arc::new(root);
-        self.nodes.lock().insert(root_node.inode_num, Arc::downgrade(&root_node));
+        self.nodes.lock().insert(root_node.node_id, Arc::downgrade(&root_node));
         let root = DirEntry::new(root_node, None, FsString::new());
         assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
     }
@@ -156,29 +156,29 @@ impl FileSystem {
 
     /// Get or create an FsNode for this file system.
     ///
-    /// If inode_num is Some, then this function checks the node cache to
+    /// If node_id is Some, then this function checks the node cache to
     /// determine whether this node is already open. If so, the function
     /// returns the existing FsNode. If not, the function calls the given
     /// create_fn function to create the FsNode.
     ///
-    /// If inode_num is None, then this function assigns a new inode number
+    /// If node_id is None, then this function assigns a new identifier number
     /// and calls the given create_fn function to create the FsNode with the
     /// assigned number.
     ///
     /// Returns Err only if create_fn returns Err.
     pub fn get_or_create_node<F>(
         &self,
-        inode_num: Option<ino_t>,
+        node_id: Option<ino_t>,
         create_fn: F,
     ) -> Result<FsNodeHandle, Errno>
     where
         F: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
     {
-        let inode_num = inode_num.unwrap_or_else(|| self.next_inode_num());
+        let node_id = node_id.unwrap_or_else(|| self.next_node_id());
         let mut nodes = self.nodes.lock();
-        match nodes.entry(inode_num) {
+        match nodes.entry(node_id) {
             Entry::Vacant(entry) => {
-                let node = create_fn(inode_num)?;
+                let node = create_fn(node_id)?;
                 entry.insert(Arc::downgrade(&node));
                 Ok(node)
             }
@@ -186,7 +186,7 @@ impl FileSystem {
                 if let Some(node) = entry.get().upgrade() {
                     return Ok(node);
                 }
-                let node = create_fn(inode_num)?;
+                let node = create_fn(node_id)?;
                 entry.insert(Arc::downgrade(&node));
                 Ok(node)
             }
@@ -207,7 +207,7 @@ impl FileSystem {
         if let Some(label) = self.selinux_context.get() {
             let _ = node.ops().set_xattr(&node, b"security.selinux", label, XattrOp::Create);
         }
-        self.nodes.lock().insert(node.inode_num, Arc::downgrade(&node));
+        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
         node
     }
 
@@ -217,8 +217,8 @@ impl FileSystem {
         mode: FileMode,
         owner: FsCred,
     ) -> FsNodeHandle {
-        let inode_num = self.next_inode_num();
-        self.create_node_with_id(ops, inode_num, mode, owner)
+        let node_id = self.next_node_id();
+        self.create_node_with_id(ops, node_id, mode, owner)
     }
 
     pub fn create_node(
@@ -235,16 +235,16 @@ impl FileSystem {
     /// Called from the Drop trait of FsNode.
     pub fn remove_node(&self, node: &mut FsNode) {
         let mut nodes = self.nodes.lock();
-        if let Some(weak_node) = nodes.get(&node.inode_num) {
+        if let Some(weak_node) = nodes.get(&node.node_id) {
             if std::ptr::eq(weak_node.as_ptr(), node) {
-                nodes.remove(&node.inode_num);
+                nodes.remove(&node.node_id);
             }
         }
     }
 
-    pub fn next_inode_num(&self) -> ino_t {
+    pub fn next_node_id(&self) -> ino_t {
         assert!(!self.ops.generate_node_ids());
-        self.next_inode.fetch_add(1, Ordering::Relaxed)
+        self.next_node_id.fetch_add(1, Ordering::Relaxed)
     }
 
     /// Move |renamed| that is at |old_name| in |old_parent| to |new_name| in |new_parent|

@@ -39,15 +39,10 @@ impl MemoryDirectoryFile {
 /// necessary to subtract 2 from the offset in subsequent logic.
 pub fn emit_dotdot(file: &FileObject, sink: &mut dyn DirentSink) -> Result<(), Errno> {
     if sink.offset() == 0 {
-        sink.add(file.node().inode_num, 1, DirectoryEntryType::DIR, b".")?;
+        sink.add(file.node().node_id, 1, DirectoryEntryType::DIR, b".")?;
     }
     if sink.offset() == 1 {
-        sink.add(
-            file.name.entry.parent_or_self().node.inode_num,
-            2,
-            DirectoryEntryType::DIR,
-            b"..",
-        )?;
+        sink.add(file.name.entry.parent_or_self().node.node_id, 2, DirectoryEntryType::DIR, b"..")?;
     }
     Ok(())
 }
@@ -103,7 +98,7 @@ impl FileOps for MemoryDirectoryFile {
                 if let Some(entry) = maybe_entry.upgrade() {
                     let mode = entry.node.info().mode;
                     sink.add(
-                        entry.node.inode_num,
+                        entry.node.node_id,
                         sink.offset() + 1,
                         DirectoryEntryType::from_mode(mode),
                         name,

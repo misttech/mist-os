@@ -843,7 +843,7 @@ impl<'a> RenameGuard<'a> {
             // biggest.
             if new_parent.is_descendant_of(old_parent)
                 || (!old_parent.is_descendant_of(new_parent)
-                    && old_parent.node.inode_num < new_parent.node.inode_num)
+                    && old_parent.node.node_id < new_parent.node.node_id)
             {
                 let old_parent_guard = old_parent.lock_children();
                 let new_parent_guard = new_parent.lock_children();

@@ -1890,7 +1890,11 @@ fn write_map(
         if map.prot_flags.contains(ProtectionFlags::EXEC) { 'x' } else { '-' },
         if map.options.contains(MappingOptions::SHARED) { 's' } else { 'p' },
         map.vmo_offset,
-        if let MappingName::File(filename) = &map.name { filename.entry.node.inode_num } else { 0 }
+        if let MappingName::File(filename) = &map.name {
+            filename.entry.node.info().ino
+        } else {
+            0
+        }
     )?;
     let fill_to_name = |sink: &mut DynamicFileBuf| {
         // The filename goes at >= the 74th column (73rd when zero indexed)

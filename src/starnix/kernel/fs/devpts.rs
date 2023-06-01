@@ -26,10 +26,10 @@ pub const DEVPTS_COUNT: u32 = DEVPTS_MAJOR_COUNT * 256;
 // https://github.com/google/gvisor/blob/master/test/syscalls/linux/pty.cc
 const BLOCK_SIZE: blksize_t = 1024;
 
-// The inode of the different node in the devpts filesystem.
-const ROOT_INODE: ino_t = 1;
-const PTMX_INODE: ino_t = 2;
-const FIRST_PTS_INODE: ino_t = 3;
+// The node identifier of the different node in the devpts filesystem.
+const ROOT_NODE_ID: ino_t = 1;
+const PTMX_NODE_ID: ino_t = 2;
+const FIRST_PTS_NODE_ID: ino_t = 3;
 
 pub fn dev_pts_fs(kernel: &Kernel, options: FileSystemOptions) -> &FileSystemHandle {
     kernel.dev_pts_fs.get_or_init(|| init_devpts(kernel, options))
@@ -73,7 +73,7 @@ fn init_devpts(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle 
     }
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options);
     fs.set_root(DevPtsRootDir { state });
-    assert!(fs.root().node.inode_num == ROOT_INODE);
+    debug_assert!(fs.root().node.node_id == ROOT_NODE_ID);
     fs
 }
 
@@ -112,7 +112,7 @@ impl FsNodeOps for DevPtsRootDir {
         result.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::CHR,
             name: b"ptmx".to_vec(),
-            inode: Some(PTMX_INODE),
+            inode: Some(PTMX_NODE_ID),
         });
         for (id, terminal) in self.state.terminals.read().iter() {
             if let Some(terminal) = terminal.upgrade() {
@@ -120,7 +120,7 @@ impl FsNodeOps for DevPtsRootDir {
                     result.push(VecDirectoryEntry {
                         entry_type: DirectoryEntryType::CHR,
                         name: format!("{id}").as_bytes().to_vec(),
-                        inode: Some((*id as ino_t) + FIRST_PTS_INODE),
+                        inode: Some((*id as ino_t) + FIRST_PTS_NODE_ID),
                     });
                 }
             }
@@ -138,7 +138,7 @@ impl FsNodeOps for DevPtsRootDir {
         if name == "ptmx" {
             let node = node.fs().create_node_with_id(
                 Box::new(SpecialNode),
-                PTMX_INODE,
+                PTMX_NODE_ID,
                 mode!(IFCHR, 0o666),
                 FsCred::root(),
             );
@@ -155,7 +155,7 @@ impl FsNodeOps for DevPtsRootDir {
                 if !terminal.read().is_main_closed() {
                     let node = node.fs().create_node_with_id(
                         Box::new(SpecialNode),
-                        (id as ino_t) + FIRST_PTS_INODE,
+                        (id as ino_t) + FIRST_PTS_NODE_ID,
                         mode!(IFCHR, 0o620),
                         terminal.fscred.clone(),
                     );

@@ -57,7 +57,7 @@ impl FileOps for VecDirectory {
         // Subtract 2 from the offset to account for `.` and `..`.
         for entry in self.0.iter().skip(sink.offset() as usize - 2) {
             // Assign an inode if one wasn't set.
-            let inode = entry.inode.unwrap_or_else(|| file.fs.next_inode_num());
+            let inode = entry.inode.unwrap_or_else(|| file.fs.next_node_id());
             sink.add(inode, sink.offset() + 1, entry.entry_type, &entry.name)?;
         }
         Ok(())

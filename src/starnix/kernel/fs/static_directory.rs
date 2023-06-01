@@ -174,7 +174,7 @@ impl FileOps for Arc<StaticDirectory> {
         // Subtract 2 from the offset to account for `.` and `..`.
         for (name, node) in self.entries.iter().skip(sink.offset() as usize - 2) {
             sink.add(
-                node.inode_num,
+                node.node_id,
                 sink.offset() + 1,
                 DirectoryEntryType::from_mode(node.info().mode),
                 name,

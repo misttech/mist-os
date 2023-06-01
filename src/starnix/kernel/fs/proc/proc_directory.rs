@@ -129,7 +129,7 @@ impl FileOps for Arc<ProcDirectory> {
         // the sink. Subtract 2 from the offset, to account for `.` and `..`.
         for (name, node) in self.nodes.iter().skip((sink.offset() - 2) as usize) {
             sink.add(
-                node.inode_num,
+                node.node_id,
                 sink.offset() + 1,
                 DirectoryEntryType::from_mode(node.info().mode),
                 name,
@@ -150,7 +150,7 @@ impl FileOps for Arc<ProcDirectory> {
             for pid in &pids[start..] {
                 // TODO: Figure out if this inode number is fine, given the content of the task
                 // directories.
-                let inode_num = file.fs.next_inode_num();
+                let inode_num = file.fs.next_node_id();
                 let name = format!("{pid}");
 
                 // The + 1 is to set the offset to the next possible pid for subsequent reads.

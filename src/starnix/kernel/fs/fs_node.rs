@@ -28,8 +28,9 @@ pub struct FsNode {
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
 
-    /// The inode number for this FsNode.
-    pub inode_num: ino_t,
+    /// The node idenfier for this FsNode. By default, this will be used as the inode number of
+    /// this node.
+    pub node_id: ino_t,
 
     /// The pipe located at this node, if any.
     ///
@@ -71,6 +72,7 @@ pub type FsNodeHandle = Arc<FsNode>;
 
 #[derive(Default)]
 pub struct FsNodeInfo {
+    pub ino: ino_t,
     pub mode: FileMode,
     pub size: usize,
     pub storage_size: usize,
@@ -547,22 +549,23 @@ impl FsNode {
     pub fn new_uncached(
         ops: Box<dyn FsNodeOps>,
         fs: &FileSystemHandle,
-        inode_num: ino_t,
+        node_id: ino_t,
         mode: FileMode,
         owner: FsCred,
     ) -> FsNodeHandle {
-        Arc::new(Self::new_internal(ops, Arc::downgrade(fs), inode_num, mode, owner))
+        Arc::new(Self::new_internal(ops, Arc::downgrade(fs), node_id, mode, owner))
     }
 
     fn new_internal(
         ops: Box<dyn FsNodeOps>,
         fs: Weak<FileSystem>,
-        inode_num: ino_t,
+        node_id: ino_t,
         mode: FileMode,
         owner: FsCred,
     ) -> Self {
         let now = fuchsia_runtime::utc_time();
         let info = FsNodeInfo {
+            ino: node_id,
             mode,
             blksize: DEFAULT_BYTES_PER_BLOCK,
             uid: owner.uid,
@@ -579,7 +582,7 @@ impl FsNode {
             let result = Self {
                 ops,
                 fs,
-                inode_num,
+                node_id,
                 fifo: if mode.is_fifo() { Some(Pipe::new()) } else { None },
                 socket: OnceCell::new(),
                 info: RwLock::new(info),
@@ -963,7 +966,7 @@ impl FsNode {
         let blocks = info.storage_size as i64 / info.blksize as i64;
 
         Ok(stat_t {
-            st_ino: self.inode_num,
+            st_ino: info.ino,
             st_mode: info.mode.bits(),
             st_size: info.size as off_t,
             st_blocks: blocks,
@@ -1022,7 +1025,7 @@ impl FsNode {
             stx_uid: info.uid,
             stx_gid: info.gid,
             stx_mode: info.mode.bits() as u16,
-            stx_ino: self.inode_num,
+            stx_ino: info.ino,
             stx_size: info.size as u64,
             stx_blocks: blocks as u64,
             stx_attributes_mask: 0, // TODO

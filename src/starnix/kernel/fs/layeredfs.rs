@@ -100,7 +100,7 @@ impl FileOps for LayeredFsRootNodeOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         for (key, fs) in self.fs.mappings.iter().skip(sink.offset() as usize) {
-            sink.add(fs.root().node.inode_num, sink.offset() + 1, DirectoryEntryType::DIR, key)?;
+            sink.add(fs.root().node.info().ino, sink.offset() + 1, DirectoryEntryType::DIR, key)?;
         }
 
         struct DirentSinkWrapper<'a> {

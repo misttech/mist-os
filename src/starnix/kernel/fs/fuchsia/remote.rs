@@ -47,7 +47,7 @@ impl RemoteFs {
         let remote_node = RemoteNode::new(root.into_handle(), rights)?;
         let attrs = remote_node.zxio.attr_get().map_err(|_| errno!(EIO))?;
         let mut root_node = FsNode::new_root(remote_node);
-        root_node.inode_num = attrs.id;
+        root_node.node_id = attrs.id;
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached,
