@@ -28,23 +28,28 @@ async fn add_event(action: &'static str, label: Option<String>) {
         .await;
 }
 
-pub(crate) async fn server_mode_event(mode: &str) {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn server_mode_event(mode: &str) {
     add_event("server.mode", Some(mode.into())).await
 }
 
-pub(crate) async fn server_started_event() {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn server_started_event() {
     add_event("server.state", Some("started".into())).await
 }
 
-pub(crate) async fn server_failed_to_start_event(msg: &str) {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn server_failed_to_start_event(msg: &str) {
     add_event("server.state", Some(msg.into())).await
 }
 
-pub(crate) async fn server_disabled_event() {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn server_disabled_event() {
     add_event("server.state", Some("disabled".into())).await
 }
 
-pub(crate) async fn add_repository_event(repo_spec: &RepositorySpec) {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn add_repository_event(repo_spec: &RepositorySpec) {
     let repo_type = match repo_spec {
         RepositorySpec::FileSystem { .. } => "filesystem",
         RepositorySpec::Pm { .. } => "pm",
@@ -55,14 +60,17 @@ pub(crate) async fn add_repository_event(repo_spec: &RepositorySpec) {
     add_event("protocol.add-repository", Some(repo_type.into())).await
 }
 
-pub(crate) async fn remove_repository_event() {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn remove_repository_event() {
     add_event("protocol.remove-repository", None).await
 }
 
-pub(crate) async fn register_repository_event() {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn register_repository_event() {
     add_event("protocol.register-repository-to-target", None).await
 }
 
-pub(crate) async fn deregister_repository_event() {
+// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+pub async fn deregister_repository_event() {
     add_event("protocol.deregister-repository-from-target", None).await
 }
