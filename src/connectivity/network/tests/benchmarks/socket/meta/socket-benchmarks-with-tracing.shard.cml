@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/connectivity/network/tests/benchmarks/meta/socket-benchmarks.shard.cml",
+        "//src/connectivity/network/tests/benchmarks/socket/meta/socket-benchmarks.shard.cml",
         "sys/testing/system-test.shard.cml",
     ],
     program: {

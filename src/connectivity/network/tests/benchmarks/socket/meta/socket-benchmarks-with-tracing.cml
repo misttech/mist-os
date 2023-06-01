@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/tests/benchmarks/meta/socket-benchmarks-with-tracing.shard.cml" ],
+    include: [ "//src/connectivity/network/tests/benchmarks/socket/meta/socket-benchmarks-with-tracing.shard.cml" ],
     program: {
         // TODO(https://fxbug.dev/121880): Move this to the shard once it's
         // possible to compose environment args.
