@@ -897,6 +897,18 @@ impl ComponentModelForAnalyzer {
                 let (result, route) = Self::route_capability_sync(request, target);
                 let error =
                     result.map_err(|e| e.into()).and_then(|s| self.check_use_source(&s)).err();
+
+                // Ignore any route that failed due to a void expose to a target with an
+                // optional dependency on the capability.
+                let error = match error {
+                    Some(AnalyzerModelError::RoutingError(
+                        RoutingError::AvailabilityRoutingError(
+                            AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
+                        ),
+                    )) => None,
+                    _ => error,
+                };
+
                 Some(VerifyRouteResult {
                     using_node: target.node_path(),
                     capability: Some(expose_decl.target_name().clone()),

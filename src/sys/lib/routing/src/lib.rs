@@ -608,7 +608,7 @@ where
     M: DebugRouteMapper + 'static,
 {
     // This is a noop visitor for exposes
-    let mut availability_visitor = AvailabilityProtocolVisitor::required();
+    let mut availability_visitor = AvailabilityProtocolVisitor::new_from_expose(&expose_decl);
     let allowed_sources = AllowedSourcesBuilder::new()
         .framework(InternalCapability::Protocol)
         .builtin()
@@ -680,7 +680,8 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let mut availability_visitor = AvailabilityServiceVisitor::required();
+    let mut availability_visitor =
+        AvailabilityServiceVisitor::new_from_expose_bundle(&expose_bundle);
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
     let source = router::route_from_expose(
         expose_bundle,
@@ -850,7 +851,7 @@ where
     let mut state = DirectoryState {
         rights: WalkState::new(),
         subdir: PathBuf::new(),
-        availability_state: Availability::Required.into(),
+        availability_state: expose_decl.availability.clone().into(),
     };
     let allowed_sources = AllowedSourcesBuilder::new()
         .framework(InternalCapability::Directory)

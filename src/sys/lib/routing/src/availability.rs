@@ -4,6 +4,7 @@
 
 use {
     crate::error::AvailabilityRoutingError,
+    crate::RouteBundle,
     cm_rust::{
         Availability, DirectoryDecl, EventStreamDecl, ExposeDeclCommon, ExposeDirectoryDecl,
         ExposeProtocolDecl, ExposeServiceDecl, ExposeSource, OfferDeclCommon, OfferDirectoryDecl,
@@ -127,8 +128,12 @@ macro_rules! make_availability_visitor {
                 Self(offer_decl.availability().unwrap_or(&Availability::Required).clone().into())
             }
 
-            pub fn required() -> Self {
-                Self(Availability::Required.into())
+            pub fn new_from_expose<E>(expose_decl: &E) -> Self where E: ExposeDeclCommon {
+                Self(expose_decl.availability().clone().into())
+            }
+
+            pub fn new_from_expose_bundle<E>(bundle: &RouteBundle<E>) -> Self where E: ExposeDeclCommon + Clone {
+                Self(bundle.availability().clone().into())
             }
         }
 

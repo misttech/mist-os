@@ -560,6 +560,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 .create_static_file(Path::new("dir/hippo"), "hello")
                 .await
                 .expect("failed to create file");
+
             for check_use in vec![
                 CheckUse::Service {
                     path: "/svc/fuchsia.examples.EchoService_a".parse().unwrap(),
@@ -578,6 +579,26 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 },
             ] {
                 model.check_use(AbsoluteMoniker::root(), check_use).await;
+            }
+
+            for check_use in vec![
+                CheckUse::Service {
+                    path: "/fuchsia.examples.EchoService".parse().unwrap(),
+                    instance: ServiceInstance::Named("default".to_owned()),
+                    member: "echo".to_owned(),
+                    expected_res: ExpectedResult::Ok,
+                },
+                CheckUse::Protocol {
+                    path: "/fuchsia.examples.Echo".parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+                CheckUse::Directory {
+                    path: "/dir".parse().unwrap(),
+                    file: PathBuf::from("hippo"),
+                    expected_res: ExpectedResult::Ok,
+                },
+            ] {
+                model.check_use_exposed_dir(vec!["b"].try_into().unwrap(), check_use).await;
             }
         }
     }

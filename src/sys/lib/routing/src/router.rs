@@ -33,9 +33,10 @@ use {
         RegistrationDecl, RouteInfo,
     },
     cm_rust::{
-        name_mappings_to_map, CapabilityDecl, CapabilityDeclCommon, ExposeDecl, ExposeDeclCommon,
-        ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource,
-        OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl, UseDeclCommon, UseSource,
+        name_mappings_to_map, Availability, CapabilityDecl, CapabilityDeclCommon, ExposeDecl,
+        ExposeDeclCommon, ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl,
+        OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl,
+        UseDeclCommon, UseSource,
     },
     cm_types::Name,
     derivative::Derivative,
@@ -1395,6 +1396,23 @@ where
             }
             0 => panic!("empty bundles are not allowed"),
             _ => Self::Aggregate(input),
+        }
+    }
+}
+
+impl<T> RouteBundle<T>
+where
+    T: ExposeDeclCommon + Clone,
+{
+    pub fn availability(&self) -> &Availability {
+        match self {
+            Self::Single(e) => e.availability(),
+            Self::Aggregate(v) => {
+                assert!(
+                    v.iter().zip(v.iter().skip(1)).all(|(a, b)| a.availability() == b.availability()),
+                    "CM validation should ensure all aggregated capabilities have the same availability");
+                v[0].availability()
+            }
         }
     }
 }
