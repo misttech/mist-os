@@ -31,6 +31,14 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
                 FsCred::root(),
             ),
         );
+        dir.node(
+            b"pid_max",
+            fs.create_node(
+                BytesFile::new_node(b"4194304".to_vec()),
+                mode!(IFREG, 0o644),
+                FsCred::root(),
+            ),
+        );
     });
     dir.subdir(b"net", 0o555, |dir| {
         dir.subdir(b"core", 0o555, |dir| {
