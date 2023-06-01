@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth as fidl,
-    std::{fmt, str::FromStr},
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_bluetooth as fidl;
+use fuchsia_inspect_contrib::log::WriteInspect;
+use std::{fmt, str::FromStr};
 
 /// Valid id strings have only Hex characters (0-9, a-f) and are 16 chars long
 /// to match the 64 bit representation of a PeerId.
@@ -57,6 +56,16 @@ impl From<fidl::PeerId> for PeerId {
 impl Into<fidl::PeerId> for PeerId {
     fn into(self) -> fidl::PeerId {
         fidl::PeerId { value: self.0 }
+    }
+}
+
+impl WriteInspect for PeerId {
+    fn write_inspect(
+        &self,
+        writer: &fuchsia_inspect::Node,
+        key: impl Into<fuchsia_inspect::StringReference>,
+    ) {
+        writer.record_string(key, self.to_string());
     }
 }
 

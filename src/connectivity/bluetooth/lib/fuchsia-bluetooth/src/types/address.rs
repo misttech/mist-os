@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth as fidl;
+use fuchsia_inspect_contrib::log::WriteInspect;
 use std::fmt;
 
 use crate::error::Error;
@@ -134,6 +135,16 @@ impl Into<fidl::Address> for &Address {
 impl fmt::Display for Address {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "[address ({}) {}]", self.address_type_string(), addr_to_string(self.bytes()))
+    }
+}
+
+impl WriteInspect for Address {
+    fn write_inspect(
+        &self,
+        writer: &fuchsia_inspect::Node,
+        key: impl Into<fuchsia_inspect::StringReference>,
+    ) {
+        writer.record_string(key, self.to_string());
     }
 }
 

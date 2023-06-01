@@ -24,7 +24,8 @@ use fuchsia_bluetooth::types::pairing_options::PairingOptions;
 use fuchsia_bluetooth::types::{
     Address, BondingData, HostData, HostId, HostInfo, Identity, Peer, PeerId,
 };
-use fuchsia_inspect::{self as inspect, unique_name, Property};
+use fuchsia_inspect::{self as inspect, unique_name, NumericProperty, Property};
+use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use fuchsia_zircon::{self as zx, Duration};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Future};
@@ -78,27 +79,37 @@ pub enum HostService {
 pub enum DiscoveryState {
     NotDiscovering,
     Pending(Vec<oneshot::Sender<Arc<DiscoverySession>>>),
-    Discovering(Weak<DiscoverySession>, HostDiscoverySession),
+    Discovering {
+        session: Weak<DiscoverySession>,
+        host_session: HostDiscoverySession,
+        started: fasync::Time,
+    },
 }
 
 impl DiscoveryState {
     // If a dispatcher discovery session exists, return an Arc<> pointer to it.
     fn get_discovery_session(&self) -> Option<Arc<DiscoverySession>> {
         match self {
-            DiscoveryState::Discovering(weak_session, _) => weak_session.upgrade(),
+            DiscoveryState::Discovering { session, .. } => session.upgrade(),
             _ => None,
         }
     }
 
-    fn end_discovery_session(&mut self) {
+    // Idempotently end the discovery session.
+    // Returns the duration of a session, if one was ended.
+    fn end_discovery_session(&mut self) -> Option<fasync::Duration> {
         // If we are Discovering, HostDiscoverySession is dropped here
-        *self = DiscoveryState::NotDiscovering;
+        let prev = std::mem::replace(self, DiscoveryState::NotDiscovering);
+        if let DiscoveryState::Discovering { started, .. } = prev {
+            return Some(fasync::Time::now() - started);
+        }
+        None
     }
 
     // If possible, replace the current host session with a given new one. This does not affect
     // the dispatcher session.
     fn attach_new_host_session(&mut self, new_host_session: HostDiscoverySession) {
-        if let DiscoveryState::Discovering(_, host_session) = self {
+        if let DiscoveryState::Discovering { host_session, .. } = self {
             *host_session = new_host_session;
         }
     }
@@ -112,9 +123,15 @@ pub struct DiscoverySession {
 
 impl Drop for DiscoverySession {
     fn drop(&mut self) {
-        self.dispatcher_state.write().discovery.end_discovery_session()
+        let mut write = self.dispatcher_state.write();
+        if let Some(dur) = write.discovery.end_discovery_session() {
+            inspect_log!(write.inspect.discovery_history, duration: dur.into_seconds_f64());
+        }
     }
 }
+
+static RECENTLY_REMOVED_PEERS_COUNT: usize = 15;
+static RECENT_DISCOVERY_SESSIONS_COUNT: usize = 5;
 
 struct HostDispatcherInspect {
     _inspect: inspect::Node,
@@ -126,6 +143,9 @@ struct HostDispatcherInspect {
     input_capability: inspect::StringProperty,
     output_capability: inspect::StringProperty,
     has_pairing_delegate: inspect::UintProperty,
+    evicted_peers: BoundedListNode,
+    discovery_sessions: inspect::UintProperty,
+    discovery_history: BoundedListNode,
 }
 
 impl HostDispatcherInspect {
@@ -139,6 +159,15 @@ impl HostDispatcherInspect {
             has_pairing_delegate: inspect.create_uint("has_pairing_delegate", 0),
             peers: inspect.create_child("peers"),
             hosts: inspect.create_child("hosts"),
+            discovery_sessions: inspect.create_uint("discovery_sessions", 0),
+            discovery_history: BoundedListNode::new(
+                inspect.create_child("discovery_history"),
+                RECENT_DISCOVERY_SESSIONS_COUNT,
+            ),
+            evicted_peers: BoundedListNode::new(
+                inspect.create_child("recently_removed"),
+                RECENTLY_REMOVED_PEERS_COUNT,
+            ),
             _inspect: inspect,
         }
     }
@@ -484,10 +513,16 @@ impl HostDispatcher {
         let dispatcher_session =
             Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
 
+        self.state.read().inspect.discovery_sessions.add(1);
+
         // Replace Pending state with new session and send session token to waiters
         if let DiscoveryState::Pending(client_queue) = std::mem::replace(
             &mut self.state.write().discovery,
-            DiscoveryState::Discovering(Arc::downgrade(&dispatcher_session), host_session),
+            DiscoveryState::Discovering {
+                session: Arc::downgrade(&dispatcher_session),
+                host_session,
+                started: fasync::Time::now(),
+            },
         ) {
             for client in client_queue {
                 let _ = client.send(dispatcher_session.clone());
@@ -642,11 +677,9 @@ impl HostDispatcher {
             let mut state = self.state.write();
 
             let node = state.inspect.peers().create_child(unique_name("peer_"));
-            node.record_string("peer_id", peer.id.to_string());
             let peer = Inspectable::new(peer, node);
             let _drop_old_value = state.peers.insert(peer.id.clone(), peer);
             state.inspect.peer_count.set(state.peers.len() as u64);
-
             state.watch_peers_publisher.clone()
         };
 
@@ -665,7 +698,9 @@ impl HostDispatcher {
     pub fn on_device_removed(&self, id: PeerId) -> impl Future<Output = ()> {
         let mut publisher = {
             let mut state = self.state.write();
-            drop(state.peers.remove(&id));
+            if let Some(removed) = state.peers.remove(&id) {
+                inspect_log!(state.inspect.evicted_peers, peer: removed);
+            }
             state.inspect.peer_count.set(state.peers.len() as u64);
             state.watch_peers_publisher.clone()
         };

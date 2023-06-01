@@ -5,6 +5,7 @@
 use fidl_fuchsia_bluetooth::{Appearance, DeviceClass};
 use fidl_fuchsia_bluetooth_sys as fsys;
 use fuchsia_inspect::Node;
+use fuchsia_inspect_contrib::log::WriteInspect;
 use std::{convert::TryFrom, fmt};
 
 use crate::assigned_numbers::find_service_uuid;
@@ -17,11 +18,11 @@ pub struct Peer {
     /// Uniquely identifies this peer on the current system.
     pub id: PeerId,
 
-    /// Bluetooth device address that identifies this peer. Clients
-    /// should display this field to the user when |name| is not available.
+    /// Bluetooth device address that identifies this peer.
+    /// Avoid using this and prefer to use name and/or appearance instead.
     ///
-    /// NOTE: Clients should use the `id` field to keep track of peers instead of their
-    /// address.
+    /// NOTE: Clients should prefer to use the `id` field to keep track of
+    /// peers instead of their address.
     pub address: Address,
 
     /// The Bluetooth technologies that are supported by this peer.
@@ -56,7 +57,34 @@ pub struct Peer {
     pub bredr_services: Vec<Uuid>,
 }
 
-/// Generate a unique ID to use with audio_core for an input, given the `peer_id` and whether it
+impl Peer {
+    /// Records the immutable properties of this peer to the Node given.
+    fn record_inspect(&self, node: &Node) {
+        node.record_string("peer_id", &self.id.to_string());
+        node.record_string("technology", &self.technology.debug());
+        node.record_string("appearance", &self.appearance.debug());
+        node.record_string("address", &self.address.to_string());
+        if let Some(rssi) = self.rssi {
+            node.record_int("rssi", rssi as i64);
+        }
+        if let Some(tx_power) = self.tx_power {
+            node.record_int("tx_power", tx_power as i64);
+        }
+        node.record_uint("connected", self.connected.to_property());
+        node.record_uint("bonded", self.bonded.to_property());
+        if !self.le_services.is_empty() {
+            node.record_string("le_services", &self.le_services.to_property());
+        }
+        if !self.bredr_services.is_empty() {
+            node.record_string("bredr_services", &self.bredr_services.to_property());
+        }
+        if let Some(name) = &self.name {
+            node.record_string("name", name);
+        }
+    }
+}
+
+/// Generate a unique ID to use with audio_core, given the `peer_id` and whether it
 /// will be an input device. Current format is:
 /// [
 ///   0x42, 0x54, - Prefix reserved for Bluetooth Audio devices
@@ -82,28 +110,21 @@ pub fn peer_audio_stream_id(peer_id: PeerId, uuid: Uuid) -> [u8; 16] {
 
 impl ImmutableDataInspect<Peer> for ImmutableDataInspectManager {
     fn new(data: &Peer, manager: Node) -> ImmutableDataInspectManager {
-        manager.record_string("technology", &data.technology.debug());
-        manager.record_string("appearance", &data.appearance.debug());
-        if let Some(rssi) = data.rssi {
-            manager.record_int("rssi", rssi as i64);
-        }
-        if let Some(tx_power) = data.tx_power {
-            manager.record_int("tx_power", tx_power as i64);
-        }
-        manager.record_uint("connected", data.connected.to_property());
-        manager.record_uint("bonded", data.bonded.to_property());
-        if !data.le_services.is_empty() {
-            manager.record_string("le_services", &data.le_services.to_property());
-        }
-        if !data.bredr_services.is_empty() {
-            manager.record_string("bredr_services", &data.bredr_services.to_property());
-        }
+        data.record_inspect(&manager);
         Self { _manager: manager }
     }
 }
 
 impl IsInspectable for Peer {
     type I = ImmutableDataInspectManager;
+}
+
+impl WriteInspect for Peer {
+    fn write_inspect(&self, writer: &Node, key: impl Into<fuchsia_inspect::StringReference>) {
+        writer.record_child(key, |node| {
+            self.record_inspect(node);
+        });
+    }
 }
 
 impl fmt::Display for Peer {

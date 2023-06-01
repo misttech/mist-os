@@ -265,8 +265,8 @@ impl HostDevice {
     /// a task that never ends in successful operation and only returns in case of a failure to
     /// communicate with the bt-host device.
     pub async fn watch_events<H: HostListener + Clone>(self, listener: H) -> anyhow::Result<()> {
-        let handle_fidl = self.clone().handle_fidl_events(listener.clone());
-        let watch_peers = self.clone().watch_peers(listener.clone());
+        let handle_fidl = self.handle_fidl_events(listener.clone());
+        let watch_peers = self.watch_peers(listener.clone());
         let watch_state = self.watch_state(listener);
         pin_mut!(handle_fidl);
         pin_mut!(watch_peers);
@@ -278,15 +278,20 @@ impl HostDevice {
         }
     }
 
-    async fn watch_peers<H: HostListener + Clone>(self, mut listener: H) -> types::Result<()> {
+    fn watch_peers<H: HostListener>(
+        &self,
+        mut listener: H,
+    ) -> impl Future<Output = types::Result<()>> {
         let proxy = self.0.proxy.clone();
-        loop {
-            let (updated, removed) = proxy.watch_peers().await?;
-            for peer in updated.into_iter() {
-                listener.on_peer_updated(peer.try_into()?).await;
-            }
-            for id in removed.into_iter() {
-                listener.on_peer_removed(id.into()).await;
+        async move {
+            loop {
+                let (updated, removed) = proxy.watch_peers().await?;
+                for peer in updated.into_iter() {
+                    listener.on_peer_updated(peer.try_into()?).await;
+                }
+                for id in removed.into_iter() {
+                    listener.on_peer_removed(id.into()).await;
+                }
             }
         }
     }
@@ -298,26 +303,31 @@ impl HostDevice {
         }
     }
 
-    async fn handle_fidl_events<H: HostListener>(self, mut listener: H) -> types::Result<()> {
+    fn handle_fidl_events<H: HostListener>(
+        &self,
+        mut listener: H,
+    ) -> impl Future<Output = types::Result<()>> {
         let mut stream = self.0.proxy.take_event_stream();
-        while let Some(event) = stream.next().await {
-            match event? {
-                HostEvent::OnNewBondingData { data } => {
-                    info!("Received bonding data");
-                    let data: BondingData = match data.try_into() {
-                        Err(e) => {
-                            error!("Invalid bonding data, ignoring: {:#?}", e);
-                            continue;
+        async move {
+            while let Some(event) = stream.next().await {
+                match event? {
+                    HostEvent::OnNewBondingData { data } => {
+                        info!("Received bonding data");
+                        let data: BondingData = match data.try_into() {
+                            Err(e) => {
+                                error!("Invalid bonding data, ignoring: {:#?}", e);
+                                continue;
+                            }
+                            Ok(data) => data,
+                        };
+                        if let Err(e) = listener.on_new_host_bond(data.into()).await {
+                            error!("Failed to persist bonding data: {:#?}", e);
                         }
-                        Ok(data) => data,
-                    };
-                    if let Err(e) = listener.on_new_host_bond(data.into()).await {
-                        error!("Failed to persist bonding data: {:#?}", e);
                     }
-                }
-            };
+                };
+            }
+            Err(types::Error::InternalError(format_err!("Host FIDL event stream terminated")))
         }
-        Err(types::Error::InternalError(format_err!("Host FIDL event stream terminated")))
     }
 
     async fn refresh_host_info(self) -> types::Result<HostInfo> {

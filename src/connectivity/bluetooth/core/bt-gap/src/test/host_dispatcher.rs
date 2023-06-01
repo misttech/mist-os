@@ -97,7 +97,14 @@ async fn on_device_changed_inspect_state() {
     assert_data_tree!(inspector, root: {
         system: contains {
             peer_count: 0u64,
-            peers: { }
+            peers: { },
+            recently_removed: contains {
+                "0": contains {
+                    peer: contains {
+                        peer_id: peer_id.to_string(),
+                    }
+                }
+            }
         }
     });
 }
