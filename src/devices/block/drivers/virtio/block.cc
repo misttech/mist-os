@@ -263,7 +263,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     fbl::AutoLock lock(&txn_lock_);
     index = alloc_blk_req();
     if (index >= blk_req_count) {
-      zxlogf(ERROR, "too many block requests queued (%zu)!", index);
+      zxlogf(TRACE, "too many block requests queued (%zu)!", index);
       return ZX_ERR_NO_RESOURCES;
     }
   }
@@ -292,7 +292,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     desc = vring_.AllocDescChain(static_cast<uint16_t>(2u + pagecount), &i);
   }
   if (!desc) {
-    zxlogf(ERROR, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
+    zxlogf(TRACE, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
     fbl::AutoLock lock(&txn_lock_);
     free_blk_req(index);
     return ZX_ERR_NO_RESOURCES;
