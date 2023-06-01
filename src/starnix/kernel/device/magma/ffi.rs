@@ -487,11 +487,14 @@ pub fn query(
 
     if result_buffer_out != zx::sys::ZX_HANDLE_INVALID {
         let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) };
+        let vmo_size = vmo.get_size().unwrap();
         let file = Anon::new_file(
             current_task,
             Box::new(VmoFileObject::new(Arc::new(vmo))),
             OpenFlags::RDWR,
         );
+        // Enable seek for file size discovery.
+        file.node().info_write().size = vmo_size as usize;
         let fd = current_task.add_file(file, FdFlags::empty())?;
         response.result_buffer_out = fd.raw() as u64;
     } else {
