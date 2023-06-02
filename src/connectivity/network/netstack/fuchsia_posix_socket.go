@@ -583,13 +583,13 @@ func (ep *endpoint) GetTimestamp(fidl.Context) (socket.BaseSocketGetTimestampRes
 }
 
 func (ep *endpoint) setTimestamp(value socket.TimestampOption) {
-	ep.sockOptStats.SetTimestamp.Add(1)
 	ep.mu.Lock()
 	ep.mu.sockOptTimestamp = value
 	ep.mu.Unlock()
 }
 
 func (ep *endpointWithMutators) SetTimestamp(_ fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampResult, error) {
+	ep.ep.sockOptStats.SetTimestamp.Add(1)
 	ep.ep.setTimestamp(value)
 	return socket.BaseSocketSetTimestampResultWithResponse(socket.BaseSocketSetTimestampResponse{}), nil
 }
