@@ -232,38 +232,6 @@ you can run FEMU in headless mode:
 ```posix-terminal
 ffx emu start --headless
 ```
-
-### Specify GPU used by FEMU
-
-By default, the FEMU launcher attempts to detect if the host has a GPU that can be used for
-graphics rendering. If you need to explicitly set the rendering type, you can use
-the `--gpu` flag with the following options:
-
-<table><tbody>
-  <tr>
-   <th>GPU Emulation method</th>
-   <th>Explanation</th>
-   <th>Flag</th>
-  </tr>
-  <tr>
-   <td>Hardware (host GPU)</td>
-   <td>Uses the host machine's GPU directly to perform GPU processing.</td>
-   <td><code>ffx emu start --gpu host</code></td>
-  </tr>
-  <tr>
-   <td>SwiftShader</td>
-   <td>Uses SwiftShader libraries to simulate GPU processing.</td>
-   <td><code>ffx emu start --gpu swiftshader_indirect</code></td>
-  </tr>
-  <tr>
-   <td>Auto</td>
-   <td>Resolves to <code>host</code> if there is a hardware GPU available or
-       <code>swiftshader_indirect</code> if there isn't a hardware GPU available.
-       <code>auto</code> is the current default.</td>
-   <td><code>ffx emu start --gpu auto</code></td>
-  </tr>
-</tbody></table>
-
 ### Reboot FEMU {#reboot-femu}
 
 To reboot FEMU, run the following `ffx` command:
@@ -312,6 +280,41 @@ for FEMU on Linux machine using [TUN/TAP][tuntap]{: .external}.
   for FEMU on macOS – while this setup does not support Fuchsia device
   discovery, you can still use `fx` tools (for example,`fx ssh`) to
   interact with your FEMU instance.
+
+### Specify GPU used by FEMU (experimental)
+
+By default, the FEMU launcher uses [SwiftShader](https://swiftshader.googlesource.com/SwiftShader)
+Vulkan ICD for host graphics rendering. You can set the emulator to use the host GPU hardware
+for rendering using the `--gpu` flag with the following options:
+
+<table><tbody>
+  <tr>
+   <th>GPU Emulation method</th>
+   <th>Explanation</th>
+   <th>Flag</th>
+  </tr>
+  <tr>
+   <td>SwiftShader</td>
+   <td>Uses SwiftShader libraries to simulate GPU processing.
+       <code>swiftshader_indirect</code> is the current default.</td>
+   <td><code>ffx emu start --gpu swiftshader_indirect</code></td>
+  </tr>
+  <tr>
+   <td>Hardware (host GPU)</td>
+   <td>Uses the host machine's GPU directly to perform GPU processing.</td>
+   <td><code>ffx emu start --gpu host</code></td>
+  </tr>
+  <tr>
+   <td>Auto</td>
+   <td>Resolves to <code>host</code> if there is a hardware GPU available or
+       <code>swiftshader_indirect</code> if there isn't a hardware GPU available.</td>
+   <td><code>ffx emu start --gpu auto</code></td>
+  </tr>
+</tbody></table>
+
+Warning: GPU emulation modes `host` and `auto` are for experimental use only and
+are not officially supported by the Fuchsia Emulator team. There may be graphics
+artifacts, testing failures or emulator crashes when using these two modes.
 
 <!-- Reference links -->
 
