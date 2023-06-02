@@ -4,6 +4,11 @@
 
 //! This module contains the implementation of FxBlob (Blobfs-on-Fxfs).
 
+mod blob;
 mod directory;
+mod writer;
 
-pub use crate::fxblob::directory::{init_vmex_resource, BlobDirectory};
+#[cfg(test)]
+mod testing;
+
+pub use crate::fxblob::{blob::init_vmex_resource, directory::BlobDirectory};
