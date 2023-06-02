@@ -9,7 +9,18 @@ use crate::fs::FsStr;
 use crate::types::*;
 
 #[derive(
-    Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    AsBytes,
+    FromZeroes,
+    FromBytes,
 )]
 #[repr(transparent)]
 pub struct FdNumber(i32);

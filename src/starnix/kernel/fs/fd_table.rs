@@ -4,11 +4,11 @@
 
 use bitflags::bitflags;
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 use crate::fs::*;
-use crate::lock::{Mutex, RwLock};
+use crate::lock::Mutex;
 use crate::task::Task;
 use crate::types::*;
 
@@ -53,20 +53,82 @@ impl FdTableEntry {
     }
 }
 
+/// Having the map a separate data structure allows us to memoize next_fd, which is the
+/// lowest numbered file descriptor not in use.
+#[derive(Clone, Debug, Default)]
+struct FdMap {
+    map: HashMap<FdNumber, FdTableEntry>,
+    next_fd: FdNumber,
+}
+
+impl FdMap {
+    fn insert_entry(
+        &mut self,
+        task: &Task,
+        fd: FdNumber,
+        entry: FdTableEntry,
+    ) -> Result<(), Errno> {
+        if fd.raw() as u64 >= task.thread_group.get_rlimit(Resource::NOFILE) {
+            return error!(EMFILE);
+        }
+        if fd.raw() == self.next_fd.raw() {
+            self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(fd.raw() + 1));
+        }
+        self.map.insert(fd, entry);
+        Ok(())
+    }
+
+    fn remove_entry(&mut self, fd: &FdNumber) -> Option<FdTableEntry> {
+        let removed = self.map.remove(fd);
+        if removed.is_some() && fd.raw() < self.next_fd.raw() {
+            self.next_fd = *fd;
+        }
+        removed
+    }
+
+    // Returns the (possibly memoized) lowest available FD >= minfd in this map.
+    fn get_lowest_available_fd(&self, minfd: FdNumber) -> FdNumber {
+        if minfd.raw() > self.next_fd.raw() {
+            return self.calculate_lowest_available_fd(&minfd);
+        }
+        self.next_fd
+    }
+
+    // Recalculates the lowest available FD >= minfd based on the contents of the map.
+    fn calculate_lowest_available_fd(&self, minfd: &FdNumber) -> FdNumber {
+        let mut fd = *minfd;
+        while self.map.contains_key(&fd) {
+            fd = FdNumber::from_raw(fd.raw() + 1);
+        }
+        fd
+    }
+
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&FdNumber, &mut FdTableEntry) -> bool,
+    {
+        self.map.retain(f);
+        self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(0));
+    }
+}
+
 #[derive(Debug, Default)]
 struct FdTableInner {
-    map: RwLock<HashMap<FdNumber, FdTableEntry>>,
+    map_handle: Mutex<FdMap>,
 }
 
 impl FdTableInner {
     fn id(&self) -> FdTableId {
-        FdTableId::new(self.map.read().deref() as *const HashMap<FdNumber, FdTableEntry>)
+        FdTableId::new(&self.map_handle.lock().map as *const HashMap<FdNumber, FdTableEntry>)
     }
 
     fn unshare(&self) -> FdTableInner {
-        let inner = FdTableInner { map: RwLock::new(self.map.read().clone()) };
+        let inner = {
+            let new_fdmap = self.map_handle.lock().clone();
+            FdTableInner { map_handle: Mutex::new(new_fdmap) }
+        };
         let id = inner.id();
-        inner.map.write().values_mut().for_each(|entry| entry.fd_table_id = id);
+        inner.map_handle.lock().map.values_mut().for_each(|entry| entry.fd_table_id = id);
         inner
     }
 }
@@ -107,7 +169,9 @@ impl FdTable {
     }
 
     pub fn exec(&self) {
-        self.table.lock().map.write().retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
+        let inner = self.table.lock();
+        let mut state = inner.map_handle.lock();
+        state.retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
     }
 
     pub fn insert(&self, task: &Task, fd: FdNumber, file: FileHandle) -> Result<(), Errno> {
@@ -123,8 +187,8 @@ impl FdTable {
     ) -> Result<(), Errno> {
         let id = self.id();
         let inner = self.table.lock();
-        let mut map = inner.map.write();
-        self.insert_entry(task, &mut map, fd, FdTableEntry::new(file, id, flags))
+        let mut state = inner.map_handle.lock();
+        state.insert_entry(task, fd, FdTableEntry::new(file, id, flags))
     }
 
     pub fn add_with_flags(
@@ -135,28 +199,14 @@ impl FdTable {
     ) -> Result<FdNumber, Errno> {
         let id = self.id();
         let inner = self.table.lock();
-        let mut map = inner.map.write();
-        let fd = self.get_lowest_available_fd(&map, FdNumber::from_raw(0));
-        self.insert_entry(task, &mut map, fd, FdTableEntry::new(file, id, flags))?;
+        let mut state = inner.map_handle.lock();
+        let fd = state.next_fd;
+        state.insert_entry(task, fd, FdTableEntry::new(file, id, flags))?;
         Ok(fd)
     }
 
-    fn insert_entry(
-        &self,
-        task: &Task,
-        map: &mut HashMap<FdNumber, FdTableEntry>,
-        fd: FdNumber,
-        entry: FdTableEntry,
-    ) -> Result<(), Errno> {
-        if fd.raw() as u64 >= task.thread_group.get_rlimit(Resource::NOFILE) {
-            return error!(EMFILE);
-        }
-        map.insert(fd, entry);
-        Ok(())
-    }
-
     // Duplicates a file handle.
-    // If newfd does not contain a value, a new FdNumber is allocated. Returns the new FdNumber.
+    // If target is  TargetFdNumber::Minimum, a new FdNumber is allocated. Returns the new FdNumber.
     pub fn duplicate(
         &self,
         task: &Task,
@@ -170,21 +220,22 @@ impl FdTable {
         let result = {
             let id = self.id();
             let inner = self.table.lock();
-            let mut map = inner.map.write();
-            let file =
-                map.get(&oldfd).map(|entry| entry.file.clone()).ok_or_else(|| errno!(EBADF))?;
+            let mut state = inner.map_handle.lock();
+            let file = state
+                .map
+                .get(&oldfd)
+                .map(|entry| entry.file.clone())
+                .ok_or_else(|| errno!(EBADF))?;
 
             let fd = match target {
                 TargetFdNumber::Specific(fd) => {
-                    _removed_file = map.remove(&fd);
+                    _removed_file = state.remove_entry(&fd);
                     fd
                 }
-                TargetFdNumber::Minimum(fd) => self.get_lowest_available_fd(&map, fd),
-                TargetFdNumber::Default => {
-                    self.get_lowest_available_fd(&map, FdNumber::from_raw(0))
-                }
+                TargetFdNumber::Minimum(fd) => state.get_lowest_available_fd(fd),
+                TargetFdNumber::Default => state.get_lowest_available_fd(FdNumber::from_raw(0)),
             };
-            self.insert_entry(task, &mut map, fd, FdTableEntry::new(file, id, flags))?;
+            state.insert_entry(task, fd, FdTableEntry::new(file, id, flags))?;
             Ok(fd)
         };
         result
@@ -195,10 +246,10 @@ impl FdTable {
     }
 
     pub fn get_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        self.table
-            .lock()
+        let inner = self.table.lock();
+        let state = inner.map_handle.lock();
+        state
             .map
-            .read()
             .get(&fd)
             .map(|entry| (entry.file.clone(), entry.flags))
             .ok_or_else(|| errno!(EBADF))
@@ -215,8 +266,16 @@ impl FdTable {
     pub fn close(&self, fd: FdNumber) -> Result<(), Errno> {
         // Drop the file object only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
-        let removed = { self.table.lock().map.write().remove(&fd) };
-        removed.ok_or_else(|| errno!(EBADF)).map(|_| {})
+        let removed = {
+            let inner = self.table.lock();
+            let mut state = inner.map_handle.lock();
+            state.remove_entry(&fd)
+        };
+        if removed.is_some() {
+            Ok(())
+        } else {
+            Err(errno!(EBADF))
+        }
     }
 
     /// Drop the fd table, closing any files opened exclusively by this table.
@@ -235,8 +294,9 @@ impl FdTable {
     pub fn set_fd_flags(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
         self.table
             .lock()
+            .map_handle
+            .lock()
             .map
-            .write()
             .get_mut(&fd)
             .map(|entry| {
                 entry.flags = flags;
@@ -248,24 +308,12 @@ impl FdTable {
     where
         F: Fn(FdNumber, &mut FdFlags) -> bool,
     {
-        self.table.lock().map.write().retain(|fd, entry| f(*fd, &mut entry.flags));
-    }
-
-    fn get_lowest_available_fd(
-        &self,
-        map: &HashMap<FdNumber, FdTableEntry>,
-        minfd: FdNumber,
-    ) -> FdNumber {
-        let mut fd = minfd;
-        while map.contains_key(&fd) {
-            fd = FdNumber::from_raw(fd.raw() + 1);
-        }
-        fd
+        self.table.lock().map_handle.lock().map.retain(|fd, entry| f(*fd, &mut entry.flags));
     }
 
     /// Returns a vector of all current file descriptors in the table.
     pub fn get_all_fds(&self) -> Vec<FdNumber> {
-        self.table.lock().map.read().keys().cloned().collect()
+        self.table.lock().map_handle.lock().map.keys().cloned().collect()
     }
 }
 
