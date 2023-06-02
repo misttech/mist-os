@@ -91,10 +91,10 @@ pub fn execute_syscall(
     }
 }
 
-/// Finishes `current_task` updates after a restricted mode exit such as a syscall, exception, or kick.
+/// Finishes `current_task` updates after system call dispatch.
 ///
 /// Returns an `ExitStatus` if the task is meant to exit.
-pub fn process_completed_restricted_exit(
+pub fn process_completed_syscall(
     current_task: &mut CurrentTask,
     error_context: &Option<ErrorContext>,
 ) -> Result<Option<ExitStatus>, Errno> {
