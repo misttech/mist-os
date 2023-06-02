@@ -49,11 +49,7 @@ void SymbolServer::ChangeState(SymbolServer::State state) {
 
 std::unique_ptr<SymbolServer> SymbolServer::FromURL(Session* session, const std::string& url,
                                                     bool require_authentication) {
-  if (debug::StringStartsWith(url, "gs://")) {
-    return std::make_unique<SymbolServerImpl>(session, url, require_authentication);
-  }
-
-  return nullptr;
+  return std::make_unique<SymbolServerImpl>(session, url, require_authentication);
 }
 
 void SymbolServer::DoInit() {

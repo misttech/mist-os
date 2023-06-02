@@ -7,6 +7,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 
 #include "src/developer/debug/zxdb/client/symbol_server.h"
 #include "src/developer/debug/zxdb/symbols/debug_symbol_file_type.h"
@@ -29,24 +30,23 @@ class DownloadManager {
   // binary information.
   void RequestDownload(const std::string& build_id, DebugSymbolFileType file_type);
 
-  // Adds |server| to the download object associated with any modules that are missing
-  // symbols in the current process.
-  void OnSymbolServerBecomesReady(SymbolServer* server);
-
   bool HasDownload(const std::string& build_id) const;
 
   // Get a test download object.
   std::shared_ptr<Download> InjectDownloadForTesting(const std::string& build_id);
 
  private:
-  // Create a new download object for downloading a given build ID.
-  //
-  // If multiple callers request a download of the same build ID, this will return the same object
-  // to each.
+  using DownloadIdentifier = std::pair<std::string, DebugSymbolFileType>;
+
+  // Get a download object corresponding to |build_id| and |file_type|. If no
+  // matching object is found, a new one is allocated and will request a
+  // download against all configured symbol servers. If this particular build_id
+  // and file_type have been attempted before and failed, this will return
+  // nullptr and do nothing.
   std::shared_ptr<Download> GetDownload(std::string build_id, DebugSymbolFileType file_type);
 
   // Called every time a new download starts.
-  void DownloadStarted();
+  void DownloadStarted(const std::shared_ptr<Download>& download);
 
   // Called every time a download ends.
   void DownloadFinished();
@@ -57,8 +57,13 @@ class DownloadManager {
 
   size_t download_fail_count_ = 0;
 
+  // Keep track of the build_ids that have been attempted and failed. These will prevent spamming
+  // the console with download errors (particularly while running tests) which will spawn lots of
+  // processes that will likely have the same build_ids that will fail downloading.
+  std::set<DownloadIdentifier> failed_downloads_;
+
   // Downloads currently in progress.
-  std::map<std::pair<std::string, DebugSymbolFileType>, std::weak_ptr<Download>> downloads_;
+  std::map<DownloadIdentifier, std::weak_ptr<Download>> downloads_;
 
   System* system_;  // owns |this|.
 

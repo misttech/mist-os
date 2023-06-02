@@ -7,6 +7,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <map>
+#include <memory>
 
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
@@ -18,8 +19,20 @@
 #include "src/developer/debug/zxdb/symbols/debug_symbol_file_type.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
+
+namespace {
+std::string DebugSymbolFileTypeToString(DebugSymbolFileType file_type) {
+  switch (file_type) {
+    case DebugSymbolFileType::kDebugInfo:
+      return "debuginfo";
+    case DebugSymbolFileType::kBinary:
+      return "binary";
+  }
+}
+}  // namespace
 
 // When we want to download symbols for a build ID, we create a Download object. We then fire off
 // requests to all symbol servers we know about asking whether they have the symbols we need. These
@@ -66,7 +79,8 @@ class Download {
   size_t failed_server_count_ = 0;
   std::string build_id_;
   DebugSymbolFileType file_type_;
-  std::map<ErrType, Err> errors_;
+  // Collection for errors encountered during download.
+  std::map<ErrType, std::vector<std::string>> errors_;
   std::string path_;
   SymbolServer::FetchCallback result_cb_;
   std::vector<FetchFunction> server_fetches_;
@@ -79,15 +93,18 @@ void Download::Finish() {
 
   Err final_err;
   if (errors_.size() == 1) {
-    final_err = errors_.begin()->second;
+    final_err = Err(errors_.begin()->first);
   } else if (!errors_.empty()) {
-    final_err = Err("Multiple errors encountered while downloading build_id %s", build_id_.c_str());
+    final_err =
+        Err(fxl::StringPrintf("Multiple errors encountered while downloading %s for build_id %s",
+                              DebugSymbolFileTypeToString(file_type_).c_str(), build_id_.c_str()));
   }
 
   // Specialize the error message if the build id was not found on any servers.
   if (final_err.type() == ErrType::kNotFound) {
-    final_err =
-        Err("build_id %s not found on %zu servers\n", build_id_.c_str(), failed_server_count_);
+    final_err = Err("%s for build_id %s not found on %zu servers\n",
+                    DebugSymbolFileTypeToString(file_type_).c_str(), build_id_.c_str(),
+                    failed_server_count_);
   }
 
   if (debug::MessageLoop::Current()) {
@@ -134,9 +151,9 @@ void Download::Error(std::shared_ptr<Download> self, const Err& err) {
   if (!result_cb_)
     return;
 
-  self->failed_server_count_++;
+  failed_server_count_++;
 
-  errors_[err.type()] = err;
+  errors_[err.type()].push_back(err.msg());
 
   if (!trying_ && !server_fetches_.empty()) {
     RunFetch(self, server_fetches_.back());
@@ -168,30 +185,7 @@ DownloadManager::DownloadManager(System* system) : system_(system), weak_factory
 DownloadManager::~DownloadManager() = default;
 
 void DownloadManager::RequestDownload(const std::string& build_id, DebugSymbolFileType file_type) {
-  auto download = GetDownload(build_id, file_type);
-
-  for (auto& server : system_->GetSymbolServers()) {
-    if (server->state() == SymbolServer::State::kReady)
-      download->AddServer(download, server);
-  }
-}
-
-void DownloadManager::OnSymbolServerBecomesReady(SymbolServer* server) {
-  for (const auto& target : system_->GetTargets()) {
-    auto process = target->GetProcess();
-    if (!process)
-      continue;
-
-    for (const auto& mod : process->GetSymbols()->GetStatus()) {
-      if (!mod.symbols || !mod.symbols->module_symbols()) {
-        auto download = GetDownload(mod.build_id, DebugSymbolFileType::kDebugInfo);
-        download->AddServer(download, server);
-      } else if (!mod.symbols->module_symbols()->HasBinary()) {
-        auto download = GetDownload(mod.build_id, DebugSymbolFileType::kBinary);
-        download->AddServer(download, server);
-      }
-    }
-  }
+  GetDownload(build_id, file_type);
 }
 
 std::shared_ptr<Download> DownloadManager::InjectDownloadForTesting(const std::string& build_id) {
@@ -200,11 +194,14 @@ std::shared_ptr<Download> DownloadManager::InjectDownloadForTesting(const std::s
 
 std::shared_ptr<Download> DownloadManager::GetDownload(std::string build_id,
                                                        DebugSymbolFileType file_type) {
-  if (auto existing = downloads_[{build_id, file_type}].lock()) {
-    return existing;
-  }
+  DownloadIdentifier download_id{build_id, file_type};
 
-  DownloadStarted();
+  if (auto existing = downloads_[download_id].lock()) {
+    return existing;
+  } else if (failed_downloads_.find(download_id) != failed_downloads_.end()) {
+    // This build_id has failed previously. Don't try again.
+    return nullptr;
+  }
 
   auto download = std::make_shared<Download>(
       build_id, file_type,
@@ -230,20 +227,28 @@ std::shared_ptr<Download> DownloadManager::GetDownload(std::string build_id,
           }
         } else {
           weak_this->download_fail_count_++;
-
+          weak_this->failed_downloads_.insert({build_id, file_type});
           weak_this->system_->NotifyFailedToFindDebugSymbols(err, build_id, file_type);
         }
 
         weak_this->DownloadFinished();
       });
 
-  downloads_[{build_id, file_type}] = download;
+  // Add all configured servers to the new download object.
+  DownloadStarted(download);
+
+  downloads_[download_id] = download;
 
   return download;
 }
 
-void DownloadManager::DownloadStarted() {
+void DownloadManager::DownloadStarted(const std::shared_ptr<Download>& download) {
   FX_DCHECK(system_);
+
+  for (auto& server : system_->GetSymbolServers()) {
+    if (server->state() == SymbolServer::State::kReady)
+      download->AddServer(download, server);
+  }
 
   if (download_count_ == 0) {
     for (auto& observer : system_->session()->download_observers()) {
