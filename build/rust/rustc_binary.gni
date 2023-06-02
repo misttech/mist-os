@@ -4,6 +4,7 @@
 
 import("//build/rust/rustc_artifact.gni")
 import("//build/rust/rustc_test.gni")
+import("//build/toolchain/rbe.gni")
 
 # Defines a Rust binary
 #
@@ -263,12 +264,21 @@ template("rustc_binary") {
                              "visibility",
                            ])
 
+    disable_rbe = !rust_rbe_enable
     if (defined(invoker.disable_rbe)) {
       disable_rbe = invoker.disable_rbe
     }
 
     configs = []
     configs = invoker.configs
+
+    # Unstripped binaries can be massive compared to stripped binaries.
+    # When skipping downloads, artifacts can be retrieved from RBE later using
+    # `build/rbe/dlwrap.py --download ...`.
+    if (!disable_rbe && !rust_rbe_download_unstripped_binaries) {
+      configs += [ "//build/config/rust:no_download" ]
+    }
+
     deps = []
     if (defined(invoker.deps)) {
       deps += invoker.deps
