@@ -10,19 +10,19 @@ use {
     tracing::error,
 };
 
-// Number of previous RSSI measurements to exponentially weigh into average.
-// TODO(fxbug.dev/84870): Tune smoothing factor.
+/// Number of previous RSSI measurements to exponentially weigh into average.
+/// TODO(fxbug.dev/84870): Tune smoothing factor.
 pub const EWMA_SMOOTHING_FACTOR: usize = 10;
-// Number of previous RSSI velocities to exponentially weigh into the average. Keeping the number
-// small lets the number react quickly and have a magnitude similar to if it weren't smoothed as
-// an EWMA, but makes the EWMA less resistant to momentary outliers.
+/// Number of previous RSSI velocities to exponentially weigh into the average. Keeping the number
+/// small lets the number react quickly and have a magnitude similar to if it weren't smoothed as
+/// an EWMA, but makes the EWMA less resistant to momentary outliers.
 pub const EWMA_VELOCITY_SMOOTHING_FACTOR: usize = 3;
 
 pub const RSSI_AND_VELOCITY_SCORE_WEIGHT: f32 = 0.6;
 pub const SNR_SCORE_WEIGHT: f32 = 0.4;
 
-// Threshold for BSS signal scores (bound from 0-100), under which a BSS's signal is considered
-// suboptimal. Used to determine if roaming should be considered.
+/// Threshold for BSS signal scores (bound from 0-100), under which a BSS's signal is considered
+/// suboptimal. Used to determine if roaming should be considered.
 pub const SUBOPTIMAL_SIGNAL_THRESHOLD: u8 = 45;
 
 /// Connection quality data related to signal

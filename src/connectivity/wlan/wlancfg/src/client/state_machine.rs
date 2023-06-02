@@ -41,6 +41,12 @@ use {
     },
 };
 
+/// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
+/// scans. IF there isn't a change, it is unlikely that there would be a reason to roam now.
+const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::Duration = zx::Duration::from_minutes(15);
+const MIN_TIME_BETWEEN_ROAM_SCANS: zx::Duration = zx::Duration::from_minutes(1);
+const MIN_RSSI_CHANGE_TO_ROAM_SCAN: i8 = 5;
+
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
 const CONNECT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(30);
 type State = state_machine::State<ExitReason>;
@@ -533,6 +539,9 @@ async fn connected_state(
 ) -> Result<State, ExitReason> {
     debug!("Entering connected state");
     let mut connect_start_time = fasync::Time::now();
+    let mut time_prev_roam_scan = connect_start_time;
+    let mut roam_reasons_prev_scan = vec![];
+    let mut rssi_prev_roam_scan = options.ap_state.original().rssi_dbm;
 
     // Initialize connection data
     let past_connections = common_options
@@ -620,16 +629,34 @@ async fn connected_state(
                                 common_options.iface_id,
                                 current_connection.network.clone(),
                                 ind,
-                                bss_quality_data.clone()
+                                bss_quality_data.clone(),
                             ).await;
 
                             // Evaluate current BSS, and determine if roaming future should be
                             // triggered.
                             let (_bss_score, roam_reasons) = bss_selection::evaluate_current_bss(bss_quality_data.clone());
                             if !roam_reasons.is_empty() {
-                                common_options.telemetry_sender.send(TelemetryEvent::RoamingScan);
-                                // TODO(haydennix): Trigger roaming future, which must be idempotent
-                                // since repeated calls are likely.
+                                let now = fasync::Time::now();
+                                if now < time_prev_roam_scan + MIN_TIME_BETWEEN_ROAM_SCANS {
+                                    continue;
+                                }
+                                // If there isn't a new reason to roam and the previous scan
+                                // happened recently, do not scan again.
+                                let is_scan_old =
+                                    now > time_prev_roam_scan + TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
+                                let has_new_reason =
+                                    roam_reasons.iter().any(|r| { !roam_reasons_prev_scan.contains(r) });
+                                let is_rssi_different =
+                                    (rssi_prev_roam_scan - ind.rssi_dbm).abs() > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
+                                if  is_scan_old || has_new_reason || is_rssi_different
+                                     {
+                                        // TODO(haydennix): Trigger roaming future, which must be
+                                        // idempotent since repeated calls are likely.
+                                        common_options.telemetry_sender.send(TelemetryEvent::RoamingScan);
+                                        time_prev_roam_scan = fasync::Time::now();
+                                        roam_reasons_prev_scan = roam_reasons;
+                                        rssi_prev_roam_scan = ind.rssi_dbm;
+                                    }
                             }
                             false
                         }
@@ -813,7 +840,6 @@ mod tests {
                 network_config::{self, AddAndGetRecent, Credential, FailureReason},
                 PastConnectionList, SavedNetworksManager,
             },
-            telemetry::{TelemetryEvent, TelemetrySender},
             util::{
                 listener,
                 testing::{
@@ -2724,7 +2750,8 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_should_roam() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        let start_time = fasync::Time::from_nanos(0);
+        exec.set_fake_time(start_time);
 
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2764,6 +2791,12 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
+        // Make sure the connected state gets time of connection before sending the signal report.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Set the time to be a while after the connection started, since roams shouldn't
+        // happen immediately after connnection begins.
+        exec.set_fake_time(start_time + fasync::Duration::from_minutes(20));
 
         // Send a signal report indicating the connection is weak.
         let rssi_1 = -90;
@@ -2783,6 +2816,113 @@ mod tests {
             }
         );
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));
+    }
+
+    #[fuchsia::test]
+    fn connected_state_should_not_roam_scan_frequently() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let mut time = fasync::Time::from_nanos(0);
+        exec.set_fake_time(time);
+
+        let test_values = test_setup();
+        let mut telemetry_receiver = test_values.telemetry_receiver;
+
+        // Create helper function for sending signal reports in this test.
+        fn send_signal_report(
+            rssi: i8,
+            snr: i8,
+            connect_txn_handle: &fidl_sme::ConnectTransactionControlHandle,
+        ) {
+            let fidl_signal_report =
+                fidl_internal::SignalReportIndication { rssi_dbm: rssi, snr_db: snr };
+            connect_txn_handle
+                .send_on_signal_report(&fidl_signal_report)
+                .expect("failed to send signal report");
+        }
+
+        let mut connect_selection = generate_connect_selection();
+        let rssi_1 = -75;
+        let snr = 30;
+
+        // Set initial RSSI and SNR values
+        connect_selection.target.bss.rssi = rssi_1;
+        connect_selection.target.bss.snr_db = snr;
+
+        // Set initial RSSI and SNR values in bss description
+        let mut bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        bss_description.rssi_dbm = rssi_1;
+        bss_description.snr_db = snr;
+        connect_selection.target.bss.bss_description = bss_description.clone().into();
+
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            currently_fulfilled_connection: connect_selection.clone(),
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+        let connect_txn_handle = connect_txn_stream.control_handle();
+
+        let fut = run_state_machine(initial_state);
+        pin_mut!(fut);
+
+        // Send a signal report indicating the connection is weak and unchanged.
+        send_signal_report(rssi_1, snr, &connect_txn_handle);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Check that a roam scan doesn't happen right after connection begins, even if the signal
+        // is bad and has significantly different RSSI from when the last roam scan happened.
+        poll_telemetry_signal_report_event(&mut telemetry_receiver);
+        assert_variant!(telemetry_receiver.try_next(), Err(_));
+
+        // Check that after a while even without a change in RSSI there would be a roam scan.
+        time = time + fasync::Duration::from_minutes(20);
+        exec.set_fake_time(time);
+        send_signal_report(rssi_1, snr, &connect_txn_handle);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        poll_telemetry_signal_report_event(&mut telemetry_receiver);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));
+
+        // Check that after more than the minimum amount of time, if the RSSI has changed
+        // significantly from the last roam scan, another scan can happen.
+        let rssi_2 = rssi_1 - 10;
+        time = time + MIN_TIME_BETWEEN_ROAM_SCANS + fasync::Duration::from_minutes(2);
+        exec.set_fake_time(time);
+        send_signal_report(rssi_2, snr, &connect_txn_handle);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        poll_telemetry_signal_report_event(&mut telemetry_receiver);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));
+
+        // Check that after a moderately short amount of time without a change in RSSI, there is
+        // not another scan.
+        time = time + MIN_TIME_BETWEEN_ROAM_SCANS + fasync::Duration::from_minutes(2);
+        exec.set_fake_time(time);
+        send_signal_report(rssi_2, snr, &connect_txn_handle);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        poll_telemetry_signal_report_event(&mut telemetry_receiver);
+        assert_variant!(telemetry_receiver.try_next(), Err(_));
+    }
+
+    /// Get the next signal report telemetry event without verifying the values. The purpose is to
+    /// pull the event from the channel in order to get later events that tests care about.
+    fn poll_telemetry_signal_report_event(telemetry_receiver: &mut mpsc::Receiver<TelemetryEvent>) {
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::OnSignalReport { .. }))
+        );
     }
 
     #[fuchsia::test]
