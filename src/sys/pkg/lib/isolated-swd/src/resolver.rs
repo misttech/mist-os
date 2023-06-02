@@ -32,14 +32,16 @@ pub(crate) mod for_tests {
         crate::cache::for_tests::CacheForTest,
         anyhow::{anyhow, Context, Error},
         blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg,
+        fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg_ext as pkg,
         fidl_fuchsia_pkg_ext::RepositoryConfigs,
+        fuchsia_async as fasync,
         fuchsia_component_test::ChildRef,
         fuchsia_component_test::{
             Capability, ChildOptions, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
         },
         fuchsia_pkg_testing::serve::ServedRepository,
         fuchsia_url::RepositoryUrl,
+        futures::{FutureExt as _, StreamExt as _},
         std::sync::Arc,
     };
 
@@ -73,6 +75,31 @@ pub(crate) mod for_tests {
                 RepositoryConfigs::Version1(vec![served_repo.make_repo_config(repo_url)]);
 
             let cert_bytes = std::fs::read(std::path::Path::new(SSL_TEST_CERTS_PATH)).unwrap();
+
+            let service_reflector = realm_builder
+                .add_local_child(
+                    "pkg_resolver_service_reflector",
+                    move |handles| {
+                        let mut fs = fuchsia_component::server::ServiceFs::new();
+                        // Not necessary for updates, but prevents spam of irrelevant error logs.
+                        fs.dir("svc").add_fidl_service(move |stream| {
+                            fasync::Task::spawn(
+                                Arc::new(mock_metrics::MockMetricEventLoggerFactory::new())
+                                    .run_logger_factory(stream),
+                            )
+                            .detach()
+                        });
+                        async move {
+                            fs.serve_connection(handles.outgoing_dir).unwrap();
+                            let () = fs.collect().await;
+                            Ok(())
+                        }
+                        .boxed()
+                    },
+                    ChildOptions::new(),
+                )
+                .await
+                .unwrap();
 
             let pkg_resolver = realm_builder
                 .add_child("pkg-resolver", "#meta/pkg-resolver.cm", ChildOptions::new())
@@ -137,6 +164,18 @@ pub(crate) mod for_tests {
                         .capability(Capability::protocol_by_name("fuchsia.pkg.PackageCache"))
                         .capability(Capability::protocol_by_name("fuchsia.space.Manager"))
                         .from(&cache_ref)
+                        .to(&pkg_resolver),
+                )
+                .await
+                .unwrap();
+
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(
+                            Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>(),
+                        )
+                        .from(&service_reflector)
                         .to(&pkg_resolver),
                 )
                 .await

@@ -79,7 +79,7 @@ impl Updater {
             if state.is_success() {
                 return Ok(());
             } else if state.is_failure() {
-                return Err(anyhow!("update attempt failed"));
+                return Err(anyhow!("update attempt failed in state {:?}", state));
             }
         }
 
@@ -127,7 +127,7 @@ pub(crate) mod for_tests {
         crate::resolver::for_tests::{ResolverForTest, EMPTY_REPO_PATH},
         anyhow::Context,
         blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_io as fio,
+        fidl_fuchsia_metrics as fmetrics,
         fidl_fuchsia_paver::PaverRequestStream,
         fuchsia_async as fasync,
         fuchsia_component_test::{
@@ -139,7 +139,6 @@ pub(crate) mod for_tests {
         mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent},
         std::collections::HashMap,
         std::sync::Arc,
-        vfs::directory::entry::DirectoryEntry,
     };
 
     pub const TEST_REPO_URL: &str = "fuchsia-pkg://fuchsia.com";
@@ -257,29 +256,25 @@ pub(crate) mod for_tests {
                 .await
                 .unwrap();
 
-            // Set up blobfs and routes
-            let blobfs_proxy = blobfs.root_dir_proxy().context("getting root dir proxy").unwrap();
-            let blobfs_vfs = vfs::remote::remote_dir(blobfs_proxy);
-
-            let mock_blobfs = realm_builder
+            let service_reflector = realm_builder
                 .add_local_child(
-                    "system_updater_mock_directories",
+                    "system_updater_service_reflector",
                     move |handles| {
-                        let blobfs_clone = blobfs_vfs.clone();
-                        let out_dir = vfs::pseudo_directory! {
-                            "blob" => blobfs_clone,
-                        };
-                        let scope = vfs::execution_scope::ExecutionScope::new();
-                        let () = out_dir.open(
-                            scope.clone(),
-                            fio::OpenFlags::RIGHT_READABLE
-                                | fio::OpenFlags::RIGHT_WRITABLE
-                                | fio::OpenFlags::RIGHT_EXECUTABLE,
-                            vfs::path::Path::dot(),
-                            handles.outgoing_dir.into_channel().into(),
-                        );
+                        let mut fs = fuchsia_component::server::ServiceFs::new();
+                        // Not necessary for updates, but without this system-updater will wait 30
+                        // seconds trying to flush cobalt logs before logging an attempt error,
+                        // and the test is torn down before then, so the error is lost. Also
+                        // prevents spam of irrelevant error logs.
+                        fs.dir("svc").add_fidl_service(move |stream| {
+                            fasync::Task::spawn(
+                                Arc::new(mock_metrics::MockMetricEventLoggerFactory::new())
+                                    .run_logger_factory(stream),
+                            )
+                            .detach()
+                        });
                         async move {
-                            scope.wait().await;
+                            fs.serve_connection(handles.outgoing_dir).unwrap();
+                            let () = fs.collect().await;
                             Ok(())
                         }
                         .boxed()
@@ -293,11 +288,9 @@ pub(crate) mod for_tests {
                 .add_route(
                     Route::new()
                         .capability(
-                            Capability::directory("blob-exec")
-                                .path("/blob")
-                                .rights(fio::RW_STAR_DIR | fio::Operations::EXECUTE),
+                            Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>(),
                         )
-                        .from(&mock_blobfs)
+                        .from(&service_reflector)
                         .to(&system_updater),
                 )
                 .await

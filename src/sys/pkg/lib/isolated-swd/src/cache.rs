@@ -42,13 +42,12 @@ pub(crate) mod for_tests {
         super::*,
         anyhow::{Context as _, Error},
         blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_io as fio,
+        fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fuchsia_async as fasync,
         fuchsia_component_test::{
             Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
         },
         futures::prelude::*,
         std::sync::Arc,
-        vfs::directory::entry::DirectoryEntry,
     };
 
     pub struct CacheForTest {
@@ -62,27 +61,24 @@ pub(crate) mod for_tests {
             blobfs: &BlobfsRamdisk,
         ) -> Result<ChildRef, Error> {
             let blobfs_proxy = blobfs.root_dir_proxy().context("getting root dir proxy").unwrap();
-            let blobfs_vfs = vfs::remote::remote_dir(blobfs_proxy);
 
             let local_mocks = realm_builder
                 .add_local_child(
-                    "pkg_cache_blobfs_mock",
+                    "pkg_cache_service_reflector",
                     move |handles| {
-                        let blobfs_clone = blobfs_vfs.clone();
-                        let out_dir = vfs::pseudo_directory! {
-                            "blob" => blobfs_clone,
-                        };
-                        let scope = vfs::execution_scope::ExecutionScope::new();
-                        let () = out_dir.open(
-                            scope.clone(),
-                            fio::OpenFlags::RIGHT_READABLE
-                                | fio::OpenFlags::RIGHT_WRITABLE
-                                | fio::OpenFlags::RIGHT_EXECUTABLE,
-                            vfs::path::Path::dot(),
-                            handles.outgoing_dir.into_channel().into(),
-                        );
+                        let mut fs = fuchsia_component::server::ServiceFs::new();
+                        // Not necessary for updates, but prevents spam of irrelevant error logs.
+                        fs.dir("svc").add_fidl_service(move |stream| {
+                            fasync::Task::spawn(
+                                Arc::new(mock_metrics::MockMetricEventLoggerFactory::new())
+                                    .run_logger_factory(stream),
+                            )
+                            .detach()
+                        });
+                        fs.add_remote("blob", Clone::clone(&blobfs_proxy));
                         async move {
-                            scope.wait().await;
+                            fs.serve_connection(handles.outgoing_dir).unwrap();
+                            let () = fs.collect().await;
                             Ok(())
                         }
                         .boxed()
@@ -148,6 +144,18 @@ pub(crate) mod for_tests {
                             "fuchsia.update.CommitStatusProvider",
                         ))
                         .from(&system_update_committer)
+                        .to(&pkg_cache),
+                )
+                .await
+                .unwrap();
+
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(
+                            Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>(),
+                        )
+                        .from(&local_mocks)
                         .to(&pkg_cache),
                 )
                 .await
