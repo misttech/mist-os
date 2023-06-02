@@ -18,10 +18,10 @@ pub use crate::output_validator::*;
 pub use crate::stream::*;
 pub use crate::stream_runner::*;
 pub use crate::test_spec::*;
-use anyhow::Error;
+
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, anyhow::Error>;
 
 #[derive(Error, Debug)]
 #[error("FatalError: {}", _0)]

@@ -4,12 +4,12 @@
 
 // TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove this module.
 
-extern crate alloc;
+extern crate alloc as rustalloc;
 
-pub use ::alloc::*;
+pub use ::rustalloc::*;
 
 pub mod collections {
-    pub use ::alloc::collections::*;
+    pub use ::rustalloc::collections::*;
 
     pub use ::std::collections::{hash_map, HashMap, HashSet};
 }
