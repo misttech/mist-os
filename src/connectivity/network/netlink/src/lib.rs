@@ -127,6 +127,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
     let NetlinkWorkerParams { route_client_receiver } = params;
 
     let route_clients = ClientTable::default();
+    let (interfaces_request_sink, interfaces_request_stream) = mpsc::channel(1);
 
     let _: Vec<()> = futures::future::join_all([
         // Accept new NETLINK_ROUTE clients.
@@ -136,7 +137,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
                 connect_new_clients::<NetlinkRoute, _, _>(
                     route_clients,
                     route_client_receiver,
-                    NetlinkRouteRequestHandler,
+                    NetlinkRouteRequestHandler { interfaces_request_sink },
                 )
                 .await;
                 panic!("route_client_receiver stream unexpectedly finished")
@@ -167,17 +168,18 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
         // Interfaces Worker.
         {
             fasync::Task::spawn(async move {
-                let worker = match interfaces::EventLoop::new(route_clients) {
-                    Ok(worker) => worker,
-                    Err(InterfacesEventLoopError::Fidl(e)) => {
-                        panic!("Interfaces event loop creation error: {:?}", e)
-                    }
-                    Err(InterfacesEventLoopError::Netstack(_)) => {
-                        unreachable!(
-                            "The Netstack variant is not returned when creating a new worker"
-                        );
-                    }
-                };
+                let worker =
+                    match interfaces::EventLoop::new(route_clients, interfaces_request_stream) {
+                        Ok(worker) => worker,
+                        Err(InterfacesEventLoopError::Fidl(e)) => {
+                            panic!("Interfaces event loop creation error: {:?}", e)
+                        }
+                        Err(InterfacesEventLoopError::Netstack(_)) => {
+                            unreachable!(
+                                "The Netstack variant is not returned when creating a new worker"
+                            );
+                        }
+                    };
                 match worker.run().await {
                     InterfacesEventLoopError::Fidl(e) => {
                         panic!("Interfaces event loop error: {:?}", e)
@@ -199,7 +201,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
 async fn connect_new_clients<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>>(
     client_table: ClientTable<F, S>,
     client_receiver: UnboundedReceiver<ClientWithReceiver<F, S, R>>,
-    request_handler_impl: F::RequestHandler,
+    request_handler_impl: F::RequestHandler<S>,
 ) {
     client_receiver
         // Drive each client concurrently with `for_each_concurrent`. Note that
@@ -222,7 +224,7 @@ fn spawn_client_request_handler<
 >(
     client: InternalClient<F, S>,
     receiver: R,
-    handler: F::RequestHandler,
+    handler: F::RequestHandler<S>,
 ) -> fasync::Task<()> {
     // State needed to handle an individual request, that is cycled through the
     // `fold` combinator below.

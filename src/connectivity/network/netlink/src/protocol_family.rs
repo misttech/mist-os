@@ -17,6 +17,7 @@ use tracing::warn;
 
 use crate::{
     client::ExternalClient,
+    messaging::Sender,
     multicast_groups::{
         InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
         MulticastCapableNetlinkFamily, SingleLegacyGroup,
@@ -28,7 +29,7 @@ pub(crate) trait ProtocolFamily: MulticastCapableNetlinkFamily + Send + 'static 
     /// The message type associated with the protocol family.
     type Message: Clone + Debug + Emitable + Send + 'static;
     /// The implementation for handling requests from this protocol family.
-    type RequestHandler: NetlinkFamilyRequestHandler<Self::Message>;
+    type RequestHandler<S: Sender<Self::Message>>: NetlinkFamilyRequestHandler<Self::Message>;
 
     const NAME: &'static str;
 }
@@ -44,6 +45,10 @@ pub mod route {
     //! This module implements the Route Netlink Protocol Family.
 
     use super::*;
+
+    use futures::channel::mpsc;
+
+    use crate::interfaces;
 
     use netlink_packet_route::rtnl::{
         constants::{
@@ -143,16 +148,25 @@ pub mod route {
 
     impl ProtocolFamily for NetlinkRoute {
         type Message = NetlinkMessage<RtnlMessage>;
-        type RequestHandler = NetlinkRouteRequestHandler;
+        type RequestHandler<S: Sender<Self::Message>> = NetlinkRouteRequestHandler<S>;
 
         const NAME: &'static str = "NETLINK_ROUTE";
     }
 
     #[derive(Clone)]
-    pub(crate) struct NetlinkRouteRequestHandler;
+    pub(crate) struct NetlinkRouteRequestHandler<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+    > {
+        // TODO(https://issuetracker.google.com/283827094): Handle interface/address
+        // requests.
+        #[allow(unused)]
+        pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
+    }
 
     #[async_trait]
-    impl NetlinkFamilyRequestHandler<NetlinkMessage<RtnlMessage>> for NetlinkRouteRequestHandler {
+    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>
+        NetlinkFamilyRequestHandler<NetlinkMessage<RtnlMessage>> for NetlinkRouteRequestHandler<S>
+    {
         async fn handle_request(
             &mut self,
             req: NetlinkMessage<RtnlMessage>,
@@ -322,7 +336,7 @@ pub(crate) mod testutil {
 
     impl ProtocolFamily for FakeProtocolFamily {
         type Message = FakeNetlinkMessage;
-        type RequestHandler = FakeNetlinkRequestHandler;
+        type RequestHandler<S: Sender<Self::Message>> = FakeNetlinkRequestHandler;
 
         const NAME: &'static str = "FAKE_PROTOCOL_FAMILY";
     }

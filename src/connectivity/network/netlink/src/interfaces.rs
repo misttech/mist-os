@@ -12,12 +12,16 @@ use std::{
     num::NonZeroU64,
 };
 
-use anyhow::anyhow;
 use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
-use futures::{pin_mut, StreamExt as _, TryStreamExt as _};
+
+use anyhow::anyhow;
+use futures::{
+    channel::{mpsc, oneshot},
+    pin_mut, StreamExt as _, TryStreamExt as _,
+};
 use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::{
     AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
@@ -27,12 +31,46 @@ use netlink_packet_route::{
 use tracing::{debug, warn};
 
 use crate::{
-    client::ClientTable,
+    client::{ClientTable, InternalClient},
     messaging::Sender,
     multicast_groups::ModernGroup,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
     NETLINK_LOG_TAG,
 };
+
+/// Arguments for an RTM_GETLINK [`Request`].
+#[derive(Debug)]
+pub(crate) enum GetLinkArgs {
+    #[allow(unused)]
+    Dump,
+    // TODO(https://issuetracker.google.com/283134954): Support get requests w/
+    // filter.
+}
+
+/// [`Request`] arguments associated with links.
+#[derive(Debug)]
+pub(crate) enum LinkRequestArgs {
+    /// RTM_GETLINK
+    #[allow(unused)]
+    Get(GetLinkArgs),
+}
+
+/// The argument(s) for a [`Request`].
+#[derive(Debug)]
+pub(crate) enum RequestArgs {
+    #[allow(unused)]
+    Link(LinkRequestArgs),
+}
+
+/// A request associated with links or addresses.
+pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
+    /// The resource and operation-specific argument(s) for this request.
+    pub args: RequestArgs,
+    /// The client that made the request.
+    pub client: InternalClient<NetlinkRoute, S>,
+    /// A completer that will have the result of the request sent over.
+    pub completer: oneshot::Sender<()>,
+}
 
 /// Contains the asynchronous work related to RTM_LINK and RTM_ADDR messages.
 ///
@@ -43,6 +81,8 @@ pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>
     state_proxy: fnet_interfaces::StateProxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
     route_clients: ClientTable<NetlinkRoute, S>,
+    /// A stream of [`Request`]s for the event loop to handle.
+    request_stream: mpsc::Receiver<Request<S>>,
 }
 
 /// RTM_LINK and RTM_ADDR related event loop errors.
@@ -87,12 +127,13 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
     /// This is fallible iff it is not possible to obtain the `StateProxy`.
     pub(crate) fn new(
         route_clients: ClientTable<NetlinkRoute, S>,
+        request_stream: mpsc::Receiver<Request<S>>,
     ) -> Result<Self, InterfacesEventLoopError> {
         use fuchsia_component::client::connect_to_protocol;
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
             .map_err(|e| InterfacesEventLoopError::Fidl(FidlError::Unspecified(e)))?;
 
-        Ok(EventLoop { state_proxy, route_clients })
+        Ok(EventLoop { state_proxy, route_clients, request_stream })
     }
 
     /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -103,7 +144,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
     /// event loop task, for example, if the watcher stream ends or if
     /// the FIDL protocol cannot be connected.
     pub(crate) async fn run(self) -> InterfacesEventLoopError {
-        let EventLoop { state_proxy, route_clients } = self;
+        let EventLoop { state_proxy, route_clients, request_stream } = self;
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(&state_proxy);
 
@@ -151,36 +192,83 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
             (interface_properties, addresses)
         };
 
-        loop {
-            let stream_res = if_event_stream.try_next().await;
-            let event = match stream_res {
-                Ok(Some(event)) => event,
-                Ok(None) => {
-                    return InterfacesEventLoopError::Netstack(NetstackError::EventStreamEnded);
-                }
-                Err(e) => {
-                    return InterfacesEventLoopError::Fidl(FidlError::EventStream(e));
-                }
-            };
+        // Chain a pending so that the stream never ends. This is so that tests
+        // can safely rely on just closing the watcher to terminate the event
+        // loop. This is okay because we do not expect the request stream to
+        // reasonably end and if we did want to support graceful shutdown of the
+        // event loop, we can have a dedicated shutdown signal.
+        let mut request_stream = request_stream.chain(futures::stream::pending());
 
-            match handle_interface_watcher_event(
-                &mut interface_properties,
-                &mut addresses,
-                &route_clients,
-                event,
-            ) {
-                Ok(()) => {}
-                Err(InterfaceEventHandlerError::ExistingEventReceived(properties)) => {
-                    // This error indicates there is an inconsistent interface state shared
-                    // between Netlink and Netstack.
-                    return InterfacesEventLoopError::Netstack(
-                        NetstackError::ExistingEventReceived(properties),
-                    );
+        loop {
+            futures::select! {
+                stream_res = if_event_stream.try_next() => {
+                    let event = match stream_res {
+                        Ok(Some(event)) => event,
+                        Ok(None) => {
+                            return InterfacesEventLoopError::Netstack(NetstackError::EventStreamEnded);
+                        }
+                        Err(e) => {
+                            return InterfacesEventLoopError::Fidl(FidlError::EventStream(e));
+                        }
+                    };
+
+                    match handle_interface_watcher_event(
+                        &mut interface_properties,
+                        &mut addresses,
+                        &route_clients,
+                        event,
+                    ) {
+                        Ok(()) => {}
+                        Err(InterfaceEventHandlerError::ExistingEventReceived(properties)) => {
+                            // This error indicates there is an inconsistent interface state shared
+                            // between Netlink and Netstack.
+                            return InterfacesEventLoopError::Netstack(
+                                NetstackError::ExistingEventReceived(properties),
+                            );
+                        }
+                        Err(InterfaceEventHandlerError::Update(e)) => {
+                            // This error is severe enough to indicate a larger problem in Netstack.
+                            return InterfacesEventLoopError::Netstack(NetstackError::Update(e));
+                        }
+                    }
                 }
-                Err(InterfaceEventHandlerError::Update(e)) => {
-                    // This error is severe enough to indicate a larger problem in Netstack.
-                    return InterfacesEventLoopError::Netstack(NetstackError::Update(e));
+                req = request_stream.next() => {
+                    Self::handle_request(
+                        &interface_properties,
+                        req.expect(
+                            "request stream should never end because of chained `pending`",
+                        ),
+                    )
                 }
+            }
+        }
+    }
+
+    fn handle_request(
+        interface_properties: &HashMap<u64, fnet_interfaces_ext::Properties>,
+        Request { args, mut client, completer }: Request<S>,
+    ) {
+        debug!("got request {args:?} from {client}");
+
+        match &args {
+            RequestArgs::Link(LinkRequestArgs::Get(args)) => match args {
+                GetLinkArgs::Dump => {
+                    interface_properties
+                        .values()
+                        .filter_map(NetlinkLinkMessage::optionally_from)
+                        .for_each(|message| client.send(message.into_rtnl_new_link()));
+                }
+            },
+        }
+
+        debug!("handled request {args:?} from {client}");
+
+        match completer.send(()) {
+            Ok(()) => (),
+            Err(()) => {
+                // Not treated as a hard error because the socket
+                // may have been closed.
+                warn!("failed to send completion event to socket ({client}) handler")
             }
         }
     }
@@ -635,10 +723,11 @@ mod tests {
     use fidl_fuchsia_net as fnet;
     use fuchsia_async::{self as fasync};
     use fuchsia_zircon as zx;
-    use futures::{future::FutureExt as _, stream::Stream};
+    use futures::{future::FutureExt as _, sink::SinkExt as _, stream::Stream};
 
     use assert_matches::assert_matches;
     use net_declare::fidl_ip;
+    use netlink_packet_core::NetlinkPayload;
     use netlink_packet_route::{
         AddressHeader, AddressMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
     };
@@ -858,6 +947,7 @@ mod tests {
     struct Setup<W> {
         event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>>,
         watcher_stream: W,
+        request_sink: mpsc::Sender<Request<FakeSender<NetlinkMessage<RtnlMessage>>>>,
     }
 
     fn setup_with_route_clients(
@@ -865,7 +955,8 @@ mod tests {
     ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
         let (state_proxy, if_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
-        let event_loop = EventLoop::<FakeSender<_>> { state_proxy, route_clients };
+        let (request_sink, request_stream) = mpsc::channel(1);
+        let event_loop = EventLoop::<FakeSender<_>> { state_proxy, route_clients, request_stream };
 
         let watcher_stream = if_stream
             .and_then(|req| match req {
@@ -878,7 +969,7 @@ mod tests {
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
 
-        Setup { event_loop, watcher_stream }
+        Setup { event_loop, watcher_stream, request_sink }
     }
 
     fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
@@ -964,7 +1055,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_stream_ended() {
-        let Setup { event_loop, watcher_stream } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
@@ -981,7 +1072,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_events() {
-        let Setup { event_loop, watcher_stream } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
@@ -994,7 +1085,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_adds() {
-        let Setup { event_loop, watcher_stream } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
@@ -1017,7 +1108,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_existing_after_add() {
-        let Setup { event_loop, watcher_stream } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
@@ -1099,17 +1190,17 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    const LO_INTERFACE_ID: u64 = 1;
+    const LO_NAME: &str = "lo";
+    const ETH_INTERFACE_ID: u64 = 2;
+    const ETH_NAME: &str = "eth";
+    const WLAN_INTERFACE_ID: u64 = 3;
+    const WLAN_NAME: &str = "wlan";
+    const PPP_INTERFACE_ID: u64 = 4;
+    const PPP_NAME: &str = "ppp";
+
     #[fuchsia::test]
     async fn test_deliver_updates() {
-        const LO_INTERFACE_ID: u64 = 1;
-        const LO_NAME: &str = "lo";
-        const ETH_INTERFACE_ID: u64 = 2;
-        const ETH_NAME: &str = "eth";
-        const WLAN_INTERFACE_ID: u64 = 3;
-        const WLAN_NAME: &str = "wlan";
-        const PPP_INTERFACE_ID: u64 = 4;
-        const PPP_NAME: &str = "ppp";
-
         let (mut link_sink, link_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
             &[ModernGroup(RTNLGRP_LINK)],
@@ -1134,7 +1225,7 @@ mod tests {
                 ModernGroup(RTNLGRP_IPV4_IFADDR),
             ],
         );
-        let Setup { event_loop, mut watcher_stream } = setup_with_route_clients({
+        let Setup { event_loop, mut watcher_stream, request_sink: _ } = setup_with_route_clients({
             let route_clients = ClientTable::default();
             route_clients.add_client(link_client);
             route_clients.add_client(addr4_client);
@@ -1338,6 +1429,107 @@ mod tests {
                 eth_link,
                 ppp_v4_addr,
                 ppp_v6_addr,
+            ],
+        );
+        assert_eq!(&other_sink.take_messages()[..], &[]);
+    }
+
+    #[fuchsia::test]
+    async fn test_get_link() {
+        let (mut link_sink, link_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[ModernGroup(RTNLGRP_LINK)],
+        );
+        let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_2,
+            &[ModernGroup(RTNLGRP_IPV4_ROUTE)],
+        );
+        let Setup { event_loop, mut watcher_stream, mut request_sink } =
+            setup_with_route_clients({
+                let route_clients = ClientTable::default();
+                route_clients.add_client(link_client.clone());
+                route_clients.add_client(other_client);
+                route_clients
+            });
+        let event_loop_fut = event_loop.run().fuse();
+        futures::pin_mut!(event_loop_fut);
+
+        let watcher_stream_fut = respond_to_watcher(
+            watcher_stream.by_ref(),
+            [
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(LO_INTERFACE_ID),
+                    name: Some(LO_NAME.to_string()),
+                    device_class: Some(LOOPBACK),
+                    online: Some(true),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(ETH_INTERFACE_ID),
+                    name: Some(ETH_NAME.to_string()),
+                    device_class: Some(ETHERNET),
+                    online: Some(false),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
+            ],
+        );
+        futures::select! {
+            () = watcher_stream_fut.fuse() => {},
+            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+        }
+        assert_eq!(&link_sink.take_messages()[..], &[]);
+        assert_eq!(&other_sink.take_messages()[..], &[]);
+
+        let (completer, waiter) = oneshot::channel();
+        let fut = request_sink
+            .send(Request {
+                args: RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
+                client: link_client.clone(),
+                completer,
+            })
+            .then(|res| {
+                res.expect("send request");
+                waiter
+            });
+        futures::select! {
+            res = fut.fuse() => assert_eq!(res, Ok(())),
+            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+        }
+        assert_eq!(
+            {
+                let mut messages = link_sink.take_messages();
+                messages.sort_by_key(|message| {
+                    assert_matches!(
+                        &message.payload,
+                        NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
+                            m.header.index
+                        }
+                    )
+                });
+                messages
+            },
+            [
+                create_netlink_link_message(
+                    LO_INTERFACE_ID,
+                    ARPHRD_LOOPBACK,
+                    IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                    create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+                )
+                .into_rtnl_new_link(),
+                create_netlink_link_message(
+                    ETH_INTERFACE_ID,
+                    ARPHRD_ETHER,
+                    0,
+                    create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+                )
+                .into_rtnl_new_link(),
             ],
         );
         assert_eq!(&other_sink.take_messages()[..], &[]);
