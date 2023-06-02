@@ -33,8 +33,8 @@ void NodeRemovalTracker::CheckRemovalDone() {
     return;
   }
   int pkg_count = 0, all_count = 0;
-  for (auto [id, value] : nodes_) {
-    auto [name, node_collection, state] = value;
+  for (const auto& [id, value] : nodes_) {
+    const auto& [name, node_collection, state] = value;
     if (state != NodeState::kStopping) {
       all_count++;
       LOGF(DEBUG, "NRT: %s node %s waiting on %s",
