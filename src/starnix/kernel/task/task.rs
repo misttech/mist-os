@@ -916,14 +916,15 @@ impl Task {
     ///
     /// This will interrupt any blocking syscalls if the task is blocked on one.
     /// The signal_state of the task must not be locked.
-    ///
-    /// TODO(qsr): This should also interrupt any running code.
     pub fn interrupt(&self) {
         self.read().signals.waiter.access(|waiter| {
             if let Some(waiter) = waiter {
                 waiter.interrupt()
             }
-        })
+        });
+        if let Some(thread) = self.thread.read().as_ref() {
+            crate::execution::interrupt_thread(thread);
+        }
     }
 
     pub fn command(&self) -> CString {
