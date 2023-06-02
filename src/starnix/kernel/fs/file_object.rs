@@ -328,13 +328,13 @@ macro_rules! fileops_impl_seekable {
         fn seek(
             &self,
             file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            current_task: &crate::task::CurrentTask,
             current_offset: crate::types::off_t,
             new_offset: crate::types::off_t,
             whence: crate::fs::SeekOrigin,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
             crate::fs::default_seek(current_offset, new_offset, whence, |offset| {
-                let file_size = file.node().stat()?.st_size as off_t;
+                let file_size = file.node().stat(current_task)?.st_size as off_t;
                 offset.checked_add(file_size).ok_or_else(|| errno!(EINVAL))
             })
         }

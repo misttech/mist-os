@@ -126,7 +126,8 @@ impl FsNodeOps for File {
 
     fn update_info<'a>(
         &self,
-        _node: &'a FsNode,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;

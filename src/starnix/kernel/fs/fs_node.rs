@@ -408,7 +408,8 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Return a reader lock on the updated information.
     fn update_info<'a>(
         &self,
-        _node: &'a FsNode,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         Ok(info.read())
@@ -1003,8 +1004,8 @@ impl FsNode {
         self.info().mode.is_lnk()
     }
 
-    pub fn stat(&self) -> Result<stat_t, Errno> {
-        let info = self.ops().update_info(self, &self.info)?;
+    pub fn stat(&self, current_task: &CurrentTask) -> Result<stat_t, Errno> {
+        let info = self.ops().update_info(self, current_task, &self.info)?;
 
         // The blksize cast is necessary depending on the architecture.
         #[allow(clippy::unnecessary_cast)]
@@ -1037,9 +1038,9 @@ impl FsNode {
         }
     }
 
-    pub fn statx(&self, mask: u32) -> Result<statx, Errno> {
+    pub fn statx(&self, current_task: &CurrentTask, mask: u32) -> Result<statx, Errno> {
         // Ignore mask for now and fill in all of the fields.
-        let info = self.ops().update_info(self, &self.info)?;
+        let info = self.ops().update_info(self, current_task, &self.info)?;
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
         }
@@ -1300,7 +1301,7 @@ mod tests {
             Ok(())
         })
         .expect("update_info");
-        let stat = node.stat().expect("stat");
+        let stat = node.stat(&current_task).expect("stat");
 
         assert_eq!(stat.st_mode, FileMode::IFSOCK.bits());
         assert_eq!(stat.st_size, 1);

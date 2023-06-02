@@ -527,7 +527,7 @@ pub fn sys_fstat(
     buffer: UserRef<stat_t>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let result = file.node().stat()?;
+    let result = file.node().stat(current_task)?;
     current_task.mm.write_object(buffer, &result)?;
     Ok(())
 }
@@ -546,7 +546,7 @@ pub fn sys_newfstatat(
     }
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
-    let result = name.entry.node.stat()?;
+    let result = name.entry.node.stat(current_task)?;
     current_task.mm.write_object(buffer, &result)?;
     Ok(())
 }
@@ -579,7 +579,7 @@ pub fn sys_statx(
 
     let flags = LookupFlags::from_bits(flags, all_flags)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
-    let result = name.entry.node.statx(mask)?;
+    let result = name.entry.node.statx(current_task, mask)?;
     current_task.mm.write_object(statxbuf, &result)?;
     Ok(())
 }
@@ -2099,7 +2099,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let fd = FdNumber::from_raw(10);
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
-        let file_size = file_handle.node().stat().unwrap().st_size;
+        let file_size = file_handle.node().stat(&current_task).unwrap().st_size;
         current_task.files.insert(&current_task, fd, file_handle).unwrap();
 
         assert_eq!(sys_lseek(&current_task, fd, 0, SeekOrigin::Cur as u32)?, 0);
