@@ -228,10 +228,6 @@ void vm_init_preheap() {
 
   vm_init_preheap_vmars();
 
-  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
-    AttributionObject::KernelAttributionInit();
-  }
-
   // mark the physical pages used by the boot time allocator
   if (boot_alloc_end != boot_alloc_start) {
     dprintf(INFO, "VM: marking boot alloc used range [%#" PRIxPTR ", %#" PRIxPTR ")\n",
@@ -275,6 +271,10 @@ void vm_init_preheap() {
 
 void vm_init() {
   LTRACE_ENTRY;
+
+  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
+    AttributionObject::KernelAttributionInit();
+  }
 
   // Protect the regions of the physmap that are not backed by normal memory.
   //

@@ -511,13 +511,6 @@ ProcessDispatcher::State ProcessDispatcher::state() const {
   return state_;
 }
 
-// TODO(fxbug.dev/117196): Make this method inline if KBMA is accepted.
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-const fbl::RefPtr<AttributionObject>& ProcessDispatcher::attribution_object() const {
-  return attribution_object_;
-}
-#endif
-
 fbl::RefPtr<JobDispatcher> ProcessDispatcher::job() { return job_; }
 
 void ProcessDispatcher::SetStateLocked(State s) {

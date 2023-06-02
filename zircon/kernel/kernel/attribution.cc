@@ -8,9 +8,8 @@
 fbl::DoublyLinkedList<AttributionObjectNode*> AttributionObjectNode::all_nodes_;
 fbl::DoublyLinkedList<AttributionObjectsCursor*> AttributionObjectsCursor::all_cursors_;
 
-// Save some memory if kernel-based memory attribution is disabled.
 #if KERNEL_BASED_MEMORY_ATTRIBUTION
-AttributionObject AttributionObject::kernel_attribution_;
+fbl::RefPtr<AttributionObject> AttributionObject::kernel_attribution_object_;
 #endif
 
 void AttributionObjectNode::AddToGlobalListLocked(AttributionObjectNode* where,
@@ -36,9 +35,13 @@ AttributionObject* AttributionObjectNode::DowncastToAttributionObject() {
                                                    : nullptr;
 }
 
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
 void AttributionObject::KernelAttributionInit() TA_NO_THREAD_SAFETY_ANALYSIS {
-  AttributionObject::kernel_attribution_.Adopt();
+  fbl::AllocChecker ac;
+  kernel_attribution_object_ = fbl::MakeRefCountedChecked<AttributionObject>(&ac);
+  ASSERT(ac.check());
 }
+#endif
 
 AttributionObject::~AttributionObject() {
   if (!InContainer()) {

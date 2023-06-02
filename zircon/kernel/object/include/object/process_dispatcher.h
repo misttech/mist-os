@@ -174,7 +174,13 @@ class ProcessDispatcher final
 
   // Attribution object tracking the process that this dispatcher instance
   // represents.
-  const fbl::RefPtr<AttributionObject>& attribution_object() const;
+  const fbl::RefPtr<AttributionObject>& attribution_object() const {
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+    return attribution_object_;
+#else
+    return AttributionObject::null_attribution_ptr_;
+#endif
+  }
 
   fbl::RefPtr<JobDispatcher> job();
 

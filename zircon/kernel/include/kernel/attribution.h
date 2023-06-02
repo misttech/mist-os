@@ -89,6 +89,14 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, public Attr
   AttributionObject() : AttributionObjectNode(AttributionObjectNode::NodeType::AttributionObject) {}
   ~AttributionObject();
 
+  // A placeholder pointer to AttributionObject that is always NULL.
+  //
+  // Used when KBMA is disabled by functions that return a const fbl::RefPtr<AttributionObject>&
+  // as the return value.
+#if !KERNEL_BASED_MEMORY_ATTRIBUTION
+  static inline const fbl::RefPtr<AttributionObject> null_attribution_ptr_{nullptr};
+#endif
+
   static void KernelAttributionInit();
 
   // Provides a statically defined AttributionObject that tracks
@@ -96,8 +104,12 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, public Attr
   // kernel. The returned value is provided to VmObjectPaged::create
   // calls for vmos created by the kernel, and is stored as a member
   // variable on the backing VmCowPages.
-  static fbl::RefPtr<AttributionObject> GetKernelAttribution() {
-    return fbl::RefPtr<AttributionObject>(&kernel_attribution_);
+  static const fbl::RefPtr<AttributionObject>& GetKernelAttribution() {
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+    return kernel_attribution_object_;
+#else
+    return null_attribution_ptr_;
+#endif
   }
 
   // Sets the owning koid and inserts this attribution object in the list before
@@ -155,9 +167,11 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, public Attr
   // The koid of the process that this attribution object is tracking.
   zx_koid_t owning_koid_;
 
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
   // The attribution object used to track resident memory
   // for VMOs attributed to the kernel.
-  static AttributionObject kernel_attribution_;
+  static fbl::RefPtr<AttributionObject> kernel_attribution_object_;
+#endif
 };
 
 // AttributionObjectsCursor is an iterator that can visit a subrange of nodes
