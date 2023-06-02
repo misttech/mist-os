@@ -404,9 +404,11 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         let mut bytes = vec![0; self.available];
         let result = callback(&mut bytes)?;
+        bytes.truncate(result);
         if result > 0 {
             self.pipe.messages.write_message(bytes.into());
             self.pipe.notify_write();
+            self.available -= result;
         }
         Ok(result)
     }

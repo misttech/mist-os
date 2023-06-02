@@ -39,4 +39,18 @@ TEST(PipeTest, BlockingSmallWrites) {
   ASSERT_EQ(errno, EAGAIN);
 }
 
+TEST(PipeTest, SpliceShortRead) {
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string path = tmp == nullptr ? "/tmp/test_file" : std::string(tmp) + "/test_file";
+  int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777);
+  ASSERT_GE(fd, 0);
+  ASSERT_EQ(write(fd, "hello", 5), 5);
+  int pipefd[2];
+  SAFE_SYSCALL(pipe2(pipefd, 0));
+  off64_t offset = 0;
+  ASSERT_EQ(splice(fd, &offset, pipefd[1], nullptr, 100, 0), 5);
+  char buffer[100];
+  ASSERT_EQ(read(pipefd[0], buffer, 10), 5);
+  ASSERT_EQ(strncmp(buffer, "hello", 5), 0);
+}
 }  // namespace
