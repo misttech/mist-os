@@ -55,10 +55,16 @@ impl FdTableEntry {
 
 /// Having the map a separate data structure allows us to memoize next_fd, which is the
 /// lowest numbered file descriptor not in use.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct FdMap {
     map: HashMap<FdNumber, FdTableEntry>,
     next_fd: FdNumber,
+}
+
+impl Default for FdMap {
+    fn default() -> Self {
+        FdMap { map: HashMap::default(), next_fd: FdNumber::from_raw(0) }
+    }
 }
 
 impl FdMap {
