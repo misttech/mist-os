@@ -108,18 +108,19 @@ class RustActionTests(unittest.TestCase):
 
     def test_crate_type(self):
         cases = [
-            ("rlib", rustc.CrateType.RLIB, False),
-            ("bin", rustc.CrateType.BINARY, True),
-            ("cdylib", rustc.CrateType.CDYLIB, True),
-            ("dylib", rustc.CrateType.DYLIB, True),
-            ("proc-macro", rustc.CrateType.PROC_MACRO, True),
-            ("staticlib", rustc.CrateType.STATICLIB, False),
+            ("rlib", rustc.CrateType.RLIB, False, False),
+            ("bin", rustc.CrateType.BINARY, True, True),
+            ("cdylib", rustc.CrateType.CDYLIB, True, True),
+            ("dylib", rustc.CrateType.DYLIB, True, True),
+            ("proc-macro", rustc.CrateType.PROC_MACRO, True, False),
+            ("staticlib", rustc.CrateType.STATICLIB, False, False),
         ]
-        for k, v, needs_linker in cases:
+        for k, v, needs_linker, is_executable in cases:
             r = rustc.RustAction(
                 ['../tools/rustc', '--crate-type', k, '-o', 'foo.rlib'])
             self.assertEqual(r.crate_type, v)
             self.assertEqual(r.needs_linker, needs_linker)
+            self.assertEqual(r.main_output_is_executable, is_executable)
 
     def test_emit_link(self):
         r = rustc.RustAction(

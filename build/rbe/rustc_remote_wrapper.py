@@ -20,6 +20,7 @@ import argparse
 import glob
 import os
 import subprocess
+import stat
 import sys
 
 import cl_utils
@@ -32,6 +33,10 @@ from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
+
+# standard '755' executable permissions
+_EXEC_PERMS = stat.S_IRWXU | (stat.S_IRGRP |
+                              stat.S_IXGRP) | (stat.S_IROTH | stat.S_IXOTH)
 
 
 def msg(text: str):
@@ -732,7 +737,19 @@ class RustRemoteAction(object):
     def _post_remote_success_action(self) -> int:
         if self._depfile_exists():
             self._rewrite_remote_depfile()
-        # TODO: if downloads were skipped, need to force-download depfile
+
+        if not self.remote_action.download_outputs and self._rust_action.main_output_is_executable:
+            # TODO(b/285030257): This is a workaround to a problem where
+            # download stubs need the appropriate execution permissions
+            # to be set, so that remote execution inputs get the same
+            # permissions.  This is important for tools that mirror execution
+            # bits from inputs to outputs, like llvm-objcopy.
+            # Once re-client presents permission information in the
+            # --action_log (reproxy remote_metadata), this workaround can
+            # be replaced with a more generalized solution.
+            if remote_action.is_download_stub_file(
+                    self._rust_action.output_file):
+                self._rust_action.output_file.chmod(_EXEC_PERMS)
         return 0
 
     def _rewrite_remote_depfile(self):

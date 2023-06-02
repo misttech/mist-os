@@ -86,12 +86,15 @@ def _write_lines_to_file(path: Path, lines: Iterable[str]):
     with open(path, 'w') as f:
         f.write(contents)
 
+
 def _fill_string_to_size(text: str, size: int, pattern: str) -> str:
     """Append string with a filler pattern to bring it up to a size."""
     to_fill = size - len(text)
     if to_fill <= 0:
         return text
-    return text + pattern * (to_fill // len(pattern)) + pattern[:to_fill % len(pattern)]
+    return text + pattern * (to_fill // len(pattern)) + pattern[:to_fill %
+                                                                len(pattern)]
+
 
 def _files_match(file1: Path, file2: Path) -> bool:
     """Compares two files, returns True if they both exist and match."""
@@ -461,20 +464,22 @@ class ReproxyLogEntry(object):
         """
         stubs = dict()
         # TODO: the following could be parallelized
-        stubs.update({
-            f:
-            self._write_download_stub(
-                path=f,
-                build_id=build_id,
-                working_dir_abs=working_dir_abs,
-            ) for f in files})
-        stubs.update({
-            d:
-            self._write_download_stub(
-                path=d,
-                build_id=build_id,
-                working_dir_abs=working_dir_abs,
-            ) for d in dirs})
+        stubs.update(
+            {
+                f: self._write_download_stub(
+                    path=f,
+                    build_id=build_id,
+                    working_dir_abs=working_dir_abs,
+                ) for f in files
+            })
+        stubs.update(
+            {
+                d: self._write_download_stub(
+                    path=d,
+                    build_id=build_id,
+                    working_dir_abs=working_dir_abs,
+                ) for d in dirs
+            })
         return stubs
 
     @staticmethod
@@ -682,11 +687,12 @@ class DownloadStubInfo(object):
         # but we need a temporary ugly workaround:
         sha256sum, slash, size = self.blob_digest.partition('/')
         with open(output_abspath, 'w') as f:
-            f.write(_fill_string_to_size(
-                text='\n'.join(lines),
-                size=int(size),
-                pattern='\n# TODO(b/284380439): avoid resizing stub file',
-            ))
+            f.write(
+                _fill_string_to_size(
+                    text='\n'.join(lines),
+                    size=int(size),
+                    pattern='\n# TODO(b/284380439): avoid resizing stub file',
+                ))
 
     def create(self, working_dir_abs: Path):
         """Create a download stub file.
@@ -739,7 +745,9 @@ class DownloadStubInfo(object):
             build_id=variables["build_id"],
         )
 
-    def download(self, downloader: remotetool.RemoteTool, working_dir_abs: Path) -> cl_utils.SubprocessResult:
+    def download(
+            self, downloader: remotetool.RemoteTool,
+            working_dir_abs: Path) -> cl_utils.SubprocessResult:
         """Retrieves the file or dir referenced by the stub.
 
         Reads the stub info from file.
@@ -778,10 +786,12 @@ class DownloadStubInfo(object):
 
         return status
 
+
 def _file_starts_with(path: Path, text: str) -> bool:
     with open(path, 'rb') as f:
         # read only a small number of bytes to compare
         return os.pread(f.fileno(), len(text), 0) == text.encode()
+
 
 def is_download_stub_file(path: Path) -> Optional[Path]:
     """Returns true if the path points to a download stub."""
@@ -792,7 +802,8 @@ def is_download_stub_file(path: Path) -> Optional[Path]:
 
 
 def download_from_stub(
-        stub: Path, downloader: remotetool.RemoteTool, working_dir_abs: Path) -> cl_utils.SubprocessResult:
+        stub: Path, downloader: remotetool.RemoteTool,
+        working_dir_abs: Path) -> cl_utils.SubprocessResult:
     """Possibly downloads a file over a stub link.
     Args:
       downloader: remotetool instance used to download.
@@ -1308,8 +1319,7 @@ class RemoteAction(object):
         for path in self.always_download:
             stub_info = stub_infos[path]
             status = stub_info.download(
-                downloader=downloader,
-                working_dir_abs=self.working_dir)
+                downloader=downloader, working_dir_abs=self.working_dir)
             if status.returncode != 0:  # alert, but do not fail
                 msg(f"Unable to download {path}.")
 
@@ -1349,32 +1359,34 @@ class RemoteAction(object):
             # Nothing do compare.
             return 0
 
-        # ran remotely
-        if self.download_outputs:
-            # Possibly transform some of the remote outputs.
-            # It is important that transformations are applied before
-            # local vs. remote comparison.
-            if self._post_remote_run_success_action:
-                self.vmsg("Running post-remote-success actions")
-                post_run_status = self._post_remote_run_success_action()
-                if post_run_status != 0:
-                    return post_run_status
+        if not self.download_outputs:
+            self._process_download_stubs()
 
-            if self.compare_with_local:
+        # Possibly transform some of the remote outputs.
+        # It is important that transformations are applied before
+        # local vs. remote comparison, and after possible download stub
+        # generation.
+        if self._post_remote_run_success_action:
+            self.vmsg("Running post-remote-success actions")
+            post_run_status = self._post_remote_run_success_action()
+            if post_run_status != 0:
+                return post_run_status
+
+        if self.compare_with_local:  # requesting comparison vs. local
+            if self.download_outputs:
                 # Also run locally, and compare outputs.
                 return self._compare_against_local()
-        else:
-            self._process_download_stubs()
 
             # TODO: in compare-mode, force-download all output files and dirs,
             # overriding and taking precedence over
             # --download_outputs=false, because comparison is intended
             # to be done locally with downloaded artifacts.
             # For now, just advise the user.
-            if self.compare_with_local and not self.remote_disable:
+            if not self.remote_disable:
                 msg(
                     "Cannot compare remote outputs as requested because --download_outputs=false.  Re-run with downloads enabled to compare outputs."
                 )
+
         return 0
 
     def _on_failure(self, result: cl_utils.SubprocessResult) -> int:

@@ -241,6 +241,12 @@ class RustAction(object):
         }
 
     @property
+    def main_output_is_executable(self) -> bool:
+        return self.crate_type in {
+            CrateType.BINARY, CrateType.DYLIB, CrateType.CDYLIB
+        }
+
+    @property
     def want_sysroot_libgcc(self) -> bool:
         return self._want_sysroot_libgcc
 
