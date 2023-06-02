@@ -15,12 +15,13 @@ rustc_library("platform") {
   if (is_fuchsia) {
     sources += [
       "src/fuchsia.rs",
-      "src/fuchsia/blob.rs",
       "src/fuchsia/component.rs",
       "src/fuchsia/device.rs",
       "src/fuchsia/directory.rs",
       "src/fuchsia/errors.rs",
       "src/fuchsia/file.rs",
+      "src/fuchsia/fxblob.rs",
+      "src/fuchsia/fxblob/directory.rs",
       "src/fuchsia/memory_pressure.rs",
       "src/fuchsia/node.rs",
       "src/fuchsia/paged_object_handle.rs",

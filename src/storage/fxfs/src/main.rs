@@ -17,8 +17,8 @@ use {
         serialized_types::LATEST_VERSION,
     },
     fxfs_platform::{
-        blob::init_vmex_resource,
         component::{new_block_client, Component},
+        fxblob::init_vmex_resource,
         RemoteCrypt,
     },
     std::sync::Arc,

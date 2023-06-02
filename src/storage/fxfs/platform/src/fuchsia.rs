@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod blob;
 pub mod component;
 mod device;
 pub mod directory;
 mod errors;
 pub mod file;
+pub mod fxblob;
 mod memory_pressure;
 pub mod node;
 mod paged_object_handle;

@@ -4,9 +4,9 @@
 
 use {
     crate::fuchsia::{
-        blob::BlobDirectory,
         component::map_to_raw_status,
         directory::FxDirectory,
+        fxblob::BlobDirectory,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot, RootDir},
         RemoteCrypt,

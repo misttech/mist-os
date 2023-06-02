@@ -4,8 +4,8 @@
 
 use {
     crate::fuchsia::{
-        blob::BlobDirectory, component::spawn_on_pager_executor, directory::FxDirectory,
-        file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
+        component::spawn_on_pager_executor, directory::FxDirectory, file::FxFile,
+        fxblob::BlobDirectory, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
         volumes_directory::VolumesDirectory,
     },
     anyhow::Context,
