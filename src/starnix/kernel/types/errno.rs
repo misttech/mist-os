@@ -365,7 +365,7 @@ macro_rules! error {
 /// tagged with the current file name and line number.
 macro_rules! errno_from_code {
     ($err:expr) => {{
-        let errno = ErrnoCode::from_error_code($err);
+        let errno = crate::types::errno::ErrnoCode::from_error_code($err);
         Errno::new(
             errno,
             stringify!($err),
