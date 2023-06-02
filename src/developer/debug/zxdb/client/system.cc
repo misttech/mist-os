@@ -738,11 +738,18 @@ void System::AddSymbolServer(std::unique_ptr<SymbolServer> unique_server) {
     for (auto& observer : weak_this->observers_)
       observer.OnSymbolServerStatusChanged(server);
 
+    if (state == SymbolServer::State::kReady)
+      weak_this->download_manager_.OnSymbolServerBecomesReady(server);
+
     if (initializing && state != SymbolServer::State::kBusy &&
         state != SymbolServer::State::kInitializing) {
       initializing = false;
     }
   });
+
+  if (server->state() == SymbolServer::State::kReady) {
+    download_manager_.OnSymbolServerBecomesReady(server);
+  }
 }
 
 }  // namespace zxdb

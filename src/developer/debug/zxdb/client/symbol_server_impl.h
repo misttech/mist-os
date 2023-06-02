@@ -16,14 +16,9 @@ namespace zxdb {
 
 class SymbolServerImpl : public SymbolServer {
  public:
-  // Construct a new symbol server. Expects a url with one of these formats:
-  //   1. gs://bucket/[namespace]
-  //   2. https://debuginfod.server.com
-  // Format (1) may be appended with "/debug" to hit the gcs_flat endpoint. If there is no format
-  // following the GCS bucket namespace, the "/buildid" debuginfod endpoint will be assumed.
+  // Construct a new symbol server. Expects a url of the format gs://bucket/[namespace]
   SymbolServerImpl(Session* session, const std::string& url, bool require_authentication);
 
-  // SymbolServer implementation.
   void DoAuthenticate(const std::map<std::string, std::string>& data,
                       fit::callback<void(const Err&)> cb) override;
   void CheckFetch(const std::string& build_id, DebugSymbolFileType file_type,
@@ -40,12 +35,7 @@ class SymbolServerImpl : public SymbolServer {
 
   void OnAuthenticationResponse(Curl::Error result, fit::callback<void(const Err&)> cb,
                                 const std::string& response);
-
-  // This is the base URL to the server, including a trailing '/'. Depending on the server we're
-  // talking to, some processing may be applied to the URL given to the constructor to hit the
-  // correct endpoint.
-  std::string base_url_;
-
+  std::string path_;
   fxl::WeakPtrFactory<SymbolServerImpl> weak_factory_;
 };
 
